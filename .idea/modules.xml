@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/firebase_auth/firebase_auth.iml" filepath="$PROJECT_DIR$/firebase_auth/firebase_auth.iml" />
+      <module fileurl="file://$PROJECT_DIR$/firebase_common/firebase_common.iml" filepath="$PROJECT_DIR$/firebase_common/firebase_common.iml" />
+      <module fileurl="file://$PROJECT_DIR$/firebase_firestore/firebase_firestore.iml" filepath="$PROJECT_DIR$/firebase_firestore/firebase_firestore.iml" />
+      <module fileurl="file://$PROJECT_DIR$/protolite_well_known_types/protolite_well_known_types.iml" filepath="$PROJECT_DIR$/protolite_well_known_types/protolite_well_known_types.iml" />
+    </modules>
+  </component>
+</project>
