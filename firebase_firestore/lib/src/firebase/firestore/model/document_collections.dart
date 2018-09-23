@@ -2,8 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'dart:collection';
-
+import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
@@ -12,17 +11,20 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 /// Provides static helpers around document collections.
 class DocumentCollections {
   /** Returns an empty, immutable document map */
-  static SplayTreeMap<DocumentKey, Document> emptyDocumentMap() {
-    return SplayTreeMap<DocumentKey, Document>();
+  static ImmutableSortedMap<DocumentKey, Document> emptyDocumentMap() {
+    return ImmutableSortedMap.emptyMap(DocumentKey.comparator);
   }
 
   /** Returns an empty, immutable "maybe" document map */
-  static SplayTreeMap<DocumentKey, MaybeDocument> emptyMaybeDocumentMap() {
-    return SplayTreeMap<DocumentKey, MaybeDocument>();
+  static ImmutableSortedMap<DocumentKey, MaybeDocument>
+      emptyMaybeDocumentMap() {
+    return ImmutableSortedMap.emptyMap<DocumentKey, MaybeDocument>(
+        DocumentKey.comparator);
   }
 
   /** Returns an empty, immutable versions map */
-  static SplayTreeMap<DocumentKey, SnapshotVersion> emptyVersionMap() {
-    return SplayTreeMap<DocumentKey, SnapshotVersion>();
+  static ImmutableSortedMap<DocumentKey, SnapshotVersion> emptyVersionMap() {
+    return ImmutableSortedMap.emptyMap<DocumentKey, SnapshotVersion>(
+        DocumentKey.comparator);
   }
 }

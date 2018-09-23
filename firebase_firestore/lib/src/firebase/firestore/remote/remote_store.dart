@@ -2,8 +2,7 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
-import 'dart:collection';
-
+import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
@@ -45,5 +44,5 @@ abstract class RemoteStoreCallback {
   /// the last snapshot.
   ///
   /// * Returns an empty set of document keys for unknown targets.
-  SplayTreeSet<DocumentKey> getRemoteKeysForTarget(int targetId);
+  ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId);
 }

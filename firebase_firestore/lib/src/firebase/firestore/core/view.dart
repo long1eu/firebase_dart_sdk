@@ -2,8 +2,7 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
-import 'dart:collection';
-
+import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/limbo_document_change.dart';
@@ -36,15 +35,15 @@ class View {
 
   /// The set of documents that the server has told us belongs to the target associated with
   /// this view.
-  SplayTreeSet<DocumentKey> syncedDocuments;
+  ImmutableSortedSet<DocumentKey> syncedDocuments;
 
   /// Documents in the view but not in the remote target
-  SplayTreeSet<DocumentKey> limboDocuments;
+  ImmutableSortedSet<DocumentKey> limboDocuments;
 
   /// Documents that have local changes
-  SplayTreeSet<DocumentKey> mutatedKeys;
+  ImmutableSortedSet<DocumentKey> mutatedKeys;
 
-  View(this.query, SplayTreeSet<DocumentKey> remoteDocuments) {
+  View(this.query, ImmutableSortedSet<DocumentKey> remoteDocuments) {
     syncState = ViewSnapshotSyncState.none;
     documentSet = DocumentSet.emptySet(query.comparator);
     syncedDocuments = remoteDocuments;
@@ -61,7 +60,7 @@ class View {
   /// of docs and changes instead of the current view.
   /// Returns a new set of docs, changes, and refill flag.
   DocumentChanges computeDocChanges<D extends MaybeDocument>(
-      SplayTreeMap<DocumentKey, D> docChanges,
+      ImmutableSortedMap<DocumentKey, D> docChanges,
       [DocumentChanges previousChanges]) {
     final DocumentViewChangeSet changeSet = previousChanges != null
         ? previousChanges.changeSet
@@ -69,7 +68,7 @@ class View {
     final DocumentSet oldDocumentSet = previousChanges != null //
         ? previousChanges.documentSet
         : documentSet;
-    SplayTreeSet<DocumentKey> newMutatedKeys = previousChanges != null //
+    ImmutableSortedSet<DocumentKey> newMutatedKeys = previousChanges != null //
         ? previousChanges.mutatedKeys
         : mutatedKeys;
 
@@ -90,7 +89,7 @@ class View {
             ? oldDocumentSet.last
             : null;
 
-    for (MapEntry<DocumentKey, MaybeDocument> entry in docChanges.entries) {
+    for (MapEntry<DocumentKey, MaybeDocument> entry in docChanges) {
       final DocumentKey key = entry.key;
       final Document oldDoc = oldDocumentSet.getDocument(key);
       Document newDoc = null;
@@ -111,14 +110,13 @@ class View {
       if (newDoc != null) {
         newDocumentSet = newDocumentSet.add(newDoc);
         if (newDoc.hasLocalMutations) {
-          newMutatedKeys.add(newDoc.key);
+          newMutatedKeys = newMutatedKeys.insert(newDoc.key);
         } else {
-          newMutatedKeys.remove(newDoc.key);
+          newMutatedKeys = newMutatedKeys.remove(newDoc.key);
         }
-        newMutatedKeys = SplayTreeSet.from(newMutatedKeys);
       } else {
         newDocumentSet = newDocumentSet.remove(key);
-        newMutatedKeys = SplayTreeSet.from(newMutatedKeys..remove(key));
+        newMutatedKeys = newMutatedKeys.remove(key);
       }
       // Calculate change
       if (oldDoc != null && newDoc != null) {
@@ -250,15 +248,14 @@ class View {
   void applyTargetChange(TargetChange targetChange) {
     if (targetChange != null) {
       for (DocumentKey documentKey in targetChange.addedDocuments) {
-        syncedDocuments = SplayTreeSet.from(syncedDocuments..add(documentKey));
+        syncedDocuments = syncedDocuments.insert(documentKey);
       }
       for (DocumentKey documentKey in targetChange.modifiedDocuments) {
         Assert.hardAssert(syncedDocuments.contains(documentKey),
             'Modified document $documentKey not found in view.');
       }
       for (DocumentKey documentKey in targetChange.removedDocuments) {
-        syncedDocuments =
-            SplayTreeSet.from(syncedDocuments..remove(documentKey));
+        syncedDocuments = syncedDocuments.remove(documentKey);
       }
       current = targetChange.current;
     }
@@ -272,11 +269,11 @@ class View {
 
     // TODO: Do this incrementally so that it's not quadratic when updating many
     // documents.
-    SplayTreeSet<DocumentKey> oldLimboDocs = limboDocuments;
+    ImmutableSortedSet<DocumentKey> oldLimboDocs = limboDocuments;
     limboDocuments = DocumentKey.emptyKeySet;
     for (Document doc in documentSet) {
       if (shouldBeLimboDoc(doc.key)) {
-        limboDocuments = SplayTreeSet.from(limboDocuments..add(doc.key));
+        limboDocuments = limboDocuments.insert(doc.key);
       }
     }
 
@@ -361,5 +358,5 @@ class DocumentChanges {
   /// local cache.
   final bool needsRefill;
 
-  final SplayTreeSet<DocumentKey> mutatedKeys;
+  final ImmutableSortedSet<DocumentKey> mutatedKeys;
 }

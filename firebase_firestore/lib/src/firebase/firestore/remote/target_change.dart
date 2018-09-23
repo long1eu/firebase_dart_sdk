@@ -2,9 +2,8 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
-import 'dart:collection';
-
 import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 
 /// A [TargetChange] specifies the set of changes for a specific target as part
@@ -26,15 +25,15 @@ class TargetChange {
 
   /// Returns the set of documents that were newly assigned to this target as
   /// part of this remote event.
-  final SplayTreeSet<DocumentKey> addedDocuments;
+  final ImmutableSortedSet<DocumentKey> addedDocuments;
 
   /// Returns the set of documents that were already assigned to this target but
   /// received an update during this remote event.
-  final SplayTreeSet<DocumentKey> modifiedDocuments;
+  final ImmutableSortedSet<DocumentKey> modifiedDocuments;
 
   /// Returns the set of documents that were removed from this target as part of
   /// this remote event.
-  final SplayTreeSet<DocumentKey> removedDocuments;
+  final ImmutableSortedSet<DocumentKey> removedDocuments;
 
   const TargetChange(
     this.resumeToken,

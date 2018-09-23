@@ -2,8 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'dart:collection';
-
+import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value_options.dart';
@@ -11,39 +10,56 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 class ObjectValue extends FieldValue {
-  final SplayTreeMap<String, FieldValue> _value;
-
-  static final ObjectValue empty =
-      ObjectValue(SplayTreeMap<String, FieldValue>());
+  final ImmutableSortedMap<String, FieldValue> _value;
 
   const ObjectValue(this._value);
 
+  static final ObjectValue empty = ObjectValue(
+      ImmutableSortedMap.emptyMap<String, FieldValue>(Util.comparator()));
+
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
-    return ObjectValue(SplayTreeMap.from(value));
+    return ObjectValue.fromImmutableMap(
+        ImmutableSortedMap.fromMap(value, Util.comparator()));
+  }
+
+  factory ObjectValue.fromImmutableMap(
+      ImmutableSortedMap<String, FieldValue> value) {
+    if (value.isEmpty) {
+      return empty;
+    } else {
+      return new ObjectValue(value);
+    }
   }
 
   @override
   int get typeOrder => FieldValue.typeOrderObject;
 
   @override
-  Map<String, Object> get value => _value.map((String key, FieldValue value) =>
-      MapEntry<String, Object>(key, value.value));
+  Map<String, Object> get value {
+    Map<String, Object> res = <String, Object>{};
+    for (MapEntry<String, FieldValue> entry in _value) {
+      res[entry.key] = entry.value.value;
+    }
+    return res;
+  }
 
-  Map<String, FieldValue> get internalValue => _value;
+  ImmutableSortedMap<String, FieldValue> get internalValue => _value;
 
   @override
   Map<String, Object> valueWith(FieldValueOptions options) {
-    return _value.map((String key, FieldValue value) =>
-        MapEntry<String, Object>(key, value.valueWith(options)));
+    Map<String, Object> res = <String, Object>{};
+    for (MapEntry<String, FieldValue> entry in _value) {
+      res[entry.key] = entry.value.valueWith(options);
+    }
+    return res;
   }
 
   @override
   int compareTo(FieldValue other) {
     if (other is ObjectValue) {
-      final Iterator<MapEntry<String, FieldValue>> iterator1 =
-          _value.entries.iterator;
+      final Iterator<MapEntry<String, FieldValue>> iterator1 = _value.iterator;
       final Iterator<MapEntry<String, FieldValue>> iterator2 =
-          other._value.entries.iterator;
+          other._value.iterator;
       while (iterator1.moveNext() && iterator2.moveNext()) {
         final MapEntry<String, FieldValue> entry1 = iterator1.current;
         final MapEntry<String, FieldValue> entry2 = iterator2.current;
@@ -98,7 +114,7 @@ class ObjectValue extends FieldValue {
 
     final String childName = path.first;
     if (path.length == 1) {
-      return ObjectValue(_value..remove(childName));
+      return ObjectValue.fromImmutableMap(_value.remove(childName));
     } else {
       final FieldValue child = _value[childName];
       if (child is ObjectValue) {
@@ -127,7 +143,7 @@ class ObjectValue extends FieldValue {
   }
 
   ObjectValue _setChild(String childName, FieldValue value) {
-    return ObjectValue(_value..addEntries([MapEntry(childName, value)]));
+    return ObjectValue.fromImmutableMap(_value.insert(childName, value));
   }
 
   @override

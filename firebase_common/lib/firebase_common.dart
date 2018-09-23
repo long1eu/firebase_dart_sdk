@@ -9,5 +9,6 @@ export 'src/errors/firebase_error.dart';
 export 'src/internal/internal_token_provider.dart';
 export 'src/internal/internal_token_result.dart';
 export 'src/internal/internal_token_result.dart';
+export 'src/util/log.dart';
 export 'src/util/preconditions.dart';
 export 'src/util/to_string_helper.dart';

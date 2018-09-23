@@ -7,12 +7,12 @@ import 'package:firebase_database_collection/src/immutable_sorted_map.dart';
 class ImmutableSortedSet<T> extends Iterable<T> {
   final ImmutableSortedMap<T, void> _map;
 
-  factory ImmutableSortedSet(List<T> elems, Comparator<T> comparator) {
+  factory ImmutableSortedSet([List<T> elems, Comparator<T> comparator]) {
     return ImmutableSortedSet._(ImmutableSortedMap.buildFrom(
-      elems,
+      elems ?? <T>[],
       <T, void>{},
       ImmutableSortedMap.identityTranslator(),
-      comparator,
+      comparator ?? (a, b) => (a as dynamic).compareTo(b),
     ));
   }
 

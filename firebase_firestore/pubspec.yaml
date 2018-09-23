@@ -8,13 +8,20 @@ environment:
   sdk: '>=2.0.0 <3.0.0'
 
 dependencies:
+  flutter:
+    sdk: flutter
   firebase_common:
     path: ../firebase_common
   firebase_auth:
     path: ../firebase_auth
+  firebase_database_collection:
+    path: ../firebase_database_collection
+
   quiver: '>=2.0.0 <3.0.0'
   protobuf: ^0.10.2
   grpc: ^0.6.4
+  isolate: ^2.0.2
+  sqflite: any
 
 dev_dependencies:
   test: ^1.0.0

@@ -6,6 +6,7 @@
       <w>growable</w>
       <w>initializers</w>
       <w>memoized</w>
+      <w>subcollections</w>
     </words>
   </dictionary>
 </component>

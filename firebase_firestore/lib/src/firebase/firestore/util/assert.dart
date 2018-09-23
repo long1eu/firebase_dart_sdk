@@ -19,4 +19,25 @@ class Assert {
   static AssertionError fail(String message, [Error cause]) {
     throw AssertionError('$message ${cause != null ? 'cause: $cause' : ''}');
   }
+
+  static T checkNotNull<T>(T reference, [Object errorMessage]) {
+    if (reference == null) {
+      throw new ArgumentError.notNull(errorMessage);
+    }
+    return reference;
+  }
+
+  /**
+   * Ensures the truth of an expression involving one or more parameters to the calling method.
+   *
+   * @param expression a boolean expression
+   * @param errorMessage the exception message to use if the check fails; will be converted to a
+   *     string using {@link String#valueOf(Object)}
+   * @throws IllegalArgumentException if {@code expression} is false
+   */
+  static void checkArgument(bool expression, Object errorMessage) {
+    if (!expression) {
+      throw new ArgumentError(errorMessage);
+    }
+  }
 }

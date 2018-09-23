@@ -32,4 +32,8 @@ class Util {
     return new FirebaseFirestoreError(
         error.message, FirebaseFirestoreErrorCode.values[error.code]);
   }
+
+  static Comparator<T> comparator<T extends Comparable<T>>() {
+    return (T a, T b) => a.compareTo(b);
+  }
 }

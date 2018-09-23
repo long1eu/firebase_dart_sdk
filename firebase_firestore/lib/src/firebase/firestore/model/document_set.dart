@@ -2,8 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'dart:collection';
-
+import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_collections.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 
@@ -12,8 +11,8 @@ import 'document.dart';
 /// An immutable set of documents (unique by key) ordered by the given
 /// comparator or ordered by key by default if no document is present.
 class DocumentSet extends Iterable<Document> {
-  final SplayTreeMap<DocumentKey, Document> _keyIndex;
-  final SplayTreeSet<Document> _sortedSet;
+  final ImmutableSortedMap<DocumentKey, Document> _keyIndex;
+  final ImmutableSortedSet<Document> _sortedSet;
 
   const DocumentSet._(this._keyIndex, this._sortedSet);
 
@@ -31,7 +30,7 @@ class DocumentSet extends Iterable<Document> {
 
     return new DocumentSet._(
       DocumentCollections.emptyDocumentMap(),
-      SplayTreeSet<Document>(adjustedComparator),
+      ImmutableSortedSet<Document>(<Document>[], adjustedComparator),
     );
   }
 
@@ -55,12 +54,12 @@ class DocumentSet extends Iterable<Document> {
   /// Returns the first document in the set according to the set's ordering, or
   /// null if the set is empty.
   @override
-  Document get first => isNotEmpty ? _sortedSet.first : null;
+  Document get first => _sortedSet.minEntry;
 
   /// Returns the last document in the set according to the set's ordering, or
   /// null if the set is empty.
   @override
-  Document get last => isNotEmpty ? _sortedSet.last : null;
+  Document get last => _sortedSet.maxEntry;
 
   /// Returns the document previous to the document associated with the given
   /// key in the set according to the set's ordering. Returns null if the
@@ -68,12 +67,11 @@ class DocumentSet extends Iterable<Document> {
   ///
   /// Throws ArgumentError if the set does not contain the key
   Document getPredecessor(DocumentKey key) {
-    if (!_keyIndex.containsKey(key)) {
+    final Document document = _keyIndex[key];
+    if (document == null) {
       throw new ArgumentError("Key not contained in DocumentSet: $key");
     }
-
-    key = _keyIndex.lastKeyBefore(key);
-    return _keyIndex[key];
+    return _sortedSet.getPredecessorEntry(document);
   }
 
   /// Returns the index of the provided key in the document set, or -1 if the
@@ -84,7 +82,7 @@ class DocumentSet extends Iterable<Document> {
       return -1;
     }
 
-    return _keyIndex.keys.toList(growable: false).indexOf(key);
+    return _sortedSet.indexOf(document);
   }
 
   /// Returns a new DocumentSet that contains the given document, replacing any
@@ -94,13 +92,11 @@ class DocumentSet extends Iterable<Document> {
     // sortedSet from accumulating values that aren't in the index.
     DocumentSet removed = remove(document.key);
 
-    removed._keyIndex[document.key] = document;
-    removed._sortedSet.add(document);
-
-    return DocumentSet._(
-      SplayTreeMap.from<DocumentKey, Document>(removed._keyIndex),
-      SplayTreeSet.from(removed._sortedSet),
-    );
+    ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
+        removed._keyIndex.insert(document.key, document);
+    ImmutableSortedSet<Document> newSortedSet =
+        removed._sortedSet.insert(document);
+    return new DocumentSet._(newKeyIndex, newSortedSet);
   }
 
   /// Returns a new DocumentSet with the document for the provided key removed.
@@ -113,24 +109,27 @@ class DocumentSet extends Iterable<Document> {
     _keyIndex.remove(key);
     _sortedSet.remove(document);
 
-    return DocumentSet._(
-      SplayTreeMap.from<DocumentKey, Document>(_keyIndex),
-      SplayTreeSet.from(_sortedSet),
-    );
+    ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
+        _keyIndex.remove(key);
+    ImmutableSortedSet<Document> newSortedSet = _sortedSet.remove(document);
+    return new DocumentSet._(newKeyIndex, newSortedSet);
   }
 
-  /**
-   * Returns a copy of the documents in this set as array. This is O(n) in the size of the set TODO:
-   * Consider making this backed by the set instead to achieve O(1)?
-   */
+  /// Returns a copy of the documents in this set as array. This is O(n) in the
+  /// size of the set.
+  // TODO:Consider making this backed by the set instead to achieve O(1)?
   @override
   List<Document> toList({bool growable: true}) {
-    return _sortedSet.toList(growable: growable);
+    List<Document> documents = List<Document>(length);
+    for (Document document in this) {
+      documents.add(document);
+    }
+    return documents;
   }
 
   @override
   bool operator ==(Object other) {
-    if (this == other) {
+    if (identical(this, other)) {
       return true;
     }
 

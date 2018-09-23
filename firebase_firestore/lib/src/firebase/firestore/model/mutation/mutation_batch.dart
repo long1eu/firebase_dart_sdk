@@ -22,7 +22,7 @@ class MutationBatch {
   ///
   /// * Batch ID values from the local store are non-negative so this value is
   /// before all batches.
-  static const int UNKNOWN = -1;
+  static const int unknown = -1;
 
   final int batchId;
 

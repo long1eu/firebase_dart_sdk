@@ -1,15 +1,19 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 17/09/2018
+import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:quiver/collection.dart';
 
 /// DocumentKey represents the location of a document in the Firestore database.
 class DocumentKey implements Comparable<DocumentKey> {
   static const String keyFieldName = '__name__';
 
-  static final Set<DocumentKey> emptyKeySet = TreeSet<DocumentKey>();
+  static final Comparator<DocumentKey> comparator =
+      (a, b) => a.path.compareTo(b.path);
+
+  static final ImmutableSortedSet<DocumentKey> emptyKeySet =
+      ImmutableSortedSet<DocumentKey>();
 
   /// Returns true iff the given path is a path to a document.
   static bool isDocumentKey(ResourcePath path) => path.length % 2 == 0;

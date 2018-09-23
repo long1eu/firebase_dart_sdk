@@ -2,18 +2,34 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
+import 'dart:async';
+
+import 'package:firebase_database_collection/firebase_database_collection.dart';
+import 'package:firebase_database_collection/src/immutable_sorted_set.dart';
 import 'package:firebase_firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
+import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/database_info.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/sync_engine.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/view.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/event_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:firebase_firestore/src/firebase/firestore/no_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/remote_state.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
 
 /**
@@ -21,7 +37,6 @@ import 'package:grpc/grpc.dart';
  * architecture.
  */
 class FirestoreClient implements RemoteStoreCallback {
-
   static const String logTag = "FirestoreClient";
 
   final DatabaseInfo databaseInfo;
@@ -34,45 +49,32 @@ class FirestoreClient implements RemoteStoreCallback {
   SyncEngine syncEngine;
   EventManager eventManager;
 
-  FirestoreClient(
-
-      DatabaseInfo databaseInfo,
-      final bool usePersistence,
-      CredentialsProvider credentialsProvider,
-      final AsyncQueue asyncQueue) {
-    this.databaseInfo = databaseInfo;
-    this.credentialsProvider = credentialsProvider;
-    this.asyncQueue = asyncQueue;
-
-    TaskCompletionSource<User> firstUser = new TaskCompletionSource<>();
-    final AtomicBoolean initialized = new AtomicBoolean(false);
-    credentialsProvider.setChangeListener(
-        (User user) -> {
-          if (initialized.compareAndSet(false, true)) {
-            hardAssert(!firstUser.getTask().isComplete(), "Already fulfilled first user task");
-            firstUser.setResult(user);
-          } else {
-            asyncQueue.enqueueAndForget(
-                () -> {
-                  Logger.debug(LOG_TAG, "Credential changed. Current user: %s", user.getUid());
-                  syncEngine.handleCredentialChange(user);
-                });
-          }
+  FirestoreClient(this.databaseInfo, final bool usePersistence,
+      this.credentialsProvider, this.asyncQueue) {
+    Completer<User> firstUser = new Completer<User>();
+    bool initialized = false;
+    credentialsProvider.setChangeListener((User user) {
+      if (initialized == false) {
+        initialized = true;
+        Assert.hardAssert(
+            !firstUser.isCompleted, "Already fulfilled first user task");
+        firstUser.complete(user);
+      } else {
+        asyncQueue.enqueueAndForget(() {
+          Log.d(logTag, "Credential changed. Current user: ${user.uid}");
+          syncEngine.handleCredentialChange(user);
         });
+      }
+    });
 
     // Defer initialization until we get the current user from the changeListener. This is
     // guaranteed to be synchronously dispatched onto our worker queue, so we will be initialized
     // before any subsequently queued work runs.
-    asyncQueue.enqueueAndForget(
-        () -> {
-          try {
-            // Block on initial user being available
-            User initialUser = Tasks.await(firstUser.getTask());
-            initialize(context, initialUser, usePersistence);
-          } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-          }
-        });
+    asyncQueue.enqueueAndForget(() async {
+      // Block on initial user being available
+      User initialUser = await firstUser.future;
+      initialize(initialUser, usePersistence);
+    });
   }
 
   Future<void> disableNetwork() {
@@ -86,88 +88,86 @@ class FirestoreClient implements RemoteStoreCallback {
   /** Shuts down this client, cancels all writes / listeners, and releases all resources. */
   Future<void> shutdown() {
     credentialsProvider.removeChangeListener();
-    return asyncQueue.enqueue(
-        () {
-          remoteStore.shutdown();
-          persistence.shutdown();
-        });
+    return asyncQueue.enqueue(() {
+      remoteStore.shutdown();
+      persistence.shutdown();
+    });
   }
 
   /** Starts listening to a query. */
-  QueryListener listen(
-      Query query, ListenOptions options, EventListener<ViewSnapshot> listener) {
+  QueryListener listen(Query query, ListenOptions options,
+      EventListener<ViewSnapshot> listener) {
     QueryListener queryListener = new QueryListener(query, options, listener);
-    asyncQueue.enqueueAndForget(() => eventManager.addQueryListener(queryListener));
+    asyncQueue.enqueueAndForget(
+        () async => eventManager.addQueryListener(queryListener));
     return queryListener;
   }
 
   /** Stops listening to a query previously listened to. */
   void stopListening(QueryListener listener) {
-    asyncQueue.enqueueAndForget(() => eventManager.removeQueryListener(listener));
+    asyncQueue.enqueueAndForget(
+        () async => eventManager.removeQueryListener(listener));
   }
 
   Future<Document> getDocumentFromLocalCache(DocumentKey docKey) {
     return asyncQueue
         .enqueue(() => localStore.readDocument(docKey))
-        .continueWith(
-            (result) {
-              MaybeDocument maybeDoc = result.getResult();
+        .then((result) {
+      MaybeDocument maybeDoc = result;
 
-              if (maybeDoc is Document) {
-                return  maybeDoc ;
-              } else if (maybeDoc is NoDocument) {
-                return null;
-              } else {
-                throw new FirebaseFirestoreError(
-                    "Failed to get document from cache. (However, this document may exist on the "
-                        "server. Run again without setting source to CACHE to attempt "
-                         "to retrieve the document from the server.)", FirebaseFirestoreErrorCode.unavailable);
-              }
-            });
+      if (maybeDoc is Document) {
+        return maybeDoc;
+      } else if (maybeDoc is NoDocument) {
+        return null;
+      } else {
+        throw new FirebaseFirestoreError(
+            'Failed to get document from cache. (However, this document may '
+            'exist on the server. Run again without setting source to CACHE to '
+            'attempt to retrieve the document from the server.)',
+            FirebaseFirestoreErrorCode.unavailable);
+      }
+    });
   }
 
   Future<ViewSnapshot> getDocumentsFromLocalCache(Query query) {
-    return asyncQueue.enqueue(
-        ()  {
-          ImmutableSortedMap<DocumentKey, Document> docs = localStore.executeQuery(query);
+    return asyncQueue.enqueue(() async {
+      ImmutableSortedMap<DocumentKey, Document> docs =
+          localStore.executeQuery(query);
 
-          View view =
-              new View(
-                  query,
-                  new ImmutableSortedSet<DocumentKey>(
-                      Collections.emptyList(), DocumentKey::compareTo));
-          View.DocumentChanges viewDocChanges = view.computeDocChanges(docs);
-          return view.applyChanges(viewDocChanges).getSnapshot();
-        });
+      View view = new View(query, new ImmutableSortedSet<DocumentKey>());
+      DocumentChanges viewDocChanges = view.computeDocChanges(docs);
+      return view.applyChanges(viewDocChanges).snapshot;
+    });
   }
 
   /** Writes mutations. The returned task will be notified when it's written to the backend. */
-  public Future<void> write(final List<Mutation> mutations) {
-    final TaskCompletionSource<Void> source = new TaskCompletionSource<>();
-    asyncQueue.enqueueAndForget(() -> syncEngine.writeMutations(mutations, source));
+  Future<void> write(final List<Mutation> mutations) {
+    final Completer<void> source = Completer<void>();
+    asyncQueue
+        .enqueueAndForget(() => syncEngine.writeMutations(mutations, source));
     return source.getTask();
   }
 
   /** Tries to execute the transaction in updateFunction up to retries times. */
-  public <TResult> Future<TResult> transaction(
-      Function<Transaction, Future<TResult>> updateFunction, int retries) {
-    return AsyncQueue.callTask(
-        asyncQueue.getExecutor(),
-        () -> syncEngine.transaction(asyncQueue, updateFunction, retries));
+  Future<TResult> transaction<TResult>(
+      /*void Function<Transaction, Future<TResult>>*/ dynamic updateFunction,
+      int retries) {
+    return AsyncQueue.callTask(asyncQueue.getExecutor(),
+        () => syncEngine.transaction(asyncQueue, updateFunction, retries));
   }
 
-  private void initialize(Context context, User user, bool usePersistence) {
+  //p
+  void initialize(User user, bool usePersistence) {
     // Note: The initialization work must all be synchronous (we can't dispatch more work) since
     // external write/listen operations could get queued to run before that subsequent work
     // completes.
-    Logger.debug(LOG_TAG, "Initializing. user=%s", user.getUid());
+    Log.d(logTag, "Initializing. user=${user.uid}");
 
     if (usePersistence) {
       LocalSerializer serializer =
-          new LocalSerializer(new RemoteSerializer(databaseInfo.getDatabaseId()));
-      persistence =
-          new SQLitePersistence(
-              context, databaseInfo.getPersistenceKey(), databaseInfo.getDatabaseId(), serializer);
+          new LocalSerializer(new RemoteSerializer(databaseInfo.databaseId));
+      persistence = new SQLitePersistence(context, databaseInfo.persistenceKey,
+          databaseInfo.databaseId, serializer);
     } else {
       persistence = MemoryPersistence.createEagerGcMemoryPersistence();
     }
@@ -175,7 +175,8 @@ class FirestoreClient implements RemoteStoreCallback {
     persistence.start();
     localStore = new LocalStore(persistence, user);
 
-    Datastore datastore = new Datastore(databaseInfo, asyncQueue, credentialsProvider);
+    Datastore datastore =
+        new Datastore(databaseInfo, asyncQueue, credentialsProvider);
     remoteStore = new RemoteStore(this, localStore, datastore, asyncQueue);
 
     syncEngine = new SyncEngine(localStore, remoteStore, user);
@@ -187,34 +188,34 @@ class FirestoreClient implements RemoteStoreCallback {
     remoteStore.start();
   }
 
-  @Override
-  public void handleRemoteEvent(RemoteEvent remoteEvent) {
+  @override
+  void handleRemoteEvent(RemoteEvent remoteEvent) {
     syncEngine.handleRemoteEvent(remoteEvent);
   }
 
-  @Override
-  public void handleRejectedListen(int targetId, Status error) {
+  @override
+  void handleRejectedListen(int targetId, GrpcError error) {
     syncEngine.handleRejectedListen(targetId, error);
   }
 
-  @Override
-  public void handleSuccessfulWrite(MutationBatchResult mutationBatchResult) {
+  @override
+  void handleSuccessfulWrite(MutationBatchResult mutationBatchResult) {
     syncEngine.handleSuccessfulWrite(mutationBatchResult);
   }
 
-  @Override
-  public void handleRejectedWrite(int batchId, Status error) {
+  @override
+  void handleRejectedWrite(int batchId, GrpcError error) {
     syncEngine.handleRejectedWrite(batchId, error);
   }
 
-  @Override
-  public void handleOnlineStateChange(OnlineState onlineState) {
+  @override
+  void handleOnlineStateChange(OnlineState onlineState) {
     syncEngine.handleOnlineStateChange(onlineState);
     eventManager.handleOnlineStateChange(onlineState);
   }
 
-  @Override
-  public ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId) {
+  @override
+  ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId) {
     return syncEngine.getRemoteKeysForTarget(targetId);
   }
 }
