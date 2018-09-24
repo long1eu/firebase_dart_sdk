@@ -19,7 +19,7 @@ class StringValue extends FieldValue {
   int get typeOrder => FieldValue.typeOrderString;
 
   @override
-  Object get value => _value;
+  String get value => _value;
 
   @override
   int compareTo(FieldValue other) {

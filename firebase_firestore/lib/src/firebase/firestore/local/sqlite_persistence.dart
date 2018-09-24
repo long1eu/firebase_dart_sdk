@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_lru_reference_delegate.dart';

@@ -6,6 +6,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
+import 'package:fixnum/fixnum.dart';
 
 /// An immutable set of metadata that the store will need to keep track of for
 /// each query.

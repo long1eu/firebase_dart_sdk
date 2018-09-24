@@ -15,6 +15,16 @@ class OrderByDirection {
 
   static const OrderByDirection ascending = OrderByDirection._(1);
   static const OrderByDirection descending = OrderByDirection._(-1);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrderByDirection &&
+          runtimeType == other.runtimeType &&
+          _comparisonModifier == other._comparisonModifier;
+
+  @override
+  int get hashCode => _comparisonModifier.hashCode;
 }
 
 /// Represents a sort order for a Firestore Query

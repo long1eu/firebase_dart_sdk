@@ -53,8 +53,8 @@ abstract class ArrayTransformOperation implements TransformOperation {
 }
 
 /** An array union transform operation. */
-class Union extends ArrayTransformOperation {
-  Union(List<FieldValue> elements) : super(elements);
+class ArrayTransformOperationUnion extends ArrayTransformOperation {
+  ArrayTransformOperationUnion(List<FieldValue> elements) : super(elements);
 
   @override
   ArrayValue apply(FieldValue previousValue) {
@@ -70,8 +70,8 @@ class Union extends ArrayTransformOperation {
 }
 
 /** An array remove transform operation. */
-class Remove extends ArrayTransformOperation {
-  Remove(List<FieldValue> elements) : super(elements);
+class ArrayTransformOperationRemove extends ArrayTransformOperation {
+  ArrayTransformOperationRemove(List<FieldValue> elements) : super(elements);
 
   @override
   ArrayValue apply(FieldValue previousValue) {

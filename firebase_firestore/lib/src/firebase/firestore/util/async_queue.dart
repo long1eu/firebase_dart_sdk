@@ -6,7 +6,7 @@ import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/core/version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:isolate/isolate.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/executor.dart';
 import 'package:meta/meta.dart';
 
 /// Well-known "timer" IDs used when scheduling delayed tasks on the AsyncQueue.
@@ -31,112 +31,37 @@ enum TimerId {
   ONLINE_STATE_TIMEOUT,
 }
 
-typedef Future<TResult> Task<TResult>();
+typedef Task<TResult> = Future<TResult> Function();
 
 /// A helper class that allows to schedule/queue [Function]s on a single
 /// threaded background queue. */
 class AsyncQueue {
-  /**
-   * The single thread that will be used by the executor. This is created early and managed directly
-   * so that it's possible later to make assertions about executing on the correct thread.
-   */
-  static IsolateRunner _thread;
-
-  /// Executes the given Callable on a specific executor and returns a Task that completes when the
-  /// Task returned from the Callable completes. Similar to Tasks.call, but takes a function that
-  /// returns a Task.
-  ///
-  /// @param executor The executor to run the task on.
-  /// @param task The Callable to execute.
-  /// @return A Task that will be completed when task's Task is complete.
+  /// Executes the given Callable on a specific executor and returns a Future
+  /// that completes when the Task returned.
   static Future<TResult> callTask<TResult>(
-      IsolateRunner executor, Task<TResult> task) {
+      Executor executor, Task<TResult> task) {
     Completer<TResult> tcs = Completer();
 
-    executor.run((_) {
+    executor.run(() async {
       try {
-        task()
-            .then((TResult r) => tcs.complete(r))
-            .catchError((e, s) => tcs.completeError(e, s));
+        final result = await task();
+        tcs.complete(result);
       } on Error catch (e) {
         tcs.completeError(e);
       } catch (t) {
         StateError e = StateError("Unhandled throwable in callTask. $t");
         tcs.completeError(e);
       }
-    }, '');
+    });
     return tcs.future;
   }
 
-  // Tasks scheduled to be queued in the future. Tasks are automatically removed after they are run
-  // or canceled.
-  // NOTE: We disallow duplicates currently, so this could be a Set<> which might have better
-  // theoretical removal speed, except this list will always be small so ArrayList is fine.
-  final List<DelayedTask> delayedTasks;
-
-  static Future<AsyncQueue> createQueue() async {
-    final List<DelayedTask> delayedTasks = List<DelayedTask>();
-    _thread ??= await () async {
-      final IsolateRunner runner = await IsolateRunner.spawn();
-      runner.errors.listen((dynamic e) => panic(e));
-      return runner;
-    }();
-
-    return AsyncQueue._(delayedTasks);
-  }
-
-  const AsyncQueue._(this.delayedTasks);
-
-  /// Queue and run this Callable task immediately after every other already
-  /// queued task.
-  Future<T> enqueue<T>(Task<T> task) {
-    return _thread.run(_enqueue, '');
-  }
-
-  static Future<T> _enqueue<T>(task) async {
-    final Completer<T> completionSource = Completer<T>();
-    try {
-      final T result = await task();
-      completionSource.complete(result);
-    } catch (e) {
-      completionSource.completeError(e);
-      throw AssertionError(e);
-    }
-    return completionSource.future;
-  }
-
-  /// Queue and run this Runnable task immediately after every other already
-  /// queued task. Unlike [enqueue], returns void instead of a [Task] Object for
-  /// use when we have no need to "wait" on the task completing.
-  void enqueueAndForget(Task task) => enqueue(task);
-
-  /// Schedule a task after the specified delay.
+  /// Immediately stops running any scheduled tasks and causes a "panic"
+  /// (through crashing the app).
   ///
-  /// * The returned [DelayedTask] can be used to cancel the task prior to its
-  /// running.
-  DelayedTask enqueueAfterDelay<T>(
-      TimerId timerId, Duration delay, Task<T> task) {
-    // While not necessarily harmful, we currently don't expect to have multiple tasks with the same
-    // timer id in the queue, so defensively reject them.
-    Assert.hardAssert(!containsDelayedTask(timerId),
-        "Attempted to schedule multiple operations with timer id $timerId.");
-
-    DelayedTask delayedTask =
-        createAndScheduleDelayedTask(timerId, delay, task);
-    delayedTasks.add(delayedTask);
-
-    return delayedTask;
-  }
-
-  /**
-   * Immediately stops running any scheduled tasks and causes a "panic" (through crashing the app).
-   *
-   * <p>Should only be used for unrecoverable exceptions.
-   *
-   * @param t The Throwable that is caused the panic.
-   */
+  /// * Should only be used for unrecoverable exceptions.
   static void panic(dynamic t) {
-    _thread.kill();
+    _thread.close();
 
     if (t is OutOfMemoryError) {
       // OOMs can happen if developers try to load too much data at once. Instead of treating
@@ -149,7 +74,55 @@ class AsyncQueue {
     }
   }
 
-  /** Determines if a delayed task with a particular timerId exists. */
+  /// The single thread that will be used by the executor. This is created early
+  /// and managed directly so that it's possible later to make assertions about
+  /// executing on the correct thread.
+  static Executor _thread;
+
+  // Tasks scheduled to be queued in the future. Tasks are automatically removed
+  // after they are run or canceled.
+  // NOTE: We disallow duplicates currently, so this could be a Set which might
+  // have better theoretical removal speed, except this list will always be
+  // small so List is fine.
+  final List<DelayedTask> delayedTasks;
+
+  static Future<AsyncQueue> createQueue() async {
+    final List<DelayedTask> delayedTasks = List<DelayedTask>();
+    _thread ??= await Executor.create((dynamic e) => panic(e));
+    return AsyncQueue._(delayedTasks);
+  }
+
+  const AsyncQueue._(this.delayedTasks);
+
+  /// Queue and run this task immediately after every other already queued task.
+  Future<T> enqueue<T>(Task<T> task) {
+    return _thread.run(task);
+  }
+
+  /// Queue and run this Runnable task immediately after every other already
+  /// queued task. Unlike [enqueue], returns void instead of a Future for
+  /// use when we have no need to "wait" on the task completing.
+  void enqueueAndForget(Task task) => enqueue(task);
+
+  /// Schedule a task after the specified delay.
+  ///
+  /// * The returned [DelayedTask] can be used to cancel the task prior to its
+  /// running.
+  DelayedTask enqueueAfterDelay<T>(
+      TimerId timerId, Duration delay, Task<T> task) {
+    // While not necessarily harmful, we currently don't expect to have multiple
+    // tasks with the same timer id in the queue, so defensively reject them.
+    Assert.hardAssert(!containsDelayedTask(timerId),
+        'Attempted to schedule multiple operations with timer id $timerId.');
+
+    DelayedTask delayedTask =
+        _createAndScheduleDelayedTask(timerId, delay, task);
+    delayedTasks.add(delayedTask);
+
+    return delayedTask;
+  }
+
+  /// Determines if a delayed task with a particular timerId exists. */
   @visibleForTesting
   bool containsDelayedTask(TimerId timerId) {
     for (DelayedTask delayedTask in delayedTasks) {
@@ -165,7 +138,7 @@ class AsyncQueue {
   /// scheduled using this TimerId will be run. Method throws if no matching
   /// task exists. Pass TimerId.ALL to run all delayed tasks.
   @visibleForTesting
-  void runDelayedTasksUntil(TimerId lastTimerId) {
+  Future<void> runDelayedTasksUntil(TimerId lastTimerId) async {
     Assert.hardAssert(
         lastTimerId == TimerId.ALL || containsDelayedTask(lastTimerId),
         'Attempted to run tasks until missing TimerId: $lastTimerId');
@@ -178,7 +151,7 @@ class AsyncQueue {
     // We copy the list before enumerating to avoid concurrent modification as
     // we remove tasks.
     for (DelayedTask delayedTask in delayedTasks.toList()) {
-      delayedTask.skipDelay();
+      await delayedTask.skipDelay();
       if (lastTimerId != TimerId.ALL && delayedTask.timerId == lastTimerId) {
         break;
       }
@@ -188,13 +161,13 @@ class AsyncQueue {
   /// Shuts down the AsyncQueue and releases resources after which no progress
   /// will ever be made again.
   void shutdown() {
-    _thread.kill();
+    _thread.close();
     _thread = null;
   }
 
   /// Creates and returns a DelayedTask that has been scheduled to be executed
   /// on the provided queue after the provided delay.
-  DelayedTask<T> createAndScheduleDelayedTask<T>(
+  DelayedTask<T> _createAndScheduleDelayedTask<T>(
       TimerId timerId, Duration delay, Task<T> task) {
     return DelayedTask._<T>(
         timerId, DateTime.now().add(delay), task, _removeDelayedTask)
@@ -238,7 +211,7 @@ class DelayedTask<T> implements Comparable<DelayedTask> {
 
   /// Runs the operation immediately (if it hasn't already been run or
   /// canceled).
-  void skipDelay() => handleDelayElapsed();
+  Future<T> skipDelay() => handleDelayElapsed();
 
   /// Cancels the task if it hasn't already been executed or canceled.
   ///
@@ -252,10 +225,10 @@ class DelayedTask<T> implements Comparable<DelayedTask> {
     }
   }
 
-  void handleDelayElapsed() {
+  Future<T> handleDelayElapsed() async {
     if (scheduledFuture != null) {
       markDone();
-      task();
+      await AsyncQueue._thread.run(task);
     }
   }
 

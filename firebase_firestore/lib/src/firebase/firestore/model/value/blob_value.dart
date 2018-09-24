@@ -17,7 +17,7 @@ class BlobValue extends FieldValue {
   int get typeOrder => FieldValue.typeOrderBlob;
 
   @override
-  Object get value => _value;
+  Blob get value => _value;
 
   @override
   int compareTo(FieldValue other) {

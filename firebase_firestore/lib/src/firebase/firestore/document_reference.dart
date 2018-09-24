@@ -221,7 +221,7 @@ class DocumentReference {
   Future<void> update(ParsedUpdateData parsedData) {
     return firestore
         .getClient()
-        .write(parsedData.toMutationList(key, Precondition.exists(true)))
+        .write(parsedData.toMutationList(key, Precondition.fromExists(true)))
         .continueWith(Executors.DIRECT_EXECUTOR, voidErrorTransformer());
   }
 

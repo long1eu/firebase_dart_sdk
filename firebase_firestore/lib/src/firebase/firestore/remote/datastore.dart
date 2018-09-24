@@ -10,6 +10,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:grpc/grpc.dart';

@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_database_collection/src/immutable_sorted_set.dart';
 import 'package:firebase_firestore/firebase_firestore.dart';
@@ -18,8 +19,10 @@ import 'package:firebase_firestore/src/firebase/firestore/core/view.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/event_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/local_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
@@ -67,13 +70,14 @@ class FirestoreClient implements RemoteStoreCallback {
       }
     });
 
+    // todo move this to a static method
     // Defer initialization until we get the current user from the changeListener. This is
     // guaranteed to be synchronously dispatched onto our worker queue, so we will be initialized
     // before any subsequently queued work runs.
     asyncQueue.enqueueAndForget(() async {
       // Block on initial user being available
       User initialUser = await firstUser.future;
-      initialize(initialUser, usePersistence);
+      await _initialize(initialUser, usePersistence);
     });
   }
 
@@ -140,12 +144,13 @@ class FirestoreClient implements RemoteStoreCallback {
     });
   }
 
-  /** Writes mutations. The returned task will be notified when it's written to the backend. */
+  /// Writes mutations. The returned Future will be notified when it's written
+  /// to the backend.
   Future<void> write(final List<Mutation> mutations) {
     final Completer<void> source = Completer<void>();
     asyncQueue
         .enqueueAndForget(() => syncEngine.writeMutations(mutations, source));
-    return source.getTask();
+    return source.future;
   }
 
   /** Tries to execute the transaction in updateFunction up to retries times. */
@@ -156,18 +161,21 @@ class FirestoreClient implements RemoteStoreCallback {
         () => syncEngine.transaction(asyncQueue, updateFunction, retries));
   }
 
-  //p
-  void initialize(User user, bool usePersistence) {
-    // Note: The initialization work must all be synchronous (we can't dispatch more work) since
-    // external write/listen operations could get queued to run before that subsequent work
-    // completes.
+  Future<void> _initialize(User user, bool usePersistence) async {
+    // Note: The initialization work must all be synchronous (we can't dispatch
+    // more work) since external write/listen operations could get queued to run
+    // before that subsequent work completes.
     Log.d(logTag, "Initializing. user=${user.uid}");
 
     if (usePersistence) {
       LocalSerializer serializer =
           new LocalSerializer(new RemoteSerializer(databaseInfo.databaseId));
-      persistence = new SQLitePersistence(context, databaseInfo.persistenceKey,
-          databaseInfo.databaseId, serializer);
+
+      persistence = await SQLitePersistence.create(
+        databaseInfo.persistenceKey,
+        databaseInfo.databaseId,
+        serializer,
+      );
     } else {
       persistence = MemoryPersistence.createEagerGcMemoryPersistence();
     }

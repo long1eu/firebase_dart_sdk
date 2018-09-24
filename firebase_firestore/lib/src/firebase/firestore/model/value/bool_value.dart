@@ -20,7 +20,7 @@ class BoolValue extends FieldValue {
 
   // Since we create shared instances for true / false, we can use reference equality.
   @override
-  Object get value => _value;
+  bool get value => _value;
 
   @override
   int compareTo(FieldValue other) {

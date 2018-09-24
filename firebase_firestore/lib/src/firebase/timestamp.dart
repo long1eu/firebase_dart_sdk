@@ -3,6 +3,7 @@
 // on 17/09/2018
 
 import 'package:firebase_common/firebase_common.dart';
+import 'package:fixnum/fixnum.dart';
 
 /// A Timestamp represents a point in time independent of any time zone or
 /// calendar, represented as seconds and fractions of seconds at nanosecond
@@ -16,16 +17,16 @@ import 'package:firebase_common/firebase_common.dart';
 ///
 /// see [The reference timestamp definition](https://github.com/google/protobuf/blob/master/src/google/protobuf/timestamp.proto)
 class Timestamp implements Comparable<Timestamp> {
-  final int seconds;
+  final Int64 seconds;
   final int nanoseconds;
 
   @publicApi
   const Timestamp(this.seconds, this.nanoseconds);
 
   factory Timestamp.fromDate(DateTime date) {
-    final int millis = date.millisecondsSinceEpoch;
-    int seconds = millis ~/ 1000;
-    int nanoseconds = (millis % 1000) * 1000000;
+    final Int64 millis = Int64(date.millisecondsSinceEpoch);
+    Int64 seconds = millis ~/ 1000;
+    int nanoseconds = ((millis % 1000) * 1000000).toInt();
     if (nanoseconds < 0) {
       seconds -= 1;
       nanoseconds += 1000000000;
@@ -42,7 +43,7 @@ class Timestamp implements Comparable<Timestamp> {
 
   DateTime toDate() {
     return DateTime.fromMillisecondsSinceEpoch(
-        seconds * 1000 + (nanoseconds ~/ 1000000));
+        (seconds * 1000 + (nanoseconds ~/ 1000000)).toInt());
   }
 
   @override
@@ -50,11 +51,11 @@ class Timestamp implements Comparable<Timestamp> {
     if (seconds == other.seconds) {
       return nanoseconds - other.nanoseconds;
     } else {
-      return seconds - other.seconds;
+      return seconds.compareTo(other.seconds);
     }
   }
 
-  static void validateRange(int seconds, int nanoseconds) {
+  static void validateRange(Int64 seconds, int nanoseconds) {
     Preconditions.checkArgument(
         nanoseconds >= 0, "Timestamp nanoseconds out of range: $nanoseconds");
     Preconditions.checkArgument(

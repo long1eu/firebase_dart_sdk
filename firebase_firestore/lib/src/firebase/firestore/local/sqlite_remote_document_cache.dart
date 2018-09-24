@@ -7,14 +7,17 @@ import 'dart:async';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart'
-    as sq;
+as sq;
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/proto/firestore/local/maybe_document.pb.dart'
+as proto;
 import 'package:protobuf/protobuf.dart';
 
 class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
@@ -30,7 +33,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     GeneratedMessage message = serializer.encodeMaybeDocument(maybeDocument);
 
     await db.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           INSERT
           OR REPLACE INTO remote_documents (path, contents)
@@ -45,7 +48,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     String path = _pathForKey(documentKey);
 
     await db.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           DELETE
           FROM remote_documents
@@ -60,7 +63,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     String path = _pathForKey(documentKey);
 
     final Map<String, dynamic> row = (await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT contents
           FROM remote_documents
@@ -74,7 +77,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query) async {
+  getAllDocumentsMatchingQuery(Query query) async {
     // Use the query path as a prefix for testing if a document matches the
     // query.
     ResourcePath prefix = query.path;
@@ -86,7 +89,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     Map<DocumentKey, Document> results = <DocumentKey, Document>{};
 
     final List<Map<String, dynamic>> result = await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT path, contents
           FROM remote_documents
@@ -108,7 +111,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       if (path.length != immediateChildrenPathLength) continue;
 
       final MaybeDocument maybeDoc =
-          decodeMaybeDocument(row['remote_documents']);
+      decodeMaybeDocument(row['remote_documents']);
       if (maybeDoc is! Document) continue;
 
       Document doc = maybeDoc;
@@ -127,8 +130,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   MaybeDocument decodeMaybeDocument(List<int> bytes) {
     try {
       return serializer
-          .decodeMaybeDocument(/*com.google.firebase.firestore.proto.*/
-              MaybeDocument.parseFrom(bytes));
+          .decodeMaybeDocument(proto.MaybeDocument.fromBuffer(bytes));
     } on InvalidProtocolBufferException catch (e) {
       throw Assert.fail("MaybeDocument failed to parse: $e");
     }

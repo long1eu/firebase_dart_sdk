@@ -326,12 +326,14 @@ class UserDataConverter {
     } else if (value is firestore.ArrayUnionFieldValue) {
       List<FieldValue> parsedElements =
           _parseArrayTransformElements(value.elements);
-      ArrayTransformOperation arrayUnion = Union(parsedElements);
+      ArrayTransformOperation arrayUnion =
+          ArrayTransformOperationUnion(parsedElements);
       context.fieldTransforms.add(new FieldTransform(context.path, arrayUnion));
     } else if (value is firestore.ArrayRemoveFieldValue) {
       List<FieldValue> parsedElements =
           _parseArrayTransformElements(value.elements);
-      ArrayTransformOperation arrayRemove = Remove(parsedElements);
+      ArrayTransformOperation arrayRemove =
+          ArrayTransformOperationRemove(parsedElements);
       context.fieldTransforms
           .add(new FieldTransform(context.path, arrayRemove));
     } else {

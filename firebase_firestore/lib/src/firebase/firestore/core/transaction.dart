@@ -84,7 +84,7 @@ class Transaction {
   Precondition precondition(DocumentKey key) {
     SnapshotVersion version = readVersions[key];
     if (version != null) {
-      return Precondition.updateTime(version);
+      return Precondition.fromUpdateTime(version);
     } else {
       return Precondition.none;
     }
@@ -102,10 +102,10 @@ class Transaction {
       throw new StateError("Can't update a document that doesn't exist.");
     } else if (version != null) {
       // Document exists, base precondition on document update time.
-      return Precondition.updateTime(version);
+      return Precondition.fromUpdateTime(version);
     } else {
       // Document was not read, so we just use the preconditions for a blind write.
-      return Precondition.exists(true);
+      return Precondition.fromExists(true);
     }
   }
 

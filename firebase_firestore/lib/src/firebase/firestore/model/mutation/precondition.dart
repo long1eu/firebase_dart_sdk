@@ -15,35 +15,35 @@ class Precondition {
   static final Precondition none = Precondition(null, null);
 
   /// If set, preconditions a mutation based on the last updateTime.
-  final SnapshotVersion _updateTime;
+  final SnapshotVersion updateTime;
 
   /// If set, preconditions a mutation based on whether the document exists.
-  final bool _exists;
+  final bool exists;
 
-  const Precondition(this._updateTime, this._exists)
-      : assert(_updateTime != null && _exists != null,
+  const Precondition(this.updateTime, this.exists)
+      : assert(updateTime != null && exists != null,
             'Precondition can specify "exists" or "updateTime" but not both');
 
   /// Creates a new Precondition with an exists flag.
-  factory Precondition.exists(bool exists) {
+  factory Precondition.fromExists(bool exists) {
     return Precondition(null, exists);
   }
 
   /// Creates a new Precondition based on a version a document exists at.
-  factory Precondition.updateTime(SnapshotVersion updateTime) {
+  factory Precondition.fromUpdateTime(SnapshotVersion updateTime) {
     return Precondition(updateTime, null);
   }
 
   /// Returns whether this Precondition is empty.
-  bool get isNone => _updateTime == null && _exists == null;
+  bool get isNone => updateTime == null && exists == null;
 
   /// Returns true if the preconditions is valid for the given document
   /// (or null if no document is available).
   bool isValidFor(MaybeDocument maybeDoc) {
-    if (this._updateTime != null) {
-      return maybeDoc is Document && maybeDoc.version == _updateTime;
-    } else if (_exists != null) {
-      if (_exists) {
+    if (this.updateTime != null) {
+      return maybeDoc is Document && maybeDoc.version == updateTime;
+    } else if (exists != null) {
+      if (exists) {
         return maybeDoc is Document;
       } else {
         return maybeDoc == null || maybeDoc is NoDocument;
@@ -59,20 +59,20 @@ class Precondition {
       identical(this, other) ||
       other is Precondition &&
           runtimeType == other.runtimeType &&
-          _updateTime == other._updateTime &&
-          _exists == other._exists;
+          updateTime == other.updateTime &&
+          exists == other.exists;
 
   @override
-  int get hashCode => _updateTime.hashCode ^ _exists.hashCode;
+  int get hashCode => updateTime.hashCode ^ exists.hashCode;
 
   @override
   String toString() {
     if (isNone) {
       return 'Precondition{<none>}';
-    } else if (_updateTime != null) {
-      return 'Precondition{updateTime: $_updateTime}';
-    } else if (_exists != null) {
-      return 'Precondition{exists: $_exists}';
+    } else if (updateTime != null) {
+      return 'Precondition{updateTime: $updateTime}';
+    } else if (exists != null) {
+      return 'Precondition{exists: $exists}';
     } else {
       throw Assert.fail('Invalid Precondition');
     }
