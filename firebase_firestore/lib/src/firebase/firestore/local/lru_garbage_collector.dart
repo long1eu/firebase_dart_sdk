@@ -29,21 +29,22 @@ class LruGarbageCollector {
     _RollingSequenceNumberBuffer buffer =
         new _RollingSequenceNumberBuffer(count);
     await delegate.forEachTarget(
-        (queryData) => buffer.addElement(queryData.sequenceNumber));
-    await delegate.forEachOrphanedDocumentSequenceNumber(buffer.addElement);
+        null, (queryData) => buffer.addElement(queryData.sequenceNumber));
+    await delegate.forEachOrphanedDocumentSequenceNumber(
+        null, (it) => buffer.addElement(it));
     return buffer.maxValue;
   }
 
   /// Removes targets with a sequence number equal to or less than the given
   /// upper bound, and removes document associations with those targets.
   Future<int> removeQueries(int upperBound, Set<int> liveQueries) {
-    return delegate.removeQueries(upperBound, liveQueries);
+    return delegate.removeQueries(null, upperBound, liveQueries);
   }
 
   /// Removes documents that have a sequence number equal to or less than the
   /// upper bound and are not otherwise pinned.
   Future<int> removeOrphanedDocuments(int upperBound) {
-    return delegate.removeOrphanedDocuments(upperBound);
+    return delegate.removeOrphanedDocuments(null, upperBound);
   }
 }
 

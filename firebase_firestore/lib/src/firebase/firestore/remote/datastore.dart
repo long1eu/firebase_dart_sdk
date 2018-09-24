@@ -6,37 +6,42 @@ import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/database_info.dart';
+import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel.dart';
+import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart';
+import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart';
 import 'package:grpc/grpc.dart';
-import 'package:meta/meta.dart';
 
-/**
- * Datastore represents a proxy for the remote server, hiding details of the RPC layer. It:
- *
- * <ul>
- *   <li>Manages connections to the server
- *   <li>Authenticates to the server
- *   <li>Manages threading and keeps higher-level code running on the worker queue
- *   <li>Serializes internal model objects to and from protocol buffers
- * </ul>
- *
- * <p>The Datastore is generally not responsible for understanding the higher-level protocol
- * involved in actually making changes or reading data, and is otherwise stateless.
- */
+/// Datastore represents a proxy for the remote server, hiding details of the
+/// RPC layer. It:
+///
+/// <ul>
+/// <li>Manages connections to the server
+/// <li>Authenticates to the server
+/// <li>Manages threading and keeps higher-level code running on the worker queue
+/// <li>Serializes internal model objects to and from protocol buffers
+/// </ul>
+///
+/// <p>The Datastore is generally not responsible for understanding the
+/// higher-level protocol involved in actually making changes or reading data,
+/// and is otherwise stateless.
 class Datastore {
-  /** Set of lowercase, white-listed headers for logging purposes. */
+  /// Set of lowercase, white-listed headers for logging purposes.
   static final Set<String> WHITE_LISTED_HEADERS = new Set<String>.from([
-    "date",
-    "x-google-backends",
-    "x-google-netmon-label",
-    "x-google-service",
-    "x-google-gfe-request-trace"
+    'date',
+    'x-google-backends',
+    'x-google-netmon-label',
+    'x-google-service',
+    'x-google-gfe-request-trace'
   ]);
 
   final DatabaseInfo databaseInfo;
@@ -44,130 +49,122 @@ class Datastore {
   final RemoteSerializer serializer;
   final FirestoreChannel channel;
 
-  static Supplier<ManagedChannelBuilder<dynamic>>
-      overrideChannelBuilderSupplier;
+  static Future<Datastore> create(DatabaseInfo databaseInfo,
+      AsyncQueue workerQueue, CredentialsProvider credentialsProvider,
+      {ClientChannel clientChannel}) async {
+    clientChannel ??= ClientChannel(databaseInfo.host,
+        options: ChannelOptions(
+            credentials: databaseInfo.sslEnabled
+                ? ChannelCredentials.secure()
+                : ChannelCredentials.insecure()));
 
-  /**
-   * Helper function to globally override the channel that RPCs use. Useful for testing when you
-   * want to bypass SSL certificate checking.
-   *
-   * @param channelBuilderSupplier The supplier for a channel builder that is used to create gRPC
-   *     channels.
-   */
-  @visibleForTesting
-  static void overrideChannelBuilder(
-      Supplier<ManagedChannelBuilder<dynamic>> channelBuilderSupplier) {
-    Datastore.overrideChannelBuilderSupplier = channelBuilderSupplier;
+    final FirestoreChannel channel = await FirestoreChannel.create(
+      credentialsProvider,
+      clientChannel,
+      databaseInfo.databaseId,
+    );
+
+    final RemoteSerializer serializer =
+        RemoteSerializer(databaseInfo.databaseId);
+
+    return Datastore._(databaseInfo, workerQueue, serializer, channel);
   }
 
-  Datastore(DatabaseInfo databaseInfo, AsyncQueue workerQueue,
-      CredentialsProvider credentialsProvider) {
-    this.databaseInfo = databaseInfo;
-    this.workerQueue = workerQueue;
-    this.serializer = new RemoteSerializer(databaseInfo.databaseId);
+  Datastore._(
+      this.databaseInfo, this.workerQueue, this.serializer, this.channel);
 
-    ManagedChannelBuilder<dynamic> channelBuilder;
-    if (overrideChannelBuilderSupplier != null) {
-      channelBuilder = overrideChannelBuilderSupplier();
-    } else {
-      channelBuilder = ManagedChannelBuilder.forTarget(databaseInfo.host);
-      if (!databaseInfo.isSslEnabled()) {
-        // Note that the boolean flag does *NOT* indicate whether or not plaintext should be used
-        channelBuilder.usePlaintext();
-      }
-    }
-
-    // This ensures all callbacks are issued on the worker queue. If this call is removed,
-    // all calls need to be audited to make sure they are executed on the right thread.
-    channelBuilder.executor(workerQueue.getExecutor());
-
-    channel = new FirestoreChannel(workerQueue, credentialsProvider,
-        channelBuilder.build(), databaseInfo.databaseId);
-  }
-
-  /** Creates a new WatchStream that is still unstarted but uses a common shared channel */
-  WatchStream createWatchStream(WatchStream.Callback listener) {
+  /// Creates a new [WatchStream] that is still unstarted but uses a common
+  /// shared channel
+  WatchStream createWatchStream(WatchStreamCallback listener) {
     return new WatchStream(channel, workerQueue, serializer, listener);
   }
 
-  /** Creates a new WriteStream that is still unstarted but uses a common shared channel */
-  WriteStream createWriteStream(WriteStream.Callback listener) {
+  /// Creates a new [WriteStream] that is still unstarted but uses a common
+  /// shared channel
+  WriteStream createWriteStream(WriteStreamCallback listener) {
     return new WriteStream(channel, workerQueue, serializer, listener);
   }
 
-  Future<List<MutationResult>> commit(List<Mutation> mutations) {
-    CommitRequest.Builder builder = CommitRequest.newBuilder();
-    builder.setDatabase(serializer.databaseName());
-    for (Mutation mutation in mutations) {
-      builder.addWrites(serializer.encodeMutation(mutation));
-    }
-    /*
-    return channel
-        .runRpc(FirestoreGrpc.getCommitMethod(), builder.build())
-        .continueWith(
-            workerQueue.getExecutor(),
-            task -> {
-              if (!task.isSuccessful()) {
-                if (task.getException() instanceof FirebaseFirestoreException
-                    && ((FirebaseFirestoreException) task.getException()).getCode()
-                        == FirebaseFirestoreException.Code.UNAUTHENTICATED) {
-                  channel.invalidateToken();
-                }
-                throw task.getException();
-              }
-              CommitResponse response = task.getResult();
-              SnapshotVersion commitVersion = serializer.decodeVersion(response.getCommitTime());
+  Future<List<MutationResult>> commit(List<Mutation> mutations) async {
+    final CommitRequest builder = CommitRequest.create();
+    builder.database = serializer.databaseName;
 
-              int count = response.getWriteResultsCount();
-              ArrayList<MutationResult> results = new ArrayList<>(count);
-              for (int i = 0; i < count; i++) {
-                com.google.firestore.v1beta1.WriteResult result = response.getWriteResults(i);
-                results.add(serializer.decodeMutationResult(result, commitVersion));
-              }
-              return results;
-            });*/
+    for (Mutation mutation in mutations) {
+      builder.writes.add(serializer.encodeMutation(mutation));
+    }
+
+    try {
+      final CommitResponse response = await channel.runRpc(
+        ClientMethod<CommitRequest, CommitResponse>(
+          'commit',
+          (CommitRequest req) => req.writeToBuffer(),
+          (List<int> req) => CommitResponse.fromBuffer(req),
+        ),
+        builder.freeze(),
+      );
+
+      final SnapshotVersion commitVersion =
+          serializer.decodeVersion(response.commitTime);
+
+      final int count = response.writeResults.length;
+      final List<MutationResult> results = List<MutationResult>(count);
+      for (int i = 0; i < count; i++) {
+        final WriteResult result = response.writeResults[i];
+        results.add(serializer.decodeMutationResult(result, commitVersion));
+      }
+      return results;
+    } catch (e) {
+      if (e is FirebaseFirestoreError &&
+          e.code == FirebaseFirestoreErrorCode.unauthenticated) {
+        channel.invalidateToken();
+      }
+
+      rethrow;
+    }
   }
 
-  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) {
-    BatchGetDocumentsRequest.Builder builder =
-        BatchGetDocumentsRequest.newBuilder();
-    builder.setDatabase(serializer.databaseName());
+  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
+    final BatchGetDocumentsRequest builder = BatchGetDocumentsRequest.create();
+    builder.database = serializer.databaseName;
     for (DocumentKey key in keys) {
-      builder.addDocuments(serializer.encodeKey(key));
+      builder.documents.add(serializer.encodeKey(key));
     }
-    /*
-    return channel
-        .runStreamingResponseRpc(FirestoreGrpc.getBatchGetDocumentsMethod(), builder.build())
-        .continueWith(
-            workerQueue.getExecutor(),
-            task -> {
-              if (!task.isSuccessful()) {
-                if (task.getException() instanceof FirebaseFirestoreException
-                    && ((FirebaseFirestoreException) task.getException()).getCode()
-                        == FirebaseFirestoreException.Code.UNAUTHENTICATED) {
-                  channel.invalidateToken();
-                }
-              }
 
-              Map<DocumentKey, MaybeDocument> resultMap = new HashMap<>();
-              List<BatchGetDocumentsResponse> responses = task.getResult();
-              for (BatchGetDocumentsResponse response : responses) {
-                MaybeDocument doc = serializer.decodeMaybeDocument(response);
-                resultMap.put(doc.getKey(), doc);
-              }
-              List<MaybeDocument> results = new ArrayList<>();
-              for (DocumentKey key : keys) {
-                results.add(resultMap.get(key));
-              }
-              return results;
-            });*/
+    try {
+      final List<BatchGetDocumentsResponse> responses =
+          await channel.runStreamingResponseRpc(
+              ClientMethod(
+                'batchGet',
+                (BatchGetDocumentsRequest req) => req.writeToBuffer(),
+                (List<int> res) => BatchGetDocumentsResponse.fromBuffer(res),
+              ),
+              builder.freeze());
+
+      final Map<DocumentKey, MaybeDocument> resultMap =
+          <DocumentKey, MaybeDocument>{};
+      for (BatchGetDocumentsResponse response in responses) {
+        final MaybeDocument doc = serializer.decodeMaybeDocument(response);
+        resultMap[doc.key] = doc;
+      }
+      final List<MaybeDocument> results = List<MaybeDocument>();
+      for (DocumentKey key in keys) {
+        results.add(resultMap[key]);
+      }
+      return results;
+    } catch (e) {
+      if (e is FirebaseFirestoreError &&
+          e.code == FirebaseFirestoreErrorCode.unauthenticated) {
+        channel.invalidateToken();
+      }
+      return <MaybeDocument>[];
+    }
   }
 
   static bool isPermanentWriteError(GrpcError status) {
     // See go/firestore-client-errors
     switch (status.code) {
       case StatusCode.ok:
-        throw new ArgumentError("Treated status OK as error");
+        throw new ArgumentError('Treated status OK as error');
       case StatusCode.cancelled:
       case StatusCode.unknown:
       case StatusCode.deadlineExceeded:

@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
+import 'dart:async';
+
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_lru_reference_delegate.dart';
@@ -21,21 +23,21 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
       : docs = DocumentCollections.emptyMaybeDocumentMap();
 
   @override
-  void add(MaybeDocument document) {
+  Future<void> add(_, MaybeDocument document) async {
     docs = docs.insert(document.key, document);
   }
 
   @override
-  void remove(DocumentKey key) {
+  Future<void> remove(_, DocumentKey key) async {
     docs = docs.remove(key);
   }
 
   @override
-  MaybeDocument get(DocumentKey key) => docs[key];
+  Future<MaybeDocument> get(_, DocumentKey key) async => docs[key];
 
   @override
-  ImmutableSortedMap<DocumentKey, Document> getAllDocumentsMatchingQuery(
-      Query query) {
+  Future<ImmutableSortedMap<DocumentKey, Document>>
+      getAllDocumentsMatchingQuery(_, Query query) async {
     ImmutableSortedMap<DocumentKey, Document> result =
         DocumentCollections.emptyDocumentMap();
 
@@ -68,12 +70,12 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
   /// Remove any documents that the delegate reports as not pinned at the given
   /// upper bound.
-  int removeOrphanedDocuments(
-      MemoryLruReferenceDelegate delegate, int upperBound) {
+  Future<int> removeOrphanedDocuments(
+      MemoryLruReferenceDelegate delegate, int upperBound) async {
     int count = 0;
     ImmutableSortedMap<DocumentKey, MaybeDocument> updated = docs;
     for (MapEntry<DocumentKey, MaybeDocument> entry in docs) {
-      if (!delegate.isPinned(entry.key, upperBound)) {
+      if (!(await delegate.isPinned(entry.key, upperBound))) {
         updated = updated.remove(entry.key);
         count++;
       }

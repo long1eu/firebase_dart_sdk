@@ -55,10 +55,10 @@ abstract class Persistence {
   Persistence();
 
   /// Starts persistent storage, opening the database or similar.
-  FutureOr<void> start();
+  Future<void> start();
 
   /// Releases any resources held during eager shutdown.
-  FutureOr<void> shutdown();
+  Future<void> shutdown();
 
   bool get started;
 
@@ -88,11 +88,10 @@ abstract class Persistence {
   /// [action] is a description of the action performed by this transaction,
   /// used for logging when executing the [operation] to be run inside
   /// a transaction.
-  FutureOr<void> runTransaction(String action, Transaction<void> operation);
+  Future<void> runTransaction(String action, Transaction<void> operation);
 
   /// Performs an operation inside a persistence transaction. Any reads or
   /// writes against persistence must be performed within a transaction. Writes
   /// will be committed atomically once the transaction completes.
-  FutureOr<T> runTransactionAndReturn<T>(
-      String action, Transaction<T> operation);
+  Future<T> runTransactionAndReturn<T>(String action, Transaction<T> operation);
 }

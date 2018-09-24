@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/executor.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -38,6 +39,18 @@ void main() {
   Future<void> waitForExpectedSteps() {
     return Future.delayed(const Duration(seconds: 1));
   }
+
+  test('simon_test', () async {
+    final Executor executor = await Executor.create((e) {});
+
+    Future<TimerId> fun() {
+      return Future.value(TimerId.ALL);
+    }
+
+    final TimerId result = await AsyncQueue.callTask<TimerId>(executor, fun);
+
+    print(result);
+  });
 
   test('canScheduleTasksInTheFuture', () async {
     expectedSteps = [1, 2, 3, 4];

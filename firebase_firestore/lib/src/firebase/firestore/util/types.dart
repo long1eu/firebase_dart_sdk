@@ -9,4 +9,4 @@ import 'package:sqflite/sqflite.dart';
 typedef void Runnable();
 typedef Future<T> Supplier<T>();
 typedef void Consumer<T>(T);
-typedef Transaction<T> = FutureOr<T> Function([DatabaseExecutor transaction]);
+typedef Transaction<T> = Future<T> Function(DatabaseExecutor transaction);

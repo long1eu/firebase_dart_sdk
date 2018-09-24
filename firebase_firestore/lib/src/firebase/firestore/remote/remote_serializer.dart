@@ -46,7 +46,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/string_val
 import 'package:firebase_firestore/src/firebase/firestore/model/value/timestamp_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/existence_filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/whatch_change.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/common.pb.dart'
@@ -323,14 +323,24 @@ class RemoteSerializer {
 
   /*private*/
   ObjectValue decodeMapValue(proto.MapValue value) {
-    return decodeFields(_FieldWrapper.fromMapValue(value.fields));
+    return decodeMapFields(value.fields);
   }
 
   // PORTING NOTE: There's no encodeFields here because there's no way to write
   // it that doesn't involve creating a temporary map.
-  ObjectValue decodeFields(List<_FieldWrapper> fields) {
+  ObjectValue decodeMapFields(List<proto.MapValue_FieldsEntry> fields) {
     ObjectValue result = ObjectValue.empty;
-    for (_FieldWrapper entry in fields) {
+    for (proto.MapValue_FieldsEntry entry in fields) {
+      FieldPath path = FieldPath.fromSingleSegment(entry.key);
+      FieldValue value = decodeValue(entry.value);
+      result = result.set(path, value);
+    }
+    return result;
+  }
+
+  ObjectValue decodeDocumentFields(List<proto.Document_FieldsEntry> fields) {
+    ObjectValue result = ObjectValue.empty;
+    for (proto.Document_FieldsEntry entry in fields) {
       FieldPath path = FieldPath.fromSingleSegment(entry.key);
       FieldValue value = decodeValue(entry.value);
       result = result.set(path, value);
@@ -370,8 +380,7 @@ class RemoteSerializer {
     Assert.hardAssert(response.hasFound(),
         'Tried to deserialize a found document from a missing document.');
     final DocumentKey key = decodeKey(response.found.name);
-    final ObjectValue value =
-        decodeFields(_FieldWrapper.fromDocumentFields(response.found.fields));
+    final ObjectValue value = decodeDocumentFields(response.found.fields);
     final SnapshotVersion version = decodeVersion(response.found.updateTime);
     Assert.hardAssert(version != SnapshotVersion.none,
         'Got a document response with no snapshot version');
@@ -431,16 +440,12 @@ class RemoteSerializer {
       if (mutation.hasUpdateMask()) {
         return new PatchMutation(
             decodeKey(mutation.update.name),
-            decodeFields(
-                _FieldWrapper.fromDocumentFields(mutation.update.fields)),
+            decodeDocumentFields(mutation.update.fields),
             decodeDocumentMask(mutation.updateMask),
             precondition);
       } else {
-        return new SetMutation(
-            decodeKey(mutation.update.name),
-            decodeFields(
-                _FieldWrapper.fromDocumentFields(mutation.update.fields)),
-            precondition);
+        return new SetMutation(decodeKey(mutation.update.name),
+            decodeDocumentFields(mutation.update.fields), precondition);
       }
     } else if (mutation.hasDelete()) {
       return new DeleteMutation(decodeKey(mutation.delete), precondition);
@@ -608,13 +613,13 @@ class RemoteSerializer {
 
   // Queries
 
-  Map<String, String> encodeListenRequestLabels(QueryData queryData) {
+  MapEntry<String, String> encodeListenRequestLabels(QueryData queryData) {
     String value = encodeLabel(queryData.purpose);
     if (value == null) {
       return null;
     }
 
-    return <String, String>{'goog-listen-tags': value};
+    return MapEntry<String, String>('goog-listen-tags', value);
   }
 
   /*private*/
@@ -1026,8 +1031,7 @@ class RemoteSerializer {
           decodeVersion(docChange.document.updateTime);
       Assert.hardAssert(version != SnapshotVersion.none,
           'Got a document change without an update time');
-      final ObjectValue data = decodeFields(
-          _FieldWrapper.fromDocumentFields(docChange.document.fields));
+      final ObjectValue data = decodeDocumentFields(docChange.document.fields);
       final Document document =
           new Document(key, version, data, /*hasLocalMutations=*/ false);
       watchChange =
@@ -1076,22 +1080,5 @@ class RemoteSerializer {
   GrpcError fromStatus(proto.Status status) {
     // TODO: Use details?
     return GrpcError.custom(status.code, status.message);
-  }
-}
-
-class _FieldWrapper {
-  final String key;
-  final proto.Value value;
-
-  _FieldWrapper(this.key, this.value);
-
-  static List<_FieldWrapper> fromMapValue(
-      List<proto.MapValue_FieldsEntry> fields) {
-    return fields.map((it) => _FieldWrapper(it.key, it.value));
-  }
-
-  static List<_FieldWrapper> fromDocumentFields(
-      List<proto.Document_FieldsEntry> fields) {
-    return fields.map((it) => _FieldWrapper(it.key, it.value));
   }
 }

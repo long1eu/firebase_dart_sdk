@@ -102,7 +102,8 @@ class LocalSerializer {
   /*private*/
   Document decodeDocument(proto.Document document) {
     final DocumentKey key = rpcSerializer.decodeKey(document.name);
-    final ObjectValue value = rpcSerializer.decodeFields(document.fields);
+    final ObjectValue value =
+        rpcSerializer.decodeDocumentFields(document.fields);
     final SnapshotVersion version =
         rpcSerializer.decodeVersion(document.updateTime);
     return new Document(key, version, value, false);

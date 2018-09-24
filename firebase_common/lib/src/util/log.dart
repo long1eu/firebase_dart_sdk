@@ -10,4 +10,6 @@ class Log {
   static void w(String tag, dynamic message) => print('W:$tag||$message');
 
   static void e(String tag, dynamic message) => print('E:$tag||$message');
+
+  static bool isDebugEnabled;
 }

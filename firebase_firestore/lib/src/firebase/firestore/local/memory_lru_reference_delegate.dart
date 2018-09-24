@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
+import 'dart:async';
+
 import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
@@ -61,52 +63,53 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  void forEachTarget(Consumer<QueryData> consumer) {
-    persistence.queryCache.forEachTarget(consumer);
+  Future<void> forEachTarget(_, Consumer<QueryData> consumer) async {
+    persistence.queryCache.forEachTarget(null, consumer);
   }
 
   @override
-  void forEachOrphanedDocumentSequenceNumber(Consumer<int> consumer) {
+  Future<void> forEachOrphanedDocumentSequenceNumber(
+      _, Consumer<int> consumer) async {
     for (int sequenceNumber in orphanedSequenceNumbers.values) {
       consumer(sequenceNumber);
     }
   }
 
   @override
-  int removeQueries(int upperBound, Set<int> activeTargetIds) {
+  Future<int> removeQueries(_, int upperBound, Set<int> activeTargetIds) async {
     return persistence.queryCache.removeQueries(upperBound, activeTargetIds);
   }
 
   @override
-  int removeOrphanedDocuments(int upperBound) {
+  Future<int> removeOrphanedDocuments(_, int upperBound) async {
     return persistence.remoteDocumentCache
         .removeOrphanedDocuments(this, upperBound);
   }
 
   @override
-  void removeMutationReference(DocumentKey key) {
+  Future<void> removeMutationReference(_, DocumentKey key) async {
     orphanedSequenceNumbers[key] = currentSequenceNumber;
   }
 
   @override
-  void removeTarget(QueryData queryData) {
+  Future<void> removeTarget(_, QueryData queryData) async {
     final QueryData updated = queryData.copy(queryData.snapshotVersion,
         queryData.resumeToken, currentSequenceNumber);
-    persistence.queryCache.updateQueryData(updated);
+    persistence.queryCache.updateQueryData(null, updated);
   }
 
   @override
-  void addReference(DocumentKey key) {
+  Future<void> addReference(_, DocumentKey key) async {
     orphanedSequenceNumbers[key] = currentSequenceNumber;
   }
 
   @override
-  void removeReference(DocumentKey key) {
+  Future<void> removeReference(_, DocumentKey key) async {
     orphanedSequenceNumbers[key] = currentSequenceNumber;
   }
 
   @override
-  void updateLimboDocument(DocumentKey key) {
+  Future<void> updateLimboDocument(_, DocumentKey key) async {
     orphanedSequenceNumbers[key] = currentSequenceNumber;
   }
 
@@ -119,7 +122,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
     return false;
   }
 
-  bool isPinned(DocumentKey key, int upperBound) {
+  Future<bool> isPinned(DocumentKey key, int upperBound) async {
     if (_mutationQueuesContainsKey(key)) {
       return true;
     }
@@ -128,7 +131,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       return true;
     }
 
-    if (persistence.queryCache.containsKey(key)) {
+    if (await persistence.queryCache.containsKey(null, key)) {
       return true;
     }
 

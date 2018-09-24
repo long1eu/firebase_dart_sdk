@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
+import 'dart:async';
+
 import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_mutation_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
@@ -27,22 +29,28 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   int get currentSequenceNumber => ListenSequence.INVALID;
 
   @override
-  void addReference(DocumentKey key) => orphanedDocuments.remove(key);
+  Future<void> addReference(_, DocumentKey key) async {
+    orphanedDocuments.remove(key);
+  }
 
   @override
-  void removeReference(DocumentKey key) => orphanedDocuments.add(key);
+  Future<void> removeReference(_, DocumentKey key) async {
+    orphanedDocuments.add(key);
+  }
 
   @override
-  void removeMutationReference(DocumentKey key) => orphanedDocuments.add(key);
+  Future<void> removeMutationReference(_, DocumentKey key) async {
+    orphanedDocuments.add(key);
+  }
 
   @override
-  void removeTarget(QueryData queryData) {
+  Future<void> removeTarget(_, QueryData queryData) async {
     final MemoryQueryCache queryCache = persistence.queryCache;
-    for (DocumentKey key
-        in queryCache.getMatchingKeysForTargetId(queryData.targetId)) {
+    for (DocumentKey key in await queryCache.getMatchingKeysForTargetId(
+        null, queryData.targetId)) {
       orphanedDocuments.add(key);
     }
-    queryCache.removeQueryData(queryData);
+    queryCache.removeQueryData(null, queryData);
   }
 
   @override
@@ -50,20 +58,20 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
 
   /// In eager garbage collection, collection is run on transaction commit.
   @override
-  void onTransactionCommitted() {
+  void onTransactionCommitted() async {
     final MemoryRemoteDocumentCache remoteDocuments =
         persistence.remoteDocumentCache;
     for (DocumentKey key in orphanedDocuments) {
-      if (!_isReferenced(key)) {
-        remoteDocuments.remove(key);
+      if (!(await _isReferenced(key))) {
+        remoteDocuments.remove(null, key);
       }
     }
     orphanedDocuments = null;
   }
 
   @override
-  void updateLimboDocument(DocumentKey key) {
-    if (_isReferenced(key)) {
+  Future<void> updateLimboDocument(_, DocumentKey key) async {
+    if (await _isReferenced(key)) {
       orphanedDocuments.remove(key);
     } else {
       orphanedDocuments.add(key);
@@ -80,8 +88,8 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   }
 
   /// Returns true if the given document is referenced by anything.
-  bool _isReferenced(DocumentKey key) {
-    if (persistence.queryCache.containsKey(key)) {
+  Future<bool> _isReferenced(DocumentKey key) async {
+    if (await persistence.queryCache.containsKey(null, key)) {
       return true;
     }
 

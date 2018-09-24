@@ -1,6 +1,8 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 20/09/2018
+import 'dart:async';
+
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_eager_reference_delegate.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_lru_reference_delegate.dart';
@@ -55,13 +57,13 @@ class MemoryPersistence extends Persistence {
   }
 
   @override
-  void start() {
+  Future<void> start() async {
     Assert.hardAssert(!started, 'MemoryPersistence double-started!');
     started = true;
   }
 
   @override
-  void shutdown() {
+  Future<void> shutdown() async {
     // TODO: This assertion seems problematic, since we may attempt shutdown in
     // the finally block after failing to initialize.
     Assert.hardAssert(started, 'MemoryPersistence shutdown without start');
@@ -85,19 +87,20 @@ class MemoryPersistence extends Persistence {
   Iterable<MemoryMutationQueue> getMutationQueues() => mutationQueues.values;
 
   @override
-  void runTransaction(String action, Transaction operation) {
+  Future<void> runTransaction(String action, Transaction operation) async {
     referenceDelegate.onTransactionStarted();
     try {
-      operation();
+      operation(null);
     } finally {
       referenceDelegate.onTransactionCommitted();
     }
   }
 
   @override
-  T runTransactionAndReturn<T>(String action, Transaction<T> operation) {
+  Future<T> runTransactionAndReturn<T>(
+      String action, Transaction<T> operation) async {
     referenceDelegate.onTransactionStarted();
-    final T result = operation();
+    final T result = await operation(null);
     referenceDelegate.onTransactionCommitted();
     return result;
   }

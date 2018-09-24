@@ -43,7 +43,7 @@ class SQLitePersistence extends Persistence {
   final _OpenHelper opener;
   final LocalSerializer serializer;
 
-  Database db;
+  Database _db;
   bool started;
   SQLiteQueryCache queryCache;
   SQLiteRemoteDocumentCache remoteDocumentCache;
@@ -77,7 +77,7 @@ class SQLitePersistence extends Persistence {
   Future<void> start() async {
     Assert.hardAssert(!started, 'SQLitePersistence double-started!');
     started = true;
-    await queryCache.start();
+    await queryCache.start(_db);
     referenceDelegate.start(queryCache.highestListenSequenceNumber);
   }
 
@@ -85,8 +85,8 @@ class SQLitePersistence extends Persistence {
   Future<void> shutdown() async {
     Assert.hardAssert(started, 'SQLitePersistence shutdown without start!');
     started = false;
-    await db.close();
-    db = null;
+    await _db.close();
+    _db = null;
   }
 
   @override
@@ -99,7 +99,7 @@ class SQLitePersistence extends Persistence {
       String action, Transaction<void> operation) async {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
-    await db.transaction((tx) => operation(tx), exclusive: true);
+    await _db.transaction((tx) => operation(tx), exclusive: true);
     referenceDelegate.onTransactionCommitted();
   }
 
@@ -108,16 +108,18 @@ class SQLitePersistence extends Persistence {
       String action, Transaction<T> operation) {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
-    return db.transaction((tx) => operation(tx), exclusive: true);
+    return _db.transaction((tx) => operation(tx), exclusive: true);
   }
 
   /// Execute the given non-query SQL statement.
-  Future<void> execute(String sql, [List<Object> args]) async {
-    return await db.execute(sql, args);
+  Future<void> execute(DatabaseExecutor tx, String sql,
+      [List<Object> args]) async {
+    return await tx.execute(sql, args);
   }
 
-  Future<List<Map<String, dynamic>>> query(String sql, [List<dynamic> args]) {
-    return db.rawQuery(sql, args);
+  Future<List<Map<String, dynamic>>> query(DatabaseExecutor tx, String sql,
+      [List<dynamic> args]) {
+    return tx.rawQuery(sql, args);
   }
 }
 

@@ -33,8 +33,27 @@ enum TimerId {
 
 typedef Task<TResult> = Future<TResult> Function();
 
+class AsyncQueueObject<TResult> {
+  final Task<TResult> task;
+  final Completer<TResult> tcs;
+
+  AsyncQueueObject(this.task, this.tcs);
+
+  Future<void> somethingElse() async {
+    try {
+      final result = await task();
+      tcs.complete(result);
+    } on Error catch (e) {
+      tcs.completeError(e);
+    } catch (t) {
+      StateError e = StateError("Unhandled throwable in callTask. $t");
+      tcs.completeError(e);
+    }
+  }
+}
+
 /// A helper class that allows to schedule/queue [Function]s on a single
-/// threaded background queue. */
+/// threaded background queue.
 class AsyncQueue {
   /// Executes the given Callable on a specific executor and returns a Future
   /// that completes when the Task returned.
@@ -42,17 +61,8 @@ class AsyncQueue {
       Executor executor, Task<TResult> task) {
     Completer<TResult> tcs = Completer();
 
-    executor.run(() async {
-      try {
-        final result = await task();
-        tcs.complete(result);
-      } on Error catch (e) {
-        tcs.completeError(e);
-      } catch (t) {
-        StateError e = StateError("Unhandled throwable in callTask. $t");
-        tcs.completeError(e);
-      }
-    });
+    final AsyncQueueObject<TResult> obj = AsyncQueueObject(task, tcs);
+    executor.run(obj.somethingElse);
     return tcs.future;
   }
 

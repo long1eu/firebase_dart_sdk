@@ -28,6 +28,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/null_value
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// An indexed implementation of [QueryEngine] which performs fairly efficient
 /// queries.
@@ -89,15 +90,15 @@ class IndexedQueryEngine implements QueryEngine {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      Query query) {
+      DatabaseExecutor tx, Query query) {
     return query.isDocumentQuery
-        ? localDocuments.getDocumentsMatchingQuery(query)
-        : performCollectionQuery(query);
+        ? localDocuments.getDocumentsMatchingQuery(tx, query)
+        : performCollectionQuery(tx, query);
   }
 
   /// Executes the query using both indexes and post-filtering.
   Future<ImmutableSortedMap<DocumentKey, Document>> performCollectionQuery(
-      Query query) async {
+      DatabaseExecutor tx, Query query) async {
     Assert.hardAssert(!query.isDocumentQuery,
         'matchesCollectionQuery called with document query.');
 
@@ -105,13 +106,14 @@ class IndexedQueryEngine implements QueryEngine {
     ImmutableSortedMap<DocumentKey, Document> filteredResults;
 
     if (indexRange != null) {
-      filteredResults = await _performQueryUsingIndex(query, indexRange);
+      filteredResults = await _performQueryUsingIndex(tx, query, indexRange);
     } else {
       Assert.hardAssert(query.filters.isEmpty,
           'If there are any filters, we should be able to use an index.');
       // TODO: Call overlay.getCollectionDocuments(query.path) and filter the
       // results (there may still be startAt/endAt bounds that apply).
-      filteredResults = await localDocuments.getDocumentsMatchingQuery(query);
+      filteredResults =
+          await localDocuments.getDocumentsMatchingQuery(tx, query);
     }
 
     return filteredResults;
@@ -120,7 +122,7 @@ class IndexedQueryEngine implements QueryEngine {
   /// Applies 'filter' to the index cursor, looks up the relevant documents from the local documents
   /// view and returns all matches.
   Future<ImmutableSortedMap<DocumentKey, Document>> _performQueryUsingIndex(
-      Query query, IndexRange indexRange) async {
+      DatabaseExecutor tx, Query query, IndexRange indexRange) async {
     ImmutableSortedMap<DocumentKey, Document> results =
         DocumentCollections.emptyDocumentMap();
     final IndexCursor cursor =
@@ -128,7 +130,7 @@ class IndexedQueryEngine implements QueryEngine {
     try {
       while (cursor.next) {
         final Document document =
-            await localDocuments.getDocument(cursor.documentKey);
+            await localDocuments.getDocument(tx, cursor.documentKey);
         if (query.matches(document)) {
           results = results.insert(cursor.documentKey, document);
         }

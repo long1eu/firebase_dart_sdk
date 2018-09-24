@@ -10,15 +10,16 @@ import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dar
 import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart'
-as sq;
+    as sq;
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/proto/firestore/local/maybe_document.pb.dart'
-as proto;
+    as proto;
 import 'package:protobuf/protobuf.dart';
+import 'package:sqflite/sqflite.dart';
 
 class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   final sq.SQLitePersistence db;
@@ -28,12 +29,12 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   SQLiteRemoteDocumentCache(this.db, this.serializer);
 
   @override
-  Future<void> add(MaybeDocument maybeDocument) async {
+  Future<void> add(DatabaseExecutor tx, MaybeDocument maybeDocument) async {
     String path = _pathForKey(maybeDocument.key);
     GeneratedMessage message = serializer.encodeMaybeDocument(maybeDocument);
 
-    await db.execute(
-      // @formatter:off
+    await db.execute(tx,
+        // @formatter:off
         '''
           INSERT
           OR REPLACE INTO remote_documents (path, contents)
@@ -44,11 +45,11 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<void> remove(DocumentKey documentKey) async {
+  Future<void> remove(DatabaseExecutor tx, DocumentKey documentKey) async {
     String path = _pathForKey(documentKey);
 
-    await db.execute(
-      // @formatter:off
+    await db.execute(tx,
+        // @formatter:off
         '''
           DELETE
           FROM remote_documents
@@ -59,11 +60,12 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<MaybeDocument> get(DocumentKey documentKey) async {
+  Future<MaybeDocument> get(
+      DatabaseExecutor tx, DocumentKey documentKey) async {
     String path = _pathForKey(documentKey);
 
-    final Map<String, dynamic> row = (await db.query(
-      // @formatter:off
+    final Map<String, dynamic> row = (await db.query(tx,
+        // @formatter:off
         '''
           SELECT contents
           FROM remote_documents
@@ -77,7 +79,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-  getAllDocumentsMatchingQuery(Query query) async {
+      getAllDocumentsMatchingQuery(DatabaseExecutor tx, Query query) async {
     // Use the query path as a prefix for testing if a document matches the
     // query.
     ResourcePath prefix = query.path;
@@ -88,8 +90,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     Map<DocumentKey, Document> results = <DocumentKey, Document>{};
 
-    final List<Map<String, dynamic>> result = await db.query(
-      // @formatter:off
+    final List<Map<String, dynamic>> result = await db.query(tx,
+        // @formatter:off
         '''
           SELECT path, contents
           FROM remote_documents
@@ -111,7 +113,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       if (path.length != immediateChildrenPathLength) continue;
 
       final MaybeDocument maybeDoc =
-      decodeMaybeDocument(row['remote_documents']);
+          decodeMaybeDocument(row['remote_documents']);
       if (maybeDoc is! Document) continue;
 
       Document doc = maybeDoc;

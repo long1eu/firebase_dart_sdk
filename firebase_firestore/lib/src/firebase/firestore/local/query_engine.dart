@@ -9,13 +9,14 @@ import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// Represents a query engine capable of performing queries over the local
 /// document cache.
 abstract class QueryEngine {
   /// Returns all local documents matching the specified query.
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      Query query);
+      DatabaseExecutor tx, Query query);
 
   /// Notifies the query engine of a document change in case it would like to
   /// update indexes and the like.

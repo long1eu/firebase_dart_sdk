@@ -7,30 +7,33 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// Persistence layers intending to use LRU Garbage collection should implement
 /// this interface. This interface defines the operations that the LRU garbage
 /// collector needs from the persistence layer.
 abstract class LruDelegate {
   /// Enumerates all the targets in the QueryCache.
-  FutureOr<void> forEachTarget(Consumer<QueryData> consumer);
+  Future<void> forEachTarget(DatabaseExecutor tx, Consumer<QueryData> consumer);
 
   int get targetCount;
 
   /// Enumerates sequence numbers for documents not associated with a target.
-  FutureOr<void> forEachOrphanedDocumentSequenceNumber(Consumer<int> consumer);
+  Future<void> forEachOrphanedDocumentSequenceNumber(
+      DatabaseExecutor tx, Consumer<int> consumer);
 
   /// Removes all targets that have a sequence number less than or equal to
   /// [upperBound], and are not present in the [activeTargetIds] set.
   ///
   /// Returns the number of targets removed.
-  FutureOr<int> removeQueries(int upperBound, Set<int> activeTargetIds);
+  Future<int> removeQueries(
+      DatabaseExecutor tx, int upperBound, Set<int> activeTargetIds);
 
   /// Removes all unreferenced documents from the cache that have a sequence
   /// number less than or equal to the given sequence number.
   ///
   /// Returns the number of documents removed.
-  FutureOr<int> removeOrphanedDocuments(int upperBound);
+  Future<int> removeOrphanedDocuments(DatabaseExecutor tx, int upperBound);
 
   /// Access to the underlying LRU Garbage collector instance.
   LruGarbageCollector get garbageCollector;

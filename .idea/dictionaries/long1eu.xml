@@ -1,6 +1,8 @@
 <component name="ProjectDictionaryState">
   <dictionary name="long1eu">
     <words>
+      <w>bidi</w>
+      <w>datastore</w>
       <w>firestore</w>
       <w>geopoint</w>
       <w>growable</w>
