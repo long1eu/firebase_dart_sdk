@@ -109,10 +109,12 @@ enum StreamState {
 
 /// A (super-interface) for the stream callbacks. Implementations of Stream
 /// should provide their own interface that extends this interface.
-abstract class StreamCallback {
+class StreamCallback {
   /// The stream is now open and is accepting messages
-  void onOpen();
+  final void Function() onOpen;
 
   /// The stream has closed. If there was an error, the status will be != OK.
-  void onClose(GrpcError status);
+  final void Function(GrpcError status) onClose;
+
+  const StreamCallback({this.onOpen, this.onClose});
 }

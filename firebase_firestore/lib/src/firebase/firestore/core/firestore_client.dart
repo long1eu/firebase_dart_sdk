@@ -19,6 +19,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/view.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/event_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/local_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
@@ -30,6 +31,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
@@ -63,7 +65,7 @@ class FirestoreClient implements RemoteStoreCallback {
             !firstUser.isCompleted, "Already fulfilled first user task");
         firstUser.complete(user);
       } else {
-        asyncQueue.enqueueAndForget(() {
+        asyncQueue.enqueueAndForget(() async {
           Log.d(logTag, "Credential changed. Current user: ${user.uid}");
           syncEngine.handleCredentialChange(user);
         });

@@ -238,7 +238,7 @@ class DelayedTask<T> implements Comparable<DelayedTask> {
   Future<T> handleDelayElapsed() async {
     if (scheduledFuture != null) {
       markDone();
-      await AsyncQueue._thread.run(task);
+      return await AsyncQueue._thread.run(task);
     }
   }
 

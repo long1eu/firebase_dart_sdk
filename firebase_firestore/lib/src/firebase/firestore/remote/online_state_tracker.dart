@@ -8,6 +8,10 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
 
+/// Called whenever the online state of the client changes. This is based on
+/// the watch stream for now.
+typedef OnlineStateCallback = void Function(OnlineState onlineState);
+
 /// A component used by the [RemoteStore] to track the [OnlineState] (that is,
 /// whether or not the client as a whole should be considered to be online or
 /// offline), implementing the appropriate heuristics.
@@ -143,7 +147,7 @@ class OnlineStateTracker {
   void _setAndBroadcastState(OnlineState newState) {
     if (newState != _state) {
       _state = newState;
-      _onlineStateCallback.handleOnlineStateChange(newState);
+      _onlineStateCallback(newState);
     }
   }
 
@@ -167,10 +171,4 @@ class OnlineStateTracker {
       _onlineStateTimer = null;
     }
   }
-}
-
-abstract class OnlineStateCallback {
-  /// Called whenever the online state of the client changes. This is based on
-  /// the watch stream for now.
-  void handleOnlineStateChange(OnlineState onlineState);
 }
