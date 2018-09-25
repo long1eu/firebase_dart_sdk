@@ -49,16 +49,16 @@ class Datastore {
   final RemoteSerializer serializer;
   final FirestoreChannel channel;
 
-  static Future<Datastore> create(DatabaseInfo databaseInfo,
-      AsyncQueue workerQueue, CredentialsProvider credentialsProvider,
-      {ClientChannel clientChannel}) async {
+  factory Datastore(DatabaseInfo databaseInfo, AsyncQueue workerQueue,
+      CredentialsProvider credentialsProvider,
+      {ClientChannel clientChannel}) {
     clientChannel ??= ClientChannel(databaseInfo.host,
         options: ChannelOptions(
             credentials: databaseInfo.sslEnabled
                 ? ChannelCredentials.secure()
                 : ChannelCredentials.insecure()));
 
-    final FirestoreChannel channel = await FirestoreChannel.create(
+    final FirestoreChannel channel = FirestoreChannel(
       credentialsProvider,
       clientChannel,
       databaseInfo.databaseId,

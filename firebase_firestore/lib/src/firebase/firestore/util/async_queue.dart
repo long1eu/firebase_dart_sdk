@@ -190,6 +190,8 @@ class AsyncQueue {
     bool found = delayedTasks.remove(task);
     Assert.hardAssert(found, "Delayed task not found.");
   }
+
+  Executor get executor => _thread;
 }
 
 /// Represents a Task scheduled to be run in the future on an AsyncQueue.
@@ -246,7 +248,7 @@ class DelayedTask<T> implements Comparable<DelayedTask> {
   /// be removed.
   void markDone() {
     Assert.hardAssert(scheduledFuture != null,
-        "Caller should have verified scheduledFuture is non-null.");
+        'Caller should have verified scheduledFuture is non-null.');
     scheduledFuture = null;
     removeDelayedTask(this);
   }

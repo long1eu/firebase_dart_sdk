@@ -35,10 +35,8 @@ class FirestoreChannel {
   /// Call options to be used when invoking RPCs.
   final CallOptions _callOptions;
 
-  static Future<FirestoreChannel> create(
-      CredentialsProvider credentialsProvider,
-      ClientChannel channel,
-      DatabaseId databaseId) async {
+  factory FirestoreChannel(CredentialsProvider credentialsProvider,
+      ClientChannel channel, DatabaseId databaseId) {
     final CallOptions options = CallOptions(providers: [
       FirestoreCallCredentials(credentialsProvider).getRequestMetadata,
       (Map<String, String> map, String url) {

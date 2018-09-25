@@ -95,18 +95,7 @@ class RemoteStore implements TargetMetadataProvider {
   /*private*/
   final Queue<MutationBatch> writePipeline;
 
-  RemoteStore._s(
-    this.remoteStoreCallback,
-    this.localStore,
-    this.datastore,
-    this.listenTargets,
-    this.onlineStateTracker,
-    this.watchStream,
-    this.writeStream,
-    this.writePipeline,
-  );
-
-  RemoteStore._(this.remoteStoreCallback, this.localStore, this.datastore,
+  RemoteStore(this.remoteStoreCallback, this.localStore, this.datastore,
       AsyncQueue workerQueue)
       : listenTargets = {},
         writePipeline = Queue<MutationBatch>(),
@@ -128,6 +117,17 @@ class RemoteStore implements TargetMetadataProvider {
       onWriteResponse: handleWriteStreamMutationResults,
     ));
   }
+
+  RemoteStore._(
+    this.remoteStoreCallback,
+    this.localStore,
+    this.datastore,
+    this.listenTargets,
+    this.onlineStateTracker,
+    this.watchStream,
+    this.writeStream,
+    this.writePipeline,
+  );
 
   /// Re-enables the network. Only to be called as the counterpart to
   /// [disableNetwork].
@@ -311,8 +311,8 @@ class RemoteStore implements TargetMetadataProvider {
   }
 
   /*private*/
-  void handleWatchChange(
-      SnapshotVersion snapshotVersion, WatchChange watchChange) {
+  Future<void> handleWatchChange(
+      SnapshotVersion snapshotVersion, WatchChange watchChange) async {
     // Mark the connection as ONLINE because we got a message from the server.
     onlineStateTracker.updateState(OnlineState.online);
 
@@ -327,7 +327,7 @@ class RemoteStore implements TargetMetadataProvider {
         watchTargetChange.cause != null) {
       // There was an error on a target, don't wait for a consistent snapshot to
       // raise events
-      processTargetError(watchTargetChange);
+      await processTargetError(watchTargetChange);
     } else {
       if (watchChange is WatchChangeDocumentChange) {
         watchChangeAggregator.handleDocumentChange(watchChange);
@@ -345,7 +345,7 @@ class RemoteStore implements TargetMetadataProvider {
         if (snapshotVersion.compareTo(lastRemoteSnapshotVersion) >= 0) {
           // We have received a target change with a global snapshot if the
           // snapshot version is not equal to SnapshotVersion.MIN.
-          raiseWatchSnapshot(snapshotVersion);
+          await raiseWatchSnapshot(snapshotVersion);
         }
       }
     }
@@ -386,7 +386,7 @@ class RemoteStore implements TargetMetadataProvider {
   /// [RemoteEvent], and passes that on to the listener, which is typically the
   /// [SyncEngine].
   /*private*/
-  void raiseWatchSnapshot(SnapshotVersion snapshotVersion) {
+  Future<void> raiseWatchSnapshot(SnapshotVersion snapshotVersion) async {
     Assert.hardAssert(snapshotVersion != SnapshotVersion.none,
         'Can\'t raise event for unknown SnapshotVersion');
     final RemoteEvent remoteEvent =
@@ -438,11 +438,12 @@ class RemoteStore implements TargetMetadataProvider {
     }
 
     // Finally raise remote event
-    remoteStoreCallback.handleRemoteEvent(remoteEvent);
+    await remoteStoreCallback.handleRemoteEvent(remoteEvent);
   }
 
   /*private*/
-  void processTargetError(WatchChangeWatchTargetChange targetChange) {
+  Future<void> processTargetError(
+      WatchChangeWatchTargetChange targetChange) async {
     Assert.hardAssert(
         targetChange.cause != null, 'Processing target error without a cause');
     for (int targetId in targetChange.targetIds) {
@@ -450,7 +451,8 @@ class RemoteStore implements TargetMetadataProvider {
       if (listenTargets.containsKey(targetId)) {
         listenTargets.remove(targetId);
         watchChangeAggregator.removeTarget(targetId);
-        remoteStoreCallback.handleRejectedListen(targetId, targetChange.cause);
+        await remoteStoreCallback.handleRejectedListen(
+            targetId, targetChange.cause);
       }
     }
   }
@@ -537,7 +539,7 @@ class RemoteStore implements TargetMetadataProvider {
 
     final MutationBatchResult mutationBatchResult = MutationBatchResult.create(
         batch, commitVersion, results, writeStream.lastStreamToken);
-    remoteStoreCallback.handleSuccessfulWrite(mutationBatchResult);
+    await remoteStoreCallback.handleSuccessfulWrite(mutationBatchResult);
 
     // It's possible that with the completion of this mutation another slot has
     // freed up.
@@ -607,9 +609,10 @@ class RemoteStore implements TargetMetadataProvider {
       // -- this was just a bad request, so inhibit backoff on the next restart
       writeStream.inhibitBackoff();
 
-      remoteStoreCallback.handleRejectedWrite(batch.batchId, status);
+      await remoteStoreCallback.handleRejectedWrite(batch.batchId, status);
 
-      // It's possible that with the completion of this mutation another slot has freed up.
+      // It's possible that with the completion of this mutation another slot
+      // has freed up.
       await fillWritePipeline();
     }
   }
@@ -630,7 +633,7 @@ abstract class RemoteStoreCallback {
   /// Handle a remote event to the sync engine, notifying any views of the
   /// changes, and releasing any pending mutation batches that would become
   /// visible because of the snapshot version the remote event contains.
-  void handleRemoteEvent(RemoteEvent remoteEvent);
+  Future<void> handleRemoteEvent(RemoteEvent remoteEvent);
 
   /// Reject the listen for the given [targetId]. This can be triggered by the
   /// backend for any active target.
@@ -639,17 +642,17 @@ abstract class RemoteStoreCallback {
   /// is a description of the condition that has forced the rejection. Nearly
   /// always this will be an indication that the user is no longer authorized to
   /// see the data matching the target.
-  void handleRejectedListen(int targetId, GrpcError error);
+  Future<void> handleRejectedListen(int targetId, GrpcError error);
 
   /// Applies the result of a successful write of a mutation batch to the sync
   /// engine, emitting snapshots in any views that the mutation applies to, and
   /// removing the batch from the mutation queue.
-  void handleSuccessfulWrite(MutationBatchResult successfulWrite);
+  Future<void> handleSuccessfulWrite(MutationBatchResult successfulWrite);
 
   /// Rejects the batch, removing the batch from the mutation queue, recomputing
   /// the local view of any documents affected by the batch and then, emitting
   /// snapshots with the reverted value.
-  void handleRejectedWrite(int batchId, GrpcError error);
+  Future<void> handleRejectedWrite(int batchId, GrpcError error);
 
   /// Called whenever the online state of the client changes. This is based on
   /// the watch stream for now.

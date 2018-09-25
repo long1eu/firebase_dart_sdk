@@ -15,6 +15,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dar
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/sync_engine.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/transaction.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/event_listener.dart';
@@ -84,7 +85,9 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   Future<void> disableNetwork() {
-    return asyncQueue.enqueue(() => remoteStore.disableNetwork());
+    return asyncQueue.enqueue(() {
+      remoteStore.disableNetwork();
+    });
   }
 
   Future<void> enableNetwork() {
@@ -104,8 +107,8 @@ class FirestoreClient implements RemoteStoreCallback {
   QueryListener listen(Query query, ListenOptions options,
       EventListener<ViewSnapshot> listener) {
     QueryListener queryListener = new QueryListener(query, options, listener);
-    asyncQueue.enqueueAndForget(
-        () async => eventManager.addQueryListener(queryListener));
+    asyncQueue
+        .enqueueAndForget(() => eventManager.addQueryListener(queryListener));
     return queryListener;
   }
 
@@ -137,8 +140,8 @@ class FirestoreClient implements RemoteStoreCallback {
 
   Future<ViewSnapshot> getDocumentsFromLocalCache(Query query) {
     return asyncQueue.enqueue(() async {
-      ImmutableSortedMap<DocumentKey, Document> docs =
-          localStore.executeQuery(query);
+      final ImmutableSortedMap<DocumentKey, Document> docs =
+          await localStore.executeQuery(query);
 
       View view = new View(query, new ImmutableSortedSet<DocumentKey>());
       DocumentChanges viewDocChanges = view.computeDocChanges(docs);
@@ -157,9 +160,8 @@ class FirestoreClient implements RemoteStoreCallback {
 
   /** Tries to execute the transaction in updateFunction up to retries times. */
   Future<TResult> transaction<TResult>(
-      /*void Function<Transaction, Future<TResult>>*/ dynamic updateFunction,
-      int retries) {
-    return AsyncQueue.callTask(asyncQueue.getExecutor(),
+      Future<TResult> Function(Transaction) updateFunction, int retries) {
+    return AsyncQueue.callTask(asyncQueue.executor,
         () => syncEngine.transaction(asyncQueue, updateFunction, retries));
   }
 
@@ -186,11 +188,11 @@ class FirestoreClient implements RemoteStoreCallback {
     localStore = new LocalStore(persistence, user);
 
     Datastore datastore =
-        new Datastore(databaseInfo, asyncQueue, credentialsProvider);
-    remoteStore = new RemoteStore(this, localStore, datastore, asyncQueue);
+        Datastore(databaseInfo, asyncQueue, credentialsProvider);
+    remoteStore = RemoteStore(this, localStore, datastore, asyncQueue);
 
-    syncEngine = new SyncEngine(localStore, remoteStore, user);
-    eventManager = new EventManager(syncEngine);
+    syncEngine = SyncEngine(localStore, remoteStore, user);
+    eventManager = EventManager(syncEngine);
 
     // NOTE: RemoteStore depends on LocalStore (for persisting stream tokens, refilling mutation
     // queue, etc.) so must be started after LocalStore.
@@ -199,23 +201,24 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   @override
-  void handleRemoteEvent(RemoteEvent remoteEvent) {
-    syncEngine.handleRemoteEvent(remoteEvent);
+  Future<void> handleRemoteEvent(RemoteEvent remoteEvent) async {
+    await syncEngine.handleRemoteEvent(remoteEvent);
   }
 
   @override
-  void handleRejectedListen(int targetId, GrpcError error) {
-    syncEngine.handleRejectedListen(targetId, error);
+  Future<void> handleRejectedListen(int targetId, GrpcError error) async {
+    await syncEngine.handleRejectedListen(targetId, error);
   }
 
   @override
-  void handleSuccessfulWrite(MutationBatchResult mutationBatchResult) {
-    syncEngine.handleSuccessfulWrite(mutationBatchResult);
+  Future<void> handleSuccessfulWrite(
+      MutationBatchResult mutationBatchResult) async {
+    await syncEngine.handleSuccessfulWrite(mutationBatchResult);
   }
 
   @override
-  void handleRejectedWrite(int batchId, GrpcError error) {
-    syncEngine.handleRejectedWrite(batchId, error);
+  Future<void> handleRejectedWrite(int batchId, GrpcError error) async {
+    await syncEngine.handleRejectedWrite(batchId, error);
   }
 
   @override

@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'dart:async';
+
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
@@ -10,10 +12,9 @@ import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dar
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 
-/**
- * EventManager is responsible for mapping queries to query event listeners. It handles "fan-out."
- * (Identical queries will re-use the same watch on the backend.)
- */
+/// EventManager is responsible for mapping queries to query event listeners.
+/// It handles "fan-out." (Identical queries will re-use the same watch on the
+/// backend.)
 class EventManager implements SyncEngineCallback {
   final SyncEngine syncEngine;
 
@@ -22,17 +23,16 @@ class EventManager implements SyncEngineCallback {
   OnlineState onlineState = OnlineState.unknown;
 
   EventManager(this.syncEngine) : this.queries = <Query, QueryListenersInfo>{} {
-    syncEngine.setCallback(this);
+    syncEngine.callback = this;
   }
 
-  /**
-   * Adds a query listener that will be called with new snapshots for the query. The EventManager is
-   * responsible for multiplexing many listeners to a single listen in the SyncEngine and will
-   * perform a listen if it's the first QueryListener added for a query.
-   *
-   * @return the targetId of the listen call in the SyncEngine.
-   */
-  int addQueryListener(QueryListener queryListener) {
+  /// Adds a query listener that will be called with new snapshots for the
+  /// query. The [EventManager] is responsible for multiplexing many listeners
+  /// to a single listen in the [SyncEngine] and will perform a listen if it's
+  /// the first [QueryListener] added for a query.
+  ///
+  /// Returns the targetId of the listen call in the [SyncEngine].
+  Future<void> addQueryListener(QueryListener queryListener) async {
     Query query = queryListener.query;
 
     QueryListenersInfo queryInfo = queries[query];
@@ -51,7 +51,7 @@ class EventManager implements SyncEngineCallback {
     }
 
     if (firstListen) {
-      queryInfo.targetId = syncEngine.listen(query);
+      queryInfo.targetId = await syncEngine.listen(query);
     }
     return queryInfo.targetId;
   }
