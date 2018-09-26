@@ -36,7 +36,7 @@ import 'package:grpc/grpc.dart';
 /// and is otherwise stateless.
 class Datastore {
   /// Set of lowercase, white-listed headers for logging purposes.
-  static final Set<String> WHITE_LISTED_HEADERS = new Set<String>.from([
+  static final Set<String> whiteListedHeaders = Set<String>.from(<String>[
     'date',
     'x-google-backends',
     'x-google-netmon-label',
@@ -55,8 +55,8 @@ class Datastore {
     clientChannel ??= ClientChannel(databaseInfo.host,
         options: ChannelOptions(
             credentials: databaseInfo.sslEnabled
-                ? ChannelCredentials.secure()
-                : ChannelCredentials.insecure()));
+                ? const ChannelCredentials.secure()
+                : const ChannelCredentials.insecure()));
 
     final FirestoreChannel channel = FirestoreChannel(
       credentialsProvider,
@@ -76,13 +76,13 @@ class Datastore {
   /// Creates a new [WatchStream] that is still unstarted but uses a common
   /// shared channel
   WatchStream createWatchStream(WatchStreamCallback listener) {
-    return new WatchStream(channel, workerQueue, serializer, listener);
+    return WatchStream(channel, workerQueue, serializer, listener);
   }
 
   /// Creates a new [WriteStream] that is still unstarted but uses a common
   /// shared channel
   WriteStream createWriteStream(WriteStreamCallback listener) {
-    return new WriteStream(channel, workerQueue, serializer, listener);
+    return WriteStream(channel, workerQueue, serializer, listener);
   }
 
   Future<List<MutationResult>> commit(List<Mutation> mutations) async {
@@ -133,7 +133,7 @@ class Datastore {
     try {
       final List<BatchGetDocumentsResponse> responses =
           await channel.runStreamingResponseRpc(
-              ClientMethod(
+              ClientMethod<BatchGetDocumentsRequest, BatchGetDocumentsResponse>(
                 'batchGet',
                 (BatchGetDocumentsRequest req) => req.writeToBuffer(),
                 (List<int> res) => BatchGetDocumentsResponse.fromBuffer(res),
@@ -146,7 +146,7 @@ class Datastore {
         final MaybeDocument doc = serializer.decodeMaybeDocument(response);
         resultMap[doc.key] = doc;
       }
-      final List<MaybeDocument> results = List<MaybeDocument>();
+      final List<MaybeDocument> results = <MaybeDocument>[];
       for (DocumentKey key in keys) {
         results.add(resultMap[key]);
       }
@@ -164,7 +164,7 @@ class Datastore {
     // See go/firestore-client-errors
     switch (status.code) {
       case StatusCode.ok:
-        throw new ArgumentError('Treated status OK as error');
+        throw ArgumentError('Treated status OK as error');
       case StatusCode.cancelled:
       case StatusCode.unknown:
       case StatusCode.deadlineExceeded:
@@ -189,7 +189,7 @@ class Datastore {
       case StatusCode.dataLoss:
         return true;
       default:
-        throw new ArgumentError('Unknown gRPC status code: ${status}');
+        throw ArgumentError('Unknown gRPC status code: $status');
     }
   }
 }

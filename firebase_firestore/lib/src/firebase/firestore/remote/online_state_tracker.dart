@@ -30,7 +30,7 @@ class OnlineStateTracker {
   /// TODO(mikelehen): This used to be set to 2 as a mitigation for b/66228394.
   /// @jdimond thinks that bug is sufficiently fixed so that we can set this back
   /// to 1. If that works okay, we could potentially remove this logic entirely.
-  static final int _maxWatchStreamFailures = 1;
+  static const int _maxWatchStreamFailures = 1;
 
   /// To deal with stream attempts that don't succeed or fail in a timely manner,
   /// we have a timeout for [OnlineState] to reach [OnlineState.online] or
@@ -39,7 +39,7 @@ class OnlineStateTracker {
   static const int _onlineStateTimeoutMs = 10 * 1000;
 
   /// The log tag to use for this class.
-  static const String _tag = "OnlineStateTracker";
+  static const String _tag = 'OnlineStateTracker';
 
   /// The current OnlineState.
   OnlineState _state;
@@ -53,7 +53,7 @@ class OnlineStateTracker {
   /// transition from [OnlineState.unknown] to [OnlineState.offline] without
   /// waiting for the stream to actually fail ([_maxWatchStreamFailures]
   /// times).
-  DelayedTask _onlineStateTimer;
+  DelayedTask<void> _onlineStateTimer;
 
   /// Whether the client should log a warning message if it fails to connect to
   /// the backend (initially true, cleared after a successful stream, or if
@@ -82,7 +82,7 @@ class OnlineStateTracker {
 
       Assert.hardAssert(_onlineStateTimer == null,
           'onlineStateTimer shouldn\'t be started yet');
-      _onlineStateTimer = _workerQueue.enqueueAfterDelay(
+      _onlineStateTimer = _workerQueue.enqueueAfterDelay<void>(
           TimerId.ONLINE_STATE_TIMEOUT,
           Duration(milliseconds: _onlineStateTimeoutMs), () {
         _onlineStateTimer = null;
@@ -112,15 +112,15 @@ class OnlineStateTracker {
       // To get to [OnlineState.online], [updateState] must have been called
       // which would have reset our heuristics.
       Assert.hardAssert(
-          this._watchStreamFailures == 0, 'watchStreamFailures must be 0');
+          _watchStreamFailures == 0, 'watchStreamFailures must be 0');
       Assert.hardAssert(
-          this._onlineStateTimer == null, 'onlineStateTimer must be null');
+          _onlineStateTimer == null, 'onlineStateTimer must be null');
     } else {
       _watchStreamFailures++;
       if (_watchStreamFailures >= _maxWatchStreamFailures) {
         _clearOnlineStateTimer();
         _logClientOfflineWarningIfNecessary(
-            'Connection failed ${_maxWatchStreamFailures} times. Most recent error: $status');
+            'Connection failed $_maxWatchStreamFailures times. Most recent error: $status');
         _setAndBroadcastState(OnlineState.offline);
       }
     }

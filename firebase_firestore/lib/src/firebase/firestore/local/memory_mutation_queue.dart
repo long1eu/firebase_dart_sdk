@@ -42,9 +42,11 @@ class MemoryMutationQueue implements MutationQueue {
 
   /// The next value to use when assigning sequential ids to each mutation
   /// batch.
+  @override
   int nextBatchId;
 
   /// The highest acknowledged mutation in the queue.
+  @override
   int highestAcknowledgedBatchId;
 
   /// The last received stream token from the server, used to acknowledge which
@@ -57,7 +59,7 @@ class MemoryMutationQueue implements MutationQueue {
 
   MemoryMutationQueue(this.persistence)
       : queue = <MutationBatch>[],
-        batchesByDocumentKey = new ImmutableSortedSet<DocumentReference>(
+        batchesByDocumentKey = ImmutableSortedSet<DocumentReference>(
             <DocumentReference>[], DocumentReference.byKey),
         nextBatchId = 1,
         highestAcknowledgedBatchId = MutationBatch.unknown,
@@ -88,7 +90,8 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> acknowledgeBatch(_, MutationBatch batch, List<int> streamToken) {
+  Future<void> acknowledgeBatch(
+      _, MutationBatch batch, List<int> streamToken) async {
     final int batchId = batch.batchId;
     Assert.hardAssert(batchId > highestAcknowledgedBatchId,
         'Mutation batchIds must be acknowledged in order');
@@ -96,7 +99,7 @@ class MemoryMutationQueue implements MutationQueue {
     final int batchIndex = indexOfExistingBatchId(batchId, 'acknowledged');
 
     // Verify that the batch in the queue is the one to be acknowledged.
-    MutationBatch check = queue[batchIndex];
+    final MutationBatch check = queue[batchIndex];
     Assert.hardAssert(batchId == check.batchId,
         'Queue ordering failure: expected batch $batchId, got batch ${check.batchId}');
     Assert.hardAssert(
@@ -107,34 +110,34 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> setLastStreamToken(_, List<int> streamToken) {
-    this.lastStreamToken = Assert.checkNotNull(streamToken);
+  Future<void> setLastStreamToken(_, List<int> streamToken) async {
+    lastStreamToken = Assert.checkNotNull(streamToken);
   }
 
   @override
   Future<MutationBatch> addMutationBatch(
       _, Timestamp localWriteTime, List<Mutation> mutations) async {
     Assert.hardAssert(
-        !mutations.isEmpty, 'Mutation batches should not be empty');
+        mutations.isNotEmpty, 'Mutation batches should not be empty');
 
     final int batchId = nextBatchId;
     nextBatchId += 1;
 
     final int size = queue.length;
     if (size > 0) {
-      MutationBatch prior = queue[size - 1];
+      final MutationBatch prior = queue[size - 1];
       Assert.hardAssert(prior.batchId < batchId,
           'Mutation batchIds must be monotonically increasing order');
     }
 
     final MutationBatch batch =
-        new MutationBatch(batchId, localWriteTime, mutations);
+        MutationBatch(batchId, localWriteTime, mutations);
     queue.add(batch);
 
     // Track references by document key.
     for (Mutation mutation in mutations) {
-      batchesByDocumentKey = batchesByDocumentKey
-          .insert(new DocumentReference(mutation.key, batchId));
+      batchesByDocumentKey =
+          batchesByDocumentKey.insert(DocumentReference(mutation.key, batchId));
     }
 
     return batch;
@@ -168,7 +171,7 @@ class MemoryMutationQueue implements MutationQueue {
 
     // Finally return the first non-tombstone batch.
     for (; index < size; index++) {
-      MutationBatch batch = queue[index];
+      final MutationBatch batch = queue[index];
       if (!batch.isTombstone) {
         return batch;
       }
@@ -204,10 +207,10 @@ class MemoryMutationQueue implements MutationQueue {
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
       _, DocumentKey documentKey) async {
-    final DocumentReference start = new DocumentReference(documentKey, 0);
+    final DocumentReference start = DocumentReference(documentKey, 0);
 
     final List<MutationBatch> result = <MutationBatch>[];
-    Iterator<DocumentReference> iterator =
+    final Iterator<DocumentReference> iterator =
         batchesByDocumentKey.iteratorFrom(start);
     while (iterator.moveNext()) {
       final DocumentReference reference = iterator.current;
@@ -227,14 +230,14 @@ class MemoryMutationQueue implements MutationQueue {
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
       _, Iterable<DocumentKey> documentKeys) async {
-    ImmutableSortedSet<int> uniqueBatchIDs = new ImmutableSortedSet<int>();
+    ImmutableSortedSet<int> uniqueBatchIDs = ImmutableSortedSet<int>();
 
     for (DocumentKey key in documentKeys) {
-      final DocumentReference start = new DocumentReference(key, 0);
-      final Iterator<DocumentReference> batchesIter =
+      final DocumentReference start = DocumentReference(key, 0);
+      final Iterator<DocumentReference> batchesIterator =
           batchesByDocumentKey.iteratorFrom(start);
-      while (batchesIter.moveNext()) {
-        DocumentReference reference = batchesIter.current;
+      while (batchesIterator.moveNext()) {
+        final DocumentReference reference = batchesIterator.current;
         if (key != reference.key) {
           break;
         }
@@ -250,8 +253,8 @@ class MemoryMutationQueue implements MutationQueue {
       _, Query query) async {
     // Use the query path as a prefix for testing if a document matches the
     // query.
-    ResourcePath prefix = query.path;
-    int immediateChildrenPathLength = prefix.length + 1;
+    final ResourcePath prefix = query.path;
+    final int immediateChildrenPathLength = prefix.length + 1;
 
     // Construct a document reference for actually scanning the index. Unlike
     // the prefix, the document key in this reference must have an even number
@@ -262,11 +265,11 @@ class MemoryMutationQueue implements MutationQueue {
       startPath = startPath.appendSegment('');
     }
     final DocumentReference start =
-        new DocumentReference(DocumentKey.fromPath(startPath), 0);
+        DocumentReference(DocumentKey.fromPath(startPath), 0);
 
     // Find unique [batchId]s referenced by all documents potentially matching the
     // query.
-    ImmutableSortedSet<int> uniqueBatchIDs = new ImmutableSortedSet<int>();
+    ImmutableSortedSet<int> uniqueBatchIDs = ImmutableSortedSet<int>();
 
     final Iterator<DocumentReference> iterator =
         batchesByDocumentKey.iteratorFrom(start);
@@ -293,7 +296,7 @@ class MemoryMutationQueue implements MutationQueue {
       ImmutableSortedSet<int> batchIds) async {
     // Construct an array of matching batches, sorted by batchId to ensure that
     // multiple mutations affecting the same document key are applied in order.
-    List<MutationBatch> result = [];
+    final List<MutationBatch> result = <MutationBatch>[];
     for (int batchId in batchIds) {
       final MutationBatch batch = await lookupMutationBatch(null, batchId);
       if (batch != null) {
@@ -305,7 +308,7 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> removeMutationBatches(_, List<MutationBatch> batches) {
+  Future<void> removeMutationBatches(_, List<MutationBatch> batches) async {
     final int batchCount = batches.length;
     Assert.hardAssert(
         batchCount > 0, 'Should not remove mutations when none exist.');
@@ -363,7 +366,7 @@ class MemoryMutationQueue implements MutationQueue {
         final DocumentKey key = mutation.key;
         persistence.referenceDelegate.removeMutationReference(null, key);
 
-        final DocumentReference reference = new DocumentReference(key, batchId);
+        final DocumentReference reference = DocumentReference(key, batchId);
         references = references.remove(reference);
       }
     }
@@ -371,7 +374,7 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> performConsistencyCheck(_) {
+  Future<void> performConsistencyCheck(_) async {
     if (queue.isEmpty) {
       Assert.hardAssert(batchesByDocumentKey.isEmpty,
           'Document leak -- detected dangling mutation references when queue is empty.');
@@ -381,7 +384,7 @@ class MemoryMutationQueue implements MutationQueue {
   bool containsKey(DocumentKey key) {
     // Create a reference with a zero ID as the start position to find any
     // document reference with this key.
-    final DocumentReference reference = new DocumentReference(key, 0);
+    final DocumentReference reference = DocumentReference(key, 0);
 
     final Iterator<DocumentReference> iterator =
         batchesByDocumentKey.iteratorFrom(reference);
@@ -440,7 +443,7 @@ class MemoryMutationQueue implements MutationQueue {
   /// in passive form (e.g. 'acknowledged' in a routine that acknowledges
   /// batches).
   int indexOfExistingBatchId(int batchId, String action) {
-    int index = indexOfBatchId(batchId);
+    final int index = indexOfBatchId(batchId);
     Assert.hardAssert(
         index >= 0 && index < queue.length, 'Batches must exist to be $action');
     return index;

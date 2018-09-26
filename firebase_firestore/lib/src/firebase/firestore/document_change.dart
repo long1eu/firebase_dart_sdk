@@ -5,6 +5,7 @@
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
@@ -26,77 +27,72 @@ enum DocumentChangesType {
   removed
 }
 
-/**
- * A DocumentChange represents a change to the documents matching a query. It contains the document
- * affected and a the type of change that occurred (added, modified, or removed).
- *
- * <p><b>Subclassing Note</b>: Firestore classes are not meant to be subclassed except for use in
- * test mocks. Subclassing is not supported in production code and new SDK releases may break code
- * that does so.
- */
+/// A [DocumentChange] represents a change to the documents matching a query. It
+/// contains the document affected and a the type of change that occurred
+/// (added, modified, or removed).
+///
+/// * <b>Subclassing Note</b>: Firestore classes are not meant to be subclassed
+/// except for use in test mocks. Subclassing is not supported in production
+/// code and new SDK releases may break code that does so.
 @publicApi
-class DocumentChanges {
-  /** An enumeration of snapshot diff types. */
-
+class DocumentChange {
+  /// An enumeration of snapshot diff types.
   final DocumentChangesType type;
 
-  /**
-   * Returns the newly added or modified document if this DocumentChange is for an updated document.
-   * Returns the deleted document if this document change represents a removal.
-   *
-   * @return A snapshot of the new data (for Type.ADDED or Type.MODIFIED) or the removed data (for
-   *     Type.REMOVED).
-   */
+  /// Returns the newly added or modified document if this [DocumentChange] is
+  /// for an updated document. Returns the deleted document if this document
+  /// change represents a removal.
+  ///
+  /// Returns a snapshot of the new data (for [DocumentChangesType.added] or
+  /// [DocumentChangesType.modified]) or the removed data (for
+  /// [DocumentChangesType.removed]).
   final QueryDocumentSnapshot document;
 
-  /**
-   * The index of the changed document in the result set immediately prior to this DocumentChange
-   * (i.e. supposing that all prior DocumentChange objects have been applied). Returns -1 for
-   * 'added' events.
-   */
-  /** The index in the old snapshot, after processing all previous changes. */
+  /// The index of the changed document in the result set immediately prior to
+  /// this [DocumentChange] (i.e. supposing that all prior [DocumentChange]
+  /// objects have been applied). Returns -1 for 'added' events.
+  ///
+  /// Returns the index in the old snapshot, after processing all previous changes.
   final int oldIndex;
 
-  /**
-   * The index of the changed document in the result set immediately after this DocumentChange (i.e.
-   * supposing that all prior DocumentChange objects and the current DocumentChange object have been
-   * applied). Returns -1 for 'removed' events.
-   */
-  /** The index in the new snapshot, after processing all previous changes. */
+  /// The index of the changed document in the result set immediately after this
+  /// [DocumentChange] (i.e. supposing that all prior [DocumentChange] objects
+  /// and the current [DocumentChange] object have been applied). Returns -1 for
+  /// 'removed' events.
+  ///
+  /// The index in the new snapshot, after processing all previous changes.
   final int newIndex;
 
   @visibleForTesting
-  DocumentChanges(this.document, this.type, this.oldIndex, this.newIndex);
+  DocumentChange(this.document, this.type, this.oldIndex, this.newIndex);
 
-  /** Creates the list of DocumentChanges from a ViewSnapshot. */
-  static List<DocumentChanges> changesFromSnapshot(
-      /*FirebaseFirestore*/ dynamic firestore,
-      MetadataChanges metadataChanges,
-      ViewSnapshot snapshot) {
-    List<DocumentChanges> documentChanges = <DocumentChanges>[];
+  /// Creates the list of DocumentChanges from a ViewSnapshot.
+  static List<DocumentChange> changesFromSnapshot(FirebaseFirestore firestore,
+      MetadataChanges metadataChanges, ViewSnapshot snapshot) {
+    final List<DocumentChange> documentChanges = <DocumentChange>[];
     if (snapshot.oldDocuments.isEmpty) {
-      // Special case the first snapshot because index calculation is easy and fast. Also all
-      // changes on the first snapshot are adds so there are also no metadata-only changes to filter
-      // out.
+      // Special case the first snapshot because index calculation is easy and
+      // fast. Also all changes on the first snapshot are adds so there are also
+      // no metadata-only changes to filter out.
       int index = 0;
-      Document lastDoc = null;
+      Document lastDoc;
       for (DocumentViewChange change in snapshot.changes) {
         final Document document = change.document;
-        QueryDocumentSnapshot documentSnapshot =
+        final QueryDocumentSnapshot documentSnapshot =
             QueryDocumentSnapshot.fromDocument(
                 firestore, document, snapshot.isFromCache);
         Assert.hardAssert(change.type == DocumentViewChangeType.added,
-            "Invalid added event for first snapshot");
+            'Invalid added event for first snapshot');
         Assert.hardAssert(
             lastDoc == null || snapshot.query.comparator(lastDoc, document) < 0,
-            "Got added events in wrong order");
-        documentChanges.add(new DocumentChanges(
+            'Got added events in wrong order');
+        documentChanges.add(DocumentChange(
             documentSnapshot, DocumentChangesType.added, -1, index++));
         lastDoc = document;
       }
     } else {
-      // A DocumentSet that is updated incrementally as changes are applied to use to lookup the
-      // index of a document.
+      // A DocumentSet that is updated incrementally as changes are applied to
+      // use to lookup the index of a document.
       DocumentSet indexTracker = snapshot.oldDocuments;
       for (DocumentViewChange change in snapshot.changes) {
         if (metadataChanges == MetadataChanges.EXCLUDE &&
@@ -104,7 +100,7 @@ class DocumentChanges {
           continue;
         }
         final Document document = change.document;
-        QueryDocumentSnapshot documentSnapshot =
+        final QueryDocumentSnapshot documentSnapshot =
             QueryDocumentSnapshot.fromDocument(
                 firestore, document, snapshot.isFromCache);
         int oldIndex, newIndex;
@@ -123,8 +119,8 @@ class DocumentChanges {
         } else {
           newIndex = -1;
         }
-        documentChanges.add(
-            new DocumentChanges(documentSnapshot, type, oldIndex, newIndex));
+        documentChanges
+            .add(DocumentChange(documentSnapshot, type, oldIndex, newIndex));
       }
     }
     return documentChanges;
@@ -140,7 +136,7 @@ class DocumentChanges {
       case DocumentViewChangeType.removed:
         return DocumentChangesType.removed;
       default:
-        throw new ArgumentError('Unknown view change type: ${change.type}');
+        throw ArgumentError('Unknown view change type: ${change.type}');
     }
   }
 }

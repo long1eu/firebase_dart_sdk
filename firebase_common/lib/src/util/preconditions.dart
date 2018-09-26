@@ -5,7 +5,7 @@
 class Preconditions {
   static void checkState(bool condition, Object message) {
     if (!condition) {
-      throw StateError(message);
+      throw StateError('$message');
     }
   }
 

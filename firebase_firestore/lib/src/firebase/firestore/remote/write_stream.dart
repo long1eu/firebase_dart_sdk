@@ -57,7 +57,7 @@ class WriteStream
       this._serializer, WriteStreamCallback listener)
       : super(
             channel,
-            ClientMethod(
+            ClientMethod<WriteRequest, WriteResponse>(
               'write',
               (WriteRequest req) => req.writeToBuffer(),
               (List<int> res) => WriteResponse.fromBuffer(res),
@@ -69,7 +69,7 @@ class WriteStream
 
   @override
   void start() {
-    this._handshakeComplete = false;
+    _handshakeComplete = false;
     super.start();
   }
 
@@ -98,7 +98,7 @@ class WriteStream
     final WriteRequest request = WriteRequest.create()
       ..database = _serializer.databaseName;
 
-    writeRequest(request.freeze());
+    writeRequest(request..freeze());
   }
 
   /// Sends a list of mutations to the Firestore backend to apply
@@ -113,12 +113,12 @@ class WriteStream
       request.writes.add(_serializer.encodeMutation(mutation));
     }
 
-    writeRequest(request.freeze());
+    writeRequest(request..freeze());
   }
 
   @override
-  void onNext(WriteResponse response) {
-    lastStreamToken = response.streamToken;
+  void onNext(WriteResponse change) {
+    lastStreamToken = change.streamToken;
 
     if (!_handshakeComplete) {
       // The first response is the handshake response
@@ -132,12 +132,12 @@ class WriteStream
       backoff.reset();
 
       final SnapshotVersion commitVersion =
-          _serializer.decodeVersion(response.commitTime);
+          _serializer.decodeVersion(change.commitTime);
 
-      final int count = response.writeResults.length;
+      final int count = change.writeResults.length;
       final List<MutationResult> results = List<MutationResult>(count);
       for (int i = 0; i < count; i++) {
-        final WriteResult result = response.writeResults[i];
+        final WriteResult result = change.writeResults[i];
         results.add(_serializer.decodeMutationResult(result, commitVersion));
       }
       listener.onWriteResponse(commitVersion, results);
@@ -157,8 +157,8 @@ class WriteStreamCallback extends StreamCallback {
       onWriteResponse;
 
   const WriteStreamCallback({
-    @required onOpen,
-    @required onClose,
+    @required void Function() onOpen,
+    @required void Function(GrpcError) onClose,
     @required this.onHandshakeComplete,
     @required this.onWriteResponse,
   }) : super(onOpen: onOpen, onClose: onClose);

@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/src/annotations.dart';
 import 'package:firebase_common/src/auth/get_token_result.dart';
 import 'package:firebase_common/src/data_collection_default_change.dart';
@@ -30,7 +31,7 @@ class FirebaseApp {
   static const String firebaseAppPrefs = 'com.google.firebase.common.prefs';
   @visibleForTesting
   static const String _dataCollectionDefaultEnabledPreferenceKey =
-      "firebase_data_collection_default_enabled";
+      'firebase_data_collection_default_enabled';
 
   static final Map<String, FirebaseApp> instances = <String, FirebaseApp>{};
 
@@ -181,6 +182,10 @@ class FirebaseApp {
   /// Returns a mutable list of all FirebaseApps.
   List<FirebaseApp> get apps => List<FirebaseApp>.from(instances.values);
 
+  InternalAuthProvider getAuthProvider() {
+    return null;
+  }
+
   @deprecated
   @keepForSdk
   set tokenProvider(InternalTokenProvider tokenProvider) {
@@ -209,8 +214,8 @@ class FirebaseApp {
     _checkNotDeleted();
 
     if (_tokenProvider == null) {
-      return Future.error(
-          FirebaseApiNotAvailableError('firebase_auth is not linked,'
+      return Future<GetTokenResult>.error(
+          const FirebaseApiNotAvailableError('firebase_auth is not linked,'
               ' please fall back to unauthenticated mode.'));
     } else {
       return _tokenProvider.getAccessToken(forceRefresh);
@@ -225,7 +230,7 @@ class FirebaseApp {
   String get uid {
     _checkNotDeleted();
     if (_tokenProvider == null) {
-      throw FirebaseApiNotAvailableError('firebase_auth is not linked,'
+      throw const FirebaseApiNotAvailableError('firebase_auth is not linked,'
           ' please fall back to unauthenticated mode.');
     } else {
       return _tokenProvider.uid;
@@ -256,7 +261,7 @@ class FirebaseApp {
     if (automaticResourceManagementEnabled != enabled) {
       automaticResourceManagementEnabled = enabled;
 
-      bool inBackground = lifecycleHandler.isBackground;
+      final bool inBackground = lifecycleHandler.isBackground;
       if (enabled && inBackground) {
         // Automatic resource management has been enabled while the app is in the
         // background, notify the listeners of the app being in the background.

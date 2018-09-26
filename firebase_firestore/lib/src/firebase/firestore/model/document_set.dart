@@ -19,8 +19,9 @@ class DocumentSet extends Iterable<Document> {
   factory DocumentSet.emptySet(Comparator<Document> comparator) {
     // We have to add the document key comparator to the passed in comparator,
     // as it's the only guaranteed unique property of a document.
-    Comparator<Document> adjustedComparator = (Document left, Document right) {
-      int comparison = comparator(left, right);
+    final Comparator<Document> adjustedComparator =
+        (Document left, Document right) {
+      final int comparison = comparator(left, right);
       if (comparison == 0) {
         return Document.keyComparator(left, right);
       } else {
@@ -28,7 +29,7 @@ class DocumentSet extends Iterable<Document> {
       }
     };
 
-    return new DocumentSet._(
+    return DocumentSet._(
       DocumentCollections.emptyDocumentMap(),
       ImmutableSortedSet<Document>(<Document>[], adjustedComparator),
     );
@@ -45,7 +46,9 @@ class DocumentSet extends Iterable<Document> {
 
   /// Returns true iff this set contains a document with the given key.
   @override
-  bool contains(Object key) => _keyIndex.containsKey(key);
+  bool contains(Object key) {
+    return key is DocumentKey ? _keyIndex.containsKey(key) : false;
+  }
 
   /// Returns the document from this set with the given key if it exists or
   /// null if it doesn't.
@@ -69,7 +72,7 @@ class DocumentSet extends Iterable<Document> {
   Document getPredecessor(DocumentKey key) {
     final Document document = _keyIndex[key];
     if (document == null) {
-      throw new ArgumentError("Key not contained in DocumentSet: $key");
+      throw ArgumentError('Key not contained in DocumentSet: $key');
     }
     return _sortedSet.getPredecessorEntry(document);
   }
@@ -77,7 +80,7 @@ class DocumentSet extends Iterable<Document> {
   /// Returns the index of the provided key in the document set, or -1 if the
   /// document key is not present in the set;
   int indexOf(DocumentKey key) {
-    Document document = _keyIndex[key];
+    final Document document = _keyIndex[key];
     if (document == null) {
       return -1;
     }
@@ -90,18 +93,18 @@ class DocumentSet extends Iterable<Document> {
   DocumentSet add(Document document) {
     // Remove any prior mapping of the document's key before adding, preventing
     // sortedSet from accumulating values that aren't in the index.
-    DocumentSet removed = remove(document.key);
+    final DocumentSet removed = remove(document.key);
 
-    ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
+    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
         removed._keyIndex.insert(document.key, document);
-    ImmutableSortedSet<Document> newSortedSet =
+    final ImmutableSortedSet<Document> newSortedSet =
         removed._sortedSet.insert(document);
-    return new DocumentSet._(newKeyIndex, newSortedSet);
+    return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
   /// Returns a new DocumentSet with the document for the provided key removed.
   DocumentSet remove(DocumentKey key) {
-    Document document = _keyIndex[key];
+    final Document document = _keyIndex[key];
     if (document == null) {
       return this;
     }
@@ -109,10 +112,11 @@ class DocumentSet extends Iterable<Document> {
     _keyIndex.remove(key);
     _sortedSet.remove(document);
 
-    ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
+    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
         _keyIndex.remove(key);
-    ImmutableSortedSet<Document> newSortedSet = _sortedSet.remove(document);
-    return new DocumentSet._(newKeyIndex, newSortedSet);
+    final ImmutableSortedSet<Document> newSortedSet =
+        _sortedSet.remove(document);
+    return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
   /// Returns a copy of the documents in this set as array. This is O(n) in the
@@ -120,10 +124,8 @@ class DocumentSet extends Iterable<Document> {
   // TODO:Consider making this backed by the set instead to achieve O(1)?
   @override
   List<Document> toList({bool growable: true}) {
-    List<Document> documents = List<Document>(length);
-    for (Document document in this) {
-      documents.add(document);
-    }
+    final List<Document> documents = List<Document>(length);
+    forEach(documents.add);
     return documents;
   }
 
@@ -133,7 +135,7 @@ class DocumentSet extends Iterable<Document> {
       return true;
     }
 
-    if (other == null || runtimeType != other.runtimeType) {
+    if (runtimeType != other.runtimeType) {
       return false;
     }
 

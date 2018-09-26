@@ -114,7 +114,7 @@ class StreamCallback {
   final void Function() onOpen;
 
   /// The stream has closed. If there was an error, the status will be != OK.
-  final void Function(GrpcError status) onClose;
+  final void Function(GrpcError) onClose;
 
   const StreamCallback({this.onOpen, this.onClose});
 }

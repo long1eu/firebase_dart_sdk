@@ -34,7 +34,7 @@ class WatchStream
       WatchStreamCallback listener)
       : super(
             channel,
-            ClientMethod(
+            ClientMethod<ListenRequest, ListenResponse>(
               'listen',
               (ListenRequest req) => req.writeToBuffer(),
               (List<int> res) => ListenResponse.fromBuffer(res),
@@ -65,7 +65,7 @@ class WatchStream
       request.labels.add(entry);
     }
 
-    writeRequest(request.freeze());
+    writeRequest(request..freeze());
   }
 
   /// Unregisters interest in the results of the query associated with the given
@@ -82,14 +82,13 @@ class WatchStream
   }
 
   @override
-  void onNext(ListenResponse listenResponse) {
+  void onNext(ListenResponse change) {
     // A successful response means the stream is healthy
     backoff.reset();
 
-    final WatchChange watchChange =
-        serializer.decodeWatchChange(listenResponse);
+    final WatchChange watchChange = serializer.decodeWatchChange(change);
     final SnapshotVersion snapshotVersion =
-        serializer.decodeVersionFromListenResponse(listenResponse);
+        serializer.decodeVersionFromListenResponse(change);
     listener.onWatchChange(snapshotVersion, watchChange);
   }
 }
@@ -104,8 +103,8 @@ class WatchStreamCallback extends StreamCallback {
       onWatchChange;
 
   const WatchStreamCallback({
-    @required onOpen,
-    @required onClose,
+    @required void Function() onOpen,
+    @required void Function(GrpcError status) onClose,
     @required this.onWatchChange,
   }) : super(onOpen: onOpen, onClose: onClose);
 }

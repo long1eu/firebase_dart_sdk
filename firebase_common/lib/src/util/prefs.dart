@@ -11,7 +11,7 @@ import 'package:firebase_common/src/annotations.dart';
 @keepForSdk
 class Prefs {
   final File file;
-  Completer<void> completer = Completer();
+  Completer<void> completer = Completer<void>();
   Map<String, dynamic> json;
 
   Prefs(this.file) {
@@ -27,7 +27,7 @@ class Prefs {
     _complete();
   }
 
-  bool getBool(String key) => json[key];
+  bool getBool(String key) => json[key] as bool;
 
   void _complete() {
     if (completer.isCompleted) {
@@ -40,7 +40,7 @@ class Prefs {
   Future<void> _write() {
     return file.writeAsString(jsonEncode(json)).then((_) {
       completer.complete();
-      completer = Completer();
+      completer = Completer<void>();
     });
   }
 }

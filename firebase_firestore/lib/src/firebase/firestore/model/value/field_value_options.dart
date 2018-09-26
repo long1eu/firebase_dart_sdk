@@ -9,6 +9,6 @@ class FieldValueOptions {
   final ServerTimestampBehavior serverTimestampBehavior;
   final bool timestampsInSnapshotsEnabled;
 
-  const FieldValueOptions(
-      this.serverTimestampBehavior, this.timestampsInSnapshotsEnabled);
+  const FieldValueOptions(this.serverTimestampBehavior,
+      [this.timestampsInSnapshotsEnabled = true]);
 }

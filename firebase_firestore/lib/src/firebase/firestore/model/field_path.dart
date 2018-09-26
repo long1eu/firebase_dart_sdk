@@ -16,7 +16,7 @@ class FieldPath extends BasePath<FieldPath> {
 
   /// Creates a [FieldPath] with a single field. Does not split on dots.
   factory FieldPath.fromSingleSegment(String fieldName) {
-    return FieldPath._(List.unmodifiable(<String>[fieldName]));
+    return FieldPath._(List<String>.unmodifiable(<String>[fieldName]));
   }
 
   /// Creates a [FieldPath] from a list of parsed field path segments.
@@ -42,7 +42,7 @@ class FieldPath extends BasePath<FieldPath> {
     bool inBackticks = false;
 
     while (i < path.length) {
-      int c = path.codeUnitAt(i);
+      final int c = path.codeUnitAt(i);
       //U+005C => \
       if (c == 0x5C) {
         if (i + 1 == path.length) {
@@ -54,7 +54,7 @@ class FieldPath extends BasePath<FieldPath> {
       //U+002E => .
       if (c == 0x2E) {
         if (!inBackticks) {
-          String elem = buffer.toString();
+          final String elem = buffer.toString();
           if (elem.isEmpty) {
             throw ArgumentError(
                 'Invalid field path ($path). Paths must not be empty, begin '
@@ -75,7 +75,7 @@ class FieldPath extends BasePath<FieldPath> {
       }
       i++;
     }
-    String lastElem = buffer.toString();
+    final String lastElem = buffer.toString();
     if (lastElem.isEmpty) {
       throw ArgumentError(
           'Invalid field path ($path). Paths must not be empty, begin with '
@@ -92,7 +92,7 @@ class FieldPath extends BasePath<FieldPath> {
       return false;
     }
 
-    int first = identifier.codeUnitAt(0);
+    final int first = identifier.codeUnitAt(0);
     if (first != 0x5F /* _ */ &&
         (first < 0x61 /* a */ || first > 0x7A /* z */) &&
         (first < 0x41 /* A */ || first > 0x5A /* Z */)) {
@@ -100,7 +100,7 @@ class FieldPath extends BasePath<FieldPath> {
     }
 
     for (int i = 1; i < identifier.length; i++) {
-      int c = identifier.codeUnitAt(i);
+      final int c = identifier.codeUnitAt(i);
       if (c != 0x5F /* _ */ &&
           (c < 0x61 /* a */ || c > 0x7A /* z */) &&
           (c < 0x41 /* A */ || c > 0x5A /* Z */) &&
@@ -113,14 +113,14 @@ class FieldPath extends BasePath<FieldPath> {
 
   @override
   String get canonicalString {
-    StringBuffer builder = StringBuffer();
+    final StringBuffer builder = StringBuffer();
     for (int i = 0; i < length; i++) {
       if (i > 0) {
-        builder.write(".");
+        builder.write('.');
       }
       // Escape backslashes and dots.
       String escaped = getSegment(i);
-      escaped = escaped.replaceAll("\\", "\\\\").replaceAll("`", "\\`");
+      escaped = escaped.replaceAll('\\', '\\\\').replaceAll('`', '\\`');
 
       if (!_isValidIdentifier(escaped)) {
         escaped = '`' + escaped + '`';

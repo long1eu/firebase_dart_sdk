@@ -15,20 +15,20 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
   /// data, but small enough to not notice degradation in performance for
   /// inserting and lookups. Feel free to empirically determine this constant,
   /// but don't expect much gain in real world performance.
-  static final int arrayToRbTreeSizeThreshold = 25;
+  static const int arrayToRbTreeSizeThreshold = 25;
 
   const ImmutableSortedMap();
 
   factory ImmutableSortedMap.emptyMap(Comparator<K> comparator) {
-    return new ArraySortedMap(comparator);
+    return ArraySortedMap<K, V>(comparator);
   }
 
   factory ImmutableSortedMap.fromMap(
       Map<K, V> values, Comparator<K> comparator) {
     if (values.length < arrayToRbTreeSizeThreshold) {
-      return ArraySortedMap.fromMap(values, comparator);
+      return ArraySortedMap<K, V>.fromMap(values, comparator);
     } else {
-      return RBTreeSortedMap.fromMap(values, comparator);
+      return RBTreeSortedMap<K, V>.fromMap(values, comparator);
     }
   }
 

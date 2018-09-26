@@ -12,7 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart'
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
-/** Represents the internal structure of a Firestore Query */
+/// Represents the internal structure of a Firestore Query
 class Query {
   static const int noLimit = -1;
 
@@ -53,7 +53,7 @@ class Query {
   ///
   /// The [path] to the collection to be queried over.
   factory Query.atPath(ResourcePath path) {
-    return new Query(path, <Filter>[], <OrderBy>[], noLimit, null, null);
+    return Query(path, <Filter>[], <OrderBy>[], noLimit, null, null);
   }
 
   /// Returns true if this Query is for a specific document.
@@ -327,29 +327,29 @@ class Query {
   @override
   String toString() {
     StringBuffer builder = StringBuffer();
-    builder.write("Query(");
+    builder.write('Query(');
     builder.write(path.canonicalString);
     if (!filters.isEmpty) {
-      builder.write(" where ");
+      builder.write(' where ');
       for (int i = 0; i < filters.length; i++) {
         if (i > 0) {
-          builder.write(" and ");
+          builder.write(' and ');
         }
         builder.write(filters[i]);
       }
     }
 
     if (!explicitSortOrder.isEmpty) {
-      builder.write(" order by ");
+      builder.write(' order by ');
       for (int i = 0; i < explicitSortOrder.length; i++) {
         if (i > 0) {
-          builder.write(", ");
+          builder.write(', ');
         }
         builder.write(explicitSortOrder[i]);
       }
     }
 
-    builder.write(")");
+    builder.write(')');
     return builder.toString();
   }
 }
@@ -357,19 +357,19 @@ class Query {
 class QueryComparator {
   final List<OrderBy> sortOrder;
 
-  const QueryComparator._(this.sortOrder);
-
   factory QueryComparator(List<OrderBy> order) {
     bool hasKeyOrdering = false;
     for (OrderBy orderBy in order) {
       hasKeyOrdering = hasKeyOrdering || orderBy.field == FieldPath.keyPath;
     }
     if (!hasKeyOrdering) {
-      throw new ArgumentError('QueryComparator needs to have a key ordering');
+      throw ArgumentError('QueryComparator needs to have a key ordering');
     }
 
     return QueryComparator._(order);
   }
+
+  const QueryComparator._(this.sortOrder);
 
   Comparator<Document> get comparator => (Document doc1, Document doc2) {
         for (OrderBy order in sortOrder) {

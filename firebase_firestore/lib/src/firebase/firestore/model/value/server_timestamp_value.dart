@@ -61,7 +61,7 @@ class ServerTimestampValue extends FieldValue {
   }
 
   @override
-  String toString() => "<ServerTimestamp localTime=$localWriteTime>";
+  String toString() => '<ServerTimestamp localTime=$localWriteTime>';
 
   @override
   bool operator ==(Object other) =>

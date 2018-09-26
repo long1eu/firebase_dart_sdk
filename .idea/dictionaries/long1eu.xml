@@ -1,14 +1,23 @@
 <component name="ProjectDictionaryState">
   <dictionary name="long1eu">
     <words>
+      <w>backticks</w>
       <w>bidi</w>
       <w>datastore</w>
       <w>firestore</w>
       <w>geopoint</w>
+      <w>goog</w>
       <w>growable</w>
       <w>initializers</w>
       <w>memoized</w>
+      <w>protos</w>
+      <w>rewatching</w>
+      <w>subcollection</w>
       <w>subcollections</w>
+      <w>unioned</w>
+      <w>unlisten</w>
+      <w>unlistens</w>
+      <w>unwatching</w>
     </words>
   </dictionary>
 </component>

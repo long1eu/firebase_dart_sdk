@@ -77,7 +77,7 @@ class IndexedQueryEngine implements QueryEngine {
 
   // [ArrayValue] and [ObjectValue] are currently considered low cardinality
   // because we don't index them uniquely.
-  static final List<Type> lowCardinalityTypes = [
+  static final List<Type> lowCardinalityTypes = <Type>[
     BoolValue,
     ArrayValue,
     ObjectValue
@@ -157,11 +157,11 @@ class IndexedQueryEngine implements QueryEngine {
           'Filter type expected to be RelationFilter');
       final RelationFilter relationFilter = filter;
 
-      double operatorSelectivity =
+      final double operatorSelectivity =
           relationFilter.operator == FilterOperator.equal
               ? highSelectivity
               : lowSelectivity;
-      double typeSelectivity =
+      final double typeSelectivity =
           lowCardinalityTypes.contains(relationFilter.value.runtimeType)
               ? lowSelectivity
               : highSelectivity;
@@ -180,7 +180,7 @@ class IndexedQueryEngine implements QueryEngine {
     double currentSelectivity = -1.0;
 
     if (query.filters.isNotEmpty) {
-      Filter selectedFilter = null;
+      Filter selectedFilter;
       for (Filter currentFilter in query.filters) {
         final double estimatedSelectivity =
             _estimateFilterSelectivity(currentFilter);
@@ -211,8 +211,8 @@ class IndexedQueryEngine implements QueryEngine {
     final IndexRangeBuilder indexRange =
         IndexRangeBuilder(fieldPath: filter.field);
     if (filter is RelationFilter) {
-      RelationFilter relationFilter = filter;
-      FieldValue filterValue = relationFilter.value;
+      final RelationFilter relationFilter = filter;
+      final FieldValue filterValue = relationFilter.value;
       switch (relationFilter.operator) {
         case FilterOperator.equal:
           indexRange.start = filterValue;
@@ -228,7 +228,7 @@ class IndexedQueryEngine implements QueryEngine {
           break;
         default:
           // TODO: Add support for ARRAY_CONTAINS.
-          throw Assert.fail("Unexpected operator in query filter");
+          throw Assert.fail('Unexpected operator in query filter');
       }
     } else if (filter is NaNFilter) {
       indexRange.start = DoubleValue.nan;
@@ -243,8 +243,8 @@ class IndexedQueryEngine implements QueryEngine {
   @override
   void handleDocumentChange(
       MaybeDocument oldDocument, MaybeDocument newDocument) {
-    // TODO: Determine changed fields and make appropriate addEntry() / removeEntry()
-    // on SQLiteCollectionIndex.
-    throw new StateError("Not yet implemented.");
+    // TODO: Determine changed fields and make appropriate
+    // addEntry() / removeEntry() on [SQLiteCollectionIndex].
+    throw StateError('Not yet implemented.');
   }
 }

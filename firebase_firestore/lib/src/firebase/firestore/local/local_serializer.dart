@@ -10,10 +10,10 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
@@ -33,8 +33,6 @@ import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/query.pb.d
     as proto;
 import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart'
     as proto;
-import 'package:firebase_firestore/src/proto/google/protobuf/struct.pb.dart'
-    as proto show NullValue;
 import 'package:firebase_firestore/src/proto/google/protobuf/timestamp.pb.dart'
     as proto;
 import 'package:firebase_firestore/src/proto/google/protobuf/wrappers.pb.dart'
@@ -54,23 +52,24 @@ class LocalSerializer {
   /// Encodes a MaybeDocument model to the equivalent protocol buffer for local
   /// storage.
   proto.MaybeDocument encodeMaybeDocument(MaybeDocument document) {
-    proto.MaybeDocument builder = proto.MaybeDocument.create();
+    final proto.MaybeDocument builder = proto.MaybeDocument.create();
     if (document is NoDocument) {
-      builder.noDocument = encodeNoDocument(document);
+      builder.noDocument = _encodeNoDocument(document);
     } else if (document is Document) {
-      builder.document = encodeDocument(document);
+      builder.document = _encodeDocument(document);
     } else {
       throw Assert.fail('Unknown document type ${document.runtimeType}');
     }
-    return builder.freeze();
+
+    return builder..freeze();
   }
 
   /// Decodes a MaybeDocument proto to the equivalent model.
   MaybeDocument decodeMaybeDocument(proto.MaybeDocument data) {
     if (data.hasDocument()) {
-      return decodeDocument(data.document);
+      return _decodeDocument(data.document);
     } else if (data.hasNoDocument()) {
-      return decodeNoDocument(data.noDocument);
+      return _decodeNoDocument(data.noDocument);
     } else {
       throw Assert.fail('Unknown MaybeDocument $data');
     }
@@ -79,8 +78,7 @@ class LocalSerializer {
   /// Encodes a Document for local storage. This differs from the v1beta1 RPC
   /// serializer for Documents in that it preserves the updateTime, which is
   /// considered an output only value by the server.
-  /*private*/
-  proto.Document encodeDocument(Document document) {
+  proto.Document _encodeDocument(Document document) {
     final proto.Document builder = proto.Document.create();
     builder.name = rpcSerializer.encodeKey(document.key);
 
@@ -95,36 +93,33 @@ class LocalSerializer {
 
     final Timestamp updateTime = document.version.timestamp;
     builder.updateTime = rpcSerializer.encodeTimestamp(updateTime);
-    return builder.freeze();
+    return builder..freeze();
   }
 
   /// Decodes a Document proto to the equivalent model.
-  /*private*/
-  Document decodeDocument(proto.Document document) {
+  Document _decodeDocument(proto.Document document) {
     final DocumentKey key = rpcSerializer.decodeKey(document.name);
     final ObjectValue value =
         rpcSerializer.decodeDocumentFields(document.fields);
     final SnapshotVersion version =
         rpcSerializer.decodeVersion(document.updateTime);
-    return new Document(key, version, value, false);
+    return Document(key, version, value, false);
   }
 
   /// Encodes a NoDocument value to the equivalent proto.
-  /*private*/
-  proto.NoDocument encodeNoDocument(NoDocument document) {
-    proto.NoDocument builder = proto.NoDocument.create();
+  proto.NoDocument _encodeNoDocument(NoDocument document) {
+    final proto.NoDocument builder = proto.NoDocument.create();
     builder.name = rpcSerializer.encodeKey(document.key);
     builder.readTime =
         rpcSerializer.encodeTimestamp(document.version.timestamp);
-    return builder.freeze();
+    return builder..freeze();
   }
 
   /// Decodes a NoDocument proto to the equivalent model.
-  /*private*/
-  NoDocument decodeNoDocument(proto.NoDocument proto) {
-    DocumentKey key = rpcSerializer.decodeKey(proto.name);
-    SnapshotVersion version = rpcSerializer.decodeVersion(proto.readTime);
-    return new NoDocument(key, version);
+  NoDocument _decodeNoDocument(proto.NoDocument proto) {
+    final DocumentKey key = rpcSerializer.decodeKey(proto.name);
+    final SnapshotVersion version = rpcSerializer.decodeVersion(proto.readTime);
+    return NoDocument(key, version);
   }
 
   /// Encodes a MutationBatch model for local storage in the mutation queue.
@@ -135,29 +130,29 @@ class LocalSerializer {
     for (Mutation mutation in batch.mutations) {
       result.writes.add(rpcSerializer.encodeMutation(mutation));
     }
-    return result.freeze();
+    return result..freeze();
   }
 
-  /** Decodes a WriteBatch proto into a MutationBatch model. */
+  /// Decodes a [WriteBatch] proto into a MutationBatch model. */
   MutationBatch decodeMutationBatch(proto.WriteBatch batch) {
     final int batchId = batch.batchId;
-    Timestamp localWriteTime =
+    final Timestamp localWriteTime =
         rpcSerializer.decodeTimestamp(batch.localWriteTime);
 
     final int count = batch.writes.length;
-    List<Mutation> mutations = List<Mutation>(count);
+    final List<Mutation> mutations = List<Mutation>(count);
     for (int i = 0; i < count; i++) {
       mutations.add(rpcSerializer.decodeMutation(batch.writes[i]));
     }
 
-    return new MutationBatch(batchId, localWriteTime, mutations);
+    return MutationBatch(batchId, localWriteTime, mutations);
   }
 
   proto.Target encodeQueryData(QueryData queryData) {
     Assert.hardAssert(queryData.purpose == QueryPurpose.listen,
-        "Only queries with purpose ${QueryPurpose.listen} may be stored, got ${queryData.purpose}");
+        'Only queries with purpose ${QueryPurpose.listen} may be stored, got ${queryData.purpose}');
 
-    proto.Target result = proto.Target.create();
+    final proto.Target result = proto.Target.create();
 
     result
       ..targetId = queryData.targetId
@@ -172,7 +167,7 @@ class LocalSerializer {
       result.query = rpcSerializer.encodeQueryTarget(query);
     }
 
-    return result.freeze();
+    return result..freeze();
   }
 
   QueryData decodeQueryData(proto.Target target) {
@@ -193,13 +188,7 @@ class LocalSerializer {
       throw Assert.fail('Unknown targetType $target}');
     }
 
-    return new QueryData(
-      query,
-      targetId,
-      sequenceNumber,
-      QueryPurpose.listen,
-      version,
-      resumeToken,
-    );
+    return QueryData(query, targetId, sequenceNumber, QueryPurpose.listen,
+        version, resumeToken);
   }
 }

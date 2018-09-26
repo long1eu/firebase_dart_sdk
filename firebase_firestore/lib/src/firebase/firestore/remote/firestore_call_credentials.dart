@@ -8,7 +8,7 @@ import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provi
 import 'package:grpc/grpc.dart';
 
 class FirestoreCallCredentials {
-  static const String tag = "FirestoreCallCredentials";
+  static const String tag = 'FirestoreCallCredentials';
 
   static const String _authorizationHeader = 'Authorization';
 
@@ -16,7 +16,7 @@ class FirestoreCallCredentials {
 
   FirestoreCallCredentials(this.credentialsProvider);
 
-  Future<void> getRequestMetadata(
+  Future<Null> getRequestMetadata(
       Map<String, String> metadata, String uri) async {
     try {
       final String token = await credentialsProvider.token;

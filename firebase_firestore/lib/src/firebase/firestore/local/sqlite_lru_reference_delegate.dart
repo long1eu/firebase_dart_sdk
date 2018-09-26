@@ -25,7 +25,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   SQLiteLruReferenceDelegate(this.persistence)
       : _currentSequenceNumber = ListenSequence.INVALID {
-    this.garbageCollector = new LruGarbageCollector(this);
+    garbageCollector = LruGarbageCollector(this);
   }
 
   @override
@@ -35,7 +35,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   LruGarbageCollector garbageCollector;
 
   void start(int highestSequenceNumber) {
-    listenSequence = new ListenSequence(highestSequenceNumber);
+    listenSequence = ListenSequence(highestSequenceNumber);
   }
 
   @override
@@ -84,7 +84,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
         );
 
     for (Map<String, dynamic> row in result) {
-      consumer(row['sequence_number']);
+      consumer(row['sequence_number'] as int);
     }
   }
 
@@ -122,7 +122,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
           WHERE path = ?;
         ''',
         // @formatter:on
-        [EncodedPath.encode(key.path)])).isNotEmpty;
+        <String>[EncodedPath.encode(key.path)])).isNotEmpty;
   }
 
   /// Returns true if anything would prevent this document from being garbage
@@ -147,7 +147,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
              AND target_id = 0;
         ''',
         // @formatter:on
-        [EncodedPath.encode(key.path)]);
+        <String>[EncodedPath.encode(key.path)]);
   }
 
   @override
@@ -165,10 +165,11 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
              AND sequence_number <= ?;
         ''',
         // @formatter:on
-        [upperBound]);
+        <int>[upperBound]);
 
     for (Map<String, dynamic> row in result) {
-      final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
+      final ResourcePath path =
+          EncodedPath.decodeResourcePath(row['path'] as String);
       final DocumentKey key = DocumentKey.fromPath(path);
       if (!await _isPinned(tx, key)) {
         count++;
@@ -182,7 +183,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<void> removeTarget(DatabaseExecutor tx, QueryData queryData) async {
-    QueryData updated = queryData.copy(
+    final QueryData updated = queryData.copy(
       queryData.snapshotVersion,
       queryData.resumeToken,
       currentSequenceNumber,
@@ -197,7 +198,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   Future<void> _writeSentinel(DatabaseExecutor tx, DocumentKey key) async {
-    String path = EncodedPath.encode(key.path);
+    final String path = EncodedPath.encode(key.path);
     await persistence.execute(tx,
         // @formatter:off
         '''
@@ -206,6 +207,6 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
           VALUES (0, ?, ?);
         ''',
         // @formatter:on
-        [path, currentSequenceNumber]);
+        <dynamic>[path, currentSequenceNumber]);
   }
 }

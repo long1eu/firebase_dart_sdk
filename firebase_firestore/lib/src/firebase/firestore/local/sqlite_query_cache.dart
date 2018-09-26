@@ -19,6 +19,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:firebase_firestore/src/proto/firestore/local/target.pb.dart'
     as proto;
+import 'package:fixnum/fixnum.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Cached Queries backed by SQLite.
@@ -42,7 +43,7 @@ class SQLiteQueryCache implements QueryCache {
   Future<void> start(DatabaseExecutor tx) async {
     // Store exactly one row in the table. If the row exists at all, it's the
     // global metadata.
-    List<Map<String, dynamic>> result = await db.query(tx,
+    final List<Map<String, dynamic>> result = await db.query(tx,
         // @formatter:off
         '''
           SELECT highest_target_id,
@@ -57,13 +58,13 @@ class SQLiteQueryCache implements QueryCache {
         );
     final Map<String, dynamic> row = result.first;
 
-    highestTargetId = row['highest_target_id'];
-    lastListenSequenceNumber = row['highest_listen_sequence_number'];
+    highestTargetId = row['highest_target_id'] as int;
+    lastListenSequenceNumber = row['highest_listen_sequence_number'] as int;
     lastRemoteSnapshotVersion = SnapshotVersion(Timestamp(
-      row['last_remote_snapshot_version_seconds'],
-      row['last_remote_snapshot_version_nanos'],
+      Int64(row['last_remote_snapshot_version_seconds'] as int),
+      row['last_remote_snapshot_version_nanos'] as int,
     ));
-    targetCount = row['targetCount'];
+    targetCount = row['targetCount'] as int;
 
     Assert.hardAssert(result.length == 1, 'Missing target_globals entry');
   }
@@ -97,11 +98,11 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   Future<void> _saveQueryData(DatabaseExecutor tx, QueryData queryData) async {
-    int targetId = queryData.targetId;
-    String canonicalId = queryData.query.canonicalId;
-    Timestamp version = queryData.snapshotVersion.timestamp;
+    final int targetId = queryData.targetId;
+    final String canonicalId = queryData.query.canonicalId;
+    final Timestamp version = queryData.snapshotVersion.timestamp;
 
-    proto.Target targetProto = localSerializer.encodeQueryData(queryData);
+    final proto.Target targetProto = localSerializer.encodeQueryData(queryData);
 
     await db.execute(tx,
         // @formatter:off
@@ -117,7 +118,7 @@ class SQLiteQueryCache implements QueryCache {
           VALUES (?, ?, ?, ?, ?, ?, ?);        
         ''',
         // @formatter:on
-        [
+        <dynamic>[
           targetId,
           canonicalId,
           version.seconds,
@@ -176,7 +177,7 @@ class SQLiteQueryCache implements QueryCache {
         '''
         // @formatter:on
         ,
-        [
+        <dynamic>[
           highestTargetId,
           lastListenSequenceNumber,
           lastRemoteSnapshotVersion.timestamp.seconds,
@@ -195,7 +196,7 @@ class SQLiteQueryCache implements QueryCache {
           WHERE target_id = ?;
         ''',
         // @formatter:on
-        [targetId]);
+        <int>[targetId]);
     targetCount--;
   }
 
@@ -256,12 +257,13 @@ class SQLiteQueryCache implements QueryCache {
           WHERE canonical_id = ?;
         ''',
         // @formatter:on
-        [canonicalId]);
+        <String>[canonicalId]);
 
     QueryData data;
     for (Map<String, dynamic> row in result) {
       // TODO: break out early if found.
-      final QueryData found = _decodeQueryData(row['target_proto']);
+      final QueryData found =
+          _decodeQueryData(row['target_proto'] as List<int>);
 
       // After finding a potential match, check that the query is actually equal
       // to the requested query.
@@ -291,7 +293,7 @@ class SQLiteQueryCache implements QueryCache {
     // on any attempts to add duplicate entries. This works because there's no
     // additional information in the row. If we want to track additional data
     // this will probably need to become INSERT OR REPLACE instead.
-    final String statement =
+    const String statement =
         // @formatter:off
         '''
           INSERT
@@ -304,7 +306,7 @@ class SQLiteQueryCache implements QueryCache {
     final ReferenceDelegate delegate = db.referenceDelegate;
     for (DocumentKey key in keys) {
       final String path = EncodedPath.encode(key.path);
-      await db.execute(tx, statement, [targetId, path]);
+      await db.execute(tx, statement, <dynamic>[targetId, path]);
       await delegate.addReference(tx, key);
     }
   }
@@ -313,7 +315,7 @@ class SQLiteQueryCache implements QueryCache {
   Future<void> removeMatchingKeys(DatabaseExecutor tx,
       ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     // PORTING NOTE: The reverse index (document_targets) is maintained by SQLite.
-    final String statement =
+    const String statement =
         // @formatter:off
         '''
           DELETE
@@ -327,7 +329,7 @@ class SQLiteQueryCache implements QueryCache {
     final ReferenceDelegate delegate = db.referenceDelegate;
     for (DocumentKey key in keys) {
       final String path = EncodedPath.encode(key.path);
-      await db.execute(tx, statement, [targetId, path]);
+      await db.execute(tx, statement, <dynamic>[targetId, path]);
       await delegate.removeReference(tx, key);
     }
   }
@@ -342,7 +344,7 @@ class SQLiteQueryCache implements QueryCache {
           WHERE target_id = ?;
         ''',
         // @formatter:on
-        [targetId]);
+        <int>[targetId]);
   }
 
   @override
@@ -358,7 +360,7 @@ class SQLiteQueryCache implements QueryCache {
           WHERE target_id = ?;
         ''',
         // @formatter:on
-        [targetId]);
+        <int>[targetId]);
 
     for (Map<String, dynamic> row in result) {
       final String path = row['path'];
@@ -372,9 +374,9 @@ class SQLiteQueryCache implements QueryCache {
 
   @override
   Future<bool> containsKey(DatabaseExecutor tx, DocumentKey key) async {
-    String path = EncodedPath.encode(key.path);
+    final String path = EncodedPath.encode(key.path);
 
-    final result = await db.query(tx,
+    final List<Map<String, dynamic>> result = await db.query(tx,
         // @formatter:off
         '''
           SELECT target_id
@@ -384,7 +386,7 @@ class SQLiteQueryCache implements QueryCache {
           LIMIT 1;
         ''',
         // @formatter:on
-        [path]);
+        <String>[path]);
 
     return result.isNotEmpty;
   }

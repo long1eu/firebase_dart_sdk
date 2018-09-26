@@ -30,8 +30,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<void> add(DatabaseExecutor tx, MaybeDocument maybeDocument) async {
-    String path = _pathForKey(maybeDocument.key);
-    GeneratedMessage message = serializer.encodeMaybeDocument(maybeDocument);
+    final String path = _pathForKey(maybeDocument.key);
+    final GeneratedMessage message =
+        serializer.encodeMaybeDocument(maybeDocument);
 
     await db.execute(tx,
         // @formatter:off
@@ -41,12 +42,12 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           VALUES (?, ?);
         ''',
         // @formatter:on
-        [path, message.writeToBuffer()]);
+        <dynamic>[path, message.writeToBuffer()]);
   }
 
   @override
   Future<void> remove(DatabaseExecutor tx, DocumentKey documentKey) async {
-    String path = _pathForKey(documentKey);
+    final String path = _pathForKey(documentKey);
 
     await db.execute(tx,
         // @formatter:off
@@ -56,13 +57,13 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           WHERE path = ?;
         ''',
         // @formatter:on
-        [path]);
+        <String>[path]);
   }
 
   @override
   Future<MaybeDocument> get(
       DatabaseExecutor tx, DocumentKey documentKey) async {
-    String path = _pathForKey(documentKey);
+    final String path = _pathForKey(documentKey);
 
     final Map<String, dynamic> row = (await db.query(tx,
         // @formatter:off
@@ -72,9 +73,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           WHERE path = ?;
         ''',
         // @formatter:on
-        [path])).first;
+        <String>[path])).first;
 
-    return decodeMaybeDocument(row['contents']);
+    return decodeMaybeDocument(row['contents'] as List<int>);
   }
 
   @override
@@ -82,13 +83,13 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       getAllDocumentsMatchingQuery(DatabaseExecutor tx, Query query) async {
     // Use the query path as a prefix for testing if a document matches the
     // query.
-    ResourcePath prefix = query.path;
-    int immediateChildrenPathLength = prefix.length + 1;
+    final ResourcePath prefix = query.path;
+    final int immediateChildrenPathLength = prefix.length + 1;
 
-    String prefixPath = EncodedPath.encode(prefix);
-    String prefixSuccessorPath = EncodedPath.prefixSuccessor(prefixPath);
+    final String prefixPath = EncodedPath.encode(prefix);
+    final String prefixSuccessorPath = EncodedPath.prefixSuccessor(prefixPath);
 
-    Map<DocumentKey, Document> results = <DocumentKey, Document>{};
+    final Map<DocumentKey, Document> results = <DocumentKey, Document>{};
 
     final List<Map<String, dynamic>> result = await db.query(tx,
         // @formatter:off
@@ -99,9 +100,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
             AND path < ?;
         ''',
         // @formatter:on
-        [prefixPath, prefixSuccessorPath]);
+        <String>[prefixPath, prefixSuccessorPath]);
 
-    for (var row in result) {
+    for (Map<String, dynamic> row in result) {
       // TODO: Actually implement a single-collection query
       //
       // The query is actually returning any path that starts with the query
@@ -109,20 +110,22 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       // a query on 'rooms' will return rooms/abc/messages/xyx but we shouldn't
       // match it. Fix this by discarding rows with document keys more than one
       // segment longer than the query path.
-      final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
+      final ResourcePath path =
+          EncodedPath.decodeResourcePath(row['path'] as String);
       if (path.length != immediateChildrenPathLength) continue;
 
       final MaybeDocument maybeDoc =
-          decodeMaybeDocument(row['remote_documents']);
+          decodeMaybeDocument(row['remote_documents'] as List<int>);
       if (maybeDoc is! Document) continue;
 
-      Document doc = maybeDoc;
+      final Document doc = maybeDoc;
       if (!query.matches(doc)) continue;
 
       results[doc.key] = doc;
     }
 
-    return ImmutableSortedMap.fromMap(results, DocumentKey.comparator);
+    return ImmutableSortedMap<DocumentKey, Document>.fromMap(
+        results, DocumentKey.comparator);
   }
 
   String _pathForKey(DocumentKey key) {
@@ -134,7 +137,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       return serializer
           .decodeMaybeDocument(proto.MaybeDocument.fromBuffer(bytes));
     } on InvalidProtocolBufferException catch (e) {
-      throw Assert.fail("MaybeDocument failed to parse: $e");
+      throw Assert.fail('MaybeDocument failed to parse: $e');
     }
   }
 }

@@ -18,7 +18,20 @@ import 'package:firebase_database_collection/src/lltb_value_node.dart';
 /// twice as much memory.
 class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   LLRBNode<K, V> _root;
+  @override
   Comparator<K> comparator;
+
+  RBTreeSortedMap(this.comparator, [LLRBNode<K, V> root])
+      : _root = root ?? LLRBEmptyNode<K, V>();
+
+  factory RBTreeSortedMap.fromMap(Map<K, V> values, Comparator<K> comparator) {
+    return RBTreeSortedMapBuilder.buildFrom(
+      values.keys.toList(),
+      values,
+      ImmutableSortedMap.identityTranslator(),
+      comparator,
+    );
+  }
 
   static RBTreeSortedMap<A, C> buildFrom<A, B, C>(
       List<A> keys,
@@ -33,18 +46,6 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
     );
   }
 
-  factory RBTreeSortedMap.fromMap(Map<K, V> values, Comparator<K> comparator) {
-    return RBTreeSortedMapBuilder.buildFrom(
-      values.keys.toList(),
-      values,
-      ImmutableSortedMap.identityTranslator(),
-      comparator,
-    );
-  }
-
-  RBTreeSortedMap(this.comparator, [LLRBNode<K, V> root])
-      : _root = root ?? LLRBEmptyNode<K, V>();
-
   // For testing purposes
   LLRBNode<K, V> get root => _root;
 
@@ -52,7 +53,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   LLRBNode<K, V> getNode(K key) {
     LLRBNode<K, V> node = _root;
     while (!node.isEmpty) {
-      int cmp = this.comparator(key, node.key);
+      final int cmp = this.comparator(key, node.key);
       if (cmp < 0) {
         node = node.left;
       } else if (cmp == 0) {
@@ -75,22 +76,22 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
 
   @override
   ImmutableSortedMap<K, V> remove(K key) {
-    if (!this.containsKey(key)) {
+    if (!containsKey(key)) {
       return this;
     } else {
-      LLRBNode<K, V> newRoot = _root
-          .remove(key, this.comparator)
+      final LLRBNode<K, V> newRoot = _root
+          .remove(key, comparator)
           .copy(null, null, LLRBNodeColor.black, null, null);
-      return RBTreeSortedMap<K, V>(this.comparator, newRoot);
+      return RBTreeSortedMap<K, V>(comparator, newRoot);
     }
   }
 
   @override
   ImmutableSortedMap<K, V> insert(K key, V value) {
-    LLRBNode<K, V> newRoot = _root
-        .insert(key, value, this.comparator)
+    final LLRBNode<K, V> newRoot = _root
+        .insert(key, value, comparator)
         .copy(null, null, LLRBNodeColor.black, null, null);
-    return RBTreeSortedMap<K, V>(this.comparator, newRoot);
+    return RBTreeSortedMap<K, V>(comparator, newRoot);
   }
 
   @override
@@ -112,31 +113,30 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
 
   @override
   Iterator<MapEntry<K, V>> get iterator {
-    return ImmutableSortedMapIterator<K, V>(
-        _root, null, this.comparator, false);
+    return ImmutableSortedMapIterator<K, V>(_root, null, comparator, false);
   }
 
   @override
   Iterator<MapEntry<K, V>> iteratorFrom(K key) {
-    return ImmutableSortedMapIterator<K, V>(_root, key, this.comparator, false);
+    return ImmutableSortedMapIterator<K, V>(_root, key, comparator, false);
   }
 
   @override
   Iterator<MapEntry<K, V>> reverseIteratorFrom(K key) {
-    return ImmutableSortedMapIterator<K, V>(_root, key, this.comparator, true);
+    return ImmutableSortedMapIterator<K, V>(_root, key, comparator, true);
   }
 
   @override
   Iterator<MapEntry<K, V>> get reverseIterator {
-    return ImmutableSortedMapIterator<K, V>(_root, null, this.comparator, true);
+    return ImmutableSortedMapIterator<K, V>(_root, null, comparator, true);
   }
 
   @override
   K getPredecessorKey(K key) {
     LLRBNode<K, V> node = _root;
-    LLRBNode<K, V> rightParent = null;
+    LLRBNode<K, V> rightParent;
     while (!node.isEmpty) {
-      int cmp = this.comparator(key, node.key);
+      final int cmp = this.comparator(key, node.key);
       if (cmp == 0) {
         if (!node.left.isEmpty) {
           node = node.left;
@@ -156,14 +156,14 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
         node = node.right;
       }
     }
-    throw new ArgumentError(
+    throw ArgumentError(
         'Couldn\'t find predecessor key of non-present key: $key');
   }
 
   @override
   K getSuccessorKey(K key) {
     LLRBNode<K, V> node = _root;
-    LLRBNode<K, V> leftParent = null;
+    LLRBNode<K, V> leftParent;
     while (!node.isEmpty) {
       final int cmp = this.comparator(node.key, key);
       if (cmp == 0) {
@@ -185,7 +185,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
         node = node.left;
       }
     }
-    throw new ArgumentError(
+    throw ArgumentError(
         'Couldn\'t find successor key of non-present key: $key');
   }
 
@@ -195,7 +195,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
     int prunedNodes = 0;
     LLRBNode<K, V> node = _root;
     while (!node.isEmpty) {
-      int cmp = this.comparator(key, node.key);
+      final int cmp = this.comparator(key, node.key);
       if (cmp == 0) {
         return prunedNodes + node.left.length;
       } else if (cmp < 0) {
@@ -226,13 +226,14 @@ class RBTreeSortedMapBuilder<A, B, C> {
   }
 
   void _buildPennant(LLRBNodeColor color, int chunkSize, int start) {
-    LLRBNode<A, C> treeRoot = _buildBalancedTree(start + 1, chunkSize - 1);
-    A key = this.keys[start];
+    final LLRBNode<A, C> treeRoot =
+        _buildBalancedTree(start + 1, chunkSize - 1);
+    final A key = keys[start];
     LLRBValueNode<A, C> node;
     if (color == LLRBNodeColor.red) {
       node = LLRBRedValueNode<A, C>(key, getValue(key), null, treeRoot);
     } else {
-      node = new LLRBBlackValueNode<A, C>(key, getValue(key), null, treeRoot);
+      node = LLRBBlackValueNode<A, C>(key, getValue(key), null, treeRoot);
     }
     if (_root == null) {
       _root = node;
@@ -247,15 +248,15 @@ class RBTreeSortedMapBuilder<A, B, C> {
     if (size == 0) {
       return LLRBEmptyNode<A, C>();
     } else if (size == 1) {
-      final A key = this.keys[start];
-      return new LLRBBlackValueNode<A, C>(key, getValue(key), null, null);
+      final A key = keys[start];
+      return LLRBBlackValueNode<A, C>(key, getValue(key), null, null);
     } else {
       final int half = size ~/ 2;
       final int middle = start + half;
-      LLRBNode<A, C> left = _buildBalancedTree(start, half);
-      LLRBNode<A, C> right = _buildBalancedTree(middle + 1, half);
+      final LLRBNode<A, C> left = _buildBalancedTree(start, half);
+      final LLRBNode<A, C> right = _buildBalancedTree(middle + 1, half);
       final A key = keys[middle];
-      return new LLRBBlackValueNode<A, C>(key, getValue(key), left, right);
+      return LLRBBlackValueNode<A, C>(key, getValue(key), left, right);
     }
   }
 
@@ -264,13 +265,13 @@ class RBTreeSortedMapBuilder<A, B, C> {
       Map<B, C> values,
       KeyTranslator<A, B> translator,
       Comparator<A> comparator) {
-    RBTreeSortedMapBuilder<A, B, C> builder =
-        new RBTreeSortedMapBuilder<A, B, C>(keys, values, translator);
+    final RBTreeSortedMapBuilder<A, B, C> builder =
+        RBTreeSortedMapBuilder<A, B, C>(keys, values, translator);
     keys.sort(comparator);
-    Iterator<BooleanChunk> iter = (new Base1_2(keys.length)).iterator;
+    final Iterator<BooleanChunk> it = Base1_2(keys.length).iterator;
     int index = keys.length;
-    while (iter.moveNext()) {
-      BooleanChunk next = iter.current;
+    while (it.moveNext()) {
+      final BooleanChunk next = it.current;
       index -= next.chunkSize;
       if (next.isOne) {
         builder._buildPennant(LLRBNodeColor.black, next.chunkSize, index);
@@ -280,7 +281,7 @@ class RBTreeSortedMapBuilder<A, B, C> {
         builder._buildPennant(LLRBNodeColor.red, next.chunkSize, index);
       }
     }
-    return new RBTreeSortedMap<A, C>(
+    return RBTreeSortedMap<A, C>(
       comparator,
       builder._root == null ? LLRBEmptyNode<A, C>() : builder._root,
     );
@@ -292,15 +293,17 @@ class BooleanChunk {
   int chunkSize;
 }
 
+// ignore: camel_case_types
 class Base1_2 extends Iterable<BooleanChunk> {
+  @override
   final int length;
   int value;
 
   factory Base1_2(int size) {
-    int toCalc = size + 1;
-    final length = (log(toCalc) / log(2)).floor();
+    final int toCalc = size + 1;
+    final int length = (log(toCalc) / log(2)).floor();
 
-    int mask = pow(2, length) - 1;
+    final int mask = pow(2, length) - 1;
     final int value = toCalc & mask;
 
     return Base1_2._(length, value);
@@ -318,9 +321,9 @@ class Base1_2 extends Iterable<BooleanChunk> {
 
       while (currentPosition >= 0) {
         final int result = value & (1 << currentPosition);
-        final BooleanChunk next = new BooleanChunk();
+        final BooleanChunk next = BooleanChunk();
         next.isOne = result == 0;
-        next.chunkSize = pow(2, currentPosition);
+        next.chunkSize = pow(2, currentPosition).toInt();
         currentPosition--;
         yield next;
       }

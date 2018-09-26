@@ -7,11 +7,11 @@ import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dar
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/event_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 /// QueryListener takes a series of internal view snapshots and determines when
 /// to raise events.
@@ -36,18 +36,18 @@ class QueryListener {
 
   void onViewSnapshot(ViewSnapshot newSnapshot) {
     Assert.hardAssert(
-        !newSnapshot.changes.isEmpty || newSnapshot.didSyncStateChange,
+        newSnapshot.changes.isNotEmpty || newSnapshot.didSyncStateChange,
         'We got a new snapshot with no changes?');
 
     if (!options.includeDocumentMetadataChanges) {
       // Remove the metadata only changes
-      List<DocumentViewChange> documentChanges = <DocumentViewChange>[];
+      final List<DocumentViewChange> documentChanges = <DocumentViewChange>[];
       for (DocumentViewChange change in newSnapshot.changes) {
         if (change.type != DocumentViewChangeType.metadata) {
           documentChanges.add(change);
         }
       }
-      newSnapshot = new ViewSnapshot(
+      newSnapshot = ViewSnapshot(
           newSnapshot.query,
           newSnapshot.documents,
           newSnapshot.oldDocuments,
@@ -62,14 +62,14 @@ class QueryListener {
         raiseInitialEvent(newSnapshot);
       }
     } else if (shouldRaiseEvent(newSnapshot)) {
-      listener.onEvent(newSnapshot, null);
+      listener(newSnapshot, null);
     }
 
-    this.snapshot = newSnapshot;
+    snapshot = newSnapshot;
   }
 
   void onError(FirebaseFirestoreError error) {
-    listener.onEvent(null, error);
+    listener(null, error);
   }
 
   void onOnlineStateChanged(OnlineState onlineState) {
@@ -114,7 +114,7 @@ class QueryListener {
       return true;
     }
 
-    bool hasPendingWritesChanged = this.snapshot != null &&
+    final bool hasPendingWritesChanged = this.snapshot != null &&
         this.snapshot.hasPendingWrites != snapshot.hasPendingWrites;
     if (snapshot.didSyncStateChange || hasPendingWritesChanged) {
       return options.includeQueryMetadataChanges;
@@ -129,22 +129,22 @@ class QueryListener {
   void raiseInitialEvent(ViewSnapshot snapshot) {
     Assert.hardAssert(
         !raisedInitialEvent, 'Trying to raise initial event for second time');
-    snapshot = new ViewSnapshot(
+    snapshot = ViewSnapshot(
         snapshot.query,
         snapshot.documents,
         DocumentSet.emptySet(snapshot.query.comparator),
         QueryListener._getInitialViewChanges(snapshot),
         snapshot.isFromCache,
         snapshot.hasPendingWrites,
-        /*didSyncStateChange=*/
+        /*didSyncStateChange:*/
         true);
     raisedInitialEvent = true;
-    listener.onEvent(snapshot, null);
+    listener(snapshot, null);
   }
 
   static List<DocumentViewChange> _getInitialViewChanges(
       ViewSnapshot snapshot) {
-    List<DocumentViewChange> res = <DocumentViewChange>[];
+    final List<DocumentViewChange> res = <DocumentViewChange>[];
     for (Document doc in snapshot.documents) {
       res.add(DocumentViewChange(DocumentViewChangeType.added, doc));
     }

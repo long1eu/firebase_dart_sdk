@@ -12,11 +12,6 @@ class ResourcePath extends BasePath<ResourcePath> {
   const ResourcePath._([List<String> segments = const <String>[]])
       : super(segments);
 
-  @override
-  ResourcePath createPathWithSegments(List<String> segments) {
-    return ResourcePath._(segments);
-  }
-
   factory ResourcePath.fromSegments(List<String> segments) {
     return segments.isEmpty ? empty : ResourcePath._(segments);
   }
@@ -33,7 +28,12 @@ class ResourcePath extends BasePath<ResourcePath> {
 
     // We may still have an empty segment at the beginning or end if they had a
     // leading or trailing slash (which we allow).
-    return ResourcePath._(path.split('/').where(isNotNull));
+    return ResourcePath._(path.split('/').where(isNotNull).toList());
+  }
+
+  @override
+  ResourcePath createPathWithSegments(List<String> segments) {
+    return ResourcePath._(segments);
   }
 
   @override
@@ -41,12 +41,12 @@ class ResourcePath extends BasePath<ResourcePath> {
     // NOTE: The client is ignorant of any path segments containing escape
     // sequences (e.g. __id123__) and just passes them through raw (they exist
     // for legacy reasons and should not be used frequently).
-    StringBuffer builder = StringBuffer();
+    final StringBuffer builder = StringBuffer();
     for (int i = 0; i < length; i++) {
       if (i > 0) {
-        builder.write("/");
+        builder.write('/');
       }
-      builder.write([i]);
+      builder.write(segments[i]);
     }
     return builder.toString();
   }

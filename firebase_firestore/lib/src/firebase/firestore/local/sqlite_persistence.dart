@@ -19,6 +19,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:meta/meta.dart';
 import 'package:sqflite/sqflite.dart' hide Transaction;
+import 'package:sqflite/sqflite.dart' as sql show Transaction;
 
 /// A SQLite-backed instance of Persistence.
 ///
@@ -28,26 +29,24 @@ import 'package:sqflite/sqflite.dart' hide Transaction;
 class SQLitePersistence extends Persistence {
   static const String tag = 'SQLitePersistence';
 
-  /// Creates the database name that is used to identify the database to be used
-  /// with a Firestore instance. Note that this needs to stay stable across
-  /// releases. The database is uniquely identified by a persistence key -
-  /// usually the Firebase app name - and a DatabaseId (project and database).
-  ///
-  /// * Format is [firestore.{persistence-key}.{project-id}.{database-id}].
-  @visibleForTesting
-  static String _databaseName(String persistenceKey, DatabaseId databaseId) {
-    return Uri.encodeFull(
-        'firestore.$persistenceKey.${databaseId.projectId}.${databaseId.databaseId}');
-  }
-
   final _OpenHelper opener;
   final LocalSerializer serializer;
 
   Database _db;
+
+  @override
   bool started;
+
+  @override
   SQLiteQueryCache queryCache;
+
+  @override
   SQLiteRemoteDocumentCache remoteDocumentCache;
+
+  @override
   SQLiteLruReferenceDelegate referenceDelegate;
+
+  SQLitePersistence(this.serializer, this.opener);
 
   static Future<SQLitePersistence> create(
     String persistenceKey,
@@ -71,7 +70,17 @@ class SQLitePersistence extends Persistence {
       ..referenceDelegate = referenceDelegate;
   }
 
-  SQLitePersistence(this.serializer, this.opener);
+  /// Creates the database name that is used to identify the database to be used
+  /// with a Firestore instance. Note that this needs to stay stable across
+  /// releases. The database is uniquely identified by a persistence key -
+  /// usually the Firebase app name - and a DatabaseId (project and database).
+  ///
+  /// * Format is [firestore.{persistence-key}.{project-id}.{database-id}].
+  @visibleForTesting
+  static String _databaseName(String persistenceKey, DatabaseId databaseId) {
+    return Uri.encodeFull(
+        'firestore.$persistenceKey.${databaseId.projectId}.${databaseId.databaseId}');
+  }
 
   @override
   Future<void> start() async {
@@ -91,7 +100,7 @@ class SQLitePersistence extends Persistence {
 
   @override
   MutationQueue getMutationQueue(User user) {
-    return new SQLiteMutationQueue(this, serializer, user);
+    return SQLiteMutationQueue(this, serializer, user);
   }
 
   @override
@@ -99,7 +108,8 @@ class SQLitePersistence extends Persistence {
       String action, Transaction<void> operation) async {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
-    await _db.transaction((tx) => operation(tx), exclusive: true);
+    await _db.transaction((sql.Transaction tx) => operation(tx),
+        exclusive: true);
     referenceDelegate.onTransactionCommitted();
   }
 
@@ -108,7 +118,8 @@ class SQLitePersistence extends Persistence {
       String action, Transaction<T> operation) {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
-    return _db.transaction((tx) => operation(tx), exclusive: true);
+    return _db.transaction((sql.Transaction tx) => operation(tx),
+        exclusive: true);
   }
 
   /// Execute the given non-query SQL statement.
@@ -151,27 +162,27 @@ class _OpenHelper {
     void ensureConfigured(Database db) async {
       if (!configured) {
         configured = true;
-        await db.rawQuery('PRAGMA locking_mode = EXCLUSIVE;', []);
+        await db.execute('PRAGMA locking_mode = EXCLUSIVE;');
       }
     }
 
     final Database db = await openDatabase(
       '',
-      version: SQLiteSchema.VERSION,
+      version: SQLiteSchema.version,
       onConfigure: (Database db) async {
         configured = true;
-        await db.rawQuery('PRAGMA locking_mode = EXCLUSIVE;', []);
+        await db.execute('PRAGMA locking_mode = EXCLUSIVE;');
       },
-      onCreate: (db, version) async {
-        await ensureConfigured(db);
+      onCreate: (Database db, int version) async {
+        ensureConfigured(db);
         SQLiteSchema(db).runMigrations(0);
       },
-      onUpgrade: (db, fromVersion, toVersion) async {
-        await ensureConfigured(db);
-        new SQLiteSchema(db).runMigrations(fromVersion);
+      onUpgrade: (Database db, int fromVersion, int toVersion) async {
+        ensureConfigured(db);
+        SQLiteSchema(db).runMigrations(fromVersion);
       },
-      onDowngrade: (db, fromVersion, toVersion) async {
-        await ensureConfigured(db);
+      onDowngrade: (Database db, int fromVersion, int toVersion) async {
+        ensureConfigured(db);
 
         // For now, we can safely do nothing.
         //
@@ -187,7 +198,7 @@ class _OpenHelper {
         // We'll have to revisit this once we ship a migration past version 1,
         // but this will definitely be good enough for our initial launch.
       },
-      onOpen: (db) => ensureConfigured(db),
+      onOpen: (Database db) => ensureConfigured(db),
     );
 
     return _OpenHelper(db);

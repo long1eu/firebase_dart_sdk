@@ -12,16 +12,16 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// * Bool
 /// * todo finish this
 abstract class FieldValue implements Comparable<FieldValue> {
-  static final int typeOrderNull = 0;
-  static final int typeOrderBool = 1;
-  static final int typeOrderNumber = 2;
-  static final int typeOrderTimestamp = 3;
-  static final int typeOrderString = 4;
-  static final int typeOrderBlob = 5;
-  static final int typeOrderReference = 6;
-  static final int typeOrderGeopoint = 7;
-  static final int typeOrderArray = 8;
-  static final int typeOrderObject = 9;
+  static const int typeOrderNull = 0;
+  static const int typeOrderBool = 1;
+  static const int typeOrderNumber = 2;
+  static const int typeOrderTimestamp = 3;
+  static const int typeOrderString = 4;
+  static const int typeOrderBlob = 5;
+  static const int typeOrderReference = 6;
+  static const int typeOrderGeopoint = 7;
+  static const int typeOrderArray = 8;
+  static const int typeOrderObject = 9;
 
   const FieldValue();
 
@@ -46,12 +46,12 @@ abstract class FieldValue implements Comparable<FieldValue> {
 
   @override
   String toString() {
-    Object val = value;
+    final Object val = value;
     return val == null ? 'null' : val.toString();
   }
 
   int defaultCompareTo(FieldValue other) {
-    int cmp = typeOrder.compareTo(other.typeOrder);
+    final int cmp = typeOrder.compareTo(other.typeOrder);
     Assert.hardAssert(cmp != 0,
         'Default compareTo should not be used for values of same type.');
     return cmp;

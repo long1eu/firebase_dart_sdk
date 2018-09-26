@@ -23,41 +23,28 @@ import 'package:meta/meta.dart';
 /// [CallbackT] The type which is used for stream specific callbacks.
 abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     implements Stream<CallbackT> {
-  /**
-   * Initial backoff time in milliseconds after an error. Set to 1s according to
-   * https://cloud.google.com/apis/design/errors.
-   */
-  /*/*private*/*/
-  static final int BACKOFF_INITIAL_DELAY_MS =
-      Duration(seconds: 1).inMilliseconds;
+  /// Initial backoff time in milliseconds after an error. Set to 1s according to
+  /// https://cloud.google.com/apis/design/errors.
 
-  /*/*private*/*/
-  static final int BACKOFF_MAX_DELAY_MS = Duration(minutes: 1).inMilliseconds;
+  static final int _backoffInitialDelayMs = Duration(seconds: 1).inMilliseconds;
+  static final int _backoffMaxDelayMs = Duration(minutes: 1).inMilliseconds;
 
-  /*/*private*/*/
-  static final double BACKOFF_FACTOR = 1.5;
+  static const double _backoffFactor = 1.5;
 
-  /** The time a stream stays open after it is marked idle. */
-  /*/*private*/*/
-  static final int IDLE_TIMEOUT_MS = Duration(minutes: 1).inMilliseconds;
+  /// The time a stream stays open after it is marked idle.
+  static final int _idleTimeoutMs = Duration(minutes: 1).inMilliseconds;
 
-  /*/*private*/*/
-  DelayedTask idleTimer;
+  DelayedTask<void> _idleTimer;
 
-  /*/*private*/*/
-  final FirestoreChannel firestoreChannel;
+  final FirestoreChannel _firestoreChannel;
 
-  /*/*private*/*/
-  final ClientMethod<ReqT, RespT> methodDescriptor;
+  final ClientMethod<ReqT, RespT> _methodDescriptor;
 
-  /*/*private*/*/
-  final AsyncQueue workerQueue;
+  final AsyncQueue _workerQueue;
 
-  /*/*private*/*/
-  final TimerId idleTimerId;
+  final TimerId _idleTimerId;
 
-  /*/*private*/*/
-  StreamState state = StreamState.Initial;
+  StreamState _state = StreamState.Initial;
 
   /// A close count that's incremented every time the stream is closed; used by
   /// [CloseGuardedRunner] to invalidate callbacks that happen after close.
@@ -68,60 +55,60 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
   final CallbackT listener;
 
   AbstractStream(
-    this.firestoreChannel,
-    this.methodDescriptor,
-    this.workerQueue,
+    this._firestoreChannel,
+    this._methodDescriptor,
+    this._workerQueue,
     TimerId connectionTimerId,
-    this.idleTimerId,
+    this._idleTimerId,
     this.listener,
   ) : backoff = ExponentialBackoff(
-          workerQueue,
+          _workerQueue,
           connectionTimerId,
-          BACKOFF_INITIAL_DELAY_MS,
-          BACKOFF_FACTOR,
-          BACKOFF_MAX_DELAY_MS,
+          _backoffInitialDelayMs,
+          _backoffFactor,
+          _backoffMaxDelayMs,
         );
 
   @override
   bool get isStarted {
-    return state == StreamState.Starting ||
-        state == StreamState.Open ||
-        state == StreamState.Backoff;
+    return _state == StreamState.Starting ||
+        _state == StreamState.Open ||
+        _state == StreamState.Backoff;
   }
 
   @override
   bool get isOpen {
-    return state == StreamState.Open;
+    return _state == StreamState.Open;
   }
 
   @override
   void start() {
     Assert.hardAssert(_call == null, 'Last call still set');
-    Assert.hardAssert(idleTimer == null, 'Idle timer still set');
+    Assert.hardAssert(_idleTimer == null, 'Idle timer still set');
 
-    if (state == StreamState.Error) {
+    if (_state == StreamState.Error) {
       _performBackoff();
       return;
     }
 
-    Assert.hardAssert(state == StreamState.Initial, 'Already started');
+    Assert.hardAssert(_state == StreamState.Initial, 'Already started');
 
     final CloseGuardedRunner closeGuardedRunner =
         CloseGuardedRunner(_closeCount, () => _closeCount);
-    final StreamObserver<RespT> streamObserver =
-        new StreamObserver<RespT>(closeGuardedRunner, this);
+    final StreamObserver<ReqT, RespT, CallbackT> streamObserver =
+        StreamObserver<ReqT, RespT, CallbackT>(closeGuardedRunner, this);
 
-    _call =
-        firestoreChannel.runBidiStreamingRpc(methodDescriptor, streamObserver);
+    _call = _firestoreChannel.runBidiStreamingRpc(
+        _methodDescriptor, streamObserver);
 
     // Note that Starting is only used as intermediate state until onOpen is called asynchronously,
     // since auth handled transparently by gRPC
-    state = StreamState.Starting;
+    _state = StreamState.Starting;
 
-    workerQueue.enqueueAndForget(() {
+    _workerQueue.enqueueAndForget<void>(() {
       closeGuardedRunner.run(() {
-        state = StreamState.Open;
-        this.listener.onOpen();
+        _state = StreamState.Open;
+        listener.onOpen();
       });
     });
   }
@@ -162,7 +149,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     } else if (code == StatusCode.unauthenticated) {
       // 'unauthenticated' error means the token was rejected. Try force
       // refreshing it in case it just expired.
-      firestoreChannel.invalidateToken();
+      _firestoreChannel.invalidateToken();
     }
 
     if (finalState != StreamState.Error) {
@@ -174,7 +161,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
       // Clean up the underlying RPC. If this [close()] is in response to an
       // error, don't attempt to call half-close to avoid secondary failures.
       if (status.code == StatusCode.ok) {
-        Log.d(runtimeType.toString(), "($hashCode) Closing stream client-side");
+        Log.d(runtimeType.toString(), '($hashCode) Closing stream client-side');
         await _call.cancel();
       }
       _call = null;
@@ -183,7 +170,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     // This state must be assigned before calling listener.onClose to allow the
     // callback to inhibit backoff or otherwise manipulate the state in its
     // non-started state.
-    this.state = finalState;
+    _state = finalState;
 
     // Notify the listener that the stream closed.
     listener.onClose(status);
@@ -205,7 +192,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     Assert.hardAssert(
         !isStarted, 'Can only inhibit backoff after in a stopped state');
 
-    state = StreamState.Initial;
+    _state = StreamState.Initial;
     backoff.reset();
   }
 
@@ -217,7 +204,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
 
   /// Called by the idle timer when the stream should close due to inactivity.
   Future<void> _handleIdleCloseTimer() async {
-    if (this.isOpen) {
+    if (isOpen) {
       // When timing out an idle stream there's no reason to force the stream
       // into backoff when it restarts so set the stream state to Initial
       // instead of Error.
@@ -242,17 +229,17 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
   void onNext(RespT change);
 
   void _performBackoff() {
-    Assert.hardAssert(state == StreamState.Error,
+    Assert.hardAssert(_state == StreamState.Error,
         'Should only perform backoff in an error state');
-    state = StreamState.Backoff;
+    _state = StreamState.Backoff;
 
     backoff.backoffAndRun(() {
-      Assert.hardAssert(state == StreamState.Backoff,
-          'State should still be backoff but was $state');
+      Assert.hardAssert(_state == StreamState.Backoff,
+          'State should still be backoff but was $_state');
       // Momentarily set state to Initial as start() expects it.
-      state = StreamState.Initial;
+      _state = StreamState.Initial;
       start();
-      Assert.hardAssert(isStarted, "Stream should have started");
+      Assert.hardAssert(isStarted, 'Stream should have started');
     });
   }
 
@@ -268,16 +255,16 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     // Starts the idle timer if we are in state [StreamState.Open] and are not
     // yet already running a timer (in which case the previous idle timeout
     // still applies).
-    if (this.isOpen && idleTimer == null) {
-      idleTimer = workerQueue.enqueueAfterDelay(this.idleTimerId,
-          Duration(milliseconds: IDLE_TIMEOUT_MS), _handleIdleCloseTimer);
+    if (isOpen && _idleTimer == null) {
+      _idleTimer = _workerQueue.enqueueAfterDelay(_idleTimerId,
+          Duration(milliseconds: _idleTimeoutMs), _handleIdleCloseTimer);
     }
   }
 
   void _cancelIdleCheck() {
-    if (idleTimer != null) {
-      idleTimer.cancel();
-      idleTimer = null;
+    if (_idleTimer != null) {
+      _idleTimer.cancel();
+      _idleTimer = null;
     }
   }
 }
@@ -287,9 +274,9 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
 /// closed / re-opened, etc.
 ///
 /// * PORTING NOTE: Because all the stream callbacks already happen on the
-/// [workerQueue], we don't need to dispatch onto the queue, and so we instead
+/// [_workerQueue], we don't need to dispatch onto the queue, and so we instead
 /// only expose a run() method which asserts that we're already on the
-/// [workerQueue].
+/// [_workerQueue].
 class CloseGuardedRunner {
   final int initialCloseCount;
   final int Function() closeCount;
@@ -307,23 +294,24 @@ class CloseGuardedRunner {
 
 /// Implementation of [IncomingStreamObserver] that runs callbacks via
 /// [CloseGuardedRunner].
-class StreamObserver<RespT> implements IncomingStreamObserver<RespT> {
+class StreamObserver<ReqT, RespT, CallbackT extends StreamCallback>
+    implements IncomingStreamObserver<RespT> {
   final CloseGuardedRunner _dispatcher;
-  final AbstractStream stream;
+  final AbstractStream<ReqT, RespT, CallbackT> stream;
 
-  StreamObserver(this._dispatcher, this.stream);
+  const StreamObserver(this._dispatcher, this.stream);
 
   @override
   void onHeaders(Map<String, String> headers) {
     _dispatcher.run(() {
       if (Log.isDebugEnabled) {
-        Map<String, String> whitelistedHeaders = <String, String>{};
+        final Map<String, String> whitelistedHeaders = <String, String>{};
         for (String header in headers.keys) {
-          if (Datastore.WHITE_LISTED_HEADERS.contains(header.toLowerCase())) {
+          if (Datastore.whiteListedHeaders.contains(header.toLowerCase())) {
             whitelistedHeaders[header] = headers[header];
           }
         }
-        if (!whitelistedHeaders.isEmpty) {
+        if (whitelistedHeaders.isNotEmpty) {
           Log.d('AbstractStream',
               '($hashCode) Stream received headers: $whitelistedHeaders');
         }
@@ -342,7 +330,7 @@ class StreamObserver<RespT> implements IncomingStreamObserver<RespT> {
   @override
   void onReady() {
     _dispatcher
-        .run(() => Log.d('AbstractStream', "($hashCode) Stream is ready"));
+        .run(() => Log.d('AbstractStream', '($hashCode) Stream is ready'));
   }
 
   @override

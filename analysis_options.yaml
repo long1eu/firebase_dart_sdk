@@ -10,11 +10,9 @@ analyzer:
     todo: ignore
   exclude:
     - '**.g.dart'
-    - '*/i18n.dart'
-    - 'qwil_flutter/bin/cache/**'
-    - 'qwil_flutter/lib/i18n/stock_messages_*.dart'
-    - 'qwil_flutter/lib/src/http/**'
-    - 'qwil_flutter/ios/**'
+    - '**.pb.dart'
+    - '**.pbjson.dart'
+    - '**.pbserver.dart'
 
 linter:
   rules:

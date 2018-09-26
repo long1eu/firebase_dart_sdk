@@ -29,8 +29,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
@@ -40,24 +40,23 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 
-/**
- * SyncEngine is the central controller in the client SDK architecture. It is the glue code between
- * the EventManager, LocalStore, and RemoteStore. Some of SyncEngine's responsibilities include:
- *
- * <ol>
- *   <li>Coordinating client requests and remote events between the EventManager and the local and
- *       remote data stores.
- *   <li>Managing a View object for each query, providing the unified view between the local and
- *       remote data stores.
- *   <li>Notifying the RemoteStore when the LocalStore has new mutations in its queue that need
- *       sending to the backend.
- * </ol>
- *
- * * The SyncEngine’s methods should only ever be called by methods running on our own worker
- * dispatch queue.
- */
+/// [SyncEngine] is the central controller in the client SDK architecture. It is
+/// the glue code between the [EventManager], [LocalStore], and [RemoteStore].
+/// Some of [SyncEngine]'s responsibilities include:
+///
+/// <ol>
+/// <li>Coordinating client requests and remote events between the
+/// [EventManager] and the local and remote data stores.
+/// <li>Managing a [View] object for each query, providing the unified view
+/// between the local and remote data stores.
+/// <li>Notifying the [RemoteStore] when the LocalStore has new mutations in its
+/// queue that need sending to the backend.
+/// </ol>
+///
+/// * The [SyncEngine]’s methods should only ever be called by methods running
+/// on our own worker dispatch queue.
 class SyncEngine implements RemoteStoreCallback {
-  static final String _tag = 'SyncEngine';
+  static const String _tag = 'SyncEngine';
 
   /// The local store, used to persist mutations and cached documents.
   final LocalStore _localStore;
@@ -85,7 +84,7 @@ class SyncEngine implements RemoteStoreCallback {
   final ReferenceSet _limboDocumentRefs;
 
   /// Stores user completion blocks, indexed by user and batch id.
-  final Map<User, Map<int, Completer>> _mutationUserCallbacks;
+  final Map<User, Map<int, Completer<void>>> _mutationUserCallbacks;
 
   /// Used for creating the target ids for the listens used to resolve limbo
   /// documents.
@@ -96,12 +95,12 @@ class SyncEngine implements RemoteStoreCallback {
   SyncEngineCallback callback;
 
   SyncEngine(this._localStore, this._remoteStore, this._currentUser)
-      : _queryViewsByQuery = {},
-        _queryViewsByTarget = {},
-        _limboTargetsByKey = {},
-        _limboResolutionsByTarget = {},
-        _limboDocumentRefs = new ReferenceSet(),
-        _mutationUserCallbacks = {},
+      : _queryViewsByQuery = <Query, QueryView>{},
+        _queryViewsByTarget = <int, QueryView>{},
+        _limboTargetsByKey = <DocumentKey, int>{},
+        _limboResolutionsByTarget = <int, _LimboResolution>{},
+        _limboDocumentRefs = ReferenceSet(),
+        _mutationUserCallbacks = <User, Map<int, Completer<void>>>{},
         _targetIdGenerator = TargetIdGenerator.getSyncEngineGenerator(0);
 
   void _assertCallback(String method) {
@@ -123,19 +122,19 @@ class SyncEngine implements RemoteStoreCallback {
     final QueryData queryData = await _localStore.allocateQuery(query);
     final ImmutableSortedMap<DocumentKey, Document> docs =
         await _localStore.executeQuery(query);
-    ImmutableSortedSet<DocumentKey> remoteKeys =
+    final ImmutableSortedSet<DocumentKey> remoteKeys =
         await _localStore.getRemoteDocumentKeys(queryData.targetId);
 
-    final View view = new View(query, remoteKeys);
+    final View view = View(query, remoteKeys);
     final DocumentChanges viewDocChanges = view.computeDocChanges(docs);
     final ViewChange viewChange = view.applyChanges(viewDocChanges);
     Assert.hardAssert(view.limboDocuments.isEmpty,
         'View returned limbo docs before target ack from the server');
 
-    final QueryView queryView = new QueryView(query, queryData.targetId, view);
+    final QueryView queryView = QueryView(query, queryData.targetId, view);
     _queryViewsByQuery[query] = queryView;
     _queryViewsByTarget[queryData.targetId] = queryView;
-    callback.onViewSnapshots([viewChange.snapshot]);
+    callback.onViewSnapshots(<ViewSnapshot>[viewChange.snapshot]);
 
     _remoteStore.listen(queryData);
     return queryData.targetId;
@@ -143,7 +142,7 @@ class SyncEngine implements RemoteStoreCallback {
 
   /// Stops listening to a query previously listened to via listen. */
   void stopListening(Query query) {
-    _assertCallback("stopListening");
+    _assertCallback('stopListening');
 
     final QueryView queryView = _queryViewsByQuery[query];
     Assert.hardAssert(
@@ -166,7 +165,7 @@ class SyncEngine implements RemoteStoreCallback {
     final LocalWriteResult result = await _localStore.writeLocally(mutations);
     addUserCallback(result.batchId, userTask);
 
-    await _emitNewSnapshot(result.changes, /*remoteEvent=*/ null);
+    await _emitNewSnapshot(result.changes, /*remoteEvent:*/ null);
     _remoteStore.fillWritePipeline();
   }
 
@@ -174,7 +173,7 @@ class SyncEngine implements RemoteStoreCallback {
   void addUserCallback(int batchId, Completer<void> userTask) {
     Map<int, Completer<void>> userTasks = _mutationUserCallbacks[_currentUser];
     if (userTasks == null) {
-      userTasks = {};
+      userTasks = <int, Completer<void>>{};
       _mutationUserCallbacks[_currentUser] = userTasks;
     }
     userTasks[batchId] = userTask;
@@ -209,19 +208,19 @@ class SyncEngine implements RemoteStoreCallback {
     } catch (e) {
       // TODO: Only retry on real transaction failures.
       if (retries == 0) {
-        final Error e = new FirebaseFirestoreError(
+        final Error e = FirebaseFirestoreError(
             'Transaction failed all retries.',
             FirebaseFirestoreErrorCode.aborted);
-        return Future.error(e);
+        return Future<TResult>.error(e);
       }
       return this.transaction(asyncQueue, updateFunction, retries - 1);
     }
   }
 
-  /** Called by FirestoreClient to notify us of a new remote event. */
+  /// Called by [FirestoreClient] to notify us of a new remote event.
   @override
   Future<void> handleRemoteEvent(RemoteEvent event) async {
-    _assertCallback("handleRemoteEvent");
+    _assertCallback('handleRemoteEvent');
 
     // Update `receivedDocument` as appropriate for any limbo targets.
     for (MapEntry<int, TargetChange> entry in event.targetChanges.entries) {
@@ -262,7 +261,7 @@ class SyncEngine implements RemoteStoreCallback {
   /// of the change.
   @override
   void handleOnlineStateChange(OnlineState onlineState) {
-    final List<ViewSnapshot> newViewSnapshots = List<ViewSnapshot>();
+    final List<ViewSnapshot> newViewSnapshots = <ViewSnapshot>[];
     for (MapEntry<Query, QueryView> entry in _queryViewsByQuery.entries) {
       final View view = entry.value.view;
       final ViewChange viewChange = view.applyOnlineStateChange(onlineState);
@@ -310,14 +309,16 @@ class SyncEngine implements RemoteStoreCallback {
       // is kind of a hack. Ideally, we would have a method in the local store
       // to purge a document. However, it would be tricky to keep all of the
       // local store's invariants with another method.
-      final Map<DocumentKey, MaybeDocument> documentUpdates = {
+      final Map<DocumentKey, MaybeDocument> documentUpdates =
+          <DocumentKey, MaybeDocument>{
         limboKey: NoDocument(limboKey, SnapshotVersion.none)
       };
-      final Set<DocumentKey> limboDocuments = Set.from([limboKey]);
-      final RemoteEvent event = new RemoteEvent(
+      final Set<DocumentKey> limboDocuments =
+          Set<DocumentKey>.from(<DocumentKey>[limboKey]);
+      final RemoteEvent event = RemoteEvent(
         SnapshotVersion.none,
-        /* targetChanges: */ {},
-        /* targetMismatches: */ Set(),
+        /* targetChanges: */ <int, TargetChange>{},
+        /* targetMismatches: */ Set<int>(),
         documentUpdates,
         limboDocuments,
       );
@@ -342,7 +343,7 @@ class SyncEngine implements RemoteStoreCallback {
     // listen events.
     _notifyUser(mutationBatchResult.batch.batchId, /*status:*/ null);
 
-    ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
         await _localStore.acknowledgeBatch(mutationBatchResult);
 
     await _emitNewSnapshot(changes, /*remoteEvent:*/ null);
@@ -358,7 +359,7 @@ class SyncEngine implements RemoteStoreCallback {
     // listen events.
     _notifyUser(batchId, status);
 
-    ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
         await _localStore.rejectBatch(batchId);
     await _emitNewSnapshot(changes, /*remoteEvent:*/ null);
   }
@@ -371,8 +372,8 @@ class SyncEngine implements RemoteStoreCallback {
     // NOTE: Mutations restored from persistence won't have task completion
     // sources, so it's okay for this (or the task below) to be null.
     if (userTasks != null) {
-      int boxedBatchId = batchId;
-      Completer<void> userTask = userTasks[boxedBatchId];
+      final int boxedBatchId = batchId;
+      final Completer<void> userTask = userTasks[boxedBatchId];
       if (userTask != null) {
         if (status != null) {
           userTask.completeError(Util.exceptionFromStatus(status));
@@ -416,8 +417,9 @@ class SyncEngine implements RemoteStoreCallback {
   Future<void> _emitNewSnapshot(
       ImmutableSortedMap<DocumentKey, MaybeDocument> changes,
       RemoteEvent remoteEvent) async {
-    List<ViewSnapshot> newSnapshots = List<ViewSnapshot>();
-    List<LocalViewChanges> documentChangesInAllViews = List<LocalViewChanges>();
+    final List<ViewSnapshot> newSnapshots = <ViewSnapshot>[];
+    final List<LocalViewChanges> documentChangesInAllViews =
+        <LocalViewChanges>[];
 
     for (MapEntry<Query, QueryView> entry in _queryViewsByQuery.entries) {
       final QueryView queryView = entry.value;
@@ -440,7 +442,7 @@ class SyncEngine implements RemoteStoreCallback {
 
       if (viewChange.snapshot != null) {
         newSnapshots.add(viewChange.snapshot);
-        LocalViewChanges docChanges = LocalViewChanges.fromViewSnapshot(
+        final LocalViewChanges docChanges = LocalViewChanges.fromViewSnapshot(
           queryView.targetId,
           viewChange.snapshot,
         );
@@ -496,7 +498,7 @@ class SyncEngine implements RemoteStoreCallback {
   @visibleForTesting
   Map<DocumentKey, int> getCurrentLimboDocuments() {
     // Make a defensive copy as the Map continues to be modified.
-    return Map.from(_limboTargetsByKey);
+    return Map<DocumentKey, int>.from(_limboTargetsByKey);
   }
 
   Future<void> handleCredentialChange(User user) async {
@@ -508,7 +510,7 @@ class SyncEngine implements RemoteStoreCallback {
       // mutation queue.
       final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
           await _localStore.handleUserChange(user);
-      await _emitNewSnapshot(changes, /*remoteEvent=*/ null);
+      await _emitNewSnapshot(changes, /*remoteEvent:*/ null);
     }
 
     // Notify remote store so it can restart its streams.

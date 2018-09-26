@@ -20,10 +20,10 @@ abstract class MutationQueue {
   /// [highestAcknowledgedBatchId] is less than [nextBatchId]. This prevents the
   /// local store from creating new batches that the mutation queue would
   /// consider erroneously acknowledged.
-  Future<void> start(Transaction tx);
+  Future<void> start(DatabaseExecutor tx);
 
   /// Returns true if this queue contains no mutation batches.
-  Future<bool> isEmpty(Transaction tx);
+  Future<bool> isEmpty(DatabaseExecutor tx);
 
   /// Returns the next batch ID that will be assigned to a new mutation batch.
   ///
@@ -39,20 +39,20 @@ abstract class MutationQueue {
 
   /// Acknowledges the given [batch].
   Future<void> acknowledgeBatch(
-      Transaction tx, MutationBatch batch, List<int> streamToken);
+      DatabaseExecutor tx, MutationBatch batch, List<int> streamToken);
 
   /// Returns the current stream token for this mutation queue.
   List<int> get lastStreamToken;
 
   /// Sets the stream token for this mutation queue.
-  Future<void> setLastStreamToken(Transaction tx, List<int> streamToken);
+  Future<void> setLastStreamToken(DatabaseExecutor tx, List<int> streamToken);
 
   /// Creates a new mutation batch and adds it to this mutation queue.
   Future<MutationBatch> addMutationBatch(
-      Transaction tx, Timestamp localWriteTime, List<Mutation> mutations);
+      DatabaseExecutor tx, Timestamp localWriteTime, List<Mutation> mutations);
 
   /// Loads the mutation batch with the given [batchId].
-  Future<MutationBatch> lookupMutationBatch(Transaction tx, int batchId);
+  Future<MutationBatch> lookupMutationBatch(DatabaseExecutor tx, int batchId);
 
   /// Returns the first unacknowledged mutation batch after the passed in
   /// [batchId] in the mutation queue or null if empty.
@@ -61,12 +61,12 @@ abstract class MutationQueue {
   /// mutation in the queue. Returns the next mutation or null if there wasn't
   /// one.
   Future<MutationBatch> getNextMutationBatchAfterBatchId(
-      Transaction tx, int batchId);
+      DatabaseExecutor tx, int batchId);
 
   /// Returns all mutation batches in the mutation queue.
   // TODO: PERF: Current consumer only needs mutated keys; if we can provide
   // that cheaply, we should replace this.
-  Future<List<MutationBatch>> getAllMutationBatches(Transaction tx);
+  Future<List<MutationBatch>> getAllMutationBatches(DatabaseExecutor tx);
 
   /// Finds all mutations with a [batchId] less than or equal to the given
   /// [batchId].
@@ -75,7 +75,7 @@ abstract class MutationQueue {
   /// [batchId] and the number of acknowledged batches should be very small when
   /// things are functioning well.
   Future<List<MutationBatch>> getAllMutationBatchesThroughBatchId(
-      Transaction tx, int batchId);
+      DatabaseExecutor tx, int batchId);
 
   /// Finds all mutation batches that could <b>possibly<b> affect the given
   /// document key. Not all mutations in a batch will necessarily affect the
@@ -88,7 +88,7 @@ abstract class MutationQueue {
   ///
   /// * Batches are guaranteed to be sorted by batch ID.
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
-      Transaction tx, DocumentKey documentKey);
+      DatabaseExecutor tx, DocumentKey documentKey);
 
   /// Finds all mutation batches that could <b>possibly<b> affect the given set
   /// of document keys. Not all mutations in a batch will necessarily affect
@@ -101,7 +101,7 @@ abstract class MutationQueue {
   ///
   /// * Batches are guaranteed to be sorted by batch ID.
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
-      Transaction tx, Iterable<DocumentKey> documentKeys);
+      DatabaseExecutor tx, Iterable<DocumentKey> documentKeys);
 
   /// Finds all mutation batches that could affect the results for the given
   /// query. Not all mutations in a batch will necessarily affect the query, so
@@ -117,7 +117,7 @@ abstract class MutationQueue {
   /// filter criteria in order to be a match (but any fields it does contain do
   /// need to match).
   Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(
-      Transaction tx, Query query);
+      DatabaseExecutor tx, Query query);
 
   /// Removes the given mutation batches from the queue. This is useful in two
   /// circumstances:
@@ -131,9 +131,9 @@ abstract class MutationQueue {
   /// range of batchIds. This is most easily accomplished by loading mutations
   /// with [getAllMutationBatchesThroughBatchId].
   Future<void> removeMutationBatches(
-      Transaction tx, List<MutationBatch> batches);
+      DatabaseExecutor tx, List<MutationBatch> batches);
 
   /// Performs a consistency check, examining the mutation queue for any leaks,
   /// if possible.
-  Future<void> performConsistencyCheck(Transaction tx);
+  Future<void> performConsistencyCheck(DatabaseExecutor tx);
 }

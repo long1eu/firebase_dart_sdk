@@ -7,72 +7,63 @@ import 'package:firebase_database_collection/src/immutable_sorted_map.dart';
 class ImmutableSortedSet<T> extends Iterable<T> {
   final ImmutableSortedMap<T, void> _map;
 
-  factory ImmutableSortedSet([List<T> elems, Comparator<T> comparator]) {
-    return ImmutableSortedSet._(ImmutableSortedMap.buildFrom(
-      elems ?? <T>[],
+  factory ImmutableSortedSet([List<T> elements, Comparator<T> comparator]) {
+    return ImmutableSortedSet<T>._(ImmutableSortedMap.buildFrom(
+      elements ?? <T>[],
       <T, void>{},
       ImmutableSortedMap.identityTranslator(),
-      comparator ?? (a, b) => (a as dynamic).compareTo(b),
+      comparator ?? (T a, T b) => (a as Comparable<T>).compareTo(b),
     ));
   }
 
   ImmutableSortedSet._(this._map);
 
   @override
-  bool contains(entry) => this._map.containsKey(entry);
+  bool contains(Object element) {
+    return element is T ? _map.containsKey(element) : false;
+  }
 
   ImmutableSortedSet<T> remove(T entry) {
-    ImmutableSortedMap<T, void> newMap = this._map.remove(entry);
-    return (newMap == this._map) ? this : new ImmutableSortedSet<T>._(newMap);
+    final ImmutableSortedMap<T, void> newMap = _map.remove(entry);
+    return (newMap == _map) ? this : ImmutableSortedSet<T>._(newMap);
   }
 
   ImmutableSortedSet<T> insert(T entry) {
-    return new ImmutableSortedSet<T>._(_map.insert(entry, null));
+    return ImmutableSortedSet<T>._(_map.insert(entry, null));
   }
 
   T get minEntry => _map.minKey;
 
-  T get maxEntry => this._map.maxKey;
+  T get maxEntry => _map.maxKey;
 
   @override
-  int get length => this._map.length;
-
-  bool get isEmpty => this._map.isEmpty;
+  int get length => _map.length;
 
   @override
-  Iterator<T> get iterator {
-    return new _WrappedEntryIterator<T>(this._map.iterator);
-  }
+  bool get isEmpty => _map.isEmpty;
+
+  @override
+  Iterator<T> get iterator => _getIterator(_map.iterator).iterator;
 
   Iterator<T> get reverseIterator {
-    return new _WrappedEntryIterator<T>(this._map.reverseIterator);
+    return _getIterator(_map.reverseIterator).iterator;
   }
 
-  Iterator<T> iteratorFrom(T entry) {
-    return new _WrappedEntryIterator<T>(this._map.iteratorFrom(entry));
+  Iterator<T> iteratorFrom(T key) {
+    return _getIterator(_map.iteratorFrom(key)).iterator;
   }
 
-  Iterator<T> reverseIteratorFrom(T entry) {
-    return new _WrappedEntryIterator<T>(this._map.reverseIteratorFrom(entry));
+  Iterator<T> reverseIteratorFrom(T key) {
+    return _getIterator(_map.reverseIteratorFrom(key)).iterator;
   }
 
-  T getPredecessorEntry(T entry) {
-    return this._map.getPredecessorKey(entry);
+  T getPredecessorEntry(T entry) => _map.getPredecessorKey(entry);
+
+  int indexOf(T entry) => _map.indexOf(entry);
+
+  Iterable<T> _getIterator(Iterator<MapEntry<T, void>> it) sync* {
+    while (it.moveNext()) {
+      yield it.current.key;
+    }
   }
-
-  int indexOf(T entry) {
-    return this._map.indexOf(entry);
-  }
-}
-
-class _WrappedEntryIterator<T> implements Iterator<T> {
-  final Iterator<MapEntry<T, void>> iterator;
-
-  const _WrappedEntryIterator(this.iterator);
-
-  @override
-  T get current => iterator.current.key;
-
-  @override
-  bool moveNext() => iterator.moveNext();
 }

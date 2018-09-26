@@ -14,6 +14,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 class RelationFilter extends Filter {
   final FilterOperator operator;
   final FieldValue value;
+  @override
   final FieldPath field;
 
   /// Creates a new filter that compares fields and values. Only intended to be
@@ -22,8 +23,8 @@ class RelationFilter extends Filter {
 
   @override
   bool matches(Document doc) {
-    if (this.field.isKeyField) {
-      Object refValue = value.value;
+    if (field.isKeyField) {
+      final DocumentKey refValue = value.value;
       Assert.hardAssert(refValue is DocumentKey,
           'Comparing on key, but filter value not a DocumentKey');
       Assert.hardAssert(operator != FilterOperator.arrayContains,
@@ -42,7 +43,7 @@ class RelationFilter extends Filter {
     } else {
       // Only compare types with matching backend order (such as double and int).
       return value.typeOrder == other.typeOrder &&
-          _matchesComparison(other.compareTo(this.value));
+          _matchesComparison(other.compareTo(value));
     }
   }
 

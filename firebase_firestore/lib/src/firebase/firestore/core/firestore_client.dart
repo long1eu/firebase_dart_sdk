@@ -6,7 +6,6 @@ import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
-import 'package:firebase_database_collection/src/immutable_sorted_set.dart';
 import 'package:firebase_firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
@@ -18,7 +17,6 @@ import 'package:firebase_firestore/src/firebase/firestore/core/sync_engine.dart'
 import 'package:firebase_firestore/src/firebase/firestore/core/transaction.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/event_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/local_store.dart';
@@ -29,19 +27,19 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
-import 'package:firebase_firestore/src/firebase/firestore/no_document.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/types.dart'
+    hide Transaction;
 import 'package:grpc/grpc.dart';
 
-/**
- * FirestoreClient is a top-level class that constructs and owns all of the pieces of the client SDK
- * architecture.
- */
+/// [FirestoreClient] is a top-level class that constructs and owns all of the
+/// pieces of the client SDK architecture.
 class FirestoreClient implements RemoteStoreCallback {
   static const String logTag = "FirestoreClient";
 
@@ -103,7 +101,7 @@ class FirestoreClient implements RemoteStoreCallback {
     });
   }
 
-  /** Starts listening to a query. */
+  /// Starts listening to a query. */
   QueryListener listen(Query query, ListenOptions options,
       EventListener<ViewSnapshot> listener) {
     QueryListener queryListener = new QueryListener(query, options, listener);
@@ -158,7 +156,7 @@ class FirestoreClient implements RemoteStoreCallback {
     return source.future;
   }
 
-  /** Tries to execute the transaction in updateFunction up to retries times. */
+  /// Tries to execute the transaction in updateFunction up to retries times. */
   Future<TResult> transaction<TResult>(
       Future<TResult> Function(Transaction) updateFunction, int retries) {
     return AsyncQueue.callTask(asyncQueue.executor,

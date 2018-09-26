@@ -12,7 +12,6 @@ class ToStringHelper {
     _indentingBuiltValueToStringHelperIndent += 2;
   }
 
-  @override
   void add(String field, Object value) {
     if (value != null) {
       _result

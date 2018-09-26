@@ -10,11 +10,11 @@ class DatabaseId implements Comparable<DatabaseId> {
 
   const DatabaseId._(this.projectId, this.databaseId);
 
-  factory DatabaseId.fromProject(String projectId) {
-    return DatabaseId.fromDatabase(projectId, defaultDatabaseId);
+  factory DatabaseId.forProject(String projectId) {
+    return DatabaseId.forDatabase(projectId, defaultDatabaseId);
   }
 
-  factory DatabaseId.fromDatabase(String projectId, String databaseId) {
+  factory DatabaseId.forDatabase(String projectId, String databaseId) {
     return DatabaseId._(projectId, databaseId);
   }
 

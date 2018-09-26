@@ -36,21 +36,16 @@ import 'package:grpc/grpc.dart';
 class RemoteStore implements TargetMetadataProvider {
   /// The maximum number of pending writes to allow.
   /// TODO: Negotiate this value with the backend.
-  /*private*/
-  static final int MAX_PENDING_WRITES = 10;
+  static const int _maxPendingWrites = 10;
 
   /// The log tag to use for this class.
-  /*private*/
-  static final String _tag = "RemoteStore";
+  static const String _tag = 'RemoteStore';
 
-  /*private*/
-  final RemoteStoreCallback remoteStoreCallback;
+  final RemoteStoreCallback _remoteStoreCallback;
 
-  /*private*/
-  final LocalStore localStore;
+  final LocalStore _localStore;
 
-  /*private*/
-  final Datastore datastore;
+  final Datastore _datastore;
 
   /// A mapping of watched targets that the client cares about tracking and the
   /// user has explicitly called a 'listen' for this target.
@@ -59,88 +54,81 @@ class RemoteStore implements TargetMetadataProvider {
   /// server. On re-establishing the listen stream, these targets should be sent
   /// to the server. The targets removed with unlistens are removed eagerly
   /// without waiting for confirmation from the listen stream.
-  /*private*/
-  final Map<int, QueryData> listenTargets;
+  final Map<int, QueryData> _listenTargets;
 
-  /*private*/
-  final OnlineStateTracker onlineStateTracker;
+  final OnlineStateTracker _onlineStateTracker;
 
-  /*private*/
-  WatchStream watchStream;
+  WatchStream _watchStream;
 
-  /*private*/
-  WriteStream writeStream;
+  WriteStream _writeStream;
 
-  /*private*/
-  bool networkEnabled = false;
+  bool _networkEnabled = false;
 
-  /*private*/
-  WatchChangeAggregator watchChangeAggregator;
+  WatchChangeAggregator _watchChangeAggregator;
 
-  /// A list of up to [MAX_PENDING_WRITES] writes that we have fetched from the
+  /// A list of up to [_maxPendingWrites] writes that we have fetched from the
   /// [LocalStore] via [fillWritePipeline] and have or will send to the write
   /// stream.
   ///
-  /// * Whenever [writePipeline.length] > 0 the [RemoteStore] will attempt to
+  /// * Whenever [_writePipeline.length] > 0 the [RemoteStore] will attempt to
   /// start or restart the write stream. When the stream is established the
   /// writes in the pipeline will be sent in order.
   ///
-  /// * Writes remain in [writePipeline] until they are acknowledged by the
+  /// * Writes remain in [_writePipeline] until they are acknowledged by the
   /// backend and thus will automatically be re-sent if the stream is
   /// interrupted / restarted before they're acknowledged.
   ///
   /// * Write responses from the backend are linked to their originating request
   /// purely based on order, and so we can just poll() writes from the front of
-  /// the [writePipeline] as we receive responses.
-  /*private*/
-  final Queue<MutationBatch> writePipeline;
+  /// the [_writePipeline] as we receive responses.
+  final Queue<MutationBatch> _writePipeline;
 
-  RemoteStore(this.remoteStoreCallback, this.localStore, this.datastore,
+  RemoteStore(this._remoteStoreCallback, this._localStore, this._datastore,
       AsyncQueue workerQueue)
-      : listenTargets = {},
-        writePipeline = Queue<MutationBatch>(),
-        onlineStateTracker = new OnlineStateTracker(
+      : _listenTargets = <int, QueryData>{},
+        _writePipeline = Queue<MutationBatch>(),
+        _onlineStateTracker = OnlineStateTracker(
           workerQueue,
-          remoteStoreCallback.handleOnlineStateChange,
+          _remoteStoreCallback.handleOnlineStateChange,
         ) {
     // Create new streams (but note they're not started yet).
-    watchStream = datastore.createWatchStream(WatchStreamCallback(
-      onOpen: handleWatchStreamOpen,
-      onClose: handleWatchStreamClose,
-      onWatchChange: handleWatchChange,
+    _watchStream = _datastore.createWatchStream(WatchStreamCallback(
+      onOpen: _handleWatchStreamOpen,
+      onClose: _handleWatchStreamClose,
+      onWatchChange: _handleWatchChange,
     ));
 
-    writeStream = datastore.createWriteStream(WriteStreamCallback(
-      onOpen: writeStream.writeHandshake,
-      onClose: handleWriteStreamClose,
-      onHandshakeComplete: handleWriteStreamHandshakeComplete,
-      onWriteResponse: handleWriteStreamMutationResults,
+    _writeStream = _datastore.createWriteStream(WriteStreamCallback(
+      onOpen: _writeStream.writeHandshake,
+      onClose: _handleWriteStreamClose,
+      onHandshakeComplete: _handleWriteStreamHandshakeComplete,
+      onWriteResponse: _handleWriteStreamMutationResults,
     ));
   }
 
   RemoteStore._(
-    this.remoteStoreCallback,
-    this.localStore,
-    this.datastore,
-    this.listenTargets,
-    this.onlineStateTracker,
-    this.watchStream,
-    this.writeStream,
-    this.writePipeline,
+    this._remoteStoreCallback,
+    this._localStore,
+    this._datastore,
+    this._listenTargets,
+    this._onlineStateTracker,
+    this._watchStream,
+    this._writeStream,
+    this._writePipeline,
   );
 
   /// Re-enables the network. Only to be called as the counterpart to
   /// [disableNetwork].
   Future<void> enableNetwork() async {
-    networkEnabled = true;
+    _networkEnabled = true;
 
-    if (canUseNetwork()) {
-      writeStream.lastStreamToken = localStore.getLastStreamToken();
+    if (_canUseNetwork()) {
+      _writeStream.lastStreamToken = _localStore.getLastStreamToken();
 
-      if (shouldStartWatchStream()) {
-        startWatchStream();
+      if (_shouldStartWatchStream()) {
+        _startWatchStream();
       } else {
-        onlineStateTracker.updateState(OnlineState.unknown);
+        _onlineStateTracker.updateState(OnlineState.unknown);
       }
 
       // This will start the write stream if necessary.
@@ -151,25 +139,25 @@ class RemoteStore implements TargetMetadataProvider {
   /// Temporarily disables the network. The network can be re-enabled using
   /// [enableNetwork].
   void disableNetwork() {
-    networkEnabled = false;
+    _networkEnabled = false;
     disableNetworkInternal();
 
     // Set the OnlineState to OFFLINE so get()s return from cache, etc.
-    onlineStateTracker.updateState(OnlineState.offline);
+    _onlineStateTracker.updateState(OnlineState.offline);
   }
 
   /*private*/
   void disableNetworkInternal() {
-    watchStream.stop();
-    writeStream.stop();
+    _watchStream.stop();
+    _writeStream.stop();
 
-    if (!writePipeline.isEmpty) {
+    if (_writePipeline.isNotEmpty) {
       Log.d(_tag,
-          'Stopping write stream with ${writePipeline.length} pending writes');
-      writePipeline.clear();
+          'Stopping write stream with ${_writePipeline.length} pending writes');
+      _writePipeline.clear();
     }
 
-    cleanUpWatchStreamState();
+    _cleanUpWatchStreamState();
   }
 
   /// Starts up the remote store, creating streams, restoring state from
@@ -187,11 +175,11 @@ class RemoteStore implements TargetMetadataProvider {
     Log.d(_tag, 'Shutting down');
     // For now, all shutdown logic is handled by disableNetworkInternal(). We
     // might expand on this in the future.
-    networkEnabled = false;
-    this.disableNetworkInternal();
+    _networkEnabled = false;
+    disableNetworkInternal();
     // Set the OnlineState to UNKNOWN (rather than OFFLINE) to avoid potentially
     // triggering spurious listener events with cached data, etc.
-    onlineStateTracker.updateState(OnlineState.unknown);
+    _onlineStateTracker.updateState(OnlineState.unknown);
   }
 
   /// Tells the [RemoteStore] that the currently authenticated user has changed.
@@ -202,14 +190,14 @@ class RemoteStore implements TargetMetadataProvider {
   Future<void> handleCredentialChange() async {
     // If the network has been explicitly disabled, make sure we don't
     // accidentally re-enable it.
-    if (canUseNetwork()) {
+    if (_canUseNetwork()) {
       // Tear down and re-create our network streams. This will ensure we get a
       // fresh auth token for the new user and re-fill the write pipeline with
       // new mutations from the [LocalStore] (since mutations are per-user).
       Log.d(_tag, 'Restarting streams for new credential.');
-      networkEnabled = false;
+      _networkEnabled = false;
       disableNetworkInternal();
-      onlineStateTracker.updateState(OnlineState.unknown);
+      _onlineStateTracker.updateState(OnlineState.unknown);
       await enableNetwork();
     }
   }
@@ -219,22 +207,21 @@ class RemoteStore implements TargetMetadataProvider {
   /// Listens to the target identified by the given [QueryData]. */
   void listen(QueryData queryData) {
     final int targetId = queryData.targetId;
-    Assert.hardAssert(!listenTargets.containsKey(targetId),
+    Assert.hardAssert(!_listenTargets.containsKey(targetId),
         'listen called with duplicate target ID: $targetId');
 
-    listenTargets[targetId] = queryData;
+    _listenTargets[targetId] = queryData;
 
-    if (shouldStartWatchStream()) {
-      startWatchStream();
-    } else if (watchStream.isOpen) {
-      sendWatchRequest(queryData);
+    if (_shouldStartWatchStream()) {
+      _startWatchStream();
+    } else if (_watchStream.isOpen) {
+      _sendWatchRequest(queryData);
     }
   }
 
-  /*private*/
-  void sendWatchRequest(QueryData queryData) {
-    watchChangeAggregator.recordPendingTargetRequest(queryData.targetId);
-    watchStream.watchQuery(queryData);
+  void _sendWatchRequest(QueryData queryData) {
+    _watchChangeAggregator.recordPendingTargetRequest(queryData.targetId);
+    _watchStream.watchQuery(queryData);
   }
 
   /// Stops listening to the target with the given target ID.
@@ -242,84 +229,80 @@ class RemoteStore implements TargetMetadataProvider {
   /// * If this is called with the last active targetId, the watch stream enters
   /// idle mode and will be torn down after one minute of inactivity.
   void stopListening(int targetId) {
-    QueryData queryData = listenTargets.remove(targetId);
+    final QueryData queryData = _listenTargets.remove(targetId);
     Assert.hardAssert(queryData != null,
         'stopListening called on target no currently watched: $targetId');
 
     // The watch stream might not be started if we're in a disconnected state
-    if (watchStream.isOpen) {
-      sendUnwatchRequest(targetId);
+    if (_watchStream.isOpen) {
+      _sendUnwatchRequest(targetId);
     }
 
-    if (listenTargets.isEmpty) {
-      if (watchStream.isOpen) {
-        watchStream.markIdle();
-      } else if (this.canUseNetwork()) {
+    if (_listenTargets.isEmpty) {
+      if (_watchStream.isOpen) {
+        _watchStream.markIdle();
+      } else if (_canUseNetwork()) {
         // Revert to [OnlineState.unknown] if the watch stream is not open and
         // we have no listeners, since without any listens to send we cannot
         // confirm if the stream is healthy and upgrade to [OnlineState.online].
-        this.onlineStateTracker.updateState(OnlineState.unknown);
+        _onlineStateTracker.updateState(OnlineState.unknown);
       }
     }
   }
 
-  /*private*/
-  void sendUnwatchRequest(int targetId) {
-    watchChangeAggregator.recordPendingTargetRequest(targetId);
-    watchStream.unwatchTarget(targetId);
+  void _sendUnwatchRequest(int targetId) {
+    _watchChangeAggregator.recordPendingTargetRequest(targetId);
+    _watchStream.unwatchTarget(targetId);
   }
 
   /// Returns true if the network is enabled, the write stream has not yet been
   /// started and there are pending writes.
-  /*private*/
-  bool shouldStartWriteStream() {
-    return canUseNetwork() && !writeStream.isStarted && !writePipeline.isEmpty;
+  bool _shouldStartWriteStream() {
+    return _canUseNetwork() &&
+        !_writeStream.isStarted &&
+        _writePipeline.isNotEmpty;
   }
 
   /// Returns true if the network is enabled, the watch stream has not yet been
   /// started and there are active watch targets.
-  /*private*/
-  bool shouldStartWatchStream() {
-    return canUseNetwork() && !watchStream.isStarted && !listenTargets.isEmpty;
+  bool _shouldStartWatchStream() {
+    return _canUseNetwork() &&
+        !_watchStream.isStarted &&
+        _listenTargets.isNotEmpty;
   }
 
-  /*private*/
-  void cleanUpWatchStreamState() {
+  void _cleanUpWatchStreamState() {
     // If the connection is closed then we'll never get a snapshot version for
     // the accumulated changes and so we'll never be able to complete the batch.
     // When we start up again the server is going to resend these changes
     // anyway, so just toss the accumulated state.
-    watchChangeAggregator = null;
+    _watchChangeAggregator = null;
   }
 
-  /*private*/
-  void startWatchStream() {
-    Assert.hardAssert(shouldStartWatchStream(),
+  void _startWatchStream() {
+    Assert.hardAssert(_shouldStartWatchStream(),
         'startWatchStream() called when shouldStartWatchStream() is false.');
-    watchChangeAggregator = new WatchChangeAggregator(this);
-    watchStream.start();
+    _watchChangeAggregator = WatchChangeAggregator(this);
+    _watchStream.start();
 
-    onlineStateTracker.handleWatchStreamStart();
+    _onlineStateTracker.handleWatchStreamStart();
   }
 
-  /*private*/
-  void handleWatchStreamOpen() {
+  void _handleWatchStreamOpen() {
     // Restore any existing watches.
-    for (QueryData queryData in listenTargets.values) {
-      sendWatchRequest(queryData);
-    }
+    _listenTargets.values.forEach(_sendWatchRequest);
   }
 
-  /*private*/
-  Future<void> handleWatchChange(
+  Future<void> _handleWatchChange(
       SnapshotVersion snapshotVersion, WatchChange watchChange) async {
     // Mark the connection as ONLINE because we got a message from the server.
-    onlineStateTracker.updateState(OnlineState.online);
+    _onlineStateTracker.updateState(OnlineState.online);
 
-    Assert.hardAssert((watchStream != null) && (watchChangeAggregator != null),
+    Assert.hardAssert(
+        (_watchStream != null) && (_watchChangeAggregator != null),
         'WatchStream and WatchStreamAggregator should both be non-null');
 
-    WatchChangeWatchTargetChange watchTargetChange =
+    final WatchChangeWatchTargetChange watchTargetChange =
         watchChange is WatchChangeWatchTargetChange ? watchChange : null;
 
     if (watchTargetChange != null &&
@@ -327,70 +310,68 @@ class RemoteStore implements TargetMetadataProvider {
         watchTargetChange.cause != null) {
       // There was an error on a target, don't wait for a consistent snapshot to
       // raise events
-      await processTargetError(watchTargetChange);
+      await _processTargetError(watchTargetChange);
     } else {
       if (watchChange is WatchChangeDocumentChange) {
-        watchChangeAggregator.handleDocumentChange(watchChange);
+        _watchChangeAggregator.handleDocumentChange(watchChange);
       } else if (watchChange is WatchChangeExistenceFilterWatchChange) {
-        watchChangeAggregator.handleExistenceFilter(watchChange);
+        _watchChangeAggregator.handleExistenceFilter(watchChange);
       } else {
         Assert.hardAssert(watchChange is WatchChangeWatchTargetChange,
             'Expected watchChange to be an instance of WatchTargetChange');
-        watchChangeAggregator.handleTargetChange(watchChange);
+        _watchChangeAggregator
+            .handleTargetChange(watchChange as WatchChangeWatchTargetChange);
       }
 
       if (snapshotVersion != SnapshotVersion.none) {
-        SnapshotVersion lastRemoteSnapshotVersion =
-            this.localStore.getLastRemoteSnapshotVersion();
+        final SnapshotVersion lastRemoteSnapshotVersion =
+            _localStore.getLastRemoteSnapshotVersion();
         if (snapshotVersion.compareTo(lastRemoteSnapshotVersion) >= 0) {
           // We have received a target change with a global snapshot if the
           // snapshot version is not equal to SnapshotVersion.MIN.
-          await raiseWatchSnapshot(snapshotVersion);
+          await _raiseWatchSnapshot(snapshotVersion);
         }
       }
     }
   }
 
-  /*private*/
-  void handleWatchStreamClose(GrpcError status) {
+  void _handleWatchStreamClose(GrpcError status) {
     if (status.code == StatusCode.ok) {
       // Graceful stop (due to stop() or idle timeout). Make sure that's
       // desirable.
-      Assert.hardAssert(!shouldStartWatchStream(),
+      Assert.hardAssert(!_shouldStartWatchStream(),
           'Watch stream was stopped gracefully while still needed.');
     }
 
-    cleanUpWatchStreamState();
+    _cleanUpWatchStreamState();
 
     // If we still need the watch stream, retry the connection.
-    if (shouldStartWatchStream()) {
-      onlineStateTracker.handleWatchStreamFailure(status);
+    if (_shouldStartWatchStream()) {
+      _onlineStateTracker.handleWatchStreamFailure(status);
 
-      startWatchStream();
+      _startWatchStream();
     } else {
       // We don't need to restart the watch stream because there are no active
       // targets. The online state is set to unknown because there is no active
       // attempt at establishing a connection.
-      onlineStateTracker.updateState(OnlineState.unknown);
+      _onlineStateTracker.updateState(OnlineState.unknown);
     }
   }
 
-  /*private*/
-  bool canUseNetwork() {
+  bool _canUseNetwork() {
     // PORTING NOTE: This method exists mostly because web also has to take into
     // account primary vs. secondary state.
-    return networkEnabled;
+    return _networkEnabled;
   }
 
   /// Takes a batch of changes from the [Datastore], repackages them as a
   /// [RemoteEvent], and passes that on to the listener, which is typically the
   /// [SyncEngine].
-  /*private*/
-  Future<void> raiseWatchSnapshot(SnapshotVersion snapshotVersion) async {
+  Future<void> _raiseWatchSnapshot(SnapshotVersion snapshotVersion) async {
     Assert.hardAssert(snapshotVersion != SnapshotVersion.none,
         'Can\'t raise event for unknown SnapshotVersion');
     final RemoteEvent remoteEvent =
-        watchChangeAggregator.createRemoteEvent(snapshotVersion);
+        _watchChangeAggregator.createRemoteEvent(snapshotVersion);
 
     // Update in-memory resume tokens. [LocalStore] will update the persistent
     // view of these when applying the completed [RemoteEvent].
@@ -399,10 +380,10 @@ class RemoteStore implements TargetMetadataProvider {
       final TargetChange targetChange = entry.value;
       if (targetChange.resumeToken.isNotEmpty) {
         final int targetId = entry.key;
-        final QueryData queryData = this.listenTargets[targetId];
+        final QueryData queryData = _listenTargets[targetId];
         // A watched target might have been removed already.
         if (queryData != null) {
-          this.listenTargets[targetId] = queryData.copy(snapshotVersion,
+          _listenTargets[targetId] = queryData.copy(snapshotVersion,
               targetChange.resumeToken, queryData.sequenceNumber);
         }
       }
@@ -411,47 +392,46 @@ class RemoteStore implements TargetMetadataProvider {
     // Re-establish listens for the targets that have been invalidated by
     // existence filter mismatches.
     for (int targetId in remoteEvent.targetMismatches) {
-      final QueryData queryData = this.listenTargets[targetId];
+      final QueryData queryData = _listenTargets[targetId];
       // A watched target might have been removed already.
       if (queryData != null) {
         // Clear the resume token for the query, since we're in a known mismatch
         // state.
-        this.listenTargets[targetId] = queryData.copy(
+        _listenTargets[targetId] = queryData.copy(
             queryData.snapshotVersion, <int>[], queryData.sequenceNumber);
 
         // Cause a hard reset by unwatching and rewatching immediately, but
         // deliberately don't send a resume token so that we get a full update.
-        this.sendUnwatchRequest(targetId);
+        _sendUnwatchRequest(targetId);
 
         // Mark the query we send as being on behalf of an existence filter
         // mismatch, but don't actually retain that in [listenTargets]. This
         // ensures that we flag the first re-listen this way without impacting
         // future listens of this target (that might happen e.g. on reconnect).
-        final QueryData requestQueryData = new QueryData.init(
+        final QueryData requestQueryData = QueryData.init(
           queryData.query,
           targetId,
           queryData.sequenceNumber,
           QueryPurpose.existenceFilterMismatch,
         );
-        this.sendWatchRequest(requestQueryData);
+        _sendWatchRequest(requestQueryData);
       }
     }
 
     // Finally raise remote event
-    await remoteStoreCallback.handleRemoteEvent(remoteEvent);
+    await _remoteStoreCallback.handleRemoteEvent(remoteEvent);
   }
 
-  /*private*/
-  Future<void> processTargetError(
+  Future<void> _processTargetError(
       WatchChangeWatchTargetChange targetChange) async {
     Assert.hardAssert(
         targetChange.cause != null, 'Processing target error without a cause');
     for (int targetId in targetChange.targetIds) {
       // Ignore targets that have been removed already.
-      if (listenTargets.containsKey(targetId)) {
-        listenTargets.remove(targetId);
-        watchChangeAggregator.removeTarget(targetId);
-        await remoteStoreCallback.handleRejectedListen(
+      if (_listenTargets.containsKey(targetId)) {
+        _listenTargets.remove(targetId);
+        _watchChangeAggregator.removeTarget(targetId);
+        await _remoteStoreCallback.handleRejectedListen(
             targetId, targetChange.cause);
       }
     }
@@ -466,136 +446,128 @@ class RemoteStore implements TargetMetadataProvider {
   ///
   /// * Starts the write stream if necessary.
   Future<void> fillWritePipeline() async {
-    int lastBatchIdRetrieved = writePipeline.isEmpty
+    int lastBatchIdRetrieved = _writePipeline.isEmpty
         ? MutationBatch.unknown
-        : writePipeline.last.batchId;
-    while (canAddToWritePipeline()) {
+        : _writePipeline.last.batchId;
+    while (_canAddToWritePipeline()) {
       final MutationBatch batch =
-          await localStore.getNextMutationBatch(lastBatchIdRetrieved);
+          await _localStore.getNextMutationBatch(lastBatchIdRetrieved);
       if (batch == null) {
-        if (writePipeline.isEmpty) {
-          writeStream.markIdle();
+        if (_writePipeline.isEmpty) {
+          _writeStream.markIdle();
         }
         break;
       }
-      addToWritePipeline(batch);
+      _addToWritePipeline(batch);
       lastBatchIdRetrieved = batch.batchId;
     }
 
-    if (shouldStartWriteStream()) {
-      startWriteStream();
+    if (_shouldStartWriteStream()) {
+      _startWriteStream();
     }
   }
 
   /// Returns true if we can add to the write pipeline (i.e. it is not full and
   /// the network is enabled).
-  /*private*/
-  bool canAddToWritePipeline() {
-    return canUseNetwork() && writePipeline.length < MAX_PENDING_WRITES;
+  bool _canAddToWritePipeline() {
+    return _canUseNetwork() && _writePipeline.length < _maxPendingWrites;
   }
 
   /// Queues additional writes to be sent to the write stream, sending them
   /// immediately if the write stream is established.
-  /*private*/
-  void addToWritePipeline(MutationBatch mutationBatch) {
-    Assert.hardAssert(canAddToWritePipeline(),
+  void _addToWritePipeline(MutationBatch mutationBatch) {
+    Assert.hardAssert(_canAddToWritePipeline(),
         'addToWritePipeline called when pipeline is full');
 
-    writePipeline.add(mutationBatch);
+    _writePipeline.add(mutationBatch);
 
-    if (writeStream.isOpen && writeStream.isHandshakeComplete) {
-      writeStream.writeMutations(mutationBatch.mutations);
+    if (_writeStream.isOpen && _writeStream.isHandshakeComplete) {
+      _writeStream.writeMutations(mutationBatch.mutations);
     }
   }
 
-  /*private*/
-  void startWriteStream() {
-    Assert.hardAssert(shouldStartWriteStream(),
+  void _startWriteStream() {
+    Assert.hardAssert(_shouldStartWriteStream(),
         'startWriteStream() called when shouldStartWriteStream() is false.');
-    writeStream.start();
+    _writeStream.start();
   }
 
   /// Handles a successful handshake response from the server, which is our cue
   /// to send any pending writes.
-  /*private*/
-  void handleWriteStreamHandshakeComplete() {
+  void _handleWriteStreamHandshakeComplete() {
     // Record the stream token.
-    localStore.setLastStreamToken(writeStream.lastStreamToken);
+    _localStore.setLastStreamToken(_writeStream.lastStreamToken);
 
     // Send the write pipeline now that stream is established.
-    for (MutationBatch batch in writePipeline) {
-      writeStream.writeMutations(batch.mutations);
+    for (MutationBatch batch in _writePipeline) {
+      _writeStream.writeMutations(batch.mutations);
     }
   }
 
   /// Handles a successful [StreamingWriteResponse] from the server that
   /// contains a mutation result.
-  /*private*/
-  Future<void> handleWriteStreamMutationResults(
+  Future<void> _handleWriteStreamMutationResults(
       SnapshotVersion commitVersion, List<MutationResult> results) async {
     // This is a response to a write containing mutations and should be
     // correlated to the first write in our write pipeline.
-    final MutationBatch batch = writePipeline.removeFirst();
+    final MutationBatch batch = _writePipeline.removeFirst();
 
     final MutationBatchResult mutationBatchResult = MutationBatchResult.create(
-        batch, commitVersion, results, writeStream.lastStreamToken);
-    await remoteStoreCallback.handleSuccessfulWrite(mutationBatchResult);
+        batch, commitVersion, results, _writeStream.lastStreamToken);
+    await _remoteStoreCallback.handleSuccessfulWrite(mutationBatchResult);
 
     // It's possible that with the completion of this mutation another slot has
     // freed up.
     await fillWritePipeline();
   }
 
-  /*private*/
-  Future<void> handleWriteStreamClose(GrpcError status) async {
+  Future<void> _handleWriteStreamClose(GrpcError status) async {
     if (status.code == StatusCode.ok) {
       // Graceful stop (due to stop() or idle timeout). Make sure that's
       // desirable.
-      Assert.hardAssert(!shouldStartWatchStream(),
+      Assert.hardAssert(!_shouldStartWatchStream(),
           'Write stream was stopped gracefully while still needed.');
     }
 
     // If the write stream closed due to an error, invoke the error callbacks
     // if there are pending writes.
-    if (status.code != StatusCode.ok && writePipeline.isNotEmpty) {
+    if (status.code != StatusCode.ok && _writePipeline.isNotEmpty) {
       // TODO: handle UNAUTHENTICATED status, see go/firestore-client-errors
-      if (writeStream.isHandshakeComplete) {
+      if (_writeStream.isHandshakeComplete) {
         // This error affects the actual writes
-        await handleWriteError(status);
+        await _handleWriteError(status);
       } else {
         // If there was an error before the handshake has finished, it's
         // possible that the server is unable to process the stream token we're
         // sending. (Perhaps it's too old?)
-        await handleWriteHandshakeError(status);
+        await _handleWriteHandshakeError(status);
       }
     }
 
     // The write stream may have already been restarted by refilling the write
     // pipeline for failed writes. In that case, we don't want to start the
     // write stream again.
-    if (shouldStartWriteStream()) {
-      startWriteStream();
+    if (_shouldStartWriteStream()) {
+      _startWriteStream();
     }
   }
 
-  /*private*/
-  Future<void> handleWriteHandshakeError(GrpcError status) async {
+  Future<void> _handleWriteHandshakeError(GrpcError status) async {
     Assert.hardAssert(
         status.code != StatusCode.ok, 'Handling write error with status OK.');
     // Reset the token if it's a permanent error or the error code is ABORTED,
     // signaling the write stream is no longer valid.
     if (Datastore.isPermanentWriteError(status) ||
         status.code == StatusCode.aborted) {
-      final String token = Util.toDebugString(writeStream.lastStreamToken);
+      final String token = Util.toDebugString(_writeStream.lastStreamToken);
       Log.d(_tag,
           'RemoteStore error before completed handshake; resetting stream token $token: $status');
-      writeStream.lastStreamToken = WriteStream.EMPTY_STREAM_TOKEN;
-      await localStore.setLastStreamToken(WriteStream.EMPTY_STREAM_TOKEN);
+      _writeStream.lastStreamToken = WriteStream.EMPTY_STREAM_TOKEN;
+      await _localStore.setLastStreamToken(WriteStream.EMPTY_STREAM_TOKEN);
     }
   }
 
-  /*private*/
-  Future<void> handleWriteError(GrpcError status) async {
+  Future<void> _handleWriteError(GrpcError status) async {
     Assert.hardAssert(
         status.code != StatusCode.ok, 'Handling write error with status OK.');
     // Only handle permanent error, if it's transient just let the retry logic
@@ -603,13 +575,13 @@ class RemoteStore implements TargetMetadataProvider {
     if (Datastore.isPermanentWriteError(status)) {
       // If this was a permanent error, the request itself was the problem so
       // it's not going to succeed if we resend it.
-      final MutationBatch batch = writePipeline.removeFirst();
+      final MutationBatch batch = _writePipeline.removeFirst();
 
       // In this case it's also unlikely that the server itself is melting down
       // -- this was just a bad request, so inhibit backoff on the next restart
-      writeStream.inhibitBackoff();
+      _writeStream.inhibitBackoff();
 
-      await remoteStoreCallback.handleRejectedWrite(batch.batchId, status);
+      await _remoteStoreCallback.handleRejectedWrite(batch.batchId, status);
 
       // It's possible that with the completion of this mutation another slot
       // has freed up.
@@ -617,15 +589,15 @@ class RemoteStore implements TargetMetadataProvider {
     }
   }
 
-  Transaction createTransaction() => Transaction(datastore);
+  Transaction createTransaction() => Transaction(_datastore);
 
   @override
   ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId) {
-    return this.remoteStoreCallback.getRemoteKeysForTarget(targetId);
+    return _remoteStoreCallback.getRemoteKeysForTarget(targetId);
   }
 
   @override
-  QueryData getQueryDataForTarget(int targetId) => listenTargets[targetId];
+  QueryData getQueryDataForTarget(int targetId) => _listenTargets[targetId];
 }
 
 /// A callback interface for events from RemoteStore.

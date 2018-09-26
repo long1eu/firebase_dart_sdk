@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/lru_delegate.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 
 /// Implements the steps for LRU garbage collection.
 class LruGarbageCollector {
@@ -17,7 +18,7 @@ class LruGarbageCollector {
   /// Given a percentile of target to collect, returns the number of targets to
   /// collect.
   int calculateQueryCount(int percentile) {
-    int targetCount = delegate.targetCount;
+    final int targetCount = delegate.targetCount;
     return (percentile ~/ 100.0) * targetCount;
   }
 
@@ -26,12 +27,12 @@ class LruGarbageCollector {
     if (count == 0) {
       return ListenSequence.INVALID;
     }
-    _RollingSequenceNumberBuffer buffer =
-        new _RollingSequenceNumberBuffer(count);
-    await delegate.forEachTarget(
-        null, (queryData) => buffer.addElement(queryData.sequenceNumber));
+    final _RollingSequenceNumberBuffer buffer =
+        _RollingSequenceNumberBuffer(count);
+    await delegate.forEachTarget(null,
+        (QueryData queryData) => buffer.addElement(queryData.sequenceNumber));
     await delegate.forEachOrphanedDocumentSequenceNumber(
-        null, (it) => buffer.addElement(it));
+        null, (int it) => buffer.addElement(it));
     return buffer.maxValue;
   }
 
@@ -53,18 +54,18 @@ class LruGarbageCollector {
 /// them in [maxValue].
 class _RollingSequenceNumberBuffer {
   // Invert the comparison because we want to keep the smallest values.
-  static final Comparator<int> COMPARATOR = (int a, int b) => b.compareTo(a);
+  static final Comparator<int> comparator = (int a, int b) => b.compareTo(a);
   final PriorityQueue<int> queue;
   final int maxElements;
 
   _RollingSequenceNumberBuffer(this.maxElements)
-      : queue = PriorityQueue<int>(COMPARATOR);
+      : queue = PriorityQueue<int>(comparator);
 
   void addElement(int sequenceNumber) {
     if (queue.length < maxElements) {
       queue.add(sequenceNumber);
     } else {
-      int highestValue = queue.first;
+      final int highestValue = queue.first;
       if (sequenceNumber < highestValue) {
         queue.removeFirst();
         queue.add(sequenceNumber);

@@ -55,9 +55,9 @@ class GetTokenResult {
   @publicApi
   String get signInProvider {
     // Sign in provider lives inside the 'firebase' element of the JSON
-    Map<String, dynamic> firebaseElem = claims[_firebaseKey];
+    final Map<String, dynamic> firebaseElem = claims[_firebaseKey];
     if (firebaseElem != null) {
-      return firebaseElem[_signInProvider];
+      return firebaseElem[_signInProvider] as String;
     }
     return null;
   }

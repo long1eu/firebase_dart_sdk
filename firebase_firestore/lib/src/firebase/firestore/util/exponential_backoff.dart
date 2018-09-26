@@ -17,7 +17,7 @@ class ExponentialBackoff {
 
   int _currentBaseMs;
   int _lastAttemptTime;
-  DelayedTask _timerTask;
+  DelayedTask<void> _timerTask;
 
   /// Creates and returns a helper for running delayed tasks following an
   /// exponential backoff curve between attempts.
@@ -37,7 +37,7 @@ class ExponentialBackoff {
   /// applied, so the actual delay could be as much as 1.5*[maxDelayMs].
   ExponentialBackoff(this._queue, this._timerId, this._initialDelayMs,
       this._backoffFactor, this._maxDelayMs) {
-    this._lastAttemptTime = DateTime.now().millisecondsSinceEpoch;
+    _lastAttemptTime = DateTime.now().millisecondsSinceEpoch;
 
     reset();
   }
@@ -77,8 +77,8 @@ class ExponentialBackoff {
           'Backing off for $remainingDelayMs ms (base delay: $_currentBaseMs ms, delay with jitter: $desiredDelayWithJitterMs ms, last attempt: $delaySoFarMs ms ago)');
     }
 
-    _timerTask = _queue.enqueueAfterDelay(
-      this._timerId,
+    _timerTask = _queue.enqueueAfterDelay<void>(
+      _timerId,
       Duration(milliseconds: remainingDelayMs),
       () {
         _lastAttemptTime = DateTime.now().millisecondsSinceEpoch;

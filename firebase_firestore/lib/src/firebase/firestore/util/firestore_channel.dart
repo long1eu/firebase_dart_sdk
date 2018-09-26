@@ -17,14 +17,14 @@ import 'package:grpc/grpc.dart';
 /// Wrapper class around io.grpc.Channel that adds headers, exception handling
 /// and simplifies invoking RPCs.
 class FirestoreChannel {
-  static final String X_GOOG_API_CLIENT_HEADER = 'x-goog-api-client';
+  static const String _xGoogApiClientHeader = 'x-goog-api-client';
 
-  static final String RESOURCE_PREFIX_HEADER = 'google-cloud-resource-prefix';
+  static const String _resourcePrefixHeader = 'google-cloud-resource-prefix';
 
   // TODO: The gRPC version is determined using a package manifest, which is
   // not available to us at build time or runtime (it's empty when building in
   // google3). So for now we omit the version of grpc.
-  static final String X_GOOG_API_CLIENT_VALUE =
+  static const String _xGoogApiClientValue =
       'gl-dart/ fire/${Version.sdkVersion} grpc/';
 
   final CredentialsProvider _credentialsProvider;
@@ -37,14 +37,14 @@ class FirestoreChannel {
 
   factory FirestoreChannel(CredentialsProvider credentialsProvider,
       ClientChannel channel, DatabaseId databaseId) {
-    final CallOptions options = CallOptions(providers: [
+    final CallOptions options = CallOptions(providers: <MetadataProvider>[
       FirestoreCallCredentials(credentialsProvider).getRequestMetadata,
       (Map<String, String> map, String url) {
-        map.addAll({
-          X_GOOG_API_CLIENT_HEADER: X_GOOG_API_CLIENT_VALUE,
+        map.addAll(<String, String>{
+          _xGoogApiClientHeader: _xGoogApiClientValue,
           // This header is used to improve routing and project isolation by the
           // backend.
-          RESOURCE_PREFIX_HEADER:
+          _resourcePrefixHeader:
               'projects/${databaseId.projectId}/databases/${databaseId.databaseId}',
         });
       }
@@ -67,6 +67,7 @@ class FirestoreChannel {
   BidiChannel<ReqT, RespT> runBidiStreamingRpc<ReqT, RespT>(
       ClientMethod<ReqT, RespT> method,
       IncomingStreamObserver<RespT> observer) {
+    // ignore: close_sinks
     final StreamController<ReqT> controller = StreamController<ReqT>();
     final ClientCall<ReqT, RespT> call =
         _channel.createCall(method, controller.stream, _callOptions);
@@ -90,12 +91,12 @@ class FirestoreChannel {
   /// Creates and starts a streaming response RPC.
   Future<List<RespT>> runStreamingResponseRpc<ReqT, RespT>(
       ClientMethod<ReqT, RespT> method, ReqT request) {
-    final Completer<List<RespT>> completer = new Completer<List<RespT>>();
+    final Completer<List<RespT>> completer = Completer<List<RespT>>();
     final StreamController<ReqT> controller = StreamController<ReqT>();
     final ClientCall<ReqT, RespT> call =
         _channel.createCall(method, controller.stream, _callOptions);
 
-    final List<RespT> results = List<RespT>();
+    final List<RespT> results = <RespT>[];
 
     call.response.listen(
       (RespT message) {
@@ -103,8 +104,10 @@ class FirestoreChannel {
       },
       onDone: () {
         completer.complete(results);
+        controller.close();
       },
       onError: (GrpcError status) {
+        controller.close();
         completer.completeError(Util.exceptionFromStatus(status));
       },
     );
@@ -129,12 +132,14 @@ class FirestoreChannel {
       },
       onDone: () {
         if (!completer.isCompleted) {
-          completer.completeError(new FirebaseFirestoreError(
+          completer.completeError(FirebaseFirestoreError(
               'Received onClose with status OK, but no message.',
               FirebaseFirestoreErrorCode.internal));
         }
+        controller.close();
       },
       onError: (GrpcError status) {
+        controller.close();
         completer.completeError(Util.exceptionFromStatus(status));
       },
     );
@@ -145,7 +150,7 @@ class FirestoreChannel {
 
   void invalidateToken() => _credentialsProvider.invalidateToken();
 
-  static _catchError(Function function) {
+  static void _catchError(Function function) {
     try {
       function();
     } catch (t) {
@@ -178,6 +183,6 @@ class BidiChannel<ReqT, RespT> {
 
   Future<void> cancel() async {
     await _call.cancel();
-    await _sink.close();
+    _sink.close();
   }
 }

@@ -7,20 +7,20 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// BasePath represents a path sequence in the Firestore database. It is
 /// composed of an ordered sequence of string segments.
 abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
-  final List<String> _segments;
+  final List<String> segments;
 
-  const BasePath(this._segments);
+  const BasePath(this.segments);
 
-  String getSegment(int index) => _segments[index];
+  String getSegment(int index) => segments[index];
 
-  String operator [](int index) => _segments[index];
+  String operator [](int index) => segments[index];
 
   /// Returns a new path whose segments are the current path plus the passed in
   /// path
   ///
   /// Returns a new path with this path's segment plus the new one.
   B appendSegment(String segment) {
-    final List<String> newPath = List<String>.from(_segments)..add(segment);
+    final List<String> newPath = List<String>.from(segments)..add(segment);
     return createPathWithSegments(newPath);
   }
 
@@ -28,8 +28,8 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   ///
   /// Returns a new path with this segments path plus the new one
   B appendPath(B path) {
-    final List<String> newPath = List<String>.from(_segments)
-      ..addAll(path._segments);
+    final List<String> newPath = List<String>.from(segments)
+      ..addAll(path.segments);
     return createPathWithSegments(newPath);
   }
 
@@ -37,30 +37,30 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   /// segment removed. Otherwise will return a new path with the current path's
   /// first [count] segments removed.
   B popFirst([int count = 1]) {
-    int length = this.length;
+    final int length = this.length;
     Assert.hardAssert(length >= count,
         "Can't call popFirst with count > length() ($count > $length)");
-    return createPathWithSegments(_segments.sublist(count, length));
+    return createPathWithSegments(segments.sublist(count, length));
   }
 
   /// Returns a new path with the current path's last segment removed.
   B popLast() {
-    return createPathWithSegments(_segments.sublist(0, length - 1));
+    return createPathWithSegments(segments.sublist(0, length - 1));
   }
 
   /// Returns a new path made up of the first count segments of the current
   /// path.
   B keepFirst(int count) {
-    return createPathWithSegments(_segments.sublist(0, count));
+    return createPathWithSegments(segments.sublist(0, count));
   }
 
   @override
   int compareTo(B o) {
     int i = 0;
-    int myLength = length;
-    int theirLength = o.length;
+    final int myLength = length;
+    final int theirLength = o.length;
     while (i < myLength && i < theirLength) {
-      int localCompare = getSegment(i).compareTo(o.getSegment(i));
+      final int localCompare = getSegment(i).compareTo(o.getSegment(i));
       if (localCompare != 0) {
         return localCompare;
       }
@@ -71,18 +71,18 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   }
 
   /// Returns the last segment of the path
-  String getLastSegment() => _segments.last;
+  String getLastSegment() => segments.last;
 
-  String get last => _segments.last;
+  String get last => segments.last;
 
   /// Returns the first segment of the path
-  String getFirstSegment() => _segments.first;
+  String getFirstSegment() => segments.first;
 
-  String get first => _segments.first;
+  String get first => segments.first;
 
-  bool get isEmpty => _segments.isEmpty;
+  bool get isEmpty => segments.isEmpty;
 
-  bool get isNotEmpty => _segments.isNotEmpty;
+  bool get isNotEmpty => segments.isNotEmpty;
 
   /// Checks to see if this path is a prefix of (or equals) another path.
   ///
@@ -118,24 +118,18 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
 
   B createPathWithSegments(List<String> segments);
 
-  int get length => _segments.length;
-
-  @override
-  String toString() => canonicalString;
-
-  @override
-  int get hashCode {
-    int prime = 37;
-    int result = 1;
-    result = prime * result + runtimeType.hashCode;
-    result = prime * result + _segments.hashCode;
-    return result;
-  }
+  int get length => segments.length;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is BasePath &&
           runtimeType == other.runtimeType &&
-          (compareTo(other as B) == 0);
+          segments == other.segments;
+
+  @override
+  int get hashCode => segments.hashCode;
+
+  @override
+  String toString() => canonicalString;
 }
