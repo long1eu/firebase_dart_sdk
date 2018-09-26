@@ -51,7 +51,7 @@ class QueryData {
   /// resume token.
   QueryData copy(SnapshotVersion snapshotVersion, List<int> resumeToken,
       int sequenceNumber) {
-    return new QueryData(
+    return QueryData(
       query,
       targetId,
       sequenceNumber,

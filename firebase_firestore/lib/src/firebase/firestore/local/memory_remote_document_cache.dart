@@ -43,23 +43,24 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
     // Documents are ordered by key, so we can use a prefix scan to narrow down
     // the documents we need to match the query against.
-    ResourcePath queryPath = query.path;
-    DocumentKey prefix = DocumentKey.fromPath(queryPath.appendSegment(''));
-    Iterator<MapEntry<DocumentKey, MaybeDocument>> iterator =
+    final ResourcePath queryPath = query.path;
+    final DocumentKey prefix =
+        DocumentKey.fromPath(queryPath.appendSegment(''));
+    final Iterator<MapEntry<DocumentKey, MaybeDocument>> iterator =
         docs.iteratorFrom(prefix);
     while (iterator.moveNext()) {
-      MapEntry<DocumentKey, MaybeDocument> entry = iterator.current;
-      DocumentKey key = entry.key;
+      final MapEntry<DocumentKey, MaybeDocument> entry = iterator.current;
+      final DocumentKey key = entry.key;
       if (!queryPath.isPrefixOf(key.path)) {
         break;
       }
 
-      MaybeDocument maybeDoc = entry.value;
+      final MaybeDocument maybeDoc = entry.value;
       if (!(maybeDoc is Document)) {
         continue;
       }
 
-      Document doc = maybeDoc;
+      final Document doc = maybeDoc;
       if (query.matches(doc)) {
         result = result.insert(doc.key, doc);
       }

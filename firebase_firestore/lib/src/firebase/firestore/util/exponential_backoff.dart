@@ -80,7 +80,7 @@ class ExponentialBackoff {
     _timerTask = _queue.enqueueAfterDelay<void>(
       _timerId,
       Duration(milliseconds: remainingDelayMs),
-      () {
+      () async {
         _lastAttemptTime = DateTime.now().millisecondsSinceEpoch;
         task();
       },

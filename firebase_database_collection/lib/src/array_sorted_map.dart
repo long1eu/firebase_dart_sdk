@@ -13,6 +13,15 @@ import 'immutable_sorted_map.dart';
 /// increasing collection size it will automatically convert to a RBTreeSortedMap
 /// after an insert call above a certain threshold.
 class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
+  ArraySortedMap(this.comparator, [List<K> keys, List<V> values])
+      : keys = keys ?? <K>[],
+        values = values ?? <V>[];
+
+  factory ArraySortedMap.fromMap(Map<K, V> map, Comparator<K> comparator) {
+    return buildFrom<K, K, V>(List.from<K>(map.keys), map,
+        ImmutableSortedMap.identityTranslator<K>(), comparator);
+  }
+
   static ArraySortedMap<A, C> buildFrom<A, B, C>(List<A> keys, Map<B, C> values,
       KeyTranslator<A, B> translator, Comparator<A> comparator) {
     keys.sort(comparator);
@@ -26,22 +35,14 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
       valueArray[pos] = value;
       pos++;
     }
-    return new ArraySortedMap<A, C>(comparator, keyArray, valueArray);
-  }
-
-  factory ArraySortedMap.fromMap(Map<K, V> map, Comparator<K> comparator) {
-    return buildFrom<K, K, V>(List.from<K>(map.keys), map,
-        ImmutableSortedMap.identityTranslator<K>(), comparator);
+    return ArraySortedMap<A, C>(comparator, keyArray, valueArray);
   }
 
   final List<K> keys;
   final List<V> values;
+
   @override
   final Comparator<K> comparator;
-
-  ArraySortedMap(this.comparator, [List<K> keys, List<V> values])
-      : keys = keys ?? <K>[],
-        values = values ?? <V>[];
 
   @override
   bool containsKey(K key) => findKey(key) != -1;
@@ -49,7 +50,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   @override
   V operator [](K key) {
     final int pos = findKey(key);
-    return pos != -1 ? this.values[pos] : null;
+    return pos != -1 ? values[pos] : null;
   }
 
   @override
@@ -60,7 +61,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
     } else {
       final List<K> keys = _removeFromArray<K>(this.keys, pos);
       final List<V> values = _removeFromArray<V>(this.values, pos);
-      return new ArraySortedMap<K, V>(this.comparator, keys, values);
+      return ArraySortedMap<K, V>(comparator, keys, values);
     }
   }
 
@@ -68,49 +69,49 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   ImmutableSortedMap<K, V> insert(K key, V value) {
     final int pos = findKey(key);
     if (pos != -1) {
-      if (this.keys[pos] == key && this.values[pos] == value) {
+      if (keys[pos] == key && values[pos] == value) {
         return this;
       } else {
         // The key and/or value might have changed, even though the comparison
         // might still yield 0
-        final List<K> newKeys = _replaceInArray<K>(this.keys, pos, key);
-        final List<V> newValues = _replaceInArray<V>(this.values, pos, value);
-        return new ArraySortedMap<K, V>(this.comparator, newKeys, newValues);
+        final List<K> newKeys = _replaceInArray<K>(keys, pos, key);
+        final List<V> newValues = _replaceInArray<V>(values, pos, value);
+        return ArraySortedMap<K, V>(comparator, newKeys, newValues);
       }
     } else {
-      if (this.keys.length > ImmutableSortedMap.arrayToRbTreeSizeThreshold) {
-        Map<K, V> map = new Map<K, V>();
-        for (int i = 0; i < this.keys.length; i++) {
-          map[this.keys[i]] = this.values[i];
+      if (keys.length > ImmutableSortedMap.arrayToRbTreeSizeThreshold) {
+        final Map<K, V> map = <K, V>{};
+        for (int i = 0; i < keys.length; i++) {
+          map[keys[i]] = values[i];
         }
         map[key] = value;
-        return RBTreeSortedMap.fromMap(map, this.comparator);
+        return RBTreeSortedMap<K, V>.fromMap(map, comparator);
       } else {
         final int newPos = _findKeyOrInsertPosition(key);
         final List<K> keys = _addToArray<K>(this.keys, newPos, key);
         final List<V> values = _addToArray<V>(this.values, newPos, value);
 
-        return new ArraySortedMap<K, V>(this.comparator, keys, values);
+        return ArraySortedMap<K, V>(comparator, keys, values);
       }
     }
   }
 
   @override
-  K get minKey => this.keys.length > 0 ? this.keys[0] : null;
+  K get minKey => keys.isNotEmpty ? keys[0] : null;
 
   @override
-  K get maxKey => this.keys.length > 0 ? this.keys[this.keys.length - 1] : null;
+  K get maxKey => keys.isNotEmpty ? keys[keys.length - 1] : null;
 
   @override
-  int get length => this.keys.length;
+  int get length => keys.length;
 
   @override
-  bool get isEmpty => this.keys.length == 0;
+  bool get isEmpty => keys.isEmpty;
 
   @override
   void inOrderTraversal(NodeVisitor<K, V> visitor) {
-    for (int i = 0; i < this.keys.length; i++) {
-      visitor.visitEntry(this.keys[i], this.values[i]);
+    for (int i = 0; i < keys.length; i++) {
+      visitor.visitEntry(keys[i], values[i]);
     }
   }
 
@@ -135,7 +136,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
 
   @override
   Iterator<MapEntry<K, V>> get reverseIterator {
-    return _getIterable(this.keys.length - 1, true).iterator;
+    return _getIterable(keys.length - 1, true).iterator;
   }
 
   @override
@@ -146,11 +147,11 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
 
   @override
   Iterator<MapEntry<K, V>> reverseIteratorFrom(K key) {
-    int pos = _findKeyOrInsertPosition(key);
+    final int pos = _findKeyOrInsertPosition(key);
     // if there's no exact match, findKeyOrInsertPosition will return the index
     // *after* the closest match, but since this is a reverse iterator, we want
     // to start just *before* the closest match.
-    if (pos < this.keys.length && this.comparator(this.keys[pos], key) == 0) {
+    if (pos < keys.length && this.comparator(keys[pos], key) == 0) {
       return _getIterable(pos, true).iterator;
     } else {
       return _getIterable(pos - 1, true).iterator;
@@ -161,9 +162,9 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   K getPredecessorKey(K key) {
     final int pos = findKey(key);
     if (pos == -1) {
-      throw ArgumentError("Can't find predecessor of nonexistent key");
+      throw ArgumentError('Can\'t find predecessor of nonexistent key');
     } else {
-      return (pos > 0) ? this.keys[pos - 1] : null;
+      return (pos > 0) ? keys[pos - 1] : null;
     }
   }
 
@@ -171,9 +172,9 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   K getSuccessorKey(K key) {
     final int pos = findKey(key);
     if (pos == -1) {
-      throw ArgumentError("Can't find successor of nonexistent key");
+      throw ArgumentError('Can\'t find successor of nonexistent key');
     } else {
-      return (pos < this.keys.length - 1) ? this.keys[pos + 1] : null;
+      return (pos < keys.length - 1) ? keys[pos + 1] : null;
     }
   }
 
@@ -198,8 +199,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   /// collection size this still should be as fast a as binary search.
   int _findKeyOrInsertPosition(K key) {
     int newPos = 0;
-    while (newPos < this.keys.length &&
-        this.comparator(this.keys[newPos], key) < 0) {
+    while (newPos < keys.length && this.comparator(keys[newPos], key) < 0) {
       newPos++;
     }
     return newPos;
@@ -209,7 +209,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   /// collection size this still should be as fast a as binary search.
   int findKey(K key) {
     int i = 0;
-    for (K otherKey in this.keys) {
+    for (K otherKey in keys) {
       if (this.comparator(key, otherKey) == 0) {
         return i;
       }

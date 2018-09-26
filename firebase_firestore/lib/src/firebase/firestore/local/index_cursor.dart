@@ -15,11 +15,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 class IndexCursor {
   /// Advances the cursor (to the first result if this is the first call),
   /// returning false if there are no more items.
-  bool get next => throw new StateError("Not yet implemented.");
+  bool get next => throw StateError('Not yet implemented.');
 
   /// Returns the DocumentKey for the current index entry (throws if there are
   /// no more entries).
-  DocumentKey get documentKey => throw new StateError("Not yet implemented.");
+  DocumentKey get documentKey => throw StateError('Not yet implemented.');
 
-  void close() => throw new StateError("Not yet implemented.");
+  void close() => throw StateError('Not yet implemented.');
 }

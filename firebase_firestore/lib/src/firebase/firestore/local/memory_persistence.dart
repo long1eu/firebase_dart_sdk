@@ -35,25 +35,24 @@ class MemoryPersistence extends Persistence {
   @override
   bool started;
 
+  /// Use static helpers to instantiate
+  MemoryPersistence._()
+      : mutationQueues = <User, MemoryMutationQueue>{},
+        remoteDocumentCache = MemoryRemoteDocumentCache() {
+    queryCache = MemoryQueryCache(this);
+  }
+
   static MemoryPersistence createEagerGcMemoryPersistence() {
-    MemoryPersistence persistence = new MemoryPersistence._();
+    final MemoryPersistence persistence = MemoryPersistence._();
     persistence
-        ._setReferenceDelegate(new MemoryEagerReferenceDelegate(persistence));
+        ._setReferenceDelegate(MemoryEagerReferenceDelegate(persistence));
     return persistence;
   }
 
   static MemoryPersistence createLruGcMemoryPersistence() {
-    MemoryPersistence persistence = new MemoryPersistence._();
-    persistence
-        ._setReferenceDelegate(new MemoryLruReferenceDelegate(persistence));
+    final MemoryPersistence persistence = MemoryPersistence._();
+    persistence._setReferenceDelegate(MemoryLruReferenceDelegate(persistence));
     return persistence;
-  }
-
-  /// Use static helpers to instantiate
-  MemoryPersistence._()
-      : mutationQueues = {},
-        remoteDocumentCache = MemoryRemoteDocumentCache() {
-    queryCache = MemoryQueryCache(this);
   }
 
   @override
@@ -78,7 +77,7 @@ class MemoryPersistence extends Persistence {
   MutationQueue getMutationQueue(User user) {
     MemoryMutationQueue queue = mutationQueues[user];
     if (queue == null) {
-      queue = new MemoryMutationQueue(this);
+      queue = MemoryMutationQueue(this);
       mutationQueues[user] = queue;
     }
     return queue;
@@ -87,7 +86,8 @@ class MemoryPersistence extends Persistence {
   Iterable<MemoryMutationQueue> getMutationQueues() => mutationQueues.values;
 
   @override
-  Future<void> runTransaction(String action, Transaction operation) async {
+  Future<void> runTransaction(
+      String action, Transaction<void> operation) async {
     referenceDelegate.onTransactionStarted();
     try {
       operation(null);

@@ -104,7 +104,7 @@ class DocumentChange {
             QueryDocumentSnapshot.fromDocument(
                 firestore, document, snapshot.isFromCache);
         int oldIndex, newIndex;
-        DocumentChangesType type = _getType(change);
+        final DocumentChangesType type = _getType(change);
         if (type != DocumentChangesType.added) {
           oldIndex = indexTracker.indexOf(document.key);
           Assert.hardAssert(oldIndex >= 0, 'Index for document not found');

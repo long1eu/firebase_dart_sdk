@@ -40,7 +40,7 @@ class Precondition {
   /// Returns true if the preconditions is valid for the given document
   /// (or null if no document is available).
   bool isValidFor(MaybeDocument maybeDoc) {
-    if (this.updateTime != null) {
+    if (updateTime != null) {
       return maybeDoc is Document && maybeDoc.version == updateTime;
     } else if (exists != null) {
       if (exists) {
@@ -49,7 +49,7 @@ class Precondition {
         return maybeDoc == null || maybeDoc is NoDocument;
       }
     } else {
-      Assert.hardAssert(isNone, "Precondition should be empty");
+      Assert.hardAssert(isNone, 'Precondition should be empty');
       return true;
     }
   }

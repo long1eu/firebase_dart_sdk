@@ -21,10 +21,11 @@ class LocalViewChanges {
 
   factory LocalViewChanges.fromViewSnapshot(
       int targetId, ViewSnapshot snapshot) {
-    ImmutableSortedSet<DocumentKey> addedKeys =
-        new ImmutableSortedSet<DocumentKey>([], DocumentKey.comparator);
+    ImmutableSortedSet<DocumentKey> addedKeys = ImmutableSortedSet<DocumentKey>(
+        <DocumentKey>[], DocumentKey.comparator);
     ImmutableSortedSet<DocumentKey> removedKeys =
-        new ImmutableSortedSet<DocumentKey>([], DocumentKey.comparator);
+        ImmutableSortedSet<DocumentKey>(
+            <DocumentKey>[], DocumentKey.comparator);
 
     for (DocumentViewChange docChange in snapshot.changes) {
       switch (docChange.type) {
@@ -42,6 +43,6 @@ class LocalViewChanges {
       }
     }
 
-    return new LocalViewChanges(targetId, addedKeys, removedKeys);
+    return LocalViewChanges(targetId, addedKeys, removedKeys);
   }
 }

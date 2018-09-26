@@ -51,7 +51,7 @@ class DocumentReference {
 
   static DocumentReference forPath(
       ResourcePath path, FirebaseFirestore firestore) {
-    if (path.length % 2 != 0) {
+    if (path.length.remainder(2) != 0) {
       throw ArgumentError(
           'Invalid document reference. Document references must have an even number of segments, but ${path.canonicalString} has ${path.length}');
     }

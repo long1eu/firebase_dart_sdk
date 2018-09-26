@@ -25,7 +25,7 @@ class DatabaseId implements Comparable<DatabaseId> {
   }
 
   @override
-  String toString() => "DatabaseId($projectId, $databaseId)";
+  String toString() => 'DatabaseId($projectId, $databaseId)';
 
   @override
   bool operator ==(Object other) =>

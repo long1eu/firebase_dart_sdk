@@ -40,7 +40,7 @@ class MutationBatchResult {
     ImmutableSortedMap<DocumentKey, SnapshotVersion> docVersions =
         DocumentCollections.emptyVersionMap();
 
-    List<Mutation> mutations = batch.mutations;
+    final List<Mutation> mutations = batch.mutations;
     for (int i = 0; i < mutations.length; i++) {
       docVersions =
           docVersions.insert(mutations[i].key, mutationResults[i].version);

@@ -8,7 +8,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/document_view_cha
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
-/** A set of changes to documents with respect to a view. This set is mutable. */
+/// A set of changes to documents with respect to a view. This set is mutable.
 class DocumentViewChangeSet {
   // This map is sorted to make the unit tests simpler.
   final SplayTreeMap<DocumentKey, DocumentViewChange> changes =
@@ -18,7 +18,7 @@ class DocumentViewChangeSet {
 
   void addChange(DocumentViewChange change) {
     final DocumentKey key = change.document.key;
-    DocumentViewChange old = changes[key];
+    final DocumentViewChange old = changes[key];
     if (old == null) {
       changes[key] = change;
       return;

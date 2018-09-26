@@ -26,8 +26,8 @@ void main() {
       'j': 10,
     };
 
-    ImmutableSortedMap<String, int> map =
-        ArraySortedMap.fromMap(data, standardComparator());
+    final ImmutableSortedMap<String, int> map =
+        ArraySortedMap<String, int>.fromMap(data, standardComparator());
 
     expect(map.length, data.length);
   });
@@ -35,8 +35,8 @@ void main() {
   test('emptyMap', () {
     final Map<String, int> data = <String, int>{};
 
-    ImmutableSortedMap<String, int> map =
-        ArraySortedMap.fromMap(data, standardComparator());
+    final ImmutableSortedMap<String, int> map =
+        ArraySortedMap<String, int>.fromMap(data, standardComparator());
 
     expect(map.length, data.length);
     expect(map.isEmpty, isTrue);
@@ -48,15 +48,15 @@ void main() {
       'b': null,
     };
 
-    ImmutableSortedMap<String, int> map =
-        ArraySortedMap.fromMap(data, standardComparator());
+    final ImmutableSortedMap<String, int> map =
+        ArraySortedMap<String, int>.fromMap(data, standardComparator());
 
     expect(map.length, data.length);
     expect(map.isNotEmpty, isTrue);
   });
 
   test('searchForASpecificKey', () {
-    ImmutableSortedMap<int, int> map =
+    final ImmutableSortedMap<int, int> map =
         ArraySortedMap<int, int>(intComparator).insert(1, 1).insert(2, 2);
 
     expect(map[1], 1);
@@ -143,21 +143,26 @@ void main() {
   });
 
   // QuickCheck Tests
-  final someMaps = CombinedGeneratorsIterables.someMaps;
-  final someMapsFromKeysAndValuesOfSize =
+  const Iterable<Map<K, V>> Function<K, V>(
+          Generator<K> keys, Generator<V> values) someMaps =
+      CombinedGeneratorsIterables.someMaps;
+  const Iterable<Map<K, V>> Function<K, V>(
+          Generator<K> keys, Generator<V> values, Generator<int> size)
+      someMapsFromKeysAndValuesOfSize =
       CombinedGeneratorsIterables.someMapsFromKeysAndValuesOfSize;
-  final integers = PrimitiveGenerators.integers;
+  const Generator<int> Function() integers = PrimitiveGenerators.integers;
 
   test('sizeIsCorrect', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
-      expect(ArraySortedMap.fromMap(any, intComparator).length, any.length);
+      expect(ArraySortedMap<int, int>.fromMap(any, intComparator).length,
+          any.length);
     }
   });
 
   test('addWorks', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
       ImmutableSortedMap<int, int> map =
-          new ArraySortedMap<int, int>(intComparator);
+          ArraySortedMap<int, int>(intComparator);
       for (MapEntry<int, int> entry in any.entries) {
         map = map.insert(entry.key, entry.value);
       }
@@ -181,13 +186,13 @@ void main() {
 
   test('iterationIsInOrder', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
-      List<int> expectedKeys = new List<int>.from(any.keys);
+      final List<int> expectedKeys = List<int>.from(any.keys);
       expectedKeys.sort();
 
-      ImmutableSortedMap<int, int> map =
+      final ImmutableSortedMap<int, int> map =
           ArraySortedMap.fromMap<int, int>(any, intComparator);
 
-      List<int> actualKeys = new List();
+      final List<int> actualKeys = <int>[];
       for (MapEntry<int, int> entry in map) {
         actualKeys.add(entry.key);
       }
@@ -198,18 +203,18 @@ void main() {
 
   test('iterationFromKeyIsInOrder', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
-      List<int> expectedKeys = new List<int>.from(any.keys);
-      int fromKey =
+      final List<int> expectedKeys = List<int>.from(any.keys);
+      final int fromKey =
           (expectedKeys.isEmpty || PrimitiveGenerators.booleans().next())
               ? integers().next()
               : expectedKeys[0];
       expectedKeys.sort();
       expectedKeys.removeWhere((int next) => next.compareTo(fromKey) < 0);
 
-      ImmutableSortedMap<int, int> map =
+      final ImmutableSortedMap<int, int> map =
           ArraySortedMap.fromMap<int, int>(any, intComparator);
 
-      List<int> actualKeys = new List<int>();
+      final List<int> actualKeys = <int>[];
       final Iterator<MapEntry<int, int>> iteratorFrom =
           map.iteratorFrom(fromKey);
       while (iteratorFrom.moveNext()) {
@@ -222,14 +227,14 @@ void main() {
 
   test('reverseIterationIsInOrder', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
-      List<int> expectedKeys = new List<int>.from(any.keys);
+      List<int> expectedKeys = List<int>.from(any.keys);
       expectedKeys.sort();
       expectedKeys = expectedKeys.reversed.toList();
 
-      ImmutableSortedMap<int, int> map =
+      final ImmutableSortedMap<int, int> map =
           ArraySortedMap.fromMap<int, int>(any, intComparator);
 
-      List<int> actualKeys = new List<int>();
+      final List<int> actualKeys = <int>[];
       final Iterator<MapEntry<int, int>> iteratorFrom = map.reverseIterator;
       while (iteratorFrom.moveNext()) {
         actualKeys.add(iteratorFrom.current.key);
@@ -241,8 +246,8 @@ void main() {
 
   test('reverseIterationFromKeyIsInOrder', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
-      List<int> expectedKeys = new List<int>.from(any.keys);
-      int fromKey =
+      List<int> expectedKeys = List<int>.from(any.keys);
+      final int fromKey =
           (expectedKeys.isEmpty || PrimitiveGenerators.booleans().next())
               ? integers().next()
               : expectedKeys[0];
@@ -250,10 +255,10 @@ void main() {
       expectedKeys = expectedKeys.reversed.toList();
       expectedKeys.removeWhere((int next) => next.compareTo(fromKey) > 0);
 
-      ImmutableSortedMap<int, int> map =
+      final ImmutableSortedMap<int, int> map =
           ArraySortedMap.fromMap<int, int>(any, intComparator);
 
-      List<int> actualKeys = new List<int>();
+      final List<int> actualKeys = <int>[];
       final Iterator<MapEntry<int, int>> iteratorFrom =
           map.reverseIteratorFrom(fromKey);
       while (iteratorFrom.moveNext()) {
@@ -266,7 +271,7 @@ void main() {
 
   test('predecessorKeyIsCorrect', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
-      ImmutableSortedMap<int, int> map =
+      final ImmutableSortedMap<int, int> map =
           ArraySortedMap.fromMap<int, int>(any, intComparator);
 
       int predecessorKey;
@@ -280,7 +285,7 @@ void main() {
 
   test('successorKeyIsCorrect', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
-      ImmutableSortedMap<int, int> map =
+      final ImmutableSortedMap<int, int> map =
           ArraySortedMap.fromMap<int, int>(any, intComparator);
 
       int lastKey;
@@ -311,7 +316,7 @@ void main() {
       for (MapEntry<int, int> entry in any.entries) {
         map = map.insert(entry.key, entry.value);
       }
-      expect(map, TypeMatcher<RBTreeSortedMap>());
+      expect(map, const TypeMatcher<RBTreeSortedMap<int, int>>());
       for (MapEntry<int, int> entry in any.entries) {
         expect(map[entry.key], entry.value);
       }
@@ -322,22 +327,22 @@ void main() {
     ImmutableSortedMap<int, int> copy;
     ImmutableSortedMap<int, int> rbcopy;
     ImmutableSortedMap<int, int> copyWithDifferentComparator;
-    map = new ArraySortedMap<int, int>(intComparator);
-    copy = new ArraySortedMap<int, int>(intComparator);
-    rbcopy = new RBTreeSortedMap<int, int>(intComparator);
+    map = ArraySortedMap<int, int>(intComparator);
+    copy = ArraySortedMap<int, int>(intComparator);
+    rbcopy = RBTreeSortedMap<int, int>(intComparator);
     copyWithDifferentComparator =
-        new ArraySortedMap<int, int>((int o1, int o2) => o1.compareTo(o2));
+        ArraySortedMap<int, int>((int o1, int o2) => o1.compareTo(o2));
 
-    int size = ImmutableSortedMap.arrayToRbTreeSizeThreshold - 1;
+    const int size = ImmutableSortedMap.arrayToRbTreeSizeThreshold - 1;
     final Iterator<Map<int, int>> it = someMapsFromKeysAndValuesOfSize(
             integers(), integers(), PrimitiveGenerators.fixedValuesSingle(size))
         .iterator;
     it.moveNext();
-    Map<int, int> any = it.current;
+    final Map<int, int> any = it.current;
 
     for (MapEntry<int, int> entry in any.entries) {
-      int key = entry.key;
-      int value = entry.value;
+      final int key = entry.key;
+      final int value = entry.value;
       map = map.insert(key, value);
       copy = copy.insert(key, value);
       rbcopy = rbcopy.insert(key, value);
@@ -355,11 +360,10 @@ void main() {
   });
 
   test('perf', () {
-    ImmutableSortedMap<int, int> map =
-        new ArraySortedMap<int, int>(intComparator);
+    ImmutableSortedMap<int, int> map = ArraySortedMap<int, int>(intComparator);
 
     int total = 0;
-    final int tries = 100;
+    const int tries = 100;
     for (int j = 0; j < tries; j++) {
       final int startTime = DateTime.now().millisecondsSinceEpoch;
       for (int i = 0; i < 50000; i++) {
@@ -371,7 +375,7 @@ void main() {
       }
       final int elapsed = DateTime.now().millisecondsSinceEpoch - startTime;
       total += elapsed;
-      print('Elapsed: ${elapsed}');
+      print('Elapsed: $elapsed');
     }
     print('Average: ${total / tries}');
   });

@@ -19,7 +19,7 @@ class IndexRange {
   IndexRange(this.fieldPath, this.start, this.end);
 
   IndexRange copyWith({FieldPath fieldPath, FieldValue start, FieldValue end}) {
-    return new IndexRange(
+    return IndexRange(
       fieldPath ?? this.fieldPath,
       start ?? this.start,
       end ?? this.end,

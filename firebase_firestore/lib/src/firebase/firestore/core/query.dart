@@ -118,7 +118,7 @@ class Query {
     Assert.hardAssert(!DocumentKey.isDocumentKey(path),
         'No filter is allowed for document query');
 
-    FieldPath newInequalityField = null;
+    FieldPath newInequalityField;
     if (filter is RelationFilter && filter.isInequality) {
       newInequalityField = filter.field;
     }
@@ -128,7 +128,7 @@ class Query {
         queryInequalityField == null ||
             newInequalityField == null ||
             queryInequalityField == newInequalityField,
-        "Query must only have one inequality field");
+        'Query must only have one inequality field');
 
     Assert.hardAssert(
         explicitSortOrder.isEmpty ||
@@ -197,7 +197,7 @@ class Query {
         // it to be a valid query. Note that the default inequality field and key ordering is
         // ascending.
         if (inequalityField.isKeyField) {
-          this.memoizedOrderBy = <OrderBy>[keyOrderingAsc];
+          memoizedOrderBy = <OrderBy>[keyOrderingAsc];
         } else {
           memoizedOrderBy = <OrderBy>[
             OrderBy.getInstance(OrderByDirection.ascending, inequalityField),
@@ -216,7 +216,7 @@ class Query {
         if (!foundKeyOrdering) {
           // The direction of the implicit key ordering always matches the direction of the last
           // explicit sort order
-          OrderByDirection lastDirection = explicitSortOrder.length > 0
+          final OrderByDirection lastDirection = explicitSortOrder.isNotEmpty
               ? explicitSortOrder[explicitSortOrder.length - 1].direction
               : OrderByDirection.ascending;
           res.add(lastDirection == OrderByDirection.ascending
@@ -230,7 +230,7 @@ class Query {
   }
 
   bool _matchesPath(Document doc) {
-    ResourcePath docPath = doc.key.path;
+    final ResourcePath docPath = doc.key.path;
     if (DocumentKey.isDocumentKey(path)) {
       return path == docPath;
     } else {
@@ -288,36 +288,36 @@ class Query {
   /// iOS and Android canonical ids for a query exactly.
   String get canonicalId {
     // TODO: Cache the return value.
-    StringBuffer builder = StringBuffer();
+    final StringBuffer builder = StringBuffer();
     builder.write(path.canonicalString);
 
     // Add filters.
-    builder.write("|f:");
+    builder.write('|f:');
     for (Filter filter in filters) {
       builder.write(filter.canonicalId);
     }
 
     // Add order by.
-    builder.write("|ob:");
+    builder.write('|ob:');
     for (OrderBy orderBy in getOrderBy()) {
       builder.write(orderBy.field.canonicalString);
       builder.write(
-          orderBy.direction == OrderByDirection.ascending ? "asc" : "desc");
+          orderBy.direction == OrderByDirection.ascending ? 'asc' : 'desc');
     }
 
     // Add limit.
     if (hasLimit) {
-      builder.write("|l:");
+      builder.write('|l:');
       builder.write(getLimit());
     }
 
     if (_startAt != null) {
-      builder.write("|lb:");
+      builder.write('|lb:');
       builder.write(_startAt.canonicalString());
     }
 
     if (_endAt != null) {
-      builder.write("|ub:");
+      builder.write('|ub:');
       builder.write(_endAt.canonicalString());
     }
 
@@ -326,10 +326,10 @@ class Query {
 
   @override
   String toString() {
-    StringBuffer builder = StringBuffer();
+    final StringBuffer builder = StringBuffer();
     builder.write('Query(');
     builder.write(path.canonicalString);
-    if (!filters.isEmpty) {
+    if (filters.isNotEmpty) {
       builder.write(' where ');
       for (int i = 0; i < filters.length; i++) {
         if (i > 0) {
@@ -339,7 +339,7 @@ class Query {
       }
     }
 
-    if (!explicitSortOrder.isEmpty) {
+    if (explicitSortOrder.isNotEmpty) {
       builder.write(' order by ');
       for (int i = 0; i < explicitSortOrder.length; i++) {
         if (i > 0) {
@@ -373,7 +373,7 @@ class QueryComparator {
 
   Comparator<Document> get comparator => (Document doc1, Document doc2) {
         for (OrderBy order in sortOrder) {
-          int comp = order.compare(doc1, doc2);
+          final int comp = order.compare(doc1, doc2);
           if (comp != 0) {
             return comp;
           }

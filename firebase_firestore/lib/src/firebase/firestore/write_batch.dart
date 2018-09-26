@@ -50,7 +50,7 @@ class WriteBatch {
     _firestore.validateReference(documentRef);
     Assert.checkNotNull(data, 'Provided data must not be null.');
     _verifyNotCommitted();
-    ParsedDocumentData parsed = options.merge
+    final ParsedDocumentData parsed = options.merge
         ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
         : _firestore.dataConverter.parseSetData(data);
     _mutations

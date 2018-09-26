@@ -90,7 +90,7 @@ class PatchMutation extends Mutation {
 
   ObjectValue patchObject(ObjectValue obj) {
     for (FieldPath path in mask.mask) {
-      FieldValue newValue = value.get(path);
+      final FieldValue newValue = value.get(path);
       if (newValue == null) {
         obj = obj.delete(path);
       } else {
@@ -113,6 +113,7 @@ class PatchMutation extends Mutation {
   int get hashCode =>
       value.hashCode ^ mask.hashCode ^ keyAndPreconditionHashCode();
 
+  @override
   String toString() {
     return (ToStringHelper(runtimeType)
           ..add('mask', mask)

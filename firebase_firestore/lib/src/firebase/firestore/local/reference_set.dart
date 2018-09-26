@@ -28,17 +28,17 @@ class ReferenceSet {
   ImmutableSortedSet<DocumentReference> referencesByTarget;
 
   ReferenceSet()
-      : referencesByKey = new ImmutableSortedSet<DocumentReference>(
-            [], DocumentReference.byKey),
-        referencesByTarget = new ImmutableSortedSet<DocumentReference>(
-            [], DocumentReference.byTarget);
+      : referencesByKey = ImmutableSortedSet<DocumentReference>(
+            <DocumentReference>[], DocumentReference.byKey),
+        referencesByTarget = ImmutableSortedSet<DocumentReference>(
+            <DocumentReference>[], DocumentReference.byTarget);
 
   /// Returns true if the reference set contains no references.
   bool get isEmpty => referencesByKey.isEmpty;
 
   /// Adds a reference to the given document key for the given id.
   void addReference(DocumentKey key, int targetOrBatchId) {
-    DocumentReference ref = new DocumentReference(key, targetOrBatchId);
+    final DocumentReference ref = DocumentReference(key, targetOrBatchId);
     referencesByKey = referencesByKey.insert(ref);
     referencesByTarget = referencesByTarget.insert(ref);
   }
@@ -68,8 +68,7 @@ class ReferenceSet {
   /// key removed.
   void removeReferencesForId(int targetId) {
     final DocumentKey emptyKey = DocumentKey.empty();
-    final DocumentReference startRef =
-        new DocumentReference(emptyKey, targetId);
+    final DocumentReference startRef = DocumentReference(emptyKey, targetId);
     final Iterator<DocumentReference> it =
         referencesByTarget.iteratorFrom(startRef);
     while (it.moveNext()) {
@@ -83,11 +82,7 @@ class ReferenceSet {
   }
 
   /// Clears all references for all ids.
-  void removeAllReferences() {
-    for (DocumentReference reference in referencesByKey) {
-      _removeReference(reference);
-    }
-  }
+  void removeAllReferences() => referencesByKey.forEach(_removeReference);
 
   void _removeReference(DocumentReference ref) {
     referencesByKey = referencesByKey.remove(ref);
@@ -98,7 +93,7 @@ class ReferenceSet {
   /// given id.
   ImmutableSortedSet<DocumentKey> referencesForId(int target) {
     final DocumentKey emptyKey = DocumentKey.empty();
-    final DocumentReference startRef = new DocumentReference(emptyKey, target);
+    final DocumentReference startRef = DocumentReference(emptyKey, target);
 
     final Iterator<DocumentReference> iterator =
         referencesByTarget.iteratorFrom(startRef);
@@ -115,9 +110,10 @@ class ReferenceSet {
   }
 
   bool containsKey(DocumentKey key) {
-    final DocumentReference ref = new DocumentReference(key, 0);
+    final DocumentReference ref = DocumentReference(key, 0);
 
-    Iterator<DocumentReference> iterator = referencesByKey.iteratorFrom(ref);
+    final Iterator<DocumentReference> iterator =
+        referencesByKey.iteratorFrom(ref);
 
     if (!iterator.moveNext()) {
       return false;

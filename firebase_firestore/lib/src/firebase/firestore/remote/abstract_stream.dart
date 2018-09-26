@@ -105,7 +105,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     // since auth handled transparently by gRPC
     _state = StreamState.Starting;
 
-    _workerQueue.enqueueAndForget<void>(() {
+    _workerQueue.enqueueAndForget<void>(() async {
       closeGuardedRunner.run(() {
         _state = StreamState.Open;
         listener.onOpen();

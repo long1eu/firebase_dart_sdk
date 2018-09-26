@@ -77,13 +77,12 @@ class Util {
       await operation();
     } catch (e) {
       if (e is Error) {
-        e = Util.convertStatusException(e as Error);
+        final Error error = Util.convertStatusException(e);
+        if (e is FirebaseFirestoreError) {
+          throw error;
+        }
       }
-      if (e is FirebaseFirestoreError) {
-        throw e;
-      } else {
-        throw FirebaseFirestoreError('$e', FirebaseFirestoreErrorCode.unknown);
-      }
+      throw FirebaseFirestoreError('$e', FirebaseFirestoreErrorCode.unknown);
     }
   }
 }

@@ -22,14 +22,16 @@ class ArrayValue extends FieldValue {
 
   @override
   List<Object> get value {
-    return _value.map((it) => it.value).toList(growable: false);
+    return _value.map((FieldValue it) => it.value).toList(growable: false);
   }
 
   List<FieldValue> get internalValue => _value;
 
   @override
   Object valueWith(FieldValueOptions options) {
-    return _value.map((it) => it.valueWith(options)).toList(growable: false);
+    return _value
+        .map((FieldValue it) => it.valueWith(options))
+        .toList(growable: false);
   }
 
   @override

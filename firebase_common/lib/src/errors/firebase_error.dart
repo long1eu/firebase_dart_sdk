@@ -11,5 +11,6 @@ class FirebaseError implements Error {
   const FirebaseError(this.message, [this.stackTrace])
       : assert(message != null, 'Detail message must not be empty.');
 
-  String toString() => "$runtimeType: $message";
+  @override
+  String toString() => '$runtimeType: $message';
 }

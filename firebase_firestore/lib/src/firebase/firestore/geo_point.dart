@@ -31,7 +31,7 @@ class GeoPoint implements Comparable<GeoPoint> {
 
   @override
   String toString() {
-    return "GeoPoint { latitude=$latitude, longitude=$longitude }";
+    return 'GeoPoint { latitude=$latitude, longitude=$longitude }';
   }
 
   @override

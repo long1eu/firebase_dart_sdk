@@ -43,10 +43,9 @@ class View {
   /// Documents that have local changes
   ImmutableSortedSet<DocumentKey> mutatedKeys;
 
-  View(this.query, ImmutableSortedSet<DocumentKey> remoteDocuments) {
+  View(this.query, this.syncedDocuments) {
     syncState = ViewSnapshotSyncState.none;
     documentSet = DocumentSet.emptySet(query.comparator);
-    syncedDocuments = remoteDocuments;
     limboDocuments = DocumentKey.emptyKeySet;
     mutatedKeys = DocumentKey.emptyKeySet;
   }
@@ -84,7 +83,7 @@ class View {
     //
     // Note that this should never get used in a refill (when previousChanges is
     // set), because there will only be adds -- no deletes or updates.
-    Document lastDocInLimit =
+    final Document lastDocInLimit =
         (query.hasLimit && oldDocumentSet.length == query.getLimit())
             ? oldDocumentSet.last
             : null;
@@ -92,7 +91,7 @@ class View {
     for (MapEntry<DocumentKey, MaybeDocument> entry in docChanges) {
       final DocumentKey key = entry.key;
       final Document oldDoc = oldDocumentSet.getDocument(key);
-      Document newDoc = null;
+      Document newDoc;
       final MaybeDocument maybeDoc = entry.value;
 
       if (maybeDoc is Document) {
@@ -120,7 +119,7 @@ class View {
       }
       // Calculate change
       if (oldDoc != null && newDoc != null) {
-        bool docsEqual = oldDoc.data == newDoc.data;
+        final bool docsEqual = oldDoc.data == newDoc.data;
         if (!docsEqual ||
             oldDoc.hasLocalMutations != newDoc.hasLocalMutations) {
           // only report a change if document actually changed.
@@ -201,17 +200,17 @@ class View {
     applyTargetChange(targetChange);
     final List<LimboDocumentChange> limboDocumentChanges =
         updateLimboDocuments();
-    bool synced = limboDocuments.length == 0 && current;
+    final bool synced = limboDocuments.isEmpty && current;
     final ViewSnapshotSyncState newSyncState = synced //
         ? ViewSnapshotSyncState.synced
         : ViewSnapshotSyncState.local;
     final bool syncStatedChanged = newSyncState != syncState;
     syncState = newSyncState;
-    ViewSnapshot snapshot = null;
-    if (viewChanges.length != 0 || syncStatedChanged) {
+    ViewSnapshot snapshot;
+    if (viewChanges.isNotEmpty || syncStatedChanged) {
       final bool fromCache = newSyncState == ViewSnapshotSyncState.local;
       final bool hasPendingWrites = !docChanges.mutatedKeys.isEmpty;
-      snapshot = new ViewSnapshot(
+      snapshot = ViewSnapshot(
         query,
         docChanges.documentSet,
         oldDocumentSet,
@@ -221,7 +220,7 @@ class View {
         syncStatedChanged,
       );
     }
-    return new ViewChange(snapshot, limboDocumentChanges);
+    return ViewChange(snapshot, limboDocumentChanges);
   }
 
   /// Applies an [OnlineState] change to the view, potentially generating a
@@ -232,16 +231,16 @@ class View {
       // to refresh our syncState and generate a [ViewChange] as appropriate. We
       // are guaranteed to get a new [TargetChange] that sets `current` back to
       // true once the client is back online.
-      this.current = false;
+      current = false;
       return applyChanges(DocumentChanges._(
         documentSet,
-        new DocumentViewChangeSet(),
+        DocumentViewChangeSet(),
         mutatedKeys,
         /*needsRefill*/ false,
       ));
     } else {
       // No effect, just return a no-op [ViewChange].
-      return new ViewChange(null, []);
+      return ViewChange(null, <LimboDocumentChange>[]);
     }
   }
 
@@ -269,7 +268,7 @@ class View {
 
     // TODO: Do this incrementally so that it's not quadratic when updating many
     // documents.
-    ImmutableSortedSet<DocumentKey> oldLimboDocs = limboDocuments;
+    final ImmutableSortedSet<DocumentKey> oldLimboDocs = limboDocuments;
     limboDocuments = DocumentKey.emptyKeySet;
     for (Document doc in documentSet) {
       if (shouldBeLimboDoc(doc.key)) {
@@ -278,19 +277,17 @@ class View {
     }
 
     // Diff the new limbo docs with the old limbo docs.
-    List<LimboDocumentChange> changes =
+    final List<LimboDocumentChange> changes =
         List<LimboDocumentChange>(oldLimboDocs.length + limboDocuments.length);
     for (DocumentKey key in oldLimboDocs) {
       if (!limboDocuments.contains(key)) {
-        changes
-            .add(new LimboDocumentChange(LimboDocumentChangeType.removed, key));
+        changes.add(LimboDocumentChange(LimboDocumentChangeType.removed, key));
       }
     }
 
     for (DocumentKey key in limboDocuments) {
       if (!oldLimboDocs.contains(key)) {
-        changes
-            .add(new LimboDocumentChange(LimboDocumentChangeType.added, key));
+        changes.add(LimboDocumentChange(LimboDocumentChangeType.added, key));
       }
     }
     return changes;
@@ -302,7 +299,7 @@ class View {
       return false;
     }
     // The local store doesn't think it's a result, so it shouldn't be in limbo.
-    Document doc = documentSet.getDocument(key);
+    final Document doc = documentSet.getDocument(key);
     if (doc == null) {
       return false;
     }

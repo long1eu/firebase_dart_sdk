@@ -8,10 +8,6 @@ import 'package:firebase_database_collection/src/llrb_node.dart';
 import 'package:firebase_database_collection/src/llrb_red_value_node.dart';
 
 abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
-  static LLRBNodeColor _oppositeColor(LLRBNode node) {
-    return node.isRed ? LLRBNodeColor.black : LLRBNodeColor.red;
-  }
-
   @override
   final K key;
   @override
@@ -25,6 +21,10 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   LLRBValueNode(this.key, this.value, LLRBNode<K, V> left, LLRBNode<K, V> right)
       : _left = left ?? LLRBEmptyNode<K, V>(),
         right = right ?? LLRBEmptyNode<K, V>();
+
+  static LLRBNodeColor _oppositeColor<K, V>(LLRBNode<K, V> node) {
+    return node.isRed ? LLRBNodeColor.black : LLRBNodeColor.red;
+  }
 
   LLRBNodeColor get color;
 
@@ -51,14 +51,14 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
     LLRBValueNode<K, V> n;
     if (cmp < 0) {
       // new key is less than current key
-      LLRBNode<K, V> newLeft = this.left.insert(key, value, comparator);
+      final LLRBNode<K, V> newLeft = left.insert(key, value, comparator);
       n = copyWith(null, null, newLeft, null);
     } else if (cmp == 0) {
       // same key
       n = copyWith(key, value, null, null);
     } else {
       // new key is greater than current key
-      LLRBNode<K, V> newRight = this.right.insert(key, value, comparator);
+      final LLRBNode<K, V> newRight = right.insert(key, value, comparator);
       n = copyWith(null, null, null, newRight);
     }
     return n._fixUp();
@@ -88,7 +88,7 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
         if (n.right.isEmpty) {
           return LLRBEmptyNode<K, V>();
         } else {
-          LLRBNode<K, V> smallest = n.right.min;
+          final LLRBNode<K, V> smallest = n.right.min;
           n = n.copyWith(smallest.key, smallest.value, null,
               (n.right as LLRBValueNode<K, V>).removeMin());
         }
@@ -149,6 +149,7 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   }
 
   // For use by the builder, which is package local
+  @override
   LLRBNode<K, V> get left => _left;
 
   set left(LLRBNode<K, V> left) {
@@ -195,7 +196,7 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
     if (n.right.isRed && !n.left.isRed) {
       n = n._rotateLeft();
     }
-    if (n.left.isRed && ((n.left) as LLRBValueNode<K, V>).left.isRed) {
+    if (n.left.isRed && (n.left as LLRBValueNode<K, V>).left.isRed) {
       n = n._rotateRight();
     }
     if (n.left.isRed && n.right.isRed) {
@@ -205,25 +206,23 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   }
 
   LLRBValueNode<K, V> _rotateLeft() {
-    LLRBValueNode<K, V> newLeft = this.copy(null, null, LLRBNodeColor.red, null,
-        (this.right as LLRBValueNode<K, V>).left);
-    return this.right.copy(null, null, this.color, newLeft, null)
-        as LLRBValueNode<K, V>;
+    final LLRBValueNode<K, V> newLeft = copy(null, null, LLRBNodeColor.red,
+        null, (right as LLRBValueNode<K, V>).left);
+    return right.copy(null, null, color, newLeft, null) as LLRBValueNode<K, V>;
   }
 
   LLRBValueNode<K, V> _rotateRight() {
-    LLRBValueNode<K, V> newRight = this.copy(null, null, LLRBNodeColor.red,
-        (this.left as LLRBValueNode<K, V>).right, null);
-    return this.left.copy(null, null, this.color, null, newRight)
-        as LLRBValueNode<K, V>;
+    final LLRBValueNode<K, V> newRight = copy(null, null, LLRBNodeColor.red,
+        (left as LLRBValueNode<K, V>).right, null);
+    return left.copy(null, null, color, null, newRight) as LLRBValueNode<K, V>;
   }
 
   LLRBValueNode<K, V> _colorFlip() {
-    LLRBNode<K, V> newLeft =
-        this.left.copy(null, null, _oppositeColor(this.left), null, null);
-    LLRBNode<K, V> newRight =
-        this.right.copy(null, null, _oppositeColor(this.right), null, null);
+    final LLRBNode<K, V> newLeft =
+        left.copy(null, null, _oppositeColor(left), null, null);
+    final LLRBNode<K, V> newRight =
+        right.copy(null, null, _oppositeColor(right), null, null);
 
-    return this.copy(null, null, _oppositeColor(this), newLeft, newRight);
+    return copy(null, null, _oppositeColor(this), newLeft, newRight);
   }
 }

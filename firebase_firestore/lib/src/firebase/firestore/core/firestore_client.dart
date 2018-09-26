@@ -41,7 +41,7 @@ import 'package:grpc/grpc.dart';
 /// [FirestoreClient] is a top-level class that constructs and owns all of the
 /// pieces of the client SDK architecture.
 class FirestoreClient implements RemoteStoreCallback {
-  static const String logTag = "FirestoreClient";
+  static const String logTag = 'FirestoreClient';
 
   final DatabaseInfo databaseInfo;
   final CredentialsProvider credentialsProvider;
@@ -55,17 +55,17 @@ class FirestoreClient implements RemoteStoreCallback {
 
   FirestoreClient(this.databaseInfo, final bool usePersistence,
       this.credentialsProvider, this.asyncQueue) {
-    Completer<User> firstUser = new Completer<User>();
+    final Completer<User> firstUser = Completer<User>();
     bool initialized = false;
     credentialsProvider.setChangeListener((User user) {
       if (initialized == false) {
         initialized = true;
         Assert.hardAssert(
-            !firstUser.isCompleted, "Already fulfilled first user task");
+            !firstUser.isCompleted, 'Already fulfilled first user task');
         firstUser.complete(user);
       } else {
         asyncQueue.enqueueAndForget(() async {
-          Log.d(logTag, "Credential changed. Current user: ${user.uid}");
+          Log.d(logTag, 'Credential changed. Current user: ${user.uid}');
           syncEngine.handleCredentialChange(user);
         });
       }
@@ -77,13 +77,13 @@ class FirestoreClient implements RemoteStoreCallback {
     // before any subsequently queued work runs.
     asyncQueue.enqueueAndForget(() async {
       // Block on initial user being available
-      User initialUser = await firstUser.future;
+      final User initialUser = await firstUser.future;
       await _initialize(initialUser, usePersistence);
     });
   }
 
   Future<void> disableNetwork() {
-    return asyncQueue.enqueue(() {
+    return asyncQueue.enqueue(() async {
       remoteStore.disableNetwork();
     });
   }
@@ -92,10 +92,11 @@ class FirestoreClient implements RemoteStoreCallback {
     return asyncQueue.enqueue(() => remoteStore.enableNetwork());
   }
 
-  /** Shuts down this client, cancels all writes / listeners, and releases all resources. */
+  /// Shuts down this client, cancels all writes / listeners, and releases all
+  /// resources.
   Future<void> shutdown() {
     credentialsProvider.removeChangeListener();
-    return asyncQueue.enqueue(() {
+    return asyncQueue.enqueue(() async {
       remoteStore.shutdown();
       persistence.shutdown();
     });
@@ -104,13 +105,13 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Starts listening to a query. */
   QueryListener listen(Query query, ListenOptions options,
       EventListener<ViewSnapshot> listener) {
-    QueryListener queryListener = new QueryListener(query, options, listener);
+    final QueryListener queryListener = QueryListener(query, options, listener);
     asyncQueue
         .enqueueAndForget(() => eventManager.addQueryListener(queryListener));
     return queryListener;
   }
 
-  /** Stops listening to a query previously listened to. */
+  /// Stops listening to a query previously listened to.
   void stopListening(QueryListener listener) {
     asyncQueue.enqueueAndForget(
         () async => eventManager.removeQueryListener(listener));
@@ -119,15 +120,15 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<Document> getDocumentFromLocalCache(DocumentKey docKey) {
     return asyncQueue
         .enqueue(() => localStore.readDocument(docKey))
-        .then((result) {
-      MaybeDocument maybeDoc = result;
+        .then((MaybeDocument result) {
+      final MaybeDocument maybeDoc = result;
 
       if (maybeDoc is Document) {
         return maybeDoc;
       } else if (maybeDoc is NoDocument) {
         return null;
       } else {
-        throw new FirebaseFirestoreError(
+        throw FirebaseFirestoreError(
             'Failed to get document from cache. (However, this document may '
             'exist on the server. Run again without setting source to CACHE to '
             'attempt to retrieve the document from the server.)',
@@ -141,8 +142,8 @@ class FirestoreClient implements RemoteStoreCallback {
       final ImmutableSortedMap<DocumentKey, Document> docs =
           await localStore.executeQuery(query);
 
-      View view = new View(query, new ImmutableSortedSet<DocumentKey>());
-      DocumentChanges viewDocChanges = view.computeDocChanges(docs);
+      final View view = View(query, ImmutableSortedSet<DocumentKey>());
+      final DocumentChanges viewDocChanges = view.computeDocChanges(docs);
       return view.applyChanges(viewDocChanges).snapshot;
     });
   }
@@ -167,11 +168,11 @@ class FirestoreClient implements RemoteStoreCallback {
     // Note: The initialization work must all be synchronous (we can't dispatch
     // more work) since external write/listen operations could get queued to run
     // before that subsequent work completes.
-    Log.d(logTag, "Initializing. user=${user.uid}");
+    Log.d(logTag, 'Initializing. user=${user.uid}');
 
     if (usePersistence) {
-      LocalSerializer serializer =
-          new LocalSerializer(new RemoteSerializer(databaseInfo.databaseId));
+      final LocalSerializer serializer =
+          LocalSerializer(RemoteSerializer(databaseInfo.databaseId));
 
       persistence = await SQLitePersistence.create(
         databaseInfo.persistenceKey,
@@ -183,9 +184,9 @@ class FirestoreClient implements RemoteStoreCallback {
     }
 
     persistence.start();
-    localStore = new LocalStore(persistence, user);
+    localStore = LocalStore(persistence, user);
 
-    Datastore datastore =
+    final Datastore datastore =
         Datastore(databaseInfo, asyncQueue, credentialsProvider);
     remoteStore = RemoteStore(this, localStore, datastore, asyncQueue);
 
@@ -226,7 +227,8 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   @override
-  ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId) {
-    return syncEngine.getRemoteKeysForTarget(targetId);
-  }
+  ImmutableSortedSet<DocumentKey> Function(int targetId)
+      get getRemoteKeysForTarget => (int targetId) {
+            return syncEngine.getRemoteKeysForTarget(targetId);
+          };
 }

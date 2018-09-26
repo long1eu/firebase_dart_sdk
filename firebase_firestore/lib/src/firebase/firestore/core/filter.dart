@@ -31,7 +31,7 @@ abstract class Filter {
     } else if (value == DoubleValue.nan) {
       if (operator != FilterOperator.equal) {
         throw ArgumentError(
-            "Invalid Query. You can only perform equality comparisons on NaN (via whereEqualTo()).");
+            'Invalid Query. You can only perform equality comparisons on NaN (via whereEqualTo()).');
       }
       return NaNFilter(path);
     } else {

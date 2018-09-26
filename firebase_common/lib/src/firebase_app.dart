@@ -58,9 +58,6 @@ class FirebaseApp {
   InternalTokenProvider _tokenProvider;
   IdTokenObserversCountChangedObserver _idTokenObserversCountChangedObserver;
 
-  FirebaseApp._(this._name, this._options, this._prefs, this.initializeApis,
-      [this.lifecycleHandler]);
-
   /// Initializes the default FirebaseApp instance using string resource values
   /// populated from the map you provide. It also initializes Firebase
   /// Analytics. Returns the default FirebaseApp, if either it has been
@@ -95,22 +92,17 @@ class FirebaseApp {
         firebaseOptions, appInit, prefs, defaultAppName, lifecycleHandler);
   }
 
-  /**
-   * Initializes the default {@link FirebaseApp} instance. Same as {@link #initializeApp(Context,
-   * FirebaseOptions, String)}, but it uses {@link #DEFAULT_APP_NAME} as name.
-   *
-   * <p>It's only required to call this to initialize Firebase if it's <strong>not possible</strong>
-   * to do so automatically in {@link com.google.firebase.provider.FirebaseInitProvider}. Automatic
-   * initialization that way is the expected situation.
-   * A factory method to initialize a {@link FirebaseApp}.
-   *
-   * @param context represents the {@link Context}
-   * @param options represents the global {@link FirebaseOptions}
-   * @param name unique name for the app. It is an error to initialize an app with an already
-   *     existing name. Starting and ending whitespace characters in the name are ignored (trimmed).
-   * @throws IllegalStateException if an app with the same name has already been initialized.
-   * @return an instance of {@link FirebaseApp}
-   */
+  FirebaseApp._(this._name, this._options, this._prefs, this.initializeApis,
+      [this.lifecycleHandler]);
+
+  /// Initializes the default [FirebaseApp] instance. Same as
+  /// [FirebaseApp.initializeApp], but it uses [FirebaseApp.defaultAppName] as
+  /// name.
+  /// [options] represents the global [FirebaseOptions]
+  /// [name] unique name for the app. It is an error to initialize an app with
+  /// an already existing name. Starting and ending whitespace characters in the
+  /// name are ignored (trimmed).
+  /// Returns an instance of [FirebaseApp]
   factory FirebaseApp.withOptions(
     FirebaseOptions options,
     InitializeApis appInit,
@@ -158,7 +150,7 @@ class FirebaseApp {
     }
 
     final List<String> availableAppNames = _getAllAppNames();
-    String availableAppNamesMessage = availableAppNames.isNotEmpty
+    final String availableAppNamesMessage = availableAppNames.isNotEmpty
         ? 'Available app names: ${availableAppNames.join(', ')}.'
         : '';
 
@@ -328,7 +320,7 @@ class FirebaseApp {
   @deprecated
   @keepForSdk
   void notifyIdTokenListeners(InternalTokenResult tokenResult) {
-    Log.d(logTag, "Notifying auth state observers.");
+    Log.d(logTag, 'Notifying auth state observers.');
     int size = 0;
     for (IdTokenObserver observer in _idTokenObservers) {
       observer.onIdTokenChanged(tokenResult);
@@ -338,7 +330,7 @@ class FirebaseApp {
   }
 
   void notifyBackgroundStateChangeObservers(bool background) {
-    Log.d(logTag, "Notifying background state change observers.");
+    Log.d(logTag, 'Notifying background state change observers.');
     for (BackgroundStateChangeObserver observer
         in backgroundStateChangeObservers) {
       observer.onBackgroundStateChanged(background);
@@ -448,7 +440,7 @@ class FirebaseApp {
   }
 
   static List<String> _getAllAppNames() {
-    List<String> allAppNames = <String>[];
+    final List<String> allAppNames = <String>[];
     for (FirebaseApp app in instances.values) {
       allAppNames.add(app.name);
     }

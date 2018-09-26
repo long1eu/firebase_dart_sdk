@@ -19,7 +19,8 @@ class ObjectValue extends FieldValue {
 
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
     return ObjectValue.fromImmutableMap(
-        ImmutableSortedMap.fromMap(value, Util.comparator()));
+        ImmutableSortedMap<String, FieldValue>.fromMap(
+            value, Util.comparator()));
   }
 
   factory ObjectValue.fromImmutableMap(
@@ -27,7 +28,7 @@ class ObjectValue extends FieldValue {
     if (value.isEmpty) {
       return empty;
     } else {
-      return new ObjectValue(value);
+      return ObjectValue(value);
     }
   }
 
@@ -36,7 +37,7 @@ class ObjectValue extends FieldValue {
 
   @override
   Map<String, Object> get value {
-    Map<String, Object> res = <String, Object>{};
+    final Map<String, Object> res = <String, Object>{};
     for (MapEntry<String, FieldValue> entry in _value) {
       res[entry.key] = entry.value.value;
     }
@@ -47,7 +48,7 @@ class ObjectValue extends FieldValue {
 
   @override
   Map<String, Object> valueWith(FieldValueOptions options) {
-    Map<String, Object> res = <String, Object>{};
+    final Map<String, Object> res = <String, Object>{};
     for (MapEntry<String, FieldValue> entry in _value) {
       res[entry.key] = entry.value.valueWith(options);
     }
@@ -101,7 +102,7 @@ class ObjectValue extends FieldValue {
         obj = ObjectValue.empty;
       }
 
-      ObjectValue newChild = obj.set(path.popFirst(), value);
+      final ObjectValue newChild = obj.set(path.popFirst(), value);
       return _setChild(childName, newChild);
     }
   }

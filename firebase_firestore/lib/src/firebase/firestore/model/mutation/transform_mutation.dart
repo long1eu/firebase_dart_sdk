@@ -17,23 +17,21 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/object_val
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
-/**
- * A mutation that modifies specific fields of the document with transform
- * operations. Currently the only supported transform is a server timestamp, but
- * IP Address, increment(n), etc. could be supported in the future.
- *
- * * It is somewhat similar to a [PatchMutation] in that it patches specific
- * fields and has no effect when applied to null or a [NoDocument] (see comment
- * on [Mutation.applyTo()] for rationale).
- */
+/// A mutation that modifies specific fields of the document with transform
+/// operations. Currently the only supported transform is a server timestamp,
+/// but IP Address, increment(n), etc. could be supported in the future.
+///
+/// * It is somewhat similar to a [PatchMutation] in that it patches specific
+/// fields and has no effect when applied to null or a [NoDocument] (see comment
+/// on [Mutation.applyTo] for rationale).
 class TransformMutation extends Mutation {
   final List<FieldTransform> fieldTransforms;
 
-  // NOTE: We set a precondition of exists: true as a safety-check, since we always combine
-  // TransformMutations with a SetMutation or PatchMutation which (if successful) should
-  // end up with an existing document.
+  // NOTE: We set a precondition of exists: true as a safety-check, since we
+  // always combine TransformMutations with a SetMutation or PatchMutation which
+  // (if successful) should end up with an existing document.
   TransformMutation(DocumentKey key, this.fieldTransforms)
-      : super(key, Precondition(null, true));
+      : super(key, Precondition.fromExists(true));
 
   @override
   MaybeDocument applyToRemoteDocument(
@@ -41,12 +39,13 @@ class TransformMutation extends Mutation {
     verifyKeyMatches(maybeDoc);
 
     Assert.hardAssert(mutationResult.transformResults != null,
-        "Transform results missing for TransformMutation.");
+        'Transform results missing for TransformMutation.');
 
     // TODO: Relax enforcement of this precondition
-    // We shouldn't actually enforce the precondition since it already passed on the backend, but we
-    // may not have a local version of the document to patch, so we use the precondition to prevent
-    // incorrectly putting a partial document into our cache.
+    // We shouldn't actually enforce the precondition since it already passed on
+    // the backend, but we may not have a local version of the document to
+    // patch, so we use the precondition to prevent incorrectly putting a
+    // partial document into our cache.
     if (!precondition.isValidFor(maybeDoc)) {
       return maybeDoc;
     }
@@ -55,8 +54,7 @@ class TransformMutation extends Mutation {
     final List<FieldValue> transformResults =
         _serverTransformResults(doc, mutationResult.transformResults);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
-    return new Document(
-        key, doc.version, newData, /* hasLocalMutations= */ false);
+    return Document(key, doc.version, newData, /* hasLocalMutations= */ false);
   }
 
   @override
@@ -72,44 +70,41 @@ class TransformMutation extends Mutation {
     final List<FieldValue> transformResults =
         _localTransformResults(localWriteTime, baseDoc);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
-    return new Document(
-        key, doc.version, newData, /* hasLocalMutations= */ true);
+    return Document(key, doc.version, newData, /* hasLocalMutations= */ true);
   }
 
-  /**
-   * Asserts that the given MaybeDocument is actually a Document and verifies that it matches the
-   * key for this mutation. Since we only support transformations with precondition exists this
-   * method is guaranteed to be safe.
-   */
+  /// Asserts that the given [MaybeDocument] is actually a [Document] and
+  /// verifies that it matches the key for this mutation. Since we only support
+  /// transformations with precondition exists this method is guaranteed to be
+  /// safe.
   Document _requireDocument(MaybeDocument maybeDoc) {
     Assert.hardAssert(
-        maybeDoc is Document, "Unknown MaybeDocument type $maybeDoc");
+        maybeDoc is Document, 'Unknown MaybeDocument type $maybeDoc');
     final Document doc = maybeDoc as Document;
     Assert.hardAssert(
-        doc.key == key, "Can only transform a document with the same key");
+        doc.key == key, 'Can only transform a document with the same key');
     return doc;
   }
 
-  /**
-   * Creates a list of "transform results" (a transform result is a field value representing the
-   * result of applying a transform) for use after a TransformMutation has been acknowledged by the
-   * server.
-   *
-   * @param baseDoc The document prior to applying this mutation batch.
-   * @param serverTransformResults The transform results received by the server.
-   * @return The transform results list.
-   */
+  /// Creates a list of "transform results" (a transform result is a field value
+  /// representing the result of applying a transform) for use after a
+  /// [TransformMutation] has been acknowledged by the server.
+  ///
+  /// [baseDoc] the document prior to applying this mutation batch.
+  /// [serverTransformResults] the transform results received by the server.
+  /// Returns the transform results list.
   List<FieldValue> _serverTransformResults(
       MaybeDocument baseDoc, List<FieldValue> serverTransformResults) {
-    final List<FieldValue> transformResults = List(fieldTransforms.length);
+    final List<FieldValue> transformResults =
+        List<FieldValue>(fieldTransforms.length);
     Assert.hardAssert(fieldTransforms.length == serverTransformResults.length,
-        "server transform count (${serverTransformResults.length}) should match field transform count (${fieldTransforms.length})");
+        'server transform count (${serverTransformResults.length}) should match field transform count (${fieldTransforms.length})');
 
     for (int i = 0; i < serverTransformResults.length; i++) {
       final FieldTransform fieldTransform = fieldTransforms[i];
       final TransformOperation transform = fieldTransform.operation;
 
-      FieldValue previousValue = null;
+      FieldValue previousValue;
       if (baseDoc is Document) {
         previousValue = baseDoc.getField(fieldTransform.fieldPath);
       }
@@ -120,22 +115,22 @@ class TransformMutation extends Mutation {
     return transformResults;
   }
 
-  /**
-   * Creates a list of "transform results" (a transform result is a field value representing the
-   * result of applying a transform) for use when applying a TransformMutation locally.
-   *
-   * @param localWriteTime The local time of the transform mutation (used to generate
-   *     ServerTimestampValues).
-   * @param baseDoc The document prior to applying this mutation batch.
-   * @return The transform results list.
-   */
+  /// Creates a list of "transform results" (a transform result is a field value
+  /// representing the result of applying a transform) for use when applying a
+  /// [TransformMutation] locally.
+  ///
+  /// [localWriteTime] the local time of the transform mutation (used to
+  /// generate [ServerTimestampValues]).
+  /// [baseDoc] The document prior to applying this mutation batch.
+  /// Returns the transform results list.
   List<FieldValue> _localTransformResults(
       Timestamp localWriteTime, MaybeDocument baseDoc) {
-    final List<FieldValue> transformResults = new List(fieldTransforms.length);
+    final List<FieldValue> transformResults =
+        List<FieldValue>(fieldTransforms.length);
     for (FieldTransform fieldTransform in fieldTransforms) {
       final TransformOperation transform = fieldTransform.operation;
 
-      FieldValue previousValue = null;
+      FieldValue previousValue;
       if (baseDoc is Document) {
         previousValue = baseDoc.getField(fieldTransform.fieldPath);
       }

@@ -1,6 +1,8 @@
 /// A Dart implementation of yeast. https://github.com/unshiftio/yeast
 class Yeast {
-  static List<int> alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'.codeUnits;
+  static List<int> alphabet =
+      '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'
+          .codeUnits;
 
   static Map<int, int> map = <int, int>{};
 
@@ -23,7 +25,7 @@ class Yeast {
     final List<int> encoded = <int>[];
 
     do {
-      encoded.insert(0, alphabet[num % length]);
+      encoded.insert(0, alphabet[num.remainder(length).toInt()]);
       num = (num / length).floor();
     } while (num > 0);
 

@@ -8,7 +8,7 @@ class ListenSequence {
 
   int previousSequenceNumber;
 
-  ListenSequence(int this.previousSequenceNumber);
+  ListenSequence(this.previousSequenceNumber);
 
   int next() => ++previousSequenceNumber;
 }

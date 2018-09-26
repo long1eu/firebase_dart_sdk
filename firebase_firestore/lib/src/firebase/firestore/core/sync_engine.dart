@@ -274,19 +274,21 @@ class SyncEngine implements RemoteStoreCallback {
     callback.onViewSnapshots(newViewSnapshots);
   }
 
+  // TODO: implement getRemoteKeysForTarget
   @override
-  ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId) {
-    final _LimboResolution limboResolution =
-        _limboResolutionsByTarget[targetId];
-    if (limboResolution != null && limboResolution.receivedDocument) {
-      return DocumentKey.emptyKeySet.insert(limboResolution.key);
-    } else {
-      final QueryView queryView = _queryViewsByTarget[targetId];
-      return queryView != null
-          ? queryView.view.syncedDocuments
-          : DocumentKey.emptyKeySet;
-    }
-  }
+  ImmutableSortedSet<DocumentKey> Function(int targetId)
+      get getRemoteKeysForTarget => (int targetId) {
+            final _LimboResolution limboResolution =
+                _limboResolutionsByTarget[targetId];
+            if (limboResolution != null && limboResolution.receivedDocument) {
+              return DocumentKey.emptyKeySet.insert(limboResolution.key);
+            } else {
+              final QueryView queryView = _queryViewsByTarget[targetId];
+              return queryView != null
+                  ? queryView.view.syncedDocuments
+                  : DocumentKey.emptyKeySet;
+            }
+          };
 
   /// Called by FirestoreClient to notify us of a rejected listen.
   @override

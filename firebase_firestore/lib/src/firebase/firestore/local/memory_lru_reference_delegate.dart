@@ -25,11 +25,11 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   int _currentSequenceNumber;
 
   MemoryLruReferenceDelegate(this.persistence)
-      : orphanedSequenceNumbers = {},
+      : orphanedSequenceNumbers = <DocumentKey, int>{},
         listenSequence =
             ListenSequence(persistence.queryCache.highestListenSequenceNumber),
         _currentSequenceNumber = ListenSequence.INVALID {
-    this.garbageCollector = new LruGarbageCollector(this);
+    garbageCollector = LruGarbageCollector(this);
   }
 
   @override
@@ -70,9 +70,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   @override
   Future<void> forEachOrphanedDocumentSequenceNumber(
       _, Consumer<int> consumer) async {
-    for (int sequenceNumber in orphanedSequenceNumbers.values) {
-      consumer(sequenceNumber);
-    }
+    orphanedSequenceNumbers.values.forEach(consumer);
   }
 
   @override
@@ -135,7 +133,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       return true;
     }
 
-    int sequenceNumber = orphanedSequenceNumbers[key];
+    final int sequenceNumber = orphanedSequenceNumbers[key];
     return sequenceNumber != null && sequenceNumber > upperBound;
   }
 }

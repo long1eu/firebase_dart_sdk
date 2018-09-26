@@ -69,6 +69,7 @@ import 'package:firebase_firestore/src/proto/google/rpc/status.pb.dart'
     as proto;
 import 'package:firebase_firestore/src/proto/google/type/latlng.pb.dart'
     as proto;
+import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 
 /// Serializer that converts to and from Firestore API protos.
@@ -82,12 +83,12 @@ class RemoteSerializer {
   // Timestamps and Versions
   proto.Timestamp encodeTimestamp(Timestamp timestamp) {
     return proto.Timestamp.create()
-      ..seconds = timestamp.seconds
+      ..seconds = Int64(timestamp.seconds)
       ..nanos = timestamp.nanoseconds;
   }
 
   Timestamp decodeTimestamp(proto.Timestamp proto) {
-    return Timestamp(proto.seconds, proto.nanos);
+    return Timestamp(proto.seconds.toInt(), proto.nanos);
   }
 
   proto.Timestamp encodeVersion(SnapshotVersion version) {
@@ -662,7 +663,7 @@ class RemoteSerializer {
       builder.parent = _encodeQueryPath(ResourcePath.empty);
     } else {
       final ResourcePath path = query.path;
-      Assert.hardAssert(path.length % 2 != 0,
+      Assert.hardAssert(path.length.remainder(2) != 0,
           'Document queries with filters are not supported.');
       builder.parent = _encodeQueryPath(path.popLast());
 

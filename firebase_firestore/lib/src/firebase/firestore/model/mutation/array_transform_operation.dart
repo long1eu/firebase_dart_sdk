@@ -52,13 +52,13 @@ abstract class ArrayTransformOperation implements TransformOperation {
   int get hashCode => elements.hashCode;
 }
 
-/** An array union transform operation. */
+/// An array union transform operation.
 class ArrayTransformOperationUnion extends ArrayTransformOperation {
   ArrayTransformOperationUnion(List<FieldValue> elements) : super(elements);
 
   @override
   ArrayValue apply(FieldValue previousValue) {
-    List<FieldValue> result =
+    final List<FieldValue> result =
         ArrayTransformOperation.coercedFieldValuesArray(previousValue);
     for (FieldValue element in elements) {
       if (!result.contains(element)) {
@@ -69,17 +69,16 @@ class ArrayTransformOperationUnion extends ArrayTransformOperation {
   }
 }
 
-/** An array remove transform operation. */
+/// An array remove transform operation.
 class ArrayTransformOperationRemove extends ArrayTransformOperation {
   ArrayTransformOperationRemove(List<FieldValue> elements) : super(elements);
 
   @override
   ArrayValue apply(FieldValue previousValue) {
-    List<FieldValue> result =
+    final List<FieldValue> result =
         ArrayTransformOperation.coercedFieldValuesArray(previousValue);
-    for (FieldValue element in elements) {
-      result.remove(element);
-    }
+
+    elements.forEach(result.remove);
     return ArrayValue.fromList(result);
   }
 }

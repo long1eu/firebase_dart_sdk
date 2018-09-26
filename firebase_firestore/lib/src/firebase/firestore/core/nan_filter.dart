@@ -8,7 +8,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart'
 import 'package:firebase_firestore/src/firebase/firestore/model/value/double_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 
-/** Filter that matches NaN (not-a-number) fields. */
+/// Filter that matches NaN (not-a-number) fields.
 class NaNFilter extends Filter {
   final FieldPath fieldPath;
 
@@ -24,7 +24,7 @@ class NaNFilter extends Filter {
   }
 
   @override
-  String get canonicalId => fieldPath.canonicalString + " IS NaN";
+  String get canonicalId => fieldPath.canonicalString + ' IS NaN';
 
   @override
   String toString() => canonicalId;

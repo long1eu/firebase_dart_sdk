@@ -53,7 +53,7 @@ class TargetState {
   void updateResumeToken(List<int> resumeToken) {
     if (resumeToken.isNotEmpty) {
       _hasChanges = true;
-      this._resumeToken = resumeToken;
+      _resumeToken = resumeToken;
     }
   }
 
@@ -67,7 +67,7 @@ class TargetState {
     ImmutableSortedSet<DocumentKey> removedDocuments = DocumentKey.emptyKeySet;
 
     for (MapEntry<DocumentKey, DocumentViewChangeType> entry
-        in this._documentChanges.entries) {
+        in _documentChanges.entries) {
       final DocumentKey key = entry.key;
       final DocumentViewChangeType changeType = entry.value;
       switch (changeType) {
@@ -85,7 +85,7 @@ class TargetState {
       }
     }
 
-    return new TargetChange(
+    return TargetChange(
       _resumeToken,
       _current,
       addedDocuments,

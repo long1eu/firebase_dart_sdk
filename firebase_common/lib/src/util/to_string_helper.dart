@@ -5,7 +5,7 @@
 int _indentingBuiltValueToStringHelperIndent = 0;
 
 class ToStringHelper {
-  StringBuffer _result = new StringBuffer();
+  StringBuffer _result = StringBuffer();
 
   ToStringHelper(Type className) {
     _result..write(className.toString())..write(' {\n');
@@ -27,7 +27,7 @@ class ToStringHelper {
   String toString() {
     _indentingBuiltValueToStringHelperIndent -= 2;
     _result..write(' ' * _indentingBuiltValueToStringHelperIndent)..write('}');
-    final stringResult = _result.toString();
+    final String stringResult = _result.toString();
     _result = null;
     return stringResult;
   }

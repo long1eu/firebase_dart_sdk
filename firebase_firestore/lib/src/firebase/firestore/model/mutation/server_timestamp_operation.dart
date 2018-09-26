@@ -9,12 +9,12 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
 /// Transforms a value into a server-generated timestamp.
 class ServerTimestampOperation implements TransformOperation {
+  factory ServerTimestampOperation() => sharedInstance;
+
   const ServerTimestampOperation._();
 
   static const ServerTimestampOperation sharedInstance =
       ServerTimestampOperation._();
-
-  factory ServerTimestampOperation() => sharedInstance;
 
   @override
   FieldValue applyToLocalView(

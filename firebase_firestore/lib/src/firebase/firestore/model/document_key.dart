@@ -10,13 +10,10 @@ class DocumentKey implements Comparable<DocumentKey> {
   static const String keyFieldName = '__name__';
 
   static final Comparator<DocumentKey> comparator =
-      (a, b) => a.path.compareTo(b.path);
+      (DocumentKey a, DocumentKey b) => a.path.compareTo(b.path);
 
   static final ImmutableSortedSet<DocumentKey> emptyKeySet =
       ImmutableSortedSet<DocumentKey>();
-
-  /// Returns true iff the given path is a path to a document.
-  static bool isDocumentKey(ResourcePath path) => path.length % 2 == 0;
 
   /// The path to the document.
   final ResourcePath path;
@@ -41,6 +38,9 @@ class DocumentKey implements Comparable<DocumentKey> {
   factory DocumentKey.fromPathString(String path) {
     return DocumentKey._(ResourcePath.fromString(path));
   }
+
+  /// Returns true iff the given path is a path to a document.
+  static bool isDocumentKey(ResourcePath path) => path.length.remainder(2) == 0;
 
   /// Returns true iff the given path is a path to a document.
   @override

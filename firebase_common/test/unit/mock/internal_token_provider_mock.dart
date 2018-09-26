@@ -18,7 +18,7 @@ class InternalTokenProviderMock implements InternalTokenProvider {
 
   @override
   Future<GetTokenResult> getAccessToken(bool forceRefresh) {
-    return Future.delayed(
+    return Future<GetTokenResult>.delayed(
         const Duration(milliseconds: 500), () => accessTokenResult);
   }
 

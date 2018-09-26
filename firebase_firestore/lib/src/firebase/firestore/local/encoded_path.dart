@@ -56,14 +56,15 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 class EncodedPath {
   static const int _escape = 0x01;
-  static final int _encodedSeparator = 0x01;
-  static final int _encodedNul = 0x10;
-  static final int _encodedEscape = 0x11;
+  static const int _encodedSeparator = 0x01;
+  static const int _encodedNul = 0x10;
+  static const int _encodedEscape = 0x11;
 
   /// Encodes a path into a SQLite-compatible string form.
   static String encode<B extends BasePath<B>>(B path) {
-    StringBuffer result = new StringBuffer();
-    for (int i = 0, length = path.length; i < length; i++) {
+    final StringBuffer result = StringBuffer();
+    final int length = path.length;
+    for (int i = 0; i < length; i++) {
       if (result.length > 0) {
         _encodeSeparator(result);
       }
@@ -75,8 +76,9 @@ class EncodedPath {
 
   /// Encodes a single segment of a path into the given StringBuffer.
   static void _encodeSegment(String segment, StringBuffer result) {
-    for (int i = 0, length = segment.length; i < length; i++) {
-      int c = segment.codeUnitAt(i);
+    final int length = segment.length;
+    for (int i = 0; i < length; i++) {
+      final int c = segment.codeUnitAt(i);
       if (c == 0x0) {
         result..write(_escape)..write(_encodedNul);
       } else if (c == _escape) {
@@ -123,14 +125,14 @@ class EncodedPath {
     final int lastReasonableEscapeIndex = path.length - 2;
 
     final List<String> segments = <String>[];
-    final StringBuffer segmentBuilder = new StringBuffer();
+    final StringBuffer segmentBuilder = StringBuffer();
 
     for (int start = 0; start < length;) {
       // The last two characters of a valid encoded path must be a separator,
       // so there must be an end to this segment.
       final int end = path.indexOf(String.fromCharCode(_escape), start);
       if (end < 0 || end > lastReasonableEscapeIndex) {
-        throw new ArgumentError('Invalid encoded resource path: "$path"');
+        throw ArgumentError('Invalid encoded resource path: "$path"');
       }
 
       final int next = path.codeUnitAt(end + 1);
@@ -175,9 +177,9 @@ class EncodedPath {
   /// always terminated with a separator, and so a successor can always be
   /// cheaply computed by incrementing the last character of the path.
   static String prefixSuccessor(String path) {
-    StringBuffer result = new StringBuffer(path);
-    int pos = result.length - 1;
-    int c = result.toString().codeUnitAt(pos);
+    final StringBuffer result = StringBuffer(path);
+    final int pos = result.length - 1;
+    final int c = result.toString().codeUnitAt(pos);
 
     // TODO: this really should be a general thing, but not worth it right now
     Assert.hardAssert(c == _encodedSeparator,

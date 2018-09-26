@@ -33,7 +33,6 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.d
 import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:fixnum/fixnum.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Local storage in the Firestore client. Coordinates persistence components like the mutation queue
@@ -134,11 +133,11 @@ class LocalStore {
         persistence.getMutationQueue(initialUser);
     final RemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
     final LocalDocumentsView localDocuments =
-        new LocalDocumentsView(remoteDocuments, mutationQueue);
+        LocalDocumentsView(remoteDocuments, mutationQueue);
     // TODO: Use IndexedQueryEngine as appropriate.
-    final SimpleQueryEngine queryEngine = new SimpleQueryEngine(localDocuments);
+    final SimpleQueryEngine queryEngine = SimpleQueryEngine(localDocuments);
 
-    final ReferenceSet localViewReferences = new ReferenceSet();
+    final ReferenceSet localViewReferences = ReferenceSet();
     persistence.referenceDelegate.additionalReferences = localViewReferences;
 
     return LocalStore._(
@@ -210,7 +209,7 @@ class LocalStore {
       User user) {
     return _persistence.runTransactionAndReturn<
         ImmutableSortedMap<DocumentKey,
-            MaybeDocument>>('handleUserChange', (tx) async {
+            MaybeDocument>>('handleUserChange', (DatabaseExecutor tx) async {
       // Swap out the mutation queue, grabbing the pending mutation batches before
       // and after.
       final List<MutationBatch> oldBatches =
@@ -223,14 +222,16 @@ class LocalStore {
           await _mutationQueue.getAllMutationBatches(tx);
 
       // Recreate our LocalDocumentsView using the new MutationQueue.
-      _localDocuments =
-          new LocalDocumentsView(_remoteDocuments, _mutationQueue);
+      _localDocuments = LocalDocumentsView(_remoteDocuments, _mutationQueue);
       // TODO: Use IndexedQueryEngine as appropriate.
-      _queryEngine = new SimpleQueryEngine(_localDocuments);
+      _queryEngine = SimpleQueryEngine(_localDocuments);
 
       // Union the old/new changed keys.
       ImmutableSortedSet<DocumentKey> changedKeys = DocumentKey.emptyKeySet;
-      for (List<MutationBatch> batches in [oldBatches, newBatches]) {
+      for (List<MutationBatch> batches in <List<MutationBatch>>[
+        oldBatches,
+        newBatches
+      ]) {
         for (MutationBatch batch in batches) {
           for (Mutation mutation in batch.mutations) {
             changedKeys = changedKeys.insert(mutation.key);
@@ -250,14 +251,14 @@ class LocalStore {
     // TODO: Call queryEngine.handleDocumentChange() appropriately.
     return _persistence.runTransactionAndReturn<LocalWriteResult>(
       'Locally write mutations',
-      (tx) async {
+      (DatabaseExecutor tx) async {
         final MutationBatch batch = await _mutationQueue.addMutationBatch(
             tx, localWriteTime, mutations);
 
         final Set<DocumentKey> keys = batch.getKeys();
         final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
             await _localDocuments.getDocuments(tx, keys);
-        return new LocalWriteResult(batch.batchId, changedDocuments);
+        return LocalWriteResult(batch.batchId, changedDocuments);
       },
     );
   }
@@ -278,7 +279,7 @@ class LocalStore {
       MutationBatchResult batchResult) {
     return _persistence.runTransactionAndReturn<
         ImmutableSortedMap<DocumentKey,
-            MaybeDocument>>('Acknowledge batch', (tx) async {
+            MaybeDocument>>('Acknowledge batch', (DatabaseExecutor tx) async {
       await _mutationQueue.acknowledgeBatch(
           tx, batchResult.batch, batchResult.streamToken);
 
@@ -287,7 +288,8 @@ class LocalStore {
         _heldBatchResults.add(batchResult);
         affected = Set<DocumentKey>();
       } else {
-        affected = await _releaseBatchResults(tx, [batchResult]);
+        affected =
+            await _releaseBatchResults(tx, <MutationBatchResult>[batchResult]);
       }
 
       await _mutationQueue.performConsistencyCheck(tx);
@@ -302,7 +304,7 @@ class LocalStore {
     // TODO: Call queryEngine.handleDocumentChange() appropriately.
     return _persistence.runTransactionAndReturn<
         ImmutableSortedMap<DocumentKey,
-            MaybeDocument>>('Reject batch', (tx) async {
+            MaybeDocument>>('Reject batch', (DatabaseExecutor tx) async {
       final MutationBatch toReject =
           await _mutationQueue.lookupMutationBatch(tx, batchId);
       Assert.hardAssert(
@@ -328,8 +330,10 @@ class LocalStore {
   ///
   /// Use [WriteStream.EMPTY_STREAM_TOKEN] to clear the current value.
   Future<void> setLastStreamToken(List<int> streamToken) async {
-    await _persistence.runTransaction('Set stream token',
-        (tx) => _mutationQueue.setLastStreamToken(tx, streamToken));
+    await _persistence.runTransaction(
+        'Set stream token',
+        (DatabaseExecutor tx) =>
+            _mutationQueue.setLastStreamToken(tx, streamToken));
   }
 
   /// Returns the last consistent snapshot processed (used by the [RemoteStore]
@@ -349,12 +353,12 @@ class LocalStore {
     // TODO: Call queryEngine.handleDocumentChange() appropriately.
     return _persistence.runTransactionAndReturn<
         ImmutableSortedMap<DocumentKey,
-            MaybeDocument>>('Apply remote event', (tx) async {
+            MaybeDocument>>('Apply remote event', (DatabaseExecutor tx) async {
       final int sequenceNumber =
           _persistence.referenceDelegate.currentSequenceNumber;
-      Set<DocumentKey> authoritativeUpdates = Set<DocumentKey>();
+      final Set<DocumentKey> authoritativeUpdates = Set<DocumentKey>();
 
-      Map<int, TargetChange> targetChanges = remoteEvent.targetChanges;
+      final Map<int, TargetChange> targetChanges = remoteEvent.targetChanges;
       for (MapEntry<int, TargetChange> entry in targetChanges.entries) {
         final int targetId = entry.key;
         final TargetChange change = entry.value;
@@ -375,12 +379,8 @@ class LocalStore {
         // then watch isn't obligated to send the absolute latest version:
         // it can send the first version that caused the document not to
         // match.
-        for (DocumentKey key in change.addedDocuments) {
-          authoritativeUpdates.add(key);
-        }
-        for (DocumentKey key in change.modifiedDocuments) {
-          authoritativeUpdates.add(key);
-        }
+        change.addedDocuments.forEach(authoritativeUpdates.add);
+        change.modifiedDocuments.forEach(authoritativeUpdates.add);
 
         await _queryCache.removeMatchingKeys(
             tx, change.removedDocuments, targetId);
@@ -423,8 +423,8 @@ class LocalStore {
             doc.version.compareTo(existingDoc.version) >= 0) {
           await _remoteDocuments.add(tx, doc);
         } else {
-          Log.d("LocalStore",
-              "Ignoring outdated watch update for $key. Current version: ${existingDoc.version}  Watch version: ${doc.version}");
+          Log.d('LocalStore',
+              'Ignoring outdated watch update for $key. Current version: ${existingDoc.version}  Watch version: ${doc.version}');
         }
 
         if (limboDocuments.contains(key)) {
@@ -445,7 +445,8 @@ class LocalStore {
         await _queryCache.setLastRemoteSnapshotVersion(tx, remoteVersion);
       }
 
-      Set<DocumentKey> releasedWriteKeys = await _releaseHeldBatchResults(tx);
+      final Set<DocumentKey> releasedWriteKeys =
+          await _releaseHeldBatchResults(tx);
 
       // Union the two key sets.
       changedDocKeys.addAll(releasedWriteKeys);
@@ -474,9 +475,9 @@ class LocalStore {
     // us to be reasonably up-to-date after a crash and avoids needing to loop
     // over all active queries on shutdown. Especially in the browser we may not
     // get time to do anything interesting while the current tab is closing.
-    final Int64 newSeconds = newQueryData.snapshotVersion.timestamp.seconds;
-    final Int64 oldSeconds = oldQueryData.snapshotVersion.timestamp.seconds;
-    final Int64 timeDelta = newSeconds - oldSeconds;
+    final int newSeconds = newQueryData.snapshotVersion.timestamp.seconds;
+    final int oldSeconds = oldQueryData.snapshotVersion.timestamp.seconds;
+    final int timeDelta = newSeconds - oldSeconds;
     if (timeDelta >= _resultTokenMaxAgeSeconds) return true;
 
     // Otherwise if the only thing that has changed about a target is its resume
@@ -494,7 +495,8 @@ class LocalStore {
   /// documents.
   Future<void> notifyLocalViewChanges(
       List<LocalViewChanges> viewChanges) async {
-    await _persistence.runTransaction("notifyLocalViewChanges", (tx) async {
+    await _persistence.runTransaction('notifyLocalViewChanges',
+        (DatabaseExecutor tx) async {
       for (LocalViewChanges viewChange in viewChanges) {
         _localViewReferences.addReferences(
             viewChange.added, viewChange.targetId);
@@ -513,8 +515,8 @@ class LocalStore {
   /// [afterBatchId] The batch to search after, or -1 for the first mutation in
   /// the queue. Returns the next mutation or null if there wasn't one.
   Future<MutationBatch> getNextMutationBatch(int afterBatchId) {
-    return _persistence
-        .runTransactionAndReturn<MutationBatch>('getNextMutationBatch', (tx) {
+    return _persistence.runTransactionAndReturn<MutationBatch>(
+        'getNextMutationBatch', (DatabaseExecutor tx) {
       return _mutationQueue.getNextMutationBatchAfterBatchId(tx, afterBatchId);
     });
   }
@@ -522,8 +524,8 @@ class LocalStore {
   /// Returns the current value of a document with a given key, or null if not
   /// found.
   Future<MaybeDocument> readDocument(DocumentKey key) {
-    return _persistence.runTransactionAndReturn<MaybeDocument>(
-        'readDocument', (tx) => _localDocuments.getDocument(tx, key));
+    return _persistence.runTransactionAndReturn<MaybeDocument>('readDocument',
+        (DatabaseExecutor tx) => _localDocuments.getDocument(tx, key));
   }
 
   /// Assigns the given query an internal id so that its results can be pinned so
@@ -531,7 +533,7 @@ class LocalStore {
   /// the store can be used to manage its view.
   Future<QueryData> allocateQuery(Query query) {
     return _persistence.runTransactionAndReturn<QueryData>('Allocate query',
-        (tx) async {
+        (DatabaseExecutor tx) async {
       int targetId;
       QueryData cached = await _queryCache.getQueryData(tx, query);
       if (cached != null) {
@@ -542,7 +544,7 @@ class LocalStore {
       } else {
         final AllocateQueryHolder holder = AllocateQueryHolder();
         holder.targetId = _targetIdGenerator.nextId();
-        holder.cached = new QueryData.init(
+        holder.cached = QueryData.init(
             query,
             holder.targetId,
             _persistence.referenceDelegate.currentSequenceNumber,
@@ -564,10 +566,10 @@ class LocalStore {
 
   /// Unpin all the documents associated with the given query.
   void releaseQuery(Query query) {
-    _persistence.runTransaction('Release query', (tx) async {
+    _persistence.runTransaction('Release query', (DatabaseExecutor tx) async {
       QueryData queryData = await _queryCache.getQueryData(tx, query);
       Assert.hardAssert(
-          queryData != null, "Tried to release nonexistent query: %$query");
+          queryData != null, 'Tried to release nonexistent query: %$query');
 
       final int targetId = queryData.targetId;
       final QueryData cachedQueryData = _targetIds[targetId];
@@ -599,7 +601,8 @@ class LocalStore {
     return _persistence
         .runTransactionAndReturn<ImmutableSortedMap<DocumentKey, Document>>(
             'executeQuery',
-            (tx) => _queryEngine.getDocumentsMatchingQuery(tx, query));
+            (DatabaseExecutor tx) =>
+                _queryEngine.getDocumentsMatchingQuery(tx, query));
   }
 
   /// Returns the keys of the documents that are associated with the given
@@ -608,14 +611,15 @@ class LocalStore {
     return _persistence
         .runTransactionAndReturn<ImmutableSortedSet<DocumentKey>>(
             'getRemoteDocumentKeys',
-            (tx) => _queryCache.getMatchingKeysForTargetId(tx, targetId));
+            (DatabaseExecutor tx) =>
+                _queryCache.getMatchingKeysForTargetId(tx, targetId));
   }
 
   /// Releases all the held batch results up to the current remote version
   /// received, and applies their mutations to the docs in the remote documents
   /// cache.
   Future<Set<DocumentKey>> _releaseHeldBatchResults(DatabaseExecutor tx) async {
-    List<MutationBatchResult> toRelease = List<MutationBatchResult>();
+    final List<MutationBatchResult> toRelease = <MutationBatchResult>[];
     for (MutationBatchResult batchResult in _heldBatchResults) {
       if (!_isRemoteUpToVersion(batchResult.commitVersion)) {
         break;
@@ -641,12 +645,14 @@ class LocalStore {
 
   bool _shouldHoldBatchResult(SnapshotVersion snapshotVersion) {
     // Check if watcher isn't up to date or prior results are already held.
-    return !_isRemoteUpToVersion(snapshotVersion) || !_heldBatchResults.isEmpty;
+    return !_isRemoteUpToVersion(snapshotVersion) ||
+        _heldBatchResults.isNotEmpty;
   }
 
   Future<Set<DocumentKey>> _releaseBatchResults(
       DatabaseExecutor tx, List<MutationBatchResult> batchResults) async {
-    List<MutationBatch> batches = new List<MutationBatch>(batchResults.length);
+    final List<MutationBatch> batches =
+        List<MutationBatch>(batchResults.length);
     // TODO: Call queryEngine.handleDocumentChange() as appropriate.
     for (MutationBatchResult batchResult in batchResults) {
       await _applyBatchResult(tx, batchResult);
@@ -658,13 +664,13 @@ class LocalStore {
 
   Future<Set<DocumentKey>> _removeMutationBatch(
       DatabaseExecutor tx, MutationBatch batch) {
-    return _removeMutationBatches(tx, [batch]);
+    return _removeMutationBatches(tx, <MutationBatch>[batch]);
   }
 
   /// Removes the given mutation batches.
   Future<Set<DocumentKey>> _removeMutationBatches(
       DatabaseExecutor tx, List<MutationBatch> batches) async {
-    Set<DocumentKey> affectedDocs = new Set<DocumentKey>();
+    final Set<DocumentKey> affectedDocs = Set<DocumentKey>();
     for (MutationBatch batch in batches) {
       for (Mutation mutation in batch.mutations) {
         affectedDocs.add(mutation.key);
@@ -699,7 +705,7 @@ class LocalStore {
   }
 }
 
-/** Mutable state for the transaction in allocateQuery. */
+/// Mutable state for the transaction in allocateQuery.
 class AllocateQueryHolder {
   QueryData cached;
   int targetId;

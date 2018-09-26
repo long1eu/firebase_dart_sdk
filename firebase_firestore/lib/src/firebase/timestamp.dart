@@ -3,7 +3,6 @@
 // on 17/09/2018
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:fixnum/fixnum.dart';
 
 /// A Timestamp represents a point in time independent of any time zone or
 /// calendar, represented as seconds and fractions of seconds at nanosecond
@@ -17,16 +16,19 @@ import 'package:fixnum/fixnum.dart';
 ///
 /// see [The reference timestamp definition](https://github.com/google/protobuf/blob/master/src/google/protobuf/timestamp.proto)
 class Timestamp implements Comparable<Timestamp> {
-  final Int64 seconds;
+  final int seconds;
   final int nanoseconds;
 
   @publicApi
-  const Timestamp(this.seconds, this.nanoseconds);
+  Timestamp(this.seconds, this.nanoseconds) {
+    validateRange(seconds, nanoseconds);
+  }
 
   factory Timestamp.fromDate(DateTime date) {
-    final Int64 millis = Int64(date.millisecondsSinceEpoch);
-    Int64 seconds = millis ~/ 1000;
-    int nanoseconds = ((millis % 1000) * 1000000).toInt();
+    final int millis = date.millisecondsSinceEpoch;
+    int seconds = millis ~/ 1000;
+    int nanoseconds = millis.remainder(1000) * 1000000;
+
     if (nanoseconds < 0) {
       seconds -= 1;
       nanoseconds += 1000000000;
@@ -49,23 +51,23 @@ class Timestamp implements Comparable<Timestamp> {
   @override
   int compareTo(Timestamp other) {
     if (seconds == other.seconds) {
-      return nanoseconds - other.nanoseconds;
+      return (nanoseconds - other.nanoseconds).sign;
     } else {
       return seconds.compareTo(other.seconds);
     }
   }
 
-  static void validateRange(Int64 seconds, int nanoseconds) {
+  static void validateRange(int seconds, int nanoseconds) {
     Preconditions.checkArgument(
-        nanoseconds >= 0, "Timestamp nanoseconds out of range: $nanoseconds");
+        nanoseconds >= 0, 'Timestamp nanoseconds out of range: $nanoseconds');
     Preconditions.checkArgument(
-        nanoseconds < 1e9, "Timestamp nanoseconds out of range: $nanoseconds");
+        nanoseconds < 1e9, 'Timestamp nanoseconds out of range: $nanoseconds');
     // Midnight at the beginning of 1/1/1 is the earliest supported timestamp.
     Preconditions.checkArgument(
-        seconds >= -62135596800, "Timestamp seconds out of range: $seconds");
+        seconds >= -62135596800, 'Timestamp seconds out of range: $seconds');
     // This will break in the year 10,000.
     Preconditions.checkArgument(
-        seconds < 253402300800, "Timestamp seconds out of range: $seconds");
+        seconds < 253402300800, 'Timestamp seconds out of range: $seconds');
   }
 
   @override

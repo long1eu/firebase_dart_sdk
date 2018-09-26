@@ -592,12 +592,14 @@ class RemoteStore implements TargetMetadataProvider {
   Transaction createTransaction() => Transaction(_datastore);
 
   @override
-  ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId) {
-    return _remoteStoreCallback.getRemoteKeysForTarget(targetId);
-  }
+  QueryData Function(int targetId) get getQueryDataForTarget =>
+      (int targetId) => _listenTargets[targetId];
 
   @override
-  QueryData getQueryDataForTarget(int targetId) => _listenTargets[targetId];
+  ImmutableSortedSet<DocumentKey> Function(int targetId)
+      get getRemoteKeysForTarget => (int targetId) {
+            return _remoteStoreCallback.getRemoteKeysForTarget(targetId);
+          };
 }
 
 /// A callback interface for events from RemoteStore.
@@ -635,5 +637,6 @@ abstract class RemoteStoreCallback {
   /// the last snapshot.
   ///
   /// * Returns an empty set of document keys for unknown targets.
-  ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId);
+  ImmutableSortedSet<DocumentKey> Function(int targetId)
+      get getRemoteKeysForTarget;
 }

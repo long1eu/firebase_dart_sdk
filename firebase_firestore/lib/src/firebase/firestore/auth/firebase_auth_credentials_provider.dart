@@ -50,7 +50,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
 
   @override
   Future<String> get token async {
-    bool doForceRefresh = forceRefresh;
+    final bool doForceRefresh = forceRefresh;
     forceRefresh = false;
 
     // Take note of the current value of the tokenCounter so that this method
@@ -93,7 +93,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   /// Returns the current [User] as obtained from the given FirebaseApp
   /// instance.
   User getUser() {
-    String uid = authProvider.uid;
-    return uid != null ? new User(uid) : User.unauthenticated;
+    final String uid = authProvider.uid;
+    return uid != null ? User(uid) : User.unauthenticated;
   }
 }

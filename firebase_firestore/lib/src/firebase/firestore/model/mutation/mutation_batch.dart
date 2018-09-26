@@ -11,11 +11,9 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
-/**
- * A batch of mutations that will be sent as one unit to the backend. Batches can be marked as a
- * tombstone if the mutation queue does not remove them immediately. When a batch is a tombstone it
- * has no mutations.
- */
+/// A batch of mutations that will be sent as one unit to the backend. Batches
+/// can be marked as a tombstone if the mutation queue does not remove them
+/// immediately. When a batch is a tombstone it has no mutations.
 class MutationBatch {
   /// A batch ID that was searched for and not found or a batch ID value known
   /// to be before all known batches.
@@ -67,7 +65,7 @@ class MutationBatch {
       DocumentKey documentKey, MaybeDocument maybeDoc) {
     if (maybeDoc != null) {
       Assert.hardAssert(maybeDoc.key == documentKey,
-          "applyToRemoteDocument: key ${documentKey} doesn't match maybeDoc key ${maybeDoc.key}");
+          "applyToRemoteDocument: key $documentKey doesn't match maybeDoc key ${maybeDoc.key}");
     }
 
     final MaybeDocument baseDoc = maybeDoc;
@@ -91,12 +89,12 @@ class MutationBatch {
 
   /// Converts this batch to a tombstone.
   MutationBatch toTombstone() {
-    return new MutationBatch(batchId, localWriteTime, <Mutation>[]);
+    return MutationBatch(batchId, localWriteTime, <Mutation>[]);
   }
 
   /// Returns the set of unique keys referenced by all mutations in the batch.
   Set<DocumentKey> getKeys() {
-    Set<DocumentKey> set = Set();
+    final Set<DocumentKey> set = Set<DocumentKey>();
     for (Mutation mutation in mutations) {
       set.add(mutation.key);
     }

@@ -282,7 +282,7 @@ class Query {
         }
         final ResourcePath path = query.path.appendSegment(documentKey);
         Assert.hardAssert(
-            path.length % 2 == 0, 'Path should be a document key');
+            path.length.remainder(2) == 0, 'Path should be a document key');
         fieldValue = ReferenceValue.valueOf(
             firestore.databaseId, DocumentKey.fromPath(path));
       } else if (value is DocumentReference) {

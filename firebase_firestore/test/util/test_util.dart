@@ -2,12 +2,15 @@
 // Lung Razvan <long1eu>
 // on 26/09/2018
 
+import 'dart:convert';
+
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/order_by.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
@@ -16,15 +19,25 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/delete_mutation.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_transform.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/patch_mutation.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/set_mutation.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change_aggregator.dart';
 import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:fixnum/fixnum.dart';
 import 'package:test/test.dart';
 
 import 'test_access_helper.dart';
@@ -47,7 +60,7 @@ class TestUtil {
 
   static Blob blob(List<int> bytes) => Blob(bytes);
 
-  static final Map<String, Object> EMPTY_MAP = <String, Object>{};
+  static final Map<String, Object> emptyMap = <String, Object>{};
 
   static FieldValue wrap(Object value) {
     final DatabaseId databaseId = DatabaseId.forProject('project');
@@ -97,12 +110,14 @@ class TestUtil {
 
   static SnapshotVersion version(int versionMicros) {
     final int seconds = versionMicros ~/ 1000000;
-    final int nanos = (versionMicros % 1000000) * 1000;
-    return SnapshotVersion(Timestamp(Int64(seconds), nanos));
+    final int nanos = (versionMicros.remainder(1000000)) * 1000;
+    return SnapshotVersion(Timestamp(seconds, nanos));
   }
 
   static Document docForValue(
-      /*String|DocumentKey*/ dynamic key, int version, ObjectValue data,
+      /*String|DocumentKey*/ dynamic key,
+      int version,
+      ObjectValue data,
       [bool hasLocalMutations = false]) {
     assert(key is String || key is DocumentKey);
 
@@ -118,7 +133,9 @@ class TestUtil {
   }
 
   static Document docForMap(
-      /*String|DocumentKey*/ dynamic key, int version, Map<String, Object> data,
+      /*String|DocumentKey*/ dynamic key,
+      int version,
+      Map<String, Object> data,
       [bool hasLocalMutations = false]) {
     assert(key is String || key is DocumentKey);
 
@@ -256,289 +273,181 @@ class TestUtil {
         modifiedDocumentKeys, removedDocumentKeys);
   }
 
-/*
-   static TargetChange ackTarget(Document/*...*/ docs) {
-    return targetChange(ByteString.EMPTY, true, Arrays.asList(docs), null, null);
+  static TargetChange ackTarget(List<Document> docs) {
+    return targetChange(<int>[], true, docs, null, null);
   }
 
-   static Map<int, QueryData> activeQueries(Iterable<int> targets) {
-    Query query = query("foo");
-    Map<int, QueryData> listenMap = new HashMap<>();
-    for (int targetId : targets) {
-      QueryData queryData =
-          new QueryData(query, targetId, ARBITRARY_SEQUENCE_NUMBER, QueryPurpose.LISTEN);
-      listenMap.put(targetId, queryData);
+  static Map<int, QueryData> activeQueries(List<int> targets) {
+    final Query query = TestUtil.query('foo');
+    final Map<int, QueryData> listenMap = <int, QueryData>{};
+    for (int targetId in targets) {
+      final QueryData queryData = QueryData.init(
+          query, targetId, ARBITRARY_SEQUENCE_NUMBER, QueryPurpose.listen);
+      listenMap[targetId] = queryData;
     }
     return listenMap;
   }
 
-   static Map<int, QueryData> activeQueries(int/*...*/ targets) {
-    return activeQueries(asList(targets));
-  }
-
-   static Map<int, QueryData> activeLimboQueries(
+  static Map<int, QueryData> activeLimboQueries(
       String docKey, Iterable<int> targets) {
-    Query query = query(docKey);
-    Map<int, QueryData> listenMap = new HashMap<>();
-    for (int targetId : targets) {
-      QueryData queryData =
-          new QueryData(query, targetId, ARBITRARY_SEQUENCE_NUMBER, QueryPurpose.LIMBO_RESOLUTION);
-      listenMap.put(targetId, queryData);
+    final Query query = TestUtil.query(docKey);
+    final Map<int, QueryData> listenMap = <int, QueryData>{};
+    for (int targetId in targets) {
+      final QueryData queryData = QueryData.init(query, targetId,
+          ARBITRARY_SEQUENCE_NUMBER, QueryPurpose.limboResolution);
+      listenMap[targetId] = queryData;
     }
     return listenMap;
   }
 
-   static Map<int, QueryData> activeLimboQueries(String docKey, int/*...*/ targets) {
-    return activeLimboQueries(docKey, asList(targets));
-  }
-
-   static RemoteEvent addedRemoteEvent(
-      MaybeDocument doc, List<int> updatedInTargets, List<int> removedFromTargets) {
-    DocumentChange change =
-        new DocumentChange(updatedInTargets, removedFromTargets, doc.getKey(), doc);
-    WatchChangeAggregator aggregator =
-        new WatchChangeAggregator(
-            new WatchChangeAggregator.TargetMetadataProvider() {
-              @Override
-               ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId) {
-                return DocumentKey.emptyKeySet();
-              }
-
-              @Override
-               QueryData getQueryDataForTarget(int targetId) {
-                return queryData(targetId, QueryPurpose.LISTEN, doc.getKey().toString());
-              }
-            });
+  static RemoteEvent addedRemoteEvent(MaybeDocument doc,
+      List<int> updatedInTargets, List<int> removedFromTargets) {
+    final WatchChangeDocumentChange change = WatchChangeDocumentChange(
+        updatedInTargets, removedFromTargets, doc.key, doc);
+    final WatchChangeAggregator aggregator =
+        WatchChangeAggregator(TargetMetadataProvider(
+      (int targetId) => DocumentKey.emptyKeySet,
+      (int targetId) =>
+          queryData(targetId, QueryPurpose.listen, doc.key.toString()),
+    ));
     aggregator.handleDocumentChange(change);
-    return aggregator.createRemoteEvent(doc.getVersion());
+    return aggregator.createRemoteEvent(doc.version);
   }
 
-   static RemoteEvent updateRemoteEvent(
-      MaybeDocument doc, List<int> updatedInTargets, List<int> removedFromTargets) {
-    return updateRemoteEvent(doc, updatedInTargets, removedFromTargets, Collections.emptyList());
-  }
-
-   static RemoteEvent updateRemoteEvent(
-      MaybeDocument doc,
-      List<int> updatedInTargets,
-      List<int> removedFromTargets,
-      List<int> limboTargets) {
-    DocumentChange change =
-        new DocumentChange(updatedInTargets, removedFromTargets, doc.getKey(), doc);
-    WatchChangeAggregator aggregator =
-        new WatchChangeAggregator(
-            new WatchChangeAggregator.TargetMetadataProvider() {
-              @Override
-               ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId) {
-                return DocumentKey.emptyKeySet().insert(doc.getKey());
-              }
-
-              @Override
-               QueryData getQueryDataForTarget(int targetId) {
-                bool isLimbo =
-                    !(updatedInTargets.contains(targetId) || removedFromTargets.contains(targetId));
-                QueryPurpose purpose =
-                    isLimbo ? QueryPurpose.LIMBO_RESOLUTION : QueryPurpose.LISTEN;
-                return queryData(targetId, purpose, doc.getKey().toString());
-              }
-            });
+  static RemoteEvent updateRemoteEvent(MaybeDocument doc,
+      List<int> updatedInTargets, List<int> removedFromTargets,
+      [List<int> limboTargets = const <int>[]]) {
+    final WatchChangeDocumentChange change = WatchChangeDocumentChange(
+        updatedInTargets, removedFromTargets, doc.key, doc);
+    final WatchChangeAggregator aggregator =
+        WatchChangeAggregator(TargetMetadataProvider(
+      (int targetId) {
+        return DocumentKey.emptyKeySet.insert(doc.key);
+      },
+      (int targetId) {
+        final bool isLimbo = !(updatedInTargets.contains(targetId) ||
+            removedFromTargets.contains(targetId));
+        final QueryPurpose purpose =
+            isLimbo ? QueryPurpose.limboResolution : QueryPurpose.listen;
+        return queryData(targetId, purpose, doc.key.toString());
+      },
+    ));
     aggregator.handleDocumentChange(change);
-    return aggregator.createRemoteEvent(doc.getVersion());
+    return aggregator.createRemoteEvent(doc.version);
   }
 
-   static SetMutation setMutation(String path, Map<String, Object> values) {
-    return new SetMutation(key(path), wrapObject(values), Precondition.NONE);
+  static SetMutation setMutation(String path, Map<String, Object> values) {
+    return SetMutation(key(path), wrapMap(values), Precondition.none);
   }
 
-   static PatchMutation patchMutation(String path, Map<String, Object> values) {
-    return patchMutation(path, values, null);
-  }
-
-   static PatchMutation patchMutation(
-      String path, Map<String, Object> values,  List<FieldPath> updateMask) {
-    ObjectValue objectValue = ObjectValue.emptyObject();
-    ArrayList<FieldPath> objectMask = new ArrayList<>();
-    for (Entry<String, Object> entry : values.entrySet()) {
-      FieldPath fieldPath = field(entry.getKey());
+  static PatchMutation patchMutation(String path, Map<String, Object> values,
+      [List<FieldPath> updateMask = const <FieldPath>[]]) {
+    ObjectValue objectValue = ObjectValue.empty;
+    final List<FieldPath> objectMask = <FieldPath>[];
+    for (MapEntry<String, Object> entry in values.entries) {
+      final FieldPath fieldPath = field(entry.key);
       objectMask.add(fieldPath);
-      if (!entry.getValue().equals(DELETE_SENTINEL)) {
-        FieldValue parsedValue = wrap(entry.getValue());
+      if (entry.value != DELETE_SENTINEL) {
+        final FieldValue parsedValue = wrap(entry.value);
         objectValue = objectValue.set(fieldPath, parsedValue);
       }
     }
 
-    bool merge = updateMask != null;
+    final bool merge = updateMask != null;
 
     // We sort the fieldMaskPaths to make the order deterministic in tests.
-    Collections.sort(objectMask);
+    objectMask.sort();
 
-    return new PatchMutation(
+    return PatchMutation(
         key(path),
         objectValue,
-        FieldMask.fromCollection(merge ? updateMask : objectMask),
-        merge ? Precondition.NONE : Precondition.exists(true));
+        FieldMask(merge ? updateMask : objectMask),
+        merge ? Precondition.none : Precondition.fromExists(true));
   }
 
-   static DeleteMutation deleteMutation(String path) {
-    return new DeleteMutation(key(path), Precondition.NONE);
+  static DeleteMutation deleteMutation(String path) {
+    return DeleteMutation(key(path), Precondition.none);
   }
 
-  /**
-   * Creates a TransformMutation by parsing any FieldValue sentinels in the provided data. The data
-   * is expected to use dotted-notation for nested fields (i.e. { "foo.bar": FieldValue.foo() } and
-   * must not contain any non-sentinel data.
-   */
-   static TransformMutation transformMutation(String path, Map<String, Object> data) {
-    UserDataConverter dataConverter = new UserDataConverter(DatabaseId.forProject("project"));
-    ParsedUpdateData result = dataConverter.parseUpdateData(data);
+  /// Creates a [TransformMutation] by parsing any [FieldValue] sentinels in the
+  /// provided data. The data is expected to use dotted-notation for nested
+  /// fields (i.e. { "foo.bar": FieldValue.foo() } and must not contain any
+  /// non-sentinel data.
+  static TransformMutation transformMutation(
+      String path, Map<String, Object> data) {
+    final UserDataConverter dataConverter =
+        UserDataConverter(DatabaseId.forProject('project'));
+    final ParsedUpdateData result = dataConverter.parseUpdateData(data);
 
-    // The order of the transforms doesn't matter, but we sort them so tests can assume a particular
-    // order.
-    ArrayList<FieldTransform> fieldTransforms = new ArrayList<>(result.getFieldTransforms());
-    Collections.sort(
-        fieldTransforms, (ft1, ft2) -> ft1.getFieldPath().compareTo(ft2.getFieldPath()));
+    // The order of the transforms doesn't matter, but we sort them so tests can
+    // assume a particular order.
+    final List<FieldTransform> fieldTransforms =
+        List.from<FieldTransform>(result.fieldTransforms);
 
-    return new TransformMutation(key(path), fieldTransforms);
+    fieldTransforms.sort((FieldTransform ft1, FieldTransform ft2) =>
+        ft1.fieldPath.compareTo(ft2.fieldPath));
+
+    return TransformMutation(key(path), fieldTransforms);
   }
 
-   static MutationResult mutationResult(int version) {
-    return new MutationResult(version(version), null);
+  static MutationResult mutationResult(int version) {
+    return MutationResult(TestUtil.version(version), null);
   }
 
-   static LocalViewChanges viewChanges(
+  static LocalViewChanges viewChanges(
       int targetId, List<String> addedKeys, List<String> removedKeys) {
-    ImmutableSortedSet<DocumentKey> added = DocumentKey.emptyKeySet();
-    for (String keyPath : addedKeys) {
+    ImmutableSortedSet<DocumentKey> added = DocumentKey.emptyKeySet;
+    for (String keyPath in addedKeys) {
       added = added.insert(key(keyPath));
     }
-    ImmutableSortedSet<DocumentKey> removed = DocumentKey.emptyKeySet();
-    for (String keyPath : removedKeys) {
+    ImmutableSortedSet<DocumentKey> removed = DocumentKey.emptyKeySet;
+    for (String keyPath in removedKeys) {
       removed = removed.insert(key(keyPath));
     }
-    return new LocalViewChanges(targetId, added, removed);
+    return LocalViewChanges(targetId, added, removed);
   }
 
-  /** Creates a resume token to match the given snapshot version. */
-  
-   static ByteString resumeToken(int snapshotVersion) {
-    if (snapshotVersion == 0) {
-      return null;
-    }
+  /// Creates a resume token to match the given snapshot version.
 
-    String snapshotString = "snapshot-" + snapshotVersion;
-    return ByteString.copyFrom(snapshotString, Charsets.UTF_8);
-  }
+  static List<int> resumeToken(
+      /*int|SnapshotVersion|String*/
+      dynamic snapshotVersion) {
+    if (snapshotVersion is int) {
+      if (snapshotVersion == 0) {
+        return null;
+      }
 
-  @NonNull
-  private static ByteString resumeToken(SnapshotVersion snapshotVersion) {
-    if (snapshotVersion.equals(SnapshotVersion.NONE)) {
-      return ByteString.EMPTY;
+      final String snapshotString = 'snapshot-$snapshotVersion';
+      return utf8.encode(snapshotString);
+    } else if (snapshotVersion is SnapshotVersion) {
+      if (snapshotVersion == SnapshotVersion.none) {
+        return <int>[];
+      } else {
+        return utf8.encode(snapshotVersion.toString());
+      }
+    } else if (snapshotVersion is String) {
+      return utf8.encode(snapshotVersion);
     } else {
-      return ByteString.copyFromUtf8(snapshotVersion.toString());
+      throw StateError(
+          'snapshotVersion should be int|SnapshotVersion|String but it\'s ${snapshotVersion.runtimeType}');
     }
   }
 
-   static ByteString streamToken(String contents) {
-    return ByteString.copyFrom(contents, Charsets.UTF_8);
+  static Map<String, Object> fromJsonString(String json) {
+    return jsonDecode(json) as Map<String, Object>;
   }
 
-  private static Map<String, Object> fromJsonString(String json) {
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      return mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+  static Map<String, Object> fromSingleQuotedString(String json) {
+    return fromJsonString(json.replaceAll("'", '"'));
   }
 
-   static Map<String, Object> fromSingleQuotedString(String json) {
-    return fromJsonString(json.replace("'", "\""));
-  }
-
-  /** Converts the values of an ImmutableSortedMap into a list, preserving key order. */
-   static <T> List<T> values(ImmutableSortedMap<?, T> map) {
-    List<T> result = new ArrayList<>();
-    for (Map.Entry<?, T> entry : map) {
-      result.add(entry.getValue());
+  /// Converts the values of an ImmutableSortedMap into a list, preserving key
+  /// order.
+  static List<T> values<T>(ImmutableSortedMap<dynamic, T> map) {
+    final List<T> result = <T>[];
+    for (MapEntry<dynamic, T> entry in map) {
+      result.add(entry.value);
     }
     return result;
   }
-
-  /**
-   * Asserts that the actual set is equal to the expected one.
-   *
-   * @param expected A list of the expected contents of the set, in order.
-   * @param actual The set to compare against.
-   * @param <T> The type of the values of in common between the expected list and actual set.
-   */
-  // PORTING NOTE: JUnit and XCTest use reversed conventions on expected and actual values :-(.
-   static <T> void assertSetEquals(List<T> expected, ImmutableSortedSet<T> actual) {
-    List<T> actualList = Lists.newArrayList(actual);
-    assertEquals(expected, actualList);
-  }
-
-  /**
-   * Asserts that the actual set is equal to the expected one.
-   *
-   * @param expected A list of the expected contents of the set, in order.
-   * @param actual The set to compare against.
-   * @param <T> The type of the values of in common between the expected list and actual set.
-   */
-  // PORTING NOTE: JUnit and XCTest use reversed conventions on expected and actual values :-(.
-   static <T> void assertSetEquals(List<T> expected, Set<T> actual) {
-    Set<T> expectedSet = Sets.newHashSet(expected);
-    assertEquals(expectedSet, actual);
-  }
-
-  /** Asserts that the given runnable block fails with an internal error. */
-   static void assertFails(Runnable block) {
-    try {
-      block.run();
-    } catch (AssertionError e) {
-      assertThat(e).hasMessageThat().startsWith("INTERNAL ASSERTION FAILED:");
-      // Otherwise success
-      return;
-    }
-    fail("Should have failed");
-  }
-
-   static void assertDoesNotThrow(Runnable block) {
-    try {
-      block.run();
-    } catch (Exception e) {
-      fail("Should not have thrown " + e);
-    }
-  }
-
-  // TODO: We could probably do some de-duplication between assertFails / expectError.
-  /** Expects runnable to throw an exception with a specific error message. */
-   static void expectError(Runnable runnable, String exceptionMessage) {
-    expectError(runnable, exceptionMessage, /*context=*/ null);
-  }
-
-  /**
-   * Expects runnable to throw an exception with a specific error message. An optional context (e.g.
-   * "for bad_data") can be provided which will be displayed in any resulting failure message.
-   */
-   static void expectError(Runnable runnable, String exceptionMessage, String context) {
-    bool exceptionThrown = false;
-    try {
-      runnable.run();
-    } catch (Throwable throwable) {
-      exceptionThrown = true;
-      String contextMessage = "Expected exception message was incorrect";
-      if (context != null) {
-        contextMessage += " (" + context + ")";
-      }
-      assertEquals(contextMessage, exceptionMessage, throwable.getMessage());
-    }
-    if (!exceptionThrown) {
-      context = (context == null) ? "" : context;
-      fail(
-          "Expected exception with message '"
-              + exceptionMessage
-              + "' but no exception was thrown"
-              + context);
-    }
-  }*/
 }

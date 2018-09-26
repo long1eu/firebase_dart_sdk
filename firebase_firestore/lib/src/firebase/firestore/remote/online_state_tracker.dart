@@ -84,7 +84,7 @@ class OnlineStateTracker {
           'onlineStateTimer shouldn\'t be started yet');
       _onlineStateTimer = _workerQueue.enqueueAfterDelay<void>(
           TimerId.ONLINE_STATE_TIMEOUT,
-          Duration(milliseconds: _onlineStateTimeoutMs), () {
+          Duration(milliseconds: _onlineStateTimeoutMs), () async {
         _onlineStateTimer = null;
         Assert.hardAssert(_state == OnlineState.unknown,
             'Timer should be canceled if we transitioned to a different state.');

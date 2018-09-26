@@ -13,6 +13,7 @@ analyzer:
     - '**.pb.dart'
     - '**.pbjson.dart'
     - '**.pbserver.dart'
+    - '**.pbenum.dart'
 
 linter:
   rules:

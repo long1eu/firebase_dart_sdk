@@ -144,7 +144,7 @@ class UserDataConverter {
 
     // fieldsAndValues.length and alternating types should already be validated
     // by Util.collectUpdateArguments().
-    Assert.hardAssert(fieldsAndValues.length % 2 == 0,
+    Assert.hardAssert(fieldsAndValues.length.remainder(2) == 0,
         'Expected fieldAndValues to contain an even number of elements');
 
     final Iterator<Object> iterator = fieldsAndValues.iterator;
@@ -338,7 +338,7 @@ class UserDataConverter {
       return TimestampValue.valueOf(Timestamp.fromDate(input));
     } else if (input is Timestamp) {
       final Timestamp timestamp = input;
-      final Int64 seconds = timestamp.seconds;
+      final int seconds = timestamp.seconds;
       // Firestore backend truncates precision down to microseconds. To ensure
       // offline mode works the same with regards to truncation, perform the
       // truncation immediately without waiting for the backend to do that.
@@ -405,15 +405,15 @@ class ParsedDocumentData {
 class ParsedUpdateData {
   final ObjectValue _data;
   final FieldMask _fieldMask;
-  final List<FieldTransform> _fieldTransforms;
+  final List<FieldTransform> fieldTransforms;
 
-  const ParsedUpdateData(this._data, this._fieldMask, this._fieldTransforms);
+  const ParsedUpdateData(this._data, this._fieldMask, this.fieldTransforms);
 
   List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
     final List<Mutation> mutations = <Mutation>[];
     mutations.add(PatchMutation(key, _data, _fieldMask, precondition));
-    if (_fieldTransforms.isNotEmpty) {
-      mutations.add(TransformMutation(key, _fieldTransforms));
+    if (fieldTransforms.isNotEmpty) {
+      mutations.add(TransformMutation(key, fieldTransforms));
     }
     return mutations;
   }

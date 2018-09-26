@@ -37,7 +37,7 @@ class LLRBBlackValueNode<K, V> extends LLRBValueNode<K, V> {
   set left(LLRBNode<K, V> left) {
     if (size != -1) {
       // Modifying left node after invoking size
-      throw new StateError('Can\'t set left after using size');
+      throw StateError('Can\'t set left after using size');
     }
     super.left = left;
   }
@@ -45,10 +45,10 @@ class LLRBBlackValueNode<K, V> extends LLRBValueNode<K, V> {
   @override
   LLRBValueNode<K, V> copyWith(
       K key, V value, LLRBNode<K, V> left, LLRBNode<K, V> right) {
-    K newKey = key == null ? this.key : key;
-    V newValue = value == null ? this.value : value;
-    LLRBNode<K, V> newLeft = left == null ? this.left : left;
-    LLRBNode<K, V> newRight = right == null ? this.right : right;
-    return new LLRBBlackValueNode<K, V>(newKey, newValue, newLeft, newRight);
+    final K newKey = key == null ? this.key : key;
+    final V newValue = value == null ? this.value : value;
+    final LLRBNode<K, V> newLeft = left == null ? this.left : left;
+    final LLRBNode<K, V> newRight = right == null ? this.right : right;
+    return LLRBBlackValueNode<K, V>(newKey, newValue, newLeft, newRight);
   }
 }

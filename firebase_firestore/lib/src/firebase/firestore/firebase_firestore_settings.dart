@@ -7,7 +7,7 @@ import 'package:firebase_common/firebase_common.dart';
 /// Settings used to configure a FirebaseFirestore instance.
 @publicApi
 class FirebaseFirestoreSettings {
-  static const String _defaultHost = "firestore.googleapis.com";
+  static const String _defaultHost = 'firestore.googleapis.com';
 
   /// The host of the Firestore backend.
   @publicApi
@@ -46,9 +46,9 @@ class FirebaseFirestoreSettings {
   @override
   String toString() {
     return (ToStringHelper(FirebaseFirestoreSettings)
-          ..add("host", host)
-          ..add("sslEnabled", sslEnabled)
-          ..add("persistenceEnabled", persistenceEnabled))
+          ..add('host', host)
+          ..add('sslEnabled', sslEnabled)
+          ..add('persistenceEnabled', persistenceEnabled))
         .toString();
   }
 }

@@ -84,26 +84,26 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
   Comparator<K> get comparator;
 
   @override
-  bool operator ==(Object o) {
-    if (identical(this, o)) {
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
       return true;
     }
 
-    if (o is! ImmutableSortedMap) {
+    if (other is! ImmutableSortedMap) {
       return false;
     }
 
-    ImmutableSortedMap<K, V> that = o;
+    final ImmutableSortedMap<K, V> that = other;
 
-    if (this.comparator != that.comparator) {
+    if (comparator != that.comparator) {
       return false;
     }
-    if (this.length != that.length) {
+    if (length != that.length) {
       return false;
     }
 
-    Iterator<MapEntry<K, V>> thisIterator = this.iterator;
-    Iterator<MapEntry<K, V>> thatIterator = that.iterator;
+    final Iterator<MapEntry<K, V>> thisIterator = iterator;
+    final Iterator<MapEntry<K, V>> thatIterator = that.iterator;
     while (thisIterator.moveNext()) {
       thatIterator.moveNext();
 
@@ -117,7 +117,7 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
   @override
   int get hashCode {
-    int result = this.comparator.hashCode;
+    int result = comparator.hashCode;
     for (MapEntry<K, V> entry in this) {
       result = 31 * result + entry.hashCode;
     }
@@ -127,23 +127,23 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
   @override
   String toString() {
-    StringBuffer b = StringBuffer();
-    b..write(runtimeType)..write("{");
+    final StringBuffer b = StringBuffer();
+    b..write(runtimeType)..write('{');
     bool first = true;
     for (MapEntry<K, V> entry in this) {
       if (first) {
         first = false;
       } else {
         b
-          ..write(", ")
-          ..write("(")
+          ..write(', ')
+          ..write('(')
           ..write(entry.key)
-          ..write("=>")
+          ..write('=>')
           ..write(entry.value)
-          ..write(")");
+          ..write(')');
       }
     }
-    b.write("};");
+    b.write('};');
     return b.toString();
   }
 

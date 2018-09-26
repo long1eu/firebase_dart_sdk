@@ -23,13 +23,14 @@ class MemoryQueryCache implements QueryCache {
 
   /// A ordered bidirectional mapping between documents and the remote target
   /// ids.
-  final ReferenceSet references = new ReferenceSet();
+  final ReferenceSet references = ReferenceSet();
 
   /// The highest numbered target id encountered.
   @override
   int highestTargetId;
 
   /// The last received snapshot version.
+  @override
   SnapshotVersion lastRemoteSnapshotVersion = SnapshotVersion.none;
 
   int highestSequenceNumber = 0;
@@ -43,9 +44,7 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<void> forEachTarget(_, Consumer<QueryData> consumer) async {
-    for (QueryData queryData in queries.values) {
-      consumer(queryData);
-    }
+    queries.values.forEach(consumer);
   }
 
   @override
@@ -62,7 +61,7 @@ class MemoryQueryCache implements QueryCache {
   @override
   Future<void> addQueryData(_, QueryData queryData) async {
     queries[queryData.query] = queryData;
-    int targetId = queryData.targetId;
+    final int targetId = queryData.targetId;
     if (targetId > highestTargetId) {
       highestTargetId = targetId;
     }
@@ -98,6 +97,7 @@ class MemoryQueryCache implements QueryCache {
         removed++;
         return true;
       }
+      return false;
     });
 
     return removed;
@@ -112,7 +112,7 @@ class MemoryQueryCache implements QueryCache {
   Future<void> addMatchingKeys(
       _, ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     references.addReferences(keys, targetId);
-    ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
+    final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
     for (DocumentKey key in keys) {
       referenceDelegate.addReference(null, key);
     }
@@ -122,7 +122,7 @@ class MemoryQueryCache implements QueryCache {
   Future<void> removeMatchingKeys(
       _, ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     references.removeReferences(keys, targetId);
-    ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
+    final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
     for (DocumentKey key in keys) {
       referenceDelegate.removeReference(null, key);
     }

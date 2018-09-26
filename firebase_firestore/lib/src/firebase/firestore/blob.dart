@@ -19,8 +19,8 @@ class Blob implements Comparable<Blob> {
 
     for (int i = 0; i < size; i++) {
       // Make sure the bytes are unsigned
-      int thisByte = bytes[i] & 0xff;
-      int otherByte = other.bytes[i] & 0xff;
+      final int thisByte = bytes[i] & 0xff;
+      final int otherByte = other.bytes[i] & 0xff;
       if (thisByte < otherByte) {
         return -1;
       } else if (thisByte > otherByte) {

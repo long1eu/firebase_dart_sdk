@@ -152,7 +152,7 @@ class WatchChangeAggregator {
           // queries.
           final DocumentKey key = DocumentKey.fromPath(query.path);
           _removeDocumentFromTarget(
-              targetId, key, new NoDocument(key, SnapshotVersion.none));
+              targetId, key, NoDocument(key, SnapshotVersion.none));
         } else {
           Assert.hardAssert(expectedCount == 1,
               'Single document existence filter with count: $expectedCount');
@@ -173,7 +173,7 @@ class WatchChangeAggregator {
   /// provided snapshot version. Resets the accumulated changes before
   /// returning.
   RemoteEvent createRemoteEvent(SnapshotVersion snapshotVersion) {
-    final Map<int, TargetChange> targetChanges = {};
+    final Map<int, TargetChange> targetChanges = <int, TargetChange>{};
 
     for (MapEntry<int, TargetState> entry in _targetStates.entries) {
       final int targetId = entry.key;
@@ -191,7 +191,7 @@ class WatchChangeAggregator {
           if (_pendingDocumentUpdates[key] == null &&
               !_targetContainsDocument(targetId, key)) {
             _removeDocumentFromTarget(
-                targetId, key, new NoDocument(key, snapshotVersion));
+                targetId, key, NoDocument(key, snapshotVersion));
           }
         }
 
@@ -202,7 +202,7 @@ class WatchChangeAggregator {
       }
     }
 
-    final Set<DocumentKey> resolvedLimboDocuments = Set();
+    final Set<DocumentKey> resolvedLimboDocuments = Set<DocumentKey>();
 
     // We extract the set of limbo-only document updates as the GC logic
     // special-cases documents that do not appear in the query cache.
@@ -227,12 +227,13 @@ class WatchChangeAggregator {
       }
     }
 
-    final RemoteEvent remoteEvent = new RemoteEvent(
-        snapshotVersion,
-        Map.from(targetChanges),
-        Set.from(_pendingTargetResets),
-        Map.from(_pendingDocumentUpdates),
-        Set.from(resolvedLimboDocuments));
+    final RemoteEvent remoteEvent = RemoteEvent(
+      snapshotVersion,
+      Map<int, TargetChange>.from(targetChanges),
+      Set<int>.from(_pendingTargetResets),
+      Map<DocumentKey, MaybeDocument>.from(_pendingDocumentUpdates),
+      Set<DocumentKey>.from(resolvedLimboDocuments),
+    );
 
     // Re-initialize the current state to ensure that we do not modify the
     // generated [RemoteEvent].
@@ -298,9 +299,9 @@ class WatchChangeAggregator {
   int _getCurrentDocumentCountForTarget(int targetId) {
     final TargetState targetState = _ensureTargetState(targetId);
     final TargetChange targetChange = targetState.toTargetChange();
-    return (_targetMetadataProvider.getRemoteKeysForTarget(targetId).length +
+    return _targetMetadataProvider.getRemoteKeysForTarget(targetId).length +
         targetChange.addedDocuments.length -
-        targetChange.removedDocuments.length);
+        targetChange.removedDocuments.length;
   }
 
   /// Increment the number of acks needed from watch before we can consider the
@@ -314,7 +315,7 @@ class WatchChangeAggregator {
   TargetState _ensureTargetState(int targetId) {
     TargetState targetState = _targetStates[targetId];
     if (targetState == null) {
-      targetState = new TargetState();
+      targetState = TargetState();
       _targetStates[targetId] = targetState;
     }
 
@@ -378,12 +379,16 @@ class WatchChangeAggregator {
 
 /// Interface implemented by [RemoteStore] to expose target metadata to the
 /// [WatchChangeAggregator].
-abstract class TargetMetadataProvider {
+class TargetMetadataProvider {
   /// Returns the set of remote document keys for the given target id as of the
   /// last raised snapshot or an empty set of document keys for unknown targets.
-  ImmutableSortedSet<DocumentKey> getRemoteKeysForTarget(int targetId);
+  final ImmutableSortedSet<DocumentKey> Function(int targetId)
+      getRemoteKeysForTarget;
 
   /// Returns the [QueryData] for an active target id or 'null' if this query is
   /// unknown or has become inactive.
-  QueryData getQueryDataForTarget(int targetId);
+  final QueryData Function(int targetId) getQueryDataForTarget;
+
+  const TargetMetadataProvider(
+      this.getRemoteKeysForTarget, this.getQueryDataForTarget);
 }

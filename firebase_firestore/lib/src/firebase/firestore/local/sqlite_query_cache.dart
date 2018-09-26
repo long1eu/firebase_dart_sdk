@@ -19,7 +19,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:firebase_firestore/src/proto/firestore/local/target.pb.dart'
     as proto;
-import 'package:fixnum/fixnum.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Cached Queries backed by SQLite.
@@ -61,7 +60,7 @@ class SQLiteQueryCache implements QueryCache {
     highestTargetId = row['highest_target_id'] as int;
     lastListenSequenceNumber = row['highest_listen_sequence_number'] as int;
     lastRemoteSnapshotVersion = SnapshotVersion(Timestamp(
-      Int64(row['last_remote_snapshot_version_seconds'] as int),
+      row['last_remote_snapshot_version_seconds'] as int,
       row['last_remote_snapshot_version_nanos'] as int,
     ));
     targetCount = row['targetCount'] as int;

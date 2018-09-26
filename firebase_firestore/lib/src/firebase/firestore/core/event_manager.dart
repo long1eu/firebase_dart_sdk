@@ -33,12 +33,12 @@ class EventManager implements SyncEngineCallback {
   ///
   /// Returns the targetId of the listen call in the [SyncEngine].
   Future<void> addQueryListener(QueryListener queryListener) async {
-    Query query = queryListener.query;
+    final Query query = queryListener.query;
 
     QueryListenersInfo queryInfo = queries[query];
-    bool firstListen = queryInfo == null;
+    final bool firstListen = queryInfo == null;
     if (firstListen) {
-      queryInfo = new QueryListenersInfo();
+      queryInfo = QueryListenersInfo();
       queries[query] = queryInfo;
     }
 
@@ -56,7 +56,8 @@ class EventManager implements SyncEngineCallback {
     return queryInfo.targetId;
   }
 
-  /** Removes a previously added listener and returns true if the listener was found. */
+  /// Removes a previously added listener and returns true if the listener was
+  /// found.
   bool removeQueryListener(QueryListener listener) {
     final Query query = listener.query;
     final QueryListenersInfo queryInfo = queries[query];
@@ -78,8 +79,8 @@ class EventManager implements SyncEngineCallback {
   @override
   void onViewSnapshots(List<ViewSnapshot> snapshotList) {
     for (ViewSnapshot viewSnapshot in snapshotList) {
-      Query query = viewSnapshot.query;
-      QueryListenersInfo info = queries[query];
+      final Query query = viewSnapshot.query;
+      final QueryListenersInfo info = queries[query];
       if (info != null) {
         for (QueryListener listener in info.listeners) {
           listener.onViewSnapshot(viewSnapshot);
@@ -91,7 +92,7 @@ class EventManager implements SyncEngineCallback {
 
   @override
   void onError(Query query, GrpcError error) {
-    QueryListenersInfo info = queries[query];
+    final QueryListenersInfo info = queries[query];
     if (info != null) {
       for (QueryListener listener in info.listeners) {
         listener.onError(Util.exceptionFromStatus(error));
@@ -119,14 +120,15 @@ class QueryListenersInfo {
   QueryListenersInfo() : listeners = <QueryListener>[];
 }
 
-/** Holds (internal) options for listening */
+/// Holds (internal) options for listening
 class ListenOptions {
-  /** Raise events when only metadata of documents changes */
+  /// Raise events when only metadata of documents changes
   bool includeDocumentMetadataChanges;
 
-  /** Raise events when only metadata of the query changes */
+  /// Raise events when only metadata of the query changes
   bool includeQueryMetadataChanges;
 
-  /** Wait for a sync with the server when online, but still raise events while offline. */
+  /// Wait for a sync with the server when online, but still raise events while
+  /// offline.
   bool waitForSyncWhenOnline;
 }

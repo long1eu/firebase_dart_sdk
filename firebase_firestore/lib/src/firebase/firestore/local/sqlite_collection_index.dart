@@ -25,19 +25,19 @@ class SQLiteCollectionIndex {
   /// Adds the specified entry to the index.
   void addEntry(
       FieldPath fieldPath, FieldValue fieldValue, DocumentKey documentKey) {
-    throw new StateError('Not yet implemented.');
+    throw StateError('Not yet implemented.');
   }
 
   /// Adds the specified entry to the index.
   void removeEntry(
       FieldPath fieldPath, FieldValue fieldValue, DocumentKey documentKey) {
-    throw new StateError('Not yet implemented.');
+    throw StateError('Not yet implemented.');
   }
 
   /// Gets a forward or reverse cursor for the specified range of the index.
   /// Since index entries are lossy, some cursor results may not match the
   /// specified range, so the consumer must always post-filter the results.
   IndexCursor getCursor(ResourcePath collectionPath, IndexRange indexRange) {
-    throw new StateError('Not yet implemented.');
+    throw StateError('Not yet implemented.');
   }
 }

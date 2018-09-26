@@ -32,15 +32,13 @@ class Bound {
 
   String canonicalString() {
     // TODO: Make this collision robust.
-    StringBuffer builder = StringBuffer();
+    final StringBuffer builder = StringBuffer();
     if (before) {
-      builder.write("b:");
+      builder.write('b:');
     } else {
-      builder.write("a:");
+      builder.write('a:');
     }
-    for (FieldValue indexComponent in position) {
-      builder.write(indexComponent);
-    }
+    position.forEach(builder.write);
     return builder.toString();
   }
 
@@ -50,8 +48,8 @@ class Bound {
         'Bound has more components than query\'s orderBy');
     int comparison = 0;
     for (int i = 0; i < position.length; i++) {
-      OrderBy orderByComponent = orderBy[i];
-      FieldValue component = position[i];
+      final OrderBy orderByComponent = orderBy[i];
+      final FieldValue component = position[i];
       if (orderByComponent.field == FieldPath.keyPath) {
         final Object refValue = component.value;
         Assert.hardAssert(refValue is DocumentKey,
