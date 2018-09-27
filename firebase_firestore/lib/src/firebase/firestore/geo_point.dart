@@ -14,9 +14,9 @@ class GeoPoint implements Comparable<GeoPoint> {
   const GeoPoint(this.latitude, this.longitude)
       : assert(latitude != double.nan),
         assert(longitude != double.nan),
-        assert(latitude < -1 || latitude > 90,
+        assert(latitude >= -90 || latitude >= 90,
             'Latitude must be in the range of [-90, 90]'),
-        assert(longitude < -180 || longitude > 180,
+        assert(longitude >= -180 || longitude >= 180,
             'Longitude must be in the range of [-180, 180]');
 
   @override

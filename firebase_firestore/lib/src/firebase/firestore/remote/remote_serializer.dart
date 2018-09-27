@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 23/09/2018
 
+import 'dart:typed_data';
+
 import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/bound.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
@@ -69,6 +71,7 @@ import 'package:firebase_firestore/src/proto/google/rpc/status.pb.dart'
     as proto;
 import 'package:firebase_firestore/src/proto/google/type/latlng.pb.dart'
     as proto;
+import 'package:firebase_firestore/src/proto/google/type/latlng.pb.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 
@@ -260,10 +263,10 @@ class RemoteSerializer {
       final Timestamp timestamp = decodeTimestamp(proto.timestampValue);
       return TimestampValue.valueOf(timestamp);
     } else if (proto.hasGeoPointValue()) {
-      //final proto.LatLng latLng = proto.geoPointValue;
-      //return GeoPointValue.valueOf(_decodeGeoPoint(latLng));
+      final LatLng latLng = proto.geoPointValue;
+      return GeoPointValue.valueOf(_decodeGeoPoint(latLng));
     } else if (proto.hasBytesValue()) {
-      final Blob bytes = Blob(proto.bytesValue);
+      final Blob bytes = Blob(Uint8List.fromList(proto.bytesValue));
       return BlobValue.valueOf(bytes);
     } else if (proto.hasReferenceValue()) {
       final ResourcePath resourceName =

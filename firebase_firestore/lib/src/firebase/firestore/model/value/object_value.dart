@@ -58,15 +58,11 @@ class ObjectValue extends FieldValue {
   @override
   int compareTo(FieldValue other) {
     if (other is ObjectValue) {
-      final Iterator<MapEntry<String, FieldValue>> iterator1 = _value.iterator;
-      final Iterator<MapEntry<String, FieldValue>> iterator2 =
-          other._value.iterator;
-      while (iterator1.moveNext() && iterator2.moveNext()) {
-        final MapEntry<String, FieldValue> entry1 = iterator1.current;
-        final MapEntry<String, FieldValue> entry2 = iterator2.current;
+      for (int i = 0; i < _value.length && i < other._value.length; i++) {
+        final MapEntry<String, FieldValue> entry1 = _value.elementAt(i);
+        final MapEntry<String, FieldValue> entry2 = other._value.elementAt(i);
 
         final int keyCompare = entry1.key.compareTo(entry2.key);
-
         if (keyCompare != 0) {
           return keyCompare;
         }
@@ -78,8 +74,7 @@ class ObjectValue extends FieldValue {
         }
       }
 
-      // Only equal if both iterators are exhausted.
-      return Util.compareBools(iterator1.moveNext(), iterator2.moveNext());
+      return _value.length.compareTo(other._value.length);
     } else {
       return defaultCompareTo(other);
     }

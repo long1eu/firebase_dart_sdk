@@ -3,6 +3,7 @@
 // on 26/09/2018
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
@@ -59,7 +60,8 @@ class TestUtil {
     return res;
   }
 
-  static Blob blob(List<int> bytes) => Blob(bytes);
+  static Blob blob([List<int> bytes = const <int>[]]) =>
+      Blob(Uint8List.fromList(bytes));
 
   static final Map<String, Object> emptyMap = <String, Object>{};
 
@@ -101,12 +103,10 @@ class TestUtil {
     return TestAccessHelper.createDocumentReference(TestUtil.key(key));
   }
 
-  static DatabaseId dbId(String project, String database) {
-    return DatabaseId.forDatabase(project, database);
-  }
-
-  static DatabaseId dbIdForProject(String project) {
-    return DatabaseId.forProject(project);
+  static DatabaseId dbId(String project, [String database]) {
+    return database == null
+        ? DatabaseId.forProject(project)
+        : DatabaseId.forDatabase(project, database);
   }
 
   static SnapshotVersion version(int versionMicros) {
@@ -156,8 +156,8 @@ class TestUtil {
     return NoDocument(TestUtil.key(key), TestUtil.version(version));
   }
 
-  static DocumentSet docSet(
-      Comparator<Document> comparator, List<Document> documents) {
+  static DocumentSet docSet(Comparator<Document> comparator,
+      [List<Document> documents = const <Document>[]]) {
     DocumentSet set = DocumentSet.emptySet(comparator);
     for (Document document in documents) {
       set = set.add(document);

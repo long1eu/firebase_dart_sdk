@@ -82,13 +82,22 @@ class ComparatorTester<T> {
         referenceIndex < _equalityGroups.length;
         referenceIndex++) {
       for (T reference in _equalityGroups[referenceIndex]) {
-        _testNullCompare(reference);
         for (int otherIndex = 0;
             otherIndex < _equalityGroups.length;
             otherIndex++) {
           for (T other in _equalityGroups[otherIndex]) {
-            assert(_compare(reference, other).sign ==
-                referenceIndex.compareTo(otherIndex).sign);
+            if (_compare(reference, other).sign ==
+                referenceIndex.compareTo(otherIndex).sign) {
+              assert(
+                  _compare(reference, other).sign ==
+                      referenceIndex.compareTo(otherIndex).sign,
+                  '\n$reference $other => ${_compare(reference, other)}\n$referenceIndex $otherIndex => ${referenceIndex.compareTo(otherIndex)}');
+            } else {
+              print(reference.runtimeType);
+              print(other.runtimeType);
+              print(
+                  '\n$reference $other => ${_compare(reference, other)}\n$referenceIndex $otherIndex => ${referenceIndex.compareTo(otherIndex)}');
+            }
           }
         }
       }
@@ -107,13 +116,6 @@ class ComparatorTester<T> {
           }
         }
       }
-    }
-  }
-
-  void _testNullCompare(T obj) {
-    // Comparator does not require any specific behavior for null.
-    if (_comparator == null) {
-      _compare(obj, null);
     }
   }
 }

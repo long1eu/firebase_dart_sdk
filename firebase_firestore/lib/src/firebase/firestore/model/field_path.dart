@@ -49,7 +49,7 @@ class FieldPath extends BasePath<FieldPath> {
           throw ArgumentError('Trailing escape character is not allowed');
         }
         i++;
-        buffer.write(path.codeUnitAt(i));
+        buffer.writeCharCode(path.codeUnitAt(i));
       } else
       //U+002E => .
       if (c == 0x2E) {
@@ -64,14 +64,14 @@ class FieldPath extends BasePath<FieldPath> {
           res.add(elem);
         } else {
           // escaped, append to current segment
-          buffer.write(c);
+          buffer.writeCharCode(c);
         }
       } else
       //U+0060 => `
       if (c == 0x60) {
         inBackticks = !inBackticks;
       } else {
-        buffer.write(c);
+        buffer.writeCharCode(c);
       }
       i++;
     }

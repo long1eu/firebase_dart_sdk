@@ -20,7 +20,7 @@ class NullValue extends FieldValue {
 
   @override
   int compareTo(FieldValue other) {
-    if (other is NullValue) {
+    if (other is NullValue || other == null) {
       return 0;
     } else {
       return defaultCompareTo(other);

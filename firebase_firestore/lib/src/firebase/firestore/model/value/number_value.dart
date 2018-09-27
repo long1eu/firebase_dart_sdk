@@ -10,17 +10,17 @@ abstract class NumberValue extends FieldValue {
   const NumberValue();
 
   @override
-  Object get value;
+  num get value;
 
   @override
   int get typeOrder => FieldValue.typeOrderNumber;
 
   @override
   int compareTo(FieldValue other) {
-    if (other is! NumberValue) {
+    if (other is NumberValue) {
+      return value.compareTo(other.value);
+    } else {
       return defaultCompareTo(other);
     }
-
-    return (value as Comparable).compareTo(other.value);
   }
 }

@@ -3,12 +3,13 @@
 // on 17/09/2018
 
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 class Blob implements Comparable<Blob> {
-  final List<int> bytes;
+  final Uint8List bytes;
 
   const Blob(this.bytes);
 

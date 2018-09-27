@@ -57,6 +57,10 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
 
   @override
   int compareTo(B o) {
+    if (o == null) {
+      return 1;
+    }
+
     int i = 0;
     final int myLength = length;
     final int theirLength = o.length;

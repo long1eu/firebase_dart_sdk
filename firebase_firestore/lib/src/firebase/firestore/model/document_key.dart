@@ -45,7 +45,12 @@ class DocumentKey implements Comparable<DocumentKey> {
 
   /// Returns true iff the given path is a path to a document.
   @override
-  int compareTo(DocumentKey other) => path.compareTo(other.path);
+  int compareTo(DocumentKey other) {
+    if (other == null) {
+      return 1;
+    }
+    return path.compareTo(other.path);
+  }
 
   @override
   bool operator ==(Object other) =>
