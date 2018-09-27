@@ -18,7 +18,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
         values = values ?? <V>[];
 
   factory ArraySortedMap.fromMap(Map<K, V> map, Comparator<K> comparator) {
-    return buildFrom<K, K, V>(List.from<K>(map.keys), map,
+    return buildFrom<K, K, V>(List<K>.from(map.keys), map,
         ImmutableSortedMap.identityTranslator<K>(), comparator);
   }
 

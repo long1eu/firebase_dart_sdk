@@ -124,7 +124,7 @@ class DocumentSet extends Iterable<Document> {
   // TODO:Consider making this backed by the set instead to achieve O(1)?
   @override
   List<Document> toList({bool growable: true}) {
-    final List<Document> documents = List<Document>(length);
+    final List<Document> documents = <Document>[];
     forEach(documents.add);
     return documents;
   }

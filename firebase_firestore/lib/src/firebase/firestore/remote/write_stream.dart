@@ -135,10 +135,10 @@ class WriteStream
           _serializer.decodeVersion(change.commitTime);
 
       final int count = change.writeResults.length;
-      final List<MutationResult> results = List<MutationResult>(count);
+      final List<MutationResult> results = <MutationResult>[]..length = count;
       for (int i = 0; i < count; i++) {
         final WriteResult result = change.writeResults[i];
-        results.add(_serializer.decodeMutationResult(result, commitVersion));
+        results[i] = _serializer.decodeMutationResult(result, commitVersion);
       }
       listener.onWriteResponse(commitVersion, results);
     }

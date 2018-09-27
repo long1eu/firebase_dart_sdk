@@ -70,18 +70,15 @@ class TargetState {
         in _documentChanges.entries) {
       final DocumentKey key = entry.key;
       final DocumentViewChangeType changeType = entry.value;
-      switch (changeType) {
-        case DocumentViewChangeType.added:
-          addedDocuments = addedDocuments.insert(key);
-          break;
-        case DocumentViewChangeType.modified:
-          modifiedDocuments = modifiedDocuments.insert(key);
-          break;
-        case DocumentViewChangeType.removed:
-          removedDocuments = removedDocuments.insert(key);
-          break;
-        default:
-          throw Assert.fail('Encountered invalid change type: $changeType');
+
+      if (changeType == DocumentViewChangeType.added) {
+        addedDocuments = addedDocuments.insert(key);
+      } else if (changeType == DocumentViewChangeType.modified) {
+        modifiedDocuments = modifiedDocuments.insert(key);
+      } else if (changeType == DocumentViewChangeType.removed) {
+        removedDocuments = removedDocuments.insert(key);
+      } else {
+        throw Assert.fail('Encountered invalid change type: $changeType');
       }
     }
 

@@ -60,7 +60,7 @@ class FieldPath {
       // By default, split() doesn't return empty leading and trailing segments. This can be enabled
       // by passing "-1" as the  limit.
       // todo handle the above
-      return FieldPath.of(path.split('\\.'));
+      return FieldPath.of(path.split('.'));
     } on ArgumentError catch (_) {
       throw ArgumentError(
           "Invalid field path ($path). Paths must not be empty, begin with '.', end with '.', or contain '..'");

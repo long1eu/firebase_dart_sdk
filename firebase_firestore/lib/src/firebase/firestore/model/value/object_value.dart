@@ -15,7 +15,7 @@ class ObjectValue extends FieldValue {
   const ObjectValue(this._value);
 
   static final ObjectValue empty = ObjectValue(
-      ImmutableSortedMap.emptyMap<String, FieldValue>(Util.comparator()));
+      ImmutableSortedMap<String, FieldValue>.emptyMap(Util.comparator()));
 
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
     return ObjectValue.fromImmutableMap(
@@ -153,8 +153,7 @@ class ObjectValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      super == other &&
-          other is ObjectValue &&
+      other is ObjectValue &&
           runtimeType == other.runtimeType &&
           _value == other._value;
 

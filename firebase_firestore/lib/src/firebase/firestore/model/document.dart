@@ -36,10 +36,10 @@ class Document extends MaybeDocument implements Comparable<Document> {
       identical(this, other) ||
       other is Document &&
           runtimeType == other.runtimeType &&
-          data == other.data &&
-          hasLocalMutations == other.hasLocalMutations &&
+          version == other.version &&
           key == other.key &&
-          version == other.version;
+          hasLocalMutations == other.hasLocalMutations &&
+          data == other.data;
 
   @override
   int get hashCode =>

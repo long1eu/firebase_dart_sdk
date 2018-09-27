@@ -80,10 +80,12 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Returns the list of documents.
   @publicApi
   List<DocumentSnapshot> get documents {
-    final List<DocumentSnapshot> res =
-        List<DocumentSnapshot>(_snapshot.documents.length);
+    final List<DocumentSnapshot> res = <DocumentSnapshot>[]..length =
+        _snapshot.documents.length;
+    int i = 0;
     for (core.Document doc in _snapshot.documents) {
-      res.add(_convertDocument(doc));
+      res[i] = _convertDocument(doc);
+      i++;
     }
     return res;
   }

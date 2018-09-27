@@ -95,8 +95,8 @@ class TransformMutation extends Mutation {
   /// Returns the transform results list.
   List<FieldValue> _serverTransformResults(
       MaybeDocument baseDoc, List<FieldValue> serverTransformResults) {
-    final List<FieldValue> transformResults =
-        List<FieldValue>(fieldTransforms.length);
+    final List<FieldValue> transformResults = <FieldValue>[]..length =
+        fieldTransforms.length;
     Assert.hardAssert(fieldTransforms.length == serverTransformResults.length,
         'server transform count (${serverTransformResults.length}) should match field transform count (${fieldTransforms.length})');
 
@@ -109,8 +109,8 @@ class TransformMutation extends Mutation {
         previousValue = baseDoc.getField(fieldTransform.fieldPath);
       }
 
-      transformResults.add(transform.applyToRemoteDocument(
-          previousValue, serverTransformResults[i]));
+      transformResults[i] = transform.applyToRemoteDocument(
+          previousValue, serverTransformResults[i]);
     }
     return transformResults;
   }

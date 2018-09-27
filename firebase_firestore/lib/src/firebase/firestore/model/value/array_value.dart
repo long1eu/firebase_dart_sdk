@@ -4,6 +4,7 @@
 
 import 'dart:math';
 
+import 'package:collection/collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value_options.dart';
 import 'package:meta/meta.dart';
@@ -55,10 +56,9 @@ class ArrayValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      super == other &&
-          other is ArrayValue &&
+      other is ArrayValue &&
           runtimeType == other.runtimeType &&
-          _value == other._value;
+          const DeepCollectionEquality().equals(_value, other._value);
 
   @override
   int get hashCode => super.hashCode ^ _value.hashCode;

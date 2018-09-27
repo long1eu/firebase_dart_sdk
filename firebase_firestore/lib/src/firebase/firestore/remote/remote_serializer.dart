@@ -220,7 +220,7 @@ class RemoteSerializer {
     if (value is BoolValue) {
       builder.booleanValue = value.value;
     } else if (value is IntegerValue) {
-      builder.integerValue = value.value;
+      builder.integerValue = Int64(value.value);
     } else if (value is DoubleValue) {
       builder.doubleValue = value.value;
     } else if (value is StringValue) {
@@ -253,15 +253,15 @@ class RemoteSerializer {
     } else if (proto.hasBooleanValue()) {
       return BoolValue.valueOf(proto.booleanValue);
     } else if (proto.hasIntegerValue()) {
-      return IntegerValue.valueOf(proto.integerValue);
+      return IntegerValue.valueOf(proto.integerValue.toInt());
     } else if (proto.hasDoubleValue()) {
       return DoubleValue.valueOf(proto.doubleValue);
     } else if (proto.hasTimestampValue()) {
       final Timestamp timestamp = decodeTimestamp(proto.timestampValue);
       return TimestampValue.valueOf(timestamp);
     } else if (proto.hasGeoPointValue()) {
-      final proto.LatLng latLng = proto.geoPointValue;
-      return GeoPointValue.valueOf(_decodeGeoPoint(latLng));
+      //final proto.LatLng latLng = proto.geoPointValue;
+      //return GeoPointValue.valueOf(_decodeGeoPoint(latLng));
     } else if (proto.hasBytesValue()) {
       final Blob bytes = Blob(proto.bytesValue);
       return BlobValue.valueOf(bytes);
@@ -297,9 +297,9 @@ class RemoteSerializer {
 
   ArrayValue _decodeArrayValue(proto.ArrayValue protoArray) {
     final int count = protoArray.values.length;
-    final List<FieldValue> wrappedList = List<FieldValue>(count);
+    final List<FieldValue> wrappedList = <FieldValue>[]..length = count;
     for (int i = 0; i < count; i++) {
-      wrappedList.add(decodeValue(protoArray.values[i]));
+      wrappedList[i] = decodeValue(protoArray.values[i]);
     }
     return ArrayValue.fromList(wrappedList);
   }
@@ -496,9 +496,9 @@ class RemoteSerializer {
 
   FieldMask _decodeDocumentMask(proto.DocumentMask mask) {
     final int count = mask.fieldPaths.length;
-    final List<FieldPath> paths = List<FieldPath>(count);
+    final List<FieldPath> paths = <FieldPath>[]..length = count;
     for (int i = 0; i < count; i++) {
-      paths.add(FieldPath.fromServerFormat(mask.fieldPaths[i]));
+      paths[i] = FieldPath.fromServerFormat(mask.fieldPaths[i]);
     }
     return FieldMask(paths);
   }
@@ -566,9 +566,9 @@ class RemoteSerializer {
   List<FieldValue> _decodeArrayTransformElements(
       proto.ArrayValue elementsProto) {
     final int count = elementsProto.values.length;
-    final List<FieldValue> result = List<FieldValue>(count);
+    final List<FieldValue> result = <FieldValue>[]..length = count;
     for (int i = 0; i < count; i++) {
-      result.add(decodeValue(elementsProto.values[i]));
+      result[i] = decodeValue(elementsProto.values[i]);
     }
     return result;
   }
@@ -588,9 +588,9 @@ class RemoteSerializer {
     List<FieldValue> transformResults;
     final int transformResultsCount = proto.transformResults.length;
     if (transformResultsCount > 0) {
-      transformResults = List<FieldValue>(transformResultsCount);
+      transformResults = <FieldValue>[]..length = transformResultsCount;
       for (int i = 0; i < transformResultsCount; i++) {
-        transformResults.add(decodeValue(proto.transformResults[i]));
+        transformResults[i] = decodeValue(proto.transformResults[i]);
       }
     }
     return MutationResult(version, transformResults);
@@ -725,9 +725,9 @@ class RemoteSerializer {
     List<OrderBy> orderBy;
     final int orderByCount = query.orderBy.length;
     if (orderByCount > 0) {
-      orderBy = List<OrderBy>(orderByCount);
+      orderBy = <OrderBy>[]..length = orderByCount;
       for (int i = 0; i < orderByCount; i++) {
-        orderBy.add(_decodeOrderBy(query.orderBy[i]));
+        orderBy[i] = _decodeOrderBy(query.orderBy[i]);
       }
     } else {
       orderBy = <OrderBy>[];
@@ -789,17 +789,19 @@ class RemoteSerializer {
       filters = <proto.StructuredQuery_Filter>[value];
     }
 
-    final List<Filter> result = List<Filter>(filters.length);
+    final List<Filter> result = <Filter>[]..length = filters.length;
+    int i = 0;
     for (proto.StructuredQuery_Filter filter in filters) {
       if (filter.hasCompositeFilter()) {
         throw Assert.fail('Nested composite filters are not supported.');
       } else if (filter.hasFieldFilter()) {
-        result.add(_decodeRelationFilter(filter.fieldFilter));
+        result[i] = _decodeRelationFilter(filter.fieldFilter);
       } else if (filter.hasUnaryFilter()) {
-        result.add(_decodeUnaryFilter(filter.unaryFilter));
+        result[i] = _decodeUnaryFilter(filter.unaryFilter);
       } else {
         throw Assert.fail('Unrecognized Filter.filterType $filter');
       }
+      i++;
     }
 
     return result;
@@ -955,7 +957,8 @@ class RemoteSerializer {
 
   Bound _decodeBound(proto.Cursor value) {
     final int valuesCount = value.values.length;
-    final List<FieldValue> indexComponents = List<FieldValue>(valuesCount);
+    final List<FieldValue> indexComponents = <FieldValue>[]..length =
+        valuesCount;
 
     for (int i = 0; i < valuesCount; i++) {
       final proto.Value valueProto = value.values[i];

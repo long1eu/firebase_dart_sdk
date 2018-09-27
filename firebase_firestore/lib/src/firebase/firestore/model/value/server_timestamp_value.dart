@@ -66,8 +66,7 @@ class ServerTimestampValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      super == other &&
-          other is ServerTimestampValue &&
+      other is ServerTimestampValue &&
           runtimeType == other.runtimeType &&
           localWriteTime == other.localWriteTime &&
           previousValue == other.previousValue;

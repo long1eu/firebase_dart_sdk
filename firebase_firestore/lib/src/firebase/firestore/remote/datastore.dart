@@ -107,10 +107,10 @@ class Datastore {
           serializer.decodeVersion(response.commitTime);
 
       final int count = response.writeResults.length;
-      final List<MutationResult> results = List<MutationResult>(count);
+      final List<MutationResult> results = <MutationResult>[]..length = count;
       for (int i = 0; i < count; i++) {
         final WriteResult result = response.writeResults[i];
-        results.add(serializer.decodeMutationResult(result, commitVersion));
+        results[i] = serializer.decodeMutationResult(result, commitVersion);
       }
       return results;
     } catch (e) {

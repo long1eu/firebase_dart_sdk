@@ -29,7 +29,7 @@ class View {
   /// current after it has seen the current flag from the backend and did not
   /// lose consistency within the watch stream (e.g. because of an existence
   /// filter mismatch).
-  bool current;
+  bool current = false;
 
   DocumentSet documentSet;
 
@@ -189,7 +189,7 @@ class View {
 
     viewChanges.sort((DocumentViewChange a, DocumentViewChange b) {
       final int typeComp =
-          View.changeTypeOrder(a).compareTo(View.changeTypeOrder(b));
+          View._changeTypeOrder(a).compareTo(View._changeTypeOrder(b));
       a.type.compareTo(b.type);
       if (typeComp != 0) {
         return typeComp;
@@ -197,9 +197,9 @@ class View {
       return query.comparator(a.document, b.document);
     });
 
-    applyTargetChange(targetChange);
+    _applyTargetChange(targetChange);
     final List<LimboDocumentChange> limboDocumentChanges =
-        updateLimboDocuments();
+        _updateLimboDocuments();
     final bool synced = limboDocuments.isEmpty && current;
     final ViewSnapshotSyncState newSyncState = synced //
         ? ViewSnapshotSyncState.synced
@@ -244,7 +244,7 @@ class View {
     }
   }
 
-  void applyTargetChange(TargetChange targetChange) {
+  void _applyTargetChange(TargetChange targetChange) {
     if (targetChange != null) {
       for (DocumentKey documentKey in targetChange.addedDocuments) {
         syncedDocuments = syncedDocuments.insert(documentKey);
@@ -260,7 +260,7 @@ class View {
     }
   }
 
-  List<LimboDocumentChange> updateLimboDocuments() {
+  List<LimboDocumentChange> _updateLimboDocuments() {
     // We can only determine limbo documents when we're in-sync with the server.
     if (!current) {
       return <LimboDocumentChange>[];
@@ -271,14 +271,14 @@ class View {
     final ImmutableSortedSet<DocumentKey> oldLimboDocs = limboDocuments;
     limboDocuments = DocumentKey.emptyKeySet;
     for (Document doc in documentSet) {
-      if (shouldBeLimboDoc(doc.key)) {
+      if (_shouldBeLimboDoc(doc.key)) {
         limboDocuments = limboDocuments.insert(doc.key);
       }
     }
 
     // Diff the new limbo docs with the old limbo docs.
-    final List<LimboDocumentChange> changes =
-        List<LimboDocumentChange>(oldLimboDocs.length + limboDocuments.length);
+    final List<LimboDocumentChange> changes = <LimboDocumentChange>[];
+
     for (DocumentKey key in oldLimboDocs) {
       if (!limboDocuments.contains(key)) {
         changes.add(LimboDocumentChange(LimboDocumentChangeType.removed, key));
@@ -293,11 +293,12 @@ class View {
     return changes;
   }
 
-  bool shouldBeLimboDoc(DocumentKey key) {
+  bool _shouldBeLimboDoc(DocumentKey key) {
     // If the remote end says it's part of this query, it's not in limbo.
     if (syncedDocuments.contains(key)) {
       return false;
     }
+
     // The local store doesn't think it's a result, so it shouldn't be in limbo.
     final Document doc = documentSet.getDocument(key);
     if (doc == null) {
@@ -317,20 +318,20 @@ class View {
   }
 
   /// Helper function to determine order of changes
-  static int changeTypeOrder(DocumentViewChange change) {
-    switch (change.type) {
-      case DocumentViewChangeType.added:
-        return 1;
-      case DocumentViewChangeType.modified:
-        return 2;
-      case DocumentViewChangeType.metadata:
-        // A metadata change is converted to a modified change at the public api
-        // layer. Since we sort by document key and then change type, metadata
-        // and modified changes must be sorted equivalently.
-        return 2;
-      case DocumentViewChangeType.removed:
-        return 0;
+  static int _changeTypeOrder(DocumentViewChange change) {
+    if (change.type == DocumentViewChangeType.added) {
+      return 1;
+    } else if (change.type == DocumentViewChangeType.modified) {
+      return 2;
+    } else if (change.type == DocumentViewChangeType.metadata) {
+      // A metadata change is converted to a modified change at the public api
+      // layer. Since we sort by document key and then change type, metadata
+      // and modified changes must be sorted equivalently.
+      return 2;
+    } else if (change.type == DocumentViewChangeType.removed) {
+      return 0;
     }
+
     throw ArgumentError('Unknown change type: ${change.type}');
   }
 }

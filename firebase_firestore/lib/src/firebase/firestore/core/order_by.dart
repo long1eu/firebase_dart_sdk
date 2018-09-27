@@ -49,4 +49,21 @@ class OrderBy {
       return direction._comparisonModifier * v1.compareTo(v2);
     }
   }
+
+  @override
+  String toString() {
+    return (direction == OrderByDirection.ascending ? '' : '-') +
+        field.canonicalString;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OrderBy &&
+          runtimeType == other.runtimeType &&
+          direction == other.direction &&
+          field == other.field;
+
+  @override
+  int get hashCode => direction.hashCode ^ field.hashCode;
 }

@@ -33,7 +33,7 @@ class RelationFilter extends Filter {
       return _matchesComparison(comparison);
     } else {
       final FieldValue value = doc.getField(field);
-      return value != null && _matchesValue(doc.getField(field));
+      return value != null && _matchesValue(value);
     }
   }
 
@@ -72,8 +72,20 @@ class RelationFilter extends Filter {
   // description, such as the int 3 and the string "3". So we should add the
   // types in here somehow, too.
   @override
-  String get canonicalId => '${field.canonicalString}$operator$value';
+  String get canonicalId => '${field.canonicalString} $operator $value';
 
   @override
   String toString() => canonicalId;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RelationFilter &&
+          runtimeType == other.runtimeType &&
+          operator == other.operator &&
+          value == other.value &&
+          field == other.field;
+
+  @override
+  int get hashCode => operator.hashCode ^ value.hashCode ^ field.hashCode;
 }

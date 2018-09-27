@@ -95,9 +95,6 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
     final ImmutableSortedMap<K, V> that = other;
 
-    if (comparator != that.comparator) {
-      return false;
-    }
     if (length != that.length) {
       return false;
     }
@@ -134,20 +131,22 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
       if (first) {
         first = false;
       } else {
-        b
-          ..write(', ')
-          ..write('(')
-          ..write(entry.key)
-          ..write('=>')
-          ..write(entry.value)
-          ..write(')');
+        b.write(', ');
       }
+      b
+        ..write('(')
+        ..write(entry.key)
+        ..write('=>')
+        ..write(entry.value)
+        ..write(')');
     }
     b.write('};');
     return b.toString();
   }
 
   static bool _areEqual<K, V>(MapEntry<K, V> a, MapEntry<K, V> b) {
-    return a.key == b.key && a.value == b.value;
+    final bool cmp = a.key == b.key;
+    if (!cmp) return false;
+    return a.value == b.value;
   }
 }

@@ -31,8 +31,7 @@ class BlobValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      super == other &&
-          other is BlobValue &&
+      other is BlobValue &&
           runtimeType == other.runtimeType &&
           _value == other._value;
 

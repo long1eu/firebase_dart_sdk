@@ -140,9 +140,9 @@ class LocalSerializer {
         rpcSerializer.decodeTimestamp(batch.localWriteTime);
 
     final int count = batch.writes.length;
-    final List<Mutation> mutations = List<Mutation>(count);
+    final List<Mutation> mutations = <Mutation>[]..length = count;
     for (int i = 0; i < count; i++) {
-      mutations.add(rpcSerializer.decodeMutation(batch.writes[i]));
+      mutations[i] = rpcSerializer.decodeMutation(batch.writes[i]);
     }
 
     return MutationBatch(batchId, localWriteTime, mutations);

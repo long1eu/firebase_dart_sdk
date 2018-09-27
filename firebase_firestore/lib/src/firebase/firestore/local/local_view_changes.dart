@@ -28,18 +28,12 @@ class LocalViewChanges {
             <DocumentKey>[], DocumentKey.comparator);
 
     for (DocumentViewChange docChange in snapshot.changes) {
-      switch (docChange.type) {
-        case DocumentViewChangeType.added:
-          addedKeys = addedKeys.insert(docChange.document.key);
-          break;
-
-        case DocumentViewChangeType.removed:
-          removedKeys = removedKeys.insert(docChange.document.key);
-          break;
-
-        default:
-          // Do nothing.
-          break;
+      if (docChange.type == DocumentViewChangeType.added) {
+        addedKeys = addedKeys.insert(docChange.document.key);
+      } else if (docChange.type == DocumentViewChangeType.removed) {
+        removedKeys = removedKeys.insert(docChange.document.key);
+      } else {
+        // Do nothing.
       }
     }
 

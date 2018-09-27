@@ -123,12 +123,12 @@ class QueryListenersInfo {
 /// Holds (internal) options for listening
 class ListenOptions {
   /// Raise events when only metadata of documents changes
-  bool includeDocumentMetadataChanges;
+  bool includeDocumentMetadataChanges = false;
 
   /// Raise events when only metadata of the query changes
-  bool includeQueryMetadataChanges;
+  bool includeQueryMetadataChanges = false;
 
   /// Wait for a sync with the server when online, but still raise events while
   /// offline.
-  bool waitForSyncWhenOnline;
+  bool waitForSyncWhenOnline = false;
 }

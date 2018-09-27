@@ -64,4 +64,7 @@ class FilterOperator {
 
   @override
   String toString() => _value;
+
+  @override
+  int get hashCode => _value.hashCode;
 }

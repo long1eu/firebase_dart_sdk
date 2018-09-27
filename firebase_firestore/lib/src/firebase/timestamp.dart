@@ -72,7 +72,10 @@ class Timestamp implements Comparable<Timestamp> {
 
   @override
   String toString() {
-    return 'Timestamp{seconds: $seconds, nanoseconds: $nanoseconds}';
+    return (ToStringHelper(runtimeType)
+          ..add('seconds', seconds)
+          ..add('nanoseconds', nanoseconds))
+        .toString();
   }
 
   @override

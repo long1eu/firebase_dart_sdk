@@ -37,7 +37,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/string_val
 import 'package:firebase_firestore/src/firebase/firestore/model/value/timestamp_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:fixnum/fixnum.dart';
 
 /// Helper for parsing raw user input (provided via the API) into internal model
 /// classes.
@@ -192,6 +191,7 @@ class UserDataConverter {
     final _ParseContext context =
         _ParseContext(UserDataSource.argument, FieldPath.emptyPath);
     final FieldValue parsed = _parseData(input, context);
+
     Assert.hardAssert(parsed != null, 'Parsed data should not be null.');
     Assert.hardAssert(context.fieldTransforms.isEmpty,
         'Field transforms should have been disallowed.');
@@ -243,7 +243,7 @@ class UserDataConverter {
       }
       final String key = entry.key as String;
       final FieldValue parsedValue =
-          _parseData(entry.key, context.childContextForName(key));
+          _parseData(entry.value, context.childContextForName(key));
       if (parsedValue != null) {
         result[key] = parsedValue;
       }
@@ -252,7 +252,7 @@ class UserDataConverter {
   }
 
   ArrayValue _parseList<T>(List<T> list, _ParseContext context) {
-    final List<FieldValue> result = List<FieldValue>(list.length);
+    final List<FieldValue> result = <FieldValue>[]..length = list.length;
     int entryIndex = 0;
     for (T entry in list) {
       FieldValue parsedEntry =
@@ -260,7 +260,7 @@ class UserDataConverter {
       // Just include nulls in the array for fields being replaced with a
       // sentinel.
       parsedEntry ??= NullValue.nullValue();
-      result.add(parsedEntry);
+      result[entryIndex] = parsedEntry;
       entryIndex++;
     }
     return ArrayValue.fromList(result);
@@ -327,7 +327,7 @@ class UserDataConverter {
     if (input == null) {
       return NullValue.nullValue();
     } else if (input is int) {
-      return IntegerValue.valueOf(Int64(input));
+      return IntegerValue.valueOf(input);
     } else if (input is double) {
       return DoubleValue.valueOf(input);
     } else if (input is bool) {
@@ -365,7 +365,7 @@ class UserDataConverter {
   }
 
   List<FieldValue> _parseArrayTransformElements(List<Object> elements) {
-    final List<FieldValue> result = List<FieldValue>(elements.length);
+    final List<FieldValue> result = <FieldValue>[]..length = elements.length;
     for (int i = 0; i < elements.length; i++) {
       final Object element = elements[i];
       // Although array transforms are used with writes, the actual elements
@@ -373,7 +373,7 @@ class UserDataConverter {
       // contain any FieldValue sentinels, etc.
       final _ParseContext context =
           _ParseContext(UserDataSource.argument, FieldPath.emptyPath);
-      result.add(_parseData(element, context.childContextForArray(i)));
+      result[i] = _parseData(element, context.childContextForArray(i));
     }
     return result;
   }

@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
@@ -93,7 +94,7 @@ class TestUtil {
   }
 
   static FieldPath field(String path) {
-    return FieldPath.fromSegments(path.split('\\.'));
+    return FieldPath.fromSegments(path.split('.'));
   }
 
   static DocumentReference ref(String key) {
@@ -212,7 +213,7 @@ class TestUtil {
       for (Object value in group) {
         for (List<dynamic> otherGroup in equalityGroups) {
           for (Object otherValue in otherGroup) {
-            if (otherGroup == group) {
+            if (const DeepCollectionEquality().equals(otherGroup, group)) {
               expect(otherValue, value);
             } else {
               expect(otherValue, isNot(value));

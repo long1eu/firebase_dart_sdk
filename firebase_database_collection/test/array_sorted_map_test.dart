@@ -175,7 +175,7 @@ void main() {
   test('removeWorks', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
       ImmutableSortedMap<int, int> map =
-          ArraySortedMap.fromMap<int, int>(any, intComparator);
+          ArraySortedMap<int, int>.fromMap(any, intComparator);
       for (MapEntry<int, int> entry in any.entries) {
         map = map.remove(entry.key);
       }
@@ -190,7 +190,7 @@ void main() {
       expectedKeys.sort();
 
       final ImmutableSortedMap<int, int> map =
-          ArraySortedMap.fromMap<int, int>(any, intComparator);
+          ArraySortedMap<int, int>.fromMap(any, intComparator);
 
       final List<int> actualKeys = <int>[];
       for (MapEntry<int, int> entry in map) {
@@ -212,7 +212,7 @@ void main() {
       expectedKeys.removeWhere((int next) => next.compareTo(fromKey) < 0);
 
       final ImmutableSortedMap<int, int> map =
-          ArraySortedMap.fromMap<int, int>(any, intComparator);
+          ArraySortedMap<int, int>.fromMap(any, intComparator);
 
       final List<int> actualKeys = <int>[];
       final Iterator<MapEntry<int, int>> iteratorFrom =
@@ -232,7 +232,7 @@ void main() {
       expectedKeys = expectedKeys.reversed.toList();
 
       final ImmutableSortedMap<int, int> map =
-          ArraySortedMap.fromMap<int, int>(any, intComparator);
+          ArraySortedMap<int, int>.fromMap(any, intComparator);
 
       final List<int> actualKeys = <int>[];
       final Iterator<MapEntry<int, int>> iteratorFrom = map.reverseIterator;
@@ -256,7 +256,7 @@ void main() {
       expectedKeys.removeWhere((int next) => next.compareTo(fromKey) > 0);
 
       final ImmutableSortedMap<int, int> map =
-          ArraySortedMap.fromMap<int, int>(any, intComparator);
+          ArraySortedMap<int, int>.fromMap(any, intComparator);
 
       final List<int> actualKeys = <int>[];
       final Iterator<MapEntry<int, int>> iteratorFrom =
@@ -272,7 +272,7 @@ void main() {
   test('predecessorKeyIsCorrect', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
       final ImmutableSortedMap<int, int> map =
-          ArraySortedMap.fromMap<int, int>(any, intComparator);
+          ArraySortedMap<int, int>.fromMap(any, intComparator);
 
       int predecessorKey;
 
@@ -286,7 +286,7 @@ void main() {
   test('successorKeyIsCorrect', () {
     for (Map<int, int> any in someMaps(integers(), integers())) {
       final ImmutableSortedMap<int, int> map =
-          ArraySortedMap.fromMap<int, int>(any, intComparator);
+          ArraySortedMap<int, int>.fromMap(any, intComparator);
 
       int lastKey;
 

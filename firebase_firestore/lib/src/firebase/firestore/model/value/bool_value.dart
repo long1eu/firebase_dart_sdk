@@ -32,7 +32,12 @@ class BoolValue extends FieldValue {
   }
 
   @override
-  bool operator ==(Object other) => this == other;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      super == other &&
+          other is BoolValue &&
+          runtimeType == other.runtimeType &&
+          _value == other._value;
 
   @override
   int get hashCode => _value ? 1 : 0;

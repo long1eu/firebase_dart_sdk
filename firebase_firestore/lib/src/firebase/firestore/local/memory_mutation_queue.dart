@@ -402,7 +402,7 @@ class MemoryMutationQueue implements MutationQueue {
   /// but not including the given [endIndex]. All tombstones in the queue are
   /// excluded.
   List<MutationBatch> getAllLiveMutationBatchesBeforeIndex(int endIndex) {
-    final List<MutationBatch> result = List<MutationBatch>(endIndex);
+    final List<MutationBatch> result = <MutationBatch>[];
 
     for (int i = 0; i < endIndex; i++) {
       final MutationBatch batch = queue[i];
@@ -412,7 +412,7 @@ class MemoryMutationQueue implements MutationQueue {
       }
     }
 
-    return result;
+    return result.toList(growable: false);
   }
 
   /// Finds the index of the given batchId in the mutation queue.

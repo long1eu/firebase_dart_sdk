@@ -36,8 +36,7 @@ class ReferenceValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      super == other &&
-          other is ReferenceValue &&
+      other is ReferenceValue &&
           runtimeType == other.runtimeType &&
           databaseId == other.databaseId &&
           key == other.key;

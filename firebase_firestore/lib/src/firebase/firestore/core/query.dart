@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:collection/collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/bound.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/order_by.dart';
@@ -273,6 +274,13 @@ class Query {
 
   /// Returns true if the document matches the constraints of this query.
   bool matches(Document doc) {
+    /*
+    print('_matchesPath(doc):: ${_matchesPath(doc)}');
+    print('_matchesOrderBy(doc): ${_matchesOrderBy(doc)}');
+    print('_matchesFilters(doc): ${_matchesFilters(doc)}');
+    print('_matchesBounds(doc): ${_matchesBounds(doc)}');
+
+    */
     return _matchesPath(doc) &&
         _matchesOrderBy(doc) &&
         _matchesFilters(doc) &&
@@ -323,6 +331,27 @@ class Query {
 
     return builder.toString();
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Query &&
+          runtimeType == other.runtimeType &&
+          _limit == other._limit &&
+          getOrderBy() == other.getOrderBy() &&
+          filters == other.filters &&
+          path == other.path &&
+          _startAt == other._startAt &&
+          _endAt == other._endAt;
+
+  @override
+  int get hashCode =>
+      const ListEquality<Filter>().hash(filters) ^
+      path.hashCode ^
+      _limit.hashCode ^
+      _startAt.hashCode ^
+      _endAt.hashCode ^
+      const ListEquality<OrderBy>().hash(getOrderBy());
 
   @override
   String toString() {

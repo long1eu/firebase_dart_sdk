@@ -1,6 +1,7 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 17/09/2018
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
@@ -57,5 +58,7 @@ class DocumentKey implements Comparable<DocumentKey> {
   int get hashCode => path.hashCode;
 
   @override
-  String toString() => 'DocumentKey{path: $path}';
+  String toString() {
+    return (ToStringHelper(runtimeType)..add('path', path)).toString();
+  }
 }

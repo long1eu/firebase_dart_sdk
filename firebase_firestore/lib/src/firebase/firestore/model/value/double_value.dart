@@ -20,8 +20,7 @@ class DoubleValue extends NumberValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      super == other &&
-          other is DoubleValue &&
+      other is DoubleValue &&
           runtimeType == other.runtimeType &&
           _value == other._value;
 

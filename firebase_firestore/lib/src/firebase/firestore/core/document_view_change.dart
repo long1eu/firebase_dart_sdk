@@ -24,6 +24,26 @@ class DocumentViewChangeType implements Comparable<DocumentViewChangeType> {
 
   @override
   int compareTo(DocumentViewChangeType other) => _i.compareTo(other._i);
+
+  static const List<String> _values = const <String>[
+    'removed',
+    'added',
+    'modified',
+    'metadata'
+  ];
+
+  @override
+  String toString() => _values[_i];
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DocumentViewChangeType &&
+          runtimeType == other.runtimeType &&
+          _i == other._i;
+
+  @override
+  int get hashCode => _i.hashCode;
 }
 
 class DocumentViewChange {

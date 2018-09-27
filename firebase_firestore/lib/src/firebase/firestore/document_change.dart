@@ -127,16 +127,15 @@ class DocumentChange {
   }
 
   static DocumentChangesType _getType(DocumentViewChange change) {
-    switch (change.type) {
-      case DocumentViewChangeType.added:
-        return DocumentChangesType.added;
-      case DocumentViewChangeType.metadata:
-      case DocumentViewChangeType.modified:
-        return DocumentChangesType.modified;
-      case DocumentViewChangeType.removed:
-        return DocumentChangesType.removed;
-      default:
-        throw ArgumentError('Unknown view change type: ${change.type}');
+    if (change.type == DocumentViewChangeType.added) {
+      return DocumentChangesType.added;
+    } else if (change.type == DocumentViewChangeType.modified ||
+        change.type == DocumentViewChangeType.metadata) {
+      return DocumentChangesType.modified;
+    } else if (change.type == DocumentViewChangeType.removed) {
+      return DocumentChangesType.removed;
+    } else {
+      throw ArgumentError('Unknown view change type: ${change.type}');
     }
   }
 }

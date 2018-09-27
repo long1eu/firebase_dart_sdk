@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:collection/collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// BasePath represents a path sequence in the Firestore database. It is
@@ -125,10 +126,10 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
       identical(this, other) ||
       other is BasePath &&
           runtimeType == other.runtimeType &&
-          segments == other.segments;
+          const DeepCollectionEquality().equals(segments, other.segments);
 
   @override
-  int get hashCode => segments.hashCode;
+  int get hashCode => const ListEquality<String>().hash(segments);
 
   @override
   String toString() => canonicalString;

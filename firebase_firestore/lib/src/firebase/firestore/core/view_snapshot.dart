@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
@@ -35,17 +36,23 @@ class ViewSnapshot {
   );
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ViewSnapshot &&
-          runtimeType == other.runtimeType &&
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+
+    if (other is ViewSnapshot && runtimeType == other.runtimeType) {
+      return isFromCache == other.isFromCache &&
+          hasPendingWrites == other.hasPendingWrites &&
+          didSyncStateChange == other.didSyncStateChange &&
           query == other.query &&
           documents == other.documents &&
           oldDocuments == other.oldDocuments &&
-          changes == other.changes &&
-          isFromCache == other.isFromCache &&
-          hasPendingWrites == other.hasPendingWrites &&
-          didSyncStateChange == other.didSyncStateChange;
+          const DeepCollectionEquality().equals(changes, other.changes);
+    }
+
+    return false;
+  }
 
   @override
   int get hashCode =>
