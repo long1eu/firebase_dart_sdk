@@ -51,7 +51,7 @@ class TestUtil {
 
   static const int ARBITRARY_SEQUENCE_NUMBER = 2;
 
-  static Map<String, T> map<T>(List<Object> entries) {
+  static Map<String, T> map<T>([List<Object> entries = const <Object>[]]) {
     final Map<String, T> res = <String, T>{};
     for (int i = 0; i < entries.length; i += 2) {
       res[entries[i] as String] = entries[i + 1] as T;
@@ -133,7 +133,7 @@ class TestUtil {
     }
   }
 
-  static Document docForMap(
+  static Document doc(
       /*String|DocumentKey*/ dynamic key,
       int version,
       Map<String, Object> data,
@@ -165,7 +165,8 @@ class TestUtil {
     return set;
   }
 
-  static ImmutableSortedSet<DocumentKey> keySet(List<DocumentKey> keys) {
+  static ImmutableSortedSet<DocumentKey> keySet(
+      [List<DocumentKey> keys = const <DocumentKey>[]]) {
     ImmutableSortedSet<DocumentKey> keySet = DocumentKey.emptyKeySet;
     for (DocumentKey key in keys) {
       keySet = keySet.insert(key);
@@ -231,7 +232,7 @@ class TestUtil {
   }
 
   static ImmutableSortedMap<DocumentKey, T> docUpdates<T extends MaybeDocument>(
-      List<MaybeDocument> docs) {
+      [List<MaybeDocument> docs = const <MaybeDocument>[]]) {
     ImmutableSortedMap<DocumentKey, T> res =
         ImmutableSortedMap<DocumentKey, T>.emptyMap(DocumentKey.comparator);
     for (T doc in docs) {
@@ -274,8 +275,8 @@ class TestUtil {
         modifiedDocumentKeys, removedDocumentKeys);
   }
 
-  static TargetChange ackTarget(List<Document> docs) {
-    return targetChange(<int>[], true, docs, null, null);
+  static TargetChange ackTarget([List<Document> docs]) {
+    return targetChange(<int>[], true, docs ?? const <Document>[], null, null);
   }
 
   static Map<int, QueryData> activeQueries(List<int> targets) {
@@ -383,7 +384,7 @@ class TestUtil {
     // The order of the transforms doesn't matter, but we sort them so tests can
     // assume a particular order.
     final List<FieldTransform> fieldTransforms =
-        List.from<FieldTransform>(result.fieldTransforms);
+        List<FieldTransform>.from(result.fieldTransforms);
 
     fieldTransforms.sort((FieldTransform ft1, FieldTransform ft2) =>
         ft1.fieldPath.compareTo(ft2.fieldPath));

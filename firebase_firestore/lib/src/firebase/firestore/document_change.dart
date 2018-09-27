@@ -95,7 +95,7 @@ class DocumentChange {
       // use to lookup the index of a document.
       DocumentSet indexTracker = snapshot.oldDocuments;
       for (DocumentViewChange change in snapshot.changes) {
-        if (metadataChanges == MetadataChanges.EXCLUDE &&
+        if (metadataChanges == MetadataChanges.exclude &&
             change.type == DocumentViewChangeType.metadata) {
           continue;
         }

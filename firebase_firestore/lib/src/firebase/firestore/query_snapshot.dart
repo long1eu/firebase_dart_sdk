@@ -52,7 +52,7 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   ///
   /// Returns the list of document changes since the last snapshot.
   List<DocumentChange> get documentChanges =>
-      getDocumentChanges(MetadataChanges.EXCLUDE);
+      getDocumentChanges(MetadataChanges.exclude);
 
   /// Returns the list of documents that changed since the last snapshot. If
   /// it's the first snapshot all documents will be in the list as added

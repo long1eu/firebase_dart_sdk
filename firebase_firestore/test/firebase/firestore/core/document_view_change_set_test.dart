@@ -11,8 +11,7 @@ import '../../../util/test_util.dart';
 
 void main() async {
   test('testDocumentViewChangeConstructor', () {
-    final Document doc1 =
-        TestUtil.docForMap('a/b', 0, TestUtil.emptyMap, false);
+    final Document doc1 = doc('a/b', 0, emptyMap, false);
     const DocumentViewChangeType type = DocumentViewChangeType.modified;
     final DocumentViewChange change = DocumentViewChange(type, doc1);
     expect(doc1, change.document);
@@ -22,23 +21,15 @@ void main() async {
   test('testTrack', () {
     final DocumentViewChangeSet set = DocumentViewChangeSet();
 
-    final Document added =
-        TestUtil.docForMap('a/1', 0, TestUtil.emptyMap, false);
-    final Document removed =
-        TestUtil.docForMap('a/2', 0, TestUtil.emptyMap, false);
-    final Document modified =
-        TestUtil.docForMap('a/3', 0, TestUtil.emptyMap, false);
+    final Document added = doc('a/1', 0, emptyMap, false);
+    final Document removed = doc('a/2', 0, emptyMap, false);
+    final Document modified = doc('a/3', 0, emptyMap, false);
 
-    final Document addedThenModified =
-        TestUtil.docForMap('b/1', 0, TestUtil.emptyMap, false);
-    final Document addedThenRemoved =
-        TestUtil.docForMap('b/2', 0, TestUtil.emptyMap, false);
-    final Document removedThenAdded =
-        TestUtil.docForMap('b/3', 0, TestUtil.emptyMap, false);
-    final Document modifiedThenRemoved =
-        TestUtil.docForMap('b/4', 0, TestUtil.emptyMap, false);
-    final Document modifiedThenModified =
-        TestUtil.docForMap('b/5', 0, TestUtil.emptyMap, false);
+    final Document addedThenModified = doc('b/1', 0, emptyMap, false);
+    final Document addedThenRemoved = doc('b/2', 0, emptyMap, false);
+    final Document removedThenAdded = doc('b/3', 0, emptyMap, false);
+    final Document modifiedThenRemoved = doc('b/4', 0, emptyMap, false);
+    final Document modifiedThenModified = doc('b/5', 0, emptyMap, false);
 
     set.addChange(DocumentViewChange(DocumentViewChangeType.added, added));
     set.addChange(DocumentViewChange(DocumentViewChangeType.removed, removed));
@@ -85,3 +76,8 @@ void main() async {
     expect(changes[6].type, DocumentViewChangeType.modified);
   });
 }
+
+// ignore: always_specify_types
+const doc = TestUtil.doc;
+// ignore: always_specify_types
+final emptyMap = TestUtil.emptyMap;

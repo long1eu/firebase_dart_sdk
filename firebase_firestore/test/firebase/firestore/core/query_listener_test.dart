@@ -23,9 +23,7 @@ import '../../../util/test_util.dart';
 
 void main() {
   ViewSnapshot applyChanges(View view, List<MaybeDocument> docs) {
-    return view
-        .applyChanges(view.computeDocChanges(TestUtil.docUpdates(docs)))
-        .snapshot;
+    return view.applyChanges(view.computeDocChanges(docUpdates(docs))).snapshot;
   }
 
   QueryListener queryListener(
@@ -49,13 +47,13 @@ void main() {
     final List<ViewSnapshot> accum = <ViewSnapshot>[];
     final List<ViewSnapshot> otherAccum = <ViewSnapshot>[];
 
-    final Query query = Query.atPath(TestUtil.path('rooms'));
-    final Document doc1 = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), false);
-    final Document doc2 = TestUtil.docForMap(
-        'rooms/hades', 2, TestUtil.map(<String>['name', 'hades']), false);
-    final Document doc2prime = TestUtil.docForMap('rooms/hades', 3,
-        TestUtil.map(<String>['name', 'hades', 'owner', 'Jonny']), false);
+    final Query query = Query.atPath(path('rooms'));
+    final Document doc1 =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
+    final Document doc2 =
+        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
+    final Document doc2prime = doc('rooms/hades', 3,
+        map(<String>['name', 'hades', 'owner', 'Jonny']), false);
 
     final QueryListener listener = queryListenerDefault(query, accum);
     final QueryListener otherListener = queryListenerDefault(query, otherAccum);
@@ -94,7 +92,7 @@ void main() {
   });
 
   test('testRaisesErrorEvent', () {
-    final Query query = Query.atPath(TestUtil.path('rooms/eros'));
+    final Query query = Query.atPath(path('rooms/eros'));
 
     bool hadEvent = false;
     final QueryListener listener = QueryListener(query, ListenOptions(),
@@ -111,7 +109,7 @@ void main() {
 
   test('testRaisesEventForEmptyCollectionsAfterSync', () {
     final List<ViewSnapshot> accum = <ViewSnapshot>[];
-    final Query query = Query.atPath(TestUtil.path('rooms'));
+    final Query query = Query.atPath(path('rooms'));
 
     final QueryListener listener = queryListenerDefault(query, accum);
 
@@ -120,8 +118,7 @@ void main() {
     final TargetChange ackTarget = TestUtil.ackTarget(<Document>[]);
     final ViewSnapshot snap2 = view
         .applyChanges(
-            view.computeDocChanges(TestUtil.docUpdates(<MaybeDocument>[])),
-            ackTarget)
+            view.computeDocChanges(docUpdates(<MaybeDocument>[])), ackTarget)
         .snapshot;
 
     listener.onViewSnapshot(snap1);
@@ -134,11 +131,11 @@ void main() {
   test('testDoesNotRaiseEventsForMetadataChangesUnlessSpecified', () {
     final List<ViewSnapshot> filteredAccum = <ViewSnapshot>[];
     final List<ViewSnapshot> fullAccum = <ViewSnapshot>[];
-    final Query query = Query.atPath(TestUtil.path('rooms'));
-    final Document doc1 = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), false);
-    final Document doc2 = TestUtil.docForMap(
-        'rooms/hades', 2, TestUtil.map(<String>['name', 'hades']), false);
+    final Query query = Query.atPath(path('rooms'));
+    final Document doc1 =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
+    final Document doc2 =
+        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
     final ListenOptions options1 = ListenOptions();
     final ListenOptions options2 = ListenOptions();
     options2.includeQueryMetadataChanges = true;
@@ -153,8 +150,7 @@ void main() {
     final TargetChange ackTarget = TestUtil.ackTarget(<Document>[doc1]);
     final ViewSnapshot snap2 = view
         .applyChanges(
-            view.computeDocChanges(TestUtil.docUpdates(<MaybeDocument>[])),
-            ackTarget)
+            view.computeDocChanges(docUpdates(<MaybeDocument>[])), ackTarget)
         .snapshot;
     final ViewSnapshot snap3 = applyChanges(view, <Document>[doc2]);
 
@@ -173,15 +169,15 @@ void main() {
   test('testRaisesDocumentMetadataEventsOnlyWhenSpecified', () {
     final List<ViewSnapshot> filteredAccum = <ViewSnapshot>[];
     final List<ViewSnapshot> fullAccum = <ViewSnapshot>[];
-    final Query query = Query.atPath(TestUtil.path('rooms'));
-    final Document doc1 = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), false);
-    final Document doc1Prime = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), true);
-    final Document doc2 = TestUtil.docForMap(
-        'rooms/hades', 2, TestUtil.map(<String>['name', 'hades']), false);
-    final Document doc3 = TestUtil.docForMap(
-        'rooms/other', 3, TestUtil.map(<String>['name', 'other']), false);
+    final Query query = Query.atPath(path('rooms'));
+    final Document doc1 =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
+    final Document doc1Prime =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), true);
+    final Document doc2 =
+        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
+    final Document doc3 =
+        doc('rooms/other', 3, map(<String>['name', 'other']), false);
 
     final ListenOptions options1 = ListenOptions();
     final ListenOptions options2 = ListenOptions();
@@ -212,17 +208,17 @@ void main() {
   test('testRaisesQueryMetadataEventsOnlyWhenHasPendingWritesOnTheQueryChanges',
       () {
     final List<ViewSnapshot> fullAccum = <ViewSnapshot>[];
-    final Query query = Query.atPath(TestUtil.path('rooms'));
-    final Document doc1 = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), true);
-    final Document doc2 = TestUtil.docForMap(
-        'rooms/hades', 2, TestUtil.map(<String>['name', 'hades']), true);
-    final Document doc1Prime = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), false);
-    final Document doc2Prime = TestUtil.docForMap(
-        'rooms/hades', 2, TestUtil.map(<String>['name', 'hades']), false);
-    final Document doc3 = TestUtil.docForMap(
-        'rooms/other', 3, TestUtil.map(<String>['name', 'other']), false);
+    final Query query = Query.atPath(path('rooms'));
+    final Document doc1 =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), true);
+    final Document doc2 =
+        doc('rooms/hades', 2, map(<String>['name', 'hades']), true);
+    final Document doc1Prime =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
+    final Document doc2Prime =
+        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
+    final Document doc3 =
+        doc('rooms/other', 3, map(<String>['name', 'other']), false);
 
     final ListenOptions options = ListenOptions();
     options.includeQueryMetadataChanges = true;
@@ -252,15 +248,15 @@ void main() {
 
   test('testMetadataOnlyDocumentChangesAreFilteredOut', () {
     final List<ViewSnapshot> filteredAccum = <ViewSnapshot>[];
-    final Query query = Query.atPath(TestUtil.path('rooms'));
-    final Document doc1 = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), false);
-    final Document doc1Prime = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), true);
-    final Document doc2 = TestUtil.docForMap(
-        'rooms/hades', 2, TestUtil.map(<String>['name', 'hades']), false);
-    final Document doc3 = TestUtil.docForMap(
-        'rooms/other', 3, TestUtil.map(<String>['name', 'other']), false);
+    final Query query = Query.atPath(path('rooms'));
+    final Document doc1 =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
+    final Document doc1Prime =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), true);
+    final Document doc2 =
+        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
+    final Document doc3 =
+        doc('rooms/other', 3, map(<String>['name', 'other']), false);
 
     final ListenOptions options = ListenOptions();
     options.includeDocumentMetadataChanges = false;
@@ -289,12 +285,12 @@ void main() {
 
   test('testWillWaitForSyncIfOnline', () {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
-    final Query query = Query.atPath(TestUtil.path('rooms'));
+    final Query query = Query.atPath(path('rooms'));
 
-    final Document doc1 = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), false);
-    final Document doc2 = TestUtil.docForMap(
-        'rooms/hades', 2, TestUtil.map(<String>['name', 'hades']), false);
+    final Document doc1 =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
+    final Document doc2 =
+        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
 
     final ListenOptions options = ListenOptions();
     options.waitForSyncWhenOnline = true;
@@ -304,7 +300,7 @@ void main() {
     final ViewSnapshot snap1 = applyChanges(view, <Document>[doc1]);
     final ViewSnapshot snap2 = applyChanges(view, <Document>[doc2]);
     final DocumentChanges changes =
-        view.computeDocChanges(TestUtil.docUpdates(<MaybeDocument>[]));
+        view.computeDocChanges(docUpdates(<MaybeDocument>[]));
 
     final ViewSnapshot snap3 = view
         .applyChanges(changes, TestUtil.ackTarget(<Document>[doc1, doc2]))
@@ -337,12 +333,12 @@ void main() {
 
   test('testWillRaiseInitialEventWhenGoingOffline', () {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
-    final Query query = Query.atPath(TestUtil.path('rooms'));
+    final Query query = Query.atPath(path('rooms'));
 
-    final Document doc1 = TestUtil.docForMap(
-        'rooms/eros', 1, TestUtil.map(<String>['name', 'eros']), false);
-    final Document doc2 = TestUtil.docForMap(
-        'rooms/hades', 2, TestUtil.map(<String>['name', 'hades']), false);
+    final Document doc1 =
+        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
+    final Document doc2 =
+        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
 
     final ListenOptions options = ListenOptions();
     options.waitForSyncWhenOnline = true;
@@ -390,7 +386,7 @@ void main() {
 
   test('testWillRaiseInitialEventWhenGoingOfflineAndThereAreNoDocs', () {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
-    final Query query = Query.atPath(TestUtil.path('rooms'));
+    final Query query = Query.atPath(path('rooms'));
 
     final QueryListener listener =
         queryListener(query, ListenOptions(), events);
@@ -418,7 +414,7 @@ void main() {
 
   test('testWillRaiseInitialEventWhenStartingOfflineAndThereAreNoDocs', () {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
-    final Query query = Query.atPath(TestUtil.path('rooms'));
+    final Query query = Query.atPath(path('rooms'));
 
     final QueryListener listener =
         queryListener(query, ListenOptions(), events);
@@ -443,3 +439,20 @@ void main() {
     expect(events, <ViewSnapshot>[expectedSnapshot]);
   });
 }
+
+// ignore: always_specify_types
+const map = TestUtil.map;
+// ignore: always_specify_types
+const doc = TestUtil.doc;
+// ignore: always_specify_types
+const filter = TestUtil.filter;
+// ignore: always_specify_types
+const orderBy = TestUtil.orderBy;
+// ignore: always_specify_types
+const testEquality = TestUtil.testEquality;
+// ignore: always_specify_types
+const ref = TestUtil.ref;
+// ignore: always_specify_types
+const path = TestUtil.path;
+// ignore: always_specify_types
+const docUpdates = TestUtil.docUpdates;

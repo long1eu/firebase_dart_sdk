@@ -26,7 +26,7 @@ void main() {
   }
 
   test('testMultipleListenersPerQuery', () {
-    final Query query = Query.atPath(TestUtil.path('foo/bar'));
+    final Query query = Query.atPath(path('foo/bar'));
 
     final QueryListener listener1 = queryListener(query);
     final QueryListener listener2 = queryListener(query);
@@ -45,7 +45,7 @@ void main() {
   });
 
   test('testUnlistensOnUnknownListeners', () {
-    final Query query = Query.atPath(TestUtil.path('foo/bar'));
+    final Query query = Query.atPath(path('foo/bar'));
     final SyncEngine syncSpy = SyncEngineMock();
 
     final EventManager manager = EventManager(syncSpy);
@@ -54,8 +54,8 @@ void main() {
   });
 
   test('testListenCalledInOrder', () {
-    final Query query1 = Query.atPath(TestUtil.path('foo/bar'));
-    final Query query2 = Query.atPath(TestUtil.path('bar/baz'));
+    final Query query1 = Query.atPath(path('foo/bar'));
+    final Query query2 = Query.atPath(path('bar/baz'));
 
     final SyncEngine syncSpy = SyncEngineMock();
     final EventManager eventManager = EventManager(syncSpy);
@@ -89,7 +89,7 @@ void main() {
   });
 
   test('testWillForwardOnOnlineStateChangedCalls', () {
-    final Query query1 = Query.atPath(TestUtil.path('foo/bar'));
+    final Query query1 = Query.atPath(path('foo/bar'));
 
     final SyncEngine syncSpy = SyncEngineMock();
     final EventManager eventManager = EventManager(syncSpy);
@@ -108,3 +108,6 @@ void main() {
     expect(events, <OnlineState>[OnlineState.unknown, OnlineState.online]);
   });
 }
+
+// ignore: always_specify_types
+const path = TestUtil.path;

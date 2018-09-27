@@ -636,7 +636,7 @@ class Query {
   @publicApi
   ListenerRegistration addSnapshotListener(
       EventListener<QuerySnapshot> listener,
-      [MetadataChanges metadataChanges = MetadataChanges.EXCLUDE]) {
+      [MetadataChanges metadataChanges = MetadataChanges.exclude]) {
     Assert.checkNotNull(
         metadataChanges, 'Provided MetadataChanges value must not be null.');
     Assert.checkNotNull(listener, 'Provided EventListener must not be null.');
@@ -682,9 +682,9 @@ class Query {
   static ListenOptions internalOptions(MetadataChanges metadataChanges) {
     final ListenOptions internalOptions = ListenOptions();
     internalOptions.includeDocumentMetadataChanges =
-        metadataChanges == MetadataChanges.INCLUDE;
+        metadataChanges == MetadataChanges.include;
     internalOptions.includeQueryMetadataChanges =
-        metadataChanges == MetadataChanges.INCLUDE;
+        metadataChanges == MetadataChanges.include;
     internalOptions.waitForSyncWhenOnline = false;
     return internalOptions;
   }

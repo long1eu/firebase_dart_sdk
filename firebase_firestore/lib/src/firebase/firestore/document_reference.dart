@@ -150,7 +150,7 @@ class DocumentReference {
   /// at this [DocumentReference].
 
   @publicApi
-  Future<DocumentSnapshot> get(Source source) async {
+  Future<DocumentSnapshot> get([Source source]) async {
     source ??= Source.DEFAULT;
 
     if (source == Source.CACHE) {
@@ -227,7 +227,7 @@ class DocumentReference {
   @publicApi
   ListenerRegistration addSnapshotListener(
       EventListener<DocumentSnapshot> listener,
-      [MetadataChanges metadataChanges = MetadataChanges.EXCLUDE]) {
+      [MetadataChanges metadataChanges = MetadataChanges.exclude]) {
     Assert.checkNotNull(
         metadataChanges, 'Provided MetadataChanges value must not be null.');
     Assert.checkNotNull(listener, 'Provided EventListener must not be null.');
@@ -277,9 +277,9 @@ class DocumentReference {
   static ListenOptions _internalOptions(MetadataChanges metadataChanges) {
     final ListenOptions internalOptions = ListenOptions();
     internalOptions.includeDocumentMetadataChanges =
-        metadataChanges == MetadataChanges.INCLUDE;
+        metadataChanges == MetadataChanges.include;
     internalOptions.includeQueryMetadataChanges =
-        metadataChanges == MetadataChanges.INCLUDE;
+        metadataChanges == MetadataChanges.include;
     internalOptions.waitForSyncWhenOnline = false;
     return internalOptions;
   }
