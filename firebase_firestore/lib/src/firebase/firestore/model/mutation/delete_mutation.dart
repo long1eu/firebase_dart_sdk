@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
@@ -54,5 +55,10 @@ class DeleteMutation extends Mutation {
   int get hashCode => keyAndPreconditionHashCode();
 
   @override
-  String toString() => '$runtimeType{${keyAndPreconditionToString()}';
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('key', key)
+          ..add('precondition', precondition))
+        .toString();
+  }
 }

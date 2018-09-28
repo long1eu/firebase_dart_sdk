@@ -343,7 +343,7 @@ class TestUtil {
   }
 
   static PatchMutation patchMutation(String path, Map<String, Object> values,
-      [List<FieldPath> updateMask = const <FieldPath>[]]) {
+      [List<FieldPath> updateMask]) {
     ObjectValue objectValue = ObjectValue.empty;
     final List<FieldPath> objectMask = <FieldPath>[];
     for (MapEntry<String, Object> entry in values.entries) {

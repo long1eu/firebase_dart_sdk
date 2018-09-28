@@ -65,7 +65,8 @@ class SetMutation extends Mutation {
   @override
   String toString() {
     return (ToStringHelper(runtimeType)
-          ..add('keyAndPrecondition', keyAndPreconditionToString())
+          ..add('key', key)
+          ..add('precondition', precondition)
           ..add('value', value))
         .toString();
   }

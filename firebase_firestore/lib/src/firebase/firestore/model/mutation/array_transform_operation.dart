@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:collection/collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_operation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/array_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
@@ -21,12 +22,13 @@ abstract class ArrayTransformOperation implements TransformOperation {
   @override
   FieldValue applyToRemoteDocument(
       FieldValue previousValue, FieldValue transformResult) {
-    // The server just sends null as the transform result for array operations, so we have to
-    // calculate a result the same as we do for local applications.
+    // The server just sends null as the transform result for array operations,
+    // so we have to calculate a result the same as we do for local
+    // applications.
     return apply(previousValue);
   }
 
-  /// Applies this ArrayTransformOperation against the specified previousValue. */
+  /// Applies this ArrayTransformOperation against the specified previousValue.
   ArrayValue apply(FieldValue previousValue);
 
   /// Inspects the provided value, returning an [List] copy of the internal
@@ -34,7 +36,7 @@ abstract class ArrayTransformOperation implements TransformOperation {
   /// type of FSTFieldValue.
   static List<FieldValue> coercedFieldValuesArray(FieldValue value) {
     if (value is ArrayValue) {
-      return value.internalValue;
+      return value.internalValue.toList();
     } else {
       // coerce to empty array.
       return <FieldValue>[];
@@ -46,10 +48,10 @@ abstract class ArrayTransformOperation implements TransformOperation {
       identical(this, other) ||
       other is ArrayTransformOperation &&
           runtimeType == other.runtimeType &&
-          elements == other.elements;
+          const DeepCollectionEquality().equals(elements, other.elements);
 
   @override
-  int get hashCode => elements.hashCode;
+  int get hashCode => const DeepCollectionEquality().hash(elements);
 }
 
 /// An array union transform operation.

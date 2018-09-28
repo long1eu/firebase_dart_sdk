@@ -252,7 +252,7 @@ class UserDataConverter {
   }
 
   ArrayValue _parseList<T>(List<T> list, _ParseContext context) {
-    final List<FieldValue> result = <FieldValue>[]..length = list.length;
+    final List<FieldValue> result = List<FieldValue>(list.length);
     int entryIndex = 0;
     for (T entry in list) {
       FieldValue parsedEntry =
@@ -365,7 +365,7 @@ class UserDataConverter {
   }
 
   List<FieldValue> _parseArrayTransformElements(List<Object> elements) {
-    final List<FieldValue> result = <FieldValue>[]..length = elements.length;
+    final List<FieldValue> result = List<FieldValue>(elements.length);
     for (int i = 0; i < elements.length; i++) {
       final Object element = elements[i];
       // Although array transforms are used with writes, the actual elements

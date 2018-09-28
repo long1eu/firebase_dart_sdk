@@ -300,7 +300,7 @@ class RemoteSerializer {
 
   ArrayValue _decodeArrayValue(proto.ArrayValue protoArray) {
     final int count = protoArray.values.length;
-    final List<FieldValue> wrappedList = <FieldValue>[]..length = count;
+    final List<FieldValue> wrappedList = List<FieldValue>(count);
     for (int i = 0; i < count; i++) {
       wrappedList[i] = decodeValue(protoArray.values[i]);
     }
@@ -499,7 +499,7 @@ class RemoteSerializer {
 
   FieldMask _decodeDocumentMask(proto.DocumentMask mask) {
     final int count = mask.fieldPaths.length;
-    final List<FieldPath> paths = <FieldPath>[]..length = count;
+    final List<FieldPath> paths = List<FieldPath>(count);
     for (int i = 0; i < count; i++) {
       paths[i] = FieldPath.fromServerFormat(mask.fieldPaths[i]);
     }
@@ -569,7 +569,7 @@ class RemoteSerializer {
   List<FieldValue> _decodeArrayTransformElements(
       proto.ArrayValue elementsProto) {
     final int count = elementsProto.values.length;
-    final List<FieldValue> result = <FieldValue>[]..length = count;
+    final List<FieldValue> result = List<FieldValue>(count);
     for (int i = 0; i < count; i++) {
       result[i] = decodeValue(elementsProto.values[i]);
     }
@@ -591,7 +591,7 @@ class RemoteSerializer {
     List<FieldValue> transformResults;
     final int transformResultsCount = proto.transformResults.length;
     if (transformResultsCount > 0) {
-      transformResults = <FieldValue>[]..length = transformResultsCount;
+      transformResults = List<FieldValue>(transformResultsCount);
       for (int i = 0; i < transformResultsCount; i++) {
         transformResults[i] = decodeValue(proto.transformResults[i]);
       }
@@ -728,7 +728,7 @@ class RemoteSerializer {
     List<OrderBy> orderBy;
     final int orderByCount = query.orderBy.length;
     if (orderByCount > 0) {
-      orderBy = <OrderBy>[]..length = orderByCount;
+      orderBy = List<OrderBy>(orderByCount);
       for (int i = 0; i < orderByCount; i++) {
         orderBy[i] = _decodeOrderBy(query.orderBy[i]);
       }
@@ -792,7 +792,7 @@ class RemoteSerializer {
       filters = <proto.StructuredQuery_Filter>[value];
     }
 
-    final List<Filter> result = <Filter>[]..length = filters.length;
+    final List<Filter> result = List<Filter>(filters.length);
     int i = 0;
     for (proto.StructuredQuery_Filter filter in filters) {
       if (filter.hasCompositeFilter()) {

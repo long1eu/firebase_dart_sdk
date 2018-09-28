@@ -298,8 +298,7 @@ class DocumentSnapshot {
   }
 
   List<Object> _convertArray(ArrayValue arrayValue, FieldValueOptions options) {
-    final List<Object> result = <Object>[]..length =
-        arrayValue.internalValue.length;
+    final List<Object> result = List<Object>(arrayValue.internalValue.length);
     int i = 0;
     for (FieldValue v in arrayValue.internalValue) {
       result[i] = _convertValue(v, options);

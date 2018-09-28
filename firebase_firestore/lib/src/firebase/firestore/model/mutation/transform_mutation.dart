@@ -95,8 +95,8 @@ class TransformMutation extends Mutation {
   /// Returns the transform results list.
   List<FieldValue> _serverTransformResults(
       MaybeDocument baseDoc, List<FieldValue> serverTransformResults) {
-    final List<FieldValue> transformResults = <FieldValue>[]..length =
-        fieldTransforms.length;
+    final List<FieldValue> transformResults =
+        List<FieldValue>(fieldTransforms.length);
     Assert.hardAssert(fieldTransforms.length == serverTransformResults.length,
         'server transform count (${serverTransformResults.length}) should match field transform count (${fieldTransforms.length})');
 
@@ -127,6 +127,7 @@ class TransformMutation extends Mutation {
       Timestamp localWriteTime, MaybeDocument baseDoc) {
     final List<FieldValue> transformResults =
         List<FieldValue>(fieldTransforms.length);
+    int i = 0;
     for (FieldTransform fieldTransform in fieldTransforms) {
       final TransformOperation transform = fieldTransform.operation;
 
@@ -135,8 +136,9 @@ class TransformMutation extends Mutation {
         previousValue = baseDoc.getField(fieldTransform.fieldPath);
       }
 
-      transformResults
-          .add(transform.applyToLocalView(previousValue, localWriteTime));
+      transformResults[i] =
+          transform.applyToLocalView(previousValue, localWriteTime);
+      i++;
     }
     return transformResults;
   }
@@ -168,7 +170,8 @@ class TransformMutation extends Mutation {
   @override
   String toString() {
     return (ToStringHelper(runtimeType)
-          ..add('keyAndPrecondition', keyAndPreconditionToString())
+          ..add('key', key)
+          ..add('precondition', precondition)
           ..add('fieldTransforms', fieldTransforms))
         .toString();
   }

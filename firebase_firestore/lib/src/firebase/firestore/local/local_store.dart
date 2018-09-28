@@ -651,8 +651,8 @@ class LocalStore {
 
   Future<Set<DocumentKey>> _releaseBatchResults(
       DatabaseExecutor tx, List<MutationBatchResult> batchResults) async {
-    final List<MutationBatch> batches = <MutationBatch>[]..length =
-        batchResults.length;
+    final List<MutationBatch> batches =
+        List<MutationBatch>(batchResults.length);
     // TODO: Call queryEngine.handleDocumentChange() as appropriate.
     int i = 0;
     for (MutationBatchResult batchResult in batchResults) {

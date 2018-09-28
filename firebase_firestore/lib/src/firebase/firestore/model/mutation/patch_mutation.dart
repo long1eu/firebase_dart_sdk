@@ -116,9 +116,10 @@ class PatchMutation extends Mutation {
   @override
   String toString() {
     return (ToStringHelper(runtimeType)
+          ..add('key', key)
+          ..add('precondition', precondition)
           ..add('mask', mask)
-          ..add('value', value)
-          ..add('keyAndPrecondition', keyAndPreconditionToString()))
+          ..add('value', value))
         .toString();
   }
 }

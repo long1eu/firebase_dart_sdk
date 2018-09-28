@@ -96,11 +96,6 @@ abstract class Mutation {
     return key.hashCode * 31 + precondition.hashCode;
   }
 
-  /// Helper for derived classes to implement .toString().
-  String keyAndPreconditionToString() {
-    return 'key: $key, precondition: $precondition';
-  }
-
   void verifyKeyMatches(MaybeDocument maybeDoc) {
     if (maybeDoc != null) {
       Assert.hardAssert(maybeDoc.key == key,

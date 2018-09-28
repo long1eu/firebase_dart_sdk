@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:collection/collection.dart';
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
 
 /// Provides a set of fields that can be used to partially patch a document.
@@ -9,7 +11,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart'
 ///
 /// * Examples:
 ///     1. foo - Overwrites foo entirely with the provided value. If foo is
-/// not present in the companion [ObjectValue], the field is deleted.
+///     not present in the companion [ObjectValue], the field is deleted.
 ///     2. foo.bar - Overwrites only the field bar of the object foo. If foo is
 ///     not an object, foo is replaced with an object containing foo.
 class FieldMask {
@@ -36,8 +38,13 @@ class FieldMask {
       identical(this, other) ||
       other is FieldMask &&
           runtimeType == other.runtimeType &&
-          mask == other.mask;
+          const DeepCollectionEquality().equals(mask, other.mask);
 
   @override
-  int get hashCode => mask.hashCode;
+  int get hashCode => const DeepCollectionEquality().hash(mask);
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)..add('mask', mask)).toString();
+  }
 }
