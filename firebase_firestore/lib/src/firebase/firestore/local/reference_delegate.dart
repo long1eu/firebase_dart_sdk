@@ -7,7 +7,7 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 
 /// A [ReferenceDelegate] instance handles all of the hooks into the
 /// document-reference lifecycle. This includes being added to a target, being

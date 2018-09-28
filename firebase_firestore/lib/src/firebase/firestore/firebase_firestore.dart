@@ -23,6 +23,7 @@ import 'package:firebase_firestore/src/firebase/firestore/transaction.dart';
 import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/firestore/write_batch.dart';
 import 'package:meta/meta.dart';
 
@@ -43,38 +44,50 @@ class FirebaseFirestore {
   final DatabaseId databaseId;
   final FirebaseApp firebaseApp;
   final FirebaseFirestoreSettings settings;
+  final OpenDatabase openDatabase;
   final UserDataConverter dataConverter;
 
   FirestoreClient client;
 
   @visibleForTesting
-  FirebaseFirestore(this.databaseId, this._persistenceKey,
-      this._credentialsProvider, this._asyncQueue, this.firebaseApp)
+  FirebaseFirestore(
+      this.databaseId,
+      this._persistenceKey,
+      this._credentialsProvider,
+      this._asyncQueue,
+      this.firebaseApp,
+      this.openDatabase)
       : dataConverter = UserDataConverter(databaseId),
-        settings = FirebaseFirestoreSettings();
+        settings = FirebaseFirestoreSettings() {
+    assert(
+        (settings.persistenceEnabled && openDatabase != null) ||
+            !settings.persistenceEnabled,
+        'If you enable persistance you need to give an Database implementation.');
+  }
 
   @publicApi
-  static Future<FirebaseFirestore> get instance {
+  static FirebaseFirestore get instance {
     final FirebaseApp app = FirebaseApp.instance;
     if (app == null) {
       throw StateError('You must call FirebaseApp.initializeApp first.');
     }
-    return getInstance(app, DatabaseId.defaultDatabaseId);
+    return FirestoreMultiDbComponent.instances[DatabaseId.defaultDatabaseId];
   }
 
   @publicApi
   static Future<FirebaseFirestore> getInstance(FirebaseApp app,
-      [String database = DatabaseId.defaultDatabaseId]) {
+      [String database = DatabaseId.defaultDatabaseId,
+      OpenDatabase openDatabase]) {
     Assert.checkNotNull(app, 'Provided FirebaseApp must not be null.');
 
     final FirestoreMultiDbComponent component =
         FirestoreMultiDbComponent(app, app.getAuthProvider());
     Assert.checkNotNull(component, 'Firestore component is not present.');
-    return component.get(database);
+    return component.get(database, openDatabase);
   }
 
   static Future<FirebaseFirestore> newInstance(FirebaseApp app, String database,
-      [InternalAuthProvider authProvider]) async {
+      [InternalAuthProvider authProvider, OpenDatabase openDatabase]) async {
     final String projectId = app.options.projectId;
     if (projectId == null) {
       throw ArgumentError('FirebaseOptions.getProjectId() cannot be null');
@@ -99,7 +112,14 @@ class FirebaseFirestore {
     // persistence key.
     final String persistenceKey = app.name;
 
-    return FirebaseFirestore(databaseId, persistenceKey, provider, queue, app);
+    return FirebaseFirestore(
+      databaseId,
+      persistenceKey,
+      provider,
+      queue,
+      app,
+      openDatabase,
+    );
   }
 
   void _ensureClientConfigured() {
@@ -113,6 +133,7 @@ class FirebaseFirestore {
       settings.persistenceEnabled,
       _credentialsProvider,
       _asyncQueue,
+      openDatabase,
     );
   }
 

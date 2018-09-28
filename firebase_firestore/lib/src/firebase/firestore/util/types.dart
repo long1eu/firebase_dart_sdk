@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 
 typedef void Runnable();
 typedef Future<T> Supplier<T>();

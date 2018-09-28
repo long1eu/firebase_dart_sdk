@@ -34,6 +34,7 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializ
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart'
     hide Transaction;
 import 'package:grpc/grpc.dart';
@@ -54,7 +55,7 @@ class FirestoreClient implements RemoteStoreCallback {
   EventManager eventManager;
 
   FirestoreClient(this.databaseInfo, final bool usePersistence,
-      this.credentialsProvider, this.asyncQueue) {
+      this.credentialsProvider, this.asyncQueue, OpenDatabase openDatabase) {
     final Completer<User> firstUser = Completer<User>();
     bool initialized = false;
     credentialsProvider.setChangeListener((User user) {
@@ -78,7 +79,7 @@ class FirestoreClient implements RemoteStoreCallback {
     asyncQueue.enqueueAndForget(() async {
       // Block on initial user being available
       final User initialUser = await firstUser.future;
-      await _initialize(initialUser, usePersistence);
+      await _initialize(initialUser, usePersistence, openDatabase);
     });
   }
 
@@ -164,7 +165,8 @@ class FirestoreClient implements RemoteStoreCallback {
         () => syncEngine.transaction(asyncQueue, updateFunction, retries));
   }
 
-  Future<void> _initialize(User user, bool usePersistence) async {
+  Future<void> _initialize(
+      User user, bool usePersistence, OpenDatabase openDatabase) async {
     // Note: The initialization work must all be synchronous (we can't dispatch
     // more work) since external write/listen operations could get queued to run
     // before that subsequent work completes.
@@ -178,6 +180,7 @@ class FirestoreClient implements RemoteStoreCallback {
         databaseInfo.persistenceKey,
         databaseInfo.databaseId,
         serializer,
+        openDatabase,
       );
     } else {
       persistence = MemoryPersistence.createEagerGcMemoryPersistence();

@@ -8,8 +8,6 @@ environment:
   sdk: '>=2.0.0 <3.0.0'
 
 dependencies:
-  flutter:
-    sdk: flutter
   firebase_common:
     path: ../firebase_common
   firebase_auth:
@@ -21,10 +19,13 @@ dependencies:
   protobuf: ^0.10.2
   grpc: ^0.6.4
   isolate: ^2.0.2
-  sqflite: any
+
 
 dev_dependencies:
   test: ^1.0.0
-  flutter_test:
-    sdk: flutter
   mockito: ^3.0.0
+  sqlite:
+    #git: https://github.com/long1eu/dart-sqlite
+    #/Users/long1eu/projects/IdeaProjects/firebase_flutter_sdk/firebase_firestore/lib/src/firebase/firestore/write_batch.dart
+    #/Users/long1eu/IdeaProjects/dart-sqlite
+    path: ../../../IdeaProjects/dart-sqlite

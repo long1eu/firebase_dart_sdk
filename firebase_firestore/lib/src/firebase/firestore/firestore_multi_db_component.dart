@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 
 /// Multi-resource container for Firestore.
 class FirestoreMultiDbComponent {
@@ -22,8 +23,9 @@ class FirestoreMultiDbComponent {
   FirestoreMultiDbComponent(this.app, this.authProvider);
 
   /// Provides instances of Firestore for given database names. */
-  Future<FirebaseFirestore> get(String databaseName) async {
-    return instances[databaseName] ??=
-        await FirebaseFirestore.newInstance(app, databaseName, authProvider);
+  Future<FirebaseFirestore> get(
+      String databaseName, OpenDatabase openDatabase) async {
+    return instances[databaseName] ??= await FirebaseFirestore.newInstance(
+        app, databaseName, authProvider, openDatabase);
   }
 }

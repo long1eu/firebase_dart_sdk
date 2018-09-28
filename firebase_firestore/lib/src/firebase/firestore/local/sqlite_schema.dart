@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 
 /// Migrates schemas from version 0 (empty) to whatever the current version is.
 ///
@@ -28,7 +28,7 @@ class SQLiteSchema {
 
   /// Runs the migration methods defined in this class, starting at the given
   /// version.
-  void runMigrations([int fromVersion, int toVersion]) async {
+  Future<void> runMigrations([int fromVersion, int toVersion]) async {
     fromVersion ??= 0;
     toVersion ??= version;
     // Each case in this switch statement intentionally falls through to the one
@@ -36,21 +36,21 @@ class SQLiteSchema {
     // then run through any that haven't been applied yet.
 
     if (fromVersion < 1 && toVersion >= 5) {
-      _createMutationQueue();
-      _createQueryCache();
-      _createRemoteDocumentCache();
+      await _createMutationQueue();
+      await _createQueryCache();
+      await _createRemoteDocumentCache();
     }
 
     if (fromVersion < 6 && toVersion >= 6) {
       if (Persistence.INDEXING_SUPPORT_ENABLED) {
-        _createLocalDocumentsCollectionIndex();
+        await _createLocalDocumentsCollectionIndex();
       }
     }
   }
 
   Future<void> _createMutationQueue() async {
     // A table naming all the mutation queues in the system.
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE TABLE mutation_queues (
@@ -63,7 +63,7 @@ class SQLiteSchema {
         );
 
     // All the mutation batches in the system, partitioned by user.
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE TABLE mutations (
@@ -79,7 +79,7 @@ class SQLiteSchema {
     // A manually maintained index of all the mutation batches that affect a
     // given document key. The rows in this table are references based on the
     // contents of mutations.mutations.
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE TABLE document_mutations (
@@ -95,7 +95,7 @@ class SQLiteSchema {
 
   Future<void> _createQueryCache() async {
     // A cache of targets and associated metadata
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE TABLE targets (
@@ -111,7 +111,7 @@ class SQLiteSchema {
         // @formatter:on
         );
 
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE INDEX query_targets
@@ -121,7 +121,7 @@ class SQLiteSchema {
         );
 
     // Global state tracked across all queries, tracked separately
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE TABLE target_globals (
@@ -135,7 +135,7 @@ class SQLiteSchema {
         // @formatter:on
         );
 
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           INSERT INTO target_globals (highest_target_id,
@@ -149,7 +149,7 @@ class SQLiteSchema {
         <int>[0, 0, 0, 0, 0]);
 
     // A Mapping table between targets, document paths and sequence number
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE TABLE target_documents (
@@ -164,7 +164,7 @@ class SQLiteSchema {
 
     // The document_targets reverse mapping table is just an index on
     // target_documents.
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE INDEX document_targets
@@ -176,7 +176,7 @@ class SQLiteSchema {
 
   Future<void> _createRemoteDocumentCache() async {
     // A cache of documents obtained from the server.
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE TABLE remote_documents (
@@ -194,7 +194,7 @@ class SQLiteSchema {
   Future<void> _createLocalDocumentsCollectionIndex() async {
     // A per-user, per-collection index for cached documents indexed by a single
     // field's name and value.
-    await db.rawQuery(
+    await db.query(
         // @formatter:off
         '''
           CREATE TABLE collection_index (

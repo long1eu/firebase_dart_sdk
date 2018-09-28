@@ -9,7 +9,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 
 /// Represents cached documents received from the remote backend.
 ///

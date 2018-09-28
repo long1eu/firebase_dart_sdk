@@ -44,4 +44,5 @@ void main() {
   });
 }
 
+// ignore: always_specify_types
 const map = util.TestUtil.map;

@@ -27,8 +27,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 import 'package:firebase_firestore/src/firebase/firestore/model/value/null_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:meta/meta.dart';
-import 'package:sqflite/sqflite.dart';
 
 /// An indexed implementation of [QueryEngine] which performs fairly efficient
 /// queries.

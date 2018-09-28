@@ -10,8 +10,8 @@ import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart'
 import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
-import 'package:sqflite/sqflite.dart';
 
 /// Represents cached queries received from the remote backend. This contains
 /// both a mapping between queries and the documents that matched them according

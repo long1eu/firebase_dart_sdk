@@ -139,8 +139,13 @@ void main() {
   });
 }
 
+// ignore: always_specify_types
 const doc = util.TestUtil.docForValue;
+// ignore: always_specify_types
 const wrapList = util.TestUtil.wrapList;
+// ignore: always_specify_types
 const map = util.TestUtil.map;
+// ignore: always_specify_types
 const docSet = util.TestUtil.docSet;
+// ignore: always_specify_types
 const query = util.TestUtil.query;

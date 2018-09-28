@@ -17,7 +17,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 
 /// A readonly view of the local state of all documents we're tracking (i.e. we
 /// have a cached version in [remoteDocumentCache] or local mutations for the

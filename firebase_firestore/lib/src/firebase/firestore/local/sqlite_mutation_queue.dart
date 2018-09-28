@@ -18,11 +18,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:firebase_firestore/src/proto/firestore/local/mutation.pb.dart'
     as proto;
 import 'package:protobuf/protobuf.dart';
-import 'package:sqflite/sqflite.dart';
 
 /// A mutation queue for a specific user, backed by SQLite.
 class SQLiteMutationQueue implements MutationQueue {
@@ -538,7 +538,7 @@ class SQLiteMutationQueue implements MutationQueue {
     for (MutationBatch batch in batches) {
       final int batchId = batch.batchId;
       final int deleted =
-          await tx.rawDelete(mutationDeleter, <dynamic>[uid, batchId]);
+          await tx.delete(mutationDeleter, <dynamic>[uid, batchId]);
       Assert.hardAssert(deleted != 0,
           'Mutation batch ($uid, ${batch.batchId}) did not exist');
 

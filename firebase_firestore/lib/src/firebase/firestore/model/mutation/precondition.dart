@@ -20,7 +20,7 @@ class Precondition {
   /// If set, preconditions a mutation based on whether the document exists.
   final bool exists;
 
-  const Precondition(this.updateTime, this.exists)
+  Precondition(this.updateTime, this.exists)
       : assert(updateTime == null || exists == null,
             'Precondition can specify "exists" or "updateTime" but not both');
 

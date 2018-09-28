@@ -6,8 +6,8 @@ import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
-import 'package:sqflite/sqflite.dart';
 
 /// Persistence layers intending to use LRU Garbage collection should implement
 /// this interface. This interface defines the operations that the LRU garbage

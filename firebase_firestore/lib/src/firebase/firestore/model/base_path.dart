@@ -75,6 +75,14 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
     return myLength.compareTo(theirLength);
   }
 
+  bool operator >(B other) => compareTo(other) > 0;
+
+  bool operator >=(B other) => compareTo(other) >= 0;
+
+  bool operator <(B other) => compareTo(other) < 0;
+
+  bool operator <=(B other) => compareTo(other) <= 0;
+
   /// Returns the last segment of the path
   String getLastSegment() => segments.last;
 

@@ -32,8 +32,8 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.da
 import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:sqflite/sqflite.dart';
 
 /// Local storage in the Firestore client. Coordinates persistence components like the mutation queue
 /// and remote document cache to present a latency compensated view of stored data.

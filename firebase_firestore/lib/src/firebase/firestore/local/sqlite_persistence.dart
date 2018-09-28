@@ -16,10 +16,9 @@ import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_remote_do
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_schema.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:meta/meta.dart';
-import 'package:sqflite/sqflite.dart' hide Transaction;
-import 'package:sqflite/sqflite.dart' as sql show Transaction;
 
 /// A SQLite-backed instance of Persistence.
 ///
@@ -52,9 +51,11 @@ class SQLitePersistence extends Persistence {
     String persistenceKey,
     DatabaseId databaseId,
     LocalSerializer serializer,
+    OpenDatabase openDatabase,
   ) async {
-    final String databaseName = _databaseName(persistenceKey, databaseId);
-    final _OpenHelper opener = await _OpenHelper.open(databaseName);
+    final String databaseName = sDatabaseName(persistenceKey, databaseId);
+    final _OpenHelper opener =
+        await _OpenHelper.open(databaseName, openDatabase);
     final SQLitePersistence persistence = SQLitePersistence(serializer, opener);
 
     final SQLiteQueryCache queryCache =
@@ -77,9 +78,11 @@ class SQLitePersistence extends Persistence {
   ///
   /// * Format is [firestore.{persistence-key}.{project-id}.{database-id}].
   @visibleForTesting
-  static String _databaseName(String persistenceKey, DatabaseId databaseId) {
-    return Uri.encodeFull(
-        'firestore.$persistenceKey.${databaseId.projectId}.${databaseId.databaseId}');
+  static String sDatabaseName(String persistenceKey, DatabaseId databaseId) {
+    return 'firestore.'
+        '${Uri.encodeQueryComponent(persistenceKey)}.'
+        '${Uri.encodeQueryComponent(databaseId.projectId)}.'
+        '${Uri.encodeQueryComponent(databaseId.databaseId)}';
   }
 
   @override
@@ -94,7 +97,7 @@ class SQLitePersistence extends Persistence {
   Future<void> shutdown() async {
     Assert.hardAssert(started, 'SQLitePersistence shutdown without start!');
     started = false;
-    await _db.close();
+    _db.close();
     _db = null;
   }
 
@@ -108,7 +111,7 @@ class SQLitePersistence extends Persistence {
       String action, Transaction<void> operation) async {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
-    await _db.transaction((sql.Transaction tx) => operation(tx),
+    await _db.transaction((DatabaseExecutor tx) => operation(tx),
         exclusive: true);
     referenceDelegate.onTransactionCommitted();
   }
@@ -118,7 +121,7 @@ class SQLitePersistence extends Persistence {
       String action, Transaction<T> operation) {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
-    return _db.transaction((sql.Transaction tx) => operation(tx),
+    return _db.transaction((DatabaseExecutor tx) => operation(tx),
         exclusive: true);
   }
 
@@ -130,7 +133,7 @@ class SQLitePersistence extends Persistence {
 
   Future<List<Map<String, dynamic>>> query(DatabaseExecutor tx, String sql,
       [List<dynamic> args]) {
-    return tx.rawQuery(sql, args);
+    return tx.query(sql, args);
   }
 }
 
@@ -154,7 +157,8 @@ class _OpenHelper {
 
   const _OpenHelper(this.db);
 
-  static Future<_OpenHelper> open(String databaseName) async {
+  static Future<_OpenHelper> open(
+      String databaseName, OpenDatabase openDatabase) async {
     bool configured;
 
     /// Ensures that onConfigure has been called. This should be called first
@@ -198,7 +202,7 @@ class _OpenHelper {
         // We'll have to revisit this once we ship a migration past version 1,
         // but this will definitely be good enough for our initial launch.
       },
-      onOpen: (Database db) => ensureConfigured(db),
+      onOpen: (Database db) async => ensureConfigured(db),
     );
 
     return _OpenHelper(db);
