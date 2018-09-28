@@ -473,7 +473,7 @@ class FirebaseApp {
           _name == other._name;
 
   @override
-  int get hashCode => _name.hashCode;
+  int get hashCode => _name.hashCode * 31;
 
   @override
   String toString() {

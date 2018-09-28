@@ -22,7 +22,7 @@ class InternalTokenResult {
           token == other.token;
 
   @override
-  int get hashCode => token.hashCode;
+  int get hashCode => token.hashCode * 31;
 
   @override
   String toString() {

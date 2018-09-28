@@ -65,11 +65,9 @@ void main() {
 
     final Mutation patch = patchMutation(
         'collection/key', map(<String>['foo.bar', 'new-bar-value']));
-    print(patch);
 
     final MaybeDocument local =
         patch.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
-    print(local);
 
     final Map<String, Object> expectedData = map(<dynamic>[
       'foo',
@@ -169,7 +167,7 @@ void main() {
 
     final Timestamp timestamp = Timestamp.now();
     final Mutation transform = transformMutation('collection/key',
-        map(<dynamic>['foo.bar', firestore.FieldValue.serverTimestamp]));
+        map(<dynamic>['foo.bar', firestore.FieldValue.serverTimestamp()]));
     final MaybeDocument transformedDoc =
         transform.applyToLocalView(baseDoc, baseDoc, timestamp);
 
@@ -485,7 +483,7 @@ void main() {
     final Document baseDoc = doc('collection/key', 0, data, false);
 
     final Mutation transform = transformMutation('collection/key',
-        map(<dynamic>['foo.bar', firestore.FieldValue.serverTimestamp]));
+        map(<dynamic>['foo.bar', firestore.FieldValue.serverTimestamp()]));
 
     final Timestamp serverTimestamp = Timestamp(2, 0);
 

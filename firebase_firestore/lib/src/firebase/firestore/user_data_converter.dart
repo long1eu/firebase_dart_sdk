@@ -112,7 +112,7 @@ class UserDataConverter {
           firestore.FieldPath.fromDotSeparatedPath(entry.key).internalPath;
       final Object fieldValue = entry.value;
 
-      if (fieldValue is firestore.DeleteFieldValue) {
+      if (fieldValue is firestore.FieldValue && fieldValue.isDelete) {
         // Add it to the field mask, but don't add anything to updateData.
         fieldMaskPaths.add(fieldPath);
       } else {
@@ -164,7 +164,7 @@ class UserDataConverter {
         parsedField = (fieldPath as firestore.FieldPath).internalPath;
       }
 
-      if (fieldValue is firestore.DeleteFieldValue) {
+      if (fieldValue is firestore.FieldValue && fieldValue.isDelete) {
         // Add it to the field mask, but don't add anything to updateData.
         fieldMaskPaths.add(parsedField);
       } else {
@@ -280,7 +280,7 @@ class UserDataConverter {
           '${value.methodName}() is not currently supported inside arrays');
     }
 
-    if (value is firestore.DeleteFieldValue) {
+    if (value.isDelete) {
       if (context.dataSource == UserDataSource.mergeSet) {
         // No transform to add for a delete, but we need to add it to our
         // fieldMask so it gets deleted.
@@ -296,18 +296,18 @@ class UserDataConverter {
         throw context.createError(
             'FieldValue.delete() can only be used with update() and set() with SetOptions.merge()');
       }
-    } else if (value is firestore.ServerTimestampFieldValue) {
+    } else if (value.isServerTimestamp) {
       context.fieldTransforms.add(FieldTransform(
         context.path,
         ServerTimestampOperation(),
       ));
-    } else if (value is firestore.ArrayUnionFieldValue) {
+    } else if (value.isArrayUnion) {
       final List<FieldValue> parsedElements =
           _parseArrayTransformElements(value.elements);
       final ArrayTransformOperation arrayUnion =
           ArrayTransformOperationUnion(parsedElements);
       context.fieldTransforms.add(FieldTransform(context.path, arrayUnion));
-    } else if (value is firestore.ArrayRemoveFieldValue) {
+    } else if (value.isArrayRemove) {
       final List<FieldValue> parsedElements =
           _parseArrayTransformElements(value.elements);
       final ArrayTransformOperation arrayRemove =

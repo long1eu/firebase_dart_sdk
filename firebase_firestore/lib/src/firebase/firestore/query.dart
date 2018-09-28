@@ -56,8 +56,7 @@ class Query {
       : assert(query != null),
         assert(firestore != null);
 
-  /*private*/
-  void validateOrderByFieldMatchesInequality(
+  void _validateOrderByFieldMatchesInequality(
       core.FieldPath orderBy, core.FieldPath inequality) {
     if (orderBy != inequality) {
       final String inequalityString = inequality.canonicalString;
@@ -69,8 +68,7 @@ class Query {
     }
   }
 
-  /*private*/
-  void validateNewFilter(Filter filter) {
+  void _validateNewFilter(Filter filter) {
     if (filter is RelationFilter) {
       final RelationFilter relationFilter = filter;
       if (relationFilter.isInequality) {
@@ -85,7 +83,7 @@ class Query {
         }
         final core.FieldPath firstOrderByField = query.getFirstOrderByField();
         if (firstOrderByField != null) {
-          validateOrderByFieldMatchesInequality(
+          _validateOrderByFieldMatchesInequality(
               firstOrderByField, newInequality);
         }
       } else if (relationFilter.operator == FilterOperator.arrayContains) {
@@ -106,7 +104,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query whereEqualTo(String field, Object value) {
-    return whereHelper(
+    return _whereHelper(
         FieldPath.fromDotSeparatedPath(field), FilterOperator.equal, value);
   }
 
@@ -119,7 +117,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query wherePathEqualTo(FieldPath fieldPath, Object value) {
-    return whereHelper(fieldPath, FilterOperator.equal, value);
+    return _whereHelper(fieldPath, FilterOperator.equal, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that
@@ -131,7 +129,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query whereLessThan(String field, Object value) {
-    return whereHelper(
+    return _whereHelper(
         FieldPath.fromDotSeparatedPath(field), FilterOperator.lessThan, value);
   }
 
@@ -144,7 +142,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query wherePathLessThan(FieldPath fieldPath, Object value) {
-    return whereHelper(fieldPath, FilterOperator.lessThan, value);
+    return _whereHelper(fieldPath, FilterOperator.lessThan, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that
@@ -156,7 +154,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query whereLessThanOrEqualTo(String field, Object value) {
-    return whereHelper(FieldPath.fromDotSeparatedPath(field),
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
         FilterOperator.lessThanOrEqual, value);
   }
 
@@ -169,7 +167,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query wherePathLessThanOrEqualTo(FieldPath fieldPath, Object value) {
-    return whereHelper(fieldPath, FilterOperator.lessThanOrEqual, value);
+    return _whereHelper(fieldPath, FilterOperator.lessThanOrEqual, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that
@@ -181,7 +179,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query whereGreaterThan(String field, Object value) {
-    return whereHelper(FieldPath.fromDotSeparatedPath(field),
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
         FilterOperator.graterThan, value);
   }
 
@@ -194,7 +192,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query wherePathGreaterThan(FieldPath fieldPath, Object value) {
-    return whereHelper(fieldPath, FilterOperator.graterThan, value);
+    return _whereHelper(fieldPath, FilterOperator.graterThan, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents
@@ -206,7 +204,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query whereGreaterThanOrEqualTo(String field, Object value) {
-    return whereHelper(FieldPath.fromDotSeparatedPath(field),
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
         FilterOperator.graterThanOrEqual, value);
   }
 
@@ -219,7 +217,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query wherePathGreaterThanOrEqualTo(FieldPath fieldPath, Object value) {
-    return whereHelper(fieldPath, FilterOperator.graterThanOrEqual, value);
+    return _whereHelper(fieldPath, FilterOperator.graterThanOrEqual, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that
@@ -233,7 +231,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query whereArrayContains(String field, Object value) {
-    return whereHelper(FieldPath.fromDotSeparatedPath(field),
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
         FilterOperator.arrayContains, value);
   }
 
@@ -247,7 +245,7 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query wherePathArrayContains(FieldPath fieldPath, Object value) {
-    return whereHelper(fieldPath, FilterOperator.arrayContains, value);
+    return _whereHelper(fieldPath, FilterOperator.arrayContains, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that
@@ -258,8 +256,7 @@ class Query {
   /// [op] The operator
   /// [value] The value for comparison
   /// Returns the created Query.
-  /*private*/
-  Query whereHelper(FieldPath fieldPath, FilterOperator op, Object value) {
+  Query _whereHelper(FieldPath fieldPath, FilterOperator op, Object value) {
     Assert.checkNotNull(fieldPath, 'Provided field path must not be null.');
     Assert.checkNotNull(op, 'Provided op must not be null.');
     FieldValue fieldValue;
@@ -296,15 +293,14 @@ class Query {
       fieldValue = firestore.dataConverter.parseQueryValue(value);
     }
     final Filter filter = Filter.create(fieldPath.internalPath, op, fieldValue);
-    validateNewFilter(filter);
+    _validateNewFilter(filter);
     return Query(query.filter(filter), firestore);
   }
 
-  /*private*/
-  void validateOrderByField(core.FieldPath field) {
+  void _validateOrderByField(core.FieldPath field) {
     final core.FieldPath inequalityField = query.inequalityField();
     if (query.getFirstOrderByField() == null && inequalityField != null) {
-      validateOrderByFieldMatchesInequality(field, inequalityField);
+      _validateOrderByFieldMatchesInequality(field, inequalityField);
     }
   }
 
@@ -342,7 +338,7 @@ class Query {
       throw ArgumentError(
           'Invalid query. You must not call Query.endAt() or Query.endAfter() before calling Query.orderBy().');
     }
-    validateOrderByField(fieldPath);
+    _validateOrderByField(fieldPath);
     final OrderByDirection dir = direction == Direction.ASCENDING
         ? OrderByDirection.ascending
         : OrderByDirection.descending;
@@ -373,7 +369,7 @@ class Query {
   @publicApi
   Query startAtDocument(DocumentSnapshot snapshot) {
     final Bound bound =
-        boundFromDocumentSnapshot('startAt', snapshot, /*before:*/ true);
+        _boundFromDocumentSnapshot('startAt', snapshot, /*before:*/ true);
     return Query(query.startAt(bound), firestore);
   }
 
@@ -387,7 +383,7 @@ class Query {
   @publicApi
   Query startAt(List<Object> fieldValues) {
     final Bound bound =
-        boundFromFields('startAt', fieldValues, /*before:*/ true);
+        _boundFromFields('startAt', fieldValues, /*before:*/ true);
     return Query(query.startAt(bound), firestore);
   }
 
@@ -401,7 +397,7 @@ class Query {
   @publicApi
   Query startAfterDocument(DocumentSnapshot snapshot) {
     final Bound bound =
-        boundFromDocumentSnapshot('startAfter', snapshot, /*before:*/ false);
+        _boundFromDocumentSnapshot('startAfter', snapshot, /*before:*/ false);
     return Query(query.startAt(bound), firestore);
   }
 
@@ -415,7 +411,7 @@ class Query {
   @publicApi
   Query startAfter(List<Object> fieldValues) {
     final Bound bound =
-        boundFromFields('startAfter', fieldValues, /*before:*/ false);
+        _boundFromFields('startAfter', fieldValues, /*before:*/ false);
     return Query(query.startAt(bound), firestore);
   }
 
@@ -429,7 +425,7 @@ class Query {
   @publicApi
   Query endBeforeDocument(DocumentSnapshot snapshot) {
     final Bound bound =
-        boundFromDocumentSnapshot('endBefore', snapshot, /*before:*/ true);
+        _boundFromDocumentSnapshot('endBefore', snapshot, /*before:*/ true);
     return Query(query.endAt(bound), firestore);
   }
 
@@ -443,7 +439,7 @@ class Query {
   @publicApi
   Query endBefore(List<Object> fieldValues) {
     final Bound bound =
-        boundFromFields('endBefore', fieldValues, /*before:*/ true);
+        _boundFromFields('endBefore', fieldValues, /*before:*/ true);
     return Query(query.endAt(bound), firestore);
   }
 
@@ -457,7 +453,7 @@ class Query {
   @publicApi
   Query endAtDocument(DocumentSnapshot snapshot) {
     final Bound bound =
-        boundFromDocumentSnapshot('endAt', snapshot, /*before:*/ false);
+        _boundFromDocumentSnapshot('endAt', snapshot, /*before:*/ false);
     return Query(query.endAt(bound), firestore);
   }
 
@@ -471,7 +467,7 @@ class Query {
   @publicApi
   Query endAt(List<Object> fieldValues) {
     final Bound bound =
-        boundFromFields('endAt', fieldValues, /*before:*/ false);
+        _boundFromFields('endAt', fieldValues, /*before:*/ false);
     return Query(query.endAt(bound), firestore);
   }
 
@@ -482,8 +478,7 @@ class Query {
   ///
   /// * Will throw if the document does not contain all fields of the order by
   /// of the query.
-  /*private*/
-  Bound boundFromDocumentSnapshot(
+  Bound _boundFromDocumentSnapshot(
       String methodName, DocumentSnapshot snapshot, bool before) {
     Assert.checkNotNull<DocumentSnapshot>(
         snapshot, 'Provided snapshot must not be null.');
@@ -520,8 +515,7 @@ class Query {
   }
 
   /// Converts a list of field values to Bound.
-  /*private*/
-  Bound boundFromFields(String methodName, List<Object> values, bool before) {
+  Bound _boundFromFields(String methodName, List<Object> values, bool before) {
     // Use explicit order by's because it has to match the query the user made
     final List<OrderBy> explicitOrderBy = query.explicitSortOrder;
     if (values.length > explicitOrderBy.length) {
@@ -573,12 +567,11 @@ class Query {
 
       return QuerySnapshot(Query(query, firestore), viewSnap, firestore);
     } else {
-      return getViaSnapshotListener(source);
+      return _getViaSnapshotListener(source);
     }
   }
 
-  /*private*/
-  Future<QuerySnapshot> getViaSnapshotListener(Source source) {
+  Future<QuerySnapshot> _getViaSnapshotListener(Source source) {
     final Completer<QuerySnapshot> res = Completer<QuerySnapshot>();
     final Completer<ListenerRegistration> registration =
         Completer<ListenerRegistration>();
@@ -589,7 +582,7 @@ class Query {
     options.waitForSyncWhenOnline = true;
 
     final ListenerRegistration listenerRegistration =
-        addSnapshotListenerInternal(options,
+        _addSnapshotListenerInternal(options,
             (QuerySnapshot snapshot, FirebaseFirestoreError error) async {
       if (error != null) {
         res.completeError(error);
@@ -640,8 +633,8 @@ class Query {
     Assert.checkNotNull(
         metadataChanges, 'Provided MetadataChanges value must not be null.');
     Assert.checkNotNull(listener, 'Provided EventListener must not be null.');
-    return addSnapshotListenerInternal(
-        internalOptions(metadataChanges), listener);
+    return _addSnapshotListenerInternal(
+        _internalOptions(metadataChanges), listener);
   }
 
   /// Internal helper method to create add a snapshot listener.
@@ -652,8 +645,7 @@ class Query {
   /// @param options The options to use for this listen.
   /// @param listener The event listener that will be called with the snapshots.
   /// @return A registration object that can be used to remove the listener.
-  /*private*/
-  ListenerRegistration addSnapshotListenerInternal(
+  ListenerRegistration _addSnapshotListenerInternal(
       ListenOptions options, EventListener<QuerySnapshot> listener) {
     void wrapperListener(ViewSnapshot snapshot, FirebaseFirestoreError error) {
       if (snapshot != null) {
@@ -678,8 +670,7 @@ class Query {
   }
 
   /// Converts the  API options object to the internal options object.
-  /*private*/
-  static ListenOptions internalOptions(MetadataChanges metadataChanges) {
+  static ListenOptions _internalOptions(MetadataChanges metadataChanges) {
     final ListenOptions internalOptions = ListenOptions();
     internalOptions.includeDocumentMetadataChanges =
         metadataChanges == MetadataChanges.include;
@@ -687,5 +678,24 @@ class Query {
         metadataChanges == MetadataChanges.include;
     internalOptions.waitForSyncWhenOnline = false;
     return internalOptions;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Query &&
+          runtimeType == other.runtimeType &&
+          query == other.query &&
+          firestore == other.firestore;
+
+  @override
+  int get hashCode => query.hashCode * 31 + /*firestore.hashCode * */ 31;
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('query', query)
+          ..add('firestore', firestore))
+        .toString();
   }
 }

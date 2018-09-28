@@ -308,8 +308,8 @@ class TestUtil {
         updatedInTargets, removedFromTargets, doc.key, doc);
     final WatchChangeAggregator aggregator =
         WatchChangeAggregator(TargetMetadataProvider(
-      (int targetId) => DocumentKey.emptyKeySet,
-      (int targetId) =>
+      getRemoteKeysForTarget: (int targetId) => DocumentKey.emptyKeySet,
+      getQueryDataForTarget: (int targetId) =>
           queryData(targetId, QueryPurpose.listen, doc.key.toString()),
     ));
     aggregator.handleDocumentChange(change);
@@ -323,10 +323,10 @@ class TestUtil {
         updatedInTargets, removedFromTargets, doc.key, doc);
     final WatchChangeAggregator aggregator =
         WatchChangeAggregator(TargetMetadataProvider(
-      (int targetId) {
+      getRemoteKeysForTarget: (int targetId) {
         return DocumentKey.emptyKeySet.insert(doc.key);
       },
-      (int targetId) {
+      getQueryDataForTarget: (int targetId) {
         final bool isLimbo = !(updatedInTargets.contains(targetId) ||
             removedFromTargets.contains(targetId));
         final QueryPurpose purpose =

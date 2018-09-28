@@ -196,8 +196,6 @@ void main() {
           ]
         ]));
 
-    print(document);
-
     expect(query.matches(document), isTrue);
   });
 

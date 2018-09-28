@@ -19,13 +19,13 @@ class DocumentCollections {
   /// Returns an empty, immutable "maybe" document map */
   static ImmutableSortedMap<DocumentKey, MaybeDocument>
       emptyMaybeDocumentMap() {
-    return ImmutableSortedMap.emptyMap<DocumentKey, MaybeDocument>(
+    return ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(
         DocumentKey.comparator);
   }
 
   /// Returns an empty, immutable versions map */
   static ImmutableSortedMap<DocumentKey, SnapshotVersion> emptyVersionMap() {
-    return ImmutableSortedMap.emptyMap<DocumentKey, SnapshotVersion>(
+    return ImmutableSortedMap<DocumentKey, SnapshotVersion>.emptyMap(
         DocumentKey.comparator);
   }
 }

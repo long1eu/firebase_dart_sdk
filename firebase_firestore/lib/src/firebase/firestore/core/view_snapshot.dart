@@ -56,13 +56,13 @@ class ViewSnapshot {
 
   @override
   int get hashCode =>
-      query.hashCode ^
-      documents.hashCode ^
-      oldDocuments.hashCode ^
-      changes.hashCode ^
-      isFromCache.hashCode ^
-      hasPendingWrites.hashCode ^
-      didSyncStateChange.hashCode;
+      query.hashCode * 31 +
+      documents.hashCode * 31 +
+      oldDocuments.hashCode * 31 +
+      const DeepCollectionEquality().hash(changes) * 31 +
+      (isFromCache ? 0 : 1) +
+      (hasPendingWrites ? 2 : 3) +
+      (didSyncStateChange ? 4 : 5);
 
   @override
   String toString() {

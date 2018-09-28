@@ -4,11 +4,22 @@
 
 import 'package:firebase_common/firebase_common.dart';
 
-/// Sentinel values that can be used when writing document fields with [set()] or
-/// [update()].
+/// Sentinel values that can be used when writing document fields with [set] or
+/// [update].
 @publicApi
 abstract class FieldValue {
-  const FieldValue._();
+  final List<Object> elements;
+
+  const FieldValue._(this.elements);
+
+  /// Returns a sentinel for use with update() to mark a field for deletion.
+  @publicApi
+  factory FieldValue.delete() => _deleteInstance;
+
+  /// Returns a sentinel for use with set() or update() to include a
+  /// server-generated timestamp in the written data.
+  @publicApi
+  factory FieldValue.serverTimestamp() => _serverTimestampInstance;
 
   /// Returns a special value that can be used with set() or update() that tells
   /// the server to union the given elements with any array value that already
@@ -20,7 +31,7 @@ abstract class FieldValue {
   /// for use in a call to set() or update().
   @publicApi
   factory FieldValue.arrayUnion(List<Object> elements) {
-    return ArrayUnionFieldValue._(elements);
+    return _ArrayUnionFieldValue._(elements);
   }
 
   /// Returns a special value that can be used with set() or update() that tells
@@ -33,58 +44,54 @@ abstract class FieldValue {
   /// for use in a call to set() or update().
   @publicApi
   factory FieldValue.arrayRemove(List<Object> elements) {
-    return ArrayRemoveFieldValue._(elements);
+    return _ArrayRemoveFieldValue._(elements);
   }
 
   /// Returns the method name (e.g. "FieldValue.delete") that was used to create
   /// this FieldValue instance, for use in error messages, etc.
   String get methodName;
 
-  static const DeleteFieldValue _deleteInstance = DeleteFieldValue._();
+  bool get isDelete => this is _DeleteFieldValue;
 
-  static const ServerTimestampFieldValue _serverTimestampInstance =
-      ServerTimestampFieldValue._();
+  bool get isServerTimestamp => this is _ServerTimestampFieldValue;
 
-  /// Returns a sentinel for use with update() to mark a field for deletion.
-  @publicApi
-  static FieldValue get delete => _deleteInstance;
+  bool get isArrayUnion => this is _ArrayUnionFieldValue;
 
-  /// Returns a sentinel for use with set() or update() to include a
-  /// server-generated timestamp in the written data.
-  @publicApi
-  static FieldValue get serverTimestamp => _serverTimestampInstance;
+  bool get isArrayRemove => this is _ArrayRemoveFieldValue;
+
+  static const _DeleteFieldValue _deleteInstance = _DeleteFieldValue._();
+
+  static const _ServerTimestampFieldValue _serverTimestampInstance =
+      _ServerTimestampFieldValue._();
 }
 
-/* FieldValue class for field deletes. */
-class DeleteFieldValue extends FieldValue {
-  const DeleteFieldValue._() : super._();
+/// FieldValue class for field deletes.
+class _DeleteFieldValue extends FieldValue {
+  const _DeleteFieldValue._() : super._(null);
 
   @override
   String get methodName => 'FieldValue.delete';
 }
 
-/* FieldValue class for server timestamps. */
-class ServerTimestampFieldValue extends FieldValue {
-  const ServerTimestampFieldValue._() : super._();
+/// FieldValue class for server timestamps.
+class _ServerTimestampFieldValue extends FieldValue {
+  const _ServerTimestampFieldValue._() : super._(null);
 
   @override
   String get methodName => 'FieldValue.serverTimestamp';
 }
 
-/* FieldValue class for arrayUnion() transforms. */
-class ArrayUnionFieldValue extends FieldValue {
-  const ArrayUnionFieldValue._(this.elements) : super._();
-  final List<Object> elements;
+/// FieldValue class for arrayUnion() transforms.
+class _ArrayUnionFieldValue extends FieldValue {
+  const _ArrayUnionFieldValue._(List<Object> elements) : super._(elements);
 
   @override
   String get methodName => 'FieldValue.arrayUnion';
 }
 
-/* FieldValue class for arrayRemove() transforms. */
-class ArrayRemoveFieldValue extends FieldValue {
-  final List<Object> elements;
-
-  const ArrayRemoveFieldValue._(this.elements) : super._();
+/// FieldValue class for arrayRemove() transforms.
+class _ArrayRemoveFieldValue extends FieldValue {
+  const _ArrayRemoveFieldValue._(List<Object> elements) : super._(elements);
 
   @override
   String get methodName => 'FieldValue.arrayRemove';

@@ -316,4 +316,33 @@ class DocumentSnapshot {
     }
     return null;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DocumentSnapshot &&
+          runtimeType == other.runtimeType &&
+          _firestore == other._firestore &&
+          _key == other._key &&
+          (document == null
+              ? other.document == null
+              : document == other.document) &&
+          metadata == other.metadata;
+
+  @override
+  int get hashCode {
+    return _firestore.hashCode * 31 +
+        _key.hashCode * 31 +
+        (document == null ? 0 : document.hashCode) * 31 +
+        metadata.hashCode * 31;
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('key', _key)
+          ..add('metadata', metadata)
+          ..add('document', document))
+        .toString();
+  }
 }

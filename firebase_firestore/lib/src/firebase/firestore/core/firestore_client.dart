@@ -143,7 +143,7 @@ class FirestoreClient implements RemoteStoreCallback {
           await localStore.executeQuery(query);
 
       final View view = View(query, ImmutableSortedSet<DocumentKey>());
-      final DocumentChanges viewDocChanges = view.computeDocChanges(docs);
+      final ViewDocumentChanges viewDocChanges = view.computeDocChanges(docs);
       return view.applyChanges(viewDocChanges).snapshot;
     });
   }

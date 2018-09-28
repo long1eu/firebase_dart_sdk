@@ -25,7 +25,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 @publicApi
 class CollectionReference extends Query {
   CollectionReference(ResourcePath path, FirebaseFirestore firestore)
-      : assert(path.length.remainder(2) != 1,
+      : assert(path.length.remainder(2) == 1,
             'Invalid collection reference. Collection references must have an odd number of segments, but ${path.canonicalString} has ${path.length}'),
         super(core.Query.atPath(path), firestore);
 

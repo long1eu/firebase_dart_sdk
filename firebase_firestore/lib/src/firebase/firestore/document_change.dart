@@ -14,7 +14,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
 @publicApi
-enum DocumentChangesType {
+enum DocumentChangeType {
   /// Indicates a new document was added to the set of documents matching the
   /// query.
   added,
@@ -37,15 +37,15 @@ enum DocumentChangesType {
 @publicApi
 class DocumentChange {
   /// An enumeration of snapshot diff types.
-  final DocumentChangesType type;
+  final DocumentChangeType type;
 
   /// Returns the newly added or modified document if this [DocumentChange] is
   /// for an updated document. Returns the deleted document if this document
   /// change represents a removal.
   ///
-  /// Returns a snapshot of the new data (for [DocumentChangesType.added] or
-  /// [DocumentChangesType.modified]) or the removed data (for
-  /// [DocumentChangesType.removed]).
+  /// Returns a snapshot of the new data (for [DocumentChangeType.added] or
+  /// [DocumentChangeType.modified]) or the removed data (for
+  /// [DocumentChangeType.removed]).
   final QueryDocumentSnapshot document;
 
   /// The index of the changed document in the result set immediately prior to
@@ -87,7 +87,7 @@ class DocumentChange {
             lastDoc == null || snapshot.query.comparator(lastDoc, document) < 0,
             'Got added events in wrong order');
         documentChanges.add(DocumentChange(
-            documentSnapshot, DocumentChangesType.added, -1, index++));
+            documentSnapshot, DocumentChangeType.added, -1, index++));
         lastDoc = document;
       }
     } else {
@@ -104,15 +104,15 @@ class DocumentChange {
             QueryDocumentSnapshot.fromDocument(
                 firestore, document, snapshot.isFromCache);
         int oldIndex, newIndex;
-        final DocumentChangesType type = _getType(change);
-        if (type != DocumentChangesType.added) {
+        final DocumentChangeType type = _getType(change);
+        if (type != DocumentChangeType.added) {
           oldIndex = indexTracker.indexOf(document.key);
           Assert.hardAssert(oldIndex >= 0, 'Index for document not found');
           indexTracker = indexTracker.remove(document.key);
         } else {
           oldIndex = -1;
         }
-        if (type != DocumentChangesType.removed) {
+        if (type != DocumentChangeType.removed) {
           indexTracker = indexTracker.add(document);
           newIndex = indexTracker.indexOf(document.key);
           Assert.hardAssert(newIndex >= 0, 'Index for document not found');
@@ -126,16 +126,40 @@ class DocumentChange {
     return documentChanges;
   }
 
-  static DocumentChangesType _getType(DocumentViewChange change) {
+  static DocumentChangeType _getType(DocumentViewChange change) {
     if (change.type == DocumentViewChangeType.added) {
-      return DocumentChangesType.added;
+      return DocumentChangeType.added;
     } else if (change.type == DocumentViewChangeType.modified ||
         change.type == DocumentViewChangeType.metadata) {
-      return DocumentChangesType.modified;
+      return DocumentChangeType.modified;
     } else if (change.type == DocumentViewChangeType.removed) {
-      return DocumentChangesType.removed;
+      return DocumentChangeType.removed;
     } else {
       throw ArgumentError('Unknown view change type: ${change.type}');
     }
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DocumentChange &&
+          runtimeType == other.runtimeType &&
+          type == other.type &&
+          document == other.document &&
+          oldIndex == other.oldIndex &&
+          newIndex == other.newIndex;
+
+  @override
+  int get hashCode =>
+      type.hashCode ^ document.hashCode ^ oldIndex.hashCode ^ newIndex.hashCode;
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('type', type)
+          ..add('document', document)
+          ..add('oldIndex', oldIndex)
+          ..add('newIndex', newIndex))
+        .toString();
   }
 }

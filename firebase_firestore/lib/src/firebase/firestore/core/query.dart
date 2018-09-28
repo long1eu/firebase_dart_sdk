@@ -337,21 +337,22 @@ class Query {
       identical(this, other) ||
       other is Query &&
           runtimeType == other.runtimeType &&
-          _limit == other._limit &&
-          getOrderBy() == other.getOrderBy() &&
-          filters == other.filters &&
+          const ListEquality<Filter>().equals(filters, other.filters) &&
           path == other.path &&
+          _limit == other._limit &&
           _startAt == other._startAt &&
-          _endAt == other._endAt;
+          _endAt == other._endAt &&
+          const ListEquality<OrderBy>()
+              .equals(getOrderBy(), other.getOrderBy());
 
   @override
   int get hashCode =>
-      const ListEquality<Filter>().hash(filters) ^
-      path.hashCode ^
-      _limit.hashCode ^
-      _startAt.hashCode ^
-      _endAt.hashCode ^
-      const ListEquality<OrderBy>().hash(getOrderBy());
+      const ListEquality<Filter>().hash(filters) * 31 +
+      path.hashCode * 31 +
+      _limit.hashCode * 31 +
+      _startAt.hashCode * 31 +
+      _endAt.hashCode * 31 +
+      const ListEquality<OrderBy>().hash(getOrderBy()) * 31;
 
   @override
   String toString() {

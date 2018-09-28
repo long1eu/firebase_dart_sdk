@@ -17,6 +17,7 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.d
 import 'package:firebase_firestore/src/firebase/firestore/remote/target_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:meta/meta.dart';
 
 /// A helper class to accumulate watch changes into a [RemoteEvent] and other
 /// target information.
@@ -390,5 +391,6 @@ class TargetMetadataProvider {
   final QueryData Function(int targetId) getQueryDataForTarget;
 
   const TargetMetadataProvider(
-      this.getRemoteKeysForTarget, this.getQueryDataForTarget);
+      {@required this.getRemoteKeysForTarget,
+      @required this.getQueryDataForTarget});
 }

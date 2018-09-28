@@ -61,7 +61,7 @@ class DocumentViewChange {
           document == other.document;
 
   @override
-  int get hashCode => type.hashCode ^ document.hashCode;
+  int get hashCode => type.hashCode * 31 + document.hashCode * 31;
 
   @override
   String toString() {

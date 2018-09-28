@@ -66,4 +66,14 @@ class ImmutableSortedSet<T> extends Iterable<T> {
       yield it.current.key;
     }
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImmutableSortedSet &&
+          runtimeType == other.runtimeType &&
+          _map == other._map;
+
+  @override
+  int get hashCode => _map.hashCode;
 }

@@ -12,9 +12,9 @@ import 'document.dart';
 /// comparator or ordered by key by default if no document is present.
 class DocumentSet extends Iterable<Document> {
   final ImmutableSortedMap<DocumentKey, Document> _keyIndex;
-  final ImmutableSortedSet<Document> _sortedSet;
+  final ImmutableSortedSet<Document> sortedSet;
 
-  const DocumentSet._(this._keyIndex, this._sortedSet);
+  const DocumentSet._(this._keyIndex, this.sortedSet);
 
   factory DocumentSet.emptySet(Comparator<Document> comparator) {
     // We have to add the document key comparator to the passed in comparator,
@@ -57,12 +57,12 @@ class DocumentSet extends Iterable<Document> {
   /// Returns the first document in the set according to the set's ordering, or
   /// null if the set is empty.
   @override
-  Document get first => _sortedSet.minEntry;
+  Document get first => sortedSet.minEntry;
 
   /// Returns the last document in the set according to the set's ordering, or
   /// null if the set is empty.
   @override
-  Document get last => _sortedSet.maxEntry;
+  Document get last => sortedSet.maxEntry;
 
   /// Returns the document previous to the document associated with the given
   /// key in the set according to the set's ordering. Returns null if the
@@ -74,7 +74,7 @@ class DocumentSet extends Iterable<Document> {
     if (document == null) {
       throw ArgumentError('Key not contained in DocumentSet: $key');
     }
-    return _sortedSet.getPredecessorEntry(document);
+    return sortedSet.getPredecessorEntry(document);
   }
 
   /// Returns the index of the provided key in the document set, or -1 if the
@@ -85,7 +85,7 @@ class DocumentSet extends Iterable<Document> {
       return -1;
     }
 
-    return _sortedSet.indexOf(document);
+    return sortedSet.indexOf(document);
   }
 
   /// Returns a new DocumentSet that contains the given document, replacing any
@@ -98,7 +98,7 @@ class DocumentSet extends Iterable<Document> {
     final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
         removed._keyIndex.insert(document.key, document);
     final ImmutableSortedSet<Document> newSortedSet =
-        removed._sortedSet.insert(document);
+        removed.sortedSet.insert(document);
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
@@ -110,12 +110,12 @@ class DocumentSet extends Iterable<Document> {
     }
 
     _keyIndex.remove(key);
-    _sortedSet.remove(document);
+    sortedSet.remove(document);
 
     final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
         _keyIndex.remove(key);
     final ImmutableSortedSet<Document> newSortedSet =
-        _sortedSet.remove(document);
+        sortedSet.remove(document);
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
@@ -159,8 +159,10 @@ class DocumentSet extends Iterable<Document> {
   }
 
   @override
-  int get hashCode => _keyIndex.hashCode ^ _sortedSet.hashCode;
+  int get hashCode {
+    return _keyIndex.hashCode ^ sortedSet.hashCode;
+  }
 
   @override
-  Iterator<Document> get iterator => _sortedSet.iterator;
+  Iterator<Document> get iterator => sortedSet.iterator;
 }

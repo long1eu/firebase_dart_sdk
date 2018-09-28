@@ -8,7 +8,8 @@ import 'package:test/test.dart';
 
 void main() {
   test('testFromDate', () {
-    // Very carefully  ruct an Date that won't lose precision with milliseconds.
+    // Very carefully construct a Date that won't lose precision with
+    // milliseconds.
     DateTime input = DateTime.fromMillisecondsSinceEpoch(22501);
     Timestamp actual = Timestamp.fromDate(input);
     expect(actual.seconds, Int64(22));

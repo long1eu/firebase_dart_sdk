@@ -65,5 +65,5 @@ class OrderBy {
           field == other.field;
 
   @override
-  int get hashCode => direction.hashCode ^ field.hashCode;
+  int get hashCode => direction.hashCode * 31 + field.hashCode * 31;
 }

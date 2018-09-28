@@ -80,5 +80,5 @@ class FieldPath {
           internalPath == other.internalPath;
 
   @override
-  int get hashCode => internalPath.hashCode;
+  int get hashCode => internalPath.hashCode * 31;
 }

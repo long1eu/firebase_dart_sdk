@@ -180,7 +180,7 @@ class AsyncQueue {
   /// on the provided queue after the provided delay.
   DelayedTask<T> _createAndScheduleDelayedTask<T>(
       TimerId timerId, Duration delay, Task<T> task) {
-    return DelayedTask._<T>(
+    return DelayedTask<T>._(
         timerId, DateTime.now().add(delay), task, _removeDelayedTask)
       ..start(delay);
   }

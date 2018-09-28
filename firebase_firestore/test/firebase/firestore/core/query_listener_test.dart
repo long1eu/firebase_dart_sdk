@@ -299,7 +299,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
     final ViewSnapshot snap1 = applyChanges(view, <Document>[doc1]);
     final ViewSnapshot snap2 = applyChanges(view, <Document>[doc2]);
-    final DocumentChanges changes =
+    final ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<MaybeDocument>[]));
 
     final ViewSnapshot snap3 = view

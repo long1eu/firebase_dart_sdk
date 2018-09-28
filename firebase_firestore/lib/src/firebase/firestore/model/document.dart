@@ -43,10 +43,10 @@ class Document extends MaybeDocument implements Comparable<Document> {
 
   @override
   int get hashCode =>
-      data.hashCode ^
-      hasLocalMutations.hashCode ^
       key.hashCode ^
-      version.hashCode;
+      data.hashCode ^
+      version.hashCode ^
+      (hasLocalMutations ? 1 : 0);
 
   @override
   String toString() {

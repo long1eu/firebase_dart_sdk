@@ -31,18 +31,18 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   @publicApi
   final SnapshotMetadata metadata;
 
-  final ViewSnapshot _snapshot;
+  final ViewSnapshot snapshot;
   final FirebaseFirestore _firestore;
 
   List<DocumentChange> _cachedChanges;
   MetadataChanges _cachedChangesMetadataState;
 
-  QuerySnapshot(this.query, this._snapshot, this._firestore)
+  QuerySnapshot(this.query, this.snapshot, this._firestore)
       : assert(query != null),
-        assert(_snapshot != null),
+        assert(snapshot != null),
         assert(_firestore != null),
         this.metadata =
-            SnapshotMetadata(_snapshot.hasPendingWrites, _snapshot.isFromCache);
+            SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
 
   /// Returns the list of documents that changed since the last snapshot. If
   /// it's the first snapshot all documents will be in the list as added
@@ -67,7 +67,7 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
     if (_cachedChanges == null ||
         _cachedChangesMetadataState != metadataChanges) {
       _cachedChanges = DocumentChange.changesFromSnapshot(
-              _firestore, metadataChanges, _snapshot)
+              _firestore, metadataChanges, snapshot)
           .toList(growable: false);
       _cachedChangesMetadataState = metadataChanges;
     }
@@ -81,9 +81,9 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   @publicApi
   List<DocumentSnapshot> get documents {
     final List<DocumentSnapshot> res =
-        List<DocumentSnapshot>(_snapshot.documents.length);
+        List<DocumentSnapshot>(snapshot.documents.length);
     int i = 0;
-    for (core.Document doc in _snapshot.documents) {
+    for (core.Document doc in snapshot.documents) {
       res[i] = _convertDocument(doc);
       i++;
     }
@@ -93,18 +93,18 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Returns true if there are no documents in the QuerySnapshot.
   @publicApi
   @override
-  bool get isEmpty => _snapshot.documents.isEmpty;
+  bool get isEmpty => snapshot.documents.isEmpty;
 
   /// Returns the number of documents in the QuerySnapshot.
   @publicApi
   @override
-  int get length => _snapshot.documents.length;
+  int get length => snapshot.documents.length;
 
   @override
   @publicApi
   Iterator<QueryDocumentSnapshot> get iterator {
     return () sync* {
-      final Iterator<core.Document> it = _snapshot.documents.iterator;
+      final Iterator<core.Document> it = snapshot.documents.iterator;
       while (it.moveNext()) yield _convertDocument(it.current);
     }()
         .iterator;
@@ -112,7 +112,7 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
 
   QueryDocumentSnapshot _convertDocument(Document document) {
     return QueryDocumentSnapshot.fromDocument(
-        _firestore, document, _snapshot.isFromCache);
+        _firestore, document, snapshot.isFromCache);
   }
 
   @override
@@ -121,14 +121,25 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
       other is QuerySnapshot &&
           runtimeType == other.runtimeType &&
           query == other.query &&
-          _snapshot == other._snapshot &&
+          snapshot == other.snapshot &&
           _firestore == other._firestore &&
           metadata == other.metadata;
 
   @override
   int get hashCode =>
-      query.hashCode ^
-      _snapshot.hashCode ^
-      _firestore.hashCode ^
-      metadata.hashCode;
+      query.hashCode * 31 +
+      snapshot.hashCode * 31 +
+      _firestore.hashCode * 31 +
+      metadata.hashCode * 31;
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('query', query)
+          ..add('metadata', metadata)
+          ..add('snapshot', snapshot)
+          ..add('cachedChanges', _cachedChanges)
+          ..add('cachedChangesMetadataState', _cachedChangesMetadataState))
+        .toString();
+  }
 }

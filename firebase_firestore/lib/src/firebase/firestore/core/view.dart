@@ -58,9 +58,9 @@ class View {
   /// If this is being called with a refill, then start with [previousChanges]
   /// of docs and changes instead of the current view.
   /// Returns a new set of docs, changes, and refill flag.
-  DocumentChanges computeDocChanges<D extends MaybeDocument>(
+  ViewDocumentChanges computeDocChanges<D extends MaybeDocument>(
       ImmutableSortedMap<DocumentKey, D> docChanges,
-      [DocumentChanges previousChanges]) {
+      [ViewDocumentChanges previousChanges]) {
     final DocumentViewChangeSet changeSet = previousChanges != null
         ? previousChanges.changeSet
         : DocumentViewChangeSet();
@@ -167,14 +167,14 @@ class View {
     Assert.hardAssert(!needsRefill || previousChanges == null,
         'View was refilled using docs that themselves needed refilling.');
 
-    return DocumentChanges._(
+    return ViewDocumentChanges._(
         newDocumentSet, changeSet, newMutatedKeys, needsRefill);
   }
 
   /// Updates the view with the given [ViewDocumentChanges] and updates limbo
   /// docs and sync state from the given (optional) target change. Returns a new
   /// [ViewChange] with the given docs, changes, and sync state.
-  ViewChange applyChanges(DocumentChanges docChanges,
+  ViewChange applyChanges(ViewDocumentChanges docChanges,
       [TargetChange targetChange]) {
     Assert.hardAssert(
         !docChanges.needsRefill, 'Cannot apply changes that need a refill');
@@ -232,7 +232,7 @@ class View {
       // are guaranteed to get a new [TargetChange] that sets `current` back to
       // true once the client is back online.
       current = false;
-      return applyChanges(DocumentChanges._(
+      return applyChanges(ViewDocumentChanges._(
         documentSet,
         DocumentViewChangeSet(),
         mutatedKeys,
@@ -337,8 +337,8 @@ class View {
 }
 
 /// The result of applying a set of doc changes to a view.
-class DocumentChanges {
-  const DocumentChanges._(
+class ViewDocumentChanges {
+  const ViewDocumentChanges._(
     this.documentSet,
     this.changeSet,
     this.mutatedKeys,

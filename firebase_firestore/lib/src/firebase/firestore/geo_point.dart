@@ -12,12 +12,18 @@ class GeoPoint implements Comparable<GeoPoint> {
   /// The [latitude] of this GeoPoint in the range [-90, 90] and the [longitude]
   /// of this GeoPoint in the range [-180, 180].
   const GeoPoint(this.latitude, this.longitude)
-      : assert(latitude != double.nan),
-        assert(longitude != double.nan),
-        assert(latitude >= -90 || latitude >= 90,
-            'Latitude must be in the range of [-90, 90]'),
-        assert(longitude >= -180 || longitude >= 180,
-            'Longitude must be in the range of [-180, 180]');
+      : assert(
+            !identical(latitude, double.nan), 'Latitude should not be a NaN.'),
+        assert(
+            latitude != double.infinity, 'Latitude should not be a infinity.'),
+        assert(!identical(longitude, double.nan),
+            'Longitude should not be a NaN.'),
+        assert(longitude != double.negativeInfinity,
+            'Longitude should not be a negativeInfinity.'),
+        assert(latitude >= -90.0 && latitude <= 90.0,
+            'Latitude must be in the range of [-90, 90] but was $latitude'),
+        assert(longitude >= -180.0 && longitude <= 180.0,
+            'Longitude must be in the range of [-180, 180] but was $longitude');
 
   @override
   int compareTo(GeoPoint other) {
@@ -43,5 +49,5 @@ class GeoPoint implements Comparable<GeoPoint> {
           longitude == other.longitude;
 
   @override
-  int get hashCode => latitude.hashCode ^ longitude.hashCode;
+  int get hashCode => latitude.hashCode * 31 ^ longitude.hashCode * 31;
 }

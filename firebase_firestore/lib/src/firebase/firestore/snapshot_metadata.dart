@@ -38,10 +38,13 @@ class SnapshotMetadata {
           isFromCache == other.isFromCache;
 
   @override
-  int get hashCode => hasPendingWrites.hashCode ^ isFromCache.hashCode;
+  int get hashCode => (hasPendingWrites ? 1 : 0) + (isFromCache ? 2 : 3);
 
   @override
   String toString() {
-    return 'SnapshotMetadata{hasPendingWrites: $hasPendingWrites, isFromCache: $isFromCache}';
+    return (ToStringHelper(runtimeType)
+          ..add('hasPendingWrites', hasPendingWrites)
+          ..add('isFromCache', isFromCache))
+        .toString();
   }
 }

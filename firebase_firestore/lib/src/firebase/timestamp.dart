@@ -87,5 +87,5 @@ class Timestamp implements Comparable<Timestamp> {
           nanoseconds == other.nanoseconds;
 
   @override
-  int get hashCode => seconds.hashCode ^ nanoseconds.hashCode;
+  int get hashCode => seconds.hashCode * 31 ^ nanoseconds.hashCode * 31;
 }

@@ -293,5 +293,5 @@ class DocumentReference {
           firestore == other.firestore;
 
   @override
-  int get hashCode => key.hashCode ^ firestore.hashCode;
+  int get hashCode => key.hashCode * 31 ^ firestore.hashCode * 31;
 }

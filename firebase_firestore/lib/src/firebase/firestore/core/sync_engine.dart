@@ -126,7 +126,7 @@ class SyncEngine implements RemoteStoreCallback {
         await _localStore.getRemoteDocumentKeys(queryData.targetId);
 
     final View view = View(query, remoteKeys);
-    final DocumentChanges viewDocChanges = view.computeDocChanges(docs);
+    final ViewDocumentChanges viewDocChanges = view.computeDocChanges(docs);
     final ViewChange viewChange = view.applyChanges(viewDocChanges);
     Assert.hardAssert(view.limboDocuments.isEmpty,
         'View returned limbo docs before target ack from the server');
@@ -426,7 +426,7 @@ class SyncEngine implements RemoteStoreCallback {
     for (MapEntry<Query, QueryView> entry in _queryViewsByQuery.entries) {
       final QueryView queryView = entry.value;
       final View view = queryView.view;
-      DocumentChanges viewDocChanges = view.computeDocChanges(changes);
+      ViewDocumentChanges viewDocChanges = view.computeDocChanges(changes);
       if (viewDocChanges.needsRefill) {
         // The query has a limit and some docs were removed/updated, so we need
         // to re-run the query against the local store to make sure we didn't

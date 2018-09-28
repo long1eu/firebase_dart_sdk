@@ -42,7 +42,7 @@ void main() {
 
     final ImmutableSortedMap<DocumentKey, Document> updates =
         docUpdates(<Document>[doc1, doc2, doc3]);
-    final DocumentChanges docViewChanges = view.computeDocChanges(updates);
+    final ViewDocumentChanges docViewChanges = view.computeDocChanges(updates);
     final TargetChange targetChange = ackTarget(<Document>[doc1, doc2, doc3]);
     final ViewSnapshot snapshot =
         view.applyChanges(docViewChanges, targetChange).snapshot;
@@ -232,7 +232,7 @@ void main() {
     // doc3 will be added
     // doc4 will be added + removed = nothing
     doc2 = doc('rooms/eros/messages/2', 1, map(<dynamic>['num', 5]), false);
-    DocumentChanges viewDocChanges =
+    ViewDocumentChanges viewDocChanges =
         view.computeDocChanges(docUpdates(<Document>[doc2, doc3, doc4]));
     expect(viewDocChanges.needsRefill, isTrue);
     // Verify that all the docs still match.
@@ -264,7 +264,7 @@ void main() {
     ViewChange change = applyChanges(view, <Document>[doc1]);
     expect(change.limboChanges.isEmpty, isTrue);
 
-    DocumentChanges viewDocChanges = view.computeDocChanges(docUpdates());
+    ViewDocumentChanges viewDocChanges = view.computeDocChanges(docUpdates());
     change = view.applyChanges(viewDocChanges, ackTarget());
     expect(change.limboChanges, <LimboDocumentChange>[
       LimboDocumentChange(LimboDocumentChangeType.added, doc1.key)
@@ -304,7 +304,7 @@ void main() {
     final View view = View(query, keySet(<DocumentKey>[doc1.key, doc2.key]));
 
     final TargetChange markCurrent = ackTarget();
-    final DocumentChanges changes = view.computeDocChanges(docUpdates());
+    final ViewDocumentChanges changes = view.computeDocChanges(docUpdates());
     final ViewChange change = view.applyChanges(changes, markCurrent);
     expect(change.limboChanges, isEmpty);
   });
@@ -316,7 +316,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes =
+    ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
@@ -348,7 +348,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes =
+    ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3]));
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
@@ -386,7 +386,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes = view.computeDocChanges(
+    ViewDocumentChanges changes = view.computeDocChanges(
         docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]));
     expect(changes.documentSet.length, 3);
     expect(changes.needsRefill, isFalse);
@@ -417,7 +417,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes = view.computeDocChanges(
+    ViewDocumentChanges changes = view.computeDocChanges(
         docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]));
     expect(changes.documentSet.length, 3);
     expect(changes.needsRefill, isFalse);
@@ -440,7 +440,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes =
+    ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
@@ -462,7 +462,7 @@ void main() {
     final Document doc2 = doc('rooms/eros/messages/1', 0, map(), false);
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    DocumentChanges changes =
+    ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
@@ -485,7 +485,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes =
+    ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
@@ -508,7 +508,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes =
+    ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet());
@@ -527,7 +527,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes =
+    ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
@@ -546,7 +546,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes =
+    ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
@@ -563,7 +563,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    DocumentChanges changes =
+    ViewDocumentChanges changes =
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
 

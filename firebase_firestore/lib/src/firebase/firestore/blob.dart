@@ -12,7 +12,9 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 class Blob implements Comparable<Blob> {
   final Uint8List bytes;
 
-  const Blob(this.bytes);
+  Blob(Uint8List bytes) : bytes = Uint8List.fromList(bytes.toList());
+
+  Blob.fromList(List<int> bytes) : bytes = Uint8List.fromList(bytes.toList());
 
   @override
   @publicApi

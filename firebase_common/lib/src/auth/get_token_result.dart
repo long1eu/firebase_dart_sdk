@@ -76,5 +76,5 @@ class GetTokenResult {
           claims == other.claims;
 
   @override
-  int get hashCode => token.hashCode ^ claims.hashCode;
+  int get hashCode => token.hashCode * 31 ^ claims.hashCode * 31;
 }
