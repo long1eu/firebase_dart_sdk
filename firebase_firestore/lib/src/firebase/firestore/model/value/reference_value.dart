@@ -42,5 +42,5 @@ class ReferenceValue extends FieldValue {
           key == other.key;
 
   @override
-  int get hashCode => super.hashCode ^ databaseId.hashCode ^ key.hashCode;
+  int get hashCode => databaseId.hashCode ^ key.hashCode;
 }

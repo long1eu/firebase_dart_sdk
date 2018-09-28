@@ -114,9 +114,9 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
   @override
   int get hashCode {
-    int result = comparator.hashCode;
+    int result = 0;
     for (MapEntry<K, V> entry in this) {
-      result = 31 * result + entry.hashCode;
+      result = 31 * result + entry.key.hashCode + entry.value.hashCode;
     }
 
     return result;

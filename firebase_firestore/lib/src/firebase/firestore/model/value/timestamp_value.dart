@@ -49,7 +49,7 @@ class TimestampValue extends FieldValue {
           _value == other._value;
 
   @override
-  int get hashCode => super.hashCode ^ _value.hashCode;
+  int get hashCode => _value.hashCode;
 
   @override
   String toString() => _value.toString();

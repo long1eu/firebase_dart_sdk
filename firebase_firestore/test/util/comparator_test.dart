@@ -93,8 +93,6 @@ class ComparatorTester<T> {
                       referenceIndex.compareTo(otherIndex).sign,
                   '\n$reference $other => ${_compare(reference, other)}\n$referenceIndex $otherIndex => ${referenceIndex.compareTo(otherIndex)}');
             } else {
-              print(reference.runtimeType);
-              print(other.runtimeType);
               print(
                   '\n$reference $other => ${_compare(reference, other)}\n$referenceIndex $otherIndex => ${referenceIndex.compareTo(otherIndex)}');
             }

@@ -27,8 +27,11 @@ class IntegerValue extends NumberValue {
           _value == other._value;
 
   @override
-  int get hashCode => super.hashCode ^ _value.hashCode;
+  int get hashCode => _value.hashCode;
 
+  /// NOTE:
+  /// Comparing to a NaN should always return 1;
+  /// Comparing 0 with 0.0 should return 0;
   @override
   int compareTo(FieldValue other) {
     if (other is NumberValue) {

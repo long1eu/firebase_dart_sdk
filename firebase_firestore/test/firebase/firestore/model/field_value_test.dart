@@ -25,6 +25,7 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
 import '../../../util/comparator_test.dart';
+import '../../../util/equals_tester.dart';
 import '../../../util/test_access_helper.dart';
 import '../../../util/test_util.dart';
 
@@ -414,52 +415,67 @@ void main() {
 
   test('testValueEquality', () {
     EqualsTester()
-        .addEqualityGroup(wrap(true), BoolValue.valueOf(true))
-        .addEqualityGroup(wrap(false), BoolValue.valueOf(false))
-        .addEqualityGroup(wrap(null), NullValue.nullValue())
-        .addEqualityGroup(
-            wrap(0.0 / 0.0), wrap(0x7ff8000000000000), DoubleValue.nan)
+        .addEqualityGroup(<FieldValue>[wrap(true), BoolValue.valueOf(true)])
+        .addEqualityGroup(<FieldValue>[wrap(false), BoolValue.valueOf(false)])
+        .addEqualityGroup(<FieldValue>[wrap(null), NullValue.nullValue()])
+        //.addEqualityGroup(<FieldValue>[wrap(0.0 / 0.0), DoubleValue.nan])
+
         // -0.0 and 0.0 compareTo the same but are not equal.
-        .addEqualityGroup(wrap(-0.0))
-        .addEqualityGroup(wrap(0.0))
-        .addEqualityGroup(wrap(1), IntegerValue.valueOf(1))
+        .addItem(wrap(-0.0))
+        .addItem(wrap(0.0))
+        .addEqualityGroup(<FieldValue>[wrap(1), IntegerValue.valueOf(1)])
         // Doubles and Longs aren't equal.
-        .addEqualityGroup(wrap(1.0), DoubleValue.valueOf(1.0))
-        .addEqualityGroup(wrap(1.1), DoubleValue.valueOf(1.1))
+        .addEqualityGroup(<FieldValue>[wrap(1.0), DoubleValue.valueOf(1.0)])
+        .addEqualityGroup(<FieldValue>[wrap(1.1), DoubleValue.valueOf(1.1)])
+        .addEqualityGroup(<FieldValue>[
+          wrap(blob(<int>[0, 1, 2])),
+          BlobValue.valueOf(blob(<int>[0, 1, 2]))
+        ])
+        .addItem(wrap(blob(<int>[0, 1])))
         .addEqualityGroup(
-            wrap(blob(<int>[0, 1, 2])), BlobValue.valueOf(blob(<int>[0, 1, 2])))
-        .addEqualityGroup(wrap(blob(<int>[0, 1])))
-        .addEqualityGroup(wrap('string'), StringValue.valueOf('string'))
-        .addEqualityGroup(StringValue.valueOf('strin'))
+            <FieldValue>[wrap('string'), StringValue.valueOf('string')])
+        .addItem(StringValue.valueOf('strin'))
         // latin small letter e + combining acute accent
-        .addEqualityGroup(StringValue.valueOf('e\u0301b'))
+        .addItem(StringValue.valueOf('e\u0301b'))
         // latin small letter e with acute accent
-        .addEqualityGroup(StringValue.valueOf('\u00e9a'))
-        .addEqualityGroup(
-            wrap(date1), TimestampValue.valueOf(Timestamp.fromDate(date1)))
-        .addEqualityGroup(TimestampValue.valueOf(Timestamp.fromDate(date2)))
+        .addItem(StringValue.valueOf('\u00e9a'))
+        .addEqualityGroup(<FieldValue>[
+          wrap(date1),
+          TimestampValue.valueOf(Timestamp.fromDate(date1))
+        ])
+        .addItem(TimestampValue.valueOf(Timestamp.fromDate(date2)))
         // NOTE: ServerTimestampValues can't be parsed via wrap().
-        .addEqualityGroup(ServerTimestampValue(Timestamp.fromDate(date1), null),
-            ServerTimestampValue(Timestamp.fromDate(date1), null))
-        .addEqualityGroup(ServerTimestampValue(Timestamp.fromDate(date2), null))
-        .addEqualityGroup(
-            wrap(GeoPoint(0.0, 1.0)), GeoPointValue.valueOf(GeoPoint(0.0, 1.0)))
-        .addEqualityGroup(GeoPointValue.valueOf(GeoPoint(1.0, 0.0)))
-        .addEqualityGroup(wrap(ref('coll/doc1')),
-            ReferenceValue.valueOf(dbId('project'), key('coll/doc1')))
-        .addEqualityGroup(
+        .addEqualityGroup(<ServerTimestampValue>[
+          ServerTimestampValue(Timestamp.fromDate(date1), null),
+          ServerTimestampValue(Timestamp.fromDate(date1), null)
+        ])
+        .addItem(ServerTimestampValue(Timestamp.fromDate(date2), null))
+        .addEqualityGroup(<FieldValue>[
+          wrap(GeoPoint(0.0, 1.0)),
+          GeoPointValue.valueOf(GeoPoint(0.0, 1.0))
+        ])
+        .addItem(GeoPointValue.valueOf(GeoPoint(1.0, 0.0)))
+        .addEqualityGroup(<FieldValue>[
+          wrap(ref('coll/doc1')),
+          ReferenceValue.valueOf(dbId('project'), key('coll/doc1'))
+        ])
+        .addItem(
             ReferenceValue.valueOf(dbId('project', 'bar'), key('coll/doc2')))
-        .addEqualityGroup(
+        .addItem(
             ReferenceValue.valueOf(dbId('project', 'baz'), key('coll/doc2')))
-        .addEqualityGroup(
-            wrap(<String>['foo', 'bar']), wrap(<String>['foo', 'bar']))
-        .addEqualityGroup(wrap(<String>['foo', 'bar', 'baz']))
-        .addEqualityGroup(wrap(<String>['foo']))
-        .addEqualityGroup(wrapObject(map(<dynamic>['bar', 1, 'foo', 2])),
-            wrapObject(map(<dynamic>['foo', 2, 'bar', 1])))
-        .addEqualityGroup(wrapObject(map(<dynamic>['bar', 2, 'foo', 1])))
-        .addEqualityGroup(wrapObject(map(<dynamic>['bar', 1])))
-        .addEqualityGroup(wrapObject(map(<dynamic>['foo', 1])))
+        .addEqualityGroup(<FieldValue>[
+          wrap(<String>['foo', 'bar']),
+          wrap(<String>['foo', 'bar'])
+        ])
+        .addItem(wrap(<String>['foo', 'bar', 'baz']))
+        .addItem(wrap(<String>['foo']))
+        .addEqualityGroup(<FieldValue>[
+          wrapObject(map(<dynamic>['bar', 1, 'foo', 2])),
+          wrapObject(map(<dynamic>['foo', 2, 'bar', 1]))
+        ])
+        .addItem(wrapObject(map(<dynamic>['bar', 2, 'foo', 1])))
+        .addItem(wrapObject(map(<dynamic>['bar', 1])))
+        .addItem(wrapObject(map(<dynamic>['foo', 1])))
         .testEquals();
   });
 

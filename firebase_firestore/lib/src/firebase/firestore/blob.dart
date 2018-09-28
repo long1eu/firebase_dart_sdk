@@ -5,6 +5,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
@@ -36,10 +37,12 @@ class Blob implements Comparable<Blob> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Blob && runtimeType == other.runtimeType && bytes == other.bytes;
+      other is Blob &&
+          runtimeType == other.runtimeType &&
+          const DeepCollectionEquality().equals(bytes, other.bytes);
 
   @override
-  int get hashCode => bytes.hashCode;
+  int get hashCode => const DeepCollectionEquality().hash(bytes);
 
   @override
   String toString() => 'Blob { bytes= ${Util.toDebugString(bytes)} }';

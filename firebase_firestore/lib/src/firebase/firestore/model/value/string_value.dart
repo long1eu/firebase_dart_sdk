@@ -39,5 +39,5 @@ class StringValue extends FieldValue {
   }
 
   @override
-  int get hashCode => super.hashCode ^ _value.hashCode;
+  int get hashCode => _value.hashCode;
 }

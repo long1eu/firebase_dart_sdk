@@ -18,30 +18,43 @@ class DoubleValue extends NumberValue {
   @override
   double get value => _value;
 
+  /// -0.0 is not equal with 0.0
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is DoubleValue &&
-          runtimeType == other.runtimeType &&
-          _value == other._value;
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    if (other is DoubleValue && runtimeType == other.runtimeType) {
+      if ((identical(_value, -0.0) && identical(other._value, 0.0)) ||
+          (identical(_value, 0.0) && identical(other._value, -0.0))) {
+        return false;
+      }
+
+      return _value == other._value;
+    } else {
+      return false;
+    }
+  }
 
   @override
-  int get hashCode => super.hashCode ^ _value.hashCode;
+  int get hashCode => _value.hashCode;
 
+  /// Comparing NaN's should return 0, if [this] is NaN it should return -1 and
+  /// if [other] is NaN it should return 1
   @override
   int compareTo(FieldValue other) {
     if (other is! NumberValue) {
       return defaultCompareTo(other);
     }
 
-    NumberValue val = other;
-    if (value.isNaN && val.value.isNaN) {
+    final NumberValue otherValue = other;
+    if (value.isNaN && otherValue.value.isNaN) {
       return 0;
     } else if (value.isNaN) {
       return -1;
-    } else if (val.value is double && val.value.isNaN) {
+    } else if (otherValue.value is double && otherValue.value.isNaN) {
       return 1;
-    } else if (val.value == value) {
+    } else if (otherValue.value == value) {
       return 0;
     }
 

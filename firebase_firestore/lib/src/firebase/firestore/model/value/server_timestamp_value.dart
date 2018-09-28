@@ -72,6 +72,5 @@ class ServerTimestampValue extends FieldValue {
           previousValue == other.previousValue;
 
   @override
-  int get hashCode =>
-      super.hashCode ^ localWriteTime.hashCode ^ previousValue.hashCode;
+  int get hashCode => localWriteTime.hashCode ^ previousValue.hashCode;
 }

@@ -36,5 +36,5 @@ class BlobValue extends FieldValue {
           _value == other._value;
 
   @override
-  int get hashCode => super.hashCode ^ _value.hashCode;
+  int get hashCode => _value.hashCode;
 }

@@ -61,5 +61,5 @@ class ArrayValue extends FieldValue {
           const DeepCollectionEquality().equals(_value, other._value);
 
   @override
-  int get hashCode => super.hashCode ^ _value.hashCode;
+  int get hashCode => const DeepCollectionEquality().hash(_value);
 }
