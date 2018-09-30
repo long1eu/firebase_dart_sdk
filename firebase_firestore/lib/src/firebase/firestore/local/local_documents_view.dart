@@ -43,6 +43,7 @@ class LocalDocumentsView {
   Future<MaybeDocument> _getDocument(DatabaseExecutor tx, DocumentKey key,
       List<MutationBatch> inBatches) async {
     MaybeDocument document = await remoteDocumentCache.get(tx, key);
+
     for (MutationBatch batch in inBatches) {
       document = batch.applyToLocalView(key, document);
     }
@@ -61,6 +62,7 @@ class LocalDocumentsView {
 
     final List<MutationBatch> batches = await mutationQueue
         .getAllMutationBatchesAffectingDocumentKeys(tx, keys);
+
     for (DocumentKey key in keys) {
       // TODO: PERF: Consider fetching all remote documents at once rather than
       // one-by-one.

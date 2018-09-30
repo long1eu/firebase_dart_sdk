@@ -7,7 +7,8 @@
 class User {
   static const User unauthenticated = const User();
 
-  // Porting note: no GOOGLE_CREDENTIALS or FIRST_PARTY on Android, see Token for more details.
+  // Porting note: no GOOGLE_CREDENTIALS or FIRST_PARTY on Android, see Token
+  // for more details.
   final String uid;
 
   const User([this.uid]);

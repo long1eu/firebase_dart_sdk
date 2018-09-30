@@ -34,7 +34,7 @@ class SQLitePersistence extends Persistence {
   Database _db;
 
   @override
-  bool started;
+  bool started = false;
 
   @override
   SQLiteQueryCache queryCache;
@@ -45,18 +45,18 @@ class SQLitePersistence extends Persistence {
   @override
   SQLiteLruReferenceDelegate referenceDelegate;
 
-  SQLitePersistence(this.serializer, this.opener);
+  SQLitePersistence._(this.serializer, this.opener, this._db);
 
   static Future<SQLitePersistence> create(
-    String persistenceKey,
-    DatabaseId databaseId,
-    LocalSerializer serializer,
-    OpenDatabase openDatabase,
-  ) async {
+      String persistenceKey,
+      DatabaseId databaseId,
+      LocalSerializer serializer,
+      OpenDatabase openDatabase) async {
     final String databaseName = sDatabaseName(persistenceKey, databaseId);
     final _OpenHelper opener =
         await _OpenHelper.open(databaseName, openDatabase);
-    final SQLitePersistence persistence = SQLitePersistence(serializer, opener);
+    final SQLitePersistence persistence =
+        SQLitePersistence._(serializer, opener, opener.db);
 
     final SQLiteQueryCache queryCache =
         SQLiteQueryCache(persistence, serializer);
@@ -87,14 +87,17 @@ class SQLitePersistence extends Persistence {
 
   @override
   Future<void> start() async {
+    Log.d(tag, 'Starting SQLite persistance');
     Assert.hardAssert(!started, 'SQLitePersistence double-started!');
-    started = true;
     await queryCache.start(_db);
+    started = true;
     referenceDelegate.start(queryCache.highestListenSequenceNumber);
   }
 
   @override
   Future<void> shutdown() async {
+    Log.d(tag, 'Shutingdown SQLite persistance');
+
     Assert.hardAssert(started, 'SQLitePersistence shutdown without start!');
     started = false;
     _db.close();
@@ -118,11 +121,14 @@ class SQLitePersistence extends Persistence {
 
   @override
   Future<T> runTransactionAndReturn<T>(
-      String action, Transaction<T> operation) {
+      String action, Transaction<T> operation) async {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
-    return _db.transaction((DatabaseExecutor tx) => operation(tx),
-        exclusive: true);
+    final T result = await _db.transaction((DatabaseExecutor tx) {
+      return operation(tx);
+    });
+    referenceDelegate.onTransactionCommitted();
+    return result;
   }
 
   /// Execute the given non-query SQL statement.
@@ -170,8 +176,9 @@ class _OpenHelper {
       }
     }
 
+    // TODO:{30/09/2018 00:08}-long1eu: add path
     final Database db = await openDatabase(
-      '',
+      databaseName,
       version: SQLiteSchema.version,
       onConfigure: (Database db) async {
         configured = true;
@@ -179,11 +186,11 @@ class _OpenHelper {
       },
       onCreate: (Database db, int version) async {
         ensureConfigured(db);
-        SQLiteSchema(db).runMigrations(0);
+        await SQLiteSchema(db).runMigrations(0);
       },
       onUpgrade: (Database db, int fromVersion, int toVersion) async {
         ensureConfigured(db);
-        SQLiteSchema(db).runMigrations(fromVersion);
+        await SQLiteSchema(db).runMigrations(fromVersion);
       },
       onDowngrade: (Database db, int fromVersion, int toVersion) async {
         ensureConfigured(db);

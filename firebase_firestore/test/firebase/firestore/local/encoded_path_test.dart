@@ -15,7 +15,8 @@ void main() {
   Database db;
 
   setUp(() async {
-    db = DatabaseMock('firebase/firestore/local/encoded_path_test.db');
+    db = await DatabaseMock.create(
+        'firebase/firestore/local/encoded_path_test.db');
     await db.execute('CREATE TABLE keys (key TEXT PRIMARY KEY)');
   });
 

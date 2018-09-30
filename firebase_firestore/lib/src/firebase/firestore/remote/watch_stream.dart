@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
+import 'dart:typed_data';
+
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/abstract_stream.dart';
@@ -26,7 +28,7 @@ import 'package:meta/meta.dart';
 class WatchStream
     extends AbstractStream<ListenRequest, ListenResponse, WatchStreamCallback> {
   /// The empty stream token.
-  static const List<int> EMPTY_RESUME_TOKEN = <int>[];
+  static final Uint8List emptyResumeToken = Uint8List.fromList(<int>[]);
 
   final RemoteSerializer serializer;
 

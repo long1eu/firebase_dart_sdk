@@ -26,6 +26,4 @@ dev_dependencies:
   mockito: ^3.0.0
   sqlite:
     #git: https://github.com/long1eu/dart-sqlite
-    #/Users/long1eu/projects/IdeaProjects/firebase_flutter_sdk/firebase_firestore/lib/src/firebase/firestore/write_batch.dart
-    #/Users/long1eu/IdeaProjects/dart-sqlite
     path: ../../../IdeaProjects/dart-sqlite

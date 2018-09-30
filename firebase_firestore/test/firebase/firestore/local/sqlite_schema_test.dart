@@ -17,7 +17,8 @@ void main() {
   SQLiteSchema schema;
 
   setUp(() async {
-    db = DatabaseMock('firebase/firestore/local/sqlite_schema_test.db');
+    db = await DatabaseMock.create(
+        'firebase/firestore/local/sqlite_schema_test.db');
     schema = SQLiteSchema(db);
     await schema.runMigrations();
   });

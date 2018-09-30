@@ -562,8 +562,8 @@ class RemoteStore implements TargetMetadataProvider {
       final String token = Util.toDebugString(_writeStream.lastStreamToken);
       Log.d(_tag,
           'RemoteStore error before completed handshake; resetting stream token $token: $status');
-      _writeStream.lastStreamToken = WriteStream.EMPTY_STREAM_TOKEN;
-      await _localStore.setLastStreamToken(WriteStream.EMPTY_STREAM_TOKEN);
+      _writeStream.lastStreamToken = WriteStream.emptyStreamToken;
+      await _localStore.setLastStreamToken(WriteStream.emptyStreamToken);
     }
   }
 

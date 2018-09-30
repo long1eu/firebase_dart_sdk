@@ -36,6 +36,8 @@ class ReferenceSet {
   /// Returns true if the reference set contains no references.
   bool get isEmpty => referencesByKey.isEmpty;
 
+  bool get isNotEmpty => !isEmpty;
+
   /// Adds a reference to the given document key for the given id.
   void addReference(DocumentKey key, int targetOrBatchId) {
     final DocumentReference ref = DocumentReference(key, targetOrBatchId);

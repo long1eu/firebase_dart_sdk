@@ -186,7 +186,7 @@ class FirestoreClient implements RemoteStoreCallback {
       persistence = MemoryPersistence.createEagerGcMemoryPersistence();
     }
 
-    persistence.start();
+    await persistence.start();
     localStore = LocalStore(persistence, user);
 
     final Datastore datastore =

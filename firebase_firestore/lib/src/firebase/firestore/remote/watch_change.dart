@@ -2,6 +2,9 @@
 // Lung Razvan <long1eu>
 // on 24/09/2018
 
+import 'dart:typed_data';
+
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/existence_filter.dart';
@@ -92,7 +95,7 @@ class WatchChangeWatchTargetChange extends WatchChange {
   /// be resumed after disconnecting without retransmitting all the data that
   /// matches the query. The resume token essentially identifies a point in time
   /// from which the server should resume sending results.
-  final List<int> resumeToken;
+  final Uint8List resumeToken;
 
   /// The cause, only valid if changeType == Removal
   final GrpcError cause;
@@ -100,9 +103,9 @@ class WatchChangeWatchTargetChange extends WatchChange {
   WatchChangeWatchTargetChange(
     this.changeType,
     this.targetIds, [
-    this.resumeToken = WatchStream.EMPTY_RESUME_TOKEN,
+    Uint8List resumeToken,
     GrpcError cause,
-  ])  :
+  ])  : resumeToken = resumeToken ?? WatchStream.emptyResumeToken,
         // We can get a cause that is considered ok, but everywhere we assume that
         // any non-null cause is an error.
         this.cause =
@@ -133,6 +136,11 @@ class WatchChangeWatchTargetChange extends WatchChange {
 
   @override
   String toString() {
-    return 'WatchTargetChange{changeType: $changeType, targetIds: $targetIds, resumeToken: $resumeToken, cause: $cause}';
+    return (ToStringHelper(runtimeType)
+          ..add('changeType', changeType)
+          ..add('targetIds', targetIds)
+          ..add('resumeToken', resumeToken)
+          ..add('cause', cause))
+        .toString();
   }
 }

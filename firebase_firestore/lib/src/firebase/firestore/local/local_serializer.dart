@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 23/09/2018
 
+import 'dart:typed_data';
+
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
@@ -175,7 +177,7 @@ class LocalSerializer {
 
     final SnapshotVersion version =
         rpcSerializer.decodeVersion(target.snapshotVersion);
-    final List<int> resumeToken = target.resumeToken;
+    final Uint8List resumeToken = Uint8List.fromList(target.resumeToken);
     final int sequenceNumber = target.lastListenSequenceNumber.toInt();
 
     Query query;
@@ -188,7 +190,13 @@ class LocalSerializer {
       throw Assert.fail('Unknown targetType $target}');
     }
 
-    return QueryData(query, targetId, sequenceNumber, QueryPurpose.listen,
-        version, resumeToken);
+    return QueryData(
+      query,
+      targetId,
+      sequenceNumber,
+      QueryPurpose.listen,
+      version,
+      resumeToken,
+    );
   }
 }

@@ -411,7 +411,7 @@ class TestUtil {
 
   /// Creates a resume token to match the given snapshot version.
 
-  static List<int> resumeToken(
+  static Uint8List resumeToken(
       /*int|SnapshotVersion|String*/
       dynamic snapshotVersion) {
     if (snapshotVersion is int) {
@@ -420,15 +420,15 @@ class TestUtil {
       }
 
       final String snapshotString = 'snapshot-$snapshotVersion';
-      return utf8.encode(snapshotString);
+      return Uint8List.fromList(utf8.encode(snapshotString));
     } else if (snapshotVersion is SnapshotVersion) {
       if (snapshotVersion == SnapshotVersion.none) {
-        return <int>[];
+        return Uint8List.fromList(<int>[]);
       } else {
-        return utf8.encode(snapshotVersion.toString());
+        return Uint8List.fromList(utf8.encode(snapshotVersion.toString()));
       }
     } else if (snapshotVersion is String) {
-      return utf8.encode(snapshotVersion);
+      return Uint8List.fromList(utf8.encode(snapshotVersion));
     } else {
       throw StateError(
           'snapshotVersion should be int|SnapshotVersion|String but it\'s ${snapshotVersion.runtimeType}');

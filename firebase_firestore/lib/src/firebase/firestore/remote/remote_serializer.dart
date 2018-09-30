@@ -988,7 +988,7 @@ class RemoteSerializer {
           break;
         case proto.TargetChange_TargetChangeType.REMOVE:
           changeType = WatchTargetChangeType.Removed;
-          cause = fromStatus(targetChange.cause);
+          cause = _fromStatus(targetChange.cause);
           break;
         case proto.TargetChange_TargetChangeType.CURRENT:
           changeType = WatchTargetChangeType.Current;
@@ -1000,7 +1000,11 @@ class RemoteSerializer {
           throw ArgumentError('Unknown target change type');
       }
       watchChange = WatchChangeWatchTargetChange(
-          changeType, targetChange.targetIds, targetChange.resumeToken, cause);
+        changeType,
+        targetChange.targetIds,
+        Uint8List.fromList(targetChange.resumeToken),
+        cause,
+      );
     } else if (protoChange.hasDocumentChange()) {
       final proto.DocumentChange docChange = protoChange.documentChange;
       final List<int> added = docChange.targetIds;
@@ -1055,8 +1059,7 @@ class RemoteSerializer {
     return decodeVersion(watchChange.targetChange.readTime);
   }
 
-  /*private*/
-  GrpcError fromStatus(proto.Status status) {
+  GrpcError _fromStatus(proto.Status status) {
     // TODO: Use details?
     return GrpcError.custom(status.code, status.message);
   }

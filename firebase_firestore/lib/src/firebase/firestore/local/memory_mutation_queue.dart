@@ -63,7 +63,7 @@ class MemoryMutationQueue implements MutationQueue {
             <DocumentReference>[], DocumentReference.byKey),
         nextBatchId = 1,
         highestAcknowledgedBatchId = MutationBatch.unknown,
-        lastStreamToken = WriteStream.EMPTY_STREAM_TOKEN;
+        lastStreamToken = WriteStream.emptyStreamToken;
 
   // MutationQueue implementation
 
@@ -411,7 +411,6 @@ class MemoryMutationQueue implements MutationQueue {
         result.add(batch);
       }
     }
-
     return result.toList(growable: false);
   }
 

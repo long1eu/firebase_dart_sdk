@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
+import 'dart:typed_data';
+
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
@@ -35,7 +37,7 @@ import 'package:meta/meta.dart';
 class WriteStream
     extends AbstractStream<WriteRequest, WriteResponse, WriteStreamCallback> {
   /// The empty stream token.
-  static const List<int> EMPTY_STREAM_TOKEN = <int>[];
+  static final Uint8List emptyStreamToken = Uint8List.fromList(<int>[0]);
 
   final RemoteSerializer _serializer;
 
@@ -49,7 +51,7 @@ class WriteStream
   ///
   /// NOTE: A null [streamToken] is not allowed: use the empty array for the
   /// unset value.
-  List<int> lastStreamToken = EMPTY_STREAM_TOKEN;
+  List<int> lastStreamToken = emptyStreamToken;
 
   bool _handshakeComplete = false;
 

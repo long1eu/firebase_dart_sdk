@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
@@ -53,13 +54,13 @@ class SQLiteMutationQueue implements MutationQueue {
   ///
   /// * After sending this token, earlier tokens may not be used anymore so only
   /// a single stream token is retained.
-  List<int> _lastStreamToken;
+  Uint8List _lastStreamToken;
 
   /// Creates a  mutation queue for the given user, in the SQLite database
   /// wrapped by the persistence interface.
   SQLiteMutationQueue(this.db, this.serializer, User user)
       : uid = user.isAuthenticated ? user.uid : '',
-        _lastStreamToken = WriteStream.EMPTY_STREAM_TOKEN;
+        _lastStreamToken = WriteStream.emptyStreamToken;
 
   // MutationQueue implementation
 
@@ -73,24 +74,24 @@ class SQLiteMutationQueue implements MutationQueue {
     // [lastAcknowledgedBatchId] (which is safe since the queue must be empty).
     _lastAcknowledgedBatchId = MutationBatch.unknown;
 
-    final List<Map<String, dynamic>> result = await db.query(tx,
-        // @formatter:off
-        '''
+    final List<Map<String, dynamic>> result = await db.query(
+      tx,
+      // @formatter:off
+      '''
           SELECT last_acknowledged_batch_id, last_stream_token
           FROM mutation_queues
           WHERE uid = ?;
         ''',
-        // @formatter:on
-        <String>[uid]);
+      // @formatter:on
+    );
 
-    final int rows = result.length;
     if (result.isNotEmpty) {
       final Map<String, dynamic> row = result.first;
       _lastAcknowledgedBatchId = row['last_acknowledged_batch_id'] as int;
-      _lastStreamToken = row['last_stream_token'] as List<int>;
+      _lastStreamToken = row['last_stream_token'] as Uint8List;
     }
 
-    if (rows == 0) {
+    if (result.isEmpty) {
       // Ensure we write a default entry in mutation_queues since
       // [loadNextBatchIdAcrossAllUsers] depends upon every queue having an
       // entry.
@@ -179,7 +180,7 @@ class SQLiteMutationQueue implements MutationQueue {
         'Mutation batchIds must be acknowledged in order');
 
     _lastAcknowledgedBatchId = batchId;
-    _lastStreamToken = Assert.checkNotNull(streamToken);
+    _lastStreamToken = Assert.checkNotNull(Uint8List.fromList(streamToken));
     await _writeMutationQueueMetadata(tx);
   }
 
@@ -189,7 +190,7 @@ class SQLiteMutationQueue implements MutationQueue {
   @override
   Future<void> setLastStreamToken(
       DatabaseExecutor tx, List<int> streamToken) async {
-    _lastStreamToken = Assert.checkNotNull(streamToken);
+    _lastStreamToken = Assert.checkNotNull(Uint8List.fromList(streamToken));
     await _writeMutationQueueMetadata(tx);
   }
 
@@ -382,27 +383,21 @@ class SQLiteMutationQueue implements MutationQueue {
     // SQLite limits maximum number of host parameters to 999 (see
     // https://www.sqlite.org/limits.html). To work around this, split the
     // given keys into several smaller sets and issue a separate query for each.
-    const int limit = 900;
-    final Iterator<DocumentKey> keyIter = documentKeys.iterator;
+    const int chunkSize = 900;
+    final int len = documentKeys.length;
     final Set<int> uniqueBatchIds = Set<int>();
-    int queriesPerformed = 0;
-    while (keyIter.moveNext()) {
-      ++queriesPerformed;
-      final StringBuffer placeholdersBuilder = StringBuffer();
+    for (int i = 0; i < len; i += chunkSize) {
       final List<String> args = <String>[];
       args.add(uid);
 
-      for (int i = 0; keyIter.moveNext() && i < limit; i++) {
-        final DocumentKey key = keyIter.current;
-
-        if (i > 0) {
-          placeholdersBuilder.write(', ');
-        }
-        placeholdersBuilder.write('?');
-
-        args.add(EncodedPath.encode(key.path));
-      }
-      final String placeholders = placeholdersBuilder.toString();
+      final String placeholders = documentKeys
+          .map((DocumentKey key) {
+            args.add(EncodedPath.encode(key.path));
+            return '?';
+          })
+          .skip(i)
+          .take(chunkSize)
+          .join(', ');
 
       final List<Map<String, dynamic>> rows = await db.query(
           tx,
@@ -424,7 +419,7 @@ class SQLiteMutationQueue implements MutationQueue {
         final int batchId = row['batch_id'];
         if (!uniqueBatchIds.contains(batchId)) {
           uniqueBatchIds.add(batchId);
-          result.add(decodeMutationBatch(row['mutations'] as List<int>));
+          result.add(decodeMutationBatch(row['mutations'] as Uint8List));
         }
       }
     }
@@ -433,7 +428,7 @@ class SQLiteMutationQueue implements MutationQueue {
     // (batches are ordered within one query's results, but not across queries).
     // It's likely to be rare, so don't impose performance penalty on the normal
     // case.
-    if (queriesPerformed > 1) {
+    if (documentKeys.length > 1) {
       result.sort((MutationBatch lhs, MutationBatch rhs) =>
           lhs.batchId.compareTo(rhs.batchId));
     }
@@ -552,7 +547,8 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<void> performConsistencyCheck(DatabaseExecutor tx) async {
-    if (await isEmpty(tx)) {
+    final bool empty = await isEmpty(tx);
+    if (empty) {
       // Verify that there are no entries in the document_mutations index if the
       // queue is empty.
       final List<ResourcePath> danglingMutationReferences = <ResourcePath>[];
@@ -578,7 +574,10 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   MutationBatch decodeMutationBatch(List<int> bytes) {
-    return serializer.decodeMutationBatch(proto.WriteBatch.fromBuffer(bytes));
-    // throw Assert.fail('MutationBatch failed to parse: $e');
+    try {
+      return serializer.decodeMutationBatch(proto.WriteBatch.fromBuffer(bytes));
+    } on InvalidProtocolBufferException catch (e) {
+      throw Assert.fail('MutationBatch failed to parse: $e');
+    }
   }
 }

@@ -4,7 +4,7 @@
 
 class Log {
   static bool get isDebugEnabled => _level >= LogLevel.d;
-  static LogLevel _level;
+  static LogLevel _level = LogLevel.d;
 
   static void i(String tag, dynamic message) {
     if (_level >= LogLevel.i) print('I:$tag||$message');
@@ -22,7 +22,9 @@ class Log {
     if (_level >= LogLevel.e) print('E:$tag||$message');
   }
 
-  static void setLogLevel(LogLevel level) {}
+  static void setLogLevel(LogLevel level) {
+    _level = level;
+  }
 }
 
 class LogLevel implements Comparable<LogLevel> {

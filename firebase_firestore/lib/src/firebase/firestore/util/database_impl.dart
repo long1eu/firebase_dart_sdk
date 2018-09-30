@@ -10,9 +10,7 @@ typedef Future<Database> OpenDatabase(String path,
     OnCreate onCreate,
     OnVersionChange onUpgrade,
     OnVersionChange onDowngrade,
-    OnOpen onOpen,
-    bool readOnly,
-    bool singleInstance});
+    OnOpen onOpen});
 
 typedef Future<void> OnVersionChange(
     Database db, int oldVersion, int newVersion);

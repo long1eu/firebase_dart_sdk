@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
+import 'dart:typed_data';
+
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
@@ -15,7 +17,7 @@ class QueryData {
   final int sequenceNumber;
   final QueryPurpose purpose;
   final SnapshotVersion snapshotVersion;
-  final List<int> resumeToken;
+  final Uint8List resumeToken;
 
   /// Creates a new QueryData with the given values.
   ///
@@ -43,7 +45,7 @@ class QueryData {
       sequenceNumber,
       purpose,
       SnapshotVersion.none,
-      WatchStream.EMPTY_RESUME_TOKEN,
+      WatchStream.emptyResumeToken,
     );
   }
 
@@ -57,7 +59,7 @@ class QueryData {
       sequenceNumber,
       purpose,
       snapshotVersion,
-      resumeToken,
+      Uint8List.fromList(resumeToken),
     );
   }
 }

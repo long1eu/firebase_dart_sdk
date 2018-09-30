@@ -93,7 +93,7 @@ class MutationBatch {
   }
 
   /// Returns the set of unique keys referenced by all mutations in the batch.
-  Set<DocumentKey> getKeys() {
+  Set<DocumentKey> get keys {
     final Set<DocumentKey> set = Set<DocumentKey>();
     for (Mutation mutation in mutations) {
       set.add(mutation.key);

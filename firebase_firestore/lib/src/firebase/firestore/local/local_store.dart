@@ -171,12 +171,11 @@ class LocalStore {
     await _startMutationQueue();
   }
 
-  /*p*/
   Future<void> _startMutationQueue() async {
     await _persistence.runTransaction(
       'Start MutationQueue',
       (DatabaseExecutor tx) async {
-        _mutationQueue.start(tx);
+        await _mutationQueue.start(tx);
 
         // If we have any leftover mutation batch results from a prior run,
         // just drop them.
@@ -195,7 +194,7 @@ class LocalStore {
             // NOTE: This could be more efficient if we had a
             // [removeBatchesThroughBatchID], but this set should be very small
             // and this code should go away eventually.
-            _mutationQueue.removeMutationBatches(tx, batches);
+            await _mutationQueue.removeMutationBatches(tx, batches);
           }
         }
       },
@@ -255,9 +254,10 @@ class LocalStore {
         final MutationBatch batch = await _mutationQueue.addMutationBatch(
             tx, localWriteTime, mutations);
 
-        final Set<DocumentKey> keys = batch.getKeys();
+        final Set<DocumentKey> keys = batch.keys;
         final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
             await _localDocuments.getDocuments(tx, keys);
+
         return LocalWriteResult(batch.batchId, changedDocuments);
       },
     );
@@ -328,7 +328,7 @@ class LocalStore {
   /// mutation batch. This is usually only useful after a stream handshake or in
   /// response to an error that requires clearing the stream token.
   ///
-  /// Use [WriteStream.EMPTY_STREAM_TOKEN] to clear the current value.
+  /// Use [WriteStream.emptyStreamToken] to clear the current value.
   Future<void> setLastStreamToken(List<int> streamToken) async {
     await _persistence.runTransaction(
         'Set stream token',
@@ -528,9 +528,9 @@ class LocalStore {
         (DatabaseExecutor tx) => _localDocuments.getDocument(tx, key));
   }
 
-  /// Assigns the given query an internal id so that its results can be pinned so
-  /// they don't get GC'd. A query must be allocated in the local store before
-  /// the store can be used to manage its view.
+  /// Assigns the given query an internal id so that its results can be pinned
+  /// so they don't get GC'd. A query must be allocated in the local store
+  /// before the store can be used to manage its view.
   Future<QueryData> allocateQuery(Query query) {
     return _persistence.runTransactionAndReturn<QueryData>('Allocate query',
         (DatabaseExecutor tx) async {
@@ -542,17 +542,14 @@ class LocalStore {
         // TODO: freshen last accessed date?
         targetId = cached.targetId;
       } else {
-        final AllocateQueryHolder holder = AllocateQueryHolder();
-        holder.targetId = _targetIdGenerator.nextId();
-        holder.cached = QueryData.init(
-            query,
-            holder.targetId,
-            _persistence.referenceDelegate.currentSequenceNumber,
-            QueryPurpose.listen);
-        await _queryCache.addQueryData(tx, holder.cached);
-
-        targetId = holder.targetId;
-        cached = holder.cached;
+        targetId = _targetIdGenerator.nextId();
+        cached = QueryData.init(
+          query,
+          targetId,
+          _persistence.referenceDelegate.currentSequenceNumber,
+          QueryPurpose.listen,
+        );
+        await _queryCache.addQueryData(tx, cached);
       }
 
       // Sanity check to ensure that even when resuming a query it's not
@@ -565,8 +562,9 @@ class LocalStore {
   }
 
   /// Unpin all the documents associated with the given query.
-  void releaseQuery(Query query) {
-    _persistence.runTransaction('Release query', (DatabaseExecutor tx) async {
+  Future<void> releaseQuery(Query query) async {
+    await _persistence.runTransaction('Release query',
+        (DatabaseExecutor tx) async {
       QueryData queryData = await _queryCache.getQueryData(tx, query);
       Assert.hardAssert(
           queryData != null, 'Tried to release nonexistent query: %$query');
@@ -686,7 +684,7 @@ class LocalStore {
   Future<void> _applyBatchResult(
       DatabaseExecutor tx, MutationBatchResult batchResult) async {
     final MutationBatch batch = batchResult.batch;
-    final Set<DocumentKey> docKeys = batch.getKeys();
+    final Set<DocumentKey> docKeys = batch.keys;
     for (DocumentKey docKey in docKeys) {
       final MaybeDocument remoteDoc = await _remoteDocuments.get(tx, docKey);
       MaybeDocument doc = remoteDoc;
@@ -705,10 +703,4 @@ class LocalStore {
       }
     }
   }
-}
-
-/// Mutable state for the transaction in allocateQuery.
-class AllocateQueryHolder {
-  QueryData cached;
-  int targetId;
 }

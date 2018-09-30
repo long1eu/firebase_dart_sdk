@@ -3,6 +3,7 @@
 // on 21/09/2018
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
@@ -65,7 +66,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       DatabaseExecutor tx, DocumentKey documentKey) async {
     final String path = _pathForKey(documentKey);
 
-    final Map<String, dynamic> row = (await db.query(tx,
+    final List<Map<String, dynamic>> result = await db.query(tx,
         // @formatter:off
         '''
           SELECT contents
@@ -73,8 +74,10 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           WHERE path = ?;
         ''',
         // @formatter:on
-        <String>[path])).first;
+        <String>[path]);
 
+    if (result.isEmpty) return null;
+    final Map<String, dynamic> row = result.first;
     return decodeMaybeDocument(row['contents'] as List<int>);
   }
 
@@ -114,8 +117,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           EncodedPath.decodeResourcePath(row['path'] as String);
       if (path.length != immediateChildrenPathLength) continue;
 
-      final MaybeDocument maybeDoc =
-          decodeMaybeDocument(row['remote_documents'] as List<int>);
+      final Uint8List bytes = row['contents'];
+      final MaybeDocument maybeDoc = decodeMaybeDocument(bytes);
+
       if (maybeDoc is! Document) continue;
 
       final Document doc = maybeDoc;

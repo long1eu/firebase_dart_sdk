@@ -63,7 +63,7 @@ class SQLiteQueryCache implements QueryCache {
       row['last_remote_snapshot_version_seconds'] as int,
       row['last_remote_snapshot_version_nanos'] as int,
     ));
-    targetCount = row['targetCount'] as int;
+    targetCount = row['target_count'] as int;
 
     Assert.hardAssert(result.length == 1, 'Missing target_globals entry');
   }
