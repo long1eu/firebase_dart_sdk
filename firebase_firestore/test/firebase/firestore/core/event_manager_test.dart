@@ -1,13 +1,14 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 26/09/2018
+import 'dart:async';
+
 import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/sync_engine.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:mockito/mockito.dart';
 import 'package:test/test.dart';
 
@@ -22,7 +23,7 @@ class ViewSnapshotMock extends Mock implements ViewSnapshot {}
 void main() {
   QueryListener queryListener(Query query) {
     return QueryListener(query, ListenOptions(),
-        (ViewSnapshot value, FirebaseFirestoreError error) {});
+        StreamController<ViewSnapshot>()..stream.listen(null));
   }
 
   test('testMultipleListenersPerQuery', () {

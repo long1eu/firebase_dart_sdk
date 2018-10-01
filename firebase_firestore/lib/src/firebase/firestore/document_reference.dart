@@ -14,7 +14,6 @@ import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dar
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/listener_registration.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -25,9 +24,6 @@ import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
 import 'package:firebase_firestore/src/firebase/firestore/source.dart';
 import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/executor_event_listener.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/listener_registration_impl.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 /// A [DocumentReference] refers to a document location in a Firestore database
@@ -148,7 +144,6 @@ class DocumentReference {
   /// [source] a value to configure the get behavior.
   /// Returns a Future that will be resolved with the contents of the [Document]
   /// at this [DocumentReference].
-
   @publicApi
   Future<DocumentSnapshot> get([Source source]) async {
     source ??= Source.DEFAULT;
@@ -164,113 +159,75 @@ class DocumentReference {
   }
 
   Future<DocumentSnapshot> _getViaSnapshotListener(Source source) {
-    final Completer<DocumentSnapshot> res = Completer<DocumentSnapshot>();
-    final Completer<ListenerRegistration> registration =
-        Completer<ListenerRegistration>();
-
     final ListenOptions options = ListenOptions();
     options.includeDocumentMetadataChanges = true;
     options.includeQueryMetadataChanges = true;
     options.waitForSyncWhenOnline = true;
-    final ListenerRegistration listenerRegistration =
-        _addSnapshotListenerInternal(options,
-            (DocumentSnapshot snapshot, FirebaseFirestoreError error) async {
-      if (error != null) {
-        res.completeError(error);
-        return;
+
+    return _getSnapshotsInternal(options).map((DocumentSnapshot snapshot) {
+      if (!snapshot.exists && snapshot.metadata.isFromCache) {
+        // TODO: Reconsider how to raise missing documents when offline.
+        // If we're online and the document doesn't exist then we set the
+        // result of the Future with a document with document.exists set
+        // to false. If we're offline however, we set the Error on the
+        // Task. Two options:
+        //
+        // 1)  Cache the negative response from the server so we can
+        //     deliver that even when you're offline.
+        // 2)  Actually set the Error of the Task if the document doesn't
+        //     exist when you are offline.
+        throw FirebaseFirestoreError(
+            'Failed to get document because the client is offline.',
+            FirebaseFirestoreErrorCode.unavailable);
+      } else if (snapshot.exists &&
+          snapshot.metadata.isFromCache &&
+          source == Source.SERVER) {
+        throw FirebaseFirestoreError(
+            'Failed to get document from server. (However, this document does exist '
+            'in the local cache. Run again without setting source to SERVER to '
+            'retrieve the cached document.)',
+            FirebaseFirestoreErrorCode.unavailable);
+      } else {
+        return snapshot;
       }
-
-      try {
-        final ListenerRegistration actualRegistration =
-            await registration.future;
-
-        // Remove query first before passing event to user to avoid user
-        // actions affecting the now stale query.
-        actualRegistration.remove();
-
-        if (!snapshot.exists && snapshot.metadata.isFromCache) {
-          // TODO: Reconsider how to raise missing documents when offline.
-          // If we're online and the document doesn't exist then we set the
-          // result of the Future with a document with document.exists set
-          // to false. If we're offline however, we set the Error on the
-          // Task. Two options:
-          //
-          // 1)  Cache the negative response from the server so we can
-          //     deliver that even when you're offline.
-          // 2)  Actually set the Error of the Task if the document doesn't
-          //     exist when you are offline.
-          res.completeError(FirebaseFirestoreError(
-              'Failed to get document because the client is offline.',
-              FirebaseFirestoreErrorCode.unavailable));
-        } else if (snapshot.exists &&
-            snapshot.metadata.isFromCache &&
-            source == Source.SERVER) {
-          res.completeError(FirebaseFirestoreError(
-              'Failed to get document from server. (However, this document does exist '
-              'in the local cache. Run again without setting source to SERVER to '
-              'retrieve the cached document.)',
-              FirebaseFirestoreErrorCode.unavailable));
-        } else {
-          res.complete(snapshot);
-        }
-      } catch (e) {
-        throw Assert.fail(
-          'Failed to register a listener for a single document $e',
-        );
-      }
-    });
-
-    registration.complete(listenerRegistration);
-    return res.future;
+    }).first;
   }
 
   @publicApi
-  ListenerRegistration addSnapshotListener(
-      EventListener<DocumentSnapshot> listener,
-      [MetadataChanges metadataChanges = MetadataChanges.exclude]) {
-    Assert.checkNotNull(
-        metadataChanges, 'Provided MetadataChanges value must not be null.');
-    Assert.checkNotNull(listener, 'Provided EventListener must not be null.');
-    return _addSnapshotListenerInternal(
-        _internalOptions(metadataChanges), listener);
+  Stream<DocumentSnapshot> get snapshots {
+    final ListenOptions options = _internalOptions(MetadataChanges.exclude);
+    return _getSnapshotsInternal(options);
   }
 
-  /// Internal helper method to create add a snapshot listener.
-  ///
-  /// @param executor The executor to use to call the listener.
-  /// @param options The options to use for this listen.
-  /// @param activity Optional activity this listener is scoped to.
-  /// @param listener The event listener that will be called with the snapshots.
-  /// @return A registration object that can be used to remove the listener.
-  ListenerRegistration _addSnapshotListenerInternal(
-      ListenOptions options, EventListener<DocumentSnapshot> listener) {
-    final ExecutorEventListener<ViewSnapshot> wrappedListener =
-        ExecutorEventListener<ViewSnapshot>(
-            (ViewSnapshot snapshot, FirebaseFirestoreError error) {
-      if (snapshot != null) {
-        Assert.hardAssert(snapshot.documents.length <= 1,
-            'Too many documents returned on a document query');
-        final Document document = snapshot.documents.getDocument(key);
-        DocumentSnapshot documentSnapshot;
-        if (document != null) {
-          documentSnapshot = DocumentSnapshot.fromDocument(
-              firestore, document, snapshot.isFromCache);
-        } else {
-          documentSnapshot = DocumentSnapshot.fromNoDocument(
+  @publicApi
+  Stream<DocumentSnapshot> getSnapshots([MetadataChanges changes]) {
+    final ListenOptions options =
+        _internalOptions(changes ?? MetadataChanges.exclude);
+    return _getSnapshotsInternal(options);
+  }
+
+  Stream<DocumentSnapshot> _getSnapshotsInternal(ListenOptions options) {
+    final StreamController<ViewSnapshot> controller =
+        StreamController<ViewSnapshot>();
+
+    final Stream<DocumentSnapshot> stream =
+        controller.stream.map((ViewSnapshot snapshot) {
+      Assert.hardAssert(snapshot.documents.length <= 1,
+          'Too many documents returned on a document query');
+      final Document document = snapshot.documents.getDocument(key);
+      return document != null
+          ? DocumentSnapshot.fromDocument(
+              firestore, document, snapshot.isFromCache)
+          : DocumentSnapshot.fromNoDocument(
               firestore, key, snapshot.isFromCache);
-        }
-        listener(documentSnapshot, null);
-      } else {
-        Assert.hardAssert(
-            error != null, 'Got event without value or error set');
-        listener(null, error);
-      }
     });
+
     final core.Query query = core.Query.atPath(key.path);
     final QueryListener queryListener =
-        firestore.client.listen(query, options, wrappedListener);
-    return ListenerRegistrationImpl(
-        firestore.client, queryListener, wrappedListener);
+        firestore.client.listen(query, options, controller);
+    controller.onCancel = () => firestore.client.stopListening(queryListener);
+
+    return stream;
   }
 
   /// Converts the  API [MetadataChanges] object to the internal options object.

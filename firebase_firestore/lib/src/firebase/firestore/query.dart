@@ -19,7 +19,6 @@ import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart
 import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/listener_registration.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -31,9 +30,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/reference_
 import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/source.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/executor_event_listener.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/listener_registration_impl.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 /// An enum for the direction of a sort.
@@ -572,101 +568,48 @@ class Query {
   }
 
   Future<QuerySnapshot> _getViaSnapshotListener(Source source) {
-    final Completer<QuerySnapshot> res = Completer<QuerySnapshot>();
-    final Completer<ListenerRegistration> registration =
-        Completer<ListenerRegistration>();
-
     final ListenOptions options = ListenOptions();
     options.includeDocumentMetadataChanges = true;
     options.includeQueryMetadataChanges = true;
     options.waitForSyncWhenOnline = true;
 
-    final ListenerRegistration listenerRegistration =
-        _addSnapshotListenerInternal(options,
-            (QuerySnapshot snapshot, FirebaseFirestoreError error) async {
-      if (error != null) {
-        res.completeError(error);
-        return;
-      }
-
-      try {
-        // This await should be very short; we're just forcing synchronization
-        // between this block and the outer registration.setResult.
-        final ListenerRegistration actualRegistration =
-            await registration.future;
-
-        // Remove query first before passing event to user to avoid user actions
-        // affecting the now stale query.
-        actualRegistration.remove();
-
-        if (snapshot.metadata.isFromCache && source == Source.SERVER) {
-          res.completeError(FirebaseFirestoreError(
-              'Failed to get documents from server. (However, these documents '
-              'may exist in the local cache. Run again without setting source to SERVER to retrieve the cached documents.)',
-              FirebaseFirestoreErrorCode.unavailable));
-        } else {
-          res.complete(snapshot);
-        }
-      } catch (e) {
-        throw Assert.fail(
-            'Failed to register a listener for a query result', e as Error);
-      }
-    });
-
-    registration.complete(listenerRegistration);
-    return res.future;
-  }
-
-  /// Starts listening to this query with the given options, using an Activity-scoped listener.
-  ///
-  /// * The listener will be automatically removed during {@link Activity#onStop}.
-  ///
-  /// @param activity The activity to scope the listener to.
-  /// @param metadataChanges Indicates whether metadata-only changes (i.e. only {@code
-  /// Query.getMetadata()} changed) should trigger snapshot events.
-  /// @param listener The event listener that will be called with the snapshots.
-  /// @return A registration object that can be used to remove the listener.
-  @publicApi
-  ListenerRegistration addSnapshotListener(
-      EventListener<QuerySnapshot> listener,
-      [MetadataChanges metadataChanges = MetadataChanges.exclude]) {
-    Assert.checkNotNull(
-        metadataChanges, 'Provided MetadataChanges value must not be null.');
-    Assert.checkNotNull(listener, 'Provided EventListener must not be null.');
-    return _addSnapshotListenerInternal(
-        _internalOptions(metadataChanges), listener);
-  }
-
-  /// Internal helper method to create add a snapshot listener.
-  ///
-  /// todo update this once we have a way to integrate this with the widget system and onDispose
-  /// * Will be Activity scoped if the activity parameter is non-null.
-  ///
-  /// @param options The options to use for this listen.
-  /// @param listener The event listener that will be called with the snapshots.
-  /// @return A registration object that can be used to remove the listener.
-  ListenerRegistration _addSnapshotListenerInternal(
-      ListenOptions options, EventListener<QuerySnapshot> listener) {
-    void wrapperListener(ViewSnapshot snapshot, FirebaseFirestoreError error) {
-      if (snapshot != null) {
-        final QuerySnapshot querySnapshot =
-            QuerySnapshot(this, snapshot, firestore);
-        listener(querySnapshot, null);
+    return _getSnapshotsInternal(options).map((QuerySnapshot snapshot) {
+      if (snapshot.metadata.isFromCache && source == Source.SERVER) {
+        throw FirebaseFirestoreError(
+            'Failed to get documents from server. (However, these documents '
+            'may exist in the local cache. Run again without setting source to SERVER to retrieve the cached documents.)',
+            FirebaseFirestoreErrorCode.unavailable);
       } else {
-        Assert.hardAssert(
-            error != null, 'Got event without value or error set');
-        listener(null, error);
+        return snapshot;
       }
-    }
+    }).first;
+  }
+
+  @publicApi
+  Stream<QuerySnapshot> get snapshots {
+    final ListenOptions options = _internalOptions(MetadataChanges.exclude);
+    return _getSnapshotsInternal(options);
+  }
+
+  @publicApi
+  Stream<QuerySnapshot> getSnapshots([MetadataChanges changes]) {
+    final ListenOptions options =
+        _internalOptions(changes ?? MetadataChanges.exclude);
+    return _getSnapshotsInternal(options);
+  }
+
+  Stream<QuerySnapshot> _getSnapshotsInternal(ListenOptions options) {
+    final StreamController<ViewSnapshot> controller =
+        StreamController<ViewSnapshot>();
+
+    final Stream<QuerySnapshot> stream = controller.stream.map(
+        (ViewSnapshot snapshot) => QuerySnapshot(this, snapshot, firestore));
 
     final QueryListener queryListener =
-        firestore.client.listen(query, options, wrapperListener);
+        firestore.client.listen(query, options, controller);
+    controller.onCancel = () => firestore.client.stopListening(queryListener);
 
-    return ListenerRegistrationImpl(
-      firestore.client,
-      queryListener,
-      ExecutorEventListener<ViewSnapshot>(wrapperListener),
-    );
+    return stream;
   }
 
   /// Converts the  API options object to the internal options object.

@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
+import 'dart:async';
+
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
@@ -11,7 +13,6 @@ import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_err
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 /// QueryListener takes a series of internal view snapshots and determines when
 /// to raise events.
@@ -22,7 +23,7 @@ class QueryListener {
 
   final ListenOptions options;
 
-  final EventListener<ViewSnapshot> listener;
+  final EventSink<ViewSnapshot> listener;
 
   /// Initial snapshots (e.g. from cache) may not be propagated to the wrapped
   /// observer. This flag is set to true once we've actually raised an event.
@@ -52,17 +53,17 @@ class QueryListener {
 
     if (!raisedInitialEvent) {
       if (_shouldRaiseInitialEvent(newSnapshot, onlineState)) {
-        raiseInitialEvent(newSnapshot);
+        _raiseInitialEvent(newSnapshot);
       }
-    } else if (shouldRaiseEvent(newSnapshot)) {
-      listener(newSnapshot, null);
+    } else if (_shouldRaiseEvent(newSnapshot)) {
+      listener.add(newSnapshot);
     }
 
     snapshot = newSnapshot;
   }
 
   void onError(FirebaseFirestoreError error) {
-    listener(null, error);
+    listener.addError(error);
   }
 
   void onOnlineStateChanged(OnlineState onlineState) {
@@ -70,7 +71,7 @@ class QueryListener {
     if (snapshot != null &&
         !raisedInitialEvent &&
         _shouldRaiseInitialEvent(snapshot, onlineState)) {
-      raiseInitialEvent(snapshot);
+      _raiseInitialEvent(snapshot);
     }
   }
 
@@ -99,7 +100,7 @@ class QueryListener {
     return snapshot.documents.isNotEmpty || onlineState == OnlineState.offline;
   }
 
-  bool shouldRaiseEvent(ViewSnapshot snapshot) {
+  bool _shouldRaiseEvent(ViewSnapshot snapshot) {
     // We don't need to handle includeDocumentMetadataChanges here because the
     // Metadata only changes have already been stripped out if needed. At this
     // point the only changes we will see are the ones we should propagate.
@@ -119,7 +120,7 @@ class QueryListener {
     return false;
   }
 
-  void raiseInitialEvent(ViewSnapshot snapshot) {
+  void _raiseInitialEvent(ViewSnapshot snapshot) {
     Assert.hardAssert(
         !raisedInitialEvent, 'Trying to raise initial event for second time');
 
@@ -130,7 +131,7 @@ class QueryListener {
     );
 
     raisedInitialEvent = true;
-    listener(snapshot, null);
+    listener.add(snapshot);
   }
 
   static List<DocumentViewChange> _getInitialViewChanges(

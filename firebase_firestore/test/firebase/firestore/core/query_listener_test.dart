@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 26/09/2018
 
+import 'dart:async';
+
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
@@ -28,11 +30,16 @@ void main() {
 
   QueryListener queryListener(
       Query query, ListenOptions options, List<ViewSnapshot> accumulator) {
-    return QueryListener(query, options,
-        (ViewSnapshot value, FirebaseFirestoreError error) {
-      expect(error, isNull);
-      accumulator.add(value);
-    });
+    return QueryListener(
+        query,
+        options,
+        StreamController<ViewSnapshot>()
+          ..stream.listen(
+            accumulator.add,
+            onError: (dynamic error) {
+              assert(false, 'This should never be called. $error');
+            },
+          ));
   }
 
   QueryListener queryListenerDefault(
@@ -43,7 +50,7 @@ void main() {
     return queryListener(query, options, accumulator);
   }
 
-  test('testRaisesCollectionEvents', () {
+  test('testRaisesCollectionEvents', () async {
     final List<ViewSnapshot> accum = <ViewSnapshot>[];
     final List<ViewSnapshot> otherAccum = <ViewSnapshot>[];
 
@@ -74,7 +81,10 @@ void main() {
 
     listener.onViewSnapshot(snap1);
     listener.onViewSnapshot(snap2);
+
     otherListener.onViewSnapshot(snap2);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
     expect(accum, <ViewSnapshot>[snap1, snap2]);
     expect(accum[0].changes, <DocumentViewChange>[change1, change2]);
     expect(accum[1].changes, <DocumentViewChange>[change3]);
@@ -91,23 +101,32 @@ void main() {
     expect(otherAccum, <ViewSnapshot>[snap2Prime]);
   });
 
-  test('testRaisesErrorEvent', () {
+  test('testRaisesErrorEvent', () async {
     final Query query = Query.atPath(path('rooms/eros'));
 
     bool hadEvent = false;
-    final QueryListener listener = QueryListener(query, ListenOptions(),
-        (ViewSnapshot value, FirebaseFirestoreError error) {
-      expect(value, isNull);
-      expect(error, isNotNull);
-      hadEvent = true;
-    });
+    final QueryListener listener = QueryListener(
+        query,
+        ListenOptions(),
+        StreamController<ViewSnapshot>()
+          ..stream.listen(
+            (ViewSnapshot data) {
+              assert(false, 'This should never be called.');
+            },
+            onError: (dynamic e) {
+              expect(e, isNotNull);
+              hadEvent = true;
+            },
+          ));
+
     final GrpcError status = GrpcError.alreadyExists('test error');
     final FirebaseFirestoreError error = Util.exceptionFromStatus(status);
     listener.onError(error);
-    expect(hadEvent, isTrue);
+    await Future<void>.delayed(
+        const Duration(milliseconds: 100), () => expect(hadEvent, isTrue));
   });
 
-  test('testRaisesEventForEmptyCollectionsAfterSync', () {
+  test('testRaisesEventForEmptyCollectionsAfterSync', () async {
     final List<ViewSnapshot> accum = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
 
@@ -125,10 +144,11 @@ void main() {
     expect(accum, isEmpty);
 
     listener.onViewSnapshot(snap2);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(accum.first, snap2);
   });
 
-  test('testDoesNotRaiseEventsForMetadataChangesUnlessSpecified', () {
+  test('testDoesNotRaiseEventsForMetadataChangesUnlessSpecified', () async {
     final List<ViewSnapshot> filteredAccum = <ViewSnapshot>[];
     final List<ViewSnapshot> fullAccum = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
@@ -161,12 +181,13 @@ void main() {
     fullListener.onViewSnapshot(snap1); // local event
     fullListener.onViewSnapshot(snap2); // no event
     fullListener.onViewSnapshot(snap3); // doc2 update
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     expect(filteredAccum, <ViewSnapshot>[snap1, snap3]);
     expect(fullAccum, <ViewSnapshot>[snap1, snap2, snap3]);
   });
 
-  test('testRaisesDocumentMetadataEventsOnlyWhenSpecified', () {
+  test('testRaisesDocumentMetadataEventsOnlyWhenSpecified', () async {
     final List<ViewSnapshot> filteredAccum = <ViewSnapshot>[];
     final List<ViewSnapshot> fullAccum = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
@@ -199,6 +220,7 @@ void main() {
     fullListener.onViewSnapshot(snap1);
     fullListener.onViewSnapshot(snap2);
     fullListener.onViewSnapshot(snap3);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     expect(filteredAccum, <ViewSnapshot>[snap1, snap3]);
     // Second listener should receive doc1prime as added document not modified
@@ -206,7 +228,7 @@ void main() {
   });
 
   test('testRaisesQueryMetadataEventsOnlyWhenHasPendingWritesOnTheQueryChanges',
-      () {
+      () async {
     final List<ViewSnapshot> fullAccum = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
     final Document doc1 =
@@ -234,6 +256,7 @@ void main() {
     fullListener.onViewSnapshot(snap2); // Emits no events
     fullListener.onViewSnapshot(snap3);
     fullListener.onViewSnapshot(snap4); // Metadata change event
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final ViewSnapshot expectedSnapshot4 = ViewSnapshot(
         snap4.query,
@@ -246,7 +269,7 @@ void main() {
     expect(fullAccum, <ViewSnapshot>[snap1, snap3, expectedSnapshot4]);
   });
 
-  test('testMetadataOnlyDocumentChangesAreFilteredOut', () {
+  test('testMetadataOnlyDocumentChangesAreFilteredOut', () async {
     final List<ViewSnapshot> filteredAccum = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
     final Document doc1 =
@@ -269,6 +292,7 @@ void main() {
 
     filteredListener.onViewSnapshot(snap1);
     filteredListener.onViewSnapshot(snap2);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final DocumentViewChange change3 =
         DocumentViewChange(DocumentViewChangeType.added, doc3);
@@ -283,7 +307,7 @@ void main() {
     expect(filteredAccum, <ViewSnapshot>[snap1, expectedSnapshot2]);
   });
 
-  test('testWillWaitForSyncIfOnline', () {
+  test('testWillWaitForSyncIfOnline', () async {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
 
@@ -312,6 +336,7 @@ void main() {
     listener.onOnlineStateChanged(OnlineState.online); // no event
     listener.onViewSnapshot(snap2); // no event
     listener.onViewSnapshot(snap3); // event because synced
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final DocumentViewChange change1 =
         DocumentViewChange(DocumentViewChangeType.added, doc1);
@@ -331,7 +356,7 @@ void main() {
     expect(events, <ViewSnapshot>[expectedSnapshot]);
   });
 
-  test('testWillRaiseInitialEventWhenGoingOffline', () {
+  test('testWillRaiseInitialEventWhenGoingOffline', () async {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
 
@@ -354,6 +379,7 @@ void main() {
     listener.onOnlineStateChanged(OnlineState.online); // event
     listener.onOnlineStateChanged(OnlineState.offline); // no event
     listener.onViewSnapshot(snap2); // event
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final DocumentViewChange change1 =
         DocumentViewChange(DocumentViewChangeType.added, doc1);
@@ -384,7 +410,7 @@ void main() {
     expect(events, <ViewSnapshot>[expectedSnapshot1, expectedSnapshot2]);
   });
 
-  test('testWillRaiseInitialEventWhenGoingOfflineAndThereAreNoDocs', () {
+  test('testWillRaiseInitialEventWhenGoingOfflineAndThereAreNoDocs', () async {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
 
@@ -397,6 +423,7 @@ void main() {
     listener.onOnlineStateChanged(OnlineState.online); // no event
     listener.onViewSnapshot(snap1); // no event
     listener.onOnlineStateChanged(OnlineState.offline); // event
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final ViewSnapshot expectedSnapshot = ViewSnapshot(
         snap1.query,
@@ -412,7 +439,8 @@ void main() {
     expect(events, <ViewSnapshot>[expectedSnapshot]);
   });
 
-  test('testWillRaiseInitialEventWhenStartingOfflineAndThereAreNoDocs', () {
+  test('testWillRaiseInitialEventWhenStartingOfflineAndThereAreNoDocs',
+      () async {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
 
@@ -424,6 +452,7 @@ void main() {
 
     listener.onOnlineStateChanged(OnlineState.offline);
     listener.onViewSnapshot(snap1);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final ViewSnapshot expectedSnapshot = ViewSnapshot(
         snap1.query,

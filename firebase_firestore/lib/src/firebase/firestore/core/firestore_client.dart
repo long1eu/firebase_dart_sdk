@@ -35,8 +35,6 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.da
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart'
-    hide Transaction;
 import 'package:grpc/grpc.dart';
 
 /// [FirestoreClient] is a top-level class that constructs and owns all of the
@@ -104,8 +102,8 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   /// Starts listening to a query. */
-  QueryListener listen(Query query, ListenOptions options,
-      EventListener<ViewSnapshot> listener) {
+  QueryListener listen(
+      Query query, ListenOptions options, EventSink<ViewSnapshot> listener) {
     final QueryListener queryListener = QueryListener(query, options, listener);
     asyncQueue
         .enqueueAndForget(() => eventManager.addQueryListener(queryListener));
