@@ -51,7 +51,7 @@ class WriteStream
   ///
   /// NOTE: A null [streamToken] is not allowed: use the empty array for the
   /// unset value.
-  List<int> lastStreamToken = emptyStreamToken;
+  Uint8List lastStreamToken = emptyStreamToken;
 
   bool _handshakeComplete = false;
 
@@ -120,7 +120,7 @@ class WriteStream
 
   @override
   void onNext(WriteResponse change) {
-    lastStreamToken = change.streamToken;
+    lastStreamToken = Uint8List.fromList(change.streamToken);
 
     if (!_handshakeComplete) {
       // The first response is the handshake response

@@ -47,14 +47,7 @@ class QueryListener {
           documentChanges.add(change);
         }
       }
-      newSnapshot = ViewSnapshot(
-          newSnapshot.query,
-          newSnapshot.documents,
-          newSnapshot.oldDocuments,
-          documentChanges,
-          newSnapshot.isFromCache,
-          newSnapshot.hasPendingWrites,
-          newSnapshot.didSyncStateChange);
+      newSnapshot = newSnapshot.copyWith(changes: documentChanges);
     }
 
     if (!raisedInitialEvent) {
@@ -129,15 +122,13 @@ class QueryListener {
   void raiseInitialEvent(ViewSnapshot snapshot) {
     Assert.hardAssert(
         !raisedInitialEvent, 'Trying to raise initial event for second time');
-    snapshot = ViewSnapshot(
-        snapshot.query,
-        snapshot.documents,
-        DocumentSet.emptySet(snapshot.query.comparator),
-        QueryListener._getInitialViewChanges(snapshot),
-        snapshot.isFromCache,
-        snapshot.hasPendingWrites,
-        /*didSyncStateChange:*/
-        true);
+
+    snapshot = snapshot.copyWith(
+      oldDocuments: DocumentSet.emptySet(snapshot.query.comparator),
+      changes: QueryListener._getInitialViewChanges(snapshot),
+      didSyncStateChange: true,
+    );
+
     raisedInitialEvent = true;
     listener(snapshot, null);
   }

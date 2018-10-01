@@ -3,6 +3,7 @@
 // on 23/09/2018
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
@@ -35,44 +36,49 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
-/// Local storage in the Firestore client. Coordinates persistence components like the mutation queue
-/// and remote document cache to present a latency compensated view of stored data.
+/// Local storage in the Firestore client. Coordinates persistence components
+/// like the mutation queue and remote document cache to present a latency
+/// compensated view of stored data.
 ///
-/// * The LocalStore is responsible for accepting mutations from the Sync Engine. Writes from the
-/// client are put into a queue as provisional Mutations until they are processed by the RemoteStore
-/// and confirmed as having been written to the server.
+/// * The [LocalStore] is responsible for accepting mutations from the
+/// [SyncEngine]. Writes from the client are put into a queue as provisional
+/// [Mutations] until they are processed by the RemoteStore and confirmed as
+/// having been written to the server.
 ///
-/// * The local store provides the local version of documents that have been modified locally. It
-/// maintains the constraint:
+/// * The local store provides the local version of documents that have been
+/// modified locally. It maintains the constraint:
 ///
 /// * LocalDocument = RemoteDocument + Active(LocalMutations)
 ///
-/// * (Active mutations are those that are enqueued and have not been previously acknowledged or
-/// rejected).
+/// * (Active mutations are those that are enqueued and have not been previously
+/// acknowledged or rejected).
 ///
-/// * The RemoteDocument ("ground truth") state is provided via the applyChangeBatch method. It will
-/// be some version of a server-provided document OR will be a server-provided document PLUS
-/// acknowledged mutations:
+/// * The RemoteDocument ("ground truth") state is provided via the
+/// [applyChangeBatch] method. It will be some version of a server-provided
+/// document OR will be a server-provided document PLUS acknowledged mutations:
 ///
-/// * RemoteDocument' = RemoteDocument + Acknowledged(LocalMutations)
+/// * RemoteDocument = RemoteDocument + Acknowledged(LocalMutations)
 ///
-/// * Note that this "dirty" version of a RemoteDocument will not be identical to a server base
-/// version, since it has LocalMutations added to it pending getting an authoritative copy from the
-/// server.
+/// * Note that this "dirty" version of a RemoteDocument will not be identical
+/// to a server base version, since it has LocalMutations added to it pending
+/// getting an authoritative copy from the server.
 ///
-/// * Since LocalMutations can be rejected by the server, we have to be able to revert a
-/// LocalMutation that has already been applied to the LocalDocument (typically done by replaying all
-/// remaining LocalMutations to the RemoteDocument to re-apply).
+/// * Since LocalMutations can be rejected by the server, we have to be able to
+/// revert a LocalMutation that has already been applied to the LocalDocument
+/// (typically done by replaying all remaining LocalMutations to the
+/// RemoteDocument to re-apply).
 ///
-/// * The LocalStore is responsible for the garbage collection of the documents it contains. For
-/// now, it every doc referenced by a view, the mutation queue, or the RemoteStore.
+/// * The [LocalStore] is responsible for the garbage collection of the
+/// documents it contains. For now, it every doc referenced by a view, the
+/// mutation queue, or the [RemoteStore].
 ///
-/// * It also maintains the persistence of mapping queries to resume tokens and target ids. It needs
-/// to know this data about queries to properly know what docs it would be allowed to garbage
-/// collect.
+/// * It also maintains the persistence of mapping queries to resume tokens and
+/// target ids. It needs to know this data about queries to properly know what
+/// docs it would be allowed to garbage collect.
 ///
-/// * The LocalStore must be able to efficiently execute queries against its local cache of the
-/// documents, to provide the initial set of results before any remote changes have been received.
+/// * The [LocalStore] must be able to efficiently execute queries against its
+/// local cache of the documents, to provide the initial set of results before
+/// any remote changes have been received.
 
 class LocalStore {
   /// The maximum time to leave a resume token buffered without writing it out.
@@ -322,14 +328,14 @@ class LocalStore {
   }
 
   /// Returns the last recorded stream token for the current user.
-  List<int> getLastStreamToken() => _mutationQueue.lastStreamToken;
+  Uint8List get lastStreamToken => _mutationQueue.lastStreamToken;
 
   /// Sets the stream token for the current user without acknowledging any
   /// mutation batch. This is usually only useful after a stream handshake or in
   /// response to an error that requires clearing the stream token.
   ///
   /// Use [WriteStream.emptyStreamToken] to clear the current value.
-  Future<void> setLastStreamToken(List<int> streamToken) async {
+  Future<void> setLastStreamToken(Uint8List streamToken) async {
     await _persistence.runTransaction(
         'Set stream token',
         (DatabaseExecutor tx) =>

@@ -123,7 +123,7 @@ class RemoteStore implements TargetMetadataProvider {
     _networkEnabled = true;
 
     if (_canUseNetwork()) {
-      _writeStream.lastStreamToken = _localStore.getLastStreamToken();
+      _writeStream.lastStreamToken = _localStore.lastStreamToken;
 
       if (_shouldStartWatchStream()) {
         _startWatchStream();
@@ -494,9 +494,9 @@ class RemoteStore implements TargetMetadataProvider {
 
   /// Handles a successful handshake response from the server, which is our cue
   /// to send any pending writes.
-  void _handleWriteStreamHandshakeComplete() {
+  Future<void> _handleWriteStreamHandshakeComplete() async {
     // Record the stream token.
-    _localStore.setLastStreamToken(_writeStream.lastStreamToken);
+    await _localStore.setLastStreamToken(_writeStream.lastStreamToken);
 
     // Send the write pipeline now that stream is established.
     for (MutationBatch batch in _writePipeline) {

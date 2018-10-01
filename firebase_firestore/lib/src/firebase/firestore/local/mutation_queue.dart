@@ -3,6 +3,7 @@
 // on 20/09/2018
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -39,13 +40,13 @@ abstract class MutationQueue {
 
   /// Acknowledges the given [batch].
   Future<void> acknowledgeBatch(
-      DatabaseExecutor tx, MutationBatch batch, List<int> streamToken);
+      DatabaseExecutor tx, MutationBatch batch, Uint8List streamToken);
 
   /// Returns the current stream token for this mutation queue.
-  List<int> get lastStreamToken;
+  Uint8List get lastStreamToken;
 
   /// Sets the stream token for this mutation queue.
-  Future<void> setLastStreamToken(DatabaseExecutor tx, List<int> streamToken);
+  Future<void> setLastStreamToken(DatabaseExecutor tx, Uint8List streamToken);
 
   /// Creates a new mutation batch and adds it to this mutation queue.
   Future<MutationBatch> addMutationBatch(
@@ -58,7 +59,7 @@ abstract class MutationQueue {
   /// [batchId] in the mutation queue or null if empty.
   ///
   /// [batchId] to search after, or [MutationBatch.unknown] for the first
-  /// mutation in the queue. Returns the next mutation or null if there wasn't
+  /// mutation in the queue. Returns the next [Mutation] or null if there wasn't
   /// one.
   Future<MutationBatch> getNextMutationBatchAfterBatchId(
       DatabaseExecutor tx, int batchId);
@@ -68,7 +69,7 @@ abstract class MutationQueue {
   // that cheaply, we should replace this.
   Future<List<MutationBatch>> getAllMutationBatches(DatabaseExecutor tx);
 
-  /// Finds all mutations with a [batchId] less than or equal to the given
+  /// Finds all mutations with a batch id less than or equal to the given
   /// [batchId].
   ///
   /// * Generally the caller should be asking for the next unacknowledged

@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
@@ -53,7 +54,7 @@ class MemoryMutationQueue implements MutationQueue {
   /// responses the client has processed. Stream tokens are opaque checkpoint
   /// markers whose only real value is their inclusion in the next request.
   @override
-  List<int> lastStreamToken;
+  Uint8List lastStreamToken;
 
   final MemoryPersistence persistence;
 
@@ -91,7 +92,7 @@ class MemoryMutationQueue implements MutationQueue {
 
   @override
   Future<void> acknowledgeBatch(
-      _, MutationBatch batch, List<int> streamToken) async {
+      _, MutationBatch batch, Uint8List streamToken) async {
     final int batchId = batch.batchId;
     Assert.hardAssert(batchId > highestAcknowledgedBatchId,
         'Mutation batchIds must be acknowledged in order');
@@ -110,7 +111,7 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> setLastStreamToken(_, List<int> streamToken) async {
+  Future<void> setLastStreamToken(_, Uint8List streamToken) async {
     lastStreamToken = Assert.checkNotNull(streamToken);
   }
 

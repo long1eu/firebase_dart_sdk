@@ -20,7 +20,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dar
 class SQLiteSchema {
   /// The version of the schema. Increase this by one for each migration added
   /// to [runMigrations] below.
-  static final int version = (Persistence.INDEXING_SUPPORT_ENABLED) ? 2 : 1;
+  static final int version = (Persistence.indexingSupportEnabled) ? 2 : 1;
 
   final Database db;
 
@@ -42,7 +42,7 @@ class SQLiteSchema {
     }
 
     if (fromVersion < 2 && toVersion >= 2) {
-      if (Persistence.INDEXING_SUPPORT_ENABLED) {
+      if (Persistence.indexingSupportEnabled) {
         await _createLocalDocumentsCollectionIndex();
       }
     }

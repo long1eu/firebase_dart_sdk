@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'dart:typed_data';
+
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_collections.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -15,7 +17,7 @@ class MutationBatchResult {
   final MutationBatch batch;
   final SnapshotVersion commitVersion;
   final List<MutationResult> mutationResults;
-  final List<int> streamToken;
+  final Uint8List streamToken;
   final ImmutableSortedMap<DocumentKey, SnapshotVersion> docVersions;
 
   const MutationBatchResult(
@@ -33,7 +35,7 @@ class MutationBatchResult {
       MutationBatch batch,
       SnapshotVersion commitVersion,
       List<MutationResult> mutationResults,
-      List<int> streamToken) {
+      Uint8List streamToken) {
     Assert.hardAssert(batch.mutations.length == mutationResults.length,
         'Mutations sent ${batch.mutations.length} must equal results received ${mutationResults.length}');
 
@@ -46,6 +48,11 @@ class MutationBatchResult {
           docVersions.insert(mutations[i].key, mutationResults[i].version);
     }
     return MutationBatchResult(
-        batch, commitVersion, mutationResults, streamToken, docVersions);
+      batch,
+      commitVersion,
+      mutationResults,
+      streamToken,
+      docVersions,
+    );
   }
 }

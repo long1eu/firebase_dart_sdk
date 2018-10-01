@@ -35,6 +35,26 @@ class ViewSnapshot {
     this.didSyncStateChange,
   );
 
+  ViewSnapshot copyWith({
+    Query query,
+    DocumentSet documents,
+    DocumentSet oldDocuments,
+    List<DocumentViewChange> changes,
+    bool isFromCache,
+    bool hasPendingWrites,
+    bool didSyncStateChange,
+  }) {
+    return ViewSnapshot(
+      query ?? this.query,
+      documents ?? this.documents,
+      oldDocuments ?? this.oldDocuments,
+      changes ?? this.changes,
+      isFromCache ?? this.isFromCache,
+      hasPendingWrites ?? this.hasPendingWrites,
+      didSyncStateChange ?? this.didSyncStateChange,
+    );
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {

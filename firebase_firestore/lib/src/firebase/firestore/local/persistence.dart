@@ -50,7 +50,7 @@ abstract class Persistence {
   /// Temporary setting for enabling indexing-specific code paths while in
   /// development.
   // TODO: Remove this.
-  static bool INDEXING_SUPPORT_ENABLED = false;
+  static bool indexingSupportEnabled = false;
 
   Persistence();
 

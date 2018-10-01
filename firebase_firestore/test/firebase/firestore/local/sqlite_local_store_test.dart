@@ -26,11 +26,11 @@ import 'package:test/test.dart';
 
 import '../../../util/test_util.dart';
 import '../test_util.dart' as t;
-import 'local_store_test_case.dart';
+import 'cases/local_store_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  SQLiteLocalStoreTest instance;
+  SQLiteLocalStoreTest testCase;
 
   setUp(() async {
     print('setUp');
@@ -38,13 +38,13 @@ void main() {
         await PersistenceTestHelpers.openSQLitePersistence(
             'firebase/firestore/local/local_store_${PersistenceTestHelpers.nextSQLiteDatabaseName()}.db');
 
-    instance = SQLiteLocalStoreTest(persistence);
-    await instance.setUp();
+    testCase = SQLiteLocalStoreTest(persistence);
+    await testCase.setUp();
     print('setUpDone');
   });
 
-  tearDown(() =>
-      Future.delayed(Duration(milliseconds: 250), () => instance?.tearDown()));
+  tearDown(() => Future<void>.delayed(
+      Duration(milliseconds: 250), () => testCase?.tearDown()));
 
   test('testMutationBatchKeys', () {
     final SetMutation set1 =
@@ -58,50 +58,50 @@ void main() {
   });
 
   test('testHandlesSetMutation', () async {
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
 
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
 
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
 
-    await instance.acknowledgeMutation(0);
-    instance.assertChanged(<Document>[
+    await testCase.acknowledgeMutation(0);
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), false)
     ]);
 
-    if (instance.garbageCollectorIsEager) {
+    if (testCase.garbageCollectorIsEager) {
       // Nothing is pinning this anymore, as it has been acknowledged and there
       // are no targets active.
-      await instance.assertNotContains('foo/bar');
+      await testCase.assertNotContains('foo/bar');
     } else {
-      await instance.assertContains(
+      await testCase.assertContains(
           doc('foo/bar', 0, map(<String>['foo', 'bar']), false));
     }
   });
 
   test('testHandlesSetMutationThenDocument', () async {
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(TestUtil.updateRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(TestUtil.updateRemoteEvent(
         doc('foo/bar', 2, map(<String>['it', 'changed']), true),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 2, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']), true));
   });
 
@@ -109,609 +109,609 @@ void main() {
     // Start a query that requires acks to be held.
     final Query query =
         Query.atPath(ResourcePath.fromSegments(<String>['foo']));
-    final int targetId = await instance.allocateQuery(query);
+    final int targetId = await testCase.allocateQuery(query);
 
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
 
     // The last seen version is zero, so this ack must be held.
-    await instance.acknowledgeMutation(1);
-    instance.assertChanged();
-    await instance
+    await testCase.acknowledgeMutation(1);
+    testCase.assertChanged();
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
 
-    await instance
+    await testCase
         .writeMutation(setMutation('bar/baz', map(<String>['bar', 'baz'])));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('bar/baz', 0, map(<String>['bar', 'baz']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('bar/baz', 0, map(<String>['bar', 'baz']), true));
 
-    await instance.rejectMutation();
-    instance.assertRemoved(<String>['bar/baz']);
-    await instance.assertNotContains('bar/baz');
+    await testCase.rejectMutation();
+    testCase.assertRemoved(<String>['bar/baz']);
+    await testCase.assertNotContains('bar/baz');
 
-    await instance.applyRemoteEvent(addedRemoteEvent(
+    await testCase.applyRemoteEvent(addedRemoteEvent(
         doc('foo/bar', 2, map(<String>['it', 'changed']), false),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 2, map(<String>['it', 'changed']), false)
     ]);
-    await instance.assertContains(
+    await testCase.assertContains(
         doc('foo/bar', 2, map(<String>['it', 'changed']), false));
-    await instance.assertNotContains('bar/baz');
+    await testCase.assertNotContains('bar/baz');
   });
 
   test('testHandlesDeletedDocumentThenSetMutationThenAck', () async {
     final Query query = TestUtil.query('foo');
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(
         updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
-    instance.assertRemoved(<String>['foo/bar']);
+    testCase.assertRemoved(<String>['foo/bar']);
     // Under eager GC, there is no longer a reference for the document, and it
     // should be deleted.
-    if (instance.garbageCollectorIsEager) {
-      await instance.assertNotContains('foo/bar');
+    if (testCase.garbageCollectorIsEager) {
+      await testCase.assertNotContains('foo/bar');
     } else {
-      await instance.assertContains(deletedDoc('foo/bar', 2));
+      await testCase.assertContains(deletedDoc('foo/bar', 2));
     }
 
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
 
-    await instance.releaseQuery(query);
-    await instance.acknowledgeMutation(3);
-    instance.assertChanged(<Document>[
+    await testCase.releaseQuery(query);
+    await testCase.acknowledgeMutation(3);
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), false)
     ]);
     // It has been acknowledged, and should no longer be retained as there is no
     // target and mutation
-    if (instance.garbageCollectorIsEager) {
-      await instance.assertNotContains('foo/bar');
+    if (testCase.garbageCollectorIsEager) {
+      await testCase.assertNotContains('foo/bar');
     }
   });
 
   test('testHandlesSetMutationThenDeletedDocument', () async {
     final Query query = TestUtil.query('foo');
-    final int targetId = await instance.allocateQuery(query);
-    await instance
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
 
-    await instance.applyRemoteEvent(
+    await testCase.applyRemoteEvent(
         updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
   });
 
   test('testHandlesDocumentThenSetMutationThenAckThenDocument', () async {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(addedRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(addedRemoteEvent(
         doc('foo/bar', 2, map(<String>['it', 'base']), false),
         <int>[targetId],
         <int>[]));
 
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 2, map(<String>['it', 'base']), false)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 2, map(<String>['it', 'base']), false));
 
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 2, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']), true));
 
-    await instance.acknowledgeMutation(3);
+    await testCase.acknowledgeMutation(3);
     // We haven't seen the remote event yet.
-    instance.assertChanged();
-    await instance
+    testCase.assertChanged();
+    await testCase
         .assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']), true));
 
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 3, map(<String>['it', 'changed']), false),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 3, map(<String>['it', 'changed']), false)
     ]);
-    await instance.assertContains(
+    await testCase.assertContains(
         doc('foo/bar', 3, map(<String>['it', 'changed']), false));
   });
 
   test('testHandlesPatchWithoutPriorDocument', () async {
-    await instance
+    await testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertNotContains('foo/bar');
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertNotContains('foo/bar');
 
-    await instance.acknowledgeMutation(1);
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertNotContains('foo/bar');
+    await testCase.acknowledgeMutation(1);
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertNotContains('foo/bar');
   });
 
   test('testHandlesPatchMutationThenDocumentThenAck', () async {
-    await instance
+    await testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertNotContains('foo/bar');
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertNotContains('foo/bar');
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(addedRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(addedRemoteEvent(
         doc('foo/bar', 1, map(<String>['it', 'base']), true),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 1, map(<String>['foo', 'bar', 'it', 'base']), true)
     ]);
-    await instance.assertContains(
+    await testCase.assertContains(
         doc('foo/bar', 1, map(<String>['foo', 'bar', 'it', 'base']), true));
 
-    await instance.acknowledgeMutation(2);
+    await testCase.acknowledgeMutation(2);
 
-    instance.assertChanged();
-    await instance.assertContains(
+    testCase.assertChanged();
+    await testCase.assertContains(
         doc('foo/bar', 1, map(<String>['foo', 'bar', 'it', 'base']), true));
 
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']), false),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']), false)
     ]);
-    await instance.assertContains(
+    await testCase.assertContains(
         doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']), false));
   });
 
   test('testHandlesPatchMutationThenAckThenDocument', () async {
-    await instance
+    await testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertNotContains('foo/bar');
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertNotContains('foo/bar');
 
-    await instance.acknowledgeMutation(1);
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertNotContains('foo/bar');
+    await testCase.acknowledgeMutation(1);
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertNotContains('foo/bar');
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 1, map(<String>['it', 'base']), false),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 1, map(<String>['it', 'base']), false)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 1, map(<String>['it', 'base']), false));
   });
 
   test('testHandlesDeleteMutationThenAck', () async {
-    await instance.writeMutation(deleteMutation('foo/bar'));
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertContains(deletedDoc('foo/bar', 0));
+    await testCase.writeMutation(deleteMutation('foo/bar'));
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertContains(deletedDoc('foo/bar', 0));
 
-    await instance.acknowledgeMutation(1);
-    instance.assertRemoved(<String>['foo/bar']);
+    await testCase.acknowledgeMutation(1);
+    testCase.assertRemoved(<String>['foo/bar']);
     // There's no target pinning the doc, and we've ack'd the mutation.
-    if (instance.garbageCollectorIsEager) {
-      await instance.assertNotContains('foo/bar');
+    if (testCase.garbageCollectorIsEager) {
+      await testCase.assertNotContains('foo/bar');
     } else {
-      await instance.assertContains(deletedDoc('foo/bar', 0));
+      await testCase.assertContains(deletedDoc('foo/bar', 0));
     }
   });
 
   test('testHandlesDocumentThenDeleteMutationThenAck', () async {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 1, map(<String>['it', 'base']), false),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 1, map(<String>['it', 'base']), false)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 1, map(<String>['it', 'base']), false));
 
-    await instance.writeMutation(deleteMutation('foo/bar'));
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertContains(deletedDoc('foo/bar', 0));
+    await testCase.writeMutation(deleteMutation('foo/bar'));
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertContains(deletedDoc('foo/bar', 0));
 
     // Remove the target so only the mutation is pinning the document.
-    await instance.releaseQuery(query);
-    await instance.acknowledgeMutation(2);
-    if (instance.garbageCollectorIsEager) {
+    await testCase.releaseQuery(query);
+    await testCase.acknowledgeMutation(2);
+    if (testCase.garbageCollectorIsEager) {
       // Neither the target nor the mutation pin the document, it should be gone.
-      await instance.assertNotContains('foo/bar');
+      await testCase.assertNotContains('foo/bar');
     } else {
-      await instance.assertContains(deletedDoc('foo/bar', 0));
+      await testCase.assertContains(deletedDoc('foo/bar', 0));
     }
   });
 
   test('testHandlesDeleteMutationThenDocumentThenAck', () async {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.writeMutation(deleteMutation('foo/bar'));
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertContains(deletedDoc('foo/bar', 0));
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.writeMutation(deleteMutation('foo/bar'));
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertContains(deletedDoc('foo/bar', 0));
 
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 1, map(<String>['it', 'base']), false),
         <int>[targetId],
         <int>[]));
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertContains(deletedDoc('foo/bar', 0));
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertContains(deletedDoc('foo/bar', 0));
 
-    await instance.releaseQuery(query);
-    await instance.acknowledgeMutation(2);
-    instance.assertRemoved(<String>['foo/bar']);
-    if (instance.garbageCollectorIsEager) {
+    await testCase.releaseQuery(query);
+    await testCase.acknowledgeMutation(2);
+    testCase.assertRemoved(<String>['foo/bar']);
+    if (testCase.garbageCollectorIsEager) {
       // The doc is not pinned in a target and we've acknowledged the mutation.
       // It shouldn't exist anymore.
-      await instance.assertNotContains('foo/bar');
+      await testCase.assertNotContains('foo/bar');
     } else {
-      await instance.assertContains(deletedDoc('foo/bar', 0));
+      await testCase.assertContains(deletedDoc('foo/bar', 0));
     }
   });
 
   test('testHandlesDocumentThenDeletedDocumentThenDocument', () async {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 1, map(<String>['it', 'base']), false),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 1, map(<String>['it', 'base']), false)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 1, map(<String>['it', 'base']), false));
 
-    await instance.applyRemoteEvent(
+    await testCase.applyRemoteEvent(
         updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
-    instance.assertRemoved(<String>['foo/bar']);
-    if (!instance.garbageCollectorIsEager) {
-      await instance.assertContains(deletedDoc('foo/bar', 2));
+    testCase.assertRemoved(<String>['foo/bar']);
+    if (!testCase.garbageCollectorIsEager) {
+      await testCase.assertContains(deletedDoc('foo/bar', 2));
     }
 
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 3, map(<String>['it', 'changed']), false),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 3, map(<String>['it', 'changed']), false)
     ]);
-    await instance.assertContains(
+    await testCase.assertContains(
         doc('foo/bar', 3, map(<String>['it', 'changed']), false));
   });
 
   test('testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck',
       () async {
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'old'])));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'old']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'old']), true));
 
-    await instance
+    await testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 1, map(<String>['it', 'base']), true),
         <int>[targetId],
         <int>[]));
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 1, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']), true));
 
-    await instance.releaseQuery(query);
-    await instance.acknowledgeMutation(2); // delete mutation
-    instance.assertChanged(<Document>[
+    await testCase.releaseQuery(query);
+    await testCase.acknowledgeMutation(2); // delete mutation
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 1, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']), true));
 
-    await instance.acknowledgeMutation(3); // patch mutation
-    instance.assertChanged(<Document>[
+    await testCase.acknowledgeMutation(3); // patch mutation
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 1, map(<String>['foo', 'bar']), false)
     ]);
-    if (instance.garbageCollectorIsEager) {
+    if (testCase.garbageCollectorIsEager) {
       // we've ack'd all of the mutations, nothing is keeping this pinned anymore
-      await instance.assertNotContains('foo/bar');
+      await testCase.assertNotContains('foo/bar');
     } else {
-      await instance.assertContains(
+      await testCase.assertContains(
           doc('foo/bar', 1, map(<String>['foo', 'bar']), false));
     }
   });
 
   test('testHandlesSetMutationAndPatchMutationTogether', () async {
-    await instance.writeMutations(<Mutation>[
+    await testCase.writeMutations(<Mutation>[
       setMutation('foo/bar', map(<String>['foo', 'old'])),
       patchMutation('foo/bar', map(<String>['foo', 'bar']))
     ]);
 
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
   });
 
   test('testHandlesSetMutationThenPatchMutationThenReject', () async {
-    if (!instance.garbageCollectorIsEager) {
+    if (!testCase.garbageCollectorIsEager) {
       return;
     }
 
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'old'])));
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'old']), true));
-    await instance.acknowledgeMutation(1);
-    await instance.assertNotContains('foo/bar');
+    await testCase.acknowledgeMutation(1);
+    await testCase.assertNotContains('foo/bar');
 
-    instance
+    testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
     // A blind patch is not visible in the cache
-    await instance.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/bar');
 
-    await instance.rejectMutation();
-    await instance.assertNotContains('foo/bar');
+    await testCase.rejectMutation();
+    await testCase.assertNotContains('foo/bar');
   });
 
   test('testHandlesSetMutationsAndPatchMutationOfJustOneTogether', () async {
-    await instance.writeMutations(<Mutation>[
+    await testCase.writeMutations(<Mutation>[
       setMutation('foo/bar', map(<String>['foo', 'old'])),
       setMutation('bar/baz', map(<String>['bar', 'baz'])),
       patchMutation('foo/bar', map(<String>['foo', 'bar']))
     ]);
 
-    instance.assertChanged(<Document>[
+    testCase.assertChanged(<Document>[
       doc('bar/baz', 0, map(<String>['bar', 'baz']), true),
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
 
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
-    await instance
+    await testCase
         .assertContains(doc('bar/baz', 0, map(<String>['bar', 'baz']), true));
   });
 
   test('testHandlesDeleteMutationThenPatchMutationThenAckThenAck', () async {
-    await instance.writeMutation(deleteMutation('foo/bar'));
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertContains(deletedDoc('foo/bar', 0));
+    await testCase.writeMutation(deleteMutation('foo/bar'));
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertContains(deletedDoc('foo/bar', 0));
 
-    await instance
+    await testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertContains(deletedDoc('foo/bar', 0));
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertContains(deletedDoc('foo/bar', 0));
 
-    await instance.acknowledgeMutation(2); // delete mutation
-    instance.assertRemoved(<String>['foo/bar']);
-    await instance.assertContains(deletedDoc('foo/bar', 0));
+    await testCase.acknowledgeMutation(2); // delete mutation
+    testCase.assertRemoved(<String>['foo/bar']);
+    await testCase.assertContains(deletedDoc('foo/bar', 0));
 
-    await instance.acknowledgeMutation(3); // patch mutation
-    instance.assertRemoved(<String>['foo/bar']);
-    if (instance.garbageCollectorIsEager) {
+    await testCase.acknowledgeMutation(3); // patch mutation
+    testCase.assertRemoved(<String>['foo/bar']);
+    if (testCase.garbageCollectorIsEager) {
       // There are no more pending mutations, the doc has been dropped
-      await instance.assertNotContains('foo/bar');
+      await testCase.assertNotContains('foo/bar');
     } else {
-      await instance.assertContains(deletedDoc('foo/bar', 0));
+      await testCase.assertContains(deletedDoc('foo/bar', 0));
     }
   });
 
   test('testCollectsGarbageAfterChangeBatchWithNoTargetIDs', () async {
-    if (!instance.garbageCollectorIsEager) {
+    if (!testCase.garbageCollectorIsEager) {
       return;
     }
 
     const int targetId = 1;
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         deletedDoc('foo/bar', 2), <int>[], <int>[], <int>[targetId]));
-    await instance.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/bar');
 
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 2, map(<String>['foo', 'bar']), false),
         <int>[],
         <int>[],
         <int>[targetId]));
-    await instance.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/bar');
   });
 
   test('testCollectsGarbageAfterChangeBatch', () async {
-    if (!instance.garbageCollectorIsEager) {
+    if (!testCase.garbageCollectorIsEager) {
       return;
     }
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    await instance.allocateQuery(query);
-    instance.assertTargetId(2);
+    await testCase.allocateQuery(query);
+    testCase.assertTargetId(2);
 
     final List<int> none = <int>[];
     final List<int> two = <int>[2];
-    await instance.applyRemoteEvent(addedRemoteEvent(
+    await testCase.applyRemoteEvent(addedRemoteEvent(
         doc('foo/bar', 2, map(<String>['foo', 'bar']), false), two, none));
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']), false));
 
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 2, map(<String>['foo', 'baz']), false), none, two));
 
-    await instance.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/bar');
   });
 
   test('testCollectsGarbageAfterAcknowledgedMutation', () async {
-    if (!instance.garbageCollectorIsEager) {
+    if (!testCase.garbageCollectorIsEager) {
       return;
     }
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 0, map(<String>['foo', 'old']), false),
         <int>[targetId],
         <int>[]));
-    await instance
+    await testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
-    await instance.releaseQuery(query);
-    await instance
+    await testCase.releaseQuery(query);
+    await testCase
         .writeMutation(setMutation('foo/bah', map(<String>['foo', 'bah'])));
-    await instance.writeMutation(deleteMutation('foo/baz'));
-    await instance
+    await testCase.writeMutation(deleteMutation('foo/baz'));
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
-    await instance
+    await testCase
         .assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']), true));
-    await instance.assertContains(deletedDoc('foo/baz', 0));
+    await testCase.assertContains(deletedDoc('foo/baz', 0));
 
-    await instance.acknowledgeMutation(3);
-    await instance.assertNotContains('foo/bar');
-    await instance
+    await testCase.acknowledgeMutation(3);
+    await testCase.assertNotContains('foo/bar');
+    await testCase
         .assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']), true));
-    await instance.assertContains(deletedDoc('foo/baz', 0));
+    await testCase.assertContains(deletedDoc('foo/baz', 0));
 
-    await instance.acknowledgeMutation(4);
-    await instance.assertNotContains('foo/bar');
-    await instance.assertNotContains('foo/bah');
-    await instance.assertContains(deletedDoc('foo/baz', 0));
+    await testCase.acknowledgeMutation(4);
+    await testCase.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/bah');
+    await testCase.assertContains(deletedDoc('foo/baz', 0));
 
-    await instance.acknowledgeMutation(5);
-    await instance.assertNotContains('foo/bar');
-    await instance.assertNotContains('foo/bah');
-    await instance.assertNotContains('foo/baz');
+    await testCase.acknowledgeMutation(5);
+    await testCase.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/bah');
+    await testCase.assertNotContains('foo/baz');
   });
 
   test('testCollectsGarbageAfterRejectedMutation', () async {
-    if (!instance.garbageCollectorIsEager) {
+    if (!testCase.garbageCollectorIsEager) {
       return;
     }
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    final int targetId = await instance.allocateQuery(query);
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    final int targetId = await testCase.allocateQuery(query);
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 0, map(<String>['foo', 'old']), false),
         <int>[targetId],
         <int>[]));
-    await instance
+    await testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
     // Release the query so that our target count goes back to 0 and we are
     // considered up-to-date.
-    await instance.releaseQuery(query);
-    await instance
+    await testCase.releaseQuery(query);
+    await testCase
         .writeMutation(setMutation('foo/bah', map(<String>['foo', 'bah'])));
-    await instance.writeMutation(deleteMutation('foo/baz'));
-    await instance
+    await testCase.writeMutation(deleteMutation('foo/baz'));
+    await testCase
         .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
-    await instance
+    await testCase
         .assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']), true));
-    await instance.assertContains(deletedDoc('foo/baz', 0));
+    await testCase.assertContains(deletedDoc('foo/baz', 0));
 
-    await instance.rejectMutation(); // patch mutation
-    await instance.assertNotContains('foo/bar');
-    await instance
+    await testCase.rejectMutation(); // patch mutation
+    await testCase.assertNotContains('foo/bar');
+    await testCase
         .assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']), true));
-    await instance.assertContains(deletedDoc('foo/baz', 0));
+    await testCase.assertContains(deletedDoc('foo/baz', 0));
 
-    await instance.rejectMutation(); // set mutation
-    await instance.assertNotContains('foo/bar');
-    await instance.assertNotContains('foo/bah');
-    await instance.assertContains(deletedDoc('foo/baz', 0));
+    await testCase.rejectMutation(); // set mutation
+    await testCase.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/bah');
+    await testCase.assertContains(deletedDoc('foo/baz', 0));
 
-    await instance.rejectMutation(); // delete mutation
-    await instance.assertNotContains('foo/bar');
-    await instance.assertNotContains('foo/bah');
-    await instance.assertNotContains('foo/baz');
+    await testCase.rejectMutation(); // delete mutation
+    await testCase.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/bah');
+    await testCase.assertNotContains('foo/baz');
   });
 
   test('testPinsDocumentsInTheLocalView', () async {
-    if (!instance.garbageCollectorIsEager) {
+    if (!testCase.garbageCollectorIsEager) {
       return;
     }
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    await instance.allocateQuery(query);
-    instance.assertTargetId(2);
+    await testCase.allocateQuery(query);
+    testCase.assertTargetId(2);
 
     final List<int> none = <int>[];
     final List<int> two = <int>[2];
-    await instance.applyRemoteEvent(addedRemoteEvent(
+    await testCase.applyRemoteEvent(addedRemoteEvent(
         doc('foo/bar', 1, map(<String>['foo', 'bar']), false), two, none));
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/baz', map(<String>['foo', 'baz'])));
-    await instance
+    await testCase
         .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']), false));
-    await instance
+    await testCase
         .assertContains(doc('foo/baz', 0, map(<String>['foo', 'baz']), true));
 
-    await instance.notifyLocalViewChanges(
+    await testCase.notifyLocalViewChanges(
         viewChanges(2, <String>['foo/bar', 'foo/baz'], <String>[]));
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 1, map(<String>['foo', 'bar']), false), none, two));
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/baz', 2, map(<String>['foo', 'baz']), false), two, none));
-    await instance.acknowledgeMutation(2);
-    await instance
+    await testCase.acknowledgeMutation(2);
+    await testCase
         .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']), false));
-    await instance
+    await testCase
         .assertContains(doc('foo/baz', 2, map(<String>['foo', 'baz']), false));
 
-    await instance.notifyLocalViewChanges(
+    await testCase.notifyLocalViewChanges(
         viewChanges(2, <String>[], <String>['foo/bar', 'foo/baz']));
-    await instance.releaseQuery(query);
+    await testCase.releaseQuery(query);
 
-    await instance.assertNotContains('foo/bar');
-    await instance.assertNotContains('foo/baz');
+    await testCase.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/baz');
   });
 
   test('testThrowsAwayDocumentsWithUnknownTargetIDsImmediately', () async {
-    if (!instance.garbageCollectorIsEager) {
+    if (!testCase.garbageCollectorIsEager) {
       return;
     }
 
     const int targetID = 321;
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 1, map(), false), <int>[], <int>[], <int>[targetID]));
 
-    await instance.assertNotContains('foo/bar');
+    await testCase.assertNotContains('foo/bar');
   });
 
   test('testCanExecuteDocumentQueries', () async {
-    await instance.localStore.writeLocally(<Mutation>[
+    await testCase.localStore.writeLocally(<Mutation>[
       setMutation('foo/bar', map(<String>['foo', 'bar'])),
       setMutation('foo/baz', map(<String>['foo', 'baz'])),
       setMutation('foo/bar/Foo/Bar', map(<String>['Foo', 'Bar']))
@@ -720,14 +720,14 @@ void main() {
     final Query query =
         Query.atPath(ResourcePath.fromSegments(<String>['foo', 'bar']));
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        await instance.localStore.executeQuery(query);
+        await testCase.localStore.executeQuery(query);
     expect(values(docs), <Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
     ]);
   });
 
   test('testCanExecuteCollectionQueries', () async {
-    await instance.localStore.writeLocally(<SetMutation>[
+    await testCase.localStore.writeLocally(<SetMutation>[
       setMutation('fo/bar', map(<String>['fo', 'bar'])),
       setMutation('foo/bar', map(<String>['foo', 'bar'])),
       setMutation('foo/baz', map(<String>['foo', 'baz'])),
@@ -737,7 +737,7 @@ void main() {
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        await instance.localStore.executeQuery(query);
+        await testCase.localStore.executeQuery(query);
 
     expect(values(docs), <Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']), true),
@@ -747,18 +747,18 @@ void main() {
 
   test('testCanExecuteMixedCollectionQueries', () async {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    await instance.allocateQuery(query);
-    instance.assertTargetId(2);
+    await testCase.allocateQuery(query);
+    testCase.assertTargetId(2);
 
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/baz', 10, map(<String>['a', 'b']), false), <int>[2], <int>[]));
-    await instance.applyRemoteEvent(updateRemoteEvent(
+    await testCase.applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 20, map(<String>['a', 'b']), false), <int>[2], <int>[]));
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/bonk', map(<String>['a', 'b'])));
 
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        await instance.localStore.executeQuery(query);
+        await testCase.localStore.executeQuery(query);
 
     expect(values(docs), <Document>[
       doc('foo/bar', 20, map(<String>['a', 'b']), false),
@@ -769,12 +769,12 @@ void main() {
 
   test('testPersistsResumeTokens', () async {
     // This test only works in the absence of the EagerGarbageCollector.
-    if (instance.garbageCollectorIsEager) {
+    if (testCase.garbageCollectorIsEager) {
       return;
     }
 
     final Query query = TestUtil.query('foo/bar');
-    final int targetId = await instance.allocateQuery(query);
+    final int targetId = await testCase.allocateQuery(query);
     final Uint8List resumeToken = TestUtil.resumeToken(1000);
 
     final QueryData queryData =
@@ -793,24 +793,24 @@ void main() {
             WatchTargetChangeType.Current, <int>[targetId], resumeToken);
     aggregator.handleTargetChange(watchChange);
     final RemoteEvent remoteEvent = aggregator.createRemoteEvent(version(1000));
-    await instance.applyRemoteEvent(remoteEvent);
+    await testCase.applyRemoteEvent(remoteEvent);
 
     // Stop listening so that the query should become inactive (but persistent)
-    await instance.localStore.releaseQuery(query);
+    await testCase.localStore.releaseQuery(query);
 
     // Should come back with the same resume token
-    final QueryData queryData2 = await instance.localStore.allocateQuery(query);
+    final QueryData queryData2 = await testCase.localStore.allocateQuery(query);
     expect(queryData2.resumeToken, resumeToken);
   });
 
   test('testDoesNotReplaceResumeTokenWithEmptyByteString', () async {
     // This test only works in the absence of the EagerGarbageCollector.
-    if (instance.garbageCollectorIsEager) {
+    if (testCase.garbageCollectorIsEager) {
       return;
     }
 
     final Query query = TestUtil.query('foo/bar');
-    final int targetId = await instance.allocateQuery(query);
+    final int targetId = await testCase.allocateQuery(query);
     final Uint8List resumeToken = TestUtil.resumeToken(1000);
 
     final QueryData queryData =
@@ -829,7 +829,7 @@ void main() {
     aggregator1.handleTargetChange(watchChange1);
     final RemoteEvent remoteEvent1 =
         aggregator1.createRemoteEvent(version(1000));
-    await instance.applyRemoteEvent(remoteEvent1);
+    await testCase.applyRemoteEvent(remoteEvent1);
 
     // New message with empty resume token should not replace the old resume
     // token
@@ -841,33 +841,33 @@ void main() {
     aggregator2.handleTargetChange(watchChange2);
     final RemoteEvent remoteEvent2 =
         aggregator2.createRemoteEvent(version(2000));
-    await instance.applyRemoteEvent(remoteEvent2);
+    await testCase.applyRemoteEvent(remoteEvent2);
 
     // Stop listening so that the query should become inactive (but persistent)
-    await instance.localStore.releaseQuery(query);
+    await testCase.localStore.releaseQuery(query);
 
     // Should come back with the same resume token
-    final QueryData queryData2 = await instance.localStore.allocateQuery(query);
+    final QueryData queryData2 = await testCase.localStore.allocateQuery(query);
     expect(queryData2.resumeToken, resumeToken);
   });
 
   test('testRemoteDocumentKeysForTarget', () async {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
-    await instance.allocateQuery(query);
-    instance.assertTargetId(2);
+    await testCase.allocateQuery(query);
+    testCase.assertTargetId(2);
 
-    await instance.applyRemoteEvent(addedRemoteEvent(
+    await testCase.applyRemoteEvent(addedRemoteEvent(
         doc('foo/baz', 10, map(<String>['a', 'b']), false), <int>[2], <int>[]));
-    await instance.applyRemoteEvent(addedRemoteEvent(
+    await testCase.applyRemoteEvent(addedRemoteEvent(
         doc('foo/bar', 20, map(<String>['a', 'b']), false), <int>[2], <int>[]));
-    await instance
+    await testCase
         .writeMutation(setMutation('foo/bonk', map(<String>['a', 'b'])));
 
     ImmutableSortedSet<DocumentKey> keys =
-        await instance.localStore.getRemoteDocumentKeys(2);
+        await testCase.localStore.getRemoteDocumentKeys(2);
     expect(keys, <DocumentKey>[key('foo/bar'), key('foo/baz')]);
 
-    keys = await instance.localStore.getRemoteDocumentKeys(2);
+    keys = await testCase.localStore.getRemoteDocumentKeys(2);
     expect(keys, <DocumentKey>[key('foo/bar'), key('foo/baz')]);
   });
 }

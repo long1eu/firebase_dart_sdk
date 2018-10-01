@@ -15,12 +15,12 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_m
 /// overwriting the target documents in their entirety.
 @publicApi
 class SetOptions {
-  static final SetOptions overwrite = SetOptions._(false, null);
+  static const SetOptions overwrite = SetOptions._overwrite();
 
   /// Changes the behavior of set() calls to only replace the values specified
   /// in its data argument. Fields omitted from the set() call will remain
   /// untouched.
-  static final SetOptions mergeAllFields = SetOptions._(true, null);
+  static const SetOptions mergeAllFields = SetOptions._mergeAll();
 
   final bool merge;
   final FieldMask fieldMask;
@@ -28,6 +28,14 @@ class SetOptions {
   const SetOptions._(this.merge, this.fieldMask)
       : assert(fieldMask != null && merge,
             'Cannot specify a fieldMask for non-merge sets()');
+
+  const SetOptions._overwrite()
+      : merge = false,
+        fieldMask = null;
+
+  const SetOptions._mergeAll()
+      : merge = true,
+        fieldMask = null;
 
   /// Changes the behavior of set() calls to only replace the fields under
   /// [fieldPaths]. Any field that is not specified in [fieldPaths] is ignored

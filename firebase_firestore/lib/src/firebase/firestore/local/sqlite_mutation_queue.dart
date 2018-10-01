@@ -30,7 +30,7 @@ class SQLiteMutationQueue implements MutationQueue {
   final sq.SQLitePersistence db;
   final LocalSerializer serializer;
 
-  /// The normalized uid (e.g. null => "") used in the uid column.
+  /// The normalized uid (e.g. null => '') used in the uid column.
   final String uid;
 
   /// Next value to use when assigning sequential IDs to each mutation batch.
@@ -56,7 +56,7 @@ class SQLiteMutationQueue implements MutationQueue {
   /// a single stream token is retained.
   Uint8List _lastStreamToken;
 
-  /// Creates a  mutation queue for the given user, in the SQLite database
+  /// Creates a mutation queue for the given user, in the SQLite database
   /// wrapped by the persistence interface.
   SQLiteMutationQueue(this.db, this.serializer, User user)
       : uid = user.isAuthenticated ? user.uid : '',
@@ -174,23 +174,23 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<void> acknowledgeBatch(
-      DatabaseExecutor tx, MutationBatch batch, List<int> streamToken) async {
+      DatabaseExecutor tx, MutationBatch batch, Uint8List streamToken) async {
     final int batchId = batch.batchId;
     Assert.hardAssert(batchId > _lastAcknowledgedBatchId,
         'Mutation batchIds must be acknowledged in order');
 
     _lastAcknowledgedBatchId = batchId;
-    _lastStreamToken = Assert.checkNotNull(Uint8List.fromList(streamToken));
+    _lastStreamToken = Assert.checkNotNull(streamToken);
     await _writeMutationQueueMetadata(tx);
   }
 
   @override
-  List<int> get lastStreamToken => _lastStreamToken;
+  Uint8List get lastStreamToken => _lastStreamToken;
 
   @override
   Future<void> setLastStreamToken(
-      DatabaseExecutor tx, List<int> streamToken) async {
-    _lastStreamToken = Assert.checkNotNull(Uint8List.fromList(streamToken));
+      DatabaseExecutor tx, Uint8List streamToken) async {
+    _lastStreamToken = Assert.checkNotNull(streamToken);
     await _writeMutationQueueMetadata(tx);
   }
 
