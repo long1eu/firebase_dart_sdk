@@ -23,21 +23,21 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
       : docs = DocumentCollections.emptyMaybeDocumentMap();
 
   @override
-  Future<void> add(_, MaybeDocument document) async {
+  Future<void> add(MaybeDocument document) async {
     docs = docs.insert(document.key, document);
   }
 
   @override
-  Future<void> remove(_, DocumentKey key) async {
+  Future<void> remove(DocumentKey key) async {
     docs = docs.remove(key);
   }
 
   @override
-  Future<MaybeDocument> get(_, DocumentKey key) async => docs[key];
+  Future<MaybeDocument> get(DocumentKey key) async => docs[key];
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(_, Query query) async {
+      getAllDocumentsMatchingQuery(Query query) async {
     ImmutableSortedMap<DocumentKey, Document> result =
         DocumentCollections.emptyDocumentMap();
 

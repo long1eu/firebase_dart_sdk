@@ -43,7 +43,7 @@ class MemoryQueryCache implements QueryCache {
   int get targetCount => queries.length;
 
   @override
-  Future<void> forEachTarget(_, Consumer<QueryData> consumer) async {
+  Future<void> forEachTarget(Consumer<QueryData> consumer) async {
     queries.values.forEach(consumer);
   }
 
@@ -52,14 +52,14 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<void> setLastRemoteSnapshotVersion(
-      _, SnapshotVersion snapshotVersion) async {
+      SnapshotVersion snapshotVersion) async {
     lastRemoteSnapshotVersion = snapshotVersion;
   }
 
   // Query tracking
 
   @override
-  Future<void> addQueryData(_, QueryData queryData) async {
+  Future<void> addQueryData(QueryData queryData) async {
     queries[queryData.query] = queryData;
     final int targetId = queryData.targetId;
     if (targetId > highestTargetId) {
@@ -71,14 +71,14 @@ class MemoryQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> updateQueryData(_, QueryData queryData) async {
+  Future<void> updateQueryData(QueryData queryData) async {
     // Memory persistence doesn't need to do anything different between add and
     // remove.
-    addQueryData(null, queryData);
+    addQueryData(queryData);
   }
 
   @override
-  Future<void> removeQueryData(_, QueryData queryData) async {
+  Future<void> removeQueryData(QueryData queryData) async {
     queries.remove(queryData.query);
     references.removeReferencesForId(queryData.targetId);
   }
@@ -104,28 +104,25 @@ class MemoryQueryCache implements QueryCache {
   }
 
   @override
-  Future<QueryData> getQueryData(_, Query query) async => queries[query];
+  Future<QueryData> getQueryData(Query query) async => queries[query];
 
   // Reference tracking
 
   @override
   Future<void> addMatchingKeys(
-      _, ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     references.addReferences(keys, targetId);
     final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
-    for (DocumentKey key in keys) {
-      referenceDelegate.addReference(null, key);
-    }
+
+    keys.forEach(referenceDelegate.addReference);
   }
 
   @override
   Future<void> removeMatchingKeys(
-      _, ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     references.removeReferences(keys, targetId);
     final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
-    for (DocumentKey key in keys) {
-      referenceDelegate.removeReference(null, key);
-    }
+    keys.forEach(referenceDelegate.removeReference);
   }
 
   void _removeMatchingKeysForTargetId(int targetId) {
@@ -134,11 +131,11 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
-      _, int targetId) async {
+      int targetId) async {
     return references.referencesForId(targetId);
   }
 
   @override
-  Future<bool> containsKey(_, DocumentKey key) async =>
+  Future<bool> containsKey(DocumentKey key) async =>
       references.containsKey(key);
 }

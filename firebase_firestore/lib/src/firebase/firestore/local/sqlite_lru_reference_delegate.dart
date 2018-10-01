@@ -15,7 +15,6 @@ import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persisten
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
@@ -63,15 +62,14 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   int get targetCount => persistence.queryCache.targetCount;
 
   @override
-  Future<void> forEachTarget(
-      DatabaseExecutor tx, Consumer<QueryData> consumer) async {
-    await persistence.queryCache.forEachTarget(tx, consumer);
+  Future<void> forEachTarget(Consumer<QueryData> consumer) async {
+    await persistence.queryCache.forEachTarget(consumer);
   }
 
   @override
   Future<void> forEachOrphanedDocumentSequenceNumber(
-      DatabaseExecutor tx, Consumer<int> consumer) async {
-    final List<Map<String, dynamic>> result = await persistence.query(tx,
+      Consumer<int> consumer) async {
+    final List<Map<String, dynamic>> result = await persistence.query(
         // @formatter:off
         '''
          SELECT sequence_number
@@ -89,32 +87,28 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<void> addReference(DatabaseExecutor tx, DocumentKey key) async {
-    await _writeSentinel(tx, key);
+  Future<void> addReference(DocumentKey key) async {
+    await _writeSentinel(key);
   }
 
   @override
-  Future<void> removeReference(DatabaseExecutor tx, DocumentKey key) async {
-    await _writeSentinel(tx, key);
+  Future<void> removeReference(DocumentKey key) async {
+    await _writeSentinel(key);
   }
 
   @override
-  Future<int> removeQueries(
-      DatabaseExecutor tx, int upperBound, Set<int> activeTargetIds) {
-    return persistence.queryCache
-        .removeQueries(tx, upperBound, activeTargetIds);
+  Future<int> removeQueries(int upperBound, Set<int> activeTargetIds) {
+    return persistence.queryCache.removeQueries(upperBound, activeTargetIds);
   }
 
   @override
-  Future<void> removeMutationReference(
-      DatabaseExecutor tx, DocumentKey key) async {
-    await _writeSentinel(tx, key);
+  Future<void> removeMutationReference(DocumentKey key) async {
+    await _writeSentinel(key);
   }
 
   /// Returns true if any mutation queue contains the given document.
-  Future<bool> _mutationQueuesContainKey(
-      DatabaseExecutor tx, DocumentKey key) async {
-    return (await persistence.query(tx,
+  Future<bool> _mutationQueuesContainKey(DocumentKey key) async {
+    return (await persistence.query(
         // @formatter:off
         '''
           SELECT 1
@@ -129,16 +123,16 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   /// collected, given that the document in question is not present in any
   /// targets and has a sequence number less than or equal to the upper bound
   /// for the collection run.
-  Future<bool> _isPinned(DatabaseExecutor tx, DocumentKey key) async {
+  Future<bool> _isPinned(DocumentKey key) async {
     if (additionalReferences.containsKey(key)) {
       return true;
     }
 
-    return _mutationQueuesContainKey(tx, key);
+    return _mutationQueuesContainKey(key);
   }
 
-  Future<void> _removeSentinel(DatabaseExecutor tx, DocumentKey key) async {
-    await persistence.execute(tx,
+  Future<void> _removeSentinel(DocumentKey key) async {
+    await persistence.execute(
         // @formatter:off
         '''
           DELETE
@@ -151,10 +145,9 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<int> removeOrphanedDocuments(
-      DatabaseExecutor tx, int upperBound) async {
+  Future<int> removeOrphanedDocuments(int upperBound) async {
     int count = 0;
-    final List<Map<String, dynamic>> result = await persistence.query(tx,
+    final List<Map<String, dynamic>> result = await persistence.query(
         // @formatter:off
         '''
           SELECT path
@@ -171,10 +164,10 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       final ResourcePath path =
           EncodedPath.decodeResourcePath(row['path'] as String);
       final DocumentKey key = DocumentKey.fromPath(path);
-      if (!await _isPinned(tx, key)) {
+      if (!await _isPinned(key)) {
         count++;
-        await persistence.remoteDocumentCache.remove(tx, key);
-        await _removeSentinel(tx, key);
+        await persistence.remoteDocumentCache.remove(key);
+        await _removeSentinel(key);
       }
     }
 
@@ -182,24 +175,24 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<void> removeTarget(DatabaseExecutor tx, QueryData queryData) async {
+  Future<void> removeTarget(QueryData queryData) async {
     final QueryData updated = queryData.copy(
       queryData.snapshotVersion,
       queryData.resumeToken,
       currentSequenceNumber,
     );
 
-    await persistence.queryCache.updateQueryData(tx, updated);
+    await persistence.queryCache.updateQueryData(updated);
   }
 
   @override
-  Future<void> updateLimboDocument(DatabaseExecutor tx, DocumentKey key) async {
-    await _writeSentinel(tx, key);
+  Future<void> updateLimboDocument(DocumentKey key) async {
+    await _writeSentinel(key);
   }
 
-  Future<void> _writeSentinel(DatabaseExecutor tx, DocumentKey key) async {
+  Future<void> _writeSentinel(DocumentKey key) async {
     final String path = EncodedPath.encode(key.path);
-    await persistence.execute(tx,
+    await persistence.execute(
         // @formatter:off
         '''
           INSERT

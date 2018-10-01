@@ -10,7 +10,6 @@ import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart'
 import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 /// Represents cached queries received from the remote backend. This contains
@@ -33,7 +32,7 @@ abstract class QueryCache {
   int get targetCount;
 
   /// Call the consumer for each target in the cache.
-  Future<void> forEachTarget(DatabaseExecutor tx, Consumer<QueryData> consumer);
+  Future<void> forEachTarget(Consumer<QueryData> consumer);
 
   /// A global snapshot version representing the last consistent snapshot we
   /// received from the backend. This is monotonically increasing and any
@@ -49,45 +48,44 @@ abstract class QueryCache {
   /// Set the snapshot version representing the last consistent snapshot
   /// received from the backend. (see lastRemoteSnapshotVersion for more
   /// details).
-  Future<void> setLastRemoteSnapshotVersion(
-      DatabaseExecutor tx, SnapshotVersion snapshotVersion);
+  Future<void> setLastRemoteSnapshotVersion(SnapshotVersion snapshotVersion);
 
   /// Adds an entry in the cache. This entry should not already exist.
   ///
   /// * The cache key is extracted from [QueryData.query].
-  Future<void> addQueryData(DatabaseExecutor tx, QueryData queryData);
+  Future<void> addQueryData(QueryData queryData);
 
   /// Replaces an entry in the cache. An entry with the same key should already
   /// exist.
   ///
   /// * The cache key is extracted from [QueryData.query].
-  Future<void> updateQueryData(DatabaseExecutor tx, QueryData queryData);
+  Future<void> updateQueryData(QueryData queryData);
 
   /// Removes the cached entry for the given query data. This entry should
   /// already exist in the cache. This method exists in the interface for
   /// testing purposes. Production code should instead call
   /// [ReferenceDelegate.removeTarget].
-  Future<void> removeQueryData(DatabaseExecutor tx, QueryData queryData);
+  Future<void> removeQueryData(QueryData queryData);
 
   /// Looks up a QueryData entry in the cache.
   ///
   /// The [query] corresponding to the entry to look up. Returns the cached
   /// [QueryData] entry, or null if the cache has no entry for the query.
-  Future<QueryData> getQueryData(DatabaseExecutor tx, Query query);
+  Future<QueryData> getQueryData(Query query);
 
   /// Adds the given document keys to cached query results of the given
   /// target id.
   Future<void> addMatchingKeys(
-      DatabaseExecutor tx, ImmutableSortedSet<DocumentKey> keys, int targetId);
+      ImmutableSortedSet<DocumentKey> keys, int targetId);
 
   /// Removes the given document keys from the cached query results of the given
   /// target id.
   Future<void> removeMatchingKeys(
-      DatabaseExecutor tx, ImmutableSortedSet<DocumentKey> keys, int targetId);
+      ImmutableSortedSet<DocumentKey> keys, int targetId);
 
   Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
-      DatabaseExecutor tx, int targetId);
+      int targetId);
 
   /// Returns true if the document is part of any target
-  Future<bool> containsKey(DatabaseExecutor tx, DocumentKey key);
+  Future<bool> containsKey(DocumentKey key);
 }

@@ -63,51 +63,51 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<void> forEachTarget(_, Consumer<QueryData> consumer) async {
-    persistence.queryCache.forEachTarget(null, consumer);
+  Future<void> forEachTarget(Consumer<QueryData> consumer) async {
+    persistence.queryCache.forEachTarget(consumer);
   }
 
   @override
   Future<void> forEachOrphanedDocumentSequenceNumber(
-      _, Consumer<int> consumer) async {
+      Consumer<int> consumer) async {
     orphanedSequenceNumbers.values.forEach(consumer);
   }
 
   @override
-  Future<int> removeQueries(_, int upperBound, Set<int> activeTargetIds) async {
+  Future<int> removeQueries(int upperBound, Set<int> activeTargetIds) async {
     return persistence.queryCache.removeQueries(upperBound, activeTargetIds);
   }
 
   @override
-  Future<int> removeOrphanedDocuments(_, int upperBound) async {
+  Future<int> removeOrphanedDocuments(int upperBound) async {
     return persistence.remoteDocumentCache
         .removeOrphanedDocuments(this, upperBound);
   }
 
   @override
-  Future<void> removeMutationReference(_, DocumentKey key) async {
+  Future<void> removeMutationReference(DocumentKey key) async {
     orphanedSequenceNumbers[key] = currentSequenceNumber;
   }
 
   @override
-  Future<void> removeTarget(_, QueryData queryData) async {
+  Future<void> removeTarget(QueryData queryData) async {
     final QueryData updated = queryData.copy(queryData.snapshotVersion,
         queryData.resumeToken, currentSequenceNumber);
-    persistence.queryCache.updateQueryData(null, updated);
+    persistence.queryCache.updateQueryData(updated);
   }
 
   @override
-  Future<void> addReference(_, DocumentKey key) async {
+  Future<void> addReference(DocumentKey key) async {
     orphanedSequenceNumbers[key] = currentSequenceNumber;
   }
 
   @override
-  Future<void> removeReference(_, DocumentKey key) async {
+  Future<void> removeReference(DocumentKey key) async {
     orphanedSequenceNumbers[key] = currentSequenceNumber;
   }
 
   @override
-  Future<void> updateLimboDocument(_, DocumentKey key) async {
+  Future<void> updateLimboDocument(DocumentKey key) async {
     orphanedSequenceNumbers[key] = currentSequenceNumber;
   }
 
@@ -129,7 +129,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       return true;
     }
 
-    if (await persistence.queryCache.containsKey(null, key)) {
+    if (await persistence.queryCache.containsKey(key)) {
       return true;
     }
 

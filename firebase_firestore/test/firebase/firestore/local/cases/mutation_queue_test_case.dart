@@ -10,7 +10,6 @@ import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
@@ -22,9 +21,9 @@ class MutationQueueTestCase {
 
   MutationQueueTestCase(this.persistence);
 
-  Future<void> setUp(DatabaseExecutor tx) async {
+  Future<void> setUp() async {
     mutationQueue = persistence.getMutationQueue(User.unauthenticated);
-    await mutationQueue.start(tx);
+    await mutationQueue.start();
   }
 
   Future<void> tearDown() => persistence.shutdown();
@@ -35,7 +34,9 @@ class MutationQueueTestCase {
     final SetMutation mutation = setMutation(key, map(<dynamic>['a', 1]));
 
     return persistence.runTransactionAndReturn(
-        'New mutation batch', (DatabaseExecutor tx) => mutationQueue.addMutationBatch(tx, Timestamp.now(), <SetMutation>[mutation]));
+        'New mutation batch',
+        () => mutationQueue
+            .addMutationBatch(Timestamp.now(), <SetMutation>[mutation]));
   }
 
   /// Creates a list of batches containing [number] dummy [MutationBatches].
@@ -50,19 +51,22 @@ class MutationQueueTestCase {
 
   Future<void> acknowledgeBatch(MutationBatch batch) async {
     await persistence.runTransaction(
-        'Ack batchId', (DatabaseExecutor tx) => mutationQueue.acknowledgeBatch(tx, batch, WriteStream.emptyStreamToken));
+        'Ack batchId',
+        () => mutationQueue.acknowledgeBatch(
+            batch, WriteStream.emptyStreamToken));
   }
 
   /// Calls [removeMutationBatches] on the mutation queue in a new transaction
   /// and commits.
   Future<void> removeMutationBatches(List<MutationBatch> batches) async {
-    await persistence.runTransaction('Remove mutation batches', (DatabaseExecutor tx) => mutationQueue.removeMutationBatches(tx, batches));
+    await persistence.runTransaction('Remove mutation batches',
+        () => mutationQueue.removeMutationBatches(batches));
   }
 
   /// Returns the number of mutation batches in the mutation queue.
   Future<int> batchCount() {
-    return persistence.runTransactionAndReturn(
-        'batchCount', (DatabaseExecutor tx) async => (await mutationQueue.getAllMutationBatches(tx)).length);
+    return persistence.runTransactionAndReturn('batchCount',
+        () async => (await mutationQueue.getAllMutationBatches()).length);
   }
 
   /// Removes entries from the given [batches] and returns them.
@@ -74,7 +78,8 @@ class MutationQueueTestCase {
   ///
   /// Returns a new list containing all the entries that were removed from
   /// [batches].
-  Future<List<MutationBatch>> makeHoles(List<int> holes, List<MutationBatch> batches) async {
+  Future<List<MutationBatch>> makeHoles(
+      List<int> holes, List<MutationBatch> batches) async {
     final List<MutationBatch> removed = <MutationBatch>[];
     for (int i = 0; i < holes.length; i++) {
       final int index = holes[i] - i;
@@ -91,8 +96,8 @@ class MutationQueueTestCase {
     final int batch = await batchCount();
     expect(batch, count);
 
-    await persistence.runTransaction('expectCount', (DatabaseExecutor tx) async {
-      final bool empty = await mutationQueue.isEmpty(tx);
+    await persistence.runTransaction('expectCount', () async {
+      final bool empty = await mutationQueue.isEmpty();
       expect(empty, isEmpty);
     });
   }

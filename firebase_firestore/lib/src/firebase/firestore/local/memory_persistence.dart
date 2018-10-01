@@ -90,7 +90,7 @@ class MemoryPersistence extends Persistence {
       String action, Transaction<void> operation) async {
     referenceDelegate.onTransactionStarted();
     try {
-      operation(null);
+      operation();
     } finally {
       referenceDelegate.onTransactionCommitted();
     }
@@ -100,7 +100,7 @@ class MemoryPersistence extends Persistence {
   Future<T> runTransactionAndReturn<T>(
       String action, Transaction<T> operation) async {
     referenceDelegate.onTransactionStarted();
-    final T result = await operation(null);
+    final T result = await operation();
     referenceDelegate.onTransactionCommitted();
     return result;
   }

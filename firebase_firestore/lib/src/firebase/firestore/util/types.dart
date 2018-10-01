@@ -5,12 +5,11 @@
 import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 
 typedef void Runnable();
 typedef Future<T> Supplier<T>();
 typedef void Consumer<T>(T value);
-typedef Transaction<T> = Future<T> Function(DatabaseExecutor transaction);
+typedef Transaction<T> = Future<T> Function();
 
 /// Will be called with the new value or the error if an error occurred. It's
 /// guaranteed that exactly one of value or error will be non-null.

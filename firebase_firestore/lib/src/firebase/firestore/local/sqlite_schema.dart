@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 
 /// Migrates schemas from version 0 (empty) to whatever the current version is.
 ///

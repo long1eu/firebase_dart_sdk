@@ -15,7 +15,6 @@ import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persisten
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:firebase_firestore/src/proto/firestore/local/target.pb.dart'
@@ -39,10 +38,10 @@ class SQLiteQueryCache implements QueryCache {
 
   SQLiteQueryCache(this.db, this.localSerializer);
 
-  Future<void> start(DatabaseExecutor tx) async {
+  Future<void> start() async {
     // Store exactly one row in the table. If the row exists at all, it's the
     // global metadata.
-    final List<Map<String, dynamic>> result = await db.query(tx,
+    final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
           SELECT highest_target_id,
@@ -72,9 +71,8 @@ class SQLiteQueryCache implements QueryCache {
   int get highestListenSequenceNumber => lastListenSequenceNumber;
 
   @override
-  Future<void> forEachTarget(
-      DatabaseExecutor tx, Consumer<QueryData> consumer) async {
-    final List<Map<String, dynamic>> result = await db.query(tx,
+  Future<void> forEachTarget(Consumer<QueryData> consumer) async {
+    final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
           SELECT target_proto
@@ -91,19 +89,19 @@ class SQLiteQueryCache implements QueryCache {
 
   @override
   Future<void> setLastRemoteSnapshotVersion(
-      DatabaseExecutor tx, SnapshotVersion snapshotVersion) async {
+      SnapshotVersion snapshotVersion) async {
     lastRemoteSnapshotVersion = snapshotVersion;
-    await _writeMetadata(tx);
+    await _writeMetadata();
   }
 
-  Future<void> _saveQueryData(DatabaseExecutor tx, QueryData queryData) async {
+  Future<void> _saveQueryData(QueryData queryData) async {
     final int targetId = queryData.targetId;
     final String canonicalId = queryData.query.canonicalId;
     final Timestamp version = queryData.snapshotVersion.timestamp;
 
     final proto.Target targetProto = localSerializer.encodeQueryData(queryData);
 
-    await db.execute(tx,
+    await db.execute(
         // @formatter:off
         '''
           INSERT
@@ -145,26 +143,26 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> addQueryData(DatabaseExecutor tx, QueryData queryData) async {
-    await _saveQueryData(tx, queryData);
+  Future<void> addQueryData(QueryData queryData) async {
+    await _saveQueryData(queryData);
     // PORTING NOTE: The query_targets index is maintained by SQLite.
     _updateMetadata(queryData);
     targetCount++;
-    await _writeMetadata(tx);
+    await _writeMetadata();
   }
 
   @override
-  Future<void> updateQueryData(DatabaseExecutor tx, QueryData queryData) async {
-    await _saveQueryData(tx, queryData);
+  Future<void> updateQueryData(QueryData queryData) async {
+    await _saveQueryData(queryData);
 
     if (_updateMetadata(queryData)) {
-      await _writeMetadata(tx);
+      await _writeMetadata();
     }
   }
 
-  Future<void> _writeMetadata(DatabaseExecutor tx) async {
+  Future<void> _writeMetadata() async {
     await db.execute(
-        tx,
+
         // @formatter:off
         '''
           UPDATE target_globals
@@ -185,9 +183,9 @@ class SQLiteQueryCache implements QueryCache {
         ]);
   }
 
-  Future<void> _removeTarget(DatabaseExecutor tx, int targetId) async {
-    await _removeMatchingKeysForTargetId(tx, targetId);
-    await db.execute(tx,
+  Future<void> _removeTarget(int targetId) async {
+    await _removeMatchingKeysForTargetId(targetId);
+    await db.execute(
         // @formatter:off
         '''
           DELETE
@@ -200,18 +198,17 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> removeQueryData(DatabaseExecutor tx, QueryData queryData) async {
+  Future<void> removeQueryData(QueryData queryData) async {
     final int targetId = queryData.targetId;
-    await _removeTarget(tx, targetId);
-    await _writeMetadata(tx);
+    await _removeTarget(targetId);
+    await _writeMetadata();
   }
 
   /// Drops any targets with sequence number less than or equal to the upper
   /// bound, excepting those present in [activeTargetIds]. Document associations
   /// for the removed targets are also removed. Returns the number of targets
   /// removed.
-  Future<int> removeQueries(
-      DatabaseExecutor tx, int upperBound, Set<int> activeTargetIds) async {
+  Future<int> removeQueries(int upperBound, Set<int> activeTargetIds) async {
     int count = 0;
     // SQLite has a max sql statement size, so there is technically a
     // possibility that including a an IN clause in this query to filter
@@ -219,7 +216,6 @@ class SQLiteQueryCache implements QueryCache {
     // out live targets from the result set.
 
     final List<Map<String, dynamic>> result = await db.query(
-      tx,
       // @formatter:off
       '''
           SELECT target_id
@@ -232,23 +228,23 @@ class SQLiteQueryCache implements QueryCache {
     for (Map<String, dynamic> row in result) {
       final int targetId = row['target_id'];
       if (!activeTargetIds.contains(targetId)) {
-        await _removeTarget(tx, targetId);
+        await _removeTarget(targetId);
         count++;
       }
     }
 
-    await _writeMetadata(tx);
+    await _writeMetadata();
     return count;
   }
 
   @override
-  Future<QueryData> getQueryData(DatabaseExecutor tx, Query query) async {
+  Future<QueryData> getQueryData(Query query) async {
     // Querying the targets table by canonical_id may yield more than one result
     // because canonical_id values are not required to be unique per target.
     // This query depends on the query_targets index to be efficient.
     final String canonicalId = query.canonicalId;
 
-    final List<Map<String, dynamic>> result = await db.query(tx,
+    final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
           SELECT target_proto
@@ -281,7 +277,7 @@ class SQLiteQueryCache implements QueryCache {
   // Matching key tracking
 
   @override
-  Future<void> addMatchingKeys(DatabaseExecutor tx,
+  Future<void> addMatchingKeys(
       ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     // PORTING NOTE: The reverse index (document_targets) is maintained by
     // SQLite.
@@ -305,13 +301,13 @@ class SQLiteQueryCache implements QueryCache {
     final ReferenceDelegate delegate = db.referenceDelegate;
     for (DocumentKey key in keys) {
       final String path = EncodedPath.encode(key.path);
-      await db.execute(tx, statement, <dynamic>[targetId, path]);
-      await delegate.addReference(tx, key);
+      await db.execute(statement, <dynamic>[targetId, path]);
+      await delegate.addReference(key);
     }
   }
 
   @override
-  Future<void> removeMatchingKeys(DatabaseExecutor tx,
+  Future<void> removeMatchingKeys(
       ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     // PORTING NOTE: The reverse index (document_targets) is maintained by SQLite.
     const String statement =
@@ -328,14 +324,13 @@ class SQLiteQueryCache implements QueryCache {
     final ReferenceDelegate delegate = db.referenceDelegate;
     for (DocumentKey key in keys) {
       final String path = EncodedPath.encode(key.path);
-      await db.execute(tx, statement, <dynamic>[targetId, path]);
-      await delegate.removeReference(tx, key);
+      await db.execute(statement, <dynamic>[targetId, path]);
+      await delegate.removeReference(key);
     }
   }
 
-  Future<void> _removeMatchingKeysForTargetId(
-      DatabaseExecutor tx, int targetId) async {
-    await db.execute(tx,
+  Future<void> _removeMatchingKeysForTargetId(int targetId) async {
+    await db.execute(
         // @formatter:off
         '''
           DELETE
@@ -348,10 +343,10 @@ class SQLiteQueryCache implements QueryCache {
 
   @override
   Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
-      DatabaseExecutor tx, int targetId) async {
+      int targetId) async {
     ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet;
 
-    final List<Map<String, dynamic>> result = await db.query(tx,
+    final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
           SELECT path
@@ -372,10 +367,10 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   @override
-  Future<bool> containsKey(DatabaseExecutor tx, DocumentKey key) async {
+  Future<bool> containsKey(DocumentKey key) async {
     final String path = EncodedPath.encode(key.path);
 
-    final List<Map<String, dynamic>> result = await db.query(tx,
+    final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
           SELECT target_id

@@ -19,7 +19,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:firebase_firestore/src/proto/firestore/local/mutation.pb.dart'
     as proto;
@@ -65,8 +64,8 @@ class SQLiteMutationQueue implements MutationQueue {
   // MutationQueue implementation
 
   @override
-  Future<void> start(DatabaseExecutor tx) async {
-    await _loadNextBatchIdAcrossAllUsers(tx);
+  Future<void> start() async {
+    await _loadNextBatchIdAcrossAllUsers();
 
     // On restart, [nextBatchId] may end up lower than [lastAcknowledgedBatchId]
     // since it's computed from the queue contents, and there may be no
@@ -75,7 +74,6 @@ class SQLiteMutationQueue implements MutationQueue {
     _lastAcknowledgedBatchId = MutationBatch.unknown;
 
     final List<Map<String, dynamic>> result = await db.query(
-      tx,
       // @formatter:off
       '''
           SELECT last_acknowledged_batch_id, last_stream_token
@@ -95,18 +93,18 @@ class SQLiteMutationQueue implements MutationQueue {
       // Ensure we write a default entry in mutation_queues since
       // [loadNextBatchIdAcrossAllUsers] depends upon every queue having an
       // entry.
-      await _writeMutationQueueMetadata(tx);
+      await _writeMutationQueueMetadata();
     } else if (_lastAcknowledgedBatchId >= nextBatchId) {
-      Assert.hardAssert(await isEmpty(tx),
+      Assert.hardAssert(await isEmpty(),
           'Reset nextBatchId is only possible when the queue is empty');
       _lastAcknowledgedBatchId = MutationBatch.unknown;
-      await _writeMutationQueueMetadata(tx);
+      await _writeMutationQueueMetadata();
     }
   }
 
   /// Returns one larger than the largest batch ID that has been stored. If
   /// there are no mutations returns 0. Note that batch IDs are global.
-  Future<void> _loadNextBatchIdAcrossAllUsers(DatabaseExecutor tx) async {
+  Future<void> _loadNextBatchIdAcrossAllUsers() async {
     // The dependent query below turned out to be ~500x faster than any other
     // technique, given just the primary key index on (uid, batch_id).
     //
@@ -123,7 +121,7 @@ class SQLiteMutationQueue implements MutationQueue {
     // dependent:   0.0002
 
     final List<String> uids = <String>[];
-    final List<Map<String, dynamic>> uidsRows = await db.query(tx,
+    final List<Map<String, dynamic>> uidsRows = await db.query(
         // @formatter:off
         '''
           SELECT uid
@@ -137,7 +135,7 @@ class SQLiteMutationQueue implements MutationQueue {
 
     nextBatchId = 0;
     for (String uid in uids) {
-      final List<Map<String, dynamic>> result = await db.query(tx,
+      final List<Map<String, dynamic>> result = await db.query(
           // @formatter:off
           '''
             SELECT MAX(batch_id)
@@ -156,8 +154,8 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<bool> isEmpty(DatabaseExecutor tx) async {
-    return (await db.query(tx,
+  Future<bool> isEmpty() async {
+    return (await db.query(
         // @formatter:off
         '''
           SELECT batch_id
@@ -174,28 +172,27 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<void> acknowledgeBatch(
-      DatabaseExecutor tx, MutationBatch batch, Uint8List streamToken) async {
+      MutationBatch batch, Uint8List streamToken) async {
     final int batchId = batch.batchId;
     Assert.hardAssert(batchId > _lastAcknowledgedBatchId,
         'Mutation batchIds must be acknowledged in order');
 
     _lastAcknowledgedBatchId = batchId;
     _lastStreamToken = Assert.checkNotNull(streamToken);
-    await _writeMutationQueueMetadata(tx);
+    await _writeMutationQueueMetadata();
   }
 
   @override
   Uint8List get lastStreamToken => _lastStreamToken;
 
   @override
-  Future<void> setLastStreamToken(
-      DatabaseExecutor tx, Uint8List streamToken) async {
+  Future<void> setLastStreamToken(Uint8List streamToken) async {
     _lastStreamToken = Assert.checkNotNull(streamToken);
-    await _writeMutationQueueMetadata(tx);
+    await _writeMutationQueueMetadata();
   }
 
-  Future<void> _writeMutationQueueMetadata(DatabaseExecutor tx) async {
-    await db.execute(tx,
+  Future<void> _writeMutationQueueMetadata() async {
+    await db.execute(
         // @formatter:off
         '''
         INSERT
@@ -207,7 +204,7 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<MutationBatch> addMutationBatch(DatabaseExecutor tx,
+  Future<MutationBatch> addMutationBatch(
       Timestamp localWriteTime, List<Mutation> mutations) async {
     final int batchId = nextBatchId;
     nextBatchId += 1;
@@ -216,7 +213,7 @@ class SQLiteMutationQueue implements MutationQueue {
         MutationBatch(batchId, localWriteTime, mutations);
     final GeneratedMessage proto = serializer.encodeMutationBatch(batch);
 
-    await db.execute(tx,
+    await db.execute(
         // @formatter:off
         '''
           INSERT INTO mutations (uid, batch_id, mutations)
@@ -245,16 +242,15 @@ class SQLiteMutationQueue implements MutationQueue {
       }
 
       final String path = EncodedPath.encode(key.path);
-      await db.execute(tx, statement, <dynamic>[uid, path, batchId]);
+      await db.execute(statement, <dynamic>[uid, path, batchId]);
     }
 
     return batch;
   }
 
   @override
-  Future<MutationBatch> lookupMutationBatch(
-      DatabaseExecutor tx, int batchId) async {
-    final List<Map<String, dynamic>> result = await db.query(tx,
+  Future<MutationBatch> lookupMutationBatch(int batchId) async {
+    final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
           SELECT mutations
@@ -273,14 +269,13 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<MutationBatch> getNextMutationBatchAfterBatchId(
-      DatabaseExecutor tx, int batchId) async {
+  Future<MutationBatch> getNextMutationBatchAfterBatchId(int batchId) async {
     // All batches with [batchId] <= [lastAcknowledgedBatchId] have been
     // acknowledged so the first unacknowledged batch after [batchId] will have
     // a [batchID] larger than both of these values.
     final int nextBatchId = max(batchId, _lastAcknowledgedBatchId) + 1;
 
-    final List<Map<String, dynamic>> result = await db.query(tx,
+    final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
           SELECT mutations
@@ -301,9 +296,9 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<List<MutationBatch>> getAllMutationBatches(DatabaseExecutor tx) async {
+  Future<List<MutationBatch>> getAllMutationBatches() async {
     final List<MutationBatch> result = <MutationBatch>[];
-    final List<Map<String, dynamic>> rows = await db.query(tx,
+    final List<Map<String, dynamic>> rows = await db.query(
         // @formatter:off
         '''
           SELECT mutations
@@ -323,9 +318,9 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesThroughBatchId(
-      DatabaseExecutor tx, int batchId) async {
+      int batchId) async {
     final List<MutationBatch> result = <MutationBatch>[];
-    final List<Map<String, dynamic>> rows = await db.query(tx,
+    final List<Map<String, dynamic>> rows = await db.query(
         // @formatter:off
         '''
           SELECT mutations
@@ -346,11 +341,11 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
-      DatabaseExecutor tx, DocumentKey documentKey) async {
+      DocumentKey documentKey) async {
     final String path = EncodedPath.encode(documentKey.path);
 
     final List<MutationBatch> result = <MutationBatch>[];
-    final List<Map<String, dynamic>> rows = await db.query(tx,
+    final List<Map<String, dynamic>> rows = await db.query(
         // @formatter:off
         '''
           SELECT m.mutations
@@ -374,7 +369,7 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
-      DatabaseExecutor tx, Iterable<DocumentKey> documentKeys) async {
+      Iterable<DocumentKey> documentKeys) async {
     final List<MutationBatch> result = <MutationBatch>[];
     if (documentKeys.isEmpty) {
       return result;
@@ -400,7 +395,7 @@ class SQLiteMutationQueue implements MutationQueue {
           .join(', ');
 
       final List<Map<String, dynamic>> rows = await db.query(
-          tx,
+
           // @formatter:off
           '''
             SELECT DISTINCT dm.batch_id, m.mutations
@@ -437,7 +432,7 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(
-      DatabaseExecutor tx, Query query) async {
+      Query query) async {
     // Use the query path as a prefix for testing if a document matches the
     // query.
     final ResourcePath prefix = query.path;
@@ -463,7 +458,7 @@ class SQLiteMutationQueue implements MutationQueue {
     final String prefixSuccessorPath = EncodedPath.prefixSuccessor(prefixPath);
 
     final List<MutationBatch> result = <MutationBatch>[];
-    final List<Map<String, dynamic>> rows = await db.query(tx,
+    final List<Map<String, dynamic>> rows = await db.query(
         // @formatter:off
         '''
           SELECT dm.batch_id, dm.path, m.mutations
@@ -507,8 +502,7 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> removeMutationBatches(
-      DatabaseExecutor tx, List<MutationBatch> batches) async {
+  Future<void> removeMutationBatches(List<MutationBatch> batches) async {
     const String mutationDeleter =
         // @formatter:off
         '''
@@ -533,26 +527,26 @@ class SQLiteMutationQueue implements MutationQueue {
     for (MutationBatch batch in batches) {
       final int batchId = batch.batchId;
       final int deleted =
-          await tx.delete(mutationDeleter, <dynamic>[uid, batchId]);
+          await db.delete(mutationDeleter, <dynamic>[uid, batchId]);
       Assert.hardAssert(deleted != 0,
           'Mutation batch ($uid, ${batch.batchId}) did not exist');
 
       for (Mutation mutation in batch.mutations) {
         final DocumentKey key = mutation.key;
         final String path = EncodedPath.encode(key.path);
-        await db.execute(tx, indexDeleter, <dynamic>[uid, path, batchId]);
+        await db.execute(indexDeleter, <dynamic>[uid, path, batchId]);
       }
     }
   }
 
   @override
-  Future<void> performConsistencyCheck(DatabaseExecutor tx) async {
-    final bool empty = await isEmpty(tx);
+  Future<void> performConsistencyCheck() async {
+    final bool empty = await isEmpty();
     if (empty) {
       // Verify that there are no entries in the document_mutations index if the
       // queue is empty.
       final List<ResourcePath> danglingMutationReferences = <ResourcePath>[];
-      final List<Map<String, dynamic>> rows = await db.query(tx,
+      final List<Map<String, dynamic>> rows = await db.query(
           // @formatter:off
           '''
             SELECT path

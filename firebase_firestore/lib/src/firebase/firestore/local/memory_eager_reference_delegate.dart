@@ -29,27 +29,27 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   int get currentSequenceNumber => ListenSequence.INVALID;
 
   @override
-  Future<void> addReference(_, DocumentKey key) async {
+  Future<void> addReference(DocumentKey key) async {
     orphanedDocuments.remove(key);
   }
 
   @override
-  Future<void> removeReference(_, DocumentKey key) async {
+  Future<void> removeReference(DocumentKey key) async {
     orphanedDocuments.add(key);
   }
 
   @override
-  Future<void> removeMutationReference(_, DocumentKey key) async {
+  Future<void> removeMutationReference(DocumentKey key) async {
     orphanedDocuments.add(key);
   }
 
   @override
-  Future<void> removeTarget(_, QueryData queryData) async {
+  Future<void> removeTarget(QueryData queryData) async {
     final MemoryQueryCache queryCache = persistence.queryCache;
-    (await queryCache.getMatchingKeysForTargetId(null, queryData.targetId))
+    (await queryCache.getMatchingKeysForTargetId(queryData.targetId))
         .forEach(orphanedDocuments.add);
 
-    queryCache.removeQueryData(null, queryData);
+    queryCache.removeQueryData(queryData);
   }
 
   @override
@@ -62,14 +62,14 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
         persistence.remoteDocumentCache;
     for (DocumentKey key in orphanedDocuments) {
       if (!(await _isReferenced(key))) {
-        remoteDocuments.remove(null, key);
+        remoteDocuments.remove(key);
       }
     }
     orphanedDocuments = null;
   }
 
   @override
-  Future<void> updateLimboDocument(_, DocumentKey key) async {
+  Future<void> updateLimboDocument(DocumentKey key) async {
     if (await _isReferenced(key)) {
       orphanedDocuments.remove(key);
     } else {
@@ -88,7 +88,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
 
   /// Returns true if the given document is referenced by anything.
   Future<bool> _isReferenced(DocumentKey key) async {
-    if (await persistence.queryCache.containsKey(null, key)) {
+    if (await persistence.queryCache.containsKey(key)) {
       return true;
     }
 

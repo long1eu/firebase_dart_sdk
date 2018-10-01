@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 
 /// A [ReferenceDelegate] instance handles all of the hooks into the
 /// document-reference lifecycle. This includes being added to a target, being
@@ -26,21 +25,21 @@ abstract class ReferenceDelegate {
   set additionalReferences(ReferenceSet additionalReferences);
 
   /// Notify the delegate that the given document was added to a target.
-  Future<void> addReference(DatabaseExecutor tx, DocumentKey key);
+  Future<void> addReference(DocumentKey key);
 
   /// Notify the delegate that the given document was removed from a target.
-  Future<void> removeReference(DatabaseExecutor tx, DocumentKey key);
+  Future<void> removeReference(DocumentKey key);
 
   /// Notify the delegate that a document is no longer being mutated by the
   /// user.
-  Future<void> removeMutationReference(DatabaseExecutor tx, DocumentKey key);
+  Future<void> removeMutationReference(DocumentKey key);
 
   /// Notify the delegate that a target was removed. The delegate may, but is
   /// not obligated to, actually delete the target and associated data.
-  Future<void> removeTarget(DatabaseExecutor tx, QueryData queryData);
+  Future<void> removeTarget(QueryData queryData);
 
   /// Notify the delegate that a limbo document was updated.
-  Future<void> updateLimboDocument(DatabaseExecutor tx, DocumentKey key);
+  Future<void> updateLimboDocument(DocumentKey key);
 
   /// Returns the sequence number of the current transaction. Only valid during
   /// a transaction.

@@ -16,7 +16,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_remote_do
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_schema.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:meta/meta.dart';
 
@@ -56,7 +56,7 @@ class SQLitePersistence extends Persistence {
     final _OpenHelper opener =
         await _OpenHelper.open(databaseName, openDatabase);
     final SQLitePersistence persistence =
-        SQLitePersistence._(serializer, opener, opener.db);
+        SQLitePersistence._(serializer, opener, opener._db);
 
     final SQLiteQueryCache queryCache =
         SQLiteQueryCache(persistence, serializer);
@@ -89,7 +89,7 @@ class SQLitePersistence extends Persistence {
   Future<void> start() async {
     Log.d(tag, 'Starting SQLite persistance');
     Assert.hardAssert(!started, 'SQLitePersistence double-started!');
-    await queryCache.start(_db);
+    await queryCache.start();
     started = true;
     referenceDelegate.start(queryCache.highestListenSequenceNumber);
   }
@@ -113,33 +113,48 @@ class SQLitePersistence extends Persistence {
   Future<void> runTransaction(
       String action, Transaction<void> operation) async {
     Log.d(tag, 'Starting transaction: $action');
-    referenceDelegate.onTransactionStarted();
-    await _db.transaction((DatabaseExecutor tx) => operation(tx),
-        exclusive: true);
-    referenceDelegate.onTransactionCommitted();
+    try {
+      referenceDelegate.onTransactionStarted();
+      await _db.execute('BEGIN;');
+      await operation();
+      await _db.execute('COMMIT;');
+      referenceDelegate.onTransactionCommitted();
+    } catch (e) {
+      await _db.execute('ROLLBACK;');
+      rethrow;
+    }
   }
 
   @override
   Future<T> runTransactionAndReturn<T>(
       String action, Transaction<T> operation) async {
     Log.d(tag, 'Starting transaction: $action');
-    referenceDelegate.onTransactionStarted();
-    final T result = await _db.transaction((DatabaseExecutor tx) {
-      return operation(tx);
-    });
-    referenceDelegate.onTransactionCommitted();
-    return result;
+
+    try {
+      referenceDelegate.onTransactionStarted();
+      await _db.execute('BEGIN;');
+      final T result = await operation();
+      await _db.execute('COMMIT;');
+      referenceDelegate.onTransactionCommitted();
+      return result;
+    } catch (e) {
+      await _db.execute('ROLLBACK;');
+      rethrow;
+    }
   }
 
   /// Execute the given non-query SQL statement.
-  Future<void> execute(DatabaseExecutor tx, String sql,
-      [List<Object> args]) async {
-    return await tx.execute(sql, args);
+  Future<void> execute(String statement, [List<Object> args]) {
+    return _db.execute(statement, args);
   }
 
-  Future<List<Map<String, dynamic>>> query(DatabaseExecutor tx, String sql,
+  Future<List<Map<String, dynamic>>> query(String statement,
       [List<dynamic> args]) {
-    return tx.query(sql, args);
+    return _db.query(statement, args);
+  }
+
+  Future<int> delete(String statement, [List<dynamic> args]) {
+    return _db.delete(statement, args);
   }
 }
 
@@ -159,9 +174,9 @@ class SQLitePersistence extends Persistence {
 /// * This OpenHelper attempts to obtain exclusive access to the database and
 /// attempts to do so as early as possible.
 class _OpenHelper {
-  final Database db;
+  final Database _db;
 
-  const _OpenHelper(this.db);
+  const _OpenHelper(this._db);
 
   static Future<_OpenHelper> open(
       String databaseName, OpenDatabase openDatabase) async {

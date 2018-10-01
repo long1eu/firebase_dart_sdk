@@ -9,7 +9,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/memory_persisten
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 
 import 'mock/database_mock.dart';
 

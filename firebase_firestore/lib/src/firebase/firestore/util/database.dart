@@ -18,14 +18,7 @@ typedef Future<void> OnCreate(Database db, int version);
 typedef Future<void> OnOpen(Database db);
 typedef Future<void> OnConfigure(Database db);
 
-abstract class Database implements DatabaseExecutor {
-  Future<T> transaction<T>(Future<T> action(DatabaseExecutor txn),
-      {bool exclusive});
-
-  void close();
-}
-
-abstract class DatabaseExecutor {
+abstract class Database {
   /// Runs SQLite statement without return values
   Future<void> execute(String statement, [List<dynamic> arguments]);
 
@@ -36,6 +29,8 @@ abstract class DatabaseExecutor {
   /// DELETE query
   /// Returns the number of changes made
   Future<int> delete(String statement, [List<dynamic> arguments]);
+
+  void close();
 }
 
 enum ConflictAlgorithm {

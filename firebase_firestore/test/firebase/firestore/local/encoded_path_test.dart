@@ -5,7 +5,7 @@ import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:test/test.dart';
 
 import 'mock/database_mock.dart';
@@ -51,11 +51,11 @@ void main() {
     }
 
     // Insert those all into a table, but backwards
-    await db.transaction<void>((DatabaseExecutor tx) async {
-      for (int i = encoded.length; i-- > 0;) {
-        await tx.execute('INSERT INTO keys VALUES (?)', <String>[encoded[i]]);
-      }
-    });
+    await db.execute('BEGIN;');
+    for (int i = encoded.length; i-- > 0;) {
+      await db.execute('INSERT INTO keys VALUES (?)', <String>[encoded[i]]);
+    }
+    await db.execute('COMMIT;');
 
     // Read the values out, requiring SQLite to order the keys
     final List<String> selected = List<String>(paths.length);

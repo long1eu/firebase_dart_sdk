@@ -11,7 +11,6 @@ import 'package:firebase_firestore/src/firebase/firestore/local/query_engine.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
 
 /// A naive implementation of QueryEngine that just loads all the documents in
 /// the queried collection and then filters them in memory.
@@ -22,10 +21,10 @@ class SimpleQueryEngine implements QueryEngine {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      DatabaseExecutor tx, Query query) {
+      Query query) {
     // TODO: Once LocalDocumentsView provides a getCollectionDocuments() method,
     // we should call that here and then filter the results.
-    return localDocumentsView.getDocumentsMatchingQuery(tx, query);
+    return localDocumentsView.getDocumentsMatchingQuery(query);
   }
 
   @override

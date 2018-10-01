@@ -5,7 +5,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:sqlite/sqlite.dart' as sql;
 
 class DatabaseMock extends Database {
@@ -74,22 +74,6 @@ class DatabaseMock extends Database {
           (List<sql.Row> rows) =>
               rows.map((sql.Row row) => row.toMap()).toList(),
         );
-  }
-
-  @override
-  Future<T> transaction<T>(Future<T> Function(DatabaseExecutor) action,
-      {bool exclusive}) async {
-    final Completer<T> completer = Completer<T>();
-    try {
-      database.transaction(() async {
-        final T result = await action(this);
-        completer.complete(result);
-      });
-    } catch (e) {
-      print(e);
-      completer.complete(null);
-    }
-    return completer.future;
   }
 
   @override

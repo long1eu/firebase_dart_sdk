@@ -23,7 +23,7 @@ import 'package:firebase_firestore/src/firebase/firestore/transaction.dart';
 import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:firebase_firestore/src/firebase/firestore/write_batch.dart';
 import 'package:meta/meta.dart';
 

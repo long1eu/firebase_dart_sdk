@@ -34,7 +34,7 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializ
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database_impl.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart'
     hide Transaction;
 import 'package:grpc/grpc.dart';
