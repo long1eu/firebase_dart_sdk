@@ -274,13 +274,6 @@ class Query {
 
   /// Returns true if the document matches the constraints of this query.
   bool matches(Document doc) {
-    /*
-    print('_matchesPath(doc):: ${_matchesPath(doc)}');
-    print('_matchesOrderBy(doc): ${_matchesOrderBy(doc)}');
-    print('_matchesFilters(doc): ${_matchesFilters(doc)}');
-    print('_matchesBounds(doc): ${_matchesBounds(doc)}');
-
-    */
     return _matchesPath(doc) &&
         _matchesOrderBy(doc) &&
         _matchesFilters(doc) &&

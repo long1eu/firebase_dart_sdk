@@ -42,9 +42,9 @@ class MutationQueueTestCase {
   /// Creates a list of batches containing [number] dummy [MutationBatches].
   /// Each has a different batchId.
   Future<List<MutationBatch>> createBatches(int number) async {
-    final List<MutationBatch> batches = List<MutationBatch>(number);
+    final List<MutationBatch> batches = <MutationBatch>[];
     for (int i = 0; i < number; i++) {
-      batches[i] = await addMutationBatch();
+      batches.add(await addMutationBatch());
     }
     return batches;
   }
@@ -111,3 +111,7 @@ const patchMutation = TestUtil.patchMutation;
 const map = TestUtil.map;
 // ignore: always_specify_types
 const key = TestUtil.key;
+// ignore: always_specify_types
+const path = TestUtil.path;
+// ignore: always_specify_types
+const streamToken = TestUtil.resumeToken;

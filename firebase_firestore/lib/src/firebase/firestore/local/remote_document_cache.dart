@@ -28,8 +28,8 @@ abstract class RemoteDocumentCache {
 
   /// Looks up an entry in the cache.
   ///
-  /// The [documentKey] of the entry to look up. Returns the cached [Document] or
-  /// [NoDocument] entry, or null if we have nothing cached.
+  /// The [documentKey] of the entry to look up. Returns the cached [Document]
+  /// or [NoDocument] entry, or null if we have nothing cached.
   Future<MaybeDocument> get(DocumentKey documentKey);
 
   /// Executes a query against the cached Document entries
@@ -37,7 +37,7 @@ abstract class RemoteDocumentCache {
   /// * Implementations may return extra documents if convenient. The results
   /// should be re-filtered by the consumer before presenting them to the user.
   ///
-  /// * Cached NoDocument entries have no bearing on query results.
+  /// * Cached [NoDocument] entries have no bearing on query results.
   Future<ImmutableSortedMap<DocumentKey, Document>>
       getAllDocumentsMatchingQuery(Query query);
 }

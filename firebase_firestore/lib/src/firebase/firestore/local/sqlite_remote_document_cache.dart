@@ -76,7 +76,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     if (result.isEmpty) return null;
     final Map<String, dynamic> row = result.first;
-    return decodeMaybeDocument(row['contents'] as List<int>);
+    final Uint8List contents = row['contents'];
+    return decodeMaybeDocument(contents);
   }
 
   @override
@@ -115,8 +116,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           EncodedPath.decodeResourcePath(row['path'] as String);
       if (path.length != immediateChildrenPathLength) continue;
 
-      final Uint8List bytes = row['contents'];
-      final MaybeDocument maybeDoc = decodeMaybeDocument(bytes);
+      final Uint8List contents = row['contents'];
+      final MaybeDocument maybeDoc = decodeMaybeDocument(contents);
 
       if (maybeDoc is! Document) continue;
 
@@ -134,7 +135,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     return EncodedPath.encode(key.path);
   }
 
-  MaybeDocument decodeMaybeDocument(List<int> bytes) {
+  MaybeDocument decodeMaybeDocument(Uint8List bytes) {
     try {
       return serializer
           .decodeMaybeDocument(proto.MaybeDocument.fromBuffer(bytes));

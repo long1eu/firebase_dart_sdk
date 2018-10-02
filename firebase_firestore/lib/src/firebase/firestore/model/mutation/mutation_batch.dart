@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
@@ -108,11 +109,13 @@ class MutationBatch {
           runtimeType == other.runtimeType &&
           batchId == other.batchId &&
           localWriteTime == other.localWriteTime &&
-          mutations == other.mutations;
+          const DeepCollectionEquality().equals(mutations, other.mutations);
 
   @override
   int get hashCode =>
-      batchId.hashCode ^ localWriteTime.hashCode ^ mutations.hashCode;
+      batchId.hashCode ^
+      localWriteTime.hashCode ^
+      const DeepCollectionEquality().hash(mutations);
 
   @override
   String toString() {

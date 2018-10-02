@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/lru_delegate.dart';
@@ -39,6 +40,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
+    Log.d('SQLiteLruReferenceDelegate', 'onTransactionStarted');
     Assert.hardAssert(_currentSequenceNumber == ListenSequence.INVALID,
         'Starting a transaction without committing the previous one');
     _currentSequenceNumber = listenSequence.next();
@@ -46,6 +48,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionCommitted() {
+    Log.d('SQLiteLruReferenceDelegate', 'onTransactionCommitted');
     Assert.hardAssert(_currentSequenceNumber != ListenSequence.INVALID,
         'Committing a transaction without having started one');
     _currentSequenceNumber = ListenSequence.INVALID;

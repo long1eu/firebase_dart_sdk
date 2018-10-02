@@ -74,14 +74,14 @@ class SQLiteMutationQueue implements MutationQueue {
     _lastAcknowledgedBatchId = MutationBatch.unknown;
 
     final List<Map<String, dynamic>> result = await db.query(
-      // @formatter:off
-      '''
+        // @formatter:off
+        '''
           SELECT last_acknowledged_batch_id, last_stream_token
           FROM mutation_queues
           WHERE uid = ?;
         ''',
-      // @formatter:on
-    );
+        // @formatter:on
+        <String>[uid]);
 
     if (result.isNotEmpty) {
       final Map<String, dynamic> row = result.first;
@@ -129,6 +129,7 @@ class SQLiteMutationQueue implements MutationQueue {
         '''
         // @formatter:on
         );
+
     for (Map<String, dynamic> row in uidsRows) {
       uids.add(row['uid'] as String);
     }
@@ -146,7 +147,8 @@ class SQLiteMutationQueue implements MutationQueue {
           <String>[uid]);
 
       for (Map<String, dynamic> row in result) {
-        nextBatchId = max(nextBatchId, row['MAX(batch_id)'] as int);
+        final int batchId = row['MAX(batch_id)'];
+        nextBatchId = batchId == null ? nextBatchId : max(nextBatchId, batchId);
       }
     }
 
@@ -385,17 +387,13 @@ class SQLiteMutationQueue implements MutationQueue {
       final List<String> args = <String>[];
       args.add(uid);
 
-      final String placeholders = documentKeys
-          .map((DocumentKey key) {
-            args.add(EncodedPath.encode(key.path));
-            return '?';
-          })
-          .skip(i)
-          .take(chunkSize)
-          .join(', ');
+      final String placeholders =
+          documentKeys.skip(i).take(chunkSize).map((DocumentKey key) {
+        args.add(EncodedPath.encode(key.path));
+        return '?';
+      }).join(', ');
 
       final List<Map<String, dynamic>> rows = await db.query(
-
           // @formatter:off
           '''
             SELECT DISTINCT dm.batch_id, m.mutations
