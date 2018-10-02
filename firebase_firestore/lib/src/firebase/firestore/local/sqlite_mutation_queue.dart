@@ -35,10 +35,9 @@ class SQLiteMutationQueue implements MutationQueue {
   /// Next value to use when assigning sequential IDs to each mutation batch.
   ///
   /// * NOTE: There can only be one [SQLiteMutationQueue] for a given db at a
-  /// time, hence it is safe to track [nextBatchId] as an instance-level
+  /// time, hence it is safe to track [_nextBatchId] as an instance-level
   /// property. Should we ever relax this constraint we'll need to revisit this.
-  @override
-  int nextBatchId;
+  int _nextBatchId;
 
   /// An identifier for the highest numbered batch that has been acknowledged by
   /// the server. All [MutationBatches] in this queue with batch_ids less than
@@ -61,13 +60,16 @@ class SQLiteMutationQueue implements MutationQueue {
       : uid = user.isAuthenticated ? user.uid : '',
         _lastStreamToken = WriteStream.emptyStreamToken;
 
+  @override
+  int get nextBatchId => _nextBatchId;
+
   // MutationQueue implementation
 
   @override
   Future<void> start() async {
     await _loadNextBatchIdAcrossAllUsers();
 
-    // On restart, [nextBatchId] may end up lower than [lastAcknowledgedBatchId]
+    // On restart, [_nextBatchId] may end up lower than [lastAcknowledgedBatchId]
     // since it's computed from the queue contents, and there may be no
     // mutations in the queue. In this case, we need to reset
     // [lastAcknowledgedBatchId] (which is safe since the queue must be empty).
@@ -94,9 +96,9 @@ class SQLiteMutationQueue implements MutationQueue {
       // [loadNextBatchIdAcrossAllUsers] depends upon every queue having an
       // entry.
       await _writeMutationQueueMetadata();
-    } else if (_lastAcknowledgedBatchId >= nextBatchId) {
+    } else if (_lastAcknowledgedBatchId >= _nextBatchId) {
       Assert.hardAssert(await isEmpty(),
-          'Reset nextBatchId is only possible when the queue is empty');
+          'Reset _nextBatchId is only possible when the queue is empty');
       _lastAcknowledgedBatchId = MutationBatch.unknown;
       await _writeMutationQueueMetadata();
     }
@@ -134,7 +136,7 @@ class SQLiteMutationQueue implements MutationQueue {
       uids.add(row['uid'] as String);
     }
 
-    nextBatchId = 0;
+    _nextBatchId = 0;
     for (String uid in uids) {
       final List<Map<String, dynamic>> result = await db.query(
           // @formatter:off
@@ -148,11 +150,13 @@ class SQLiteMutationQueue implements MutationQueue {
 
       for (Map<String, dynamic> row in result) {
         final int batchId = row['MAX(batch_id)'];
-        nextBatchId = batchId == null ? nextBatchId : max(nextBatchId, batchId);
+        _nextBatchId = batchId == null //
+            ? _nextBatchId
+            : max(_nextBatchId, batchId);
       }
     }
 
-    nextBatchId += 1;
+    _nextBatchId += 1;
   }
 
   @override
@@ -208,8 +212,8 @@ class SQLiteMutationQueue implements MutationQueue {
   @override
   Future<MutationBatch> addMutationBatch(
       Timestamp localWriteTime, List<Mutation> mutations) async {
-    final int batchId = nextBatchId;
-    nextBatchId += 1;
+    final int batchId = _nextBatchId;
+    _nextBatchId += 1;
 
     final MutationBatch batch =
         MutationBatch(batchId, localWriteTime, mutations);
@@ -275,7 +279,7 @@ class SQLiteMutationQueue implements MutationQueue {
     // All batches with [batchId] <= [lastAcknowledgedBatchId] have been
     // acknowledged so the first unacknowledged batch after [batchId] will have
     // a [batchID] larger than both of these values.
-    final int nextBatchId = max(batchId, _lastAcknowledgedBatchId) + 1;
+    final int _nextBatchId = max(batchId, _lastAcknowledgedBatchId) + 1;
 
     final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
@@ -288,7 +292,7 @@ class SQLiteMutationQueue implements MutationQueue {
           LIMIT 1;
         ''',
         // @formatter:on
-        <dynamic>[uid, nextBatchId]);
+        <dynamic>[uid, _nextBatchId]);
 
     if (result.isNotEmpty) {
       return decodeMutationBatch(result.first['mutations'] as List<int>);

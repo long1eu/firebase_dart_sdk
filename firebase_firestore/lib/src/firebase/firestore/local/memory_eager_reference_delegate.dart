@@ -26,7 +26,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   ReferenceSet additionalReferences;
 
   @override
-  int get currentSequenceNumber => ListenSequence.INVALID;
+  int get currentSequenceNumber => ListenSequence.invalid;
 
   @override
   Future<void> addReference(DocumentKey key) async {

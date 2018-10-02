@@ -48,9 +48,9 @@ import 'test_access_helper.dart';
 class TestUtil {
   /// A string sentinel that can be used with patchMutation() to mark a field
   /// for deletion.
-  static const String DELETE_SENTINEL = '<DELETE>';
+  static const String deleteSentinel = '<DELETE>';
 
-  static const int ARBITRARY_SEQUENCE_NUMBER = 2;
+  static const int arbitrarySequenceNumber = 2;
 
   static Map<String, T> map<T>([List<Object> entries = const <Object>[]]) {
     final Map<String, T> res = <String, T>{};
@@ -227,8 +227,8 @@ class TestUtil {
 
   static QueryData queryData(
       int targetId, QueryPurpose queryPurpose, String path) {
-    return QueryData.init(TestUtil.query(path), targetId,
-        ARBITRARY_SEQUENCE_NUMBER, queryPurpose);
+    return QueryData.init(
+        TestUtil.query(path), targetId, arbitrarySequenceNumber, queryPurpose);
   }
 
   static ImmutableSortedMap<DocumentKey, T> docUpdates<T extends MaybeDocument>(
@@ -285,7 +285,7 @@ class TestUtil {
     final Map<int, QueryData> listenMap = <int, QueryData>{};
     for (int targetId in targets) {
       final QueryData queryData = QueryData.init(
-          query, targetId, ARBITRARY_SEQUENCE_NUMBER, QueryPurpose.listen);
+          query, targetId, arbitrarySequenceNumber, QueryPurpose.listen);
       listenMap[targetId] = queryData;
     }
     return listenMap;
@@ -297,7 +297,7 @@ class TestUtil {
     final Map<int, QueryData> listenMap = <int, QueryData>{};
     for (int targetId in targets) {
       final QueryData queryData = QueryData.init(query, targetId,
-          ARBITRARY_SEQUENCE_NUMBER, QueryPurpose.limboResolution);
+          arbitrarySequenceNumber, QueryPurpose.limboResolution);
       listenMap[targetId] = queryData;
     }
     return listenMap;
@@ -350,7 +350,7 @@ class TestUtil {
     for (MapEntry<String, Object> entry in values.entries) {
       final FieldPath fieldPath = field(entry.key);
       objectMask.add(fieldPath);
-      if (entry.value != DELETE_SENTINEL) {
+      if (entry.value != deleteSentinel) {
         final FieldValue parsedValue = wrap(entry.value);
         objectValue = objectValue.set(fieldPath, parsedValue);
       }

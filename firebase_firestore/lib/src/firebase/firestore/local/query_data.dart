@@ -9,6 +9,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
+import 'package:meta/meta.dart';
 
 /// An immutable set of metadata that the store will need to keep track of for
 /// each query.
@@ -52,15 +53,18 @@ class QueryData {
 
   /// Creates a new query data instance with an updated snapshot version and
   /// resume token.
-  QueryData copy(SnapshotVersion snapshotVersion, List<int> resumeToken,
-      int sequenceNumber) {
+  QueryData copyWith(
+      {@required SnapshotVersion snapshotVersion,
+      @required Uint8List resumeToken,
+      @required int sequenceNumber}) {
+    assert(sequenceNumber != null);
     return QueryData(
       query,
       targetId,
       sequenceNumber,
       purpose,
       snapshotVersion,
-      Uint8List.fromList(resumeToken),
+      resumeToken,
     );
   }
 

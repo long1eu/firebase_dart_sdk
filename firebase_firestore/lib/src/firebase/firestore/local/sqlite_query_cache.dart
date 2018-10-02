@@ -218,14 +218,14 @@ class SQLiteQueryCache implements QueryCache {
     // out live targets from the result set.
 
     final List<Map<String, dynamic>> result = await _db.query(
-      // @formatter:off
-      '''
+        // @formatter:off
+        '''
           SELECT target_id
           FROM targets
           WHERE last_listen_sequence_number <= ?;
         ''',
-      // @formatter:on
-    );
+        // @formatter:on
+        <int>[upperBound]);
 
     for (Map<String, dynamic> row in result) {
       final int targetId = row['target_id'];

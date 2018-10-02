@@ -19,13 +19,14 @@ class LruGarbageCollector {
   /// collect.
   int calculateQueryCount(int percentile) {
     final int targetCount = delegate.targetCount;
-    return (percentile ~/ 100.0) * targetCount;
+    print(targetCount);
+    return (percentile / 100.0 * targetCount).toInt();
   }
 
   /// Returns the nth sequence number, counting in order from the smallest.
   Future<int> nthSequenceNumber(int count) async {
     if (count == 0) {
-      return ListenSequence.INVALID;
+      return ListenSequence.invalid;
     }
     final _RollingSequenceNumberBuffer buffer =
         _RollingSequenceNumberBuffer(count);

@@ -390,11 +390,14 @@ class LocalStore {
 
         // Update the resume token if the change includes one. Don't clear
         // any preexisting value.
-        final List<int> resumeToken = change.resumeToken;
+        final Uint8List resumeToken = change.resumeToken;
         if (resumeToken.isNotEmpty) {
           final QueryData oldQueryData = queryData;
-          queryData = queryData.copy(
-              remoteEvent.snapshotVersion, resumeToken, sequenceNumber);
+          queryData = queryData.copyWith(
+            snapshotVersion: remoteEvent.snapshotVersion,
+            resumeToken: resumeToken,
+            sequenceNumber: sequenceNumber,
+          );
           _targetIds[targetId] = queryData;
 
           if (_shouldPersistQueryData(oldQueryData, queryData, change)) {

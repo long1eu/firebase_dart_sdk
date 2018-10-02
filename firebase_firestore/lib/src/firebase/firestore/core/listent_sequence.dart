@@ -4,7 +4,7 @@
 
 /// Implements a monotonic sequence starting after an initial value.
 class ListenSequence {
-  static const int INVALID = -1;
+  static const int invalid = -1;
 
   int previousSequenceNumber;
 

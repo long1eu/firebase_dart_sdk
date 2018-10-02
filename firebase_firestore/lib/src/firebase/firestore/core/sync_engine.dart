@@ -488,7 +488,7 @@ class SyncEngine implements RemoteStoreCallback {
       final QueryData queryData = QueryData.init(
         query,
         limboTargetId,
-        ListenSequence.INVALID,
+        ListenSequence.invalid,
         QueryPurpose.limboResolution,
       );
       _limboResolutionsByTarget[limboTargetId] = _LimboResolution(key);

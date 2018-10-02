@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/lru_delegate.dart';
@@ -24,7 +23,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   int _currentSequenceNumber;
 
   SQLiteLruReferenceDelegate(this.persistence)
-      : _currentSequenceNumber = ListenSequence.INVALID {
+      : _currentSequenceNumber = ListenSequence.invalid {
     garbageCollector = LruGarbageCollector(this);
   }
 
@@ -40,23 +39,21 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
-    Log.d('SQLiteLruReferenceDelegate', 'onTransactionStarted');
-    Assert.hardAssert(_currentSequenceNumber == ListenSequence.INVALID,
+    Assert.hardAssert(_currentSequenceNumber == ListenSequence.invalid,
         'Starting a transaction without committing the previous one');
     _currentSequenceNumber = listenSequence.next();
   }
 
   @override
   void onTransactionCommitted() {
-    Log.d('SQLiteLruReferenceDelegate', 'onTransactionCommitted');
-    Assert.hardAssert(_currentSequenceNumber != ListenSequence.INVALID,
+    Assert.hardAssert(_currentSequenceNumber != ListenSequence.invalid,
         'Committing a transaction without having started one');
-    _currentSequenceNumber = ListenSequence.INVALID;
+    _currentSequenceNumber = ListenSequence.invalid;
   }
 
   @override
   int get currentSequenceNumber {
-    Assert.hardAssert(_currentSequenceNumber != ListenSequence.INVALID,
+    Assert.hardAssert(_currentSequenceNumber != ListenSequence.invalid,
         'Attempting to get a sequence number outside of a transaction');
     return _currentSequenceNumber;
   }
@@ -179,10 +176,10 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<void> removeTarget(QueryData queryData) async {
-    final QueryData updated = queryData.copy(
-      queryData.snapshotVersion,
-      queryData.resumeToken,
-      currentSequenceNumber,
+    final QueryData updated = queryData.copyWith(
+      snapshotVersion: queryData.snapshotVersion,
+      resumeToken: queryData.resumeToken,
+      sequenceNumber: currentSequenceNumber,
     );
 
     await persistence.queryCache.updateQueryData(updated);

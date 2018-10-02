@@ -28,7 +28,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       : orphanedSequenceNumbers = <DocumentKey, int>{},
         listenSequence =
             ListenSequence(persistence.queryCache.highestListenSequenceNumber),
-        _currentSequenceNumber = ListenSequence.INVALID {
+        _currentSequenceNumber = ListenSequence.invalid {
     garbageCollector = LruGarbageCollector(this);
   }
 
@@ -43,21 +43,21 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
-    Assert.hardAssert(_currentSequenceNumber == ListenSequence.INVALID,
+    Assert.hardAssert(_currentSequenceNumber == ListenSequence.invalid,
         'Starting a transaction without committing the previous one');
     _currentSequenceNumber = listenSequence.next();
   }
 
   @override
   void onTransactionCommitted() {
-    Assert.hardAssert(_currentSequenceNumber != ListenSequence.INVALID,
+    Assert.hardAssert(_currentSequenceNumber != ListenSequence.invalid,
         'Committing a transaction without having started one');
-    _currentSequenceNumber = ListenSequence.INVALID;
+    _currentSequenceNumber = ListenSequence.invalid;
   }
 
   @override
   int get currentSequenceNumber {
-    Assert.hardAssert(_currentSequenceNumber != ListenSequence.INVALID,
+    Assert.hardAssert(_currentSequenceNumber != ListenSequence.invalid,
         'Attempting to get a sequence number outside of a transaction');
     return _currentSequenceNumber;
   }
@@ -91,8 +91,11 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<void> removeTarget(QueryData queryData) async {
-    final QueryData updated = queryData.copy(queryData.snapshotVersion,
-        queryData.resumeToken, currentSequenceNumber);
+    final QueryData updated = queryData.copyWith(
+      snapshotVersion: queryData.snapshotVersion,
+      resumeToken: queryData.resumeToken,
+      sequenceNumber: currentSequenceNumber,
+    );
     persistence.queryCache.updateQueryData(updated);
   }
 

@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:typed_data';
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
@@ -383,8 +384,11 @@ class RemoteStore implements TargetMetadataProvider {
         final QueryData queryData = _listenTargets[targetId];
         // A watched target might have been removed already.
         if (queryData != null) {
-          _listenTargets[targetId] = queryData.copy(snapshotVersion,
-              targetChange.resumeToken, queryData.sequenceNumber);
+          _listenTargets[targetId] = queryData.copyWith(
+            snapshotVersion: snapshotVersion,
+            resumeToken: targetChange.resumeToken,
+            sequenceNumber: queryData.sequenceNumber,
+          );
         }
       }
     }
@@ -397,8 +401,11 @@ class RemoteStore implements TargetMetadataProvider {
       if (queryData != null) {
         // Clear the resume token for the query, since we're in a known mismatch
         // state.
-        _listenTargets[targetId] = queryData.copy(
-            queryData.snapshotVersion, <int>[], queryData.sequenceNumber);
+        _listenTargets[targetId] = queryData.copyWith(
+          snapshotVersion: queryData.snapshotVersion,
+          sequenceNumber: queryData.sequenceNumber,
+          resumeToken: Uint8List.fromList(<int>[]),
+        );
 
         // Cause a hard reset by unwatching and rewatching immediately, but
         // deliberately don't send a resume token so that we get a full update.
