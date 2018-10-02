@@ -759,12 +759,14 @@ class RemoteSerializer {
   proto.StructuredQuery_Filter _encodeFilters(List<Filter> filters) {
     final List<proto.StructuredQuery_Filter> protos =
         List<proto.StructuredQuery_Filter>(filters.length);
+    int i = 0;
     for (Filter filter in filters) {
       if (filter is RelationFilter) {
-        protos.add(_encodeRelationFilter(filter));
+        protos[i] = _encodeRelationFilter(filter);
       } else {
-        protos.add(_encodeUnaryFilter(filter));
+        protos[i] = _encodeUnaryFilter(filter);
       }
+      i++;
     }
     if (filters.length == 1) {
       return protos[0];

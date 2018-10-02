@@ -4,6 +4,7 @@
 
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
@@ -62,4 +63,25 @@ class QueryData {
       Uint8List.fromList(resumeToken),
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is QueryData &&
+          runtimeType == other.runtimeType &&
+          query == other.query &&
+          targetId == other.targetId &&
+          sequenceNumber == other.sequenceNumber &&
+          purpose == other.purpose &&
+          snapshotVersion == other.snapshotVersion &&
+          const DeepCollectionEquality().equals(resumeToken, other.resumeToken);
+
+  @override
+  int get hashCode =>
+      query.hashCode ^
+      targetId.hashCode ^
+      sequenceNumber.hashCode ^
+      purpose.hashCode ^
+      snapshotVersion.hashCode ^
+      const DeepCollectionEquality().hash(resumeToken);
 }

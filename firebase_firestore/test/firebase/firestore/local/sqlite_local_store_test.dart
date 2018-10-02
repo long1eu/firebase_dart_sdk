@@ -7,7 +7,6 @@ import 'dart:typed_data';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
@@ -30,7 +29,7 @@ import 'cases/local_store_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  SQLiteLocalStoreTest testCase;
+  LocalStoreTestCase testCase;
 
   setUp(() async {
     print('setUp');
@@ -38,7 +37,7 @@ void main() {
         await PersistenceTestHelpers.openSQLitePersistence(
             'firebase/firestore/local/local_store_${PersistenceTestHelpers.nextSQLiteDatabaseName()}.db');
 
-    testCase = SQLiteLocalStoreTest(persistence);
+    testCase = LocalStoreTestCase(persistence, false);
     await testCase.setUp();
     print('setUpDone');
   });
@@ -870,16 +869,6 @@ void main() {
     keys = await testCase.localStore.getRemoteDocumentKeys(2);
     expect(keys, <DocumentKey>[key('foo/bar'), key('foo/baz')]);
   });
-}
-
-class SQLiteLocalStoreTest extends LocalStoreTestCase {
-  @override
-  final Persistence persistence;
-
-  SQLiteLocalStoreTest(this.persistence);
-
-  @override
-  bool get garbageCollectorIsEager => false;
 }
 
 // ignore: always_specify_types

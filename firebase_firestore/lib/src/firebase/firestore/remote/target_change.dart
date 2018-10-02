@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
+import 'dart:typed_data';
+
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -9,14 +11,14 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 /// A [TargetChange] specifies the set of changes for a specific target as part
 /// of a [RemoteEvent]. These changes track which documents are added, modified
 /// or removed, as well as the target's resume token and whether the target is
-/// marked [CURRENT]. The actual changes *to* documents are not part of the
+/// marked [current]. The actual changes *to* documents are not part of the
 /// [TargetChange] since documents may be part of multiple targets.
 class TargetChange {
   /// Returns the opaque, server-assigned token that allows watching a query to
   /// be resumed after disconnecting without retransmitting all the data that
   /// matches the query. The resume token essentially identifies a point in time
   /// from which the server should resume sending results.
-  final List<int> resumeToken;
+  final Uint8List resumeToken;
 
   /// Returns the "current" (synced) status of this target. Note that "current"
   /// has special meaning in the RPC protocol that implies that a target is both

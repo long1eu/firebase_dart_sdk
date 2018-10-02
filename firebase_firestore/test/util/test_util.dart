@@ -242,7 +242,7 @@ class TestUtil {
   }
 
   static TargetChange targetChange<T extends MaybeDocument>(
-      List<int> resumeToken,
+      Uint8List resumeToken,
       bool current,
       Iterable<Document> addedDocuments,
       Iterable<Document> modifiedDocuments,
@@ -276,7 +276,8 @@ class TestUtil {
   }
 
   static TargetChange ackTarget([List<Document> docs]) {
-    return targetChange(<int>[], true, docs ?? const <Document>[], null, null);
+    return targetChange(Uint8List.fromList(<int>[]), true,
+        docs ?? const <Document>[], null, null);
   }
 
   static Map<int, QueryData> activeQueries(List<int> targets) {

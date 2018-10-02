@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 27/09/2018
 
+import 'dart:typed_data';
+
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/limbo_document_change.dart';
@@ -271,15 +273,19 @@ void main() {
     ]);
 
     viewDocChanges = view.computeDocChanges(docUpdates());
-    change = view.applyChanges(viewDocChanges,
-        targetChange(<int>[], true, <Document>[doc1], null, null));
+    change = view.applyChanges(
+        viewDocChanges,
+        targetChange(
+            Uint8List.fromList(<int>[]), true, <Document>[doc1], null, null));
     expect(change.limboChanges, <LimboDocumentChange>[
       LimboDocumentChange(LimboDocumentChangeType.removed, doc1.key)
     ]);
 
     viewDocChanges = view.computeDocChanges(docUpdates(<Document>[doc2]));
-    change = view.applyChanges(viewDocChanges,
-        targetChange(<int>[], true, <Document>[doc2], null, null));
+    change = view.applyChanges(
+        viewDocChanges,
+        targetChange(
+            Uint8List.fromList(<int>[]), true, <Document>[doc2], null, null));
     expect(change.limboChanges, isEmpty);
 
     change = applyChanges(view, <Document>[doc3]);

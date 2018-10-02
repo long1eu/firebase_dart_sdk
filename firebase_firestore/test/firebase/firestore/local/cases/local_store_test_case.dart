@@ -26,21 +26,19 @@ import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart';
 
-abstract class LocalStoreTestCase {
-  Persistence _localStorePersistence;
+class LocalStoreTestCase {
+  final Persistence persistence;
+  final bool garbageCollectorIsEager;
+
+  LocalStoreTestCase(this.persistence, this.garbageCollectorIsEager);
+
   List<MutationBatch> _batches;
   ImmutableSortedMap<DocumentKey, MaybeDocument> _lastChanges;
   int _lastTargetId;
-
   LocalStore localStore;
 
-  Persistence get persistence;
-
-  bool get garbageCollectorIsEager;
-
   Future<void> setUp() async {
-    _localStorePersistence = persistence;
-    localStore = LocalStore(_localStorePersistence, User.unauthenticated);
+    localStore = LocalStore(persistence, User.unauthenticated);
     await localStore.start();
 
     _batches = <MutationBatch>[];
@@ -48,9 +46,7 @@ abstract class LocalStoreTestCase {
     _lastTargetId = 0;
   }
 
-  Future<void> tearDown() async {
-    await _localStorePersistence.shutdown();
-  }
+  Future<void> tearDown() => persistence.shutdown();
 
   Future<void> writeMutation(Mutation mutation) async {
     await writeMutations(<Mutation>[mutation]);

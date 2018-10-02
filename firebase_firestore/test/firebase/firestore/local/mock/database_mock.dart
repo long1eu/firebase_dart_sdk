@@ -12,6 +12,8 @@ class DatabaseMock extends Database {
   sql.Database database;
   File path;
 
+  bool renamePath = true;
+
   DatabaseMock._(this.database, this.path);
 
   static Future<DatabaseMock> create(String name,
@@ -79,6 +81,8 @@ class DatabaseMock extends Database {
   @override
   void close() {
     database.close();
-    path.renameSync('${path.path}_');
+    if (renamePath) {
+      path.renameSync('${path.path}_');
+    }
   }
 }

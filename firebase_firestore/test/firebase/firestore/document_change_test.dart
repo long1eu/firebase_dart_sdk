@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 28/09/2018
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
@@ -53,8 +54,12 @@ void main() {
         view.applyChanges(initialChanges, initialTargetChange).snapshot;
 
     final ViewDocumentChanges updateChanges = view.computeDocChanges(updates);
-    final TargetChange updateTargetChange =
-        targetChange(<int>[], true, addedList, modifiedList, removedList);
+    final TargetChange updateTargetChange = targetChange(
+        Uint8List.fromList(<int>[]),
+        true,
+        addedList,
+        modifiedList,
+        removedList);
     final ViewSnapshot updatedSnapshot =
         view.applyChanges(updateChanges, updateTargetChange).snapshot;
 

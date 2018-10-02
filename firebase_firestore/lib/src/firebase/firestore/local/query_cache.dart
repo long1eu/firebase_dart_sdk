@@ -10,6 +10,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart'
 import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 /// Represents cached queries received from the remote backend. This contains
@@ -46,7 +47,7 @@ abstract class QueryCache {
   SnapshotVersion get lastRemoteSnapshotVersion;
 
   /// Set the snapshot version representing the last consistent snapshot
-  /// received from the backend. (see lastRemoteSnapshotVersion for more
+  /// received from the backend. (see [lastRemoteSnapshotVersion] for more
   /// details).
   Future<void> setLastRemoteSnapshotVersion(SnapshotVersion snapshotVersion);
 
@@ -67,19 +68,19 @@ abstract class QueryCache {
   /// [ReferenceDelegate.removeTarget].
   Future<void> removeQueryData(QueryData queryData);
 
-  /// Looks up a QueryData entry in the cache.
+  /// Looks up a [QueryData] entry in the cache.
   ///
   /// The [query] corresponding to the entry to look up. Returns the cached
   /// [QueryData] entry, or null if the cache has no entry for the query.
   Future<QueryData> getQueryData(Query query);
 
-  /// Adds the given document keys to cached query results of the given
-  /// target id.
+  /// Adds the given document [keys] to cached query results of the given
+  /// [targetId].
   Future<void> addMatchingKeys(
       ImmutableSortedSet<DocumentKey> keys, int targetId);
 
-  /// Removes the given document keys from the cached query results of the given
-  /// target id.
+  /// Removes the given document [keys] from the cached query results of the
+  /// given [targetId].
   Future<void> removeMatchingKeys(
       ImmutableSortedSet<DocumentKey> keys, int targetId);
 

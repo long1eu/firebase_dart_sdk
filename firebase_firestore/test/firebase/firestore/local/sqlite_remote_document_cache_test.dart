@@ -27,7 +27,7 @@ void main() {
 
     final SQLitePersistence persistence =
         await PersistenceTestHelpers.openSQLitePersistence(
-            'firebase/firestore/local/sqlite_mutation_queue_${PersistenceTestHelpers.nextSQLiteDatabaseName()}.db');
+            'firebase/firestore/local/sqlite_remote_document_cache_${PersistenceTestHelpers.nextSQLiteDatabaseName()}.db');
 
     testCase = RemoteDocumentCacheTestCase(persistence);
     testCase.setUp();

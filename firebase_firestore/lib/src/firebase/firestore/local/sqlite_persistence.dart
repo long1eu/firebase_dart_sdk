@@ -28,7 +28,8 @@ import 'package:meta/meta.dart';
 class SQLitePersistence extends Persistence {
   static const String tag = 'SQLitePersistence';
 
-  final _OpenHelper opener;
+  final OpenDatabase openDatabase;
+  final String databaseName;
   final LocalSerializer serializer;
 
   Database _db;
@@ -45,7 +46,7 @@ class SQLitePersistence extends Persistence {
   @override
   SQLiteLruReferenceDelegate referenceDelegate;
 
-  SQLitePersistence._(this.serializer, this.opener, this._db);
+  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName);
 
   static Future<SQLitePersistence> create(
       String persistenceKey,
@@ -53,10 +54,9 @@ class SQLitePersistence extends Persistence {
       LocalSerializer serializer,
       OpenDatabase openDatabase) async {
     final String databaseName = sDatabaseName(persistenceKey, databaseId);
-    final _OpenHelper opener =
-        await _OpenHelper.open(databaseName, openDatabase);
+
     final SQLitePersistence persistence =
-        SQLitePersistence._(serializer, opener, opener._db);
+        SQLitePersistence._(serializer, openDatabase, databaseName);
 
     final SQLiteQueryCache queryCache =
         SQLiteQueryCache(persistence, serializer);
@@ -89,6 +89,7 @@ class SQLitePersistence extends Persistence {
   Future<void> start() async {
     Log.d(tag, 'Starting SQLite persistance');
     Assert.hardAssert(!started, 'SQLitePersistence double-started!');
+    _db = await _openDb(databaseName, openDatabase);
     await queryCache.start();
     started = true;
     referenceDelegate.start(queryCache.highestListenSequenceNumber);
@@ -97,12 +98,15 @@ class SQLitePersistence extends Persistence {
   @override
   Future<void> shutdown() async {
     Log.d(tag, 'Shutingdown SQLite persistance');
-
     Assert.hardAssert(started, 'SQLitePersistence shutdown without start!');
+
     started = false;
     _db.close();
     _db = null;
   }
+
+  @visibleForTesting
+  Database get database => _db;
 
   @override
   MutationQueue getMutationQueue(User user) {
@@ -156,29 +160,23 @@ class SQLitePersistence extends Persistence {
   Future<int> delete(String statement, [List<dynamic> args]) {
     return _db.delete(statement, args);
   }
-}
 
-/// Configures database connections just the way we like them, delegating to
-/// SQLiteSchema to actually do the work of migration.
-///
-/// * The order of events when opening a new connection is as follows:
-///
-/// <ol>
-/// <li>New connection
-/// <li>onConfigure
-/// <li>onCreate / onUpgrade (optional; if version already matches these aren't
-/// called)
-/// <li>onOpen
-/// </ol>
-///
-/// * This OpenHelper attempts to obtain exclusive access to the database and
-/// attempts to do so as early as possible.
-class _OpenHelper {
-  final Database _db;
-
-  const _OpenHelper(this._db);
-
-  static Future<_OpenHelper> open(
+  /// Configures database connections just the way we like them, delegating to
+  /// SQLiteSchema to actually do the work of migration.
+  ///
+  /// * The order of events when opening a new connection is as follows:
+  ///
+  /// <ol>
+  /// <li>New connection
+  /// <li>onConfigure
+  /// <li>onCreate / onUpgrade (optional; if version already matches these aren't
+  /// called)
+  /// <li>onOpen
+  /// </ol>
+  ///
+  /// * This attempts to obtain exclusive access to the database and attempts to
+  /// do so as early as possible.
+  static Future<Database> _openDb(
       String databaseName, OpenDatabase openDatabase) async {
     bool configured;
 
@@ -227,6 +225,6 @@ class _OpenHelper {
       onOpen: (Database db) async => ensureConfigured(db),
     );
 
-    return _OpenHelper(db);
+    return db;
   }
 }

@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 24/09/2018
 
+import 'dart:typed_data';
+
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -28,7 +30,7 @@ class TargetState {
   bool _hasChanges = true;
 
   /// The last resume token sent to us for this target.
-  List<int> _resumeToken = <int>[];
+  Uint8List _resumeToken = Uint8List.fromList(<int>[]);
 
   bool _current = false;
 
@@ -50,7 +52,7 @@ class TargetState {
 
   /// Applies the resume token to the [TargetChange], but only when it has a new
   /// value. Empty [resumeTokens] are discarded.
-  void updateResumeToken(List<int> resumeToken) {
+  void updateResumeToken(Uint8List resumeToken) {
     if (resumeToken.isNotEmpty) {
       _hasChanges = true;
       _resumeToken = resumeToken;
