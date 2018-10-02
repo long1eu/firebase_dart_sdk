@@ -27,7 +27,7 @@ class MemoryQueryCache implements QueryCache {
 
   /// The highest numbered target id encountered.
   @override
-  int highestTargetId;
+  int highestTargetId = 0;
 
   /// The last received snapshot version.
   @override
@@ -74,7 +74,7 @@ class MemoryQueryCache implements QueryCache {
   Future<void> updateQueryData(QueryData queryData) async {
     // Memory persistence doesn't need to do anything different between add and
     // remove.
-    addQueryData(queryData);
+    return addQueryData(queryData);
   }
 
   @override
@@ -114,7 +114,9 @@ class MemoryQueryCache implements QueryCache {
     references.addReferences(keys, targetId);
     final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
 
-    keys.forEach(referenceDelegate.addReference);
+    for (DocumentKey key in keys) {
+      await referenceDelegate.addReference(key);
+    }
   }
 
   @override
@@ -122,7 +124,10 @@ class MemoryQueryCache implements QueryCache {
       ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     references.removeReferences(keys, targetId);
     final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
-    keys.forEach(referenceDelegate.removeReference);
+
+    for (DocumentKey key in keys) {
+      await referenceDelegate.removeReference(key);
+    }
   }
 
   void _removeMatchingKeysForTargetId(int targetId) {

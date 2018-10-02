@@ -49,5 +49,5 @@ abstract class ReferenceDelegate {
   void onTransactionStarted();
 
   /// Lifecycle hook to notify the delegate that a transaction has committed.
-  void onTransactionCommitted();
+  Future<void> onTransactionCommitted();
 }

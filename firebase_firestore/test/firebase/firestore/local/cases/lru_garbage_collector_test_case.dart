@@ -16,7 +16,6 @@ import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart'
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
@@ -37,7 +36,7 @@ class LruGarbageCollectorTestCase {
   int initialSequenceNumber;
   ObjectValue testValue;
 
-  Future<SQLitePersistence> Function() getPersistence;
+  Future<Persistence> Function() getPersistence;
 
   LruGarbageCollectorTestCase(this.getPersistence);
 

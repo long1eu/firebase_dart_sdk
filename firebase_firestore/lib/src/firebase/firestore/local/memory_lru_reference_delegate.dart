@@ -49,7 +49,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  void onTransactionCommitted() {
+  Future<void> onTransactionCommitted() async {
     Assert.hardAssert(_currentSequenceNumber != ListenSequence.invalid,
         'Committing a transaction without having started one');
     _currentSequenceNumber = ListenSequence.invalid;
@@ -64,7 +64,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<void> forEachTarget(Consumer<QueryData> consumer) async {
-    persistence.queryCache.forEachTarget(consumer);
+    await persistence.queryCache.forEachTarget(consumer);
   }
 
   @override
@@ -96,7 +96,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       resumeToken: queryData.resumeToken,
       sequenceNumber: currentSequenceNumber,
     );
-    persistence.queryCache.updateQueryData(updated);
+    await persistence.queryCache.updateQueryData(updated);
   }
 
   @override

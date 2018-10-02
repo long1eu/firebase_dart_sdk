@@ -45,7 +45,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  void onTransactionCommitted() {
+  Future<void> onTransactionCommitted() async {
     Assert.hardAssert(_currentSequenceNumber != ListenSequence.invalid,
         'Committing a transaction without having started one');
     _currentSequenceNumber = ListenSequence.invalid;

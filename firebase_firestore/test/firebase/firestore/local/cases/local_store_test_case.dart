@@ -63,7 +63,7 @@ class LocalStoreTestCase {
   }
 
   Future<void> notifyLocalViewChanges(LocalViewChanges changes) async {
-    localStore.notifyLocalViewChanges(<LocalViewChanges>[changes]);
+    await localStore.notifyLocalViewChanges(<LocalViewChanges>[changes]);
   }
 
   Future<void> acknowledgeMutation(int documentVersion) async {

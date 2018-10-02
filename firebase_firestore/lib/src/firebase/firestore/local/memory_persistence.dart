@@ -3,6 +3,7 @@
 // on 20/09/2018
 import 'dart:async';
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_eager_reference_delegate.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_lru_reference_delegate.dart';
@@ -16,6 +17,8 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 class MemoryPersistence extends Persistence {
+  static const String tag = 'MemoryPersistence';
+
   // The persistence objects backing MemoryPersistence are retained here to make
   // it easier to write tests affecting both the in-memory and SQLite-backed
   // persistence layers. Tests can create a new LocalStore wrapping this
@@ -33,7 +36,7 @@ class MemoryPersistence extends Persistence {
   ReferenceDelegate referenceDelegate;
 
   @override
-  bool started;
+  bool started = false;
 
   /// Use static helpers to instantiate
   MemoryPersistence._()
@@ -88,20 +91,20 @@ class MemoryPersistence extends Persistence {
   @override
   Future<void> runTransaction(
       String action, Transaction<void> operation) async {
+    Log.d(tag, 'Starting transaction: $action');
+
     referenceDelegate.onTransactionStarted();
-    try {
-      operation();
-    } finally {
-      referenceDelegate.onTransactionCommitted();
-    }
+    await operation();
+    await referenceDelegate.onTransactionCommitted();
   }
 
   @override
   Future<T> runTransactionAndReturn<T>(
       String action, Transaction<T> operation) async {
+    Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
     final T result = await operation();
-    referenceDelegate.onTransactionCommitted();
+    await referenceDelegate.onTransactionCommitted();
     return result;
   }
 }

@@ -141,14 +141,14 @@ class SyncEngine implements RemoteStoreCallback {
   }
 
   /// Stops listening to a query previously listened to via listen. */
-  void stopListening(Query query) {
+  Future<void> stopListening(Query query) async {
     _assertCallback('stopListening');
 
     final QueryView queryView = _queryViewsByQuery[query];
     Assert.hardAssert(
         queryView != null, 'Trying to stop listening to a query not found');
 
-    _localStore.releaseQuery(query);
+    await _localStore.releaseQuery(query);
     _remoteStore.stopListening(queryView.targetId);
     _removeAndCleanup(queryView);
   }
@@ -328,7 +328,7 @@ class SyncEngine implements RemoteStoreCallback {
     } else {
       final QueryView queryView = _queryViewsByTarget[targetId];
       Assert.hardAssert(queryView != null, 'Unknown target: $targetId');
-      _localStore.releaseQuery(queryView.query);
+      await _localStore.releaseQuery(queryView.query);
       _removeAndCleanup(queryView);
       callback.onError(queryView.query, error);
     }
@@ -452,7 +452,7 @@ class SyncEngine implements RemoteStoreCallback {
       }
     }
     callback.onViewSnapshots(newSnapshots);
-    _localStore.notifyLocalViewChanges(documentChangesInAllViews);
+    await _localStore.notifyLocalViewChanges(documentChangesInAllViews);
   }
 
   /// Updates the limbo document state for the given targetId.

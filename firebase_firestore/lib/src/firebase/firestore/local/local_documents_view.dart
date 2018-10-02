@@ -82,9 +82,9 @@ class LocalDocumentsView {
       Query query) async {
     final ResourcePath path = query.path;
     if (DocumentKey.isDocumentKey(path)) {
-      return await _getDocumentsMatchingDocumentQuery(path);
+      return _getDocumentsMatchingDocumentQuery(path);
     } else {
-      return await _getDocumentsMatchingCollectionQuery(query);
+      return _getDocumentsMatchingCollectionQuery(query);
     }
   }
 

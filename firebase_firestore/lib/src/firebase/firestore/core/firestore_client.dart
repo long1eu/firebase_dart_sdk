@@ -97,7 +97,7 @@ class FirestoreClient implements RemoteStoreCallback {
     credentialsProvider.removeChangeListener();
     return asyncQueue.enqueue(() async {
       remoteStore.shutdown();
-      persistence.shutdown();
+      await persistence.shutdown();
     });
   }
 

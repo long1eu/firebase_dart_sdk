@@ -5,17 +5,16 @@
 import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_cache.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:test/test.dart';
 
 import '../../../util/test_util.dart';
 import 'cases/query_cache_test_case.dart';
-import 'mock/database_mock.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
@@ -24,9 +23,8 @@ void main() {
 
   setUp(() async {
     print('setUp');
-    final SQLitePersistence persistence =
-        await PersistenceTestHelpers.openSQLitePersistence(
-            'firebase/firestore/local/sqlite_query_cache_${PersistenceTestHelpers.nextSQLiteDatabaseName()}.db');
+    final MemoryPersistence persistence =
+        await PersistenceTestHelpers.createEagerGCMemoryPersistence();
 
     testCase = QueryCacheTestCase(persistence);
     testCase.setUp();
@@ -263,12 +261,7 @@ void main() {
     expect(queryCache.highestTargetId, 42);
 
     // Verify that the highestTargetID even survives restarts.
-    final SQLitePersistence sqLitePersistence = testCase.persistence;
-    final DatabaseMock databaseMock = sqLitePersistence.database;
-
-    databaseMock.renamePath = false;
     await testCase.persistence.shutdown();
-    databaseMock.renamePath = true;
     await testCase.persistence.start();
 
     queryCache = testCase.persistence.queryCache;
@@ -283,13 +276,7 @@ void main() {
     expect(queryCache.lastRemoteSnapshotVersion, version(42));
 
     // Snapshot version persists restarts.
-
-    final SQLitePersistence sqLitePersistence = testCase.persistence;
-    final DatabaseMock databaseMock = sqLitePersistence.database;
-
-    databaseMock.renamePath = false;
     await testCase.persistence.shutdown();
-    databaseMock.renamePath = true;
     await testCase.persistence.start();
     queryCache = testCase.persistence.queryCache;
     expect(queryCache.lastRemoteSnapshotVersion, version(42));

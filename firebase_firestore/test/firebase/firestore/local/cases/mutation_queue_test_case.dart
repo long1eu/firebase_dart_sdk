@@ -93,13 +93,13 @@ class MutationQueueTestCase {
   }
 
   Future<void> expectCount({int count, bool isEmpty}) async {
-    final int batch = await batchCount();
-    expect(batch, count);
-
     await persistence.runTransaction('expectCount', () async {
       final bool empty = await mutationQueue.isEmpty();
       expect(empty, isEmpty);
     });
+
+    final int batch = await batchCount();
+    expect(batch, count);
   }
 }
 

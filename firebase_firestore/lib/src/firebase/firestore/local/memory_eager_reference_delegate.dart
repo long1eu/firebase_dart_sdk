@@ -49,20 +49,26 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
     (await queryCache.getMatchingKeysForTargetId(queryData.targetId))
         .forEach(orphanedDocuments.add);
 
-    queryCache.removeQueryData(queryData);
+    await queryCache.removeQueryData(queryData);
   }
 
   @override
-  void onTransactionStarted() => orphanedDocuments = Set<DocumentKey>();
+  void onTransactionStarted() {
+    print('#onTransactionStarted called');
+    orphanedDocuments = Set<DocumentKey>();
+  }
 
   /// In eager garbage collection, collection is run on transaction commit.
   @override
-  void onTransactionCommitted() async {
+  Future<void> onTransactionCommitted() async {
+    print('#onTransactionCommitted called');
     final MemoryRemoteDocumentCache remoteDocuments =
         persistence.remoteDocumentCache;
+
     for (DocumentKey key in orphanedDocuments) {
-      if (!(await _isReferenced(key))) {
-        remoteDocuments.remove(key);
+      final bool isReferenced = await _isReferenced(key);
+      if (!isReferenced) {
+        await remoteDocuments.remove(key);
       }
     }
     orphanedDocuments = null;
@@ -70,7 +76,8 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
 
   @override
   Future<void> updateLimboDocument(DocumentKey key) async {
-    if (await _isReferenced(key)) {
+    final bool isReferenced = await _isReferenced(key);
+    if (isReferenced) {
       orphanedDocuments.remove(key);
     } else {
       orphanedDocuments.add(key);
@@ -88,7 +95,8 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
 
   /// Returns true if the given document is referenced by anything.
   Future<bool> _isReferenced(DocumentKey key) async {
-    if (await persistence.queryCache.containsKey(key)) {
+    final bool containsKey = await persistence.queryCache.containsKey(key);
+    if (containsKey) {
       return true;
     }
 

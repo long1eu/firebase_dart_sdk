@@ -220,7 +220,7 @@ class LocalStore {
           await _mutationQueue.getAllMutationBatches();
 
       _mutationQueue = _persistence.getMutationQueue(user);
-      _startMutationQueue();
+      await _startMutationQueue();
 
       final List<MutationBatch> newBatches =
           await _mutationQueue.getAllMutationBatches();
@@ -528,8 +528,13 @@ class LocalStore {
   /// Returns the current value of a document with a given key, or null if not
   /// found.
   Future<MaybeDocument> readDocument(DocumentKey key) {
-    return _persistence.runTransactionAndReturn<MaybeDocument>(
-        'readDocument', () => _localDocuments.getDocument(key));
+    return _persistence.runTransactionAndReturn<MaybeDocument>('readDocument',
+        () async {
+      print('#readDocument start');
+      final MaybeDocument doc = await _localDocuments.getDocument(key);
+      print('#readDocument end');
+      return doc;
+    });
   }
 
   /// Assigns the given query an internal id so that its results can be pinned
@@ -591,7 +596,7 @@ class LocalStore {
       // If this was the last watch target, then we won't get any more watch
       // snapshots, so we should release any held batch results.
       if (_targetIds.isEmpty) {
-        _releaseHeldBatchResults();
+        await _releaseHeldBatchResults();
       }
     });
   }
@@ -697,7 +702,7 @@ class LocalStore {
           Assert.hardAssert(remoteDoc == null,
               'Mutation batch $batch applied to document $remoteDoc resulted in null.');
         } else {
-          _remoteDocuments.add(doc);
+          await _remoteDocuments.add(doc);
         }
       }
     }

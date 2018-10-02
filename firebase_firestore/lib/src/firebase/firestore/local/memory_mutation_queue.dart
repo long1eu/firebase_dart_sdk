@@ -75,7 +75,8 @@ class MemoryMutationQueue implements MutationQueue {
     // logs out / back in. To behave like the SQLite-backed [MutationQueue]
     // (and accommodate tests that expect as much), we reset [nextBatchId] and
     // [highestAcknowledgedBatchId] if the queue is empty.
-    if (await isEmpty()) {
+    final bool queueIsEmpty = await isEmpty();
+    if (queueIsEmpty) {
       nextBatchId = 1;
       highestAcknowledgedBatchId = MutationBatch.unknown;
     }
@@ -231,7 +232,8 @@ class MemoryMutationQueue implements MutationQueue {
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
       Iterable<DocumentKey> documentKeys) async {
-    ImmutableSortedSet<int> uniqueBatchIDs = ImmutableSortedSet<int>();
+    ImmutableSortedSet<int> uniqueBatchIDs =
+        ImmutableSortedSet<int>(<int>[], standardComparator<num>());
 
     for (DocumentKey key in documentKeys) {
       final DocumentReference start = DocumentReference(key, 0);
@@ -270,7 +272,8 @@ class MemoryMutationQueue implements MutationQueue {
 
     // Find unique [batchId]s referenced by all documents potentially matching the
     // query.
-    ImmutableSortedSet<int> uniqueBatchIDs = ImmutableSortedSet<int>();
+    ImmutableSortedSet<int> uniqueBatchIDs =
+        ImmutableSortedSet<int>(<int>[], standardComparator<num>());
 
     final Iterator<DocumentReference> iterator =
         batchesByDocumentKey.iteratorFrom(start);
@@ -351,7 +354,7 @@ class MemoryMutationQueue implements MutationQueue {
         }
       }
 
-      queue.sublist(startIndex, queueIndex).clear();
+      queue.removeRange(startIndex, queueIndex);
     } else {
       // Mark tombstones
       for (int i = startIndex; i < queueIndex; i++) {
@@ -365,12 +368,13 @@ class MemoryMutationQueue implements MutationQueue {
       final int batchId = batch.batchId;
       for (Mutation mutation in batch.mutations) {
         final DocumentKey key = mutation.key;
-        persistence.referenceDelegate.removeMutationReference(key);
+        await persistence.referenceDelegate.removeMutationReference(key);
 
         final DocumentReference reference = DocumentReference(key, batchId);
         references = references.remove(reference);
       }
     }
+
     batchesByDocumentKey = references;
   }
 

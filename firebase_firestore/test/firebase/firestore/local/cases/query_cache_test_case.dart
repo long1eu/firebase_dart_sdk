@@ -70,7 +70,7 @@ class QueryCacheTestCase {
   Future<void> removeMatchingKeysForTargetId(int targetId) async {
     await persistence.runTransaction(
         'removeReferencesForTargetId',
-        () async => queryCache.removeMatchingKeys(
+        () async => await queryCache.removeMatchingKeys(
             await queryCache.getMatchingKeysForTargetId(targetId), targetId));
   }
 }

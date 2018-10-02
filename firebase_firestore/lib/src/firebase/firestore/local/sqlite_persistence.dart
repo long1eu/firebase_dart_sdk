@@ -122,7 +122,7 @@ class SQLitePersistence extends Persistence {
       await _db.execute('BEGIN;');
       await operation();
       await _db.execute('COMMIT;');
-      referenceDelegate.onTransactionCommitted();
+      await referenceDelegate.onTransactionCommitted();
     } catch (e) {
       await _db.execute('ROLLBACK;');
       rethrow;

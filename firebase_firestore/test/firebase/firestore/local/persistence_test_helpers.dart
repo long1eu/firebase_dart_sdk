@@ -55,17 +55,17 @@ class PersistenceTestHelpers {
   }
 
   /// Creates and starts a new [MemoryPersistence] instance for testing.
-  static MemoryPersistence createEagerGCMemoryPersistence() {
+  static Future<MemoryPersistence> createEagerGCMemoryPersistence() async {
     final MemoryPersistence persistence =
         MemoryPersistence.createEagerGcMemoryPersistence();
-    persistence.start();
+    await persistence.start();
     return persistence;
   }
 
-  static MemoryPersistence createLRUMemoryPersistence() {
+  static Future<MemoryPersistence> createLRUMemoryPersistence() async {
     final MemoryPersistence persistence =
         MemoryPersistence.createLruGcMemoryPersistence();
-    persistence.start();
+    await persistence.start();
     return persistence;
   }
 }
