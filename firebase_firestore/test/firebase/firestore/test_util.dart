@@ -94,7 +94,7 @@ class TestUtil {
     return QuerySnapshot(query(path), viewSnapshot, firestore);
   }
 
-  static TargetMetadataProvider get testTargetMetadataProvider {
+  static TestTargetMetadataProvider get testTargetMetadataProvider {
     final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys =
         <int, ImmutableSortedSet<DocumentKey>>{};
     final Map<int, QueryData> queryDataMap = <int, QueryData>{};

@@ -1,8 +1,7 @@
 name: firebase_firestore
 description: A starting point for Dart libraries or applications.
-# version: 1.0.0
-# homepage: https://www.example.com
-# author: long1eu <email@example.com>
+version: 0.0.1
+author: long1eu <home@long.1eu>
 
 environment:
   sdk: '>=2.0.0 <3.0.0'
@@ -15,15 +14,12 @@ dependencies:
   firebase_database_collection:
     path: ../firebase_database_collection
 
-  quiver: '>=2.0.0 <3.0.0'
   protobuf: ^0.10.2
   grpc: ^0.6.4
-  isolate: ^2.0.2
-
 
 dev_dependencies:
   test: ^1.0.0
   mockito: ^3.0.0
   sqlite:
-    #git: https://github.com/long1eu/dart-sqlite
-    path: ../../../IdeaProjects/dart-sqlite
+    git: https://github.com/long1eu/dart-sqlite
+    #path: ../../../IdeaProjects/dart-sqlite

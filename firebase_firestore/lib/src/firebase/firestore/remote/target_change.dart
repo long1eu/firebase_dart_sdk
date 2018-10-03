@@ -4,6 +4,7 @@
 
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -50,7 +51,8 @@ class TargetChange {
       identical(this, other) ||
       other is TargetChange &&
           runtimeType == other.runtimeType &&
-          resumeToken == other.resumeToken &&
+          const DeepCollectionEquality()
+              .equals(resumeToken, other.resumeToken) &&
           current == other.current &&
           addedDocuments == other.addedDocuments &&
           modifiedDocuments == other.modifiedDocuments &&
@@ -58,7 +60,7 @@ class TargetChange {
 
   @override
   int get hashCode =>
-      resumeToken.hashCode ^
+      const DeepCollectionEquality().hash(resumeToken) ^
       current.hashCode ^
       addedDocuments.hashCode ^
       modifiedDocuments.hashCode ^
