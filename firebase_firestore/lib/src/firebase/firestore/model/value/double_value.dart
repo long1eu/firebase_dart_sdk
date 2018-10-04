@@ -7,6 +7,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/number_val
 
 /// A wrapper for float/double values in Firestore.
 class DoubleValue extends NumberValue {
+  /// A constant holding the smallest positive normal value of type
+  /// [double], 2<sup>-1022</sup>.  It is equal to the
+  /// hexadecimal floating-point literal ```0x1.0p-1022```.
+  static const double minNormal = 2.2250738585072014E-308;
+
   static const DoubleValue nan = DoubleValue(double.nan);
 
   final double _value;
