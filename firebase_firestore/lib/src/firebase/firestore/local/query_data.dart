@@ -5,6 +5,7 @@
 import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
@@ -88,4 +89,16 @@ class QueryData {
       purpose.hashCode ^
       snapshotVersion.hashCode ^
       const DeepCollectionEquality().hash(resumeToken);
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('query', query)
+          ..add('targetId', targetId)
+          ..add('sequenceNumber', sequenceNumber)
+          ..add('purpose', purpose)
+          ..add('snapshotVersion', snapshotVersion)
+          ..add('resumeToken', resumeToken))
+        .toString();
+  }
 }

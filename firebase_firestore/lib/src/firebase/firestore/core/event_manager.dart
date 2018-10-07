@@ -32,7 +32,7 @@ class EventManager implements SyncEngineCallback {
   /// the first [QueryListener] added for a query.
   ///
   /// Returns the targetId of the listen call in the [SyncEngine].
-  Future<void> addQueryListener(QueryListener queryListener) async {
+  Future<int> addQueryListener(QueryListener queryListener) async {
     final Query query = queryListener.query;
 
     QueryListenersInfo queryInfo = queries[query];

@@ -20,6 +20,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel
 import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart';
 import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart';
 import 'package:grpc/grpc.dart';
+import 'package:meta/meta.dart';
 
 /// Datastore represents a proxy for the remote server, hiding details of the
 /// RPC layer. It:
@@ -67,10 +68,11 @@ class Datastore {
     final RemoteSerializer serializer =
         RemoteSerializer(databaseInfo.databaseId);
 
-    return Datastore._(databaseInfo, workerQueue, serializer, channel);
+    return Datastore.init(databaseInfo, workerQueue, serializer, channel);
   }
 
-  Datastore._(
+  @visibleForTesting
+  Datastore.init(
       this.databaseInfo, this.workerQueue, this.serializer, this.channel);
 
   /// Creates a new [WatchStream] that is still unstarted but uses a common

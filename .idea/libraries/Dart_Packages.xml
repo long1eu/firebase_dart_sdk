@@ -325,7 +325,7 @@
         <entry key="sqlite">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/git/dart-sqlite-54e7342de16a3083608fd587643e2943a6810ba0/lib" />
+              <option value="$PROJECT_DIR$/../dart-sqlite/lib" />
             </list>
           </value>
         </entry>
@@ -411,7 +411,6 @@
       </option>
     </properties>
     <CLASSES>
-      <root url="file://$USER_HOME$/.pub-cache/git/dart-sqlite-54e7342de16a3083608fd587643e2943a6810ba0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/analyzer-0.32.4/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/analyzer-0.32.5/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/args-1.5.0/lib" />
@@ -475,6 +474,7 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/web_socket_channel-1.0.9/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/yaml-2.1.15/lib" />
       <root url="file://$USER_HOME$/IdeaProjects/dart_quickcheck/lib" />
+      <root url="file://$PROJECT_DIR$/../dart-sqlite/lib" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

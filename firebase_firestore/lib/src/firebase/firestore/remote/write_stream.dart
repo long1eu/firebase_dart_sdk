@@ -53,7 +53,8 @@ class WriteStream
   /// unset value.
   Uint8List lastStreamToken = emptyStreamToken;
 
-  bool _handshakeComplete = false;
+  @visibleForTesting
+  bool handshakeComplete = false;
 
   WriteStream(FirestoreChannel channel, AsyncQueue workerQueue,
       this._serializer, WriteStreamCallback listener)
@@ -71,13 +72,13 @@ class WriteStream
 
   @override
   void start() {
-    _handshakeComplete = false;
+    handshakeComplete = false;
     super.start();
   }
 
   @override
   void tearDown() {
-    if (_handshakeComplete) {
+    if (handshakeComplete) {
       // Send an empty write request to the backend to indicate imminent stream
       // closure. This allows the backend to clean up resources.
       writeMutations(<Mutation>[]);
@@ -86,7 +87,7 @@ class WriteStream
 
   /// Tracks whether or not a handshake has been successfully exchanged and the
   /// stream is ready to accept mutations.
-  bool get isHandshakeComplete => _handshakeComplete;
+  bool get isHandshakeComplete => handshakeComplete;
 
   /// Sends an initial [streamToken] to the server, performing the handshake
   /// required to make the [StreamingWrite] RPC work. Subsequent
@@ -94,7 +95,7 @@ class WriteStream
   /// [WriteStreamCallback.onHandshakeComplete].
   void writeHandshake() {
     Assert.hardAssert(isOpen, 'Writing handshake requires an opened stream');
-    Assert.hardAssert(!_handshakeComplete, 'Handshake already completed');
+    Assert.hardAssert(!handshakeComplete, 'Handshake already completed');
     // TODO: Support stream resumption. We intentionally do not set the stream
     // token on the handshake, ignoring any stream token we might have.
     final WriteRequest request = WriteRequest.create()
@@ -106,7 +107,7 @@ class WriteStream
   /// Sends a list of mutations to the Firestore backend to apply
   void writeMutations(List<Mutation> mutations) {
     Assert.hardAssert(isOpen, 'Writing mutations requires an opened stream');
-    Assert.hardAssert(_handshakeComplete,
+    Assert.hardAssert(handshakeComplete,
         'Handshake must be complete before writing mutations');
     final WriteRequest request = WriteRequest.create();
     request.streamToken = lastStreamToken;
@@ -122,9 +123,9 @@ class WriteStream
   void onNext(WriteResponse change) {
     lastStreamToken = Uint8List.fromList(change.streamToken);
 
-    if (!_handshakeComplete) {
+    if (!handshakeComplete) {
       // The first response is the handshake response
-      _handshakeComplete = true;
+      handshakeComplete = true;
 
       listener.onHandshakeComplete();
     } else {

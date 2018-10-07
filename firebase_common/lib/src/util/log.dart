@@ -7,24 +7,26 @@ class Log {
   static LogLevel _level = LogLevel.d;
 
   static void i(String tag, dynamic message) {
-    if (_level >= LogLevel.i) print('I:$tag||$message');
+    if (_level >= LogLevel.i) print('${_formatTag('I:$tag')}||$message');
   }
 
   static void d(String tag, dynamic message) {
-    if (_level >= LogLevel.d) print('D:$tag||$message');
+    if (_level >= LogLevel.d) print('${_formatTag('D:$tag')}||$message');
   }
 
   static void w(String tag, dynamic message) {
-    if (_level >= LogLevel.w) print('W:$tag||$message');
+    if (_level >= LogLevel.w) print('${_formatTag('W:$tag')}||$message');
   }
 
   static void e(String tag, dynamic message) {
-    if (_level >= LogLevel.e) print('E:$tag||$message');
+    if (_level >= LogLevel.e) print('${_formatTag('E:$tag')}||$message');
   }
 
   static void setLogLevel(LogLevel level) {
     _level = level;
   }
+
+  static String _formatTag(String tag) => tag.padRight(30, ' ');
 }
 
 class LogLevel implements Comparable<LogLevel> {

@@ -100,7 +100,7 @@ class RemoteStore implements TargetMetadataProvider {
     ));
 
     _writeStream = _datastore.createWriteStream(WriteStreamCallback(
-      onOpen: _writeStream.writeHandshake,
+      onOpen: () => _writeStream.writeHandshake(),
       onClose: _handleWriteStreamClose,
       onHandshakeComplete: _handleWriteStreamHandshakeComplete,
       onWriteResponse: _handleWriteStreamMutationResults,
