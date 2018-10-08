@@ -100,6 +100,7 @@ class RemoteStore implements TargetMetadataProvider {
     ));
 
     _writeStream = _datastore.createWriteStream(WriteStreamCallback(
+      // we use this so that [_writeStream] is not null when called
       onOpen: () => _writeStream.writeHandshake(),
       onClose: _handleWriteStreamClose,
       onHandshakeComplete: _handleWriteStreamHandshakeComplete,
@@ -127,7 +128,7 @@ class RemoteStore implements TargetMetadataProvider {
       _writeStream.lastStreamToken = _localStore.lastStreamToken;
 
       if (_shouldStartWatchStream()) {
-        _startWatchStream();
+        await _startWatchStream();
       } else {
         _onlineStateTracker.updateState(OnlineState.unknown);
       }
@@ -139,18 +140,18 @@ class RemoteStore implements TargetMetadataProvider {
 
   /// Temporarily disables the network. The network can be re-enabled using
   /// [enableNetwork].
-  void disableNetwork() {
+  Future<void> disableNetwork() async {
     _networkEnabled = false;
-    disableNetworkInternal();
+    await disableNetworkInternal();
 
     // Set the OnlineState to OFFLINE so get()s return from cache, etc.
     _onlineStateTracker.updateState(OnlineState.offline);
   }
 
   /*private*/
-  void disableNetworkInternal() {
-    _watchStream.stop();
-    _writeStream.stop();
+  Future<void> disableNetworkInternal() async {
+    await _watchStream.stop();
+    await _writeStream.stop();
 
     if (_writePipeline.isNotEmpty) {
       Log.d(_tag,
@@ -172,12 +173,12 @@ class RemoteStore implements TargetMetadataProvider {
 
   /// Shuts down the remote store, tearing down connections and otherwise cleaning up. This is not
   /// reversible and renders the Remote Store unusable.
-  void shutdown() {
+  Future<void> shutdown() async {
     Log.d(_tag, 'Shutting down');
     // For now, all shutdown logic is handled by disableNetworkInternal(). We
     // might expand on this in the future.
     _networkEnabled = false;
-    disableNetworkInternal();
+    await disableNetworkInternal();
     // Set the OnlineState to UNKNOWN (rather than OFFLINE) to avoid potentially
     // triggering spurious listener events with cached data, etc.
     _onlineStateTracker.updateState(OnlineState.unknown);
@@ -197,7 +198,7 @@ class RemoteStore implements TargetMetadataProvider {
       // new mutations from the [LocalStore] (since mutations are per-user).
       Log.d(_tag, 'Restarting streams for new credential.');
       _networkEnabled = false;
-      disableNetworkInternal();
+      await disableNetworkInternal();
       _onlineStateTracker.updateState(OnlineState.unknown);
       await enableNetwork();
     }
@@ -206,7 +207,7 @@ class RemoteStore implements TargetMetadataProvider {
   // Watch Stream
 
   /// Listens to the target identified by the given [QueryData]. */
-  void listen(QueryData queryData) {
+  Future<void> listen(QueryData queryData) async {
     final int targetId = queryData.targetId;
     Assert.hardAssert(!_listenTargets.containsKey(targetId),
         'listen called with duplicate target ID: $targetId');
@@ -214,7 +215,7 @@ class RemoteStore implements TargetMetadataProvider {
     _listenTargets[targetId] = queryData;
 
     if (_shouldStartWatchStream()) {
-      _startWatchStream();
+      await _startWatchStream();
     } else if (_watchStream.isOpen) {
       _sendWatchRequest(queryData);
     }
@@ -280,16 +281,16 @@ class RemoteStore implements TargetMetadataProvider {
     _watchChangeAggregator = null;
   }
 
-  void _startWatchStream() {
+  Future<void> _startWatchStream() async {
     Assert.hardAssert(_shouldStartWatchStream(),
         'startWatchStream() called when shouldStartWatchStream() is false.');
     _watchChangeAggregator = WatchChangeAggregator(this);
-    _watchStream.start();
+    await _watchStream.start();
 
     _onlineStateTracker.handleWatchStreamStart();
   }
 
-  void _handleWatchStreamOpen() {
+  Future<void> _handleWatchStreamOpen() async {
     // Restore any existing watches.
     _listenTargets.values.forEach(_sendWatchRequest);
   }
@@ -336,7 +337,7 @@ class RemoteStore implements TargetMetadataProvider {
     }
   }
 
-  void _handleWatchStreamClose(GrpcError status) {
+  Future<void> _handleWatchStreamClose(GrpcError status) async {
     if (status.code == StatusCode.ok) {
       // Graceful stop (due to stop() or idle timeout). Make sure that's
       // desirable.
@@ -350,7 +351,7 @@ class RemoteStore implements TargetMetadataProvider {
     if (_shouldStartWatchStream()) {
       _onlineStateTracker.handleWatchStreamFailure(status);
 
-      _startWatchStream();
+      await _startWatchStream();
     } else {
       // We don't need to restart the watch stream because there are no active
       // targets. The online state is set to unknown because there is no active
@@ -456,6 +457,7 @@ class RemoteStore implements TargetMetadataProvider {
     int lastBatchIdRetrieved = _writePipeline.isEmpty
         ? MutationBatch.unknown
         : _writePipeline.last.batchId;
+
     while (_canAddToWritePipeline()) {
       final MutationBatch batch =
           await _localStore.getNextMutationBatch(lastBatchIdRetrieved);
@@ -470,7 +472,7 @@ class RemoteStore implements TargetMetadataProvider {
     }
 
     if (_shouldStartWriteStream()) {
-      _startWriteStream();
+      await _startWriteStream();
     }
   }
 
@@ -493,10 +495,10 @@ class RemoteStore implements TargetMetadataProvider {
     }
   }
 
-  void _startWriteStream() {
+  Future<void> _startWriteStream() async {
     Assert.hardAssert(_shouldStartWriteStream(),
         'startWriteStream() called when shouldStartWriteStream() is false.');
-    _writeStream.start();
+    await _writeStream.start();
   }
 
   /// Handles a successful handshake response from the server, which is our cue
@@ -555,7 +557,7 @@ class RemoteStore implements TargetMetadataProvider {
     // pipeline for failed writes. In that case, we don't want to start the
     // write stream again.
     if (_shouldStartWriteStream()) {
-      _startWriteStream();
+      await _startWriteStream();
     }
   }
 

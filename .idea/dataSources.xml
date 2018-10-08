@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="sqlite_lru_garbage_collector_test-0" uuid="4df335d9-139d-4084-b6fd-252ae4d2b943">
+    <data-source source="LOCAL" name="sqlite_spec_test_Listens%3A+Will+gracefully+handle+watch+stream+reverting+snapshots+%28with+restart%29" uuid="8cc27336-84e7-4901-94c8-5335de5652ce">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
-      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/firebase_firestore/build/test/firebase/firestore/local/sqlite_lru_garbage_collector_test-0.db_</jdbc-url>
+      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/firebase_firestore/build/test/firebase/firestore/spec/sqlite_spec_test_Listens%3A+Will+gracefully+handle+watch+stream+reverting+snapshots+%28with+restart%29.db_</jdbc-url>
       <driver-properties>
         <property name="enable_load_extension" value="true" />
       </driver-properties>
@@ -18,11 +18,11 @@
         </library>
       </libraries>
     </data-source>
-    <data-source source="LOCAL" name="sqlite_lru_garbage_collector_test-14" uuid="acd52966-41c2-4717-ae9e-a114ef47acac">
+    <data-source source="LOCAL" name="sqlite_spec_test_Listens%3A+Will+gracefully+handle+watch+stream+reverting+snapshots+%28with+restart%29b_" uuid="66f99bcd-2eda-47c5-aa2a-03623c14a0f9">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
-      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/firebase_firestore/build/test/firebase/firestore/local/sqlite_lru_garbage_collector_test-14.db_</jdbc-url>
+      <jdbc-url>jdbc:sqlite:$PROJECT_DIR$/firebase_firestore/build/test/firebase/firestore/spec/sqlite_spec_test_Listens%3A+Will+gracefully+handle+watch+stream+reverting+snapshots+%28with+restart%29b_</jdbc-url>
       <driver-properties>
         <property name="enable_load_extension" value="true" />
       </driver-properties>

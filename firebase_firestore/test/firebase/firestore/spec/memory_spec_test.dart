@@ -13,17 +13,20 @@ import '../local/persistence_test_helpers.dart';
 import 'spec_test_case.dart';
 
 void main() {
-  const String EAGER_GC = 'eager-gc';
+  const String durablePersistance = 'durable-persistence';
 
   SpecTestCase testCase;
 
   setUp(() async {
     testCase = SpecTestCase(
-      (_, String name) {
-        return PersistenceTestHelpers.openSQLitePersistence(
-            'firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}b');
+      (bool garbageCollectionEnabled, _) {
+        if (garbageCollectionEnabled) {
+          return PersistenceTestHelpers.createEagerGCMemoryPersistence();
+        } else {
+          return PersistenceTestHelpers.createLRUMemoryPersistence();
+        }
       },
-      (Set<String> tags) => tags.contains(EAGER_GC),
+      (Set<String> tags) => tags.contains(durablePersistance),
     );
     await testCase.specSetUp(<String, dynamic>{});
   });

@@ -30,23 +30,17 @@ void main() {
 
   QueryListener queryListener(
       Query query, ListenOptions options, List<ViewSnapshot> accumulator) {
-    return QueryListener(
-        query,
-        options,
-        StreamController<ViewSnapshot>()
-          ..stream.listen(
-            accumulator.add,
-            onError: (dynamic error) {
-              assert(false, 'This should never be called. $error');
-            },
-          ));
+    return QueryListener(query, options)
+      ..listen(accumulator.add, onError: (dynamic error) {
+        assert(false, 'This should never be called. $error');
+      });
   }
 
   QueryListener queryListenerDefault(
       Query query, List<ViewSnapshot> accumulator) {
-    final ListenOptions options = ListenOptions();
-    options.includeDocumentMetadataChanges = true;
-    options.includeQueryMetadataChanges = true;
+    const ListenOptions options = const ListenOptions(
+        includeDocumentMetadataChanges: true,
+        includeQueryMetadataChanges: true);
     return queryListener(query, options, accumulator);
   }
 
@@ -105,19 +99,16 @@ void main() {
     final Query query = Query.atPath(path('rooms/eros'));
 
     bool hadEvent = false;
-    final QueryListener listener = QueryListener(
-        query,
-        ListenOptions(),
-        StreamController<ViewSnapshot>()
-          ..stream.listen(
-            (ViewSnapshot data) {
-              assert(false, 'This should never be called.');
-            },
-            onError: (dynamic e) {
-              expect(e, isNotNull);
-              hadEvent = true;
-            },
-          ));
+    final QueryListener listener = QueryListener(query)
+      ..listen(
+        (ViewSnapshot data) {
+          assert(false, 'This should never be called.');
+        },
+        onError: (dynamic e) {
+          expect(e, isNotNull);
+          hadEvent = true;
+        },
+      );
 
     final GrpcError status = GrpcError.alreadyExists('test error');
     final FirebaseFirestoreError error = Util.exceptionFromStatus(status);
@@ -156,9 +147,9 @@ void main() {
         doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
     final Document doc2 =
         doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
-    final ListenOptions options1 = ListenOptions();
-    final ListenOptions options2 = ListenOptions();
-    options2.includeQueryMetadataChanges = true;
+    const ListenOptions options1 = const ListenOptions();
+    const ListenOptions options2 =
+        const ListenOptions(includeQueryMetadataChanges: true);
     final QueryListener filteredListener =
         queryListener(query, options1, filteredAccum);
     final QueryListener fullListener =
@@ -200,9 +191,10 @@ void main() {
     final Document doc3 =
         doc('rooms/other', 3, map(<String>['name', 'other']), false);
 
-    final ListenOptions options1 = ListenOptions();
-    final ListenOptions options2 = ListenOptions();
-    options2.includeDocumentMetadataChanges = true;
+    const ListenOptions options1 = const ListenOptions();
+    const ListenOptions options2 =
+        const ListenOptions(includeDocumentMetadataChanges: true);
+
     final QueryListener filteredListener =
         queryListener(query, options1, filteredAccum);
     final QueryListener fullListener =
@@ -242,8 +234,8 @@ void main() {
     final Document doc3 =
         doc('rooms/other', 3, map(<String>['name', 'other']), false);
 
-    final ListenOptions options = ListenOptions();
-    options.includeQueryMetadataChanges = true;
+    const ListenOptions options =
+        const ListenOptions(includeQueryMetadataChanges: true);
     final QueryListener fullListener = queryListener(query, options, fullAccum);
 
     final View view = View(query, DocumentKey.emptyKeySet);
@@ -281,8 +273,8 @@ void main() {
     final Document doc3 =
         doc('rooms/other', 3, map(<String>['name', 'other']), false);
 
-    final ListenOptions options = ListenOptions();
-    options.includeDocumentMetadataChanges = false;
+    const ListenOptions options = const ListenOptions();
+
     final QueryListener filteredListener =
         queryListener(query, options, filteredAccum);
 
@@ -316,8 +308,9 @@ void main() {
     final Document doc2 =
         doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
 
-    final ListenOptions options = ListenOptions();
-    options.waitForSyncWhenOnline = true;
+    const ListenOptions options =
+        const ListenOptions(waitForSyncWhenOnline: true);
+
     final QueryListener listener = queryListener(query, options, events);
 
     final View view = View(query, DocumentKey.emptyKeySet);
@@ -365,8 +358,9 @@ void main() {
     final Document doc2 =
         doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
 
-    final ListenOptions options = ListenOptions();
-    options.waitForSyncWhenOnline = true;
+    const ListenOptions options =
+        const ListenOptions(waitForSyncWhenOnline: true);
+
     final QueryListener listener = queryListener(query, options, events);
 
     final View view = View(query, DocumentKey.emptyKeySet);
@@ -415,7 +409,7 @@ void main() {
     final Query query = Query.atPath(path('rooms'));
 
     final QueryListener listener =
-        queryListener(query, ListenOptions(), events);
+        queryListener(query, const ListenOptions(), events);
 
     final View view = View(query, DocumentKey.emptyKeySet);
     final ViewSnapshot snap1 = applyChanges(view, <MaybeDocument>[]);
@@ -445,7 +439,7 @@ void main() {
     final Query query = Query.atPath(path('rooms'));
 
     final QueryListener listener =
-        queryListener(query, ListenOptions(), events);
+        queryListener(query, const ListenOptions(), events);
 
     final View view = View(query, DocumentKey.emptyKeySet);
     final ViewSnapshot snap1 = applyChanges(view, <MaybeDocument>[]);

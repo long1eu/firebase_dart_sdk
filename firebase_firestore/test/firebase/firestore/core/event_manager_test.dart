@@ -1,8 +1,6 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 26/09/2018
-import 'dart:async';
-
 import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
@@ -22,11 +20,10 @@ class ViewSnapshotMock extends Mock implements ViewSnapshot {}
 
 void main() {
   QueryListener queryListener(Query query) {
-    return QueryListener(query, ListenOptions(),
-        StreamController<ViewSnapshot>()..stream.listen(null));
+    return QueryListener(query)..listen(null);
   }
 
-  test('testMultipleListenersPerQuery', () {
+  test('testMultipleListenersPerQuery', () async {
     final Query query = Query.atPath(path('foo/bar'));
 
     final QueryListener listener1 = queryListener(query);
@@ -38,19 +35,19 @@ void main() {
     manager.addQueryListener(listener1);
     manager.addQueryListener(listener2);
 
-    manager.removeQueryListener(listener1);
-    manager.removeQueryListener(listener2);
+    await manager.removeQueryListener(listener1);
+    await manager.removeQueryListener(listener2);
 
     verify(syncSpy.listen(query)).called(1);
     verify(syncSpy.stopListening(query)).called(1);
   });
 
-  test('testUnlistensOnUnknownListeners', () {
+  test('testUnlistensOnUnknownListeners', () async {
     final Query query = Query.atPath(path('foo/bar'));
     final SyncEngine syncSpy = SyncEngineMock();
 
     final EventManager manager = EventManager(syncSpy);
-    manager.removeQueryListener(queryListener(query));
+    await manager.removeQueryListener(queryListener(query));
     verifyNever(syncSpy.stopListening(query));
   });
 

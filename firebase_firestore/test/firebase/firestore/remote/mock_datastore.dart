@@ -91,27 +91,29 @@ class MockDatastore extends Datastore {
 
   /// Injects a write ack as though it had come from the backend in response to
   /// a write.
-  void ackWrite(SnapshotVersion commitVersion, List<MutationResult> results) {
-    _writeStream.ackWrite(commitVersion, results);
+  Future<void> ackWrite(
+      SnapshotVersion commitVersion, List<MutationResult> results) async {
+    await _writeStream.ackWrite(commitVersion, results);
   }
 
   /// Injects a failed write response as though it had come from the backend.
-  void failWrite(GrpcError status) {
-    _writeStream.failStream(status);
+  Future<void> failWrite(GrpcError status) async {
+    await _writeStream.failStream(status);
   }
 
   /// Injects a watch change as though it had come from the backend.
-  void writeWatchChange(WatchChange change, SnapshotVersion snapshotVersion) {
-    _watchStream.writeWatchChange(change, snapshotVersion);
+  Future<void> writeWatchChange(
+      WatchChange change, SnapshotVersion snapshotVersion) async {
+    await _watchStream.writeWatchChange(change, snapshotVersion);
   }
 
   /// Injects a stream failure as though it had come from the backend.
-  void failWatchStream(GrpcError status) {
-    _watchStream.failStream(status);
+  Future<void> failWatchStream(GrpcError status) async {
+    await _watchStream.failStream(status);
   }
 
   /// Returns the map of active targets on the watch stream, keyed by target ID.
-  Map<int, QueryData> activeTargets() {
+  Map<int, QueryData> get activeTargets {
     // Make a defensive copy as the watch stream continues to modify the Map of
     // active targets.
     return Map<int, QueryData>.from(_watchStream._activeTargets);
@@ -134,10 +136,10 @@ class _MockWatchStream extends WatchStream {
       : super(/*channel:*/ null, workerQueue, _datastore.serializer, listener);
 
   @override
-  void start() {
+  Future<void> start() async {
     Assert.hardAssert(!_open, 'Trying to start already started watch stream');
     _open = true;
-    listener.onOpen();
+    await listener.onOpen();
   }
 
   @override
@@ -178,13 +180,14 @@ class _MockWatchStream extends WatchStream {
   }
 
   /// Injects a stream failure as though it had come from the backend.
-  void failStream(GrpcError status) {
+  Future<void> failStream(GrpcError status) async {
     _open = false;
-    listener.onClose(status);
+    await listener.onClose(status);
   }
 
   /// Injects a watch change as though it had come from the backend.
-  void writeWatchChange(WatchChange change, SnapshotVersion snapshotVersion) {
+  Future<void> writeWatchChange(
+      WatchChange change, SnapshotVersion snapshotVersion) async {
     if (change is WatchChangeWatchTargetChange) {
       final WatchChangeWatchTargetChange targetChange = change;
       if (targetChange.cause != null &&
@@ -207,7 +210,7 @@ class _MockWatchStream extends WatchStream {
         snapshotVersion = SnapshotVersion.none;
       }
     }
-    listener.onWatchChange(snapshotVersion, change);
+    await listener.onWatchChange(snapshotVersion, change);
   }
 }
 
@@ -225,12 +228,12 @@ class _MockWriteStream extends WriteStream {
         super(/*channel=*/ null, workerQueue, _datastore.serializer, listener);
 
   @override
-  void start() {
+  Future<void> start() async {
     Assert.hardAssert(!_open, 'Trying to start already started write stream');
     handshakeComplete = false;
     _open = true;
     sentWrites.clear();
-    listener.onOpen();
+    await listener.onOpen();
   }
 
   @override
@@ -252,11 +255,12 @@ class _MockWriteStream extends WriteStream {
   }
 
   @override
-  void writeHandshake() {
+  Future<void> writeHandshake() async {
     Assert.hardAssert(!handshakeComplete, 'Handshake already completed');
     _datastore._writeStreamRequestCount += 1;
     handshakeComplete = true;
-    listener.onHandshakeComplete();
+
+    await listener.onHandshakeComplete();
   }
 
   @override
@@ -267,15 +271,16 @@ class _MockWriteStream extends WriteStream {
 
   /// Injects a write ack as though it had come from the backend in response to
   /// a write.
-  void ackWrite(SnapshotVersion commitVersion, List<MutationResult> results) {
-    listener.onWriteResponse(commitVersion, results);
+  Future<void> ackWrite(
+      SnapshotVersion commitVersion, List<MutationResult> results) async {
+    await listener.onWriteResponse(commitVersion, results);
   }
 
   /// Injects a stream failure as though it had come from the backend.
-  void failStream(GrpcError status) {
+  Future<void> failStream(GrpcError status) async {
     _open = false;
     sentWrites.clear();
-    listener.onClose(status);
+    await listener.onClose(status);
   }
 
   /// Returns a previous write that had been 'sent to the backend'.

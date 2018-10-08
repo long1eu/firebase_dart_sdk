@@ -314,13 +314,7 @@ class WatchChangeAggregator {
   }
 
   TargetState _ensureTargetState(int targetId) {
-    TargetState targetState = _targetStates[targetId];
-    if (targetState == null) {
-      targetState = TargetState();
-      _targetStates[targetId] = targetState;
-    }
-
-    return targetState;
+    return _targetStates[targetId] ??= TargetState();
   }
 
   Set<int> _ensureDocumentTargetMapping(DocumentKey key) {

@@ -37,6 +37,7 @@ class EventManager implements SyncEngineCallback {
 
     QueryListenersInfo queryInfo = queries[query];
     final bool firstListen = queryInfo == null;
+
     if (firstListen) {
       queryInfo = QueryListenersInfo();
       queries[query] = queryInfo;
@@ -58,7 +59,7 @@ class EventManager implements SyncEngineCallback {
 
   /// Removes a previously added listener and returns true if the listener was
   /// found.
-  bool removeQueryListener(QueryListener listener) {
+  Future<bool> removeQueryListener(QueryListener listener) async {
     final Query query = listener.query;
     final QueryListenersInfo queryInfo = queries[query];
     bool lastListen = false;
@@ -70,20 +71,20 @@ class EventManager implements SyncEngineCallback {
 
     if (lastListen) {
       queries.remove(query);
-      syncEngine.stopListening(query);
+      await syncEngine.stopListening(query);
     }
 
     return found;
   }
 
   @override
-  void onViewSnapshots(List<ViewSnapshot> snapshotList) {
+  Future<void> onViewSnapshots(List<ViewSnapshot> snapshotList) async {
     for (ViewSnapshot viewSnapshot in snapshotList) {
       final Query query = viewSnapshot.query;
       final QueryListenersInfo info = queries[query];
       if (info != null) {
         for (QueryListener listener in info.listeners) {
-          listener.onViewSnapshot(viewSnapshot);
+          await listener.onViewSnapshot(viewSnapshot);
         }
         info.viewSnapshot = viewSnapshot;
       }
@@ -123,12 +124,42 @@ class QueryListenersInfo {
 /// Holds (internal) options for listening
 class ListenOptions {
   /// Raise events when only metadata of documents changes
-  bool includeDocumentMetadataChanges = false;
+  final bool includeDocumentMetadataChanges;
 
   /// Raise events when only metadata of the query changes
-  bool includeQueryMetadataChanges = false;
+  final bool includeQueryMetadataChanges;
 
   /// Wait for a sync with the server when online, but still raise events while
   /// offline.
-  bool waitForSyncWhenOnline = false;
+  final bool waitForSyncWhenOnline;
+
+  const ListenOptions({
+    this.includeDocumentMetadataChanges = false,
+    this.includeQueryMetadataChanges = false,
+    this.waitForSyncWhenOnline = false,
+  })  : assert(includeDocumentMetadataChanges != null),
+        assert(includeQueryMetadataChanges != null),
+        assert(waitForSyncWhenOnline != null);
+
+  const ListenOptions.all()
+      : includeDocumentMetadataChanges = true,
+        includeQueryMetadataChanges = true,
+        waitForSyncWhenOnline = true;
+
+  ListenOptions copyWith({
+    bool includeDocumentMetadataChanges,
+    bool includeQueryMetadataChanges,
+    bool waitForSyncWhenOnline,
+  }) {
+    return ListenOptions(
+      includeDocumentMetadataChanges: includeDocumentMetadataChanges ??
+          this.includeDocumentMetadataChanges ??
+          false,
+      includeQueryMetadataChanges: includeQueryMetadataChanges ??
+          this.includeQueryMetadataChanges ??
+          false,
+      waitForSyncWhenOnline:
+          waitForSyncWhenOnline ?? this.waitForSyncWhenOnline ?? false,
+    );
+  }
 }

@@ -210,43 +210,39 @@ class LocalStore {
   // Android.
 
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> handleUserChange(
-      User user) {
-    return _persistence.runTransactionAndReturn<
-        ImmutableSortedMap<DocumentKey,
-            MaybeDocument>>('handleUserChange', () async {
-      // Swap out the mutation queue, grabbing the pending mutation batches before
-      // and after.
-      final List<MutationBatch> oldBatches =
-          await _mutationQueue.getAllMutationBatches();
+      User user) async {
+    // Swap out the mutation queue, grabbing the pending mutation batches before
+    // and after.
+    final List<MutationBatch> oldBatches =
+        await _mutationQueue.getAllMutationBatches();
 
-      _mutationQueue = _persistence.getMutationQueue(user);
-      await _startMutationQueue();
+    _mutationQueue = _persistence.getMutationQueue(user);
+    await _startMutationQueue();
 
-      final List<MutationBatch> newBatches =
-          await _mutationQueue.getAllMutationBatches();
+    final List<MutationBatch> newBatches =
+        await _mutationQueue.getAllMutationBatches();
 
-      // Recreate our LocalDocumentsView using the new MutationQueue.
-      _localDocuments = LocalDocumentsView(_remoteDocuments, _mutationQueue);
-      // TODO: Use IndexedQueryEngine as appropriate.
-      _queryEngine = SimpleQueryEngine(_localDocuments);
+    // Recreate our LocalDocumentsView using the new MutationQueue.
+    _localDocuments = LocalDocumentsView(_remoteDocuments, _mutationQueue);
+    // TODO: Use IndexedQueryEngine as appropriate.
+    _queryEngine = SimpleQueryEngine(_localDocuments);
 
-      // Union the old/new changed keys.
-      ImmutableSortedSet<DocumentKey> changedKeys = DocumentKey.emptyKeySet;
-      for (List<MutationBatch> batches in <List<MutationBatch>>[
-        oldBatches,
-        newBatches
-      ]) {
-        for (MutationBatch batch in batches) {
-          for (Mutation mutation in batch.mutations) {
-            changedKeys = changedKeys.insert(mutation.key);
-          }
+    // Union the old/new changed keys.
+    ImmutableSortedSet<DocumentKey> changedKeys = DocumentKey.emptyKeySet;
+    for (List<MutationBatch> batches in <List<MutationBatch>>[
+      oldBatches,
+      newBatches
+    ]) {
+      for (MutationBatch batch in batches) {
+        for (Mutation mutation in batch.mutations) {
+          changedKeys = changedKeys.insert(mutation.key);
         }
       }
+    }
 
-      // Return the set of all (potentially) changed documents as the result of
-      // the user change.
-      return _localDocuments.getDocuments(changedKeys);
-    });
+    // Return the set of all (potentially) changed documents as the result of
+    // the user change.
+    return _localDocuments.getDocuments(changedKeys);
   }
 
   /// Accepts locally generated [Mutations] and commits them to storage.
@@ -519,38 +515,29 @@ class LocalStore {
   /// [afterBatchId] The batch to search after, or -1 for the first mutation in
   /// the queue. Returns the next mutation or null if there wasn't one.
   Future<MutationBatch> getNextMutationBatch(int afterBatchId) {
-    return _persistence
-        .runTransactionAndReturn<MutationBatch>('getNextMutationBatch', () {
-      return _mutationQueue.getNextMutationBatchAfterBatchId(afterBatchId);
-    });
+    return _mutationQueue.getNextMutationBatchAfterBatchId(afterBatchId);
   }
 
   /// Returns the current value of a document with a given key, or null if not
   /// found.
-  Future<MaybeDocument> readDocument(DocumentKey key) {
-    return _persistence.runTransactionAndReturn<MaybeDocument>('readDocument',
-        () async {
-      print('#readDocument start');
-      final MaybeDocument doc = await _localDocuments.getDocument(key);
-      print('#readDocument end');
-      return doc;
-    });
+  Future<MaybeDocument> readDocument(DocumentKey key) async {
+    return _localDocuments.getDocument(key);
   }
 
   /// Assigns the given query an internal id so that its results can be pinned
   /// so they don't get GC'd. A query must be allocated in the local store
   /// before the store can be used to manage its view.
-  Future<QueryData> allocateQuery(Query query) {
-    return _persistence.runTransactionAndReturn<QueryData>('Allocate query',
-        () async {
-      int targetId;
-      QueryData cached = await _queryCache.getQueryData(query);
-      if (cached != null) {
-        // This query has been listened to previously, so reuse the previous
-        // targetId.
-        // TODO: freshen last accessed date?
-        targetId = cached.targetId;
-      } else {
+  Future<QueryData> allocateQuery(Query query) async {
+    int targetId;
+    QueryData cached = await _queryCache.getQueryData(query);
+
+    if (cached != null) {
+      // This query has been listened to previously, so reuse the previous
+      // targetId.
+      // TODO: freshen last accessed date?
+      targetId = cached.targetId;
+    } else {
+      await _persistence.runTransaction('Allocate query', () async {
         targetId = _targetIdGenerator.nextId();
         cached = QueryData.init(
           query,
@@ -558,16 +545,17 @@ class LocalStore {
           _persistence.referenceDelegate.currentSequenceNumber,
           QueryPurpose.listen,
         );
-        await _queryCache.addQueryData(cached);
-      }
 
-      // Sanity check to ensure that even when resuming a query it's not
-      // currently active.
-      Assert.hardAssert(_targetIds[targetId] == null,
-          'Tried to allocate an already allocated query: $query');
-      _targetIds[targetId] = cached;
-      return cached;
-    });
+        await _queryCache.addQueryData(cached);
+      });
+    }
+
+    // Sanity check to ensure that even when resuming a query it's not
+    // currently active.
+    Assert.hardAssert(_targetIds[targetId] == null,
+        'Tried to allocate an already allocated query: $query');
+    _targetIds[targetId] = cached;
+    return cached;
   }
 
   /// Unpin all the documents associated with the given query.
@@ -604,19 +592,13 @@ class LocalStore {
   /// Runs the given query against all the documents in the local store and
   /// returns the results.
   Future<ImmutableSortedMap<DocumentKey, Document>> executeQuery(Query query) {
-    return _persistence
-        .runTransactionAndReturn<ImmutableSortedMap<DocumentKey, Document>>(
-            'executeQuery',
-            () => _queryEngine.getDocumentsMatchingQuery(query));
+    return _queryEngine.getDocumentsMatchingQuery(query);
   }
 
   /// Returns the keys of the documents that are associated with the given
   /// target id in the remote table.
   Future<ImmutableSortedSet<DocumentKey>> getRemoteDocumentKeys(int targetId) {
-    return _persistence
-        .runTransactionAndReturn<ImmutableSortedSet<DocumentKey>>(
-            'getRemoteDocumentKeys',
-            () => _queryCache.getMatchingKeysForTargetId(targetId));
+    return _queryCache.getMatchingKeysForTargetId(targetId);
   }
 
   /// Releases all the held batch results up to the current remote version
@@ -634,7 +616,7 @@ class LocalStore {
     if (toRelease.isEmpty) {
       return Set<DocumentKey>();
     } else {
-      _heldBatchResults.sublist(0, toRelease.length).clear();
+      _heldBatchResults.removeRange(0, toRelease.length);
       return _releaseBatchResults(toRelease);
     }
   }

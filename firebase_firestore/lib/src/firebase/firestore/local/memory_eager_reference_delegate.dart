@@ -54,14 +54,12 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
 
   @override
   void onTransactionStarted() {
-    print('#onTransactionStarted called');
     orphanedDocuments = Set<DocumentKey>();
   }
 
   /// In eager garbage collection, collection is run on transaction commit.
   @override
   Future<void> onTransactionCommitted() async {
-    print('#onTransactionCommitted called');
     final MemoryRemoteDocumentCache remoteDocuments =
         persistence.remoteDocumentCache;
 

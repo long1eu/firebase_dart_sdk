@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
@@ -71,9 +72,9 @@ class WriteStream
             listener);
 
   @override
-  void start() {
+  Future<void> start() async {
     handshakeComplete = false;
-    super.start();
+    await super.start();
   }
 
   @override
@@ -93,7 +94,7 @@ class WriteStream
   /// required to make the [StreamingWrite] RPC work. Subsequent
   /// [writeMutations] calls should wait until a response has been delivered to
   /// [WriteStreamCallback.onHandshakeComplete].
-  void writeHandshake() {
+  Future<void> writeHandshake() async {
     Assert.hardAssert(isOpen, 'Writing handshake requires an opened stream');
     Assert.hardAssert(!handshakeComplete, 'Handshake already completed');
     // TODO: Support stream resumption. We intentionally do not set the stream
@@ -120,14 +121,14 @@ class WriteStream
   }
 
   @override
-  void onNext(WriteResponse change) {
+  Future<void> onNext(WriteResponse change) async {
     lastStreamToken = Uint8List.fromList(change.streamToken);
 
     if (!handshakeComplete) {
       // The first response is the handshake response
       handshakeComplete = true;
 
-      listener.onHandshakeComplete();
+      await listener.onHandshakeComplete();
     } else {
       // A successful first write response means the stream is healthy,
       // Note, that we could consider a successful handshake healthy, however,
@@ -143,7 +144,8 @@ class WriteStream
         final WriteResult result = change.writeResults[i];
         results[i] = _serializer.decodeMutationResult(result, commitVersion);
       }
-      listener.onWriteResponse(commitVersion, results);
+
+      await listener.onWriteResponse(commitVersion, results);
     }
   }
 }
@@ -152,16 +154,16 @@ class WriteStream
 /// [WriteStream]
 class WriteStreamCallback extends StreamCallback {
   /// The handshake for this write stream has completed
-  final void Function() onHandshakeComplete;
+  final Future<void> Function() onHandshakeComplete;
 
   /// Response for the last write.
-  final void Function(
+  final Future<void> Function(
           SnapshotVersion commitVersion, List<MutationResult> mutationResults)
       onWriteResponse;
 
   const WriteStreamCallback({
-    @required void Function() onOpen,
-    @required void Function(GrpcError) onClose,
+    @required Future<void> Function() onOpen,
+    @required Future<void> Function(GrpcError) onClose,
     @required this.onHandshakeComplete,
     @required this.onWriteResponse,
   }) : super(onOpen: onOpen, onClose: onClose);

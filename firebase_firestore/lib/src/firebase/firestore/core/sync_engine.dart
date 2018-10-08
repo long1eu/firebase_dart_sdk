@@ -76,8 +76,8 @@ class SyncEngine implements RemoteStoreCallback {
   final Map<DocumentKey, int> _limboTargetsByKey;
 
   /// Basically the inverse of [_limboTargetsByKey], a map of target id to a
-  /// [_LimboResolution] (which includes the DocumentKey as well as whether we've
-  /// received a document for the target).
+  /// [_LimboResolution] (which includes the DocumentKey as well as whether
+  /// we've received a document for the target).
   final Map<int, _LimboResolution> _limboResolutionsByTarget;
 
   /// Used to track any documents that are currently in limbo.
@@ -120,6 +120,7 @@ class SyncEngine implements RemoteStoreCallback {
         'We already listen to query: $query');
 
     final QueryData queryData = await _localStore.allocateQuery(query);
+
     final ImmutableSortedMap<DocumentKey, Document> docs =
         await _localStore.executeQuery(query);
     final ImmutableSortedSet<DocumentKey> remoteKeys =
@@ -134,9 +135,10 @@ class SyncEngine implements RemoteStoreCallback {
     final QueryView queryView = QueryView(query, queryData.targetId, view);
     _queryViewsByQuery[query] = queryView;
     _queryViewsByTarget[queryData.targetId] = queryView;
-    callback.onViewSnapshots(<ViewSnapshot>[viewChange.snapshot]);
+    await callback.onViewSnapshots(<ViewSnapshot>[viewChange.snapshot]);
 
-    _remoteStore.listen(queryData);
+    await _remoteStore.listen(queryData);
+
     return queryData.targetId;
   }
 
@@ -166,7 +168,7 @@ class SyncEngine implements RemoteStoreCallback {
     addUserCallback(result.batchId, userTask);
 
     await _emitNewSnapshot(result.changes, /*remoteEvent:*/ null);
-    _remoteStore.fillWritePipeline();
+    await _remoteStore.fillWritePipeline();
   }
 
   /*private*/
@@ -440,7 +442,8 @@ class SyncEngine implements RemoteStoreCallback {
           : remoteEvent.targetChanges[queryView.targetId];
       final ViewChange viewChange =
           queryView.view.applyChanges(viewDocChanges, targetChange);
-      _updateTrackedLimboDocuments(viewChange.limboChanges, queryView.targetId);
+      await _updateTrackedLimboDocuments(
+          viewChange.limboChanges, queryView.targetId);
 
       if (viewChange.snapshot != null) {
         newSnapshots.add(viewChange.snapshot);
@@ -456,13 +459,13 @@ class SyncEngine implements RemoteStoreCallback {
   }
 
   /// Updates the limbo document state for the given targetId.
-  void _updateTrackedLimboDocuments(
-      List<LimboDocumentChange> limboChanges, int targetId) {
+  Future<void> _updateTrackedLimboDocuments(
+      List<LimboDocumentChange> limboChanges, int targetId) async {
     for (LimboDocumentChange limboChange in limboChanges) {
       switch (limboChange.type) {
         case LimboDocumentChangeType.added:
           _limboDocumentRefs.addReference(limboChange.key, targetId);
-          _trackLimboChange(limboChange);
+          await _trackLimboChange(limboChange);
           break;
         case LimboDocumentChangeType.removed:
           Log.d(_tag, 'Document no longer in limbo: ${limboChange.key}');
@@ -479,7 +482,7 @@ class SyncEngine implements RemoteStoreCallback {
     }
   }
 
-  void _trackLimboChange(LimboDocumentChange change) {
+  Future<void> _trackLimboChange(LimboDocumentChange change) async {
     final DocumentKey key = change.key;
     if (!_limboTargetsByKey.containsKey(key)) {
       Log.d(_tag, 'New document in limbo: $key');
@@ -492,7 +495,7 @@ class SyncEngine implements RemoteStoreCallback {
         QueryPurpose.limboResolution,
       );
       _limboResolutionsByTarget[limboTargetId] = _LimboResolution(key);
-      _remoteStore.listen(queryData);
+      await _remoteStore.listen(queryData);
       _limboTargetsByKey[key] = limboTargetId;
     }
   }
@@ -528,14 +531,14 @@ class _LimboResolution {
   /// [SyncEngine.getRemoteKeysForTarget] and ultimately used by
   /// [WatchChangeAggregator] to decide whether it needs to manufacture a delete
   /// event for the target once the target is CURRENT.
-  bool receivedDocument;
+  bool receivedDocument = false;
 
   _LimboResolution(this.key);
 }
 
 /// A callback used to handle events from the SyncEngine
 abstract class SyncEngineCallback {
-  void onViewSnapshots(List<ViewSnapshot> snapshotList);
+  Future<void> onViewSnapshots(List<ViewSnapshot> snapshotList);
 
   void onError(Query query, GrpcError error);
 }

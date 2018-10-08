@@ -82,7 +82,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
   }
 
   @override
-  void start() {
+  Future<void> start() async {
     Assert.hardAssert(_call == null, 'Last call still set');
     Assert.hardAssert(_idleTimer == null, 'Idle timer still set');
 
@@ -105,11 +105,9 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     // since auth handled transparently by gRPC
     _state = StreamState.Starting;
 
-    _workerQueue.enqueueAndForget<void>(() async {
-      closeGuardedRunner.run(() {
-        _state = StreamState.Open;
-        listener.onOpen();
-      });
+    await closeGuardedRunner.run(() async {
+      _state = StreamState.Open;
+      await listener.onOpen();
     });
   }
 
@@ -173,7 +171,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     _state = finalState;
 
     // Notify the listener that the stream closed.
-    listener.onClose(status);
+    await listener.onClose(status);
   }
 
   /// Can be overridden to perform additional cleanup before the stream is
@@ -226,19 +224,19 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     await _close(StreamState.Error, status);
   }
 
-  void onNext(RespT change);
+  Future<void> onNext(RespT change);
 
   void _performBackoff() {
     Assert.hardAssert(_state == StreamState.Error,
         'Should only perform backoff in an error state');
     _state = StreamState.Backoff;
 
-    backoff.backoffAndRun(() {
+    backoff.backoffAndRun(() async {
       Assert.hardAssert(_state == StreamState.Backoff,
           'State should still be backoff but was $_state');
       // Momentarily set state to Initial as start() expects it.
       _state = StreamState.Initial;
-      start();
+      await start();
       Assert.hardAssert(isStarted, 'Stream should have started');
     });
   }
@@ -283,9 +281,9 @@ class CloseGuardedRunner {
 
   CloseGuardedRunner(this.initialCloseCount, this.closeCount);
 
-  void run(Function task) {
+  Future<void> run(Future<void> Function() task) async {
     if (closeCount() == initialCloseCount) {
-      task();
+      await task();
     } else {
       Log.d('AbstractStream', 'stream callback skipped by CloseGuardedRunner.');
     }
@@ -320,22 +318,22 @@ class StreamObserver<ReqT, RespT, CallbackT extends StreamCallback>
   }
 
   @override
-  void onNext(RespT response) {
-    _dispatcher.run(() {
+  Future<void> onNext(RespT response) async {
+    await _dispatcher.run(() async {
       Log.d('AbstractStream', '($hashCode) Stream received: $response');
-      stream.onNext(response);
+      await stream.onNext(response);
     });
   }
 
   @override
   void onReady() {
-    _dispatcher
-        .run(() => Log.d('AbstractStream', '($hashCode) Stream is ready'));
+    _dispatcher.run(
+        () async => Log.d('AbstractStream', '($hashCode) Stream is ready'));
   }
 
   @override
   void onClose(GrpcError status) {
-    _dispatcher.run(() {
+    _dispatcher.run(() async {
       if (status.code == StatusCode.ok) {
         Log.d('AbstractStream', '($hashCode) Stream closed.');
       } else {

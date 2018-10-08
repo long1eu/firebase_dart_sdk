@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 24/09/2018
 
+import 'dart:async';
+
 import 'package:grpc/grpc.dart';
 
 /// Interface used for incoming/receiving gRPC streams.
@@ -10,7 +12,7 @@ abstract class IncomingStreamObserver<RespT> {
   void onHeaders(Map<String, String> headers);
 
   /// A message was received on the stream.
-  void onNext(RespT response);
+  Future<void> onNext(RespT response);
 
   /// The stream is "ready" (What the hell does that mean?!).
   void onReady();

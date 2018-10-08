@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
@@ -51,7 +52,6 @@ class WatchStream
   /// affect the query will be streamed back as [WatchChange] messages that
   /// reference the [targetId] included in query.
   void watchQuery(QueryData queryData) {
-    FirestoreApi;
     Assert.hardAssert(isOpen, 'Watching queries requires an open stream');
     final ListenRequest request = ListenRequest.create()
       ..database = serializer.databaseName
@@ -84,14 +84,14 @@ class WatchStream
   }
 
   @override
-  void onNext(ListenResponse change) {
+  Future<void> onNext(ListenResponse change) async {
     // A successful response means the stream is healthy
     backoff.reset();
 
     final WatchChange watchChange = serializer.decodeWatchChange(change);
     final SnapshotVersion snapshotVersion =
         serializer.decodeVersionFromListenResponse(change);
-    listener.onWatchChange(snapshotVersion, watchChange);
+    await listener.onWatchChange(snapshotVersion, watchChange);
   }
 }
 
@@ -101,12 +101,12 @@ class WatchStreamCallback extends StreamCallback {
   /// A new change from the watch stream. Snapshot version will ne non-null if
   /// it was set
 
-  final void Function(SnapshotVersion snapshotVersion, WatchChange watchChange)
-      onWatchChange;
+  final Future<void> Function(
+      SnapshotVersion snapshotVersion, WatchChange watchChange) onWatchChange;
 
   const WatchStreamCallback({
-    @required void Function() onOpen,
-    @required void Function(GrpcError status) onClose,
+    @required Future<void> Function() onOpen,
+    @required Future<void> Function(GrpcError status) onClose,
     @required this.onWatchChange,
   }) : super(onOpen: onOpen, onClose: onClose);
 }

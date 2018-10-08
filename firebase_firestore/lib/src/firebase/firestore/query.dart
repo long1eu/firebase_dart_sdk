@@ -11,7 +11,6 @@ import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/order_by.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
     as core;
-import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/relation_filter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
@@ -568,10 +567,7 @@ class Query {
   }
 
   Future<QuerySnapshot> _getViaSnapshotListener(Source source) {
-    final ListenOptions options = ListenOptions();
-    options.includeDocumentMetadataChanges = true;
-    options.includeQueryMetadataChanges = true;
-    options.waitForSyncWhenOnline = true;
+    const ListenOptions options = const ListenOptions.all();
 
     return _getSnapshotsInternal(options).map((QuerySnapshot snapshot) {
       if (snapshot.metadata.isFromCache && source == Source.SERVER) {
@@ -599,28 +595,19 @@ class Query {
   }
 
   Stream<QuerySnapshot> _getSnapshotsInternal(ListenOptions options) {
-    final StreamController<ViewSnapshot> controller =
-        StreamController<ViewSnapshot>();
-
-    final Stream<QuerySnapshot> stream = controller.stream.map(
-        (ViewSnapshot snapshot) => QuerySnapshot(this, snapshot, firestore));
-
-    final QueryListener queryListener =
-        firestore.client.listen(query, options, controller);
-    controller.onCancel = () => firestore.client.stopListening(queryListener);
-
-    return stream;
+    return firestore.client //
+        .listen(query, options)
+        .map((ViewSnapshot snapshot) =>
+            QuerySnapshot(this, snapshot, firestore));
   }
 
   /// Converts the  API options object to the internal options object.
   static ListenOptions _internalOptions(MetadataChanges metadataChanges) {
-    final ListenOptions internalOptions = ListenOptions();
-    internalOptions.includeDocumentMetadataChanges =
-        metadataChanges == MetadataChanges.include;
-    internalOptions.includeQueryMetadataChanges =
-        metadataChanges == MetadataChanges.include;
-    internalOptions.waitForSyncWhenOnline = false;
-    return internalOptions;
+    return ListenOptions(
+      includeDocumentMetadataChanges:
+          metadataChanges == MetadataChanges.include,
+      includeQueryMetadataChanges: metadataChanges == MetadataChanges.include,
+    );
   }
 
   @override

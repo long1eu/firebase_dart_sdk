@@ -9,7 +9,6 @@ import 'package:firebase_firestore/src/firebase/firestore/collection_reference.d
 import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
     as core;
-import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
@@ -159,12 +158,8 @@ class DocumentReference {
   }
 
   Future<DocumentSnapshot> _getViaSnapshotListener(Source source) {
-    final ListenOptions options = ListenOptions();
-    options.includeDocumentMetadataChanges = true;
-    options.includeQueryMetadataChanges = true;
-    options.waitForSyncWhenOnline = true;
-
-    return _getSnapshotsInternal(options).map((DocumentSnapshot snapshot) {
+    return _getSnapshotsInternal(const ListenOptions.all())
+        .map((DocumentSnapshot snapshot) {
       if (!snapshot.exists && snapshot.metadata.isFromCache) {
         // TODO: Reconsider how to raise missing documents when offline.
         // If we're online and the document doesn't exist then we set the
@@ -207,11 +202,11 @@ class DocumentReference {
   }
 
   Stream<DocumentSnapshot> _getSnapshotsInternal(ListenOptions options) {
-    final StreamController<ViewSnapshot> controller =
-        StreamController<ViewSnapshot>();
+    final core.Query query = core.Query.atPath(key.path);
 
-    final Stream<DocumentSnapshot> stream =
-        controller.stream.map((ViewSnapshot snapshot) {
+    return firestore.client //
+        .listen(query, options)
+        .map((ViewSnapshot snapshot) {
       Assert.hardAssert(snapshot.documents.length <= 1,
           'Too many documents returned on a document query');
       final Document document = snapshot.documents.getDocument(key);
@@ -221,24 +216,15 @@ class DocumentReference {
           : DocumentSnapshot.fromNoDocument(
               firestore, key, snapshot.isFromCache);
     });
-
-    final core.Query query = core.Query.atPath(key.path);
-    final QueryListener queryListener =
-        firestore.client.listen(query, options, controller);
-    controller.onCancel = () => firestore.client.stopListening(queryListener);
-
-    return stream;
   }
 
   /// Converts the  API [MetadataChanges] object to the internal options object.
   static ListenOptions _internalOptions(MetadataChanges metadataChanges) {
-    final ListenOptions internalOptions = ListenOptions();
-    internalOptions.includeDocumentMetadataChanges =
-        metadataChanges == MetadataChanges.include;
-    internalOptions.includeQueryMetadataChanges =
-        metadataChanges == MetadataChanges.include;
-    internalOptions.waitForSyncWhenOnline = false;
-    return internalOptions;
+    return ListenOptions(
+      includeDocumentMetadataChanges:
+          metadataChanges == MetadataChanges.include,
+      includeQueryMetadataChanges: metadataChanges == MetadataChanges.include,
+    );
   }
 
   @override

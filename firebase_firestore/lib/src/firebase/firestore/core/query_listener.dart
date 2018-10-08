@@ -14,16 +14,16 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
-/// QueryListener takes a series of internal view snapshots and determines when
-/// to raise events.
-///
-/// * It uses an [EventListener] to dispatch events.
-class QueryListener {
+/// [QueryListener] takes a series of internal view snapshots and determines
+/// when to raise events.
+class QueryListener extends Stream<ViewSnapshot> {
   final Query query;
 
   final ListenOptions options;
 
-  final EventSink<ViewSnapshot> listener;
+  final void Function(QueryListener listener) onCancel;
+
+  StreamController<ViewSnapshot> sink;
 
   /// Initial snapshots (e.g. from cache) may not be propagated to the wrapped
   /// observer. This flag is set to true once we've actually raised an event.
@@ -33,9 +33,13 @@ class QueryListener {
 
   ViewSnapshot snapshot;
 
-  QueryListener(this.query, this.options, this.listener);
+  QueryListener(this.query,
+      [this.options = const ListenOptions(), this.onCancel])
+      : assert(options != null) {
+    sink = StreamController<ViewSnapshot>(onCancel: () => onCancel?.call(this));
+  }
 
-  void onViewSnapshot(ViewSnapshot newSnapshot) {
+  Future<void> onViewSnapshot(ViewSnapshot newSnapshot) async {
     Assert.hardAssert(
         newSnapshot.changes.isNotEmpty || newSnapshot.didSyncStateChange,
         'We got a new snapshot with no changes?');
@@ -56,14 +60,14 @@ class QueryListener {
         _raiseInitialEvent(newSnapshot);
       }
     } else if (_shouldRaiseEvent(newSnapshot)) {
-      listener.add(newSnapshot);
+      sink.add(newSnapshot);
     }
 
     snapshot = newSnapshot;
   }
 
   void onError(FirebaseFirestoreError error) {
-    listener.addError(error);
+    sink.addError(error);
   }
 
   void onOnlineStateChanged(OnlineState onlineState) {
@@ -131,7 +135,7 @@ class QueryListener {
     );
 
     raisedInitialEvent = true;
-    listener.add(snapshot);
+    sink.add(snapshot);
   }
 
   static List<DocumentViewChange> _getInitialViewChanges(
@@ -142,4 +146,13 @@ class QueryListener {
     }
     return res;
   }
+
+  @override
+  StreamSubscription<ViewSnapshot> listen(
+          void Function(ViewSnapshot event) onData,
+          {Function onError,
+          void Function() onDone,
+          bool cancelOnError}) =>
+      sink.stream.listen(onData,
+          onError: onError, onDone: onDone, cancelOnError: cancelOnError);
 }

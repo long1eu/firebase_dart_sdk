@@ -530,6 +530,7 @@ class SQLiteMutationQueue implements MutationQueue {
       final int batchId = batch.batchId;
       final int deleted =
           await db.delete(mutationDeleter, <dynamic>[uid, batchId]);
+
       Assert.hardAssert(deleted != 0,
           'Mutation batch ($uid, ${batch.batchId}) did not exist');
 

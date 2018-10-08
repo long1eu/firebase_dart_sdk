@@ -18,13 +18,12 @@ class Util {
 
   static String toDebugString(List<int> bytes) {
     final int size = bytes.length;
-    final StringBuffer result = StringBuffer(2 * size);
+    final StringBuffer result = StringBuffer();
     for (int i = 0; i < size; i++) {
       final int value = bytes[i] & 0xFF;
-
-      result.write((value >> 4).toRadixString(16));
-      result.write((value & 0xF).toRadixString(16));
+      result.write(value.toRadixString(16));
     }
+
     return result.toString();
   }
 

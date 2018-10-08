@@ -82,9 +82,7 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   Future<void> disableNetwork() {
-    return asyncQueue.enqueue(() async {
-      remoteStore.disableNetwork();
-    });
+    return asyncQueue.enqueue(() => remoteStore.disableNetwork());
   }
 
   Future<void> enableNetwork() {
@@ -96,24 +94,24 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<void> shutdown() {
     credentialsProvider.removeChangeListener();
     return asyncQueue.enqueue(() async {
-      remoteStore.shutdown();
+      await remoteStore.shutdown();
       await persistence.shutdown();
     });
   }
 
   /// Starts listening to a query. */
-  QueryListener listen(
-      Query query, ListenOptions options, EventSink<ViewSnapshot> listener) {
-    final QueryListener queryListener = QueryListener(query, options, listener);
+  QueryListener listen(Query query, ListenOptions options) {
+    final QueryListener queryListener =
+        QueryListener(query, options, stopListening);
     asyncQueue
         .enqueueAndForget(() => eventManager.addQueryListener(queryListener));
     return queryListener;
   }
 
   /// Stops listening to a query previously listened to.
-  void stopListening(QueryListener listener) {
-    asyncQueue.enqueueAndForget(
-        () async => eventManager.removeQueryListener(listener));
+  void stopListening(QueryListener listener) async {
+    asyncQueue
+        .enqueueAndForget(() => eventManager.removeQueryListener(listener));
   }
 
   Future<Document> getDocumentFromLocalCache(DocumentKey docKey) {
@@ -194,10 +192,10 @@ class FirestoreClient implements RemoteStoreCallback {
     syncEngine = SyncEngine(localStore, remoteStore, user);
     eventManager = EventManager(syncEngine);
 
-    // NOTE: RemoteStore depends on LocalStore (for persisting stream tokens, refilling mutation
-    // queue, etc.) so must be started after LocalStore.
-    localStore.start();
-    remoteStore.start();
+    // NOTE: RemoteStore depends on LocalStore (for persisting stream tokens,
+    // refilling mutation queue, etc.) so must be started after LocalStore.
+    await localStore.start();
+    await remoteStore.start();
   }
 
   @override
