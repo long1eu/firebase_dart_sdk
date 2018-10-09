@@ -48,7 +48,7 @@ class EventManager implements SyncEngineCallback {
     queryListener.onOnlineStateChanged(onlineState);
 
     if (queryInfo.viewSnapshot != null) {
-      queryListener.onViewSnapshot(queryInfo.viewSnapshot);
+      await queryListener.onViewSnapshot(queryInfo.viewSnapshot);
     }
 
     if (firstListen) {

@@ -56,7 +56,10 @@ class QueryListener extends Stream<ViewSnapshot> {
     }
 
     if (!raisedInitialEvent) {
-      if (_shouldRaiseInitialEvent(newSnapshot, onlineState)) {
+      final bool shouldRaiseInitialEvent =
+          _shouldRaiseInitialEvent(newSnapshot, onlineState);
+
+      if (shouldRaiseInitialEvent) {
         _raiseInitialEvent(newSnapshot);
       }
     } else if (_shouldRaiseEvent(newSnapshot)) {

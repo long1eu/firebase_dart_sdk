@@ -62,13 +62,13 @@ class WriteStream
       : super(
             channel,
             ClientMethod<WriteRequest, WriteResponse>(
-              'write',
+              'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Write',
               (WriteRequest req) => req.writeToBuffer(),
               (List<int> res) => WriteResponse.fromBuffer(res),
             ),
             workerQueue,
-            TimerId.WRITE_STREAM_CONNECTION_BACKOFF,
-            TimerId.WRITE_STREAM_IDLE,
+            TimerId.writeStreamConnectionBackoff,
+            TimerId.writeStreamIdle,
             listener);
 
   @override

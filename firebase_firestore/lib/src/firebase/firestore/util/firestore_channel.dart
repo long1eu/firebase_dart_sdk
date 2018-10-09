@@ -27,6 +27,9 @@ class FirestoreChannel {
   static const String _xGoogApiClientValue =
       'gl-dart/ fire/${Version.sdkVersion} grpc/';
 
+  /// The async worker queue that is used to dispatch events.
+  final AsyncQueue asyncQueue;
+
   final CredentialsProvider _credentialsProvider;
 
   /// The underlying gRPC channel.
@@ -35,8 +38,11 @@ class FirestoreChannel {
   /// Call options to be used when invoking RPCs.
   final CallOptions _callOptions;
 
-  factory FirestoreChannel(CredentialsProvider credentialsProvider,
-      ClientChannel channel, DatabaseId databaseId) {
+  factory FirestoreChannel(
+      AsyncQueue asyncQueue,
+      CredentialsProvider credentialsProvider,
+      ClientChannel channel,
+      DatabaseId databaseId) {
     final CallOptions options = CallOptions(providers: <MetadataProvider>[
       FirestoreCallCredentials(credentialsProvider).getRequestMetadata,
       (Map<String, String> map, String url) {
@@ -51,6 +57,7 @@ class FirestoreChannel {
     ]);
 
     return FirestoreChannel._(
+      asyncQueue,
       credentialsProvider,
       channel,
       options,
@@ -58,6 +65,7 @@ class FirestoreChannel {
   }
 
   FirestoreChannel._(
+    this.asyncQueue,
     this._credentialsProvider,
     this._channel,
     this._callOptions,
@@ -69,6 +77,7 @@ class FirestoreChannel {
       IncomingStreamObserver<RespT> observer) {
     // ignore: close_sinks
     final StreamController<ReqT> controller = StreamController<ReqT>();
+
     final ClientCall<ReqT, RespT> call =
         _channel.createCall(method, controller.stream, _callOptions);
 
@@ -83,6 +92,7 @@ class FirestoreChannel {
           return _catchError(() => observer.onClose(e as GrpcError));
         },
       );
+
     observer.onReady();
 
     return BidiChannel<ReqT, RespT>(controller, call);

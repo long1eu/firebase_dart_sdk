@@ -21,7 +21,8 @@ class Util {
     final StringBuffer result = StringBuffer();
     for (int i = 0; i < size; i++) {
       final int value = bytes[i] & 0xFF;
-      result.write(value.toRadixString(16));
+
+      result.write(value.toRadixString(16).padLeft(2, '0'));
     }
 
     return result.toString();
@@ -65,7 +66,8 @@ class Util {
     final StringBuffer builder = StringBuffer();
     const int maxRandom = _autoIdAlphabet.length;
     for (int i = 0; i < _autoIdLength; i++) {
-      builder.write(_autoIdAlphabet.codeUnitAt(rand.nextInt(maxRandom)));
+      builder
+          .writeCharCode(_autoIdAlphabet.codeUnitAt(rand.nextInt(maxRandom)));
     }
     return builder.toString();
   }

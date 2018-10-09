@@ -16,6 +16,7 @@ dependencies:
 
   protobuf: ^0.10.2
   grpc: ^0.6.4
+  rxdart: any
 
 dev_dependencies:
   test: ^1.0.0

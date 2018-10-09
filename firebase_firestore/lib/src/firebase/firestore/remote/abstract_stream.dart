@@ -13,7 +13,9 @@ import 'package:firebase_firestore/src/firebase/firestore/util/exponential_backo
 import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/incoming_stream_observer.dart';
 import 'package:grpc/grpc.dart';
+import 'package:http2/transport.dart';
 import 'package:meta/meta.dart';
+import 'package:protobuf/protobuf.dart';
 
 /// An [AbstractStream] is an abstract base class that implements the [Stream]
 /// interface.
@@ -21,8 +23,7 @@ import 'package:meta/meta.dart';
 /// [ReqT] The proto type that will be sent in this stream
 /// [RespT] The proto type that is received through this stream
 /// [CallbackT] The type which is used for stream specific callbacks.
-abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
-    implements Stream<CallbackT> {
+abstract class AbstractStream<ReqT extends GeneratedMessage, RespT extends GeneratedMessage, CallbackT extends StreamCallback> implements Stream<CallbackT> {
   /// Initial backoff time in milliseconds after an error. Set to 1s according to
   /// https://cloud.google.com/apis/design/errors.
 
@@ -71,9 +72,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
 
   @override
   bool get isStarted {
-    return _state == StreamState.Starting ||
-        _state == StreamState.Open ||
-        _state == StreamState.Backoff;
+    return _state == StreamState.Starting || _state == StreamState.Open || _state == StreamState.Backoff;
   }
 
   @override
@@ -93,22 +92,21 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
 
     Assert.hardAssert(_state == StreamState.Initial, 'Already started');
 
-    final CloseGuardedRunner closeGuardedRunner =
-        CloseGuardedRunner(_closeCount, () => _closeCount);
-    final StreamObserver<ReqT, RespT, CallbackT> streamObserver =
-        StreamObserver<ReqT, RespT, CallbackT>(closeGuardedRunner, this);
+    final CloseGuardedRunner closeGuardedRunner = CloseGuardedRunner(_closeCount, () => _closeCount);
+    final StreamObserver<ReqT, RespT, CallbackT> streamObserver = StreamObserver<ReqT, RespT, CallbackT>(closeGuardedRunner, this);
 
-    _call = _firestoreChannel.runBidiStreamingRpc(
-        _methodDescriptor, streamObserver);
+    ClientTransportConnection;
 
-    // Note that Starting is only used as intermediate state until onOpen is called asynchronously,
-    // since auth handled transparently by gRPC
+    _call = _firestoreChannel.runBidiStreamingRpc(_methodDescriptor, streamObserver);
+
+    // Note that Starting is only used as intermediate state until onOpen is
+    // called asynchronously, since auth handled transparently by gRPC
     _state = StreamState.Starting;
 
-    await closeGuardedRunner.run(() async {
-      _state = StreamState.Open;
-      await listener.onOpen();
-    });
+    _state = StreamState.Open;
+    await listener.onOpen();
+
+    //await closeGuardedRunner.run(() async {}, 'start');
   }
 
   /// Closes the stream and cleans up as necessary:
@@ -123,9 +121,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
   /// * A new stream can be opened by calling [start].
   Future<void> _close(StreamState finalState, GrpcError status) async {
     Assert.hardAssert(isStarted, 'Only started streams should be closed.');
-    Assert.hardAssert(
-        finalState == StreamState.Error || status.code == StatusCode.ok,
-        'Can\'t provide an error when not in an error state.');
+    Assert.hardAssert(finalState == StreamState.Error || status.code == StatusCode.ok, 'Can\'t provide an error when not in an error state.');
 
     // Cancel any outstanding timers (they're guaranteed not to execute).
     _cancelIdleCheck();
@@ -141,8 +137,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
       // connection attempt.
       backoff.reset();
     } else if (code == StatusCode.resourceExhausted) {
-      Log.d(runtimeType.toString(),
-          '($hashCode) Using maximum backoff delay to prevent overloading the backend.');
+      Log.d(runtimeType.toString(), '($hashCode) Using maximum backoff delay to prevent overloading the backend.');
       backoff.resetToMax();
     } else if (code == StatusCode.unauthenticated) {
       // 'unauthenticated' error means the token was rejected. Try force
@@ -187,15 +182,14 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
 
   @override
   void inhibitBackoff() {
-    Assert.hardAssert(
-        !isStarted, 'Can only inhibit backoff after in a stopped state');
+    Assert.hardAssert(!isStarted, 'Can only inhibit backoff after in a stopped state');
 
     _state = StreamState.Initial;
     backoff.reset();
   }
 
   void writeRequest(ReqT message) {
-    Log.d(runtimeType.toString(), '($hashCode) Stream sending: $message');
+    Log.d(runtimeType.toString(), '($hashCode) Stream sending: ${message.writeToJsonMap()}');
     _cancelIdleCheck();
     _call.add(message);
   }
@@ -214,8 +208,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
   /// error.
   @visibleForTesting
   void handleServerClose(GrpcError status) async {
-    Assert.hardAssert(
-        isStarted, 'Can\'t handle server close on non-started stream!');
+    Assert.hardAssert(isStarted, 'Can\'t handle server close on non-started stream!');
 
     // In theory the stream could close cleanly, however, in our current model
     // we never expect this to happen because if we stop a stream ourselves,
@@ -227,13 +220,11 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
   Future<void> onNext(RespT change);
 
   void _performBackoff() {
-    Assert.hardAssert(_state == StreamState.Error,
-        'Should only perform backoff in an error state');
+    Assert.hardAssert(_state == StreamState.Error, 'Should only perform backoff in an error state');
     _state = StreamState.Backoff;
 
     backoff.backoffAndRun(() async {
-      Assert.hardAssert(_state == StreamState.Backoff,
-          'State should still be backoff but was $_state');
+      Assert.hardAssert(_state == StreamState.Backoff, 'State should still be backoff but was $_state');
       // Momentarily set state to Initial as start() expects it.
       _state = StreamState.Initial;
       await start();
@@ -254,8 +245,7 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
     // yet already running a timer (in which case the previous idle timeout
     // still applies).
     if (isOpen && _idleTimer == null) {
-      _idleTimer = _workerQueue.enqueueAfterDelay(_idleTimerId,
-          Duration(milliseconds: _idleTimeoutMs), _handleIdleCloseTimer);
+      _idleTimer = _workerQueue.enqueueAfterDelay(_idleTimerId, Duration(milliseconds: _idleTimeoutMs), _handleIdleCloseTimer, 'AbstractStream markIdle');
     }
   }
 
@@ -276,14 +266,15 @@ abstract class AbstractStream<ReqT, RespT, CallbackT extends StreamCallback>
 /// only expose a run() method which asserts that we're already on the
 /// [_workerQueue].
 class CloseGuardedRunner {
+  final AsyncQueue asyncQueue = AsyncQueue();
   final int initialCloseCount;
   final int Function() closeCount;
 
   CloseGuardedRunner(this.initialCloseCount, this.closeCount);
 
-  Future<void> run(Future<void> Function() task) async {
+  Future<void> run(Task<void> task, String caller) async {
     if (closeCount() == initialCloseCount) {
-      await task();
+      await asyncQueue.enqueue(task, caller);
     } else {
       Log.d('AbstractStream', 'stream callback skipped by CloseGuardedRunner.');
     }
@@ -292,16 +283,15 @@ class CloseGuardedRunner {
 
 /// Implementation of [IncomingStreamObserver] that runs callbacks via
 /// [CloseGuardedRunner].
-class StreamObserver<ReqT, RespT, CallbackT extends StreamCallback>
-    implements IncomingStreamObserver<RespT> {
+class StreamObserver<ReqT extends GeneratedMessage, RespT extends GeneratedMessage, CallbackT extends StreamCallback> implements IncomingStreamObserver<RespT> {
   final CloseGuardedRunner _dispatcher;
   final AbstractStream<ReqT, RespT, CallbackT> stream;
 
   const StreamObserver(this._dispatcher, this.stream);
 
   @override
-  void onHeaders(Map<String, String> headers) {
-    _dispatcher.run(() {
+  void onHeaders(Map<String, String> headers) async {
+    _dispatcher.run(() async {
       if (Log.isDebugEnabled) {
         final Map<String, String> whitelistedHeaders = <String, String>{};
         for (String header in headers.keys) {
@@ -310,25 +300,23 @@ class StreamObserver<ReqT, RespT, CallbackT extends StreamCallback>
           }
         }
         if (whitelistedHeaders.isNotEmpty) {
-          Log.d('AbstractStream',
-              '($hashCode) Stream received headers: $whitelistedHeaders');
+          Log.d('AbstractStream', '($hashCode) Stream received headers: $whitelistedHeaders');
         }
       }
-    });
+    }, 'onHeaders');
   }
 
   @override
   Future<void> onNext(RespT response) async {
     await _dispatcher.run(() async {
-      Log.d('AbstractStream', '($hashCode) Stream received: $response');
+      Log.d('AbstractStream', '($hashCode) Stream received: ${response.writeToJsonMap()}');
       await stream.onNext(response);
-    });
+    }, 'onNext');
   }
 
   @override
-  void onReady() {
-    _dispatcher.run(
-        () async => Log.d('AbstractStream', '($hashCode) Stream is ready'));
+  void onReady() async {
+    _dispatcher.run(() async => Log.d('AbstractStream', '($hashCode) Stream is ready'), 'onReady');
   }
 
   @override
@@ -337,10 +325,9 @@ class StreamObserver<ReqT, RespT, CallbackT extends StreamCallback>
       if (status.code == StatusCode.ok) {
         Log.d('AbstractStream', '($hashCode) Stream closed.');
       } else {
-        Log.d('AbstractStream',
-            '($hashCode) Stream closed with status: $status.');
+        Log.d('AbstractStream', '($hashCode) Stream closed with status: $status.');
       }
       stream.handleServerClose(status);
-    });
+    }, 'onClose');
   }
 }

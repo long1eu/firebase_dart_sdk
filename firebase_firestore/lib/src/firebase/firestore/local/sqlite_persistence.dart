@@ -121,6 +121,7 @@ class SQLitePersistence extends Persistence {
       referenceDelegate.onTransactionStarted();
       await _db.execute('BEGIN;');
       await operation();
+      Log.d(tag, 'Commiting transaction: $action');
       await _db.execute('COMMIT;');
       await referenceDelegate.onTransactionCommitted();
     } catch (e) {
@@ -138,6 +139,7 @@ class SQLitePersistence extends Persistence {
       referenceDelegate.onTransactionStarted();
       await _db.execute('BEGIN;');
       final T result = await operation();
+      Log.d(tag, 'Commiting transaction: $action');
       await _db.execute('COMMIT;');
       referenceDelegate.onTransactionCommitted();
       return result;

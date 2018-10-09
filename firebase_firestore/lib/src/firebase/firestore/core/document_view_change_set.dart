@@ -4,6 +4,7 @@
 
 import 'dart:collection';
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
@@ -72,4 +73,9 @@ class DocumentViewChangeSet {
   }
 
   List<DocumentViewChange> getChanges() => changes.values.toList();
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)..add('changes', changes)).toString();
+  }
 }

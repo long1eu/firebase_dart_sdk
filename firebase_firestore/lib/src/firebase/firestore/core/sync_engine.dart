@@ -128,6 +128,7 @@ class SyncEngine implements RemoteStoreCallback {
 
     final View view = View(query, remoteKeys);
     final ViewDocumentChanges viewDocChanges = view.computeDocChanges(docs);
+
     final ViewChange viewChange = view.applyChanges(viewDocChanges);
     Assert.hardAssert(view.limboDocuments.isEmpty,
         'View returned limbo docs before target ack from the server');
@@ -151,8 +152,8 @@ class SyncEngine implements RemoteStoreCallback {
         queryView != null, 'Trying to stop listening to a query not found');
 
     await _localStore.releaseQuery(query);
-    _remoteStore.stopListening(queryView.targetId);
-    _removeAndCleanup(queryView);
+    await _remoteStore.stopListening(queryView.targetId);
+    await _removeAndCleanup(queryView);
   }
 
   /// Initiates the write of local mutation batch which involves adding the
@@ -262,7 +263,7 @@ class SyncEngine implements RemoteStoreCallback {
   /// Applies an [OnlineState] change to the sync engine and notifies any views
   /// of the change.
   @override
-  void handleOnlineStateChange(OnlineState onlineState) {
+  Future<void> handleOnlineStateChange(OnlineState onlineState) async {
     final List<ViewSnapshot> newViewSnapshots = <ViewSnapshot>[];
     for (MapEntry<Query, QueryView> entry in _queryViewsByQuery.entries) {
       final View view = entry.value.view;
@@ -273,7 +274,7 @@ class SyncEngine implements RemoteStoreCallback {
         newViewSnapshots.add(viewChange.snapshot);
       }
     }
-    callback.onViewSnapshots(newViewSnapshots);
+    await callback.onViewSnapshots(newViewSnapshots);
   }
 
   // TODO: implement getRemoteKeysForTarget
@@ -331,7 +332,7 @@ class SyncEngine implements RemoteStoreCallback {
       final QueryView queryView = _queryViewsByTarget[targetId];
       Assert.hardAssert(queryView != null, 'Unknown target: $targetId');
       await _localStore.releaseQuery(queryView.query);
-      _removeAndCleanup(queryView);
+      await _removeAndCleanup(queryView);
       callback.onError(queryView.query, error);
     }
   }
@@ -389,7 +390,7 @@ class SyncEngine implements RemoteStoreCallback {
     }
   }
 
-  void _removeAndCleanup(QueryView view) {
+  Future<void> _removeAndCleanup(QueryView view) async {
     _queryViewsByQuery.remove(view.query);
     _queryViewsByTarget.remove(view.targetId);
 
@@ -399,18 +400,18 @@ class SyncEngine implements RemoteStoreCallback {
     for (DocumentKey key in limboKeys) {
       if (!_limboDocumentRefs.containsKey(key)) {
         // We removed the last reference for this key.
-        _removeLimboTarget(key);
+        await _removeLimboTarget(key);
       }
     }
   }
 
-  void _removeLimboTarget(DocumentKey key) {
+  Future<void> _removeLimboTarget(DocumentKey key) async {
     // It's possible that the target already got removed because the query
     // failed. In that case, the key won't exist in [limboTargetsByKey]. Only do
     // the cleanup if we still have the target.
     final int targetId = _limboTargetsByKey[key];
     if (targetId != null) {
-      _remoteStore.stopListening(targetId);
+      await _remoteStore.stopListening(targetId);
       _limboTargetsByKey.remove(key);
       _limboResolutionsByTarget.remove(targetId);
     }
@@ -454,7 +455,8 @@ class SyncEngine implements RemoteStoreCallback {
         documentChangesInAllViews.add(docChanges);
       }
     }
-    callback.onViewSnapshots(newSnapshots);
+
+    await callback.onViewSnapshots(newSnapshots);
     await _localStore.notifyLocalViewChanges(documentChangesInAllViews);
   }
 
@@ -473,7 +475,7 @@ class SyncEngine implements RemoteStoreCallback {
           _limboDocumentRefs.removeReference(limboDocKey, targetId);
           if (!_limboDocumentRefs.containsKey(limboDocKey)) {
             // We removed the last reference for this key
-            _removeLimboTarget(limboDocKey);
+            await _removeLimboTarget(limboDocKey);
           }
           break;
         default:

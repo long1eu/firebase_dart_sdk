@@ -16,8 +16,8 @@ class Assert {
   /// AssertionError so it can be used with a throw statement. However, the
   /// method itself throws an AssertionError so fail will not accidentally be
   /// silent if the throw is forgotten.
-  static AssertionError fail(String message, [Error cause]) {
-    throw AssertionError('$message ${cause != null ? 'cause: $cause' : ''}');
+  static StateError fail(String message, [Error cause]) {
+    throw StateError('$message ${cause != null ? 'cause: $cause' : ''}');
   }
 
   static T checkNotNull<T>(T reference, [Object errorMessage]) {

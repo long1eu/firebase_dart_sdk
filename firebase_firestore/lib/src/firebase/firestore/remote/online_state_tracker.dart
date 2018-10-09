@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 24/09/2018
 
+import 'dart:async';
+
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
@@ -10,7 +12,7 @@ import 'package:grpc/grpc.dart';
 
 /// Called whenever the online state of the client changes. This is based on
 /// the watch stream for now.
-typedef OnlineStateCallback = void Function(OnlineState onlineState);
+typedef OnlineStateCallback = Future<void> Function(OnlineState onlineState);
 
 /// A component used by the [RemoteStore] to track the [OnlineState] (that is,
 /// whether or not the client as a whole should be considered to be online or
@@ -76,26 +78,26 @@ class OnlineStateTracker {
   ///
   /// * If this is the first attempt, it sets the [OnlineState] to
   /// [OnlineState.unknown] and starts the [_onlineStateTimer].
-  void handleWatchStreamStart() {
+  Future<void> handleWatchStreamStart() async {
     if (_watchStreamFailures == 0) {
-      _setAndBroadcastState(OnlineState.unknown);
+      await _setAndBroadcastState(OnlineState.unknown);
 
       Assert.hardAssert(_onlineStateTimer == null,
           'onlineStateTimer shouldn\'t be started yet');
       _onlineStateTimer = _workerQueue.enqueueAfterDelay<void>(
-          TimerId.ONLINE_STATE_TIMEOUT,
+          TimerId.onlineStateTimeout,
           Duration(milliseconds: _onlineStateTimeoutMs), () async {
         _onlineStateTimer = null;
         Assert.hardAssert(_state == OnlineState.unknown,
             'Timer should be canceled if we transitioned to a different state.');
         _logClientOfflineWarningIfNecessary(
             'Backend didn\'t respond within ${_onlineStateTimeoutMs / 1000} seconds\n');
-        _setAndBroadcastState(OnlineState.offline);
+        await _setAndBroadcastState(OnlineState.offline);
 
         // NOTE: [handleWatchStreamFailure] will continue to increment
         // [watchStreamFailures] even though we are already marked
         // [OnlineState.offline] but this is non-harmful.
-      });
+      }, 'OnlineStateTracker handleWatchStreamStart');
     }
   }
 
@@ -105,9 +107,9 @@ class OnlineStateTracker {
   /// [OnlineState.unknown]. We then may allow multiple failures (based on
   /// [_maxWatchStreamFailures]) before we actually transition to
   /// [OnlineState.offline].
-  void handleWatchStreamFailure(GrpcError status) {
+  Future<void> handleWatchStreamFailure(GrpcError status) async {
     if (_state == OnlineState.online) {
-      _setAndBroadcastState(OnlineState.unknown);
+      await _setAndBroadcastState(OnlineState.unknown);
 
       // To get to [OnlineState.online], [updateState] must have been called
       // which would have reset our heuristics.
@@ -121,7 +123,7 @@ class OnlineStateTracker {
         _clearOnlineStateTimer();
         _logClientOfflineWarningIfNecessary(
             'Connection failed $_maxWatchStreamFailures times. Most recent error: $status');
-        _setAndBroadcastState(OnlineState.offline);
+        await _setAndBroadcastState(OnlineState.offline);
       }
     }
   }
@@ -131,7 +133,7 @@ class OnlineStateTracker {
   /// * Note that this resets the timers / failure counters, etc. used by our
   /// offline heuristics, so it must not be used in place of
   /// [handleWatchStreamStart] and [handleWatchStreamFailure].
-  void updateState(OnlineState newState) {
+  Future<void> updateState(OnlineState newState) async {
     _clearOnlineStateTimer();
     _watchStreamFailures = 0;
 
@@ -141,13 +143,13 @@ class OnlineStateTracker {
       _shouldWarnClientIsOffline = false;
     }
 
-    _setAndBroadcastState(newState);
+    await _setAndBroadcastState(newState);
   }
 
-  void _setAndBroadcastState(OnlineState newState) {
+  Future<void> _setAndBroadcastState(OnlineState newState) async {
     if (newState != _state) {
       _state = newState;
-      _onlineStateCallback(newState);
+      await _onlineStateCallback(newState);
     }
   }
 
