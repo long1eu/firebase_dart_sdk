@@ -21,6 +21,11 @@ abstract class CredentialsProvider {
   /// Sets the listener to be notified of credential changes
   /// (sign-in / sign-out, token changes). It is immediately called once with
   /// the initial user.
+  Stream<User> get onChange;
+
+  /// Sets the listener to be notified of credential changes
+  /// (sign-in / sign-out, token changes). It is immediately called once with
+  /// the initial user.
   void setChangeListener(Listener<User> changeListener);
 
   /// Removes the listener set with {@link #setChangeListener}.

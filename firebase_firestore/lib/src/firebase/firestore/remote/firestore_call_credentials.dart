@@ -21,7 +21,7 @@ class FirestoreCallCredentials {
     try {
       final String token = await credentialsProvider.token;
       Log.d(tag, 'Successfully fetched token.');
-      if (token != null) {
+      if (token != null && token.isNotEmpty) {
         metadata[_authorizationHeader] = 'Bearer $token';
       }
     } on FirebaseApiNotAvailableError catch (_) {

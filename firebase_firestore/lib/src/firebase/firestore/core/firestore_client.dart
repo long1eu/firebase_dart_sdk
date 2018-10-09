@@ -52,11 +52,22 @@ class FirestoreClient implements RemoteStoreCallback {
   SyncEngine syncEngine;
   EventManager eventManager;
 
-  FirestoreClient(this.databaseInfo, final bool usePersistence,
-      this.credentialsProvider, this.asyncQueue, OpenDatabase openDatabase) {
+  FirestoreClient._(
+      this.databaseInfo, this.credentialsProvider, this.asyncQueue);
+
+  static Future<FirestoreClient> initialize(
+      DatabaseInfo databaseInfo,
+      bool usePersistence,
+      CredentialsProvider credentialsProvider,
+      AsyncQueue asyncQueue,
+      OpenDatabase openDatabase) async {
+    final FirestoreClient client =
+        FirestoreClient._(databaseInfo, credentialsProvider, asyncQueue);
+
     final Completer<User> firstUser = Completer<User>();
     bool initialized = false;
-    credentialsProvider.setChangeListener((User user) {
+
+    credentialsProvider.onChange.listen((User user) {
       if (initialized == false) {
         initialized = true;
         Assert.hardAssert(
@@ -65,28 +76,25 @@ class FirestoreClient implements RemoteStoreCallback {
       } else {
         asyncQueue.enqueueAndForget(() async {
           Log.d(logTag, 'Credential changed. Current user: ${user.uid}');
-          syncEngine.handleCredentialChange(user);
-        });
+          await client.syncEngine.handleCredentialChange(user);
+        }, 'FirestoreClinet initialize');
       }
     });
 
-    // todo move this to a static method
-    // Defer initialization until we get the current user from the changeListener. This is
-    // guaranteed to be synchronously dispatched onto our worker queue, so we will be initialized
-    // before any subsequently queued work runs.
-    asyncQueue.enqueueAndForget(() async {
-      // Block on initial user being available
-      final User initialUser = await firstUser.future;
-      await _initialize(initialUser, usePersistence, openDatabase);
-    });
+    final User user = await asyncQueue.enqueue(
+        () => firstUser.future, 'FirestoreClinet initialize get user');
+    await client._initialize(user, usePersistence, openDatabase);
+    return client;
   }
 
   Future<void> disableNetwork() {
-    return asyncQueue.enqueue(() => remoteStore.disableNetwork());
+    return asyncQueue.enqueue(
+        () => remoteStore.disableNetwork(), 'FirestoreClinet disableNetwork');
   }
 
   Future<void> enableNetwork() {
-    return asyncQueue.enqueue(() => remoteStore.enableNetwork());
+    return asyncQueue.enqueue(
+        () => remoteStore.enableNetwork(), 'FirestoreClinet enableNetwork');
   }
 
   /// Shuts down this client, cancels all writes / listeners, and releases all
@@ -96,27 +104,30 @@ class FirestoreClient implements RemoteStoreCallback {
     return asyncQueue.enqueue(() async {
       await remoteStore.shutdown();
       await persistence.shutdown();
-    });
+    }, 'FirestoreClient shutdown');
   }
 
   /// Starts listening to a query. */
   QueryListener listen(Query query, ListenOptions options) {
     final QueryListener queryListener =
         QueryListener(query, options, stopListening);
-    asyncQueue
-        .enqueueAndForget(() => eventManager.addQueryListener(queryListener));
+    asyncQueue.enqueueAndForget(
+        () => eventManager.addQueryListener(queryListener),
+        'FirestoreClinet listen');
     return queryListener;
   }
 
   /// Stops listening to a query previously listened to.
   void stopListening(QueryListener listener) async {
-    asyncQueue
-        .enqueueAndForget(() => eventManager.removeQueryListener(listener));
+    asyncQueue.enqueueAndForget(
+        () => eventManager.removeQueryListener(listener),
+        'FirestoreClinet stopListening');
   }
 
   Future<Document> getDocumentFromLocalCache(DocumentKey docKey) {
     return asyncQueue
-        .enqueue(() => localStore.readDocument(docKey))
+        .enqueue(() => localStore.readDocument(docKey),
+            'FirestoreClient getDocumentFromLocalCache')
         .then((MaybeDocument result) {
       final MaybeDocument maybeDoc = result;
 
@@ -142,23 +153,25 @@ class FirestoreClient implements RemoteStoreCallback {
       final View view = View(query, ImmutableSortedSet<DocumentKey>());
       final ViewDocumentChanges viewDocChanges = view.computeDocChanges(docs);
       return view.applyChanges(viewDocChanges).snapshot;
-    });
+    }, 'FirestoreClient getDocumentsFromLocalCache');
   }
 
   /// Writes mutations. The returned Future will be notified when it's written
   /// to the backend.
-  Future<void> write(final List<Mutation> mutations) {
+  Future<void> write(final List<Mutation> mutations) async {
     final Completer<void> source = Completer<void>();
-    asyncQueue
-        .enqueueAndForget(() => syncEngine.writeMutations(mutations, source));
-    return source.future;
+    asyncQueue.enqueueAndForget(
+        () => syncEngine.writeMutations(mutations, source),
+        'FirestoreClient write');
+    await source.future;
   }
 
   /// Tries to execute the transaction in updateFunction up to retries times. */
   Future<TResult> transaction<TResult>(
       Future<TResult> Function(Transaction) updateFunction, int retries) {
-    return AsyncQueue.callTask(asyncQueue.executor,
-        () => syncEngine.transaction(asyncQueue, updateFunction, retries));
+    return asyncQueue.enqueue(
+        () => syncEngine.transaction(asyncQueue, updateFunction, retries),
+        'FirestoreClient transaction');
   }
 
   Future<void> _initialize(
@@ -220,8 +233,8 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   @override
-  void handleOnlineStateChange(OnlineState onlineState) {
-    syncEngine.handleOnlineStateChange(onlineState);
+  Future<void> handleOnlineStateChange(OnlineState onlineState) async {
+    await syncEngine.handleOnlineStateChange(onlineState);
     eventManager.handleOnlineStateChange(onlineState);
   }
 

@@ -11,3 +11,5 @@ build/
 doc/api/
 
 proto/
+
+res/google-services.json

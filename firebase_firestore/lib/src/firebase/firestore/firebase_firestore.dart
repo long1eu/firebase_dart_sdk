@@ -37,33 +37,21 @@ import 'package:meta/meta.dart';
 class FirebaseFirestore {
   static const String _tag = 'FirebaseFirestore';
 
-  final String _persistenceKey;
-  final CredentialsProvider _credentialsProvider;
   final AsyncQueue _asyncQueue;
 
   final DatabaseId databaseId;
   final FirebaseApp firebaseApp;
-  final FirebaseFirestoreSettings settings;
-  final OpenDatabase openDatabase;
   final UserDataConverter dataConverter;
-
-  FirestoreClient client;
+  final FirestoreClient client;
 
   @visibleForTesting
   FirebaseFirestore(
-      this.databaseId,
-      this._persistenceKey,
-      this._credentialsProvider,
-      this._asyncQueue,
-      this.firebaseApp,
-      this.openDatabase)
-      : dataConverter = UserDataConverter(databaseId),
-        settings = FirebaseFirestoreSettings() {
-    assert(
-        (settings.persistenceEnabled && openDatabase != null) ||
-            !settings.persistenceEnabled,
-        'If you enable persistance you need to give an Database implementation.');
-  }
+    this.databaseId,
+    this._asyncQueue,
+    this.firebaseApp,
+    this.client, [
+    FirebaseFirestoreSettings settings,
+  ]) : dataConverter = UserDataConverter(databaseId);
 
   @publicApi
   static FirebaseFirestore get instance {
@@ -77,13 +65,15 @@ class FirebaseFirestore {
   @publicApi
   static Future<FirebaseFirestore> getInstance(FirebaseApp app,
       [String database = DatabaseId.defaultDatabaseId,
-      OpenDatabase openDatabase]) {
+      OpenDatabase openDatabase]) async {
     Assert.checkNotNull(app, 'Provided FirebaseApp must not be null.');
 
     final FirestoreMultiDbComponent component =
         FirestoreMultiDbComponent(app, app.getAuthProvider());
     Assert.checkNotNull(component, 'Firestore component is not present.');
-    return component.get(database, openDatabase);
+    final FirebaseFirestore firestore =
+        await component.get(database, openDatabase);
+    return firestore;
   }
 
   static Future<FirebaseFirestore> newInstance(FirebaseApp app, String database,
@@ -94,7 +84,7 @@ class FirebaseFirestore {
     }
     final DatabaseId databaseId = DatabaseId.forDatabase(projectId, database);
 
-    final AsyncQueue queue = await AsyncQueue.createQueue();
+    final AsyncQueue queue = AsyncQueue();
 
     CredentialsProvider provider;
     if (authProvider == null) {
@@ -112,29 +102,54 @@ class FirebaseFirestore {
     // persistence key.
     final String persistenceKey = app.name;
 
-    return FirebaseFirestore(
-      databaseId,
-      persistenceKey,
-      provider,
-      queue,
-      app,
-      openDatabase,
-    );
-  }
-
-  void _ensureClientConfigured() {
-    client ??= FirestoreClient(
+    final FirebaseFirestoreSettings settings = FirebaseFirestoreSettings();
+    final FirestoreClient client = await FirestoreClient.initialize(
       DatabaseInfo(
         databaseId,
-        _persistenceKey,
+        persistenceKey,
         settings.host,
         settings.sslEnabled,
       ),
       settings.persistenceEnabled,
-      _credentialsProvider,
-      _asyncQueue,
+      provider,
+      queue,
       openDatabase,
     );
+
+    return FirebaseFirestore(databaseId, queue, app, client, settings);
+  }
+
+  @visibleForTesting
+  static Future<FirebaseFirestore> forTests(
+      DatabaseId databaseId,
+      String persistenceKey,
+      CredentialsProvider provider,
+      AsyncQueue queue,
+      OpenDatabase openDatabase,
+      FirebaseFirestoreSettings settings) async {
+    final FirestoreClient client = await FirestoreClient.initialize(
+      DatabaseInfo(
+        databaseId,
+        persistenceKey,
+        settings.host,
+        settings.sslEnabled,
+      ),
+      settings.persistenceEnabled,
+      provider,
+      queue,
+      openDatabase,
+    );
+
+    return FirebaseFirestore(databaseId, queue, null, client, settings);
+  }
+
+  void _ensureClientConfigured() {
+    Assert.hardAssert(
+        client != null,
+        'You must call FirebaseApp.initializeApp first. '
+        'Don\'t try to get a firestore instance using the default constructor. '
+        'Use [FirebaseFirestore.instance] for the default instance or '
+        '[FirebaseFirestore.getInstance(app)] for a specific FirebaseApp.');
   }
 
   /// Gets a [CollectionReference] instance that refers to the collection at the

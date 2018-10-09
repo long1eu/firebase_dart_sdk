@@ -60,6 +60,7 @@ class Datastore {
                 : const ChannelCredentials.insecure()));
 
     final FirestoreChannel channel = FirestoreChannel(
+      workerQueue,
       credentialsProvider,
       clientChannel,
       databaseInfo.databaseId,
@@ -98,23 +99,25 @@ class Datastore {
     try {
       final CommitResponse response = await channel.runRpc(
         ClientMethod<CommitRequest, CommitResponse>(
-          'commit',
+          'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Commit',
           (CommitRequest req) => req.writeToBuffer(),
           (List<int> req) => CommitResponse.fromBuffer(req),
         ),
         builder.freeze(),
       );
 
-      final SnapshotVersion commitVersion =
-          serializer.decodeVersion(response.commitTime);
+      return workerQueue.enqueue(() async {
+        final SnapshotVersion commitVersion =
+            serializer.decodeVersion(response.commitTime);
 
-      final int count = response.writeResults.length;
-      final List<MutationResult> results = List<MutationResult>(count);
-      for (int i = 0; i < count; i++) {
-        final WriteResult result = response.writeResults[i];
-        results[i] = serializer.decodeMutationResult(result, commitVersion);
-      }
-      return results;
+        final int count = response.writeResults.length;
+        final List<MutationResult> results = List<MutationResult>(count);
+        for (int i = 0; i < count; i++) {
+          final WriteResult result = response.writeResults[i];
+          results[i] = serializer.decodeMutationResult(result, commitVersion);
+        }
+        return results;
+      }, 'Datastore commit');
     } catch (e) {
       if (e is FirebaseFirestoreError &&
           e.code == FirebaseFirestoreErrorCode.unauthenticated) {
@@ -136,7 +139,7 @@ class Datastore {
       final List<BatchGetDocumentsResponse> responses =
           await channel.runStreamingResponseRpc(
               ClientMethod<BatchGetDocumentsRequest, BatchGetDocumentsResponse>(
-                'batchGet',
+                'firestore.googleapis.com/google.firestore.v1beta1.Firestore/BatchGetDocuments',
                 (BatchGetDocumentsRequest req) => req.writeToBuffer(),
                 (List<int> res) => BatchGetDocumentsResponse.fromBuffer(res),
               ),

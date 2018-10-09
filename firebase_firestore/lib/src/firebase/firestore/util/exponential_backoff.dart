@@ -78,13 +78,10 @@ class ExponentialBackoff {
     }
 
     _timerTask = _queue.enqueueAfterDelay<void>(
-      _timerId,
-      Duration(milliseconds: remainingDelayMs),
-      () async {
-        _lastAttemptTime = DateTime.now().millisecondsSinceEpoch;
-        task();
-      },
-    );
+        _timerId, Duration(milliseconds: remainingDelayMs), () async {
+      _lastAttemptTime = DateTime.now().millisecondsSinceEpoch;
+      task();
+    }, 'ExponentialBackoff backoffAndRun');
 
     // Apply backoff factor to determine next delay and ensure it is within
     // bounds.

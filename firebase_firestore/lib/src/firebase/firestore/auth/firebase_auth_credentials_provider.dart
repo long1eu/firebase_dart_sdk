@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
+import 'package:rxdart/rxdart.dart';
 
 import '../firebase_firestore_error.dart';
 import '../util/listener.dart';
@@ -13,6 +14,7 @@ import 'credentials_provider.dart';
 import 'user.dart';
 
 class FirebaseAuthCredentialsProvider extends CredentialsProvider {
+  final BehaviorSubject<User> _onUserChange;
   final InternalAuthProvider authProvider;
 
   /// The listener registered with FirebaseApp; used to stop receiving auth
@@ -32,11 +34,13 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
 
   bool forceRefresh;
 
-  FirebaseAuthCredentialsProvider(this.authProvider) {
+  FirebaseAuthCredentialsProvider(this.authProvider)
+      : _onUserChange = BehaviorSubject<User>() {
     idTokenObserver = tokenObserver;
     currentUser = getUser();
     tokenCounter = 0;
     authProvider.addIdTokenObserver(idTokenObserver);
+    _onUserChange.add(currentUser);
   }
 
   void tokenObserver(InternalTokenResult tokenResult) {
@@ -96,4 +100,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
     final String uid = authProvider.uid;
     return uid != null ? User(uid) : User.unauthenticated;
   }
+
+  @override
+  Stream<User> get onChange => _onUserChange;
 }

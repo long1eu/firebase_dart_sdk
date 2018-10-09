@@ -38,13 +38,13 @@ class WatchStream
       : super(
             channel,
             ClientMethod<ListenRequest, ListenResponse>(
-              'listen',
+              'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Listen',
               (ListenRequest req) => req.writeToBuffer(),
               (List<int> res) => ListenResponse.fromBuffer(res),
             ),
             workerQueue,
-            TimerId.LISTEN_STREAM_CONNECTION_BACKOFF,
-            TimerId.LISTEN_STREAM_IDLE,
+            TimerId.listenStreamConnectionBackoff,
+            TimerId.listenStreamIdle,
             listener);
 
   /// Registers interest in the results of the given query. If the query
@@ -91,6 +91,7 @@ class WatchStream
     final WatchChange watchChange = serializer.decodeWatchChange(change);
     final SnapshotVersion snapshotVersion =
         serializer.decodeVersionFromListenResponse(change);
+
     await listener.onWatchChange(snapshotVersion, watchChange);
   }
 }

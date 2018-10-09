@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change_set.dart';
@@ -198,9 +199,11 @@ class View {
     });
 
     _applyTargetChange(targetChange);
+
     final List<LimboDocumentChange> limboDocumentChanges =
         _updateLimboDocuments();
     final bool synced = limboDocuments.isEmpty && current;
+
     final ViewSnapshotSyncState newSyncState = synced //
         ? ViewSnapshotSyncState.synced
         : ViewSnapshotSyncState.local;
@@ -357,4 +360,14 @@ class ViewDocumentChanges {
   final bool needsRefill;
 
   final ImmutableSortedSet<DocumentKey> mutatedKeys;
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('documentSet', documentSet)
+          ..add('changeSet', changeSet)
+          ..add('mutatedKeys', mutatedKeys)
+          ..add('mutatedKeys', mutatedKeys))
+        .toString();
+  }
 }
