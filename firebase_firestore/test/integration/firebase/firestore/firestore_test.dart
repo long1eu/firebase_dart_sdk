@@ -645,15 +645,14 @@ void main() {
     await listener.cancel();
   });
 
-  //todo
   test('testDocumentSnapshotEventsForChange', () async {
     final Map<String, Object> initialData = map(<dynamic>['a', 1.0]);
     final Map<String, Object> updateData = map(<dynamic>['a', 2.0]);
     final CollectionReference testCollection = await testCollectionWithDocs(
         firestore, map<Map<String, dynamic>>(<dynamic>['doc', initialData]));
     final DocumentReference docRef = testCollection.document('doc');
-    final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
-    final AwaitHelper<void> latch = AwaitHelper<void>(3);
+    final AwaitHelper<void> initialLatch = AwaitHelper<void>(2);
+    final AwaitHelper<void> latch = AwaitHelper<void>(4);
 
     final StreamSubscription<DocumentSnapshot> listener = docRef
         .getSnapshots(MetadataChanges.include)
@@ -661,7 +660,14 @@ void main() {
       final int latchCount = latch.length;
       latch.completeNext();
       switch (latchCount) {
+        case 4:
+          expect(doc.data, initialData);
+          expect(doc.metadata.hasPendingWrites, isFalse);
+          expect(doc.metadata.isFromCache, isTrue);
+          initialLatch.completeNext();
+          break;
         case 3:
+          print(doc.data);
           expect(doc.data, initialData);
           expect(doc.metadata.hasPendingWrites, isFalse);
           expect(doc.metadata.isFromCache, isFalse);
@@ -763,7 +769,6 @@ void main() {
     await listener.cancel();
   });
 
-  //todo
   test('testQuerySnapshotEventsForChange', () async {
     final Map<String, Object> initialData = map(<dynamic>['b', 1.0]);
     final Map<String, Object> updateData = map(<dynamic>['b', 2.0]);
@@ -773,32 +778,43 @@ void main() {
     final DocumentReference docRef = collection.document('doc');
 
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
-    final AwaitHelper<void> dataLatch = AwaitHelper<void>(3);
+    final AwaitHelper<void> dataLatch = AwaitHelper<void>(4);
 
     final StreamSubscription<QuerySnapshot> listener = collection
         .getSnapshots(MetadataChanges.include)
         .listen((QuerySnapshot snapshot) {
       final int count = dataLatch.length;
       dataLatch.completeNext();
+
       switch (count) {
-        case 3:
-          initialLatch.completeNext();
+        case 4:
           expect(snapshot.length, 1);
           final DocumentSnapshot document = snapshot.documents[0];
           expect(document.data, initialData);
           expect(document.metadata.hasPendingWrites, isFalse);
+          expect(document.metadata.isFromCache, isTrue);
+          initialLatch.completeNext();
           break;
-        case 2:
+        case 3:
           expect(snapshot.length, 1);
           final DocumentSnapshot document2 = snapshot.documents[0];
           expect(document2.data, updateData);
           expect(document2.metadata.hasPendingWrites, isTrue);
+          expect(document2.metadata.isFromCache, isTrue);
           break;
-        case 1:
+        case 2:
           expect(snapshot.length, 1);
           final DocumentSnapshot document3 = snapshot.documents[0];
           expect(document3.data, updateData);
-          expect(document3.metadata.hasPendingWrites, isFalse);
+          expect(document3.metadata.hasPendingWrites, isTrue);
+          expect(document3.metadata.isFromCache, isFalse);
+          break;
+        case 1:
+          expect(snapshot.length, 1);
+          final DocumentSnapshot document4 = snapshot.documents[0];
+          expect(document4.data, updateData);
+          expect(document4.metadata.hasPendingWrites, isFalse);
+          expect(document4.metadata.isFromCache, isFalse);
           break;
         default:
           fail('unexpected event $snapshot');
@@ -806,7 +822,7 @@ void main() {
     });
 
     await initialLatch.all;
-    docRef.set(updateData);
+    await docRef.set(updateData);
     await dataLatch.all;
     await listener.cancel();
   });
@@ -998,8 +1014,12 @@ void main() {
   test('testWriteStreamReconnectsAfterIdle', () async {
     final DocumentReference doc = testDocument(firestore);
 
+    firestore.getAsyncQueue();
     await doc.set(map(<String>['foo', 'bar']));
-    firestore.getAsyncQueue().runDelayedTasksUntil(TimerId.writeStreamIdle);
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    await firestore
+        .getAsyncQueue()
+        .runDelayedTasksUntil(TimerId.writeStreamIdle);
     await doc.set(map(<String>['foo', 'bar']));
   });
 
@@ -1007,6 +1027,7 @@ void main() {
     final DocumentReference doc = testDocument(firestore);
 
     await waitForOnlineSnapshot(doc);
+    await Future<void>.delayed(const Duration(milliseconds: 250));
     firestore.getAsyncQueue().runDelayedTasksUntil(TimerId.listenStreamIdle);
     await waitForOnlineSnapshot(doc);
   });

@@ -27,9 +27,6 @@ class FirestoreChannel {
   /// The async worker queue that is used to dispatch events.
   final AsyncQueue asyncQueue;
 
-  /// The async worker queue that is used to dispatch events.
-  final AsyncQueue asyncQueue;
-
   final CredentialsProvider _credentialsProvider;
 
   /// The underlying gRPC channel.

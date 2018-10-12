@@ -1061,7 +1061,9 @@
   "Queries return from cache when network disabled": {
     "describeName": "Offline:",
     "itName": "Queries return from cache when network disabled",
-    "tags": ["eager-gc"],
+    "tags": [
+      "eager-gc"
+    ],
     "config": {
       "useGarbageCollection": true,
       "numClients": 1
