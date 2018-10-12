@@ -266,7 +266,7 @@ class DocumentSnapshot {
       return value as T;
     } on CastError catch (_) {
       throw StateError(
-          'Field "$field" is not a $T, but it is ${value.runtimeType}');
+          'Field \'$field\' is not a $T, but it is ${value.runtimeType}');
     }
   }
 

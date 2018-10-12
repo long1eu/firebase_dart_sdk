@@ -13,7 +13,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 
 /// EventManager is responsible for mapping queries to query event listeners.
-/// It handles "fan-out." (Identical queries will re-use the same watch on the
+/// It handles 'fan-out.' (Identical queries will re-use the same watch on the
 /// backend.)
 class EventManager implements SyncEngineCallback {
   final SyncEngine syncEngine;

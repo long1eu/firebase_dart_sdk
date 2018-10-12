@@ -278,7 +278,7 @@ abstract class AbstractStream<
   }
 }
 
-/// A "runner" that runs operations but only if [closeCount] remains unchanged.
+/// A 'runner' that runs operations but only if [closeCount] remains unchanged.
 /// This allows us to turn auth / stream callbacks into no-ops if the stream is
 /// closed / re-opened, etc.
 ///

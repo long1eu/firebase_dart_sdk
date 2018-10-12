@@ -19,7 +19,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// * Paths are also used for prefix scans so it's important to distinguish
 /// whole segments from any longer segments of which they might be a prefix. For
 /// example, it's important to make it possible to scan documents in a
-/// collection "foo" without encountering documents in a collection "foobar".
+/// collection 'foo' without encountering documents in a collection 'foobar'.
 ///
 /// * Separate from the concerns about path ordering and separation, SQLite
 /// imposes additional restrictions since it does not handle TEXT fields with
@@ -31,7 +31,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// the following characteristics:
 ///
 /// <ul>
-/// <li>Segment separators ("/" or ".") sort before everything else.
+/// <li>Segment separators ('/' or '.') sort before everything else.
 /// <li>All paths have a trailing separator.
 /// <li>NUL bytes do not exist in the output, since SQLite doesn't treat them
 /// well.
@@ -41,9 +41,9 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 ///
 /// <ul>
 /// <li>'\x01' is used as an escape character.
-/// <li>Path separators are encoded as "\x01\x01"
-/// <li>NUL bytes are encoded as "\x01\x10"
-/// <li>'\x01' is encoded as "\x01\x11"
+/// <li>Path separators are encoded as '\x01\x01'
+/// <li>NUL bytes are encoded as '\x01\x10'
+/// <li>'\x01' is encoded as '\x01\x11'
 /// </ul>
 ///
 /// * This encoding leaves some room between path separators and the NUL byte
@@ -110,12 +110,12 @@ class EncodedPath {
     // Even the empty path must encode as a path of at least length 2. A path
     // with length of exactly 2 must be the empty path.
     final int length = path.length;
-    Assert.hardAssert(length >= 2, 'Invalid path "$path"');
+    Assert.hardAssert(length >= 2, 'Invalid path \'$path\'');
     if (length == 2) {
       Assert.hardAssert(
         path.codeUnitAt(0) == _escape &&
             path.codeUnitAt(1) == _encodedSeparator,
-        'Non-empty path "$path" had length 2',
+        'Non-empty path \'$path\' had length 2',
       );
       return <String>[];
     }
@@ -132,7 +132,7 @@ class EncodedPath {
       // so there must be an end to this segment.
       final int end = path.indexOf(String.fromCharCode(_escape), start);
       if (end < 0 || end > lastReasonableEscapeIndex) {
-        throw ArgumentError('Invalid encoded resource path: "$path"');
+        throw ArgumentError('Invalid encoded resource path: \'$path\'');
       }
 
       final int next = path.codeUnitAt(end + 1);
@@ -159,7 +159,7 @@ class EncodedPath {
         // The escape character can be use used in the output to encode itself.
         segmentBuilder.write(path.substring(start, end + 1));
       } else {
-        throw ArgumentError('Invalid encoded resource path: "$path"');
+        throw ArgumentError('Invalid encoded resource path: \'$path\'');
       }
 
       start = end + 2;

@@ -47,7 +47,7 @@ abstract class FieldValue {
     return _ArrayRemoveFieldValue._(elements);
   }
 
-  /// Returns the method name (e.g. "FieldValue.delete") that was used to create
+  /// Returns the method name (e.g. 'FieldValue.delete') that was used to create
   /// this FieldValue instance, for use in error messages, etc.
   String get methodName;
 

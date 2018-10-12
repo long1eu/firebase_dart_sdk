@@ -46,22 +46,22 @@ void main() {
     final DocumentReference ref = testDocument(firestore);
 
     if (includeSets) {
-      expectError(() => ref.set(data), reason);
-      expectError(() => ref.firestore.batch().set(ref, data), reason);
+      await expectError(() => ref.set(data), reason);
+      await expectError(() => ref.firestore.batch().set(ref, data), reason);
     }
 
     if (includeUpdates) {
-      expectError(() => ref.update(data), reason);
-      expectError(() => ref.firestore.batch().update(ref, data), reason);
+      await expectError(() => ref.update(data), reason);
+      await expectError(() => ref.firestore.batch().update(ref, data), reason);
     }
 
-    await firestore.runTransaction<void>((Transaction transaction) {
+    await firestore.runTransaction<void>((Transaction transaction) async {
       if (includeSets) {
-        expectError(() => transaction.set(ref, data), reason);
+        await expectError(() => transaction.set(ref, data), reason);
       }
 
       if (includeUpdates) {
-        expectError(() => transaction.update(ref, data), reason);
+        await expectError(() => transaction.update(ref, data), reason);
       }
 
       return null;
@@ -84,25 +84,25 @@ void main() {
     final DocumentSnapshot snapshot = await docRef.get();
 
     // snapshot paths
-    expectError(() => snapshot.get(path), reason);
+    await expectError(() => snapshot.get(path), reason);
 
     // Query filter / order fields
     final CollectionReference coll = testCollection(firestore);
     // whereLessThan(), etc. omitted for brevity since the code path is trivially shared.
-    expectError(() => coll.whereEqualTo(path, 1), reason);
-    expectError(() => coll.orderBy(path), reason);
+    await expectError(() => coll.whereEqualTo(path, 1), reason);
+    await expectError(() => coll.orderBy(path), reason);
 
     // update() paths.
-    expectError(() => docRef.updateFromList(<dynamic>[path, 1]), reason);
+    await expectError(() => docRef.updateFromList(<dynamic>[path, 1]), reason);
   }
 
   test('firestoreSettingsNullHostFails', () async {
-    expectError(() => FirebaseFirestoreSettings(host: null),
+    await expectError(() => FirebaseFirestoreSettings(host: null),
         'Provided host must not be null.');
   });
 
   test('disableSslWithoutSettingHostFails', () async {
-    expectError(() => FirebaseFirestoreSettings(sslEnabled: false),
+    await expectError(() => FirebaseFirestoreSettings(sslEnabled: false),
         'You can\'t set the \'sslEnabled\' setting unless you also set a non-default \'host\'.');
   });
 
@@ -145,6 +145,7 @@ void main() {
       'foo/bar',
       'foo/bar/baz/quu'
     ];
+
     final List<String> badRelativePaths = <String>['/', 'baz/quu'];
     final List<int> badPathLengths = <int>[2, 4];
 
@@ -174,10 +175,10 @@ void main() {
       final String reason =
           'Invalid path ($path). Paths must not contain // in them.';
 
-      expectError(() => firestore.collection(path), reason);
-      expectError(() => firestore.document(path), reason);
-      expectError(() => collection.document(path), reason);
-      expectError(() => doc.collection(path), reason);
+      await expectError(() => firestore.collection(path), reason);
+      await expectError(() => firestore.document(path), reason);
+      await expectError(() => collection.document(path), reason);
+      await expectError(() => doc.collection(path), reason);
     }
   });
 
@@ -193,13 +194,13 @@ void main() {
       final String error =
           'Invalid document reference. Document references must have an even number '
           'of segments, but $path has ${badPathLengths[i]}';
-      expectError(() => firestore.document(path), error);
-      expectError(() => baseCollectionRef.document(relativePath), error);
+      await expectError(() => firestore.document(path), error);
+      await expectError(() => baseCollectionRef.document(relativePath), error);
     }
   });
 
   test('writesMustNotContainDirectlyNestedLists', () async {
-    expectWriteError(
+    await expectWriteError(
         map<dynamic>(<dynamic>[
           'nested-array',
           <dynamic>[
@@ -245,7 +246,7 @@ void main() {
     final DocumentReference ref = firestore2.document('baz/quu');
     final Map<String, Object> data = map<dynamic>(<dynamic>['foo', ref]);
 
-    expectWriteError(
+    await expectWriteError(
         data,
         'Invalid data. Document reference is for database '
         '${IntegrationTestUtil.BAD_PROJECT_ID}/(default) but should be for '
@@ -254,15 +255,15 @@ void main() {
   });
 
   test('writesMustNotContainReservedFieldNames', () async {
-    expectWriteError(map<dynamic>(<dynamic>['__baz__', 1]),
+    await expectWriteError(map<dynamic>(<dynamic>['__baz__', 1]),
         'Invalid data. Document fields cannot begin and end with __ (found in field __baz__)');
-    expectWriteError(
+    await expectWriteError(
         map<dynamic>(<dynamic>[
           'foo',
           map<dynamic>(<dynamic>['__baz__', 1])
         ]),
         'Invalid data. Document fields cannot begin and end with __ (found in field foo.__baz__)');
-    expectWriteError(
+    await expectWriteError(
         map<dynamic>(<dynamic>[
           '__baz__',
           map<dynamic>(<dynamic>['foo', 1])
@@ -279,7 +280,7 @@ void main() {
 
   test('setsMustNotContainFieldValueDelete', () async {
     final DocumentReference ref = testDocument(firestore);
-    expectError(
+    await expectError(
         () => ref.set(map(<dynamic>['foo', FieldValue.delete()])),
         'Invalid data. FieldValue.delete() can only be used with update() and set() with '
         'SetOptions.merge() (found in field foo)');
@@ -287,7 +288,7 @@ void main() {
 
   test('updatesMustNotContainNestedFieldValueDeletes', () async {
     final DocumentReference ref = testDocument(firestore);
-    expectError(
+    await expectError(
         () => ref.update(map(<dynamic>[
               'foo',
               map<dynamic>(<dynamic>['bar', FieldValue.delete()])
@@ -303,9 +304,9 @@ void main() {
         'Provided document reference is from a different Firestore instance.';
     final Map<String, Object> data = map<dynamic>(<dynamic>['foo', 1]);
     final WriteBatch batch = firestore.batch();
-    expectError(() => batch.set(badRef, data), reason);
-    expectError(() => batch.update(badRef, data), reason);
-    expectError(() => batch.delete(badRef), reason);
+    await expectError(() => batch.set(badRef, data), reason);
+    await expectError(() => batch.update(badRef, data), reason);
+    await expectError(() => batch.delete(badRef), reason);
   });
 
   test('transactionsRequireCorrectDocumentReferences', () async {
@@ -315,20 +316,20 @@ void main() {
         'Provided document reference is from a different Firestore instance.';
     final Map<String, Object> data = map<dynamic>(<dynamic>['foo', 1]);
 
-    firestore.runTransaction<void>((Transaction transaction) {
-      expectError(() {
+    await firestore.runTransaction<void>((Transaction transaction) async {
+      await expectError(() async {
         // Because .get() throws a checked exception for missing docs, we have
         // to try/catch it.
         try {
-          transaction.get(badRef);
+          await transaction.get(badRef);
         } on FirebaseFirestoreError catch (e) {
           fail('transaction.get() triggered wrong exception: $e');
         }
       }, reason);
 
-      expectError(() => transaction.set(badRef, data), reason);
-      expectError(() => transaction.update(badRef, data), reason);
-      expectError(() => transaction.delete(badRef), reason);
+      await expectError(() => transaction.set(badRef, data), reason);
+      await expectError(() => transaction.update(badRef, data), reason);
+      await expectError(() => transaction.delete(badRef), reason);
       return null;
     });
   });
@@ -360,25 +361,26 @@ void main() {
   });
 
   test('fieldNamesMustNotBeEmpty', () async {
-    String reason = 'Invalid field path. Provided path must not be empty.';
-    expectError(() => FieldPath.fromSegments(<String>[]), reason);
+    String reason =
+        'Invalid field path. Provided path must not be null or empty.';
+    await expectError(() => FieldPath.of(<String>[]), reason);
 
     reason =
         'Invalid field name at argument 1. Field names must not be null or empty.';
-    expectError(() => FieldPath.of(null), reason);
-    expectError(() => FieldPath.of(<String>['']), reason);
+    await expectError(() => FieldPath.of(<String>[null]), reason);
+    await expectError(() => FieldPath.of(<String>['']), reason);
 
     reason =
         'Invalid field name at argument 2. Field names must not be null or empty.';
-    expectError(() => FieldPath.of(<String>['foo', '']), reason);
-    expectError(() => FieldPath.of(<String>['foo', null]), reason);
+    await expectError(() => FieldPath.of(<String>['foo', '']), reason);
+    await expectError(() => FieldPath.of(<String>['foo', null]), reason);
   });
 
   test('arrayTransformsFailInQueries', () async {
     final CollectionReference collection = testCollection(firestore);
     String reason =
         'Invalid data. FieldValue.arrayUnion() can only be used with set() and update() (found in field test)';
-    expectError(
+    await expectError(
         () => collection.whereEqualTo(
             'test',
             map<dynamic>(<dynamic>[
@@ -390,7 +392,7 @@ void main() {
     reason =
         'Invalid data. FieldValue.arrayRemove() can only be used with set() and update() '
         '(found in field test)';
-    expectError(
+    await expectError(
         () => collection.whereEqualTo(
             'test',
             map<dynamic>(<dynamic>[
@@ -402,16 +404,16 @@ void main() {
 
   test('arrayTransformsRejectInvalidElements', () async {
     final DocumentReference doc = testDocument(firestore);
-    const String reason = 'Invalid data. Unsupported type: Matcher';
+    const String reason = 'Invalid data. Unsupported type: Throws';
 
-    expectError(
+    await expectError(
         () => doc.set(map(<dynamic>[
               'x',
               FieldValue.arrayUnion(
                   <dynamic>[1, throwsCyclicInitializationError])
             ])),
         reason);
-    expectError(
+    await expectError(
         () => doc.set(map(<dynamic>[
               'x',
               FieldValue.arrayRemove(
@@ -424,7 +426,7 @@ void main() {
     final DocumentReference doc = testDocument(firestore);
     // This would result in a directly nested array which is not supported.
     const String reason = 'Invalid data. Nested arrays are not supported';
-    expectError(
+    await expectError(
         () => doc.set(map(<dynamic>[
               'x',
               FieldValue.arrayUnion(<dynamic>[
@@ -433,7 +435,7 @@ void main() {
               ])
             ])),
         reason);
-    expectError(
+    await expectError(
         () => doc.set(map(<dynamic>[
               'x',
               FieldValue.arrayRemove(<dynamic>[
@@ -446,22 +448,22 @@ void main() {
 
   test('queriesWithNonPositiveLimitFail', () async {
     final CollectionReference collection = testCollection(firestore);
-    expectError(() => collection.limit(0),
+    await expectError(() => collection.limit(0),
         'Invalid Query. Query limit (0) is invalid. Limit must be positive.');
-    expectError(() => collection.limit(-1),
+    await expectError(() => collection.limit(-1),
         'Invalid Query. Query limit (-1) is invalid. Limit must be positive.');
   });
 
   test('queriesWithNullOrNaNFiltersOtherThanEqualityFail', () async {
     final CollectionReference collection = testCollection(firestore);
-    expectError(() => collection.whereGreaterThan('a', null),
+    await expectError(() => collection.whereGreaterThan('a', null),
         'Invalid Query. You can only perform equality comparisons on null (via whereEqualTo()).');
-    expectError(() => collection.whereArrayContains('a', null),
+    await expectError(() => collection.whereArrayContains('a', null),
         'Invalid Query. You can only perform equality comparisons on null (via whereEqualTo()).');
 
-    expectError(() => collection.whereGreaterThan('a', double.nan),
+    await expectError(() => collection.whereGreaterThan('a', double.nan),
         'Invalid Query. You can only perform equality comparisons on NaN (via whereEqualTo()).');
-    expectError(() => collection.whereArrayContains('a', double.nan),
+    await expectError(() => collection.whereArrayContains('a', double.nan),
         'Invalid Query. You can only perform equality comparisons on NaN (via whereEqualTo()).');
   });
 
@@ -482,10 +484,10 @@ void main() {
         'Invalid query. You are trying to start or end a query using a document '
         'for which the field \'sort\' (used as the orderBy) does not exist.';
 
-    expectError(() => query.startAtDocument(snapshot), reason);
-    expectError(() => query.startAfterDocument(snapshot), reason);
-    expectError(() => query.endBeforeDocument(snapshot), reason);
-    expectError(() => query.endAtDocument(snapshot), reason);
+    await expectError(() => query.startAtDocument(snapshot), reason);
+    await expectError(() => query.startAfterDocument(snapshot), reason);
+    await expectError(() => query.endBeforeDocument(snapshot), reason);
+    await expectError(() => query.endAtDocument(snapshot), reason);
   });
 
   test('queriesMustNotHaveMoreComponentsThanOrderBy', () async {
@@ -495,21 +497,22 @@ void main() {
     const String reason =
         'Too many arguments provided to startAt(). The number of arguments '
         'must be less than or equal to the number of orderBy() clauses.';
-    expectError(() => query.startAt(<int>[1, 2]), reason);
-    expectError(() => query.orderBy('bar').startAt(<int>[1, 2, 3]), reason);
+    await expectError(() => query.startAt(<int>[1, 2]), reason);
+    await expectError(
+        () => query.orderBy('bar').startAt(<int>[1, 2, 3]), reason);
   });
 
   test('queryOrderByKeyBoundsMustBeStringsWithoutSlashes', () async {
     final CollectionReference collection = testCollection(firestore);
     final Query query = collection.orderByField(FieldPath.documentId());
-    expectError(() => query.startAt(<int>[1]),
+    await expectError(() => query.startAt(<int>[1]),
         'Invalid query. Expected a string for document ID in startAt(), but got 1.');
-    expectError(() => query.startAt(<String>['foo/bar']),
+    await expectError(() => query.startAt(<String>['foo/bar']),
         'Invalid query. Document ID \'foo/bar\' contains a slash in startAt().');
   });
 
   test('queriesWithDifferentInequalityFieldsFail', () async {
-    expectError(
+    await expectError(
         () => testCollection(firestore)
             .whereGreaterThan('x', 32)
             .whereLessThan('y', 'cat'),
@@ -525,20 +528,20 @@ void main() {
         'your first orderBy() field, but your first orderBy() is currently on field \'y\' '
         'instead.';
 
-    expectError(
+    await expectError(
         () => collection.whereGreaterThan('x', 32).orderBy('y'), reason);
-    expectError(
+    await expectError(
         () => collection.orderBy('y').whereGreaterThan('x', 32), reason);
-    expectError(
+    await expectError(
         () => collection.whereGreaterThan('x', 32).orderBy('y').orderBy('x'),
         reason);
-    expectError(
+    await expectError(
         () => collection.orderBy('y').orderBy('x').whereGreaterThan('x', 32),
         reason);
   });
 
   test('queriesWithMultipleArrayContainsFiltersFail', () async {
-    expectError(
+    await expectError(
         () => testCollection(firestore)
             .whereArrayContains('foo', 1)
             .whereArrayContains('foo', 2),
@@ -551,13 +554,13 @@ void main() {
     String reason =
         'Invalid query. You must not call Query.startAt() or Query.startAfter() '
         'before calling Query.orderBy().';
-    expectError(() => query.startAt(<int>[1]).orderBy('bar'), reason);
-    expectError(() => query.startAfter(<int>[1]).orderBy('bar'), reason);
+    await expectError(() => query.startAt(<int>[1]).orderBy('bar'), reason);
+    await expectError(() => query.startAfter(<int>[1]).orderBy('bar'), reason);
     reason =
         'Invalid query. You must not call Query.endAt() or Query.endAfter() '
         'before calling Query.orderBy().';
-    expectError(() => query.endAt(<int>[1]).orderBy('bar'), reason);
-    expectError(() => query.endBefore(<int>[1]).orderBy('bar'), reason);
+    await expectError(() => query.endAt(<int>[1]).orderBy('bar'), reason);
+    await expectError(() => query.endBefore(<int>[1]).orderBy('bar'), reason);
   });
 
   test('queriesFilteredByDocumentIDMustUseStringsOrDocumentReferences',
@@ -566,7 +569,7 @@ void main() {
     String reason =
         'Invalid query. When querying with FieldPath.documentId() you must provide '
         'a valid document ID, but it was an empty string.';
-    expectError(
+    await expectError(
         () => collection.whereGreaterThanOrEqualToField(
             FieldPath.documentId(), ''),
         reason);
@@ -574,15 +577,15 @@ void main() {
     reason =
         'Invalid query. When querying with FieldPath.documentId() you must provide '
         'a valid document ID, but \'foo/bar/baz\' contains a \'/\' character.';
-    expectError(
+    await expectError(
         () => collection.whereGreaterThanOrEqualToField(
             FieldPath.documentId(), 'foo/bar/baz'),
         reason);
 
     reason =
         'Invalid query. When querying with FieldPath.documentId() you must provide '
-        'a valid String or DocumentReference, but it was of type: java.lang.int';
-    expectError(
+        'a valid String or DocumentReference, but it was of type: int';
+    await expectError(
         () => collection.whereGreaterThanOrEqualToField(
             FieldPath.documentId(), 1),
         reason);
@@ -590,7 +593,7 @@ void main() {
     reason =
         'Invalid query. You can\'t perform array-contains queries on FieldPath.documentId() since '
         'document IDs are not arrays.';
-    expectError(
+    await expectError(
         () => collection.whereArrayContainsField(FieldPath.documentId(), 1),
         reason);
   });

@@ -31,8 +31,8 @@ class FieldPath {
   /// Return a FieldPath that points to a field location in a document.
   @publicApi
   factory FieldPath.of(List<String> fieldNames) {
-    Assert.checkArgument(fieldNames.isNotEmpty,
-        'Invalid field path. Provided path must not be empty.');
+    Assert.checkArgument(fieldNames != null && fieldNames.isNotEmpty,
+        'Invalid field path. Provided path must not be null or empty.');
 
     for (int i = 0; i < fieldNames.length; ++i) {
       Assert.checkArgument(fieldNames[i] != null && fieldNames[i].isNotEmpty,
@@ -55,15 +55,15 @@ class FieldPath {
   static FieldPath fromDotSeparatedPath(String path) {
     Assert.checkNotNull(path, 'Provided field path must not be null.');
     Assert.checkArgument(!reserved.hasMatch(path),
-        "Invalid field path ($path). Paths must not contain '~', '*', '/', '[', or ']'");
+        'Invalid field path ($path). Paths must not contain \'~\', \'*\', \'/\', \'[\', or \']\'');
     try {
       // By default, split() doesn't return empty leading and trailing segments. This can be enabled
-      // by passing "-1" as the  limit.
+      // by passing '-1' as the  limit.
       // todo handle the above
       return FieldPath.of(path.split('.'));
     } on ArgumentError catch (_) {
       throw ArgumentError(
-          "Invalid field path ($path). Paths must not be empty, begin with '.', end with '.', or contain '..'");
+          'Invalid field path ($path). Paths must not be empty, begin with \'.\', end with \'.\', or contain \'..\'');
     }
   }
 

@@ -7,7 +7,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 /// The type of the change.
 enum LimboDocumentChangeType { added, removed }
 
-/// Change to a particular document wrt to whether it is in "limbo".
+/// Change to a particular document wrt to whether it is in 'limbo'.
 class LimboDocumentChange {
   final LimboDocumentChangeType type;
   final DocumentKey key;

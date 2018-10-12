@@ -86,7 +86,7 @@ class TransformMutation extends Mutation {
     return doc;
   }
 
-  /// Creates a list of "transform results" (a transform result is a field value
+  /// Creates a list of 'transform results' (a transform result is a field value
   /// representing the result of applying a transform) for use after a
   /// [TransformMutation] has been acknowledged by the server.
   ///
@@ -115,7 +115,7 @@ class TransformMutation extends Mutation {
     return transformResults;
   }
 
-  /// Creates a list of "transform results" (a transform result is a field value
+  /// Creates a list of 'transform results' (a transform result is a field value
   /// representing the result of applying a transform) for use when applying a
   /// [TransformMutation] locally.
   ///

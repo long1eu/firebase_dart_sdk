@@ -35,7 +35,7 @@ import 'package:protobuf/protobuf.dart';
 /// [streamToken] for the calls to [writeMutations].
 ///
 /// @see <a
-/// href="https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L139">firestore.proto</a>
+/// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L139'>firestore.proto</a>
 class WriteStream
     extends AbstractStream<WriteRequest, WriteResponse, WriteStreamCallback> {
   /// The empty stream token.

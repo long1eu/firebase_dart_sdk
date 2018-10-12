@@ -184,7 +184,7 @@ class UserDataConverter {
     );
   }
 
-  /// Parse a "query value" (e.g. value in a where filter or a value in a cursor
+  /// Parse a 'query value' (e.g. value in a where filter or a value in a cursor
   /// bound).
   FieldValue parseQueryValue(Object input) {
     final _ParseContext context =
@@ -265,7 +265,7 @@ class UserDataConverter {
     return ArrayValue.fromList(result);
   }
 
-  /// "Parses" the provided FieldValue, adding any necessary transforms to
+  /// 'Parses' the provided FieldValue, adding any necessary transforms to
   /// [context.fieldTransforms].
   void _parseSentinelFieldValue(
       firestore.FieldValue value, _ParseContext context) {
@@ -400,7 +400,7 @@ class ParsedDocumentData {
   }
 }
 
-/// The result of parsing "update" data (i.e. for an updateData call).
+/// The result of parsing 'update' data (i.e. for an updateData call).
 class ParsedUpdateData {
   final ObjectValue _data;
   final FieldMask _fieldMask;
@@ -440,7 +440,7 @@ enum UserDataSource {
   argument
 }
 
-/// A "context" object passed around while parsing user data.
+/// A 'context' object passed around while parsing user data.
 class _ParseContext {
   final RegExp reservedFieldRegex = RegExp('^__.*__\$');
 
@@ -544,7 +544,7 @@ class _ParseContext {
   StateError createError(String reason) {
     final String fieldDescription =
         (path == null || path.isEmpty) ? '' : ' (found in field $path)';
-    return StateError('Invalid data. $reason $fieldDescription');
+    return StateError('Invalid data. $reason$fieldDescription');
   }
 
   /// Returns 'true' if 'fieldPath' was traversed when creating this context.

@@ -466,8 +466,6 @@ class TestUtil {
     try {
       await runnable.call();
     } catch (error) {
-      print(error.stackTrace);
-
       exceptionThrown = true;
       String contextMessage = 'Expected exception message was incorrect';
       if (context != null) {
@@ -478,7 +476,7 @@ class TestUtil {
     if (!exceptionThrown) {
       context = (context == null) ? '' : context;
       fail(
-          'Expected exception with message "$exceptionMessage" but no exception was thrown $context.');
+          'Expected exception with message \'$exceptionMessage\' but no exception was thrown $context.');
     }
   }
 }

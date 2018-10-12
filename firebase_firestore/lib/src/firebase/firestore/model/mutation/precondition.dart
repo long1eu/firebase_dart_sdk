@@ -9,7 +9,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Encodes a precondition for a mutation. This follows the model that
-/// the backend accepts with the special case of an explicit "empty"
+/// the backend accepts with the special case of an explicit 'empty'
 /// precondition (meaning no precondition).
 class Precondition {
   static const Precondition none = const Precondition._();
@@ -22,7 +22,7 @@ class Precondition {
 
   Precondition(this.updateTime, this.exists)
       : assert(updateTime == null || exists == null,
-            'Precondition can specify "exists" or "updateTime" but not both');
+            'Precondition can specify \'exists\' or \'updateTime\' but not both');
 
   const Precondition._()
       : updateTime = null,

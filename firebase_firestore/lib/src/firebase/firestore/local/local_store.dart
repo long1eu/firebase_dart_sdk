@@ -52,13 +52,13 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// * (Active mutations are those that are enqueued and have not been previously
 /// acknowledged or rejected).
 ///
-/// * The RemoteDocument ("ground truth") state is provided via the
+/// * The RemoteDocument ('ground truth') state is provided via the
 /// [applyChangeBatch] method. It will be some version of a server-provided
 /// document OR will be a server-provided document PLUS acknowledged mutations:
 ///
 /// * RemoteDocument = RemoteDocument + Acknowledged(LocalMutations)
 ///
-/// * Note that this "dirty" version of a RemoteDocument will not be identical
+/// * Note that this 'dirty' version of a RemoteDocument will not be identical
 /// to a server base version, since it has LocalMutations added to it pending
 /// getting an authoritative copy from the server.
 ///
@@ -118,7 +118,7 @@ class LocalStore {
 
   /// A [heldBatchResult] is a mutation batch result (from a write
   /// acknowledgement) that arrived before the watch stream got notified of a
-  /// snapshot that includes the write. So we "hold" it until the watch stream
+  /// snapshot that includes the write. So we 'hold' it until the watch stream
   /// catches up. It ensures that the local write remains visible (latency
   /// compensation) and doesn't temporarily appear reverted because the watch
   /// stream is slower than the write stream and so wasn't reflecting it.
@@ -338,7 +338,7 @@ class LocalStore {
     return _queryCache.lastRemoteSnapshotVersion;
   }
 
-  /// Updates the "ground-state" (remote) documents. We assume that the remote
+  /// Updates the 'ground-state' (remote) documents. We assume that the remote
   /// event reflects any write batches that have been acknowledged or rejected
   /// (i.e. we do not re-apply local mutations to updates from this event).
   ///
@@ -620,7 +620,7 @@ class LocalStore {
 
   bool _isRemoteUpToVersion(SnapshotVersion snapshotVersion) {
     // If there are no watch targets, then we won't get remote snapshots, and are always
-    // "up-to-date."
+    // 'up-to-date.'
     return snapshotVersion.compareTo(_queryCache.lastRemoteSnapshotVersion) <=
             0 ||
         _targetIds.isEmpty;

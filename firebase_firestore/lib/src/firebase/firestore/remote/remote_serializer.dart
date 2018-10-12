@@ -453,7 +453,7 @@ class RemoteSerializer {
       }
       final bool exists = precondition.exists;
       Assert.hardAssert(exists != null && exists,
-          'Transforms only support precondition "exists == true"');
+          'Transforms only support precondition \'exists == true\'');
       return TransformMutation(
           decodeKey(mutation.transform.document), fieldTransforms);
     } else {

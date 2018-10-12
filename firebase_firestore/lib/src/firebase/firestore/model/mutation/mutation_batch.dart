@@ -42,7 +42,7 @@ class MutationBatch {
       MaybeDocument maybeDoc, MutationBatchResult batchResult) {
     if (maybeDoc != null) {
       Assert.hardAssert(maybeDoc.key == documentKey,
-          "applyToRemoteDocument: key $documentKey doesn't match maybeDoc key ${maybeDoc.key}");
+          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
     }
 
     final int size = mutations.length;
@@ -66,7 +66,7 @@ class MutationBatch {
       DocumentKey documentKey, MaybeDocument maybeDoc) {
     if (maybeDoc != null) {
       Assert.hardAssert(maybeDoc.key == documentKey,
-          "applyToRemoteDocument: key $documentKey doesn't match maybeDoc key ${maybeDoc.key}");
+          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
     }
 
     final MaybeDocument baseDoc = maybeDoc;

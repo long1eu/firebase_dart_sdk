@@ -3,7 +3,6 @@
 // on 17/09/2018
 
 import 'package:firebase_firestore/src/firebase/firestore/model/base_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/operators.dart';
 
 /// A slash separated path for navigating resources (documents and collections) within Firestore.
 class ResourcePath extends BasePath<ResourcePath> {
@@ -28,7 +27,15 @@ class ResourcePath extends BasePath<ResourcePath> {
 
     // We may still have an empty segment at the beginning or end if they had a
     // leading or trailing slash (which we allow).
-    return ResourcePath._(path.split('/').where(isNotNull).toList());
+    final List<String> rawSegments = path.split('/');
+    final List<String> segments = <String>[];
+    for (String segment in rawSegments) {
+      if (segment.isNotEmpty) {
+        segments.add(segment);
+      }
+    }
+
+    return ResourcePath._(segments.toList(growable: false));
   }
 
   @override

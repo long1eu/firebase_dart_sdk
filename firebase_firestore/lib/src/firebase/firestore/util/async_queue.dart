@@ -10,7 +10,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
-/// Well-known "timer" IDs used when scheduling delayed tasks on the AsyncQueue.
+/// Well-known 'timer' IDs used when scheduling delayed tasks on the AsyncQueue.
 /// These IDs can then be used from tests to check for the presence of tasks or
 /// to run them early.
 class TimerId implements Comparable<TimerId> {
@@ -95,7 +95,7 @@ class AsyncQueue {
 
   Completer<void> _recentActiveCompleter;
 
-  /// Immediately stops running any scheduled tasks and causes a "panic"
+  /// Immediately stops running any scheduled tasks and causes a 'panic'
   /// (through crashing the app).
   ///
   /// * Should only be used for unrecoverable exceptions.
@@ -137,7 +137,7 @@ class AsyncQueue {
 
   /// Queue and run this Runnable task immediately after every other already
   /// queued task. Unlike [enqueue], returns void instead of a Future for
-  /// use when we have no need to "wait" on the task completing.
+  /// use when we have no need to 'wait' on the task completing.
   void enqueueAndForget<T>(Task<T> task, [String caller = '']) =>
       enqueue<T>(task, '$caller-enqueueAndForget');
 

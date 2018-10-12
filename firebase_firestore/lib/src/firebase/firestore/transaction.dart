@@ -115,6 +115,7 @@ class Transaction {
   /// Returns a Future that will be resolved with the contents of the [Document]
   /// at this [DocumentReference].
   Future<DocumentSnapshot> get(DocumentReference documentRef) async {
+    _firestore.validateReference(documentRef);
     final List<MaybeDocument> result =
         await _transaction.lookup(<DocumentKey>[documentRef.key]);
 

@@ -40,7 +40,7 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   B popFirst([int count = 1]) {
     final int length = this.length;
     Assert.hardAssert(length >= count,
-        "Can't call popFirst with count > length() ($count > $length)");
+        'Can\'t call popFirst with count > length() ($count > $length)');
     return createPathWithSegments(segments.sublist(count, length));
   }
 

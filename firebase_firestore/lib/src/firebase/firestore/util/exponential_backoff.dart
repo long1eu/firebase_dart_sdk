@@ -22,8 +22,8 @@ class ExponentialBackoff {
   /// Creates and returns a helper for running delayed tasks following an
   /// exponential backoff curve between attempts.
   ///
-  /// * Each delay is made up of a "base" delay which follows the exponential
-  /// backoff curve, and a +/- 50% "jitter" that is calculated and added to the
+  /// * Each delay is made up of a 'base' delay which follows the exponential
+  /// backoff curve, and a +/- 50% 'jitter' that is calculated and added to the
   /// base delay. This prevents clients from accidentally synchronizing their
   /// delays causing spikes of load to the backend.
   ///

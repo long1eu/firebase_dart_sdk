@@ -35,6 +35,10 @@ class DoubleValue extends NumberValue {
         return false;
       }
 
+      if (_value.isNaN && other._value.isNaN) {
+        return true;
+      }
+
       return _value == other._value;
     } else {
       return false;

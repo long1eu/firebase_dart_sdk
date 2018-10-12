@@ -79,7 +79,7 @@ class FieldPath extends BasePath<FieldPath> {
     if (lastElem.isEmpty) {
       throw ArgumentError(
           'Invalid field path ($path). Paths must not be empty, begin with '
-          '\'.\', end with \'.\', or contain \'..\'"');
+          '\'.\', end with \'.\', or contain \'..\'');
     }
     res.add(lastElem);
     return FieldPath._(res);

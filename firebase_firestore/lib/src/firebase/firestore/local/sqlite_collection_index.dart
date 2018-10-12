@@ -11,7 +11,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart'
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 
-/// A persisted "collection index" of all documents in the local cache (with
+/// A persisted 'collection index' of all documents in the local cache (with
 /// mutations overlaid on top of remote documents).
 ///
 /// * NOTE: There is no in-memory implementation at this time.

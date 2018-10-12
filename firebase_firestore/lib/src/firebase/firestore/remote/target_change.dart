@@ -21,7 +21,7 @@ class TargetChange {
   /// from which the server should resume sending results.
   final Uint8List resumeToken;
 
-  /// Returns the "current" (synced) status of this target. Note that "current"
+  /// Returns the 'current' (synced) status of this target. Note that 'current'
   /// has special meaning in the RPC protocol that implies that a target is both
   /// up-to-date and consistent with the rest of the watch stream.
   final bool current;

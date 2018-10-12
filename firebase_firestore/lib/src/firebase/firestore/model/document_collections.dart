@@ -16,7 +16,7 @@ class DocumentCollections {
         DocumentKey.comparator);
   }
 
-  /// Returns an empty, immutable "maybe" document map */
+  /// Returns an empty, immutable 'maybe' document map */
   static ImmutableSortedMap<DocumentKey, MaybeDocument>
       emptyMaybeDocumentMap() {
     return ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(

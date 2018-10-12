@@ -306,7 +306,7 @@ class WatchChangeAggregator {
   }
 
   /// Increment the number of acks needed from watch before we can consider the
-  /// server to be "in-sync" with the client's active targets.
+  /// server to be 'in-sync' with the client's active targets.
   void recordPendingTargetRequest(int targetId) {
     // For each request we get we need to record we need a response for it.
     final TargetState targetState = _ensureTargetState(targetId);

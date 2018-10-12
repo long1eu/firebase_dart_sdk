@@ -69,7 +69,7 @@ class RelationFilter extends Filter {
       operator != FilterOperator.arrayContains;
 
   // TODO: Technically, this won't be unique if two values have the same
-  // description, such as the int 3 and the string "3". So we should add the
+  // description, such as the int 3 and the string '3'. So we should add the
   // types in here somehow, too.
   @override
   String get canonicalId => '${field.canonicalString} $operator $value';

@@ -56,9 +56,9 @@ class Query {
       final String inequalityString = inequality.canonicalString;
       throw ArgumentError(
           'Invalid query. You have an inequality where filter (whereLessThan(), '
-          'whereGreaterThan(), etc.) on field "$inequalityString" and so you must also have "$inequalityString" as '
+          'whereGreaterThan(), etc.) on field \'$inequalityString\' and so you must also have \'$inequalityString\' as '
           'your first orderBy() field, but your first orderBy() is currently on field '
-          '"${orderBy.canonicalString}" instead.');
+          '\'${orderBy.canonicalString}\' instead.');
     }
   }
 
@@ -72,7 +72,7 @@ class Query {
         if (existingInequality != null && existingInequality != newInequality) {
           throw ArgumentError(
             'All where filters other than whereEqualTo() must be on the same field. '
-                'But you have filters on "${existingInequality.canonicalString}" and "${newInequality.canonicalString}"',
+                'But you have filters on \'${existingInequality.canonicalString}\' and \'${newInequality.canonicalString}\'',
           );
         }
         final core.FieldPath firstOrderByField = query.getFirstOrderByField();
@@ -266,7 +266,7 @@ class Query {
           // TODO: Allow slashes once ancestor queries are supported
           throw ArgumentError(
               'Invalid query. When querying with FieldPath.documentId() you must provide a valid '
-              'document ID, but "$documentKey" contains a "/" character.');
+              'document ID, but \'$documentKey\' contains a \'/\' character.');
         } else if (documentKey.isEmpty) {
           throw ArgumentError(
               'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.');
@@ -478,7 +478,7 @@ class Query {
         snapshot, 'Provided snapshot must not be null.');
     if (!snapshot.exists) {
       throw ArgumentError(
-          "Can't use a DocumentSnapshot for a document that doesn't exist for $methodName().");
+          'Can\'t use a DocumentSnapshot for a document that doesn\'t exist for $methodName().');
     }
     final Document document = snapshot.document;
     final List<FieldValue> components = <FieldValue>[];
@@ -501,7 +501,7 @@ class Query {
         } else {
           throw ArgumentError(
               'Invalid query. You are trying to start or end a query using a document for which '
-              'the field "${orderBy.field}" (used as the orderBy) does not exist.');
+              'the field \'${orderBy.field}\' (used as the orderBy) does not exist.');
         }
       }
     }
@@ -529,7 +529,7 @@ class Query {
         final String documentId = rawValue;
         if (documentId.contains('/')) {
           throw ArgumentError(
-              'Invalid query. Document ID "$documentId" contains a slash in $methodName()."');
+              'Invalid query. Document ID \'$documentId\' contains a slash in $methodName().');
         }
         final DocumentKey key =
             DocumentKey.fromPath(query.path.appendSegment(documentId));

@@ -14,7 +14,7 @@ abstract class IncomingStreamObserver<RespT> {
   /// A message was received on the stream.
   Future<void> onNext(RespT response);
 
-  /// The stream is "ready" (What the hell does that mean?!).
+  /// The stream is 'ready' (What the hell does that mean?!).
   void onReady();
 
   /// The stream has closed. Status.isOk() is false if there an error occurred.
