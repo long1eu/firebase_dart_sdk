@@ -17,13 +17,6 @@ import 'package:test/test.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-const map = TestUtil.map;
-const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
-const testFirestore = IntegrationTestUtil.testFirestore;
-const writeAllDocs = IntegrationTestUtil.writeAllDocs;
-const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;
-
 void main() {
   FirebaseFirestore firestore;
 
@@ -37,7 +30,6 @@ void main() {
     await IntegrationTestUtil.tearDown();
   });
 
-  // todo
   test('canPageThroughItems', () async {
     final CollectionReference testCollection = await testCollectionWithDocs(
         firestore,
@@ -80,7 +72,7 @@ void main() {
     lastDoc = snapshot.documents[0];
     snapshot = await testCollection.limit(3).startAfterDocument(lastDoc).get();
     expect(querySnapshotToValues(snapshot), <Map<String, String>>[]);
-  }, skip: 'todo');
+  });
 
   test('canBeCreatedFromDocuments', () async {
     final CollectionReference testCollection = await testCollectionWithDocs(
@@ -99,6 +91,7 @@ void main() {
     final DocumentSnapshot snapshot = await testCollection.document('c').get();
 
     expect(snapshot.exists, isTrue);
+
     QuerySnapshot querySnapshot = await query.startAtDocument(snapshot).get();
 
     expect(querySnapshotToValues(querySnapshot), <Map<String, dynamic>>[
@@ -112,7 +105,7 @@ void main() {
       map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
       map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
     ]);
-  }, skip: 'todo');
+  });
 
   test('canBeCreatedFromValues', () async {
     final CollectionReference testCollection = await testCollectionWithDocs(
@@ -157,14 +150,15 @@ void main() {
       map<String>(<String>['k', 'e'])
     ]);
 
-    final CollectionReference writer = (await testFirestore())
+    final CollectionReference writer = (await testFirestore(newTestSettings(),
+            'integration/cursor_canBeCreatedUsingDocumentId.db'))
         .collection('parent-collection')
         .document()
         .collection('sub-collection');
-    writeAllDocs(writer, testDocs);
+    await writeAllDocs(writer, testDocs);
 
-    final CollectionReference reader =
-        (await testFirestore()).collection(writer.path);
+    final CollectionReference reader = firestore.collection(writer.path);
+
     final QuerySnapshot snapshot = await reader
         .orderByField(FieldPath.documentId())
         .startAt(<String>['b']).endBefore(<String>['d']).get();
@@ -176,23 +170,22 @@ void main() {
   });
 
   test('canBeUsedWithReferenceValues', () async {
-    final FirebaseFirestore db = await testFirestore();
     final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
       'a',
       map<dynamic>(
-          <dynamic>['k', '1a', 'ref', db.collection('1').document('a')]),
+          <dynamic>['k', '1a', 'ref', firestore.collection('1').document('a')]),
       'b',
       map<dynamic>(
-          <dynamic>['k', '1b', 'ref', db.collection('1').document('b')]),
+          <dynamic>['k', '1b', 'ref', firestore.collection('1').document('b')]),
       'c',
       map<dynamic>(
-          <dynamic>['k', '2a', 'ref', db.collection('2').document('a')]),
+          <dynamic>['k', '2a', 'ref', firestore.collection('2').document('a')]),
       'd',
       map<dynamic>(
-          <dynamic>['k', '2b', 'ref', db.collection('2').document('b')]),
+          <dynamic>['k', '2b', 'ref', firestore.collection('2').document('b')]),
       'e',
       map<dynamic>(
-          <dynamic>['k', '3a', 'ref', db.collection('3').document('a')])
+          <dynamic>['k', '3a', 'ref', firestore.collection('3').document('a')])
     ]);
 
     final CollectionReference testCollection =
@@ -201,8 +194,9 @@ void main() {
     final QuerySnapshot snapshot = await testCollection
         .orderBy('ref')
         .startAfter(<DocumentReference>[
-      db.collection('1').document('a')
-    ]).endAt(<DocumentReference>[db.collection('2').document('b')]).get();
+      firestore.collection('1').document('a')
+    ]).endAt(
+            <DocumentReference>[firestore.collection('2').document('b')]).get();
 
     final List<String> results = <String>[];
     for (DocumentSnapshot doc in snapshot) {
@@ -244,8 +238,8 @@ void main() {
   });
 
   Timestamp timestamp(int seconds, int micros) {
-    // Firestore only supports microsecond resolution, so use a microsecond as a minimum value for
-    // nanoseconds.
+    // Firestore only supports microsecond resolution, so use a microsecond as a
+    // minimum value for nanoseconds.
     return Timestamp(seconds, micros * 1000);
   }
 
@@ -306,13 +300,29 @@ void main() {
     QuerySnapshot snapshot =
         await testCollection.whereEqualTo('timestamp', nanos).get();
     expect(querySnapshotToValues(snapshot), hasLength(1));
-    // Because Timestamp should have been truncated to microseconds, the microsecond timestamp
-    // should be considered equal to the nanosecond one.
+    // Because Timestamp should have been truncated to microseconds, the
+    // microsecond timestamp should be considered equal to the nanosecond one.
     snapshot = await testCollection.whereEqualTo('timestamp', micros).get();
     expect(querySnapshotToValues(snapshot), hasLength(1));
-    // The truncation is just to the microseconds, however, so the millisecond timestamp should be
-    // treated as different and thus the query should return no results.
+    // The truncation is just to the microseconds, however, so the millisecond
+    // timestamp should be treated as different and thus the query should return
+    // no results.
     snapshot = await testCollection.whereEqualTo('timestamp', millis).get();
     expect(querySnapshotToValues(snapshot), isEmpty);
   });
 }
+
+// ignore: always_specify_types
+const map = TestUtil.map;
+// ignore: always_specify_types
+const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
+// ignore: always_specify_types
+const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
+// ignore: always_specify_types
+const testFirestore = IntegrationTestUtil.testFirestore;
+// ignore: always_specify_types
+const newTestSettings = IntegrationTestUtil.newTestSettings;
+// ignore: always_specify_types
+const writeAllDocs = IntegrationTestUtil.writeAllDocs;
+// ignore: always_specify_types
+const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;

@@ -257,7 +257,6 @@ abstract class AbstractStream<
   /// * Only streams that are in state [StreamState.Open] can be marked idle, as
   /// all other states imply pending network operations.
   void markIdle() {
-    print('markIdle called $isOpen $_idleTimer');
     // Starts the idle timer if we are in state [StreamState.Open] and are not
     // yet already running a timer (in which case the previous idle timeout
     // still applies).

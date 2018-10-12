@@ -143,7 +143,7 @@ class SyncEngine implements RemoteStoreCallback {
     return queryData.targetId;
   }
 
-  /// Stops listening to a query previously listened to via listen. */
+  /// Stops listening to a query previously listened to via listen.
   Future<void> stopListening(Query query) async {
     _assertCallback('stopListening');
 

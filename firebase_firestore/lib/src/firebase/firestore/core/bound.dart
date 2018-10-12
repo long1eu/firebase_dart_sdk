@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -80,10 +81,11 @@ class Bound {
       other is Bound &&
           runtimeType == other.runtimeType &&
           before == other.before &&
-          position == other.position;
+          const ListEquality<FieldValue>().equals(position, other.position);
 
   @override
-  int get hashCode => before.hashCode ^ position.hashCode;
+  int get hashCode =>
+      before.hashCode ^ const ListEquality<FieldValue>().hash(position);
 
   @override
   String toString() {

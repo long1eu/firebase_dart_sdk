@@ -560,7 +560,7 @@ class LocalStore {
     await _persistence.runTransaction('Release query', () async {
       QueryData queryData = await _queryCache.getQueryData(query);
       Assert.hardAssert(
-          queryData != null, 'Tried to release nonexistent query: %$query');
+          queryData != null, 'Tried to release nonexistent query: $query');
 
       final int targetId = queryData.targetId;
       final QueryData cachedQueryData = _targetIds[targetId];

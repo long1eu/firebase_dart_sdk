@@ -326,17 +326,18 @@ class Query {
   }
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Query &&
-          runtimeType == other.runtimeType &&
-          const ListEquality<Filter>().equals(filters, other.filters) &&
-          path == other.path &&
-          _limit == other._limit &&
-          _startAt == other._startAt &&
-          _endAt == other._endAt &&
-          const ListEquality<OrderBy>()
-              .equals(getOrderBy(), other.getOrderBy());
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is Query &&
+            runtimeType == other.runtimeType &&
+            _limit == other._limit &&
+            const ListEquality<OrderBy>()
+                .equals(getOrderBy(), other.getOrderBy()) &&
+            const ListEquality<Filter>().equals(filters, other.filters) &&
+            path == other.path &&
+            _startAt == other._startAt &&
+            _endAt == other._endAt;
+  }
 
   @override
   int get hashCode =>
