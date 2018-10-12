@@ -31,9 +31,7 @@ void main() {
         expect(completedSteps, containsAllInOrder(expectedSteps));
       }
 
-      print('step $n started');
       await Future<void>.delayed(const Duration(seconds: 1));
-      print('step $n done');
       completedSteps.add(n);
       return n;
     };

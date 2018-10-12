@@ -13,6 +13,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precond
 import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
 import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 /// A write batch, used to perform multiple writes as a single atomic unit.
 ///
@@ -55,6 +56,26 @@ class WriteBatch {
         : _firestore.dataConverter.parseSetData(data);
     _mutations
         .addAll(parsed.toMutationList(documentRef.key, Precondition.none));
+    return this;
+  }
+
+  // todo update this docs
+  /// Updates fields in the document referred to by the provided
+  /// [DocumentReference]. If no document exists yet, the update will fail.
+  ///
+  /// [documentRef] The [DocumentReference] to update.
+  /// [data] a map of field / value pairs to update. Fields can contain dots to
+  /// reference nested fields within the document.
+  /// Returns this [WriteBatch] instance. Used for chaining method calls.
+  @publicApi
+  WriteBatch updateFromList(DocumentReference documentRef, List<Object> data) {
+    final ParsedUpdateData parsedData = _firestore.dataConverter
+        .parseUpdateDataFromList(Util.collectUpdateArguments(1, data));
+
+    _firestore.validateReference(documentRef);
+    _verifyNotCommitted();
+    _mutations.addAll(parsedData.toMutationList(
+        documentRef.key, Precondition.fromExists(true)));
     return this;
   }
 

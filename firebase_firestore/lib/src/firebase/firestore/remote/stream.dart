@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
 
 /// A Stream is an interface that represents a streaming RPC to the Firestore
@@ -107,14 +108,16 @@ enum StreamState {
   Backoff,
 }
 
+typedef OnClose = Future<void> Function(GrpcError error);
+
 /// A (super-interface) for the stream callbacks. Implementations of Stream
 /// should provide their own interface that extends this interface.
 class StreamCallback {
   /// The stream is now open and is accepting messages
-  final Future<void> Function() onOpen;
+  final Task<void> onOpen;
 
   /// The stream has closed. If there was an error, the status will be != OK.
-  final Future<void> Function(GrpcError) onClose;
+  final OnClose onClose;
 
   const StreamCallback({this.onOpen, this.onClose});
 }

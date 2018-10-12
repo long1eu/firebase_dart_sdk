@@ -3,6 +3,7 @@
 // on 17/09/2018
 
 import 'package:collection/collection.dart';
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_operation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/array_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
@@ -52,6 +53,11 @@ abstract class ArrayTransformOperation implements TransformOperation {
 
   @override
   int get hashCode => const DeepCollectionEquality().hash(elements);
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)..add('elements', elements)).toString();
+  }
 }
 
 /// An array union transform operation.
@@ -79,8 +85,7 @@ class ArrayTransformOperationRemove extends ArrayTransformOperation {
   ArrayValue apply(FieldValue previousValue) {
     final List<FieldValue> result =
         ArrayTransformOperation.coercedFieldValuesArray(previousValue);
-
-    elements.forEach(result.remove);
+    result.removeWhere((FieldValue it) => elements.contains(it));
     return ArrayValue.fromList(result);
   }
 }

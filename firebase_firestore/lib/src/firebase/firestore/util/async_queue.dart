@@ -47,7 +47,9 @@ class TimerId implements Comparable<TimerId> {
   bool operator <=(TimerId other) => _i <= other._i;
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is TimerId && runtimeType == other.runtimeType && _i == other._i;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TimerId && runtimeType == other.runtimeType && _i == other._i;
 
   @override
   int get hashCode => _i.hashCode;
@@ -104,7 +106,8 @@ class AsyncQueue {
       // might be due to excessive queries in Firestore.
       throw const OutOfMemoryError();
     } else {
-      throw StateError('Internal error in Firestore (${Version.sdkVersion}). $t');
+      throw StateError(
+          'Internal error in Firestore (${Version.sdkVersion}). $t');
     }
   }
 
@@ -113,8 +116,8 @@ class AsyncQueue {
   ///
   /// The task will be append to the queue and run after every task added before
   /// has been executed.
-  Future<T> enqueue<T>(Task<T> function, String caller) async {
-    //print('----QUEUE => strt $caller');
+  Future<T> enqueue<T>(Task<T> function, [String caller]) async {
+    print('----QUEUE => strt $caller');
     final _TaskQueueEntry<T> taskEntry = _TaskQueueEntry<T>(function);
 
     final bool listWasEmpty = _tasks.isEmpty;
@@ -122,31 +125,40 @@ class AsyncQueue {
 
     // Only run the just added task in case the queue hasn't been used yet or
     // the last task has been executed
-    if (_recentActiveCompleter == null || _recentActiveCompleter.isCompleted && listWasEmpty) {
+    if (_recentActiveCompleter == null ||
+        _recentActiveCompleter.isCompleted && listWasEmpty) {
       _runNext();
     }
 
     final T result = await taskEntry.completer.future;
-    //print('----QUEUE => done $caller');
+    print('----QUEUE => done $caller');
     return result;
   }
 
   /// Queue and run this Runnable task immediately after every other already
   /// queued task. Unlike [enqueue], returns void instead of a Future for
   /// use when we have no need to "wait" on the task completing.
-  void enqueueAndForget<T>(Task<T> task, [String caller = '']) => enqueue<T>(task, '$caller-enqueueAndForget');
+  void enqueueAndForget<T>(Task<T> task, [String caller = '']) =>
+      enqueue<T>(task, '$caller-enqueueAndForget');
 
   /// Schedule a task after the specified delay.
   ///
   /// * The returned [DelayedTask] can be used to cancel the task prior to its
   /// running.
-  DelayedTask<T> enqueueAfterDelay<T>(TimerId timerId, Duration delay, Task<T> task, [String caller]) {
-    print('enqueueAfterDelay called with: timerId:[$timerId], delay:[$delay], task:[$task], caller:[$caller]');
+  DelayedTask<T> enqueueAfterDelay<T>(
+      TimerId timerId, Duration delay, Task<T> task,
+      [String caller]) {
+    // todo since this is a singleton decide if we should keep it this way and
+    // removed the assert below or remove the singleton implementation and
+    // uncomment this. Having this as a singleton is not necessary a very good
+    // idea in case of multiple Firestore instances.
+    //
     // While not necessarily harmful, we currently don't expect to have multiple
     // tasks with the same timer id in the queue, so defensively reject them.
-    Assert.hardAssert(!containsDelayedTask(timerId), 'Attempted to schedule multiple operations with timer id $timerId.');
+    // Assert.hardAssert(!containsDelayedTask(timerId), 'Attempted to schedule multiple operations with timer id $timerId.');
 
-    final DelayedTask<T> delayedTask = _createAndScheduleDelayedTask(timerId, delay, task, caller);
+    final DelayedTask<T> delayedTask =
+        _createAndScheduleDelayedTask(timerId, delay, task, caller);
     _delayedTasks.add(delayedTask);
 
     return delayedTask;
@@ -169,7 +181,9 @@ class AsyncQueue {
   /// task exists. Pass TimerId.ALL to run all delayed tasks.
   @visibleForTesting
   Future<void> runDelayedTasksUntil(TimerId lastTimerId) async {
-    Assert.hardAssert(lastTimerId == TimerId.all || containsDelayedTask(lastTimerId), 'Attempted to run tasks until missing TimerId: $lastTimerId');
+    Assert.hardAssert(
+        lastTimerId == TimerId.all || containsDelayedTask(lastTimerId),
+        'Attempted to run tasks until missing TimerId: $lastTimerId');
 
     // NOTE: For performance we could store the tasks sorted, but
     // [runDelayedTasksUntil] is only called from tests, and the size is
@@ -189,7 +203,8 @@ class AsyncQueue {
       }
     }
 
-    await Future.wait<dynamic>(result.map((DelayedTask<dynamic> it) => enqueue<dynamic>(it.task, it.caller)));
+    await Future.wait<dynamic>(result.map(
+        (DelayedTask<dynamic> it) => enqueue<dynamic>(it.task, it.caller)));
   }
 
   /// Runs the next available [Task] in the queue.
@@ -221,7 +236,8 @@ class AsyncQueue {
 
   /// Creates and returns a DelayedTask that has been scheduled to be executed
   /// on the provided queue after the provided delay.
-  DelayedTask<T> _createAndScheduleDelayedTask<T>(TimerId timerId, Duration delay, Task<T> task, String caller) {
+  DelayedTask<T> _createAndScheduleDelayedTask<T>(
+      TimerId timerId, Duration delay, Task<T> task, String caller) {
     return DelayedTask<T>._(
       caller,
       timerId,
@@ -265,7 +281,8 @@ class DelayedTask<T> implements Comparable<DelayedTask<T>> {
         assert(targetTimeMs != null),
         assert(task != null),
         assert(removeDelayedTask != null) {
-    scheduledFuture = Timer(targetTimeMs.difference(DateTime.now()), _handleDelayElapsed);
+    scheduledFuture =
+        Timer(targetTimeMs.difference(DateTime.now()), _handleDelayElapsed);
   }
 
   /// Cancels the task if it hasn't already been executed or canceled.
@@ -291,7 +308,8 @@ class DelayedTask<T> implements Comparable<DelayedTask<T>> {
   /// Marks this delayed task as done, notifying the AsyncQueue that it should
   /// be removed.
   void _markDone() {
-    Assert.hardAssert(scheduledFuture != null, 'Caller should have verified scheduledFuture is non-null.');
+    Assert.hardAssert(scheduledFuture != null,
+        'Caller should have verified scheduledFuture is non-null.');
     scheduledFuture.cancel();
     scheduledFuture = null;
     removeDelayedTask(this);

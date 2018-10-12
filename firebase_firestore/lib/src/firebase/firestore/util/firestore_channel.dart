@@ -21,11 +21,8 @@ class FirestoreChannel {
 
   static const String _resourcePrefixHeader = 'google-cloud-resource-prefix';
 
-  // TODO: The gRPC version is determined using a package manifest, which is
-  // not available to us at build time or runtime (it's empty when building in
-  // google3). So for now we omit the version of grpc.
   static const String _xGoogApiClientValue =
-      'gl-dart/ fire/${Version.sdkVersion} grpc/';
+      'gl-dart/ fire/${Version.sdkVersion} grpc/${Version.grpcVersion}';
 
   /// The async worker queue that is used to dispatch events.
   final AsyncQueue asyncQueue;
@@ -56,6 +53,7 @@ class FirestoreChannel {
       }
     ]);
 
+    GrpcMetadata;
     return FirestoreChannel._(
       asyncQueue,
       credentialsProvider,
@@ -100,36 +98,42 @@ class FirestoreChannel {
 
   /// Creates and starts a streaming response RPC.
   Future<List<RespT>> runStreamingResponseRpc<ReqT, RespT>(
-      ClientMethod<ReqT, RespT> method, ReqT request) {
+      ClientMethod<ReqT, RespT> method, ReqT request) async {
     final Completer<List<RespT>> completer = Completer<List<RespT>>();
     final StreamController<ReqT> controller = StreamController<ReqT>();
     final ClientCall<ReqT, RespT> call =
         _channel.createCall(method, controller.stream, _callOptions);
 
+    bool hadError = false;
     final List<RespT> results = <RespT>[];
-
     call.response.listen(
       (RespT message) {
         results.add(message);
       },
       onDone: () {
-        completer.complete(results);
+        assert((hadError && completer.isCompleted) ||
+            !hadError && !completer.isCompleted);
+        if (!completer.isCompleted) {
+          completer.complete(results);
+        }
         controller.close();
       },
-      onError: (GrpcError status) {
+      onError: (dynamic status) {
+        hadError = true;
         controller.close();
-        completer.completeError(Util.exceptionFromStatus(status));
+        completer.completeError(Util.exceptionFromStatus(status as GrpcError));
       },
     );
 
     controller.add(request);
+    await controller.close();
 
     return completer.future;
   }
 
   /// Creates and starts a single response RPC.
   Future<RespT> runRpc<ReqT, RespT>(
-      ClientMethod<ReqT, RespT> method, ReqT request) {
+      ClientMethod<ReqT, RespT> method, ReqT request) async {
     final Completer<RespT> completer = Completer<RespT>();
     final StreamController<ReqT> controller = StreamController<ReqT>();
     final ClientCall<ReqT, RespT> call =
@@ -138,7 +142,7 @@ class FirestoreChannel {
     call.response.listen(
       (RespT message) {
         completer.complete(message);
-        call.cancel();
+        controller.close();
       },
       onDone: () {
         if (!completer.isCompleted) {
@@ -146,16 +150,15 @@ class FirestoreChannel {
               'Received onClose with status OK, but no message.',
               FirebaseFirestoreErrorCode.internal));
         }
-        controller.close();
       },
-      onError: (GrpcError status) {
+      onError: (dynamic status) {
         controller.close();
-        completer.completeError(Util.exceptionFromStatus(status));
+        completer.completeError(Util.exceptionFromStatus(status as GrpcError));
       },
     );
 
     controller.add(request);
-    return completer.future.then((_) => call.cancel());
+    return completer.future;
   }
 
   void invalidateToken() => _credentialsProvider.invalidateToken();

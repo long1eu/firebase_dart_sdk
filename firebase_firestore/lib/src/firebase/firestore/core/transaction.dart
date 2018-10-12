@@ -22,7 +22,7 @@ class Transaction {
   final Map<DocumentKey, SnapshotVersion> readVersions =
       <DocumentKey, SnapshotVersion>{};
   final List<Mutation> mutations = <Mutation>[];
-  bool committed;
+  bool committed = false;
 
   Transaction(this.datastore);
 
@@ -139,27 +139,4 @@ class Transaction {
 
     return datastore.commit(mutations);
   }
-/*
-  //p
-  static final Executor defaultExecutor = createDefaultExecutor();
-
-  //p
-  static Executor createDefaultExecutor() {
-    // Create a thread pool with a reasonable size.
-    int corePoolSize = 5;
-    // maxPoolSize only gets used when queue is full, and queue size is MAX_INT, so this is a no-op.
-    int maxPoolSize = corePoolSize;
-    int keepAliveSeconds = 1;
-    LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
-    ThreadPoolExecutor executor =
-    new ThreadPoolExecutor(
-        corePoolSize, maxPoolSize, keepAliveSeconds, TimeUnit.SECONDS, queue);
-    executor.allowCoreThreadTimeOut(true);
-    return executor;
-  }
-
-  static Executor getDefaultExecutor() {
-    return defaultExecutor;
-  }
-  */
 }

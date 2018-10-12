@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 26/09/2018
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -375,7 +376,7 @@ class TestUtil {
 
   /// Creates a [TransformMutation] by parsing any [FieldValue] sentinels in the
   /// provided data. The data is expected to use dotted-notation for nested
-  /// fields (i.e. { "foo.bar": FieldValue.foo() } and must not contain any
+  /// fields (i.e. { 'foo.bar': FieldValue.foo() } and must not contain any
   /// non-sentinel data.
   static TransformMutation transformMutation(
       String path, Map<String, Object> data) {
@@ -453,5 +454,31 @@ class TestUtil {
       result.add(entry.value);
     }
     return result;
+  }
+
+  /// Expects runnable to throw an exception with a specific error message. An
+  /// optional context (e.g. 'for bad_data') can be provided which will be
+  /// displayed in any resulting failure message.
+  static Future<void> expectError(
+      FutureOr Function() runnable, String exceptionMessage,
+      [String context]) async {
+    bool exceptionThrown = false;
+    try {
+      await runnable.call();
+    } catch (error) {
+      print(error.stackTrace);
+
+      exceptionThrown = true;
+      String contextMessage = 'Expected exception message was incorrect';
+      if (context != null) {
+        contextMessage += ' ($context)';
+      }
+      expect(error.message, exceptionMessage, reason: contextMessage);
+    }
+    if (!exceptionThrown) {
+      context = (context == null) ? '' : context;
+      fail(
+          'Expected exception with message "$exceptionMessage" but no exception was thrown $context.');
+    }
   }
 }

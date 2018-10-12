@@ -27,8 +27,9 @@ class FirebaseFirestoreSettings {
     this.host = _defaultHost,
     this.sslEnabled = true,
     this.persistenceEnabled = true,
-  }) : assert(!(!sslEnabled && host == _defaultHost),
-            'You can\'t set the "sslEnabled" setting unless you also set a non-default "host".');
+  })  : assert(host != null, 'Provided host must not be null.'),
+        assert(!(!sslEnabled && host == _defaultHost),
+            'You can\'t set the \'sslEnabled\' setting unless you also set a non-default \'host\'.');
 
   FirebaseFirestoreSettings copyWith({
     String host,

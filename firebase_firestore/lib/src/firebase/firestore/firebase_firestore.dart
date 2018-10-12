@@ -64,13 +64,16 @@ class FirebaseFirestore {
 
   @publicApi
   static Future<FirebaseFirestore> getInstance(FirebaseApp app,
-      [String database = DatabaseId.defaultDatabaseId,
-      OpenDatabase openDatabase]) async {
+      {String database = DatabaseId.defaultDatabaseId,
+      OpenDatabase openDatabase}) async {
     Assert.checkNotNull(app, 'Provided FirebaseApp must not be null.');
+    Assert.checkNotNull(
+        openDatabase, 'Provided openDatabase must not be null.');
 
     final FirestoreMultiDbComponent component =
         FirestoreMultiDbComponent(app, app.getAuthProvider());
     Assert.checkNotNull(component, 'Firestore component is not present.');
+
     final FirebaseFirestore firestore =
         await component.get(database, openDatabase);
     return firestore;
@@ -160,7 +163,8 @@ class FirebaseFirestore {
     Assert.checkNotNull(
         collectionPath, 'Provided collection path must not be null.');
     _ensureClientConfigured();
-    return CollectionReference(ResourcePath.fromString(collectionPath), this);
+    final ResourcePath resourcePath = ResourcePath.fromString(collectionPath);
+    return CollectionReference(resourcePath, this);
   }
 
   /// Gets a [DocumentReference] instance that refers to the document at the

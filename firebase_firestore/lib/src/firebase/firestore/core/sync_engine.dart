@@ -204,17 +204,19 @@ class SyncEngine implements RemoteStoreCallback {
     Assert.hardAssert(
         retries >= 0, 'Got negative number of retries for transaction.');
     final Transaction transaction = _remoteStore.createTransaction();
+    final TResult result = await updateFunction(transaction);
+
     try {
-      final TResult result = await updateFunction(transaction);
       await transaction.commit();
       return result;
     } catch (e) {
       // TODO: Only retry on real transaction failures.
       if (retries == 0) {
-        final Error e = FirebaseFirestoreError(
+        final Error error = FirebaseFirestoreError(
             'Transaction failed all retries.',
-            FirebaseFirestoreErrorCode.aborted);
-        return Future<TResult>.error(e);
+            FirebaseFirestoreErrorCode.aborted,
+            e);
+        return Future<TResult>.error(error);
       }
       return this.transaction(asyncQueue, updateFunction, retries - 1);
     }

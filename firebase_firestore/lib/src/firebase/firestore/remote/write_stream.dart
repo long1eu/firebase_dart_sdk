@@ -18,6 +18,7 @@ import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.
 import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
+import 'package:protobuf/protobuf.dart';
 
 /// A Stream that implements the [StreamingWrite] RPC.
 ///
@@ -63,7 +64,7 @@ class WriteStream
             channel,
             ClientMethod<WriteRequest, WriteResponse>(
               'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Write',
-              (WriteRequest req) => req.writeToBuffer(),
+              (GeneratedMessage req) => req.writeToBuffer(),
               (List<int> res) => WriteResponse.fromBuffer(res),
             ),
             workerQueue,
@@ -150,16 +151,17 @@ class WriteStream
   }
 }
 
+typedef OnWriteResponse = Future<void> Function(
+    SnapshotVersion commitVersion, List<MutationResult> mutationResults);
+
 /// A callback interface for the set of events that can be emitted by the
 /// [WriteStream]
 class WriteStreamCallback extends StreamCallback {
   /// The handshake for this write stream has completed
-  final Future<void> Function() onHandshakeComplete;
+  final Task<void> onHandshakeComplete;
 
   /// Response for the last write.
-  final Future<void> Function(
-          SnapshotVersion commitVersion, List<MutationResult> mutationResults)
-      onWriteResponse;
+  final OnWriteResponse onWriteResponse;
 
   const WriteStreamCallback({
     @required Future<void> Function() onOpen,

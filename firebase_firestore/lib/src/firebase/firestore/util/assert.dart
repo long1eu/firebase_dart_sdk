@@ -22,7 +22,7 @@ class Assert {
 
   static T checkNotNull<T>(T reference, [Object errorMessage]) {
     if (reference == null) {
-      throw ArgumentError.notNull('$errorMessage');
+      throw ArgumentError('$errorMessage');
     }
     return reference;
   }

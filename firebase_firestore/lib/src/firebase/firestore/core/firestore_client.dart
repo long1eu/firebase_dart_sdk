@@ -169,9 +169,8 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Tries to execute the transaction in updateFunction up to retries times. */
   Future<TResult> transaction<TResult>(
       Future<TResult> Function(Transaction) updateFunction, int retries) {
-    return asyncQueue.enqueue(
-        () => syncEngine.transaction(asyncQueue, updateFunction, retries),
-        'FirestoreClient transaction');
+    //return asyncQueue.enqueue(() => syncEngine.transaction(asyncQueue, updateFunction, retries), 'FirestoreClient transaction');
+    return syncEngine.transaction(asyncQueue, updateFunction, retries);
   }
 
   Future<void> _initialize(

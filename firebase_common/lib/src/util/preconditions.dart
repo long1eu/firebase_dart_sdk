@@ -11,7 +11,7 @@ class Preconditions {
 
   static T checkNotNull<T>(T object) {
     if (object == null) {
-      throw ArgumentError.notNull('${T.toString()}');
+      throw ArgumentError('${T.toString()}');
     } else {
       return object;
     }

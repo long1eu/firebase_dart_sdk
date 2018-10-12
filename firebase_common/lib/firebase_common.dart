@@ -10,6 +10,7 @@ export 'src/errors/firebase_error.dart';
 export 'src/errors/firebase_network_error.dart';
 export 'src/errors/firebase_too_many_requests_error.dart';
 export 'src/firebase_app.dart';
+export 'src/firebase_options.dart';
 export 'src/internal/api/firebase_no_signed_in_user_error.dart';
 export 'src/internal/internal_token_provider.dart';
 export 'src/internal/internal_token_result.dart';

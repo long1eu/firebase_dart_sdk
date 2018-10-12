@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_operation.dart';
 
@@ -22,4 +23,12 @@ class FieldTransform {
 
   @override
   int get hashCode => fieldPath.hashCode ^ operation.hashCode;
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('fieldPath', fieldPath)
+          ..add('operation', operation))
+        .toString();
+  }
 }

@@ -4,6 +4,7 @@
 
 import 'dart:collection';
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/field_path.dart'
@@ -146,14 +147,12 @@ class UserDataConverter {
     Assert.hardAssert(fieldsAndValues.length.remainder(2) == 0,
         'Expected fieldAndValues to contain an even number of elements');
 
-    final Iterator<Object> iterator = fieldsAndValues.iterator;
-
-    while (iterator.moveNext()) {
-      final Object fieldPath = iterator.current;
-      final Object fieldValue = iterator.current;
+    for (int i = 0; i < fieldsAndValues.length; i += 2) {
+      final Object fieldPath = fieldsAndValues[i];
+      final Object fieldValue = fieldsAndValues[i + 1];
 
       Assert.hardAssert(fieldPath is String || fieldPath is firestore.FieldPath,
-          'Expected argument to be String or FieldPath.');
+          'Expected argument to be String or FieldPath, but it was ${fieldPath.runtimeType}.');
 
       FieldPath parsedField;
 
@@ -416,6 +415,15 @@ class ParsedUpdateData {
       mutations.add(TransformMutation(key, fieldTransforms));
     }
     return mutations;
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('data', _data)
+          ..add('fieldMask', _fieldMask)
+          ..add('fieldTransforms', fieldTransforms))
+        .toString();
   }
 }
 

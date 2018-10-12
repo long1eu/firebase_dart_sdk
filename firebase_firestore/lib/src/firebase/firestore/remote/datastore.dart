@@ -21,6 +21,7 @@ import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.
 import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
+import 'package:protobuf/protobuf.dart';
 
 /// Datastore represents a proxy for the remote server, hiding details of the
 /// RPC layer. It:
@@ -100,24 +101,22 @@ class Datastore {
       final CommitResponse response = await channel.runRpc(
         ClientMethod<CommitRequest, CommitResponse>(
           'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Commit',
-          (CommitRequest req) => req.writeToBuffer(),
+          (GeneratedMessage req) => req.writeToBuffer(),
           (List<int> req) => CommitResponse.fromBuffer(req),
         ),
         builder.freeze(),
       );
 
-      return workerQueue.enqueue(() async {
-        final SnapshotVersion commitVersion =
-            serializer.decodeVersion(response.commitTime);
+      final SnapshotVersion commitVersion =
+          serializer.decodeVersion(response.commitTime);
 
-        final int count = response.writeResults.length;
-        final List<MutationResult> results = List<MutationResult>(count);
-        for (int i = 0; i < count; i++) {
-          final WriteResult result = response.writeResults[i];
-          results[i] = serializer.decodeMutationResult(result, commitVersion);
-        }
-        return results;
-      }, 'Datastore commit');
+      final int count = response.writeResults.length;
+      final List<MutationResult> results = List<MutationResult>(count);
+      for (int i = 0; i < count; i++) {
+        final WriteResult result = response.writeResults[i];
+        results[i] = serializer.decodeMutationResult(result, commitVersion);
+      }
+      return results;
     } catch (e) {
       if (e is FirebaseFirestoreError &&
           e.code == FirebaseFirestoreErrorCode.unauthenticated) {
@@ -138,9 +137,10 @@ class Datastore {
     try {
       final List<BatchGetDocumentsResponse> responses =
           await channel.runStreamingResponseRpc(
-              ClientMethod<BatchGetDocumentsRequest, BatchGetDocumentsResponse>(
+              ClientMethod<BatchGetDocumentsResponse,
+                  BatchGetDocumentsResponse>(
                 'firestore.googleapis.com/google.firestore.v1beta1.Firestore/BatchGetDocuments',
-                (BatchGetDocumentsRequest req) => req.writeToBuffer(),
+                (GeneratedMessage req) => req.writeToBuffer(),
                 (List<int> res) => BatchGetDocumentsResponse.fromBuffer(res),
               ),
               builder.freeze());
@@ -161,7 +161,7 @@ class Datastore {
           e.code == FirebaseFirestoreErrorCode.unauthenticated) {
         channel.invalidateToken();
       }
-      return <MaybeDocument>[];
+      rethrow;
     }
   }
 

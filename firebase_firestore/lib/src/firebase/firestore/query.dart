@@ -32,7 +32,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 /// An enum for the direction of a sort.
-// TODO: Remove this annotation once our proguard issues are sorted out.
 enum Direction { ASCENDING, DESCENDING }
 
 /// A Query which you can read or listen to. You can also construct refined Query objects by adding
@@ -47,7 +46,7 @@ class Query {
 
   final FirebaseFirestore firestore;
 
-  Query(this.query, this.firestore)
+  const Query(this.query, this.firestore)
       : assert(query != null),
         assert(firestore != null);
 
@@ -111,7 +110,7 @@ class Query {
   /// [value] The value for comparison
   /// Returns the created [Query].
   @publicApi
-  Query wherePathEqualTo(FieldPath fieldPath, Object value) {
+  Query whereEqualToField(FieldPath fieldPath, Object value) {
     return _whereHelper(fieldPath, FilterOperator.equal, value);
   }
 
@@ -136,7 +135,7 @@ class Query {
   /// [value] The value for comparison
   /// Returns the created [Query].
   @publicApi
-  Query wherePathLessThan(FieldPath fieldPath, Object value) {
+  Query whereLessThanField(FieldPath fieldPath, Object value) {
     return _whereHelper(fieldPath, FilterOperator.lessThan, value);
   }
 
@@ -161,7 +160,7 @@ class Query {
   /// [value] The value for comparison
   /// Returns the created [Query].
   @publicApi
-  Query wherePathLessThanOrEqualTo(FieldPath fieldPath, Object value) {
+  Query whereLessThanOrEqualToField(FieldPath fieldPath, Object value) {
     return _whereHelper(fieldPath, FilterOperator.lessThanOrEqual, value);
   }
 
@@ -186,7 +185,7 @@ class Query {
   /// [value] The value for comparison
   /// Returns the created [Query].
   @publicApi
-  Query wherePathGreaterThan(FieldPath fieldPath, Object value) {
+  Query whereGreaterThanField(FieldPath fieldPath, Object value) {
     return _whereHelper(fieldPath, FilterOperator.graterThan, value);
   }
 
@@ -211,7 +210,7 @@ class Query {
   /// [value] The value for comparison
   /// Returns the created [Query].
   @publicApi
-  Query wherePathGreaterThanOrEqualTo(FieldPath fieldPath, Object value) {
+  Query whereGreaterThanOrEqualToField(FieldPath fieldPath, Object value) {
     return _whereHelper(fieldPath, FilterOperator.graterThanOrEqual, value);
   }
 
@@ -239,7 +238,7 @@ class Query {
   /// [value] The value that must be contained in the array
   /// Returns the created [Query].
   @publicApi
-  Query wherePathArrayContains(FieldPath fieldPath, Object value) {
+  Query whereArrayContainsField(FieldPath fieldPath, Object value) {
     return _whereHelper(fieldPath, FilterOperator.arrayContains, value);
   }
 
@@ -307,7 +306,7 @@ class Query {
   /// Returns the created Query.
   @publicApi
   Query orderBy(String field, [Direction direction = Direction.ASCENDING]) {
-    return orderByPath(FieldPath.fromDotSeparatedPath(field), direction);
+    return orderByField(FieldPath.fromDotSeparatedPath(field), direction);
   }
 
   /// Creates and returns a new [Query] that's additionally sorted by the
@@ -317,7 +316,7 @@ class Query {
   /// [direction] the direction to sort.
   /// Returns the created Query.
   @publicApi
-  Query orderByPath(FieldPath fieldPath,
+  Query orderByField(FieldPath fieldPath,
       [Direction direction = Direction.ASCENDING]) {
     Assert.checkNotNull(fieldPath, 'Provided field path must not be null.');
     return _orderBy(fieldPath.internalPath, direction);

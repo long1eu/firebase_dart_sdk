@@ -131,7 +131,9 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
 
   B createPathWithSegments(List<String> segments);
 
-  int get length => segments.length;
+  int get length {
+    return segments.length;
+  }
 
   @override
   bool operator ==(Object other) =>

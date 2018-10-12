@@ -5,11 +5,16 @@ import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
+import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
+import 'package:firebase_firestore/src/firebase/firestore/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
+import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
 import 'package:test/test.dart';
 
+import '../../../util/await_helper.dart';
+import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
@@ -21,6 +26,7 @@ const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
 const testFirestore = IntegrationTestUtil.testFirestore;
 const writeAllDocs = IntegrationTestUtil.writeAllDocs;
 const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;
+const testCollection = IntegrationTestUtil.testCollection;
 
 void main() {
   FirebaseFirestore firestore;
@@ -126,317 +132,358 @@ void main() {
     expect(result.get('nan'), isNaN);
   });
 
-/*
-  
   test('testFilterOnInfinity', () async {
-    CollectionReference collection =
-        testCollectionWithDocs(
-            map(
-                'a', map<dynamic>(<dynamic>['inf', Double.POSITIVE_INFINITY]),
-                'b', map<dynamic>(<dynamic>['inf', Double.NEGATIVE_INFINITY])));
-    QuerySnapshot results = waitFor(collection.whereEqualTo('inf', Double.POSITIVE_INFINITY).get());
-    assertEquals(1, results.length);
-    assertEquals(asList(map<dynamic>(<dynamic>['inf', Double.POSITIVE_INFINITY])), querySnapshotToValues(results));
+    final CollectionReference collection = await testCollectionWithDocs(
+        firestore,
+        map<Map<String, dynamic>>(<dynamic>[
+          'a',
+          map<dynamic>(<dynamic>['inf', double.infinity]),
+          'b',
+          map<dynamic>(<dynamic>['inf', double.infinity])
+        ]));
+
+    final QuerySnapshot results = await collection.whereEqualTo('inf', double.infinity).get();
+    expect(results.length, 1);
+    expect(querySnapshotToValues(results), map<dynamic>(<dynamic>['inf', double.infinity]));
   });
 
-  
   test('testWillNotGetMetadataOnlyUpdates', () async {
-    CollectionReference collection = testCollection();
-    waitFor(collection.document('a').set(map<dynamic>(<dynamic>['v', 'a'])));
-    waitFor(collection.document('b').set(map<dynamic>(<dynamic>['v', 'b'])));
+    final CollectionReference collection = testCollection(firestore);
+    await collection.document('a').set(map<dynamic>(<dynamic>['v', 'a']));
+    await collection.document('b').set(map<dynamic>(<dynamic>['v', 'b']));
 
-    List<QuerySnapshot> snapshots = new ArrayList();
+    final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
 
-    Semaphore testCounter = new Semaphore(0);
-    ListenerRegistration listener =
-        collection.addSnapshotListener(
-            (snapshot, error) {
-              assertNull(error);
-              snapshots.add(snapshot);
-              testCounter.release();
-             );
+    Completer<void> completer = Completer<void>();
+    final StreamSubscription<QuerySnapshot> listener = collection.snapshots.listen((QuerySnapshot snapshot) {
+      snapshots.add(snapshot);
+      completer.complete();
+    }, onError: (dynamic e) {
+      assert(false, 'This should never be reached.');
+    });
 
-    waitFor(testCounter);
-    assertEquals(1, snapshots.length);
-    assertEquals(asList(map(<String>['v', 'a']), map(<String>['v', 'b'])), querySnapshotToValues(snapshots.get(0)));
-    waitFor(collection.document('a').set(map(<String>['v', 'a1'])));
+    await completer.future;
+    completer = Completer<void>();
 
-    waitFor(testCounter);
-    assertEquals(2, snapshots.length);
-    assertEquals(asList(map(<String>['v', 'a1']), map(<String>['v', 'b'])), querySnapshotToValues(snapshots.get(1)));
+    expect(snapshots.length, 1);
+    expect(querySnapshotToValues(snapshots[0]), <Map<String, String>>[
+      map<String>(<String>['v', 'a']),
+      map<String>(<String>['v', 'b'])
+    ]);
+    await collection.document('a').set(map<String>(<String>['v', 'a1']));
 
-    listener.remove();
-  }
+    await completer.future;
 
+    expect(snapshots.length, 2);
+    expect(querySnapshotToValues(snapshots[1]), <Map<String, String>>[
+      map<String>(<String>['v', 'a1']),
+      map<String>(<String>['v', 'b'])
+    ]);
+
+    await listener.cancel();
   });
+
   test('testCanListenForTheSameQueryWithDifferentOptions', () async {
-    CollectionReference collection = testCollection();
-    waitFor(collection.document('a').set(map(<String>['v', 'a'])));
-    waitFor(collection.document('b').set(map(<String>['v', 'b'])));
+    final CollectionReference collection = testCollection(firestore);
+    await collection.document('a').set(map<String>(<String>['v', 'a']));
+    await collection.document('b').set(map<String>(<String>['v', 'b']));
 
-    List<QuerySnapshot> snapshots = new ArrayList();
-    List<QuerySnapshot> snapshotsFull = new ArrayList();
+    final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
+    final List<QuerySnapshot> snapshotsFull = <QuerySnapshot>[];
 
-    Semaphore testCounter = new Semaphore(0);
-    Semaphore testCounterFull = new Semaphore(0);
-    ListenerRegistration listener =
-        collection.addSnapshotListener(
-            (snapshot, error) {
-              assertNull(error);
-              snapshots.add(snapshot);
-              testCounter.release();
-             /*dd*/);
+    final AwaitHelper<dynamic> testCounter = AwaitHelper<dynamic>(4);
+    final AwaitHelper<dynamic> testCounterFull = AwaitHelper<dynamic>(5);
 
-    ListenerRegistration listenerFull =
-        collection.addSnapshotListener(
-            MetadataChanges.INCLUDE,
-            (snapshot, error) {
-              assertNull(error);
-              snapshotsFull.add(snapshot);
-              testCounterFull.release();
-            });
+    final StreamSubscription<QuerySnapshot> listener = collection.snapshots.listen(
+      (QuerySnapshot snapshot) {
+        snapshots.add(snapshot);
+        testCounter.completeNext();
+      },
+      onError: (dynamic error) {
+        assert(false, 'This should never be reached.');
+      },
+    );
 
-    waitFor(testCounter);
-    waitFor(testCounterFull, 2);
-    assertEquals(1, snapshots.length);
-    assertEquals(asList(map(<String>['v', 'a']), map(<String>['v', 'b'])), querySnapshotToValues(snapshots.get(0)));
-    assertEquals(2, snapshotsFull.length);
-    assertEquals(asList(map(<String>['v', 'a']), map(<String>['v', 'b'])), querySnapshotToValues(snapshotsFull.get(0)));
-    assertEquals(asList(map(<String>['v', 'a']), map(<String>['v', 'b'])), querySnapshotToValues(snapshotsFull.get(1)));
-    assertTrue(snapshotsFull.get(0).getMetadata().isFromCache());
-    assertFalse(snapshotsFull.get(1).getMetadata().isFromCache());
+    final StreamSubscription<QuerySnapshot> listenerFull = collection.getSnapshots(MetadataChanges.include).listen(
+      (QuerySnapshot snapshot) {
+        snapshotsFull.add(snapshot);
+        testCounterFull.completeNext();
+      },
+      onError: (dynamic error) {
+        assert(false, 'This should never be reached.');
+      },
+    );
 
-    waitFor(collection.document('a').set(map(<String>['v', 'a1'])));
+    await testCounter.next;
+    await testCounterFull.following(2);
 
-    // Expect two events for the write, once from latency compensation and once from the
-    // acknowledgement from the server.
-    waitFor(testCounterFull, 2);
-    // Only one event without options
-    waitFor(testCounter);
+    expect(snapshots.length, 1);
+    expect(querySnapshotToValues(snapshots[0]), <Map<String, dynamic>>[
+      map<String>(<String>['v', 'a']),
+      map<String>(<String>['v', 'b'])
+    ]);
+    expect(snapshotsFull.length, 2);
+    expect(querySnapshotToValues(snapshotsFull[0]), <Map<String, dynamic>>[
+      map<String>(<String>['v', 'a']),
+      map<String>(<String>['v', 'b'])
+    ]);
+    expect(querySnapshotToValues(snapshotsFull[1]), <Map<String, dynamic>>[
+      map<String>(<String>['v', 'a']),
+      map<String>(<String>['v', 'b'])
+    ]);
+    expect(snapshotsFull[0].metadata.isFromCache, isTrue);
+    expect(snapshotsFull[1].metadata.isFromCache, isFalse);
 
-    assertEquals(4, snapshotsFull.length);
-    assertEquals(
-        asList(map(<String>['v', 'a1']), map(<String>['v', 'b'])), querySnapshotToValues(snapshotsFull.get(2)));
-    assertEquals(
-        asList(map(<String>['v', 'a1']), map(<String>['v', 'b'])), querySnapshotToValues(snapshotsFull.get(3)));
-    assertTrue(snapshotsFull.get(2).getMetadata().hasPendingWrites());
-    assertFalse(snapshotsFull.get(3).getMetadata().hasPendingWrites());
-
-    assertEquals(2, snapshots.length);
-    assertEquals(asList(map(<String>['v', 'a1']), map(<String>['v', 'b'])), querySnapshotToValues(snapshots.get(1)));
-
-    waitFor(collection.document('b').set(map(<String>['v', 'b1'])));
+    await collection.document('a').set(map<String>(<String>['v', 'a1']));
 
     // Expect two events for the write, once from latency compensation and once from the
     // acknowledgement from the server.
-    waitFor(testCounterFull, 2);
+    await testCounterFull.following(2);
     // Only one event without options
-    waitFor(testCounter);
+    await testCounter.next;
 
-    assertEquals(6, snapshotsFull.length);
-    assertEquals(
-        asList(map(<String>['v', 'a1']), map(<String>['v', 'b1'])), querySnapshotToValues(snapshotsFull.get(4)));
-    assertEquals(
-        asList(map(<String>['v', 'a1']), map(<String>['v', 'b1'])), querySnapshotToValues(snapshotsFull.get(5)));
-    assertTrue(snapshotsFull.get(4).getMetadata().hasPendingWrites());
-    assertFalse(snapshotsFull.get(5).getMetadata().hasPendingWrites());
+    expect(snapshotsFull.length, 4);
+    expect(querySnapshotToValues(snapshotsFull[2]), <Map<String, dynamic>>[
+      map<String>(<String>['v', 'a1']),
+      map<String>(<String>['v', 'b'])
+    ]);
+    expect(querySnapshotToValues(snapshotsFull[3]), <Map<String, dynamic>>[
+      map<String>(<String>['v', 'a1']),
+      map<String>(<String>['v', 'b'])
+    ]);
+    expect(snapshotsFull[2].metadata.isFromCache, isTrue);
+    expect(snapshotsFull[3].metadata.hasPendingWrites, isFalse);
 
-    assertEquals(3, snapshots.length);
-    assertEquals(asList(map(<String>['v', 'a1']), map(<String>['v', 'b1'])), querySnapshotToValues(snapshots.get(2)));
+    expect(snapshots.length, 2);
+    expect(querySnapshotToValues(snapshots[1]), <Map<String, dynamic>>[
+      map<String>(<String>['v', 'a1']),
+      map<String>(<String>['v', 'b'])
+    ]);
 
-    listener.remove();
-    listenerFull.remove();
-  }
+    await collection.document('b').set(map<String>(<String>['v', 'b1']));
 
+    // Expect two events for the write, once from latency compensation and once from the
+    // acknowledgement from the server.
+    await testCounterFull.next;
+    // Only one event without options
+    await testCounter.following(2);
+
+    expect(snapshotsFull.length, 6);
+    expect(querySnapshotToValues(snapshotsFull[4]), <Map<String, dynamic>>[
+      map<String>(<String>['v', 'a1']),
+      map<String>(<String>['v', 'b1'])
+    ]);
+    expect(querySnapshotToValues(snapshotsFull[5]), <Map<String, dynamic>>[
+      map<String>(<String>['v', 'a1']),
+      map<String>(<String>['v', 'b1'])
+    ]);
+    expect(snapshotsFull[4].metadata.hasPendingWrites, isTrue);
+    expect(snapshotsFull[5].metadata.hasPendingWrites, isFalse);
+
+    expect(snapshots.length, 3);
+    expect(querySnapshotToValues(snapshots[2]), <Map<String, dynamic>>[
+      map<String>(<String>['v', 'a1']),
+      map<String>(<String>['v', 'b1'])
+    ]);
+
+    listener.cancel();
+    listenerFull.cancel();
   });
+
   test('testCanListenForQueryMetadataChanges', () async {
-    Map<String, Map<String, Object>> testDocs =
-        map(
-            '1', map(<String>['sort', 1.0, 'filter', true, 'key', '1']),
-            '2', map(<String>['sort', 2.0, 'filter', true, 'key', '2']),
-            '3', map(<String>['sort', 2.0, 'filter', true, 'key', '3']),
-            '4', map(<String>['sort', 3.0, 'filter', false, 'key', '4']));
-    CollectionReference collection = testCollectionWithDocs(testDocs);
-    List<QuerySnapshot> snapshots = new ArrayList();
+    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+      '1',
+      map<dynamic>(<dynamic>['sort', 1.0, 'filter', true, 'key', '1']),
+      '2',
+      map<dynamic>(<dynamic>['sort', 2.0, 'filter', true, 'key', '2']),
+      '3',
+      map<dynamic>(<dynamic>['sort', 2.0, 'filter', true, 'key', '3']),
+      '4',
+      map<dynamic>(<dynamic>['sort', 3.0, 'filter', false, 'key', '4'])
+    ]);
+    final CollectionReference collection = await testCollectionWithDocs(firestore, testDocs);
+    final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
 
-    Semaphore testCounter = new Semaphore(0);
-    Query query1 = collection.whereLessThan('key', '4');
-    ListenerRegistration listener1 =
-        query1.addSnapshotListener(
-            (snapshot, error) {
-              assertNull(error);
-              snapshots.add(snapshot);
-              testCounter.release();
-             /*dd*/);
+    final AwaitHelper<dynamic> testCounter = AwaitHelper<dynamic>(3);
+    final Query query1 = collection.whereLessThan('key', '4');
+    final StreamSubscription<QuerySnapshot> listener1 = query1.snapshots.listen((QuerySnapshot snapshot) {
+      snapshots.add(snapshot);
+      testCounter.completeNext();
+    }, onError: (dynamic error) {
+      assert(false, 'This should never be reached.');
+    });
 
-    waitFor(testCounter);
-    assertEquals(1, snapshots.length);
-    assertEquals(
-        asList(testDocs.get('1'), testDocs.get('2'), testDocs.get('3')),
-        querySnapshotToValues(snapshots.get(0)));
+    await testCounter.next;
+    expect(snapshots.length, 1);
+    expect(querySnapshotToValues(snapshots[0]), <Map<String, dynamic>>[testDocs['1'], testDocs['2'], testDocs['3']]);
 
-    Query query2 = collection.whereEqualTo('filter', true);
-    ListenerRegistration listener2 =
-        query2.addSnapshotListener(
-            MetadataChanges.INCLUDE,
-            (snapshot, error) {
-              assertNull(error);
-              snapshots.add(snapshot);
-              testCounter.release();
-            });
+    final Query query2 = collection.whereEqualTo('filter', true);
+    final StreamSubscription<QuerySnapshot> listener2 = query2.getSnapshots(MetadataChanges.include).listen((QuerySnapshot snapshot) {
+      snapshots.add(snapshot);
+      testCounter.completeNext();
+    }, onError: (dynamic error) {
+      assert(false, 'This should never be reached.');
+    });
 
-    waitFor(testCounter, 2);
-    assertEquals(3, snapshots.length);
-    assertEquals(
-        asList(testDocs.get('1'), testDocs.get('2'), testDocs.get('3')),
-        querySnapshotToValues(snapshots.get(1)));
-    assertEquals(
-        asList(testDocs.get('1'), testDocs.get('2'), testDocs.get('3')),
-        querySnapshotToValues(snapshots.get(2)));
-    assertTrue(snapshots.get(1).getMetadata().isFromCache());
-    assertFalse(snapshots.get(2).getMetadata().isFromCache());
+    await testCounter.following(2);
+    expect(snapshots.length, 3);
+    expect(querySnapshotToValues(snapshots[1]), <Map<String, dynamic>>[testDocs['1'], testDocs['2'], testDocs['3']]);
+    expect(querySnapshotToValues(snapshots[2]), <Map<String, dynamic>>[testDocs['1'], testDocs['2'], testDocs['3']]);
+    expect(snapshots[1].metadata.isFromCache, isTrue);
+    expect(snapshots[2].metadata.isFromCache, isFalse);
 
-    listener1.remove();
-    listener2.remove();
-  }
-
+    listener1.cancel();
+    listener2.cancel();
   });
+
   test('testCanExplicitlySortByDocumentId', () async {
-    Map<String, Map<String, Object>> testDocs =
-        map(
-            'a', map(<String>['key', 'a']),
-            'b', map(<String>['key', 'b']),
-            'c', map(<String>['key', 'c']));
-    CollectionReference collection = testCollectionWithDocs(testDocs);
+    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+      'a',
+      map<String>(<String>['key', 'a']),
+      'b',
+      map<String>(<String>['key', 'b']),
+      'c',
+      map<String>(<String>['key', 'c'])
+    ]);
+
+    final CollectionReference collection = await testCollectionWithDocs(firestore, testDocs);
     // Ideally this would be descending to validate it's different than
     // the default, but that requires an extra index
-    QuerySnapshot docs = waitFor(collection.orderBy(FieldPath.documentId()).get());
-    assertEquals(
-        asList(testDocs.get('a'), testDocs.get('b'), testDocs.get('c')),
-        querySnapshotToValues(docs));
+    final QuerySnapshot docs = await collection.orderByField(FieldPath.documentId()).get();
+
+    expect(querySnapshotToValues(docs), <Map<String, dynamic>>[testDocs['a'], testDocs['b'], testDocs['c']]);
   });
 
-  
   test('testCanQueryByDocumentId', () async {
-    Map<String, Map<String, Object>> testDocs =
-        map(
-            'aa', map(<String>['key', 'aa']),
-            'ab', map(<String>['key', 'ab']),
-            'ba', map(<String>['key', 'ba']),
-            'bb', map(<String>['key', 'bb']));
-    CollectionReference collection = testCollectionWithDocs(testDocs);
-    QuerySnapshot docs = waitFor(collection.whereEqualTo(FieldPath.documentId(), 'ab').get());
-    assertEquals(singletonList(testDocs.get('ab')), querySnapshotToValues(docs));
+    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+      'aa',
+      map<String>(<String>['key', 'aa']),
+      'ab',
+      map<String>(<String>['key', 'ab']),
+      'ba',
+      map<String>(<String>['key', 'ba']),
+      'bb',
+      map<String>(<String>['key', 'bb'])
+    ]);
 
-    docs =
-        waitFor(
-            collection
-                .whereGreaterThan(FieldPath.documentId(), 'aa')
-                .whereLessThanOrEqualTo(FieldPath.documentId(), 'ba')
-                .get());
-    assertEquals(asList(testDocs.get('ab'), testDocs.get('ba')), querySnapshotToValues(docs));
+    final CollectionReference collection = await testCollectionWithDocs(firestore, testDocs);
+    QuerySnapshot docs = await collection.whereEqualToField(FieldPath.documentId(), 'ab').get();
+    expect(querySnapshotToValues(docs), <Map<String, dynamic>>[testDocs['ab']]);
+
+    docs = await collection.whereGreaterThanField(FieldPath.documentId(), 'aa').whereLessThanOrEqualToField(FieldPath.documentId(), 'ba').get();
+    expect(querySnapshotToValues(docs), <Map<String, dynamic>>[testDocs['ab'], testDocs['ba']]);
   });
 
-  
   test('testCanQueryByDocumentIdUsingRefs', () async {
-    Map<String, Map<String, Object>> testDocs =
-        map(
-            'aa', map(<String>['key', 'aa']),
-            'ab', map(<String>['key', 'ab']),
-            'ba', map(<String>['key', 'ba']),
-            'bb', map(<String>['key', 'bb']));
-    CollectionReference collection = testCollectionWithDocs(testDocs);
-    QuerySnapshot docs =
-        waitFor(collection.whereEqualTo(FieldPath.documentId(), collection.document('ab')).get());
-    assertEquals(singletonList(testDocs.get('ab')), querySnapshotToValues(docs));
+    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+      'aa',
+      map<String>(<String>['key', 'aa']),
+      'ab',
+      map<String>(<String>['key', 'ab']),
+      'ba',
+      map<String>(<String>['key', 'ba']),
+      'bb',
+      map<String>(<String>['key', 'bb'])
+    ]);
+    final CollectionReference collection = await testCollectionWithDocs(firestore, testDocs);
+    QuerySnapshot docs = await collection.whereEqualToField(FieldPath.documentId(), collection.document('ab')).get();
+    expect(querySnapshotToValues(docs), <Map<String, dynamic>>[testDocs['ab']]);
 
-    docs =
-        waitFor(
-            collection
-                .whereGreaterThan(FieldPath.documentId(), collection.document('aa'))
-                .whereLessThanOrEqualTo(FieldPath.documentId(), collection.document('ba'))
-                .get());
-    assertEquals(asList(testDocs.get('ab'), testDocs.get('ba')), querySnapshotToValues(docs));
+    docs = await collection.whereGreaterThanField(FieldPath.documentId(), collection.document('aa')).whereLessThanOrEqualToField(FieldPath.documentId(), collection.document('ba')).get();
+    expect(querySnapshotToValues(docs), <Map<String, dynamic>>[testDocs['ab'], testDocs['ba']]);
   });
 
-  
   test('testCanQueryWithAndWithoutDocumentKey', () async {
-    CollectionReference collection = testCollection();
+    final CollectionReference collection = testCollection(firestore);
     collection.add(map());
-    Task<QuerySnapshot> query1 =
-        collection.orderBy(FieldPath.documentId(), Direction.ASCENDING).get();
-    Task<QuerySnapshot> query2 = collection.get();
+    final Future<QuerySnapshot> query1 = collection.orderByField(FieldPath.documentId(), Direction.ASCENDING).get();
+    final Future<QuerySnapshot> query2 = collection.get();
 
-    waitFor(query1);
-    waitFor(query2);
+    final QuerySnapshot result1 = await query1;
+    final QuerySnapshot result2 = await query2;
 
-    assertEquals(
-        querySnapshotToValues(query1.getResult()), querySnapshotToValues(query2.getResult()));
+    expect(querySnapshotToValues(result2), querySnapshotToValues(result1));
   });
 
-  
   test('watchSurvivesNetworkDisconnect', () async {
-    CollectionReference collectionReference = testCollection();
-    FirebaseFirestore firestore = collectionReference.getFirestore();
+    final CollectionReference collectionReference = testCollection(firestore);
+    final AwaitHelper<void> receivedDocument = AwaitHelper<void>(1);
 
-    Semaphore receivedDocument = new Semaphore(0);
+    collectionReference.getSnapshots(MetadataChanges.include).listen((QuerySnapshot snapshot) {
+      if (snapshot.isNotEmpty && !snapshot.metadata.isFromCache) {
+        receivedDocument.completeNext();
+      }
+    });
 
-    collectionReference.addSnapshotListener(
-        MetadataChanges.INCLUDE,
-        (snapshot, error) {
-          if (!snapshot.isEmpty() && !snapshot.getMetadata().isFromCache()) {
-            receivedDocument.release();
-           /*dd*/
-        });
+    await firestore.disableNetwork();
+    await collectionReference.add(map(<dynamic>['foo', FieldValue.serverTimestamp()]));
+    await firestore.enableNetwork();
 
-    waitFor(firestore.disableNetwork());
-    collectionReference.add(map('foo', FieldValue.serverTimestamp()));
-    waitFor(firestore.enableNetwork());
-
-    waitFor(receivedDocument);
-  }
-
+    await receivedDocument.next;
   });
-  
+
   test('testQueriesFireFromCacheWhenOffline', () async {
-    Map<String, Map<String, Object>> testDocs = map('a', map('foo', 1));
-    CollectionReference collection = testCollectionWithDocs(testDocs);
-    EventAccumulator<QuerySnapshot> accum = new EventAccumulator();
-    ListenerRegistration listener =
-        collection.addSnapshotListener(MetadataChanges.INCLUDE, accum.listener());
+    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+      'a',
+      map<dynamic>(<dynamic>['foo', 1])
+    ]);
+    final CollectionReference collection = await testCollectionWithDocs(firestore, testDocs);
+    final EventAccumulator<QuerySnapshot> accum = EventAccumulator<QuerySnapshot>();
+
+    final StreamSubscription<QuerySnapshot> listener = collection.getSnapshots(MetadataChanges.include).listen(accum.onData, onError: accum.onError);
 
     // initial event
-    QuerySnapshot querySnapshot = accum.await();
-    assertEquals(singletonList(testDocs.get('a')), querySnapshotToValues(querySnapshot));
-    assertFalse(querySnapshot.getMetadata().isFromCache());
+    QuerySnapshot querySnapshot = await accum.wait();
+
+    expect(querySnapshotToValues(querySnapshot), <Map<String, dynamic>>[testDocs['a']]);
+    expect(querySnapshot.metadata.isFromCache, isFalse);
 
     // offline event with fromCache=true
-    waitFor(collection.firestore.getClient().disableNetwork());
-    querySnapshot = accum.await();
-    assertTrue(querySnapshot.getMetadata().isFromCache());
+    await collection.firestore.client.disableNetwork();
+    querySnapshot = await accum.wait();
+    expect(querySnapshot.metadata.isFromCache, isTrue);
 
     // back online event with fromCache=false
-    waitFor(collection.firestore.getClient().enableNetwork());
-    querySnapshot = accum.await();
-    assertFalse(querySnapshot.getMetadata().isFromCache());
+    await collection.firestore.client.enableNetwork();
+    querySnapshot = await accum.wait();
+    expect(querySnapshot.metadata.isFromCache, isFalse);
 
-    listener.remove();
+    listener.cancel();
   });
-  
+
   test('testQueriesCanUseArrayContainsFilters', () async {
-    Map<String, Object> docA = map('array', asList(42));
-    Map<String, Object> docB = map('array', asList('a', 42, 'c'));
-    Map<String, Object> docC = map('array', asList(41.999, '42', map('a', asList(42))));
-    Map<String, Object> docD = map('array', asList(42), 'array2', asList('bingo'));
-    CollectionReference collection =
-        testCollectionWithDocs(map('a', docA, 'b', docB, 'c', docC, 'd', docD));
+    final Map<String, Object> docA = map(<dynamic>[
+      'array',
+      <int>[42]
+    ]);
+    final Map<String, Object> docB = map(<dynamic>[
+      'array',
+      <dynamic>['a', 42, 'c']
+    ]);
+    final Map<String, Object> docC = map(<dynamic>[
+      'array',
+      <dynamic>[
+        41.999,
+        '42',
+        map<dynamic>(<dynamic>[
+          'a',
+          <int>[42]
+        ])
+      ]
+    ]);
+    final Map<String, Object> docD = map(<dynamic>[
+      'array',
+      <int>[42],
+      'array2',
+      <String>['bingo']
+    ]);
+    final CollectionReference collection = await testCollectionWithDocs(firestore, map<Map<String, dynamic>>(<dynamic>['a', docA, 'b', docB, 'c', docC, 'd', docD]));
 
     // Search for 'array' to contain 42
-    QuerySnapshot snapshot = waitFor(collection.whereArrayContains('array', 42).get());
-    assertEquals(asList(docA, docB, docD), querySnapshotToValues(snapshot));
+    final QuerySnapshot snapshot = await collection.whereArrayContains('array', 42).get();
+    expect(querySnapshotToValues(snapshot), <Map<String, dynamic>>[docA, docB, docD]);
 
     // NOTE: The backend doesn't currently support null, NaN, objects, or arrays, so there isn't
     // much of anything else interesting to test.
   });
-  */
 }

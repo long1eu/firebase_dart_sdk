@@ -119,6 +119,8 @@ class DocumentSnapshot {
         (document.getField(fieldPath.internalPath) != null);
   }
 
+  Object operator [](String field) => get(field);
+
   /// Returns the value at the field or null if the field doesn't exist.
   ///
   /// [field] the path to the field
@@ -127,7 +129,7 @@ class DocumentSnapshot {
   /// Returns the value at the given field or null.
   @publicApi
   Object get(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
-    return getPath(FieldPath.fromDotSeparatedPath(field),
+    return getField(FieldPath.fromDotSeparatedPath(field),
         serverTimestampBehavior ?? ServerTimestampBehavior.none);
   }
 
@@ -139,7 +141,7 @@ class DocumentSnapshot {
   /// that have not yet been set to their final value.
   /// Returns the value at the given field or null.
   @publicApi
-  Object getPath(FieldPath fieldPath,
+  Object getField(FieldPath fieldPath,
       [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     Assert.checkNotNull(fieldPath, 'Provided field path must not be null.');
@@ -155,7 +157,7 @@ class DocumentSnapshot {
   /// [field] the path to the field.
   /// Returns the value of the field
   @publicApi
-  bool getBool(String field) => _getTypedValue(field);
+  bool getBool(String field) => _getTypedValue<bool>(field);
 
   /// Returns the value of the field as a double.
   ///
@@ -205,8 +207,8 @@ class DocumentSnapshot {
   /// Throws [StateError] if the value is not a timestamp field.
   /// Returns the value of the field
   @publicApi
-  Timestamp getTimestamp(
-      String field, ServerTimestampBehavior serverTimestampBehavior) {
+  Timestamp getTimestamp(String field,
+      [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     Assert.checkNotNull(field, 'Provided field path must not be null.');
     Assert.checkNotNull(serverTimestampBehavior,
@@ -258,10 +260,14 @@ class DocumentSnapshot {
   T _castTypedValue<T>(Object value, String field) {
     if (value == null) {
       return null;
-    } else if (value is T) {
-      throw StateError('Field "$field" is not a $T');
     }
-    return value as T;
+
+    try {
+      return value as T;
+    } on CastError catch (_) {
+      throw StateError(
+          'Field "$field" is not a $T, but it is ${value.runtimeType}');
+    }
   }
 
   Object _convertValue(FieldValue value, FieldValueOptions options) {

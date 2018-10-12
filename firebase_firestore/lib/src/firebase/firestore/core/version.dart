@@ -4,7 +4,6 @@
 
 /// Holds static version string of the SDK.
 class Version {
-  // TODO: Replace this version with the general Firestore version once we stop
-  // doing out-of-band releases.
-  static const String sdkVersion = '0.6.6-dev';
+  static const String sdkVersion = '0.0.1-dev';
+  static const String grpcVersion = '0.6.5';
 }

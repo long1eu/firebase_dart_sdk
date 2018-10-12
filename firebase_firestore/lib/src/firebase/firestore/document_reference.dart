@@ -109,13 +109,28 @@ class DocumentReference {
         firestore.client.write(parsed.toMutationList(key, Precondition.none)));
   }
 
+  /// Updates fields in the document referred to by this DocumentReference. If
+  /// no document exists yet, the update will fail.
+  ///
+  /// [data] is a List of field/value pairs to be updated.
+  /// @param fieldPath The first field to update.
+  /// @param value The first value
+  /// @param moreFieldsAndValues Additional field/value pairs.
+  /// @return A Task that will be resolved when the write finishes.
+  @publicApi
+  Future<void> updateFromList(List<Object> data) async {
+    final ParsedUpdateData parsedData = firestore.dataConverter
+        .parseUpdateDataFromList(Util.collectUpdateArguments(1, data));
+    await Util.voidErrorTransformer(() => firestore.client
+        .write(parsedData.toMutationList(key, Precondition.fromExists(true))));
+  }
+
   /// Updates fields in the document referred to by this [DocumentReference]. If
   /// no document exists yet, the update will fail.
   ///
   /// [data] a map of field / value pairs to update. Fields can contain dots to reference nested
   /// fields within the document.
   /// Returns a Future that will be resolved when the write finishes.
-
   @publicApi
   Future<void> update(Map<String, Object> data) async {
     final ParsedUpdateData parsedData =

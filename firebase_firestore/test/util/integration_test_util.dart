@@ -33,8 +33,7 @@ class IntegrationTestUtil {
 
   /// Online status of all active Firestore clients.
   /*p*/
-  static final Map<FirebaseFirestore, bool> firestoreStatus =
-      <FirebaseFirestore, bool>{};
+  static final Map<FirebaseFirestore, bool> firestoreStatus = <FirebaseFirestore, bool>{};
 
   /*p*/
   static const int SEMAPHORE_WAIT_TIMEOUT_MS = 30000;
@@ -68,30 +67,18 @@ class IntegrationTestUtil {
   }
 
   static FirebaseFirestoreSettings newTestSettings() {
-    return newTestSettingsWithSnapshotTimestampsEnabled(true);
-  }
-
-  static FirebaseFirestoreSettings newTestSettingsWithSnapshotTimestampsEnabled(
-      bool enabled) {
-    return FirebaseFirestoreSettings(host: provider.firestoreHost);
+    return FirebaseFirestoreSettings();
   }
 
   /// Initializes a new Firestore instance that uses the default project,
   /// customized with the provided settings if provided.
-  static Future<FirebaseFirestore> testFirestore(
-      [FirebaseFirestoreSettings settings, String dbPath]) async {
+  static Future<FirebaseFirestore> testFirestore([FirebaseFirestoreSettings settings, String dbPath]) async {
     settings ??= newTestSettings();
-    final FirebaseFirestore firestore = await testFirestoreInstance(
-        provider.projectId,
-        LogLevel.d,
-        settings,
-        dbPath ?? currentDatabasePath);
+    final FirebaseFirestore firestore = await testFirestoreInstance(provider.projectId, LogLevel.d, settings, dbPath ?? currentDatabasePath);
 
     if (!sentFirstWrite) {
       sentFirstWrite = true;
-      await firestore
-          .document('test-collection/initial-write-doc')
-          .set(TestUtil.map(<dynamic>['foo', 1]));
+      await firestore.document('test-collection/initial-write-doc').set(TestUtil.map(<dynamic>['foo', 1]));
     }
     return firestore;
   }
@@ -99,8 +86,7 @@ class IntegrationTestUtil {
   /// Initializes a new Firestore instance that uses a non-existing default
   /// project.
   static Future<FirebaseFirestore> testAlternateFirestore() async {
-    return testFirestoreInstance(
-        BAD_PROJECT_ID, LogLevel.d, newTestSettings(), 'bad/projectId/path.db');
+    return testFirestoreInstance(BAD_PROJECT_ID, LogLevel.d, newTestSettings(), 'bad/projectId/path.db');
   }
 
   /*p*/
@@ -118,19 +104,14 @@ class IntegrationTestUtil {
   /// Initializes a new Firestore instance that can be used in testing. It is
   /// guaranteed to not share state with other instances returned from this
   /// call.
-  static Future<FirebaseFirestore> testFirestoreInstance(
-      String projectId,
-      LogLevel logLevel,
-      FirebaseFirestoreSettings settings,
-      String dbPath) async {
+  static Future<FirebaseFirestore> testFirestoreInstance(String projectId, LogLevel logLevel, FirebaseFirestoreSettings settings, String dbPath) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.setLogLevel(logLevel);
 
     // TODO: Remove this once this is ready to ship.
     Persistence.indexingSupportEnabled = true;
 
-    final DatabaseId databaseId =
-        DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
+    final DatabaseId databaseId = DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
     final String persistenceKey = 'db${firestoreStatus.length}';
 
     final String dbFullPath = '${Directory.current.path}/build/test/$dbPath';
@@ -143,20 +124,8 @@ class IntegrationTestUtil {
       persistenceKey,
       EmptyCredentialsProvider(),
       asyncQueue,
-      (String path,
-          {int version,
-          OnConfigure onConfigure,
-          OnCreate onCreate,
-          OnVersionChange onUpgrade,
-          OnVersionChange onDowngrade,
-          OnOpen onOpen}) async {
-        final DatabaseMock db = await DatabaseMock.create(dbPath,
-            version: version,
-            onConfigure: onConfigure,
-            onCreate: onCreate,
-            onUpgrade: onUpgrade,
-            onDowngrade: onDowngrade,
-            onOpen: onOpen);
+      (String path, {int version, OnConfigure onConfigure, OnCreate onCreate, OnVersionChange onUpgrade, OnVersionChange onDowngrade, OnOpen onOpen}) async {
+        final DatabaseMock db = await DatabaseMock.create(dbPath, version: version, onConfigure: onConfigure, onCreate: onCreate, onUpgrade: onUpgrade, onDowngrade: onDowngrade, onOpen: onOpen);
         db.renamePath = false;
         return db;
       },
@@ -178,22 +147,17 @@ class IntegrationTestUtil {
     return testCollection(firestore, 'test-collection').document();
   }
 
-  static Future<DocumentReference> testDocumentWithData(
-      FirebaseFirestore firestore, Map<String, Object> data) async {
+  static Future<DocumentReference> testDocumentWithData(FirebaseFirestore firestore, Map<String, Object> data) async {
     final DocumentReference docRef = testDocument(firestore);
     await docRef.set(data);
     return docRef;
   }
 
-  static CollectionReference testCollection(FirebaseFirestore firestore,
-      [String name]) {
-    return firestore
-        .collection(name == null ? Util.autoId() : '$name${Util.autoId()}');
+  static CollectionReference testCollection(FirebaseFirestore firestore, [String name]) {
+    return firestore.collection(name == null ? Util.autoId() : '$name${Util.autoId()}');
   }
 
-  static Future<CollectionReference> testCollectionWithDocs(
-      FirebaseFirestore firestore,
-      Map<String, Map<String, Object>> docs) async {
+  static Future<CollectionReference> testCollectionWithDocs(FirebaseFirestore firestore, Map<String, Map<String, Object>> docs) async {
     final CollectionReference collection = testCollection(firestore);
     final CollectionReference writer = firestore.collection(collection.id);
 
@@ -201,22 +165,17 @@ class IntegrationTestUtil {
     return collection;
   }
 
-  static Future<void> writeAllDocs(CollectionReference collection,
-      Map<String, Map<String, Object>> docs) async {
+  static Future<void> writeAllDocs(CollectionReference collection, Map<String, Map<String, Object>> docs) async {
     for (MapEntry<String, Map<String, Object>> doc in docs.entries) {
       await collection.document(doc.key).set(doc.value);
     }
   }
 
   static Future<void> waitForOnlineSnapshot(DocumentReference doc) {
-    return doc
-        .getSnapshots(MetadataChanges.include)
-        .where((DocumentSnapshot value) => !value.metadata.isFromCache)
-        .first;
+    return doc.getSnapshots(MetadataChanges.include).where((DocumentSnapshot value) => !value.metadata.isFromCache).first;
   }
 
-  static List<Map<String, Object>> querySnapshotToValues(
-      QuerySnapshot querySnapshot) {
+  static List<Map<String, Object>> querySnapshotToValues(QuerySnapshot querySnapshot) {
     final List<Map<String, Object>> res = <Map<String, Object>>[];
     for (DocumentSnapshot doc in querySnapshot) {
       res.add(doc.data);

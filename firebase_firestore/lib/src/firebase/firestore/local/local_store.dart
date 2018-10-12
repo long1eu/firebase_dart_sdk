@@ -246,22 +246,19 @@ class LocalStore {
   }
 
   /// Accepts locally generated [Mutations] and commits them to storage.
-  Future<LocalWriteResult> writeLocally(List<Mutation> mutations) {
+  Future<LocalWriteResult> writeLocally(List<Mutation> mutations) async {
     final Timestamp localWriteTime = Timestamp.now();
     // TODO: Call queryEngine.handleDocumentChange() appropriately.
-    return _persistence.runTransactionAndReturn<LocalWriteResult>(
-      'Locally write mutations',
-      () async {
-        final MutationBatch batch =
-            await _mutationQueue.addMutationBatch(localWriteTime, mutations);
 
-        final Set<DocumentKey> keys = batch.keys;
-        final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
-            await _localDocuments.getDocuments(keys);
+    final MutationBatch batch = await _persistence.runTransactionAndReturn(
+        'Locally write mutations',
+        () => _mutationQueue.addMutationBatch(localWriteTime, mutations));
 
-        return LocalWriteResult(batch.batchId, changedDocuments);
-      },
-    );
+    final Set<DocumentKey> keys = batch.keys;
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
+        await _localDocuments.getDocuments(keys);
+
+    return LocalWriteResult(batch.batchId, changedDocuments);
   }
 
   /// Acknowledges the given batch.

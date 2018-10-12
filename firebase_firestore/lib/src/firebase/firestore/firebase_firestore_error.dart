@@ -91,14 +91,19 @@ class FirebaseFirestoreErrorCode {
 
 @publicApi
 class FirebaseFirestoreError extends FirebaseError {
-  FirebaseFirestoreErrorCode code;
+  final FirebaseFirestoreErrorCode code;
+  final dynamic cause;
 
-  FirebaseFirestoreError(String message, this.code, [StackTrace stackTrance])
-      : super(message, stackTrance) {
+  FirebaseFirestoreError(
+    String message,
+    this.code, [
+    this.cause,
+    StackTrace stackTrance,
+  ]) : super(message, stackTrance) {
     Preconditions.checkNotNull(message);
     Preconditions.checkNotNull(code);
   }
 
   @override
-  String toString() => '$runtimeType:$code $message';
+  String toString() => '$runtimeType:$code $message $cause $stackTrace';
 }

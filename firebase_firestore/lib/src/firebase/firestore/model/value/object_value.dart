@@ -89,7 +89,7 @@ class ObjectValue extends FieldValue {
     if (path.length == 1) {
       return _setChild(childName, value);
     } else {
-      final FieldValue child = _value[childName];
+      final FieldValue child = internalValue[childName];
       ObjectValue obj;
       if (child is ObjectValue) {
         obj = child;
@@ -139,7 +139,7 @@ class ObjectValue extends FieldValue {
   }
 
   ObjectValue _setChild(String childName, FieldValue value) {
-    return ObjectValue.fromImmutableMap(_value.insert(childName, value));
+    return ObjectValue.fromImmutableMap(internalValue.insert(childName, value));
   }
 
   @override

@@ -17,6 +17,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart
 import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
 import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 /// The signature for providing code to be executed within a transaction
 /// context.
@@ -69,7 +70,20 @@ class Transaction {
   /// [data] A map of field / value pairs to update. Fields can contain dots to
   /// reference nested fields within the document.
   /// Return this [Transaction] instance. Used for chaining method calls.
+  @publicApi
+  Transaction updateFromList(DocumentReference documentRef, List<Object> data) {
+    final ParsedUpdateData parsedData = _firestore.dataConverter
+        .parseUpdateDataFromList(Util.collectUpdateArguments(1, data));
+    return _update(documentRef, parsedData);
+  }
 
+  /// Updates fields in the document referred to by the provided
+  /// [DocumentReference]. If no document exists yet, the update will fail.
+  ///
+  /// [documentRef] The [DocumentReference] to update.
+  /// [data] A map of field / value pairs to update. Fields can contain dots to
+  /// reference nested fields within the document.
+  /// Return this [Transaction] instance. Used for chaining method calls.
   @publicApi
   Transaction update(DocumentReference documentRef, Map<String, Object> data) {
     final ParsedUpdateData parsedData =

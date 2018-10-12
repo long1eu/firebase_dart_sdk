@@ -17,6 +17,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel
 import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
+import 'package:protobuf/protobuf.dart';
 
 /// A Stream that implements the [StreamingWatch] RPC.
 ///
@@ -39,7 +40,7 @@ class WatchStream
             channel,
             ClientMethod<ListenRequest, ListenResponse>(
               'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Listen',
-              (ListenRequest req) => req.writeToBuffer(),
+              (GeneratedMessage req) => req.writeToBuffer(),
               (List<int> res) => ListenResponse.fromBuffer(res),
             ),
             workerQueue,
@@ -96,14 +97,15 @@ class WatchStream
   }
 }
 
+typedef OnWatchChange = Future<void> Function(
+    SnapshotVersion snapshotVersion, WatchChange watchChange);
+
 /// A callback interface for the set of events that can be emitted by the
 /// [WatchStream]
 class WatchStreamCallback extends StreamCallback {
   /// A new change from the watch stream. Snapshot version will ne non-null if
   /// it was set
-
-  final Future<void> Function(
-      SnapshotVersion snapshotVersion, WatchChange watchChange) onWatchChange;
+  final OnWatchChange onWatchChange;
 
   const WatchStreamCallback({
     @required Future<void> Function() onOpen,
