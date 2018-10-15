@@ -9,10 +9,12 @@ import 'package:firebase_firestore/src/firebase/firestore/local/lru_delegate.dar
 import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_mutation_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/memory_remote_document_cache.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
@@ -80,8 +82,17 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<int> removeOrphanedDocuments(int upperBound) async {
-    return persistence.remoteDocumentCache
-        .removeOrphanedDocuments(this, upperBound);
+    int count = 0;
+    final MemoryRemoteDocumentCache cache = persistence.remoteDocumentCache;
+    for (MapEntry<DocumentKey, MaybeDocument> entry in cache.documents) {
+      final DocumentKey key = entry.key;
+      if (!(await _isPinned(key, upperBound))) {
+        cache.remove(key);
+        orphanedSequenceNumbers.remove(key);
+        count++;
+      }
+    }
+    return count;
   }
 
   @override
@@ -123,7 +134,10 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
     return false;
   }
 
-  Future<bool> isPinned(DocumentKey key, int upperBound) async {
+  /// Returns [true] if there is anything that would keep the given document
+  /// alive or if the document's sequence number is greater than the provided
+  /// upper bound.
+  Future<bool> _isPinned(DocumentKey key, int upperBound) async {
     if (_mutationQueuesContainsKey(key)) {
       return true;
     }
