@@ -333,9 +333,11 @@ class SyncEngine implements RemoteStoreCallback {
     } else {
       final QueryView queryView = _queryViewsByTarget[targetId];
       Assert.hardAssert(queryView != null, 'Unknown target: $targetId');
-      await _localStore.releaseQuery(queryView.query);
+      final Query query = queryView.query;
+      await _localStore.releaseQuery(query);
       await _removeAndCleanup(queryView);
-      callback.onError(queryView.query, error);
+      logErrorIfInteresting(error, 'Listen for $query failed');
+      callback.onError(query, error);
     }
   }
 
@@ -360,14 +362,19 @@ class SyncEngine implements RemoteStoreCallback {
   Future<void> handleRejectedWrite(int batchId, GrpcError status) async {
     _assertCallback('handleRejectedWrite');
 
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
+        await _localStore.rejectBatch(batchId);
+
+    if (changes.isNotEmpty) {
+      logErrorIfInteresting(status, 'Write failed at ${changes.minKey.path}');
+    }
+
     // The local store may or may not be able to apply the write result and
     // raise events immediately (depending on whether the watcher is caught up),
     // so we raise user callbacks first so that they consistently happen before
     // listen events.
     _notifyUser(batchId, status);
 
-    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
-        await _localStore.rejectBatch(batchId);
     await _emitNewSnapshot(changes, /*remoteEvent:*/ null);
   }
 
@@ -524,6 +531,28 @@ class SyncEngine implements RemoteStoreCallback {
 
     // Notify remote store so it can restart its streams.
     await _remoteStore.handleCredentialChange();
+  }
+
+  /// Logs the error as a warnings if it likely represents a developer mistake
+  /// such as forgetting to create an index or permission denied.
+  void logErrorIfInteresting(GrpcError error, String contextString) {
+    if (errorIsInteresting(error)) {
+      Log.w('Firestore', '$contextString: $error');
+    }
+  }
+
+  bool errorIsInteresting(GrpcError error) {
+    final int code = error.code;
+    final String description = error.message ?? '';
+
+    if (code == StatusCode.failedPrecondition &&
+        description.contains('requires an index')) {
+      return true;
+    } else if (code == StatusCode.permissionDenied) {
+      return true;
+    }
+
+    return false;
   }
 }
 
