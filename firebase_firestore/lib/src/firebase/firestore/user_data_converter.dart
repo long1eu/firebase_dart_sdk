@@ -195,16 +195,25 @@ class UserDataConverter {
 
   ObjectValue _parseMap<K, V>(Map<K, V> map, UserDataParseContext context) {
     final Map<String, FieldValue> result = <String, FieldValue>{};
-    for (MapEntry<K, V> entry in map.entries) {
-      if (entry.key is! String) {
-        throw context
-            .createError('Non-String Map key (${entry.value}) is not allowed');
+
+    if (map.isEmpty) {
+      if (context.path != null && context.path.isNotEmpty) {
+        context.addToFieldMask(context.path);
       }
-      final String key = entry.key as String;
-      final FieldValue parsedValue =
-          _parseData(entry.value, context.childContextForSegment(key));
-      if (parsedValue != null) {
-        result[key] = parsedValue;
+
+      return ObjectValue.empty;
+    } else {
+      for (MapEntry<K, V> entry in map.entries) {
+        if (entry.key is! String) {
+          throw context.createError(
+              'Non-String Map key (${entry.value}) is not allowed');
+        }
+        final String key = entry.key as String;
+        final FieldValue parsedValue =
+            _parseData(entry.value, context.childContextForSegment(key));
+        if (parsedValue != null) {
+          result[key] = parsedValue;
+        }
       }
     }
     return ObjectValue.fromMap(result);

@@ -90,11 +90,13 @@ class PatchMutation extends Mutation {
 
   ObjectValue patchObject(ObjectValue obj) {
     for (FieldPath path in mask.mask) {
-      final FieldValue newValue = value.get(path);
-      if (newValue == null) {
-        obj = obj.delete(path);
-      } else {
-        obj = obj.set(path, newValue);
+      if (path.isNotEmpty) {
+        final FieldValue newValue = value.get(path);
+        if (newValue == null) {
+          obj = obj.delete(path);
+        } else {
+          obj = obj.set(path, newValue);
+        }
       }
     }
     return obj;

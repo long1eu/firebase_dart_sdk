@@ -15,11 +15,13 @@ import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
+import 'package:firebase_firestore/src/firebase/firestore/source.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
 import '../../../util/await_helper.dart';
+import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
@@ -102,6 +104,40 @@ void main() {
     expect(doc.getBool('untouched'), isTrue);
     expect(doc.get('time'), const TypeMatcher<Timestamp>());
     expect(doc.get('nested.time'), const TypeMatcher<Timestamp>());
+  });
+
+  test('testCanMergeEmptyObject', () async {
+    final DocumentReference documentReference = await testDocument();
+    final EventAccumulator<DocumentSnapshot> eventAccumulator =
+        EventAccumulator<DocumentSnapshot>();
+    final StreamSubscription<DocumentSnapshot> subscription = documentReference
+        .snapshots
+        .listen(eventAccumulator.onData, onError: eventAccumulator.onError);
+    await eventAccumulator.wait();
+
+    documentReference.set(<String, dynamic>{});
+    DocumentSnapshot snapshot = await eventAccumulator.wait();
+    expect(snapshot.data, isEmpty);
+
+    await documentReference.set(map(<dynamic>['a', <String, dynamic>{}]),
+        SetOptions.mergeFields(<String>['a']));
+    snapshot = await eventAccumulator.wait();
+    expect(snapshot.data, map<dynamic>(<dynamic>['a', <String, dynamic>{}]));
+
+    await documentReference.set(
+        map(<dynamic>['b', <String, dynamic>{}]), SetOptions.mergeAllFields);
+    snapshot = await eventAccumulator.wait();
+    expect(
+        snapshot.data,
+        map<dynamic>(
+            <dynamic>['a', <String, dynamic>{}, 'b', <String, dynamic>{}]));
+
+    snapshot = await documentReference.get(Source.SERVER);
+    expect(
+        snapshot.data,
+        map<dynamic>(
+            <dynamic>['a', <String, dynamic>{}, 'b', <String, dynamic>{}]));
+    subscription.cancel();
   });
 
   test('testCanDeleteFieldUsingMerge', () async {
