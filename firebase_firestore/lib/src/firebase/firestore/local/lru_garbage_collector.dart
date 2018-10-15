@@ -37,8 +37,8 @@ class LruGarbageCollector {
 
   /// Removes targets with a sequence number equal to or less than the given
   /// upper bound, and removes document associations with those targets.
-  Future<int> removeQueries(int upperBound, Set<int> liveQueries) {
-    return delegate.removeQueries(upperBound, liveQueries);
+  Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) {
+    return delegate.removeTargets(upperBound, activeTargetIds);
   }
 
   /// Removes documents that have a sequence number equal to or less than the

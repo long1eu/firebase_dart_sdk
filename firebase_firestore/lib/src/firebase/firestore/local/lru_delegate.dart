@@ -24,7 +24,7 @@ abstract class LruDelegate {
   /// [upperBound], and are not present in the [activeTargetIds] set.
   ///
   /// Returns the number of targets removed.
-  Future<int> removeQueries(int upperBound, Set<int> activeTargetIds);
+  Future<int> removeTargets(int upperBound, Set<int> activeTargetIds);
 
   /// Removes all unreferenced documents from the cache that have a sequence
   /// number less than or equal to the given sequence number.

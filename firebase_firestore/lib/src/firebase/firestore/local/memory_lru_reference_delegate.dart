@@ -74,7 +74,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<int> removeQueries(int upperBound, Set<int> activeTargetIds) async {
+  Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) async {
     return persistence.queryCache.removeQueries(upperBound, activeTargetIds);
   }
 

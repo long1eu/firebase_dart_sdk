@@ -148,9 +148,9 @@ class LruGarbageCollectorTestCase {
     await queryCache.removeMatchingKeys(keySet(<DocumentKey>[key]), targetId);
   }
 
-  Future<int> removeQueries(int upperBound, Set<int> liveQueries) {
+  Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) {
     return persistence.runTransactionAndReturn('Remove queries',
-        () => garbageCollector.removeQueries(upperBound, liveQueries));
+        () => garbageCollector.removeTargets(upperBound, activeTargetIds));
   }
 
   SetMutation mutation(DocumentKey key) {

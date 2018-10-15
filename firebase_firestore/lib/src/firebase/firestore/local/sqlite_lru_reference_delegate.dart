@@ -97,7 +97,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<int> removeQueries(int upperBound, Set<int> activeTargetIds) {
+  Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) {
     return persistence.queryCache.removeQueries(upperBound, activeTargetIds);
   }
 

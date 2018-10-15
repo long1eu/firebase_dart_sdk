@@ -151,13 +151,13 @@ void main() {
   });
 
   test('testRemoveQueriesUpThroughSequenceNumber', () async {
-    final Map<int, QueryData> liveQueries = <int, QueryData>{};
+    final Map<int, QueryData> activeTargetIds = <int, QueryData>{};
     for (int i = 0; i < 100; i++) {
       final QueryData queryData = await testCase.addNextQuery();
       // Mark odd queries as live so we can test filtering out live queries.
       final int targetId = queryData.targetId;
       if (targetId % 2 == 1) {
-        liveQueries[targetId] = queryData;
+        activeTargetIds[targetId] = queryData;
       }
     }
 
@@ -165,7 +165,7 @@ void main() {
     // Expect to have GC'd 10 targets, since every other target is live
     final int upperBound = 20 + testCase.initialSequenceNumber;
     final int removed =
-        await testCase.removeQueries(upperBound, liveQueries.keys.toSet());
+        await testCase.removeTargets(upperBound, activeTargetIds.keys.toSet());
     expect(removed, 10);
 
     // Make sure we removed the even targets with targetID <= 20.
@@ -425,12 +425,12 @@ void main() {
 
     // Finally, do the garbage collection, up to but not including the removal
     // of middleTarget
-    final Set<int> liveQueries = Set<int>();
-    liveQueries.add(oldestTarget.targetId);
-    final int queriesRemoved =
-        await testCase.garbageCollector.removeQueries(upperBound, liveQueries);
+    final Set<int> activeTargetIds = Set<int>();
+    activeTargetIds.add(oldestTarget.targetId);
+    final int targetsRemoved = await testCase.garbageCollector
+        .removeTargets(upperBound, activeTargetIds);
     // Expect to remove newest target
-    expect(queriesRemoved, 1);
+    expect(targetsRemoved, 1);
     final int docsRemoved =
         await testCase.garbageCollector.removeOrphanedDocuments(upperBound);
     expect(docsRemoved, expectedRemoved.length);
