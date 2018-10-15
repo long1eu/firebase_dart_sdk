@@ -619,8 +619,8 @@ class LocalStore {
   }
 
   bool _isRemoteUpToVersion(SnapshotVersion snapshotVersion) {
-    // If there are no watch targets, then we won't get remote snapshots, and are always
-    // 'up-to-date.'
+    // If there are no watch targets, then we won't get remote snapshots, and
+    // are always 'up-to-date.'
     return snapshotVersion.compareTo(_queryCache.lastRemoteSnapshotVersion) <=
             0 ||
         _targetIds.isEmpty;

@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
@@ -18,12 +17,9 @@ import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
 void main() {
-  FirebaseFirestore firestore;
+  IntegrationTestUtil.currentDatabasePath = 'integration/smoke';
 
-  setUp(() async {
-    IntegrationTestUtil.currentDatabasePath = 'integration/smoke.db';
-    firestore = await testFirestore();
-  });
+  setUp(() => testFirestore());
 
   tearDown(() async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -33,13 +29,13 @@ void main() {
   test('testCanWriteADocument', () async {
     final Map<String, Object> testData = map(
         <String>['name', 'Patryk', 'message', 'We are actually writing data!']);
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     await collection.add(testData);
   });
 
   test('testCanReadAWrittenDocument', () async {
     final Map<String, Object> testData = map(<String>['foo', 'bar']);
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
 
     final DocumentReference newRef = await collection.add(testData);
     final DocumentSnapshot result = await newRef.get();
@@ -48,7 +44,7 @@ void main() {
 
   test('testObservesExistingDocument', () async {
     final Map<String, Object> testData = map(<String>['foo', 'bar']);
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     final DocumentReference writerRef = collection.document();
     final DocumentReference readerRef = collection.document(writerRef.id);
     await writerRef.set(testData);
@@ -63,7 +59,7 @@ void main() {
   });
 
   test('testObservesNewDocument', () async {
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     final DocumentReference writerRef = collection.document();
     final DocumentReference readerRef = collection.document(writerRef.id);
     final EventAccumulator<DocumentSnapshot> accumulator =
@@ -86,7 +82,7 @@ void main() {
 
   test('testWillFireValueEventsForEmptyCollections', () async {
     final CollectionReference collection =
-        testCollection(firestore, 'empty-collection');
+    await testCollection('empty-collection');
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
     final StreamSubscription<QuerySnapshot> listener = collection
@@ -107,7 +103,7 @@ void main() {
       '3',
       map<dynamic>(<dynamic>['name', 'Jonny', 'message', 'Back to work!'])
     ]);
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
     for (MapEntry<String, Map<String, Object>> entry in testData.entries) {
       tasks.add(collection.document(entry.key).set(entry.value));
@@ -136,7 +132,7 @@ void main() {
         '4',
         map<dynamic>(<dynamic>['sort', 3.0, 'filter', false, 'key', '4'])
       ]);
-      final CollectionReference collection = testCollection(firestore);
+      final CollectionReference collection = await testCollection();
       final List<Future<void>> tasks = <Future<void>>[];
       for (MapEntry<String, Map<String, Object>> entry in testData.entries) {
         tasks.add(collection.document(entry.key).set(entry.value));

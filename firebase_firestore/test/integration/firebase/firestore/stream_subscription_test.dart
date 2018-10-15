@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
 import 'package:test/test.dart';
 
@@ -16,13 +15,9 @@ import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
 void main() {
-  FirebaseFirestore firestore;
+  IntegrationTestUtil.currentDatabasePath = 'integration/stream_subscription';
 
-  setUp(() async {
-    IntegrationTestUtil.currentDatabasePath =
-        'integration/stream_subscription.db';
-    firestore = await testFirestore();
-  });
+  setUp(() => testFirestore());
 
   tearDown(() async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -30,7 +25,7 @@ void main() {
   });
 
   test('canBeRemoved', () async {
-    final CollectionReference collectionReference = testCollection(firestore);
+    final CollectionReference collectionReference = await testCollection();
     final DocumentReference documentReference = collectionReference.document();
 
     final AwaitHelper<void> events = AwaitHelper<void>(4);
@@ -70,7 +65,7 @@ void main() {
   });
 
   test('canBeRemovedTwice', () async {
-    final CollectionReference reference = testCollection(firestore);
+    final CollectionReference reference = await testCollection();
     final StreamSubscription<QuerySnapshot> one =
         reference.snapshots.listen((QuerySnapshot value) {});
     final StreamSubscription<DocumentSnapshot> two =
@@ -84,7 +79,7 @@ void main() {
   });
 
   test('canBeRemovedIndependently', () async {
-    final CollectionReference collectionReference = testCollection(firestore);
+    final CollectionReference collectionReference = await testCollection();
 
     final AwaitHelper<void> eventsOne = AwaitHelper<void>(2);
     final AwaitHelper<void> eventsTwo = AwaitHelper<void>(3);

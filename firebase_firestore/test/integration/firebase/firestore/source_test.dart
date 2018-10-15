@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
 import 'package:firebase_firestore/src/firebase/firestore/source.dart';
@@ -17,12 +16,9 @@ import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
 void main() {
-  FirebaseFirestore firestore;
+  IntegrationTestUtil.currentDatabasePath = 'integration/source_test';
 
-  setUp(() async {
-    IntegrationTestUtil.currentDatabasePath = 'integration/query.db';
-    firestore = await testFirestore();
-  });
+  setUp(() => testFirestore());
 
   tearDown(() async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -31,8 +27,7 @@ void main() {
 
   test('getDocumentWhileOnlineWithDefaultGetOptions', () async {
     final Map<String, Object> initialData = map(<String>['key', 'value']);
-    final DocumentReference docRef =
-        await testDocumentWithData(firestore, initialData);
+    final DocumentReference docRef = await testDocumentWithData(initialData);
 
     final DocumentSnapshot doc = await docRef.get();
 
@@ -52,7 +47,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-        await testCollectionWithDocs(firestore, initialDocs);
+    await testCollectionWithDocs(initialDocs);
 
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -63,8 +58,7 @@ void main() {
 
   test('getDocumentWhileOfflineWithDefaultGetOptions', () async {
     final Map<String, Object> initialData = map(<String>['key', 'value']);
-    final DocumentReference docRef =
-        await testDocumentWithData(firestore, initialData);
+    final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
     await docRef.firestore.disableNetwork();
@@ -87,7 +81,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-        await testCollectionWithDocs(firestore, initialDocs);
+    await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
@@ -119,8 +113,7 @@ void main() {
 
   test('getDocumentWhileOnlineWithSourceEqualToCache', () async {
     final Map<String, Object> initialData = map(<String>['key', 'value']);
-    final DocumentReference docRef =
-        await testDocumentWithData(firestore, initialData);
+    final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
 
@@ -142,7 +135,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-        await testCollectionWithDocs(firestore, initialDocs);
+    await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
 
@@ -155,8 +148,7 @@ void main() {
 
   test('getDocumentWhileOfflineWithSourceEqualToCache', () async {
     final Map<String, Object> initialData = map(<String>['key', 'value']);
-    final DocumentReference docRef =
-        await testDocumentWithData(firestore, initialData);
+    final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
     await docRef.firestore.disableNetwork();
@@ -178,7 +170,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-        await testCollectionWithDocs(firestore, initialDocs);
+    await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
@@ -210,8 +202,7 @@ void main() {
 
   test('getDocumentWhileOnlineWithSourceEqualToServer', () async {
     final Map<String, Object> initialData = map(<String>['key', 'value']);
-    final DocumentReference docRef =
-        await testDocumentWithData(firestore, initialData);
+    final DocumentReference docRef = await testDocumentWithData(initialData);
 
     final DocumentSnapshot doc = await docRef.get(Source.SERVER);
     expect(doc.exists, isTrue);
@@ -231,7 +222,7 @@ void main() {
     ]);
 
     final CollectionReference colRef =
-        await testCollectionWithDocs(firestore, initialDocs);
+    await testCollectionWithDocs(initialDocs);
 
     final QuerySnapshot qrySnap = await colRef.get(Source.SERVER);
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -242,8 +233,7 @@ void main() {
 
   test('getDocumentWhileOfflineWithSourceEqualToServer', () async {
     final Map<String, Object> initialData = map(<String>['key', 'value']);
-    final DocumentReference docRef =
-        await testDocumentWithData(firestore, initialData);
+    final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
     await docRef.firestore.disableNetwork();
@@ -261,7 +251,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-        await testCollectionWithDocs(firestore, initialDocs);
+    await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
@@ -271,8 +261,7 @@ void main() {
 
   test('getDocumentWhileOfflineWithDifferentGetOptions', () async {
     final Map<String, Object> initialData = map(<String>['key', 'value']);
-    final DocumentReference docRef =
-        await testDocumentWithData(firestore, initialData);
+    final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
     await docRef.firestore.disableNetwork();
@@ -316,7 +305,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-        await testCollectionWithDocs(firestore, initialDocs);
+    await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
@@ -379,7 +368,7 @@ void main() {
   });
 
   test('getNonExistingDocWhileOnlineWithDefaultGetOptions', () async {
-    final DocumentReference docRef = testDocument(firestore);
+    final DocumentReference docRef = await testDocument();
 
     final DocumentSnapshot doc = await docRef.get();
     expect(doc.exists, isFalse);
@@ -388,7 +377,7 @@ void main() {
   });
 
   test('getNonExistingCollectionWhileOnlineWithDefaultGetOptions', () async {
-    final CollectionReference colRef = testCollection(firestore);
+    final CollectionReference colRef = await testCollection();
 
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap, isEmpty);
@@ -398,7 +387,7 @@ void main() {
   });
 
   test('getNonExistingDocWhileOfflineWithDefaultGetOptions', () async {
-    final DocumentReference docRef = testDocument(firestore);
+    final DocumentReference docRef = await testDocument();
 
     await docRef.firestore.disableNetwork();
     expect(() => docRef.get(), throwsA(anything));
@@ -408,7 +397,7 @@ void main() {
   test(
     'getDeletedDocWhileOfflineWithDefaultGetOptions',
     () async {
-      final DocumentReference docRef = testDocument(firestore);
+      final DocumentReference docRef = await testDocument();
       await docRef.delete();
 
       await docRef.firestore.disableNetwork();
@@ -425,7 +414,7 @@ void main() {
   );
 
   test('getNonExistingCollectionWhileOfflineWithDefaultGetOptions', () async {
-    final CollectionReference colRef = testCollection(firestore);
+    final CollectionReference colRef = await testCollection();
 
     await colRef.firestore.disableNetwork();
 
@@ -437,14 +426,14 @@ void main() {
   });
 
   test('getNonExistingDocWhileOnlineWithSourceEqualToCache', () async {
-    final DocumentReference docRef = testDocument(firestore);
+    final DocumentReference docRef = await testDocument();
 
     // Attempt to get doc. This will fail since there's nothing in cache.
     expect(() => docRef.get(Source.CACHE), throwsA(anything));
   });
 
   test('getNonExistingCollectionWhileOnlineWithSourceEqualToCache', () async {
-    final CollectionReference colRef = testCollection(firestore);
+    final CollectionReference colRef = await testCollection();
 
     final QuerySnapshot qrySnap = await colRef.get(Source.CACHE);
     expect(qrySnap, isEmpty);
@@ -454,7 +443,7 @@ void main() {
   });
 
   test('getNonExistingDocWhileOfflineWithSourceEqualToCache', () async {
-    final DocumentReference docRef = testDocument(firestore);
+    final DocumentReference docRef = await testDocument();
 
     await docRef.firestore.disableNetwork();
 
@@ -463,7 +452,7 @@ void main() {
   });
 
   test('getDeletedDocWhileOfflineWithSourceEqualToCache', () async {
-    final DocumentReference docRef = testDocument(firestore);
+    final DocumentReference docRef = await testDocument();
     await docRef.delete();
 
     await docRef.firestore.disableNetwork();
@@ -476,7 +465,7 @@ void main() {
   });
 
   test('getNonExistingCollectionWhileOfflineWithSourceEqualToCache', () async {
-    final CollectionReference colRef = testCollection(firestore);
+    final CollectionReference colRef = await testCollection();
 
     await colRef.firestore.disableNetwork();
 
@@ -488,7 +477,7 @@ void main() {
   });
 
   test('getNonExistingDocWhileOnlineWithSourceEqualToServer', () async {
-    final DocumentReference docRef = testDocument(firestore);
+    final DocumentReference docRef = await testDocument();
 
     final DocumentSnapshot doc = await docRef.get(Source.SERVER);
     expect(doc.exists, isFalse);
@@ -497,7 +486,7 @@ void main() {
   });
 
   test('getNonExistingCollectionWhileOnlineWithSourceEqualToServer', () async {
-    final CollectionReference colRef = testCollection(firestore);
+    final CollectionReference colRef = await testCollection();
 
     final QuerySnapshot qrySnap = await colRef.get(Source.SERVER);
     expect(qrySnap, isEmpty);
@@ -507,7 +496,7 @@ void main() {
   });
 
   test('getNonExistingDocWhileOfflineWithSourceEqualToServer', () async {
-    final DocumentReference docRef = testDocument(firestore);
+    final DocumentReference docRef = await testDocument();
 
     await docRef.firestore.disableNetwork();
 
@@ -515,7 +504,7 @@ void main() {
   });
 
   test('getNonExistingCollectionWhileOfflineWithSourceEqualToServer', () async {
-    final CollectionReference colRef = testCollection(firestore);
+    final CollectionReference colRef = await testCollection();
 
     await colRef.firestore.disableNetwork();
     expect(() => colRef.get(Source.SERVER), throwsA(anything));

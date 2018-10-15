@@ -6,12 +6,15 @@ import 'dart:async';
 
 import 'package:rxdart/rxdart.dart';
 
-import '../util/listener.dart';
 import 'credentials_provider.dart';
 import 'user.dart';
 
 /// A Credentials Provider that always returns an empty token
 class EmptyCredentialsProvider extends CredentialsProvider {
+  // ignore: close_sinks
+  final BehaviorSubject<User> _onChange =
+  BehaviorSubject<User>(seedValue: User.unauthenticated);
+
   @override
   Future<String> get token => Future<String>.value(null);
 
@@ -19,14 +22,5 @@ class EmptyCredentialsProvider extends CredentialsProvider {
   void invalidateToken() {}
 
   @override
-  void setChangeListener(Listener<User> changeListener) {
-    changeListener(User.unauthenticated);
-  }
-
-  @override
-  void removeChangeListener() {}
-
-  @override
-  Stream<User> get onChange =>
-      BehaviorSubject<User>(seedValue: User.unauthenticated);
+  Stream<User> get onChange => _onChange;
 }

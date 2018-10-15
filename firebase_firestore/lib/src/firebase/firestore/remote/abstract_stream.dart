@@ -110,11 +110,9 @@ abstract class AbstractStream<
     // Note that Starting is only used as intermediate state until onOpen is
     // called asynchronously, since auth handled transparently by gRPC
     _state = StreamState.Starting;
-
     _state = StreamState.Open;
-    await listener.onOpen();
 
-    //await closeGuardedRunner.run(() async {}, 'start');
+    await listener.onOpen();
   }
 
   /// Closes the stream and cleans up as necessary:
@@ -220,7 +218,7 @@ abstract class AbstractStream<
   /// Called when GRPC closes the stream, which should always be due to some
   /// error.
   @visibleForTesting
-  void handleServerClose(GrpcError status) async {
+  Future<void> handleServerClose(GrpcError status) async {
     Assert.hardAssert(
         isStarted, 'Can\'t handle server close on non-started stream!');
 
@@ -348,15 +346,15 @@ class StreamObserver<
   }
 
   @override
-  void onClose(GrpcError status) {
-    _dispatcher.run(() async {
+  void onClose(GrpcError status) async {
+    await _dispatcher.run(() async {
       if (status.code == StatusCode.ok) {
         Log.d('AbstractStream', '($hashCode) Stream closed.');
       } else {
         Log.d('AbstractStream',
             '($hashCode) Stream closed with status: $status.');
       }
-      stream.handleServerClose(status);
+      await stream.handleServerClose(status);
     }, 'onClose');
   }
 }

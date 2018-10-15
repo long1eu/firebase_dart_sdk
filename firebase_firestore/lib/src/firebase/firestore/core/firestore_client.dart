@@ -46,14 +46,16 @@ class FirestoreClient implements RemoteStoreCallback {
   final CredentialsProvider credentialsProvider;
   final AsyncQueue asyncQueue;
 
+  StreamSubscription<User> onCredentialChangeSubscription;
   Persistence persistence;
   LocalStore localStore;
   RemoteStore remoteStore;
   SyncEngine syncEngine;
   EventManager eventManager;
 
-  FirestoreClient._(
-      this.databaseInfo, this.credentialsProvider, this.asyncQueue);
+  FirestoreClient._(this.databaseInfo,
+                    this.credentialsProvider,
+                    this.asyncQueue,);
 
   static Future<FirestoreClient> initialize(
       DatabaseInfo databaseInfo,
@@ -67,7 +69,8 @@ class FirestoreClient implements RemoteStoreCallback {
     final Completer<User> firstUser = Completer<User>();
     bool initialized = false;
 
-    credentialsProvider.onChange.listen((User user) {
+    client.onCredentialChangeSubscription =
+        credentialsProvider.onChange.listen((User user) {
       if (initialized == false) {
         initialized = true;
         Assert.hardAssert(
@@ -99,8 +102,8 @@ class FirestoreClient implements RemoteStoreCallback {
 
   /// Shuts down this client, cancels all writes / listeners, and releases all
   /// resources.
-  Future<void> shutdown() {
-    credentialsProvider.removeChangeListener();
+  Future<void> shutdown() async {
+    await onCredentialChangeSubscription.cancel();
     return asyncQueue.enqueue(() async {
       await remoteStore.shutdown();
       await persistence.shutdown();
@@ -108,11 +111,10 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   /// Starts listening to a query. */
-  QueryListener listen(Query query, ListenOptions options) {
+  Future<QueryListener> listen(Query query, ListenOptions options) async {
     final QueryListener queryListener =
         QueryListener(query, options, stopListening);
-    asyncQueue.enqueueAndForget(
-        () => eventManager.addQueryListener(queryListener),
+    await asyncQueue.enqueue(() => eventManager.addQueryListener(queryListener),
         'FirestoreClinet listen');
     return queryListener;
   }
@@ -166,10 +168,9 @@ class FirestoreClient implements RemoteStoreCallback {
     await source.future;
   }
 
-  /// Tries to execute the transaction in updateFunction up to retries times. */
+  /// Tries to execute the transaction in updateFunction up to retries times.
   Future<TResult> transaction<TResult>(
       Future<TResult> Function(Transaction) updateFunction, int retries) {
-    //return asyncQueue.enqueue(() => syncEngine.transaction(asyncQueue, updateFunction, retries), 'FirestoreClient transaction');
     return syncEngine.transaction(asyncQueue, updateFunction, retries);
   }
 

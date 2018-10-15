@@ -9,7 +9,6 @@ import 'package:firebase_firestore/src/firebase/firestore/document_reference.dar
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
@@ -22,12 +21,10 @@ import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
 void main() {
-  FirebaseFirestore firestore;
+  //FirebaseFirestore firestore;
+  IntegrationTestUtil.currentDatabasePath = 'integration/write_batch';
 
-  setUp(() async {
-    IntegrationTestUtil.currentDatabasePath = 'integration/write_batch.db';
-    firestore = await testFirestore();
-  });
+  setUp(() => testFirestore());
 
   tearDown(() async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -35,12 +32,12 @@ void main() {
   });
 
   test('testSupportEmptyBatches', () async {
-    await firestore.batch().commit();
+    (await testFirestore()).batch().commit();
   });
 
   test('testSetDocuments', () async {
-    final DocumentReference doc = testDocument(firestore);
-    await firestore
+    final DocumentReference doc = await testDocument();
+    await doc.firestore
         .batch()
         .set(doc, map<String>(<String>['foo', 'bar']))
         .commit();
@@ -50,8 +47,8 @@ void main() {
   });
 
   test('testSetDocumentsWithMerge', () async {
-    final DocumentReference doc = testDocument(firestore);
-    await firestore
+    final DocumentReference doc = await testDocument();
+    await doc.firestore
         .batch()
         .set(
             doc,
@@ -63,7 +60,8 @@ void main() {
             ]),
             SetOptions.mergeAllFields)
         .commit();
-    await firestore
+
+    await doc.firestore
         .batch()
         .set(
             doc,
@@ -77,7 +75,8 @@ void main() {
             ]),
             SetOptions.mergeFields(<String>['c', 'nested']))
         .commit();
-    await firestore
+
+    await doc.firestore
         .batch()
         .set(
             doc,
@@ -92,6 +91,7 @@ void main() {
               FieldPath.of(<String>['nested', 'e'])
             ]))
         .commit();
+
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
     expect(
@@ -109,23 +109,23 @@ void main() {
   });
 
   test('testUpdateDocuments', () async {
-    final DocumentReference doc = testDocument(firestore);
+    final DocumentReference doc = await testDocument();
     await doc.set(map(<String>['foo', 'bar']));
-    await firestore.batch().update(doc, map(<dynamic>['baz', 42])).commit();
+    await doc.firestore.batch().update(doc, map(<dynamic>['baz', 42])).commit();
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
     expect(snapshot.data, map<dynamic>(<dynamic>['foo', 'bar', 'baz', 42]));
   });
 
   test('testUpdateFieldsWithDots', () async {
-    final DocumentReference doc = testDocument(firestore);
+    final DocumentReference doc = await testDocument();
     await doc.set(map(<String>['a.b', 'old', 'c.d', 'old']));
 
-    await firestore.batch().updateFromList(doc, <dynamic>[
+    await doc.firestore.batch().updateFromList(doc, <dynamic>[
       FieldPath.of(<String>['a.b']),
       'new'
     ]).commit();
-    await firestore.batch().updateFromList(doc, <dynamic>[
+    await doc.firestore.batch().updateFromList(doc, <dynamic>[
       FieldPath.of(<String>['c.d']),
       'new'
     ]).commit();
@@ -136,7 +136,7 @@ void main() {
   });
 
   test('testUpdateNestedFields', () async {
-    final DocumentReference doc = testDocument(firestore);
+    final DocumentReference doc = await testDocument();
     await doc.set(map(<dynamic>[
       'a',
       map<String>(<String>['b', 'old']),
@@ -144,10 +144,13 @@ void main() {
       map<String>(<String>['d', 'old'])
     ]));
 
-    await firestore
+    await doc.firestore
         .batch()
         .updateFromList(doc, <String>['a.b', 'new']).commit();
-    await firestore.batch().update(doc, map(<String>['c.d', 'new'])).commit();
+    await doc.firestore
+        .batch()
+        .update(doc, map(<String>['c.d', 'new']))
+        .commit();
 
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
@@ -162,18 +165,18 @@ void main() {
   });
 
   test('testDeleteDocuments', () async {
-    final DocumentReference doc = testDocument(firestore);
+    final DocumentReference doc = await testDocument();
     await doc.set(map(<String>['foo', 'bar']));
     DocumentSnapshot snapshot = await doc.get();
 
     expect(snapshot.exists, isTrue);
-    await firestore.batch().delete(doc).commit();
+    await doc.firestore.batch().delete(doc).commit();
     snapshot = await doc.get();
     expect(snapshot.exists, isFalse);
   });
 
   test('testBatchesCommitAtomicallyRaisingCorrectEvents', () async {
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     final DocumentReference docA = collection.document('a');
     final DocumentReference docB = collection.document('b');
     final EventAccumulator<QuerySnapshot> accumulator =
@@ -185,7 +188,7 @@ void main() {
     expect(initialSnap.length, 0);
 
     // Atomically write two documents.
-    await firestore
+    await collection.firestore
         .batch()
         .set(docA, map(<dynamic>['a', 1]))
         .set(docB, map(<dynamic>['b', 2]))
@@ -207,7 +210,7 @@ void main() {
   });
 
   test('testBatchesFailAtomicallyRaisingCorrectEvents', () async {
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     final DocumentReference docA = collection.document('a');
     final DocumentReference docB = collection.document('b');
     final EventAccumulator<QuerySnapshot> accumulator =
@@ -222,7 +225,7 @@ void main() {
     dynamic err;
     try {
       // Atomically write 1 document and update a nonexistent document.
-      await firestore
+      await collection.firestore
           .batch()
           .set(docA, map(<dynamic>['a', 1]))
           .update(docB, map(<dynamic>['b', 2]))
@@ -250,7 +253,7 @@ void main() {
   });
 
   test('testWriteTheSameServerTimestampAcrossWrites', () async {
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     final DocumentReference docA = collection.document('a');
     final DocumentReference docB = collection.document('b');
     final EventAccumulator<QuerySnapshot> accumulator =
@@ -262,7 +265,7 @@ void main() {
     expect(initialSnap.length, 0);
 
     // Atomically write two documents with server timestamps.
-    await firestore
+    await collection.firestore
         .batch()
         .set(docA, map(<dynamic>['when', FieldValue.serverTimestamp()]))
         .set(docB, map(<dynamic>['when', FieldValue.serverTimestamp()]))
@@ -287,7 +290,7 @@ void main() {
   });
 
   test('testCanWriteTheSameDocumentMultipleTimes', () async {
-    final DocumentReference doc = testDocument(firestore);
+    final DocumentReference doc = await testDocument();
     final EventAccumulator<DocumentSnapshot> accumulator =
         EventAccumulator<DocumentSnapshot>();
     doc
@@ -296,7 +299,7 @@ void main() {
     final DocumentSnapshot initialSnap = await accumulator.wait();
     expect(initialSnap.exists, isFalse);
 
-    await firestore
+    await doc.firestore
         .batch()
         .delete(doc)
         .set(doc, map(<dynamic>['a', 1, 'b', 1, 'when', 'when']))

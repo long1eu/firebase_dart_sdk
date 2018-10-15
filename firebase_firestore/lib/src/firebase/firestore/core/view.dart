@@ -337,6 +337,16 @@ class View {
 
     throw ArgumentError('Unknown change type: ${change.type}');
   }
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+      ..add('query', query)..add('syncState', syncState)..add(
+          'current', current)..add('documentSet', documentSet)..add(
+          'syncedDocuments', syncedDocuments)..add(
+          'limboDocuments', limboDocuments)..add('mutatedKeys', mutatedKeys))
+        .toString();
+  }
 }
 
 /// The result of applying a set of doc changes to a view.
@@ -366,8 +376,7 @@ class ViewDocumentChanges {
     return (ToStringHelper(runtimeType)
           ..add('documentSet', documentSet)
           ..add('changeSet', changeSet)
-          ..add('mutatedKeys', mutatedKeys)
-          ..add('mutatedKeys', mutatedKeys))
+          ..add('mutatedKeys', mutatedKeys)..add('needsRefill', needsRefill))
         .toString();
   }
 }

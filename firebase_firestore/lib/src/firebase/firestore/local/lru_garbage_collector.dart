@@ -18,9 +18,7 @@ class LruGarbageCollector {
   /// Given a percentile of target to collect, returns the number of targets to
   /// collect.
   int calculateQueryCount(int percentile) {
-    final int targetCount = delegate.targetCount;
-    print(targetCount);
-    return (percentile / 100.0 * targetCount).toInt();
+    return (percentile / 100.0 * delegate.targetCount).toInt();
   }
 
   /// Returns the nth sequence number, counting in order from the smallest.

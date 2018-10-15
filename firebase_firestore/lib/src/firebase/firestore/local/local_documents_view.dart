@@ -81,7 +81,8 @@ class LocalDocumentsView {
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
       Query query) async {
     final ResourcePath path = query.path;
-    if (DocumentKey.isDocumentKey(path)) {
+    final bool isDocumentKey = DocumentKey.isDocumentKey(path);
+    if (isDocumentKey) {
       return _getDocumentsMatchingDocumentQuery(path);
     } else {
       return _getDocumentsMatchingCollectionQuery(query);

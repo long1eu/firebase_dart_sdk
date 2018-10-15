@@ -51,7 +51,7 @@ void main() {
     verifyNever(syncSpy.stopListening(query));
   });
 
-  test('testListenCalledInOrder', () {
+  test('testListenCalledInOrder', () async {
     final Query query1 = Query.atPath(path('foo/bar'));
     final Query query2 = Query.atPath(path('bar/baz'));
 
@@ -80,9 +80,9 @@ void main() {
     eventManager.onViewSnapshots(<ViewSnapshot>[snap1, snap2]);
 
     verifyInOrder(<void>[
-      spy1.onViewSnapshot(snap1),
-      spy3.onViewSnapshot(snap1),
-      spy2.onViewSnapshot(snap2),
+      await spy1.onViewSnapshot(snap1),
+      await spy3.onViewSnapshot(snap1),
+      await spy2.onViewSnapshot(snap2),
     ]);
   });
 

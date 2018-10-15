@@ -4,7 +4,6 @@
 
 import 'dart:async';
 import 'dart:collection';
-import 'dart:convert';
 
 import 'package:firebase_firestore/src/firebase/firestore/core/version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
@@ -117,7 +116,7 @@ class AsyncQueue {
   /// The task will be append to the queue and run after every task added before
   /// has been executed.
   Future<T> enqueue<T>(Task<T> function, [String caller]) async {
-    print('----QUEUE => strt $caller');
+    //print('----QUEUE => strt $caller');
     final _TaskQueueEntry<T> taskEntry = _TaskQueueEntry<T>(function);
 
     final bool listWasEmpty = _tasks.isEmpty;
@@ -131,7 +130,7 @@ class AsyncQueue {
     }
 
     final T result = await taskEntry.completer.future;
-    print('----QUEUE => done $caller');
+    //print('----QUEUE => done $caller');
     return result;
   }
 
@@ -220,10 +219,6 @@ class AsyncQueue {
         });
         taskEntry.completer.complete(value);
       }).catchError((dynamic error) {
-        if (error is JsonUnsupportedObjectError) {
-          print(error.stackTrace);
-        }
-
         Future<void>(() {
           _tasks.removeFirst();
           _runNext();

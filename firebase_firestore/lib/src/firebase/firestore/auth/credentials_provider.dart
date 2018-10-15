@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import '../util/listener.dart';
 import 'user.dart';
 
 /// A CredentialsProvider has a method to fetch an authorization token.
@@ -18,16 +17,7 @@ abstract class CredentialsProvider {
   /// request force refresh the token.
   void invalidateToken();
 
-  /// Sets the listener to be notified of credential changes
-  /// (sign-in / sign-out, token changes). It is immediately called once with
-  /// the initial user.
+  /// Stream that will receive credential changes (sign-in / sign-out, token
+  /// changes). It is immediately called once with the initial user.
   Stream<User> get onChange;
-
-  /// Sets the listener to be notified of credential changes
-  /// (sign-in / sign-out, token changes). It is immediately called once with
-  /// the initial user.
-  void setChangeListener(Listener<User> changeListener);
-
-  /// Removes the listener set with {@link #setChangeListener}.
-  void removeChangeListener();
 }

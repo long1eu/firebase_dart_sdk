@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/server_timestamp_behavior.dart';
@@ -20,6 +19,8 @@ import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
 void main() {
+  IntegrationTestUtil.currentDatabasePath = 'integration/server_timestamp';
+
   // Data written in tests via set.
   final Map<String, Object> setData = map(<dynamic>[
     'a',
@@ -49,9 +50,7 @@ void main() {
   StreamSubscription<DocumentSnapshot> listenerRegistration;
 
   setUp(() async {
-    IntegrationTestUtil.currentDatabasePath = 'integration/server_timestamp.db';
-    final FirebaseFirestore firestore = await testFirestore();
-    docRef = testDocument(firestore);
+    docRef = await testDocument();
     accumulator = EventAccumulator<DocumentSnapshot>();
     listenerRegistration = docRef
         .getSnapshots(MetadataChanges.include)
@@ -108,7 +107,7 @@ void main() {
     final Timestamp now = Timestamp.now();
     expect((when.seconds - now.seconds).abs() < deltaSec, isTrue,
         reason:
-            'resolved timestamp ($when) should be within $deltaSec\s of now ($now)');
+        'resolved timestamp ($when) should be within $deltaSec\s of now ($now)');
 
     // Validate the rest of the document.
     expect(snapshot.data, expectedDataWithTimestamp(when));
@@ -119,7 +118,7 @@ void main() {
   void verifyTimestampsAreEstimates(DocumentSnapshot snapshot) {
     expect(snapshot.exists, isTrue);
     final Timestamp when =
-        snapshot.getTimestamp('when', ServerTimestampBehavior.estimate);
+    snapshot.getTimestamp('when', ServerTimestampBehavior.estimate);
     expect(when, isNotNull);
     expect(snapshot.getData(ServerTimestampBehavior.estimate),
         expectedDataWithTimestamp(when));
@@ -127,8 +126,7 @@ void main() {
 
   /// Verifies a snapshot containing setData but using the previous field value
   /// for the timestamps.
-  void verifyTimestampsUsePreviousValue(
-      DocumentSnapshot current, DocumentSnapshot previous) {
+  void verifyTimestampsUsePreviousValue(DocumentSnapshot current, DocumentSnapshot previous) {
     expect(current.exists, isTrue);
     if (previous != null) {
       final Timestamp when = previous.getTimestamp('when');
@@ -167,7 +165,7 @@ void main() {
     verifyTimestampsUsePreviousValue(await accumulator.awaitLocalEvent(), null);
 
     final DocumentSnapshot previousSnapshot =
-        await accumulator.awaitRemoteEvent();
+    await accumulator.awaitRemoteEvent();
     verifyTimestampsAreResolved(previousSnapshot);
 
     await docRef.update(updateData);
@@ -187,7 +185,7 @@ void main() {
     expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
 
     final DocumentSnapshot remoteSnapshot =
-        await accumulator.awaitRemoteEvent();
+    await accumulator.awaitRemoteEvent();
     expect(remoteSnapshot.get('a'), const TypeMatcher<Timestamp>());
     expect(remoteSnapshot.get('a', ServerTimestampBehavior.estimate),
         const TypeMatcher<Timestamp>());
@@ -196,25 +194,25 @@ void main() {
   });
 
   test('testServerTimestampsCanRetainPreviousValueThroughConsecutiveUpdates',
-      () async {
-    await writeInitialData();
-    await docRef.firestore.client.disableNetwork();
-    await accumulator.awaitRemoteEvent();
-
-    docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]);
-    DocumentSnapshot localSnapshot = await accumulator.awaitLocalEvent();
-    expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
-
-    docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]);
-    localSnapshot = await accumulator.awaitLocalEvent();
-    expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
-
-    await docRef.firestore.client.enableNetwork();
-
-    final DocumentSnapshot remoteSnapshot =
+          () async {
+        await writeInitialData();
+        await docRef.firestore.client.disableNetwork();
         await accumulator.awaitRemoteEvent();
-    expect(remoteSnapshot.get('a'), const TypeMatcher<Timestamp>());
-  });
+
+        docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]);
+        DocumentSnapshot localSnapshot = await accumulator.awaitLocalEvent();
+        expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
+
+        docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]);
+        localSnapshot = await accumulator.awaitLocalEvent();
+        expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
+
+        await docRef.firestore.client.enableNetwork();
+
+        final DocumentSnapshot remoteSnapshot =
+        await accumulator.awaitRemoteEvent();
+        expect(remoteSnapshot.get('a'), const TypeMatcher<Timestamp>());
+      });
 
   test('testServerTimestampsUsesPreviousValueFromLocalMutation', () async {
     await writeInitialData();
@@ -235,7 +233,7 @@ void main() {
     await docRef.firestore.client.enableNetwork();
 
     final DocumentSnapshot remoteSnapshot =
-        await accumulator.awaitRemoteEvent();
+    await accumulator.awaitRemoteEvent();
     expect(remoteSnapshot.get('a'), const TypeMatcher<Timestamp>());
   });
 
@@ -273,24 +271,24 @@ void main() {
   });
 
   test('testServerTimestampsFailViaTransactionUpdateOnNonexistentDocument',
-      () async {
-    bool hadError = false;
-    try {
-      await docRef.firestore.runTransaction<void>((Transaction transaction) {
-        transaction.update(docRef, updateData);
-        return null;
+          () async {
+        bool hadError = false;
+        try {
+          await docRef.firestore.runTransaction<void>((Transaction transaction) {
+            transaction.update(docRef, updateData);
+            return null;
+          });
+        } on FirebaseFirestoreError catch (e) {
+          hadError = true;
+          expect(e, isNotNull);
+          // TODO: This should be a NOT_FOUND, but right now we retry transactions
+          // on any error and so this turns into ABORTED instead.
+          expect(e.code, FirebaseFirestoreErrorCode.aborted);
+        } catch (e) {
+          assert(false, 'This should not happen.');
+        }
+        expect(hadError, isTrue);
       });
-    } on FirebaseFirestoreError catch (e) {
-      hadError = true;
-      expect(e, isNotNull);
-      // TODO: This should be a NOT_FOUND, but right now we retry transactions
-      // on any error and so this turns into ABORTED instead.
-      expect(e.code, FirebaseFirestoreErrorCode.aborted);
-    } catch (e) {
-      assert(false, 'This should not happen.');
-    }
-    expect(hadError, isTrue);
-  });
 }
 
 // ignore: always_specify_types

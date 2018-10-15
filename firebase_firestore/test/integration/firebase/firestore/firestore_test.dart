@@ -24,11 +24,10 @@ import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
 void main() {
-  FirebaseFirestore firestore;
+  IntegrationTestUtil.currentDatabasePath = 'integration/firestore';
 
   setUp(() async {
-    IntegrationTestUtil.currentDatabasePath = 'integration/firestore.db';
-    firestore = await testFirestore();
+    await testFirestore();
   });
 
   tearDown(() async {
@@ -38,7 +37,7 @@ void main() {
 
   test('testCanUpdateAnExistingDocument', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -60,7 +59,7 @@ void main() {
 
   test('testCanMergeDataWithAnExistingDocumentUsingSet', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -90,7 +89,7 @@ void main() {
 
   test('testCanMergeServerTimestamps', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>['untouched', true]);
     final Map<String, Object> mergeData = map(<dynamic>[
       'time',
@@ -109,7 +108,7 @@ void main() {
 
   test('testCanDeleteFieldUsingMerge', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
 
     final Map<String, Object> initialValue = map(<dynamic>[
       'untouched',
@@ -144,7 +143,7 @@ void main() {
 
   test('testCanDeleteFieldUsingMergeFields', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
 
     final Map<String, Object> initialValue = map(<dynamic>[
       'untouched',
@@ -189,7 +188,7 @@ void main() {
 
   test('testCanSetServerTimestampsUsingMergeFields', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
 
     final Map<String, Object> initialValue = map(<dynamic>[
       'untouched',
@@ -221,7 +220,7 @@ void main() {
 
   test('testMergeReplacesArrays', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'untouched',
       true,
@@ -265,7 +264,7 @@ void main() {
 
   test('testCanDeepMergeDataWithAnExistingDocumentUsingSet', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'owner.data',
       map<dynamic>(<dynamic>['name', 'Jonny', 'email', 'old@xyz.com'])
@@ -294,7 +293,7 @@ void main() {
 
   test('testFieldMaskCannotContainMissingFields', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
 
     bool hadError = false;
     try {
@@ -313,7 +312,7 @@ void main() {
 
   test('testFieldsNotInFieldMaskAreIgnored', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -336,7 +335,7 @@ void main() {
 
   test('testFieldDeletesNotInFieldMaskAreIgnored', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -359,7 +358,7 @@ void main() {
 
   test('testFieldTransformsNotInFieldMaskAreIgnored', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -387,7 +386,7 @@ void main() {
 
   test('testFieldMaskEmpty', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -404,7 +403,7 @@ void main() {
 
   test('testFieldInFieldMaskMultipleTimes', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -433,7 +432,7 @@ void main() {
 
   test('testCanDeleteAFieldWithAnUpdate', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -455,7 +454,7 @@ void main() {
 
   test('testCanUpdateFieldsWithDots', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     await documentReference.set(map(<String>['a.b', 'old', 'c.d', 'old']));
 
     await documentReference.updateFromList(<dynamic>[
@@ -473,7 +472,7 @@ void main() {
 
   test('testCanUpdateNestedFields', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     await documentReference.set(map(<dynamic>[
       'a',
       map<String>(<String>['b', 'old']),
@@ -497,7 +496,7 @@ void main() {
 
   test('testDeleteDocument', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
     final Map<String, Object> data = map(<String>['value', 'bar']);
     await documentReference.set(data);
     DocumentSnapshot doc = await documentReference.get();
@@ -509,7 +508,7 @@ void main() {
 
   test('testCannotUpdateNonexistentDocument', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document();
+    (await testCollection('rooms')).document();
 
     bool hadError = false;
     try {
@@ -527,7 +526,7 @@ void main() {
 
   test('testCanRetrieveNonexistentDocument', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document();
+    (await testCollection('rooms')).document();
     final DocumentSnapshot documentSnapshot = await documentReference.get();
     expect(documentSnapshot.exists, isFalse);
     expect(documentSnapshot.data, isNull);
@@ -557,14 +556,14 @@ void main() {
   test('testAddingToACollectionYieldsTheCorrectDocumentReference', () async {
     final Map<String, Object> data = map(<dynamic>['foo', 1.0]);
     final DocumentReference documentReference =
-        await testCollection(firestore, 'rooms').add(data);
+    await (await testCollection('rooms')).add(data);
     final DocumentSnapshot document = await documentReference.get();
     expect(document.data, data);
   });
 
   test('testQueriesAreValidatedOnClient', () async {
     // NOTE: Failure cases are validated in ValidationTest.
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     final Query query = collection.whereGreaterThanOrEqualTo('x', 32);
     // Same inequality field works;
     query.whereLessThanOrEqualTo('x', 'cat');
@@ -589,8 +588,7 @@ void main() {
   });
 
   test('testDocumentSnapshotEventsNonExistent', () async {
-    final DocumentReference docRef =
-        testCollection(firestore, 'rooms').document();
+    final DocumentReference docRef = (await testCollection('rooms')).document();
 
     final Completer<void> completer = Completer<dynamic>();
     final StreamSubscription<DocumentSnapshot> listener = docRef
@@ -609,8 +607,7 @@ void main() {
   });
 
   test('testDocumentSnapshotEventsForAdd', () async {
-    final DocumentReference docRef =
-        testCollection(firestore, 'rooms').document();
+    final DocumentReference docRef = (await testCollection('rooms')).document();
 
     final AwaitHelper<void> dataLatch = AwaitHelper<void>(3);
     final AwaitHelper<void> emptyLatch = AwaitHelper<void>(1);
@@ -649,10 +646,11 @@ void main() {
     final Map<String, Object> initialData = map(<dynamic>['a', 1.0]);
     final Map<String, Object> updateData = map(<dynamic>['a', 2.0]);
     final CollectionReference testCollection = await testCollectionWithDocs(
-        firestore, map<Map<String, dynamic>>(<dynamic>['doc', initialData]));
+        map<Map<String, dynamic>>(<dynamic>['doc', initialData]));
+
     final DocumentReference docRef = testCollection.document('doc');
-    final AwaitHelper<void> initialLatch = AwaitHelper<void>(2);
-    final AwaitHelper<void> latch = AwaitHelper<void>(4);
+    final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
+    final AwaitHelper<void> latch = AwaitHelper<void>(3);
 
     final StreamSubscription<DocumentSnapshot> listener = docRef
         .getSnapshots(MetadataChanges.include)
@@ -660,14 +658,7 @@ void main() {
       final int latchCount = latch.length;
       latch.completeNext();
       switch (latchCount) {
-        case 4:
-          expect(doc.data, initialData);
-          expect(doc.metadata.hasPendingWrites, isFalse);
-          expect(doc.metadata.isFromCache, isTrue);
-          initialLatch.completeNext();
-          break;
         case 3:
-          print(doc.data);
           expect(doc.data, initialData);
           expect(doc.metadata.hasPendingWrites, isFalse);
           expect(doc.metadata.isFromCache, isFalse);
@@ -696,8 +687,8 @@ void main() {
 
   test('testDocumentSnapshotEventsForDelete', () async {
     final Map<String, Object> initialData = map(<dynamic>['a', 1.0]);
-    final DocumentReference docRef = (await testCollectionWithDocs(
-            firestore, map(<dynamic>['doc', initialData])))
+    final DocumentReference docRef =
+    (await testCollectionWithDocs(map(<dynamic>['doc', initialData])))
         .document('doc');
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
     final AwaitHelper<void> latch = AwaitHelper<void>(2);
@@ -729,7 +720,7 @@ void main() {
   });
 
   test('testQuerySnapshotEventsForAdd', () async {
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     final DocumentReference docRef = collection.document();
     final Map<String, Object> data = map(<dynamic>['a', 1.0]);
     final AwaitHelper<void> emptyLatch = AwaitHelper<void>(1);
@@ -773,12 +764,12 @@ void main() {
     final Map<String, Object> initialData = map(<dynamic>['b', 1.0]);
     final Map<String, Object> updateData = map(<dynamic>['b', 2.0]);
 
-    final CollectionReference collection = await testCollectionWithDocs(
-        firestore, map(<dynamic>['doc', initialData]));
+    final CollectionReference collection =
+    await testCollectionWithDocs(map(<dynamic>['doc', initialData]));
     final DocumentReference docRef = collection.document('doc');
 
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
-    final AwaitHelper<void> dataLatch = AwaitHelper<void>(4);
+    final AwaitHelper<void> dataLatch = AwaitHelper<void>(3);
 
     final StreamSubscription<QuerySnapshot> listener = collection
         .getSnapshots(MetadataChanges.include)
@@ -787,20 +778,13 @@ void main() {
       dataLatch.completeNext();
 
       switch (count) {
-        case 4:
+        case 3:
           expect(snapshot.length, 1);
           final DocumentSnapshot document = snapshot.documents[0];
           expect(document.data, initialData);
           expect(document.metadata.hasPendingWrites, isFalse);
-          expect(document.metadata.isFromCache, isTrue);
+          expect(document.metadata.isFromCache, isFalse);
           initialLatch.completeNext();
-          break;
-        case 3:
-          expect(snapshot.length, 1);
-          final DocumentSnapshot document2 = snapshot.documents[0];
-          expect(document2.data, updateData);
-          expect(document2.metadata.hasPendingWrites, isTrue);
-          expect(document2.metadata.isFromCache, isTrue);
           break;
         case 2:
           expect(snapshot.length, 1);
@@ -829,8 +813,8 @@ void main() {
 
   test('testQuerySnapshotEventsForDelete', () async {
     final Map<String, Object> initialData = map(<dynamic>['a', 1.0]);
-    final CollectionReference collection = await testCollectionWithDocs(
-        firestore, map(<dynamic>['doc', initialData]));
+    final CollectionReference collection =
+    await testCollectionWithDocs(map(<dynamic>['doc', initialData]));
     final DocumentReference docRef = collection.document('doc');
 
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
@@ -864,7 +848,7 @@ void main() {
   });
 
   test('testMetadataOnlyChangesAreNotFiredWhenNoOptionsProvided', () async {
-    final DocumentReference docRef = testCollection(firestore).document();
+    final DocumentReference docRef = (await testCollection()).document();
 
     final Map<String, Object> initialData = map(<dynamic>['a', 1.0]);
     final Map<String, Object> updateData = map(<dynamic>['b', 1.0]);
@@ -894,15 +878,18 @@ void main() {
   });
 
   test('testDocumentReferenceExposesFirestore', () async {
+    final FirebaseFirestore firestore = await testFirestore();
     expect(
         identical(firestore.document('foo/bar').firestore, firestore), isTrue);
   });
 
   test('testCollectionReferenceExposesFirestore', () async {
+    final FirebaseFirestore firestore = await testFirestore();
     expect(identical(firestore.collection('foo').firestore, firestore), isTrue);
   });
 
   test('testDocumentReferenceEquality', () async {
+    final FirebaseFirestore firestore = await testFirestore();
     final DocumentReference docRef = firestore.document('foo/bar');
     expect(firestore.document('foo/bar'), docRef);
     expect(docRef, docRef.collection('blah').parent);
@@ -914,19 +901,20 @@ void main() {
   });
 
   test('testQueryReferenceEquality', () async {
+    final FirebaseFirestore firestore = await testFirestore();
     final Query query =
-        firestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
+    firestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
     final Query query2 =
-        firestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
+    firestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
     expect(query2, query);
 
     final Query query3 =
-        firestore.collection('foo').orderBy('BAR').whereEqualTo('baz', 42);
+    firestore.collection('foo').orderBy('BAR').whereEqualTo('baz', 42);
     expect(query, isNot(query3));
 
     final FirebaseFirestore otherFirestore = await testFirestore();
     final Query query4 =
-        otherFirestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
+    otherFirestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
     expect(query4, isNot(query));
   });
 
@@ -961,7 +949,9 @@ void main() {
   test('testCanQueueWritesWhileOffline', () async {
     // Arrange
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document('eros');
+    (await testCollection('rooms')).document('eros');
+    final FirebaseFirestore firestore = documentReference.firestore;
+
     final Map<String, Object> data = map(<dynamic>[
       'desc',
       'Description',
@@ -984,9 +974,10 @@ void main() {
 
   test('testCantGetDocumentsWhileOffline', () async {
     final DocumentReference documentReference =
-        testCollection(firestore, 'rooms').document();
-
+    (await testCollection('rooms')).document();
+    final FirebaseFirestore firestore = documentReference.firestore;
     await firestore.disableNetwork();
+
     expect(() => documentReference.get(), throwsA(anything));
 
     // Write the document to the local cache.
@@ -1012,9 +1003,9 @@ void main() {
   });
 
   test('testWriteStreamReconnectsAfterIdle', () async {
-    final DocumentReference doc = testDocument(firestore);
+    final DocumentReference doc = await testDocument();
+    final FirebaseFirestore firestore = doc.firestore;
 
-    firestore.getAsyncQueue();
     await doc.set(map(<String>['foo', 'bar']));
     await Future<void>.delayed(const Duration(milliseconds: 250));
     await firestore
@@ -1024,7 +1015,8 @@ void main() {
   });
 
   test('testWatchStreamReconnectsAfterIdle', () async {
-    final DocumentReference doc = testDocument(firestore);
+    final DocumentReference doc = await testDocument();
+    final FirebaseFirestore firestore = doc.firestore;
 
     await waitForOnlineSnapshot(doc);
     await Future<void>.delayed(const Duration(milliseconds: 250));
@@ -1035,6 +1027,7 @@ void main() {
   test('testCanDisableAndEnableNetworking', () async {
     // There's not currently a way to check if networking is in fact disabled,
     // so for now just test that the method is well-behaved and doesn't throw.
+    final FirebaseFirestore firestore = await testFirestore();
     await firestore.enableNetwork();
     await firestore.enableNetwork();
     await firestore.disableNetwork();

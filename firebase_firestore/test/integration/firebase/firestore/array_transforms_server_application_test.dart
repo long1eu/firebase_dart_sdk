@@ -6,7 +6,6 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
 import 'package:firebase_firestore/src/firebase/firestore/source.dart';
@@ -21,15 +20,13 @@ import '../../../util/test_util.dart';
 /// an updated document via watch). As such they also rely on persistence being
 /// enabled so documents remain in the cache after the write.
 void main() {
-  FirebaseFirestore firestore;
+  IntegrationTestUtil.currentDatabasePath = 'integration/array_transforms';
+
   // A document reference to read and write to.
   DocumentReference docRef;
 
   setUp(() async {
-    IntegrationTestUtil.currentDatabasePath = 'integration/array_transforms.db';
-    firestore = await testFirestore();
-
-    docRef = testDocument(firestore);
+    docRef = await testDocument();
   });
 
   tearDown(() async {
@@ -54,7 +51,7 @@ void main() {
   test('updateWithNoCachedBaseDoc', () async {
     // Write an initial document in an isolated Firestore instance so it's not
     // stored in our cache.
-    (await testFirestore(newTestSettings(),
+    await (await testFirestore(newTestSettings(),
             'integration/array_transforms_updateWithNoCachedBaseDoc.db'))
         .document(docRef.path)
         .set(map(<dynamic>[

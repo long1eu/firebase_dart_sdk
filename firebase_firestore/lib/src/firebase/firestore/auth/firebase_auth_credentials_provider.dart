@@ -6,68 +6,66 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
+import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
+import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:rxdart/rxdart.dart';
 
-import '../firebase_firestore_error.dart';
-import '../util/listener.dart';
-import 'credentials_provider.dart';
-import 'user.dart';
-
+/// [FirebaseAuthCredentialsProvider] uses Firebase Auth via [FirebaseApp] to
+/// get an auth token.
+///
+/// * NOTE: To simplify the implementation, it requires that you call
+/// [setChangeListener] no more than once and don't call [getToken] after
+/// calling [removeChangeListener].
 class FirebaseAuthCredentialsProvider extends CredentialsProvider {
+  /// Stream that will receive credential changes (sign-in / sign-out, token
+  /// changes).
   final BehaviorSubject<User> _onUserChange;
-  final InternalAuthProvider authProvider;
 
-  /// The listener registered with FirebaseApp; used to stop receiving auth
-  /// changes once changeListener is removed.
-  OnIdTokenChanged idTokenObserver;
-
-  /// The listener to be notified of credential changes
-  /// (sign-in / sign-out, token changes).
-  Listener<User> changeListener;
-
-  /// The current user as reported to us via our IdTokenObserver.
-  User currentUser;
+  final InternalAuthProvider _authProvider;
 
   /// Counter used to detect if the token changed while a getToken request was
   /// outstanding.
-  int tokenCounter;
+  int _tokenCounter;
 
-  bool forceRefresh;
+  bool _forceRefresh;
 
-  FirebaseAuthCredentialsProvider(this.authProvider)
-      : _onUserChange = BehaviorSubject<User>() {
-    idTokenObserver = tokenObserver;
-    currentUser = getUser();
-    tokenCounter = 0;
-    authProvider.addIdTokenObserver(idTokenObserver);
-    _onUserChange.add(currentUser);
+  FirebaseAuthCredentialsProvider(this._authProvider)
+      : _onUserChange = BehaviorSubject<User>(
+      seedValue: _authProvider.uid != null
+                 ? User(_authProvider.uid)
+                 : User.unauthenticated) {
+    _tokenCounter = 0;
+    _onUserChange.onListen =
+        () => _authProvider.addIdTokenObserver(tokenObserver);
+    _onUserChange.onCancel =
+        () => _authProvider.removeIdTokenObserver(tokenObserver);
   }
 
+  /// The listener registered with FirebaseApp; used to stop receiving auth
+  /// changes once changeListener is removed.
   void tokenObserver(InternalTokenResult tokenResult) {
-    currentUser = getUser();
-    tokenCounter++;
-
-    if (changeListener != null) {
-      changeListener(currentUser);
-    }
+    _tokenCounter++;
+    _onUserChange.add(getUser());
   }
 
   @override
   Future<String> get token async {
-    final bool doForceRefresh = forceRefresh;
-    forceRefresh = false;
+    final bool doForceRefresh = _forceRefresh;
+    _forceRefresh = false;
 
     // Take note of the current value of the tokenCounter so that this method
-    // can fail (with a FirebaseFirestoreException) if there is a token change
+    // can fail (with a FirebaseFirestoreError) if there is a token change
     // while the request is outstanding.
-    final int savedCounter = tokenCounter;
+    final int savedCounter = _tokenCounter;
 
     final GetTokenResult result =
-        await authProvider.getAccessToken(doForceRefresh);
+    await _authProvider.getAccessToken(doForceRefresh);
 
-    // Cancel the request since the token changed while the request was outstanding so the
-    // response is potentially for a previous user (which user, we can't be sure).
-    if (savedCounter != tokenCounter) {
+    // Cancel the request since the token changed while the request was
+    // outstanding so the response is potentially for a previous user (which
+    // user, we can't be sure).
+    if (savedCounter != _tokenCounter) {
       throw FirebaseFirestoreError(
         'getToken aborted due to token change',
         FirebaseFirestoreErrorCode.aborted,
@@ -78,26 +76,12 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   }
 
   @override
-  void invalidateToken() => forceRefresh = true;
+  void invalidateToken() => _forceRefresh = true;
 
-  @override
-  void setChangeListener(Listener<User> changeListener) {
-    this.changeListener = changeListener;
-
-    // Fire the initial event.
-    changeListener(currentUser);
-  }
-
-  @override
-  void removeChangeListener() {
-    changeListener = null;
-    authProvider.removeIdTokenObserver(idTokenObserver);
-  }
-
-  /// Returns the current [User] as obtained from the given FirebaseApp
+  /// Returns the current [User] as obtained from the given [FirebaseApp]
   /// instance.
   User getUser() {
-    final String uid = authProvider.uid;
+    final String uid = _authProvider.uid;
     return uid != null ? User(uid) : User.unauthenticated;
   }
 

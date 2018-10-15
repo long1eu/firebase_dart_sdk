@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:firebase_common/firebase_common.dart';
+
 /// Simple wrapper around a nullable UID. Mostly exists to make code more
 /// readable and for use as a key in maps (since keys cannot be null).
 class User {
@@ -24,5 +26,8 @@ class User {
   int get hashCode => uid.hashCode;
 
   @override
-  String toString() => 'User{uid: $uid}';
+  String toString() {
+    return (ToStringHelper(runtimeType)
+      ..add('uid', uid)).toString();
+  }
 }

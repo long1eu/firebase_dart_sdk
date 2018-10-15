@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
 import 'package:test/test.dart';
@@ -16,12 +15,12 @@ import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-/// Note: Transforms are tested pretty thoroughly via ServerTimestampTest (via
+/// Note: Transforms are tested pretty thoroughly via [ServerTimestampTest] (via
 /// set, update, transactions, nested in documents, multiple transforms
 /// together, etc.) and so these tests mostly focus on the array transform
 /// semantics.
 void main() {
-  FirebaseFirestore firestore;
+  IntegrationTestUtil.currentDatabasePath = 'integration/array_transforms';
 
   // A document reference to read and write to.
   DocumentReference docRef;
@@ -34,10 +33,7 @@ void main() {
   StreamSubscription<DocumentSnapshot> listenerRegistration;
 
   setUp(() async {
-    IntegrationTestUtil.currentDatabasePath = 'integration/array_transforms.db';
-    firestore = await testFirestore();
-
-    docRef = testDocument(firestore);
+    docRef = await testDocument();
     accumulator = EventAccumulator<DocumentSnapshot>();
     listenerRegistration = docRef
         .getSnapshots(MetadataChanges.include)

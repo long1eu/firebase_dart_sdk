@@ -108,8 +108,8 @@ class WatchStreamCallback extends StreamCallback {
   final OnWatchChange onWatchChange;
 
   const WatchStreamCallback({
-    @required Future<void> Function() onOpen,
-    @required Future<void> Function(GrpcError status) onClose,
+                              @required Task<void> onOpen,
+                              @required OnClose onClose,
     @required this.onWatchChange,
   }) : super(onOpen: onOpen, onClose: onClose);
 }

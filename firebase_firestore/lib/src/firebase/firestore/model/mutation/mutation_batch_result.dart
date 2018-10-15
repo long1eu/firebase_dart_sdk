@@ -4,6 +4,7 @@
 
 import 'dart:typed_data';
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_collections.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -54,5 +55,14 @@ class MutationBatchResult {
       streamToken,
       docVersions,
     );
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+      ..add('batch', batch)..add('commitVersion', commitVersion)..add(
+          'mutationResults', mutationResults)..add(
+          'streamToken', streamToken)..add('docVersions', docVersions))
+        .toString();
   }
 }

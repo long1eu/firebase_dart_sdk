@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/geo_point.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
@@ -16,12 +15,9 @@ import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
 void main() {
-  FirebaseFirestore firestore;
+  IntegrationTestUtil.currentDatabasePath = 'integration/type_test';
 
-  setUp(() async {
-    IntegrationTestUtil.currentDatabasePath = 'integration/firestore.db';
-    firestore = await testFirestore();
-  });
+  setUp(() => testFirestore());
 
   tearDown(() async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -35,13 +31,13 @@ void main() {
     expect(doc.data, data);
   }
 
-  DocumentReference testDoc() {
-    return testCollection(firestore).document();
+  Future<DocumentReference> testDoc() async {
+    return (await testCollection()).document();
   }
 
   test('testCanReadAndWriteNullFields', () async {
     await verifySuccessfulWriteReadCycle(
-        map(<dynamic>['a', 1.0, 'b', null]), testDoc());
+        map(<dynamic>['a', 1.0, 'b', null]), await testDoc());
   });
 
   test('testCanReadAndWriteListFields', () async {
@@ -55,7 +51,7 @@ void main() {
             null
           ]
         ]),
-        testDoc());
+        await testDoc());
   });
 
   test('testCanReadAndWriteBlobFields', () async {
@@ -64,7 +60,7 @@ void main() {
           'blob',
           blob(<int>[1, 2, 3])
         ]),
-        testDoc());
+        await testDoc());
   });
 
   test('testCanReadAndWriteGeoPointFields', () async {
@@ -74,24 +70,24 @@ void main() {
           //ignore: prefer_const_constructors
           GeoPoint(1.23, 4.56)
         ]),
-        testDoc());
+        await testDoc());
   });
 
   test('testCanReadAndWriteTimestamps', () async {
     final Timestamp timestamp = Timestamp(100, 123000000);
     await verifySuccessfulWriteReadCycle(
-        map(<dynamic>['timestamp', timestamp]), testDoc());
+        map(<dynamic>['timestamp', timestamp]), await testDoc());
   });
 
   test('testCanReadAndWriteDates', () async {
     final DateTime date = DateTime.fromMillisecondsSinceEpoch(1491847082123);
     // Tests are set up to read back Timestamps, not Dates.
     await verifySuccessfulWriteReadCycle(
-        map(<dynamic>['date', Timestamp.fromDate(date)]), testDoc());
+        map(<dynamic>['date', Timestamp.fromDate(date)]), await testDoc());
   });
 
   test('testCanUseTypedAccessors', () async {
-    final DocumentReference doc = testDoc();
+    final DocumentReference doc = await testDoc();
     final Map<String, Object> data = map(<dynamic>[
       'null',
       null,
@@ -139,7 +135,7 @@ void main() {
   });
 
   test('testTypeAccessorsCanReturnNull', () async {
-    final DocumentReference doc = testDoc();
+    final DocumentReference doc = await testDoc();
     final Map<String, Object> data = map();
 
     await doc.set(data);
@@ -157,13 +153,13 @@ void main() {
   });
 
   test('testCanReadAndWriteDocumentReferences', () async {
-    final DocumentReference docRef = testDoc();
+    final DocumentReference docRef = await testDoc();
     final Map<String, Object> data = map(<dynamic>['a', 42, 'ref', docRef]);
     await verifySuccessfulWriteReadCycle(data, docRef);
   });
 
   test('testCanReadAndWriteDocumentReferencesInLists', () async {
-    final DocumentReference docRef = testDoc();
+    final DocumentReference docRef = await testDoc();
     final List<Object> refs = <Object>[docRef];
     final Map<String, Object> data = map(<dynamic>['a', 42, 'refs', refs]);
     await verifySuccessfulWriteReadCycle(data, docRef);

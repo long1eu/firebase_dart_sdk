@@ -53,7 +53,6 @@ class FirestoreChannel {
       }
     ]);
 
-    GrpcMetadata;
     return FirestoreChannel._(
       asyncQueue,
       credentialsProvider,
@@ -93,7 +92,8 @@ class FirestoreChannel {
 
     observer.onReady();
 
-    return BidiChannel<ReqT, RespT>(controller, call);
+    return BidiChannel<ReqT, RespT>(
+        controller, call, () => _channel.terminate());
   }
 
   /// Creates and starts a streaming response RPC.
@@ -175,8 +175,9 @@ class FirestoreChannel {
 class BidiChannel<ReqT, RespT> {
   final Sink<ReqT> _sink;
   final ClientCall<ReqT, RespT> _call;
+  final Future<void> Function() onClose;
 
-  BidiChannel(this._sink, this._call);
+  BidiChannel(this._sink, this._call, this.onClose);
 
   void add(ReqT data) => _sink.add(data);
 
@@ -195,7 +196,7 @@ class BidiChannel<ReqT, RespT> {
   }
 
   Future<void> cancel() async {
-    await _call.cancel();
     _sink.close();
+    await onClose();
   }
 }

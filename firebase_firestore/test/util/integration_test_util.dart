@@ -27,25 +27,22 @@ import 'test_util.dart';
 
 /// A set of helper methods for tests
 class IntegrationTestUtil {
+  static int dbIndex = 0;
+
   // Alternate project ID for creating 'bad' references. Doesn't actually need
   // to work.
   static const String BAD_PROJECT_ID = 'test-project-2';
 
   /// Online status of all active Firestore clients.
-  /*p*/
   static final Map<FirebaseFirestore, bool> firestoreStatus =
-      <FirebaseFirestore, bool>{};
+  <FirebaseFirestore, bool>{};
 
-  /*p*/
   static const int SEMAPHORE_WAIT_TIMEOUT_MS = 30000;
 
-  /*p*/
   static const int SHUTDOWN_WAIT_TIMEOUT_MS = 10000;
 
-  /*p*/
   static const int BATCH_WAIT_TIMEOUT_MS = 120000;
 
-  /*p*/
   static final FirestoreProvider provider = FirestoreProvider();
 
   /// TODO: There's some flakiness with hexa / emulator / whatever that causes
@@ -113,11 +110,10 @@ class IntegrationTestUtil {
   /// Initializes a new Firestore instance that can be used in testing. It is
   /// guaranteed to not share state with other instances returned from this
   /// call.
-  static Future<FirebaseFirestore> testFirestoreInstance(
-      String projectId,
-      LogLevel logLevel,
-      FirebaseFirestoreSettings settings,
-      String dbPath) async {
+  static Future<FirebaseFirestore> testFirestoreInstance(String projectId,
+                                                         LogLevel logLevel,
+                                                         FirebaseFirestoreSettings settings,
+                                                         String dbPath) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.setLogLevel(logLevel);
 
@@ -125,10 +121,13 @@ class IntegrationTestUtil {
     Persistence.indexingSupportEnabled = true;
 
     final DatabaseId databaseId =
-        DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
+    DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
     final String persistenceKey = 'db${firestoreStatus.length}';
 
-    final String dbFullPath = '${Directory.current.path}/build/test/$dbPath';
+    print('index: $dbIndex');
+    final String dbFullPath =
+        '${Directory.current.path}/build/test/$dbPath\_${dbIndex++}.db';
+
     clearPersistence(dbFullPath);
 
     final AsyncQueue asyncQueue = AsyncQueue();
@@ -138,14 +137,14 @@ class IntegrationTestUtil {
       persistenceKey,
       EmptyCredentialsProvider(),
       asyncQueue,
-      (String path,
-          {int version,
-          OnConfigure onConfigure,
-          OnCreate onCreate,
-          OnVersionChange onUpgrade,
-          OnVersionChange onDowngrade,
-          OnOpen onOpen}) async {
-        final DatabaseMock db = await DatabaseMock.create(dbPath,
+          (String path,
+           {int version,
+             OnConfigure onConfigure,
+             OnCreate onCreate,
+             OnVersionChange onUpgrade,
+             OnVersionChange onDowngrade,
+             OnOpen onOpen}) async {
+        final DatabaseMock db = await DatabaseMock.create(dbFullPath,
             version: version,
             onConfigure: onConfigure,
             onCreate: onCreate,
@@ -169,35 +168,34 @@ class IntegrationTestUtil {
     firestoreStatus.clear();
   }
 
-  static DocumentReference testDocument(FirebaseFirestore firestore) {
-    return testCollection(firestore, 'test-collection').document();
+  static Future<DocumentReference> testDocument() async {
+    return (await testCollection('test-collection')).document();
   }
 
   static Future<DocumentReference> testDocumentWithData(
-      FirebaseFirestore firestore, Map<String, Object> data) async {
-    final DocumentReference docRef = testDocument(firestore);
+      Map<String, Object> data) async {
+    final DocumentReference docRef = await testDocument();
     await docRef.set(data);
     return docRef;
   }
 
-  static CollectionReference testCollection(FirebaseFirestore firestore,
-      [String name]) {
-    return firestore
+  static Future<CollectionReference> testCollection([String name]) async {
+    return (await testFirestore())
         .collection(name == null ? Util.autoId() : '$name${Util.autoId()}');
   }
 
   static Future<CollectionReference> testCollectionWithDocs(
-      FirebaseFirestore firestore,
       Map<String, Map<String, Object>> docs) async {
-    final CollectionReference collection = testCollection(firestore);
-    final CollectionReference writer = firestore.collection(collection.id);
+    final CollectionReference collection = await testCollection();
+    final CollectionReference writer =
+    (await testFirestore()).collection(collection.id);
 
     await writeAllDocs(writer, docs);
     return collection;
   }
 
   static Future<void> writeAllDocs(CollectionReference collection,
-      Map<String, Map<String, Object>> docs) async {
+                                   Map<String, Map<String, Object>> docs) async {
     for (MapEntry<String, Map<String, Object>> doc in docs.entries) {
       await collection.document(doc.key).set(doc.value);
     }

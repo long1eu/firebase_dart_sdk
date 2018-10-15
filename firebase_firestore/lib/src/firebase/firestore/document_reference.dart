@@ -9,6 +9,7 @@ import 'package:firebase_firestore/src/firebase/firestore/collection_reference.d
 import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
     as core;
+import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
@@ -24,6 +25,7 @@ import 'package:firebase_firestore/src/firebase/firestore/source.dart';
 import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// A [DocumentReference] refers to a document location in a Firestore database
 /// and can be used to write, read, or listen to the location. There may or may
@@ -219,8 +221,9 @@ class DocumentReference {
   Stream<DocumentSnapshot> _getSnapshotsInternal(ListenOptions options) {
     final core.Query query = core.Query.atPath(key.path);
 
-    return firestore.client //
-        .listen(query, options)
+    return Observable<QueryListener>.fromFuture(
+        firestore.client.listen(query, options))
+        .flatMap((QueryListener it) => it)
         .map((ViewSnapshot snapshot) {
       Assert.hardAssert(snapshot.documents.length <= 1,
           'Too many documents returned on a document query');

@@ -18,23 +18,10 @@ import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-// public void (.+?)\(\) \{([\S\s]*?)\}([\S\s]*?)@Test
-
-const map = TestUtil.map;
-const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
-const testFirestore = IntegrationTestUtil.testFirestore;
-const writeAllDocs = IntegrationTestUtil.writeAllDocs;
-const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;
-const testCollection = IntegrationTestUtil.testCollection;
-
 void main() {
-  FirebaseFirestore firestore;
+  IntegrationTestUtil.currentDatabasePath = 'integration/query';
 
-  setUp(() async {
-    IntegrationTestUtil.currentDatabasePath = 'integration/query.db';
-    firestore = await testFirestore();
-  });
+  setUp(() => testFirestore());
 
   tearDown(() async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -42,16 +29,15 @@ void main() {
   });
 
   test('testLimitQueries', () async {
-    final CollectionReference collection = await testCollectionWithDocs(
-        firestore,
-        map<Map<String, dynamic>>(<dynamic>[
-          'a',
-          map<String>(<String>['k', 'a']),
-          'b',
-          map<String>(<String>['k', 'b']),
-          'c',
-          map<String>(<String>['k', 'c'])
-        ]));
+    final CollectionReference collection =
+    await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+      'a',
+      map<String>(<String>['k', 'a']),
+      'b',
+      map<String>(<String>['k', 'b']),
+      'c',
+      map<String>(<String>['k', 'c'])
+    ]));
 
     final Query query = collection.limit(2);
     final QuerySnapshot set = await query.get();
@@ -64,18 +50,17 @@ void main() {
   });
 
   test('testLimitQueriesUsingDescendingSortOrder', () async {
-    final CollectionReference collection = await testCollectionWithDocs(
-        firestore,
-        map<Map<String, dynamic>>(<dynamic>[
-          'a',
-          map<dynamic>(<dynamic>['k', 'a', 'sort', 0]),
-          'b',
-          map<dynamic>(<dynamic>['k', 'b', 'sort', 1]),
-          'c',
-          map<dynamic>(<dynamic>['k', 'c', 'sort', 1]),
-          'd',
-          map<dynamic>(<dynamic>['k', 'd', 'sort', 2])
-        ]));
+    final CollectionReference collection =
+    await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+      'a',
+      map<dynamic>(<dynamic>['k', 'a', 'sort', 0]),
+      'b',
+      map<dynamic>(<dynamic>['k', 'b', 'sort', 1]),
+      'c',
+      map<dynamic>(<dynamic>['k', 'c', 'sort', 1]),
+      'd',
+      map<dynamic>(<dynamic>['k', 'd', 'sort', 2])
+    ]));
 
     final Query query =
         collection.limit(2).orderBy('sort', Direction.DESCENDING);
@@ -89,24 +74,23 @@ void main() {
   });
 
   test('testKeyOrderIsDescendingForDescendingInequality', () async {
-    final CollectionReference collection = await testCollectionWithDocs(
-        firestore,
-        map<Map<String, dynamic>>(<dynamic>[
-          'a',
-          map<dynamic>(<dynamic>['foo', 42]),
-          'b',
-          map<dynamic>(<dynamic>['foo', 42.0]),
-          'c',
-          map<dynamic>(<dynamic>['foo', 42]),
-          'd',
-          map<dynamic>(<dynamic>['foo', 21]),
-          'e',
-          map<dynamic>(<dynamic>['foo', 21.0]),
-          'f',
-          map<dynamic>(<dynamic>['foo', 66]),
-          'g',
-          map<dynamic>(<dynamic>['foo', 66.0])
-        ]));
+    final CollectionReference collection =
+    await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+      'a',
+      map<dynamic>(<dynamic>['foo', 42]),
+      'b',
+      map<dynamic>(<dynamic>['foo', 42.0]),
+      'c',
+      map<dynamic>(<dynamic>['foo', 42]),
+      'd',
+      map<dynamic>(<dynamic>['foo', 21]),
+      'e',
+      map<dynamic>(<dynamic>['foo', 21.0]),
+      'f',
+      map<dynamic>(<dynamic>['foo', 66]),
+      'g',
+      map<dynamic>(<dynamic>['foo', 66.0])
+    ]));
 
     final Query query = collection
         .whereGreaterThan('foo', 21.0)
@@ -116,16 +100,15 @@ void main() {
   });
 
   test('testUnaryFilterQueries', () async {
-    final CollectionReference collection = await testCollectionWithDocs(
-        firestore,
-        map(<dynamic>[
-          'a',
-          map<dynamic>(<dynamic>['null', null, 'nan', double.nan]),
-          'b',
-          map<dynamic>(<dynamic>['null', null, 'nan', 0]),
-          'c',
-          map<dynamic>(<dynamic>['null', false, 'nan', double.nan])
-        ]));
+    final CollectionReference collection =
+    await testCollectionWithDocs(map(<dynamic>[
+      'a',
+      map<dynamic>(<dynamic>['null', null, 'nan', double.nan]),
+      'b',
+      map<dynamic>(<dynamic>['null', null, 'nan', 0]),
+      'c',
+      map<dynamic>(<dynamic>['null', false, 'nan', double.nan])
+    ]));
 
     final QuerySnapshot results = await collection
         .whereEqualTo('null', null)
@@ -139,24 +122,25 @@ void main() {
   });
 
   test('testFilterOnInfinity', () async {
-    final CollectionReference collection = await testCollectionWithDocs(
-        firestore,
-        map<Map<String, dynamic>>(<dynamic>[
-          'a',
-          map<dynamic>(<dynamic>['inf', double.infinity]),
-          'b',
-          map<dynamic>(<dynamic>['inf', double.infinity])
-        ]));
+    final CollectionReference collection =
+    await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+      'a',
+      map<dynamic>(<dynamic>['inf', double.infinity]),
+      'b',
+      map<dynamic>(<dynamic>['inf', double.negativeInfinity])
+    ]));
 
     final QuerySnapshot results =
         await collection.whereEqualTo('inf', double.infinity).get();
+
     expect(results.length, 1);
-    expect(querySnapshotToValues(results),
-        map<dynamic>(<dynamic>['inf', double.infinity]));
+    expect(querySnapshotToValues(results), <dynamic>[
+      map<dynamic>(<dynamic>['inf', double.infinity])
+    ]);
   });
 
   test('testWillNotGetMetadataOnlyUpdates', () async {
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     await collection.document('a').set(map<dynamic>(<dynamic>['v', 'a']));
     await collection.document('b').set(map<dynamic>(<dynamic>['v', 'b']));
 
@@ -193,21 +177,22 @@ void main() {
   });
 
   test('testCanListenForTheSameQueryWithDifferentOptions', () async {
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     await collection.document('a').set(map<String>(<String>['v', 'a']));
     await collection.document('b').set(map<String>(<String>['v', 'b']));
 
     final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
     final List<QuerySnapshot> snapshotsFull = <QuerySnapshot>[];
 
-    final AwaitHelper<dynamic> testCounter = AwaitHelper<dynamic>(4);
-    final AwaitHelper<dynamic> testCounterFull = AwaitHelper<dynamic>(5);
+    final AwaitHelper<dynamic> testCounter = AwaitHelper<dynamic>(3);
+    final AwaitHelper<dynamic> testCounterFull = AwaitHelper<dynamic>(6);
 
     final StreamSubscription<QuerySnapshot> listener =
         collection.snapshots.listen(
       (QuerySnapshot snapshot) {
-        snapshots.add(snapshot);
-        testCounter.completeNext();
+            print('listenerlistenerlistenerlistenerlistener');
+            snapshots.add(snapshot);
+            testCounter.completeNext();
       },
       onError: (dynamic error) {
         assert(false, 'This should never be reached.');
@@ -217,8 +202,9 @@ void main() {
     final StreamSubscription<QuerySnapshot> listenerFull =
         collection.getSnapshots(MetadataChanges.include).listen(
       (QuerySnapshot snapshot) {
-        snapshotsFull.add(snapshot);
-        testCounterFull.completeNext();
+            print('snapshotsFullsnapshotsFullsnapshotsFullsnapshotsFull');
+            snapshotsFull.add(snapshot);
+            testCounterFull.completeNext();
       },
       onError: (dynamic error) {
         assert(false, 'This should never be reached.');
@@ -245,13 +231,13 @@ void main() {
     expect(snapshotsFull[0].metadata.isFromCache, isTrue);
     expect(snapshotsFull[1].metadata.isFromCache, isFalse);
 
-    await collection.document('a').set(map<String>(<String>['v', 'a1']));
+    collection.document('a').set(map<String>(<String>['v', 'a1']));
 
-    // Expect two events for the write, once from latency compensation and once from the
-    // acknowledgement from the server.
-    await testCounterFull.following(2);
     // Only one event without options
     await testCounter.next;
+    // Expect two events for the write, once from latency compensation and once
+    // from the acknowledgement from the server.
+    await testCounterFull.following(2);
 
     expect(snapshotsFull.length, 4);
     expect(querySnapshotToValues(snapshotsFull[2]), <Map<String, dynamic>>[
@@ -262,7 +248,8 @@ void main() {
       map<String>(<String>['v', 'a1']),
       map<String>(<String>['v', 'b'])
     ]);
-    expect(snapshotsFull[2].metadata.isFromCache, isTrue);
+
+    expect(snapshotsFull[2].metadata.hasPendingWrites, isTrue);
     expect(snapshotsFull[3].metadata.hasPendingWrites, isFalse);
 
     expect(snapshots.length, 2);
@@ -272,12 +259,7 @@ void main() {
     ]);
 
     await collection.document('b').set(map<String>(<String>['v', 'b1']));
-
-    // Expect two events for the write, once from latency compensation and once from the
-    // acknowledgement from the server.
-    await testCounterFull.next;
-    // Only one event without options
-    await testCounter.following(2);
+    await Future<void>.delayed(const Duration(seconds: 1));
 
     expect(snapshotsFull.length, 6);
     expect(querySnapshotToValues(snapshotsFull[4]), <Map<String, dynamic>>[
@@ -297,8 +279,8 @@ void main() {
       map<String>(<String>['v', 'b1'])
     ]);
 
-    listener.cancel();
-    listenerFull.cancel();
+    await listener.cancel();
+    await listenerFull.cancel();
   });
 
   test('testCanListenForQueryMetadataChanges', () async {
@@ -313,7 +295,7 @@ void main() {
       map<dynamic>(<dynamic>['sort', 3.0, 'filter', false, 'key', '4'])
     ]);
     final CollectionReference collection =
-        await testCollectionWithDocs(firestore, testDocs);
+    await testCollectionWithDocs(testDocs);
     final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
 
     final AwaitHelper<dynamic> testCounter = AwaitHelper<dynamic>(3);
@@ -350,8 +332,8 @@ void main() {
     expect(snapshots[1].metadata.isFromCache, isTrue);
     expect(snapshots[2].metadata.isFromCache, isFalse);
 
-    listener1.cancel();
-    listener2.cancel();
+    await listener1.cancel();
+    await listener2.cancel();
   });
 
   test('testCanExplicitlySortByDocumentId', () async {
@@ -365,7 +347,7 @@ void main() {
     ]);
 
     final CollectionReference collection =
-        await testCollectionWithDocs(firestore, testDocs);
+    await testCollectionWithDocs(testDocs);
     // Ideally this would be descending to validate it's different than
     // the default, but that requires an extra index
     final QuerySnapshot docs =
@@ -388,7 +370,7 @@ void main() {
     ]);
 
     final CollectionReference collection =
-        await testCollectionWithDocs(firestore, testDocs);
+    await testCollectionWithDocs(testDocs);
     QuerySnapshot docs =
         await collection.whereEqualToField(FieldPath.documentId(), 'ab').get();
     expect(querySnapshotToValues(docs), <Map<String, dynamic>>[testDocs['ab']]);
@@ -413,7 +395,7 @@ void main() {
       map<String>(<String>['key', 'bb'])
     ]);
     final CollectionReference collection =
-        await testCollectionWithDocs(firestore, testDocs);
+    await testCollectionWithDocs(testDocs);
     QuerySnapshot docs = await collection
         .whereEqualToField(FieldPath.documentId(), collection.document('ab'))
         .get();
@@ -430,7 +412,7 @@ void main() {
   });
 
   test('testCanQueryWithAndWithoutDocumentKey', () async {
-    final CollectionReference collection = testCollection(firestore);
+    final CollectionReference collection = await testCollection();
     collection.add(map());
     final Future<QuerySnapshot> query1 = collection
         .orderByField(FieldPath.documentId(), Direction.ASCENDING)
@@ -444,7 +426,8 @@ void main() {
   });
 
   test('watchSurvivesNetworkDisconnect', () async {
-    final CollectionReference collectionReference = testCollection(firestore);
+    final CollectionReference collectionReference = await testCollection();
+    final FirebaseFirestore firestore = collectionReference.firestore;
     final AwaitHelper<void> receivedDocument = AwaitHelper<void>(1);
 
     collectionReference
@@ -456,7 +439,7 @@ void main() {
     });
 
     await firestore.disableNetwork();
-    await collectionReference
+    collectionReference
         .add(map(<dynamic>['foo', FieldValue.serverTimestamp()]));
     await firestore.enableNetwork();
 
@@ -469,7 +452,7 @@ void main() {
       map<dynamic>(<dynamic>['foo', 1])
     ]);
     final CollectionReference collection =
-        await testCollectionWithDocs(firestore, testDocs);
+    await testCollectionWithDocs(testDocs);
     final EventAccumulator<QuerySnapshot> accum =
         EventAccumulator<QuerySnapshot>();
 
@@ -494,7 +477,7 @@ void main() {
     querySnapshot = await accum.wait();
     expect(querySnapshot.metadata.isFromCache, isFalse);
 
-    listener.cancel();
+    await listener.cancel();
   });
 
   test('testQueriesCanUseArrayContainsFilters', () async {
@@ -524,7 +507,6 @@ void main() {
       <String>['bingo']
     ]);
     final CollectionReference collection = await testCollectionWithDocs(
-        firestore,
         map<Map<String, dynamic>>(
             <dynamic>['a', docA, 'b', docB, 'c', docC, 'd', docD]));
 
@@ -538,3 +520,16 @@ void main() {
     // arrays, so there isn't much of anything else interesting to test.
   });
 }
+
+// ignore: always_specify_types
+const map = TestUtil.map;
+// ignore: always_specify_types
+const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
+// ignore: always_specify_types
+const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
+// ignore: always_specify_types
+const testFirestore = IntegrationTestUtil.testFirestore;
+// ignore: always_specify_types
+const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;
+// ignore: always_specify_types
+const testCollection = IntegrationTestUtil.testCollection;

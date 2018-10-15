@@ -11,6 +11,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/order_by.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
     as core;
+import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/relation_filter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
@@ -30,6 +31,7 @@ import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/source.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// An enum for the direction of a sort.
 enum Direction { ASCENDING, DESCENDING }
@@ -594,8 +596,9 @@ class Query {
   }
 
   Stream<QuerySnapshot> _getSnapshotsInternal(ListenOptions options) {
-    return firestore.client //
-        .listen(query, options)
+    return Observable<QueryListener>.fromFuture(
+        firestore.client.listen(query, options))
+        .flatMap((QueryListener it) => it)
         .map((ViewSnapshot snapshot) =>
             QuerySnapshot(this, snapshot, firestore));
   }
