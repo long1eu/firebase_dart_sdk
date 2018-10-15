@@ -16,7 +16,8 @@ class ViewChange {
   @override
   String toString() {
     return (ToStringHelper(runtimeType)
-      ..add('snapshot', snapshot)..add('limboChanges', limboChanges))
+          ..add('snapshot', snapshot)
+          ..add('limboChanges', limboChanges))
         .toString();
   }
 }

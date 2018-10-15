@@ -47,7 +47,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-    await testCollectionWithDocs(initialDocs);
+        await testCollectionWithDocs(initialDocs);
 
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -81,7 +81,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-    await testCollectionWithDocs(initialDocs);
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
@@ -135,7 +135,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-    await testCollectionWithDocs(initialDocs);
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
 
@@ -170,7 +170,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-    await testCollectionWithDocs(initialDocs);
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
@@ -222,7 +222,7 @@ void main() {
     ]);
 
     final CollectionReference colRef =
-    await testCollectionWithDocs(initialDocs);
+        await testCollectionWithDocs(initialDocs);
 
     final QuerySnapshot qrySnap = await colRef.get(Source.SERVER);
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -251,7 +251,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-    await testCollectionWithDocs(initialDocs);
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
@@ -305,7 +305,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
     final CollectionReference colRef =
-    await testCollectionWithDocs(initialDocs);
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();

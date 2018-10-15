@@ -32,9 +32,9 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
 
   FirebaseAuthCredentialsProvider(this._authProvider)
       : _onUserChange = BehaviorSubject<User>(
-      seedValue: _authProvider.uid != null
-                 ? User(_authProvider.uid)
-                 : User.unauthenticated) {
+            seedValue: _authProvider.uid != null
+                ? User(_authProvider.uid)
+                : User.unauthenticated) {
     _tokenCounter = 0;
     _onUserChange.onListen =
         () => _authProvider.addIdTokenObserver(tokenObserver);
@@ -60,7 +60,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
     final int savedCounter = _tokenCounter;
 
     final GetTokenResult result =
-    await _authProvider.getAccessToken(doForceRefresh);
+        await _authProvider.getAccessToken(doForceRefresh);
 
     // Cancel the request since the token changed while the request was
     // outstanding so the response is potentially for a previous user (which

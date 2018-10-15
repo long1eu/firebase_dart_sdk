@@ -43,9 +43,8 @@ void main() {
 
   /// Waits for a WriteStream to get into a state that accepts mutations.
   Future<void> waitForWriteStreamOpen(AsyncQueue testQueue,
-                                      WriteStream writeStream,
-                                      _StreamStatusCallback callback,
-                                      [int i]) async {
+      WriteStream writeStream, _StreamStatusCallback callback,
+      [int i]) async {
     testQueue.enqueueAndForget(writeStream.start);
     await callback.openCompleter.future;
     testQueue.enqueueAndForget(writeStream.writeHandshake);

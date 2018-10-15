@@ -222,7 +222,7 @@ class DocumentReference {
     final core.Query query = core.Query.atPath(key.path);
 
     return Observable<QueryListener>.fromFuture(
-        firestore.client.listen(query, options))
+            firestore.client.listen(query, options))
         .flatMap((QueryListener it) => it)
         .map((ViewSnapshot snapshot) {
       Assert.hardAssert(snapshot.documents.length <= 1,

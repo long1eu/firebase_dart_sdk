@@ -35,7 +35,7 @@ class IntegrationTestUtil {
 
   /// Online status of all active Firestore clients.
   static final Map<FirebaseFirestore, bool> firestoreStatus =
-  <FirebaseFirestore, bool>{};
+      <FirebaseFirestore, bool>{};
 
   static final FirestoreProvider provider = FirestoreProvider();
 
@@ -101,10 +101,11 @@ class IntegrationTestUtil {
   /// Initializes a new Firestore instance that can be used in testing. It is
   /// guaranteed to not share state with other instances returned from this
   /// call.
-  static Future<FirebaseFirestore> testFirestoreInstance(String projectId,
-                                                         LogLevel logLevel,
-                                                         FirebaseFirestoreSettings settings,
-                                                         String dbPath) async {
+  static Future<FirebaseFirestore> testFirestoreInstance(
+      String projectId,
+      LogLevel logLevel,
+      FirebaseFirestoreSettings settings,
+      String dbPath) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.setLogLevel(logLevel);
 
@@ -112,7 +113,7 @@ class IntegrationTestUtil {
     Persistence.indexingSupportEnabled = true;
 
     final DatabaseId databaseId =
-    DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
+        DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
     final String persistenceKey = 'db${firestoreStatus.length}';
 
     print('index: $dbIndex');
@@ -128,13 +129,13 @@ class IntegrationTestUtil {
       persistenceKey,
       EmptyCredentialsProvider(),
       asyncQueue,
-          (String path,
-           {int version,
-             OnConfigure onConfigure,
-             OnCreate onCreate,
-             OnVersionChange onUpgrade,
-             OnVersionChange onDowngrade,
-             OnOpen onOpen}) async {
+      (String path,
+          {int version,
+          OnConfigure onConfigure,
+          OnCreate onCreate,
+          OnVersionChange onUpgrade,
+          OnVersionChange onDowngrade,
+          OnOpen onOpen}) async {
         final DatabaseMock db = await DatabaseMock.create(dbFullPath,
             version: version,
             onConfigure: onConfigure,
@@ -179,15 +180,14 @@ class IntegrationTestUtil {
       Map<String, Map<String, Object>> docs) async {
     final CollectionReference collection = await testCollection();
     final CollectionReference writer =
-    (await testFirestore()).collection(collection.id);
+        (await testFirestore()).collection(collection.id);
 
     await writeAllDocs(writer, docs);
     return collection;
   }
 
   static Future<void> writeAllDocs(CollectionReference collection,
-                                   Map<String,
-                                       Map<String, Object>> docs) async {
+      Map<String, Map<String, Object>> docs) async {
     for (MapEntry<String, Map<String, Object>> doc in docs.entries) {
       await collection.document(doc.key).set(doc.value);
     }

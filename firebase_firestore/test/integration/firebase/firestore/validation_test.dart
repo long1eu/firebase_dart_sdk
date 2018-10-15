@@ -168,7 +168,7 @@ void main() {
 
     final List<String> badPaths = <String>['foo//bar//baz', '//foo', 'foo//'];
     final CollectionReference collection =
-    firestore.collection('test-collection');
+        firestore.collection('test-collection');
     final DocumentReference doc = collection.document('test-document');
     for (String path in badPaths) {
       final String reason =
@@ -470,7 +470,7 @@ void main() {
 
   test('queriesCannotBeCreatedFromDocumentsMissingSortValues', () async {
     final CollectionReference collection =
-    await testCollectionWithDocs(map(<dynamic>[
+        await testCollectionWithDocs(map(<dynamic>[
       'f',
       map<dynamic>(<dynamic>['k', 'f', 'nosort', 1.0])
     ]));
@@ -513,8 +513,7 @@ void main() {
 
   test('queriesWithDifferentInequalityFieldsFail', () async {
     await expectError(
-            () async =>
-            (await testCollection())
+        () async => (await testCollection())
             .whereGreaterThan('x', 32)
             .whereLessThan('y', 'cat'),
         'All where filters other than whereEqualTo() must be on the same field. But you have filters on \'x\' and \'y\'');
@@ -542,8 +541,7 @@ void main() {
 
   test('queriesWithMultipleArrayContainsFiltersFail', () async {
     await expectError(
-            () async =>
-            (await testCollection())
+        () async => (await testCollection())
             .whereArrayContains('foo', 1)
             .whereArrayContains('foo', 2),
         'Invalid Query. Queries only support having a single array-contains filter.');
@@ -566,7 +564,7 @@ void main() {
 
   test('queriesFilteredByDocumentIDMustUseStringsOrDocumentReferences',
       () async {
-        final CollectionReference collection = await testCollection();
+    final CollectionReference collection = await testCollection();
     String reason =
         'Invalid query. When querying with FieldPath.documentId() you must provide '
         'a valid document ID, but it was an empty string.';

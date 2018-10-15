@@ -32,7 +32,7 @@ void main() {
   test('testGetDocuments', () async {
     final DocumentReference doc = firestore.collection('spaces').document();
     final Map<String, Object> value =
-    map(<dynamic>['foo', 1, 'desc', 'Stuff', 'owner', 'Jonny']);
+        map(<dynamic>['foo', 1, 'desc', 'Stuff', 'owner', 'Jonny']);
     await doc.set(value);
 
     try {
@@ -89,22 +89,22 @@ void main() {
     await firestore.runTransaction<void>((Transaction transaction) {
       transaction
           .set(
-          doc,
-          map(<dynamic>[
-            'a',
-            'b',
-            'nested',
-            map<String>(<String>['a', 'b'])
-          ]))
+              doc,
+              map(<dynamic>[
+                'a',
+                'b',
+                'nested',
+                map<String>(<String>['a', 'b'])
+              ]))
           .set(
-          doc,
-          map(<dynamic>[
-            'c',
-            'd',
-            'nested',
-            map<String>(<String>['c', 'd'])
-          ]),
-          SetOptions.mergeAllFields);
+              doc,
+              map(<dynamic>[
+                'c',
+                'd',
+                'nested',
+                map<String>(<String>['c', 'd'])
+              ]),
+              SetOptions.mergeAllFields);
       return null;
     });
     final DocumentSnapshot snapshot = await doc.get();
@@ -166,10 +166,10 @@ void main() {
   test('testTransactionRejectsUpdatesForNonexistentDocuments', () async {
     // Make a transaction that will fail
     final Future<void> transactionTask =
-    firestore.runTransaction<void>((Transaction transaction) async {
+        firestore.runTransaction<void>((Transaction transaction) async {
       // Get and update a document that doesn't exist so that the transaction fails
       final DocumentSnapshot doc =
-      await transaction.get(firestore.collection('nonexistent').document());
+          await transaction.get(firestore.collection('nonexistent').document());
       transaction.updateFromList(doc.reference, <String>['foo', 'bar']);
       return null;
     });
@@ -191,7 +191,7 @@ void main() {
 
     // Make a transaction that will fail
     final Future<void> transactionTask =
-    firestore.runTransaction<void>((Transaction transaction) async {
+        firestore.runTransaction<void>((Transaction transaction) async {
       final DocumentSnapshot doc = await transaction.get(docRef);
       expect(doc.exists, isTrue);
       transaction.delete(docRef);
@@ -217,7 +217,7 @@ void main() {
 
     // Make a transaction that will fail
     final Future<void> transactionTask =
-    firestore.runTransaction<void>((Transaction transaction) async {
+        firestore.runTransaction<void>((Transaction transaction) async {
       final DocumentSnapshot doc = await transaction.get(docRef);
       expect(doc.exists, isTrue);
       transaction.delete(docRef);
@@ -242,7 +242,7 @@ void main() {
   test('testTransactionRaisesErrorsForInvalidUpdates', () async {
     // Make a transaction that will fail server-side.
     final Future<void> transactionTask =
-    firestore.runTransaction<void>((Transaction transaction) async {
+        firestore.runTransaction<void>((Transaction transaction) async {
       // Try to read / write a document with an invalid path.
       final DocumentSnapshot doc = await transaction
           .get(firestore.collection('nonexistent').document('__badpath__'));
@@ -432,7 +432,7 @@ void main() {
 
     try {
       await firestore.runTransaction<void>(
-              (Transaction transaction) => transaction.get(doc));
+          (Transaction transaction) => transaction.get(doc));
     } catch (e) {
       // We currently require every document read to also be written.
       // TODO: Add this check back once we drop that.

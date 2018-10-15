@@ -108,8 +108,8 @@ class WatchStreamCallback extends StreamCallback {
   final OnWatchChange onWatchChange;
 
   const WatchStreamCallback({
-                              @required Task<void> onOpen,
-                              @required OnClose onClose,
+    @required Task<void> onOpen,
+    @required OnClose onClose,
     @required this.onWatchChange,
   }) : super(onOpen: onOpen, onClose: onClose);
 }

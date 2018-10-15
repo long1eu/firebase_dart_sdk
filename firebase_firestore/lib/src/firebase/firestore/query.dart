@@ -597,7 +597,7 @@ class Query {
 
   Stream<QuerySnapshot> _getSnapshotsInternal(ListenOptions options) {
     return Observable<QueryListener>.fromFuture(
-        firestore.client.listen(query, options))
+            firestore.client.listen(query, options))
         .flatMap((QueryListener it) => it)
         .map((ViewSnapshot snapshot) =>
             QuerySnapshot(this, snapshot, firestore));

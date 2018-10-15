@@ -29,7 +29,7 @@ void main() {
 
   test('canPageThroughItems', () async {
     final CollectionReference testCollection =
-    await testCollectionWithDocs(map(<dynamic>[
+        await testCollectionWithDocs(map(<dynamic>[
       'a',
       map<String>(<String>['v', 'a']),
       'b',
@@ -72,7 +72,7 @@ void main() {
 
   test('canBeCreatedFromDocuments', () async {
     final CollectionReference testCollection =
-    await testCollectionWithDocs(map(<dynamic>[
+        await testCollectionWithDocs(map(<dynamic>[
       'a', map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
       'b', map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
       'c', map<dynamic>(<dynamic>['k', 'c', 'sort', 2.0]),
@@ -104,7 +104,7 @@ void main() {
 
   test('canBeCreatedFromValues', () async {
     final CollectionReference testCollection =
-    await testCollectionWithDocs(map(<dynamic>[
+        await testCollectionWithDocs(map(<dynamic>[
       'a', map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
       'b', map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
       'c', map<dynamic>(<dynamic>['k', 'c', 'sort', 2.0]),
@@ -152,7 +152,7 @@ void main() {
     await writeAllDocs(writer, testDocs);
 
     final CollectionReference reader =
-    (await testFirestore()).collection(writer.path);
+        (await testFirestore()).collection(writer.path);
 
     final QuerySnapshot snapshot = await reader
         .orderByField(FieldPath.documentId())
@@ -185,14 +185,14 @@ void main() {
     ]);
 
     final CollectionReference testCollection =
-    await testCollectionWithDocs(testDocs);
+        await testCollectionWithDocs(testDocs);
 
     final QuerySnapshot snapshot = await testCollection
         .orderBy('ref')
         .startAfter(<DocumentReference>[
       firestore.collection('1').document('a')
     ]).endAt(
-        <DocumentReference>[firestore.collection('2').document('b')]).get();
+            <DocumentReference>[firestore.collection('2').document('b')]).get();
 
     final List<String> results = <String>[];
     for (DocumentSnapshot doc in snapshot) {
@@ -203,7 +203,7 @@ void main() {
 
   test('canBeUsedInDescendingQueries', () async {
     final CollectionReference testCollection =
-    await testCollectionWithDocs(map(<dynamic>[
+        await testCollectionWithDocs(map(<dynamic>[
       'a', map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
       'b', map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
       'c', map<dynamic>(<dynamic>['k', 'c', 'sort', 2.0]),
@@ -240,7 +240,7 @@ void main() {
 
   test('timestampsCanBePassedToQueriesAsLimits', () async {
     final CollectionReference testCollection =
-    await testCollectionWithDocs(map(<dynamic>[
+        await testCollectionWithDocs(map(<dynamic>[
       'a', map<Timestamp>(<dynamic>['timestamp', timestamp(100, 2)]),
       'b', map<Timestamp>(<dynamic>['timestamp', timestamp(100, 5)]),
       'c', map<Timestamp>(<dynamic>['timestamp', timestamp(100, 3)]),
@@ -259,7 +259,7 @@ void main() {
 
   test('timestampsCanBePassedToQueriesInWhereClause', () async {
     final CollectionReference testCollection =
-    await testCollectionWithDocs(map(<dynamic>[
+        await testCollectionWithDocs(map(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['timestamp', timestamp(100, 7)]),
       'b',
@@ -284,7 +284,7 @@ void main() {
     final Timestamp micros = Timestamp(0, 123456000);
     final Timestamp millis = Timestamp(0, 123000000);
     final CollectionReference testCollection =
-    await testCollectionWithDocs(map(<dynamic>[
+        await testCollectionWithDocs(map(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['timestamp', nanos])
     ]));

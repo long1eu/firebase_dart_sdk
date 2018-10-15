@@ -60,9 +60,11 @@ class MutationBatchResult {
   @override
   String toString() {
     return (ToStringHelper(runtimeType)
-      ..add('batch', batch)..add('commitVersion', commitVersion)..add(
-          'mutationResults', mutationResults)..add(
-          'streamToken', streamToken)..add('docVersions', docVersions))
+          ..add('batch', batch)
+          ..add('commitVersion', commitVersion)
+          ..add('mutationResults', mutationResults)
+          ..add('streamToken', streamToken)
+          ..add('docVersions', docVersions))
         .toString();
   }
 }

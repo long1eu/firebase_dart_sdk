@@ -35,7 +35,7 @@ void main() {
 
   test('testCanUpdateAnExistingDocument', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -57,7 +57,7 @@ void main() {
 
   test('testCanMergeDataWithAnExistingDocumentUsingSet', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -87,7 +87,7 @@ void main() {
 
   test('testCanMergeServerTimestamps', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>['untouched', true]);
     final Map<String, Object> mergeData = map(<dynamic>[
       'time',
@@ -106,7 +106,7 @@ void main() {
 
   test('testCanDeleteFieldUsingMerge', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
 
     final Map<String, Object> initialValue = map(<dynamic>[
       'untouched',
@@ -141,7 +141,7 @@ void main() {
 
   test('testCanDeleteFieldUsingMergeFields', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
 
     final Map<String, Object> initialValue = map(<dynamic>[
       'untouched',
@@ -186,7 +186,7 @@ void main() {
 
   test('testCanSetServerTimestampsUsingMergeFields', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
 
     final Map<String, Object> initialValue = map(<dynamic>[
       'untouched',
@@ -218,7 +218,7 @@ void main() {
 
   test('testMergeReplacesArrays', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'untouched',
       true,
@@ -262,7 +262,7 @@ void main() {
 
   test('testCanDeepMergeDataWithAnExistingDocumentUsingSet', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'owner.data',
       map<dynamic>(<dynamic>['name', 'Jonny', 'email', 'old@xyz.com'])
@@ -291,7 +291,7 @@ void main() {
 
   test('testFieldMaskCannotContainMissingFields', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
 
     bool hadError = false;
     try {
@@ -310,7 +310,7 @@ void main() {
 
   test('testFieldsNotInFieldMaskAreIgnored', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -333,7 +333,7 @@ void main() {
 
   test('testFieldDeletesNotInFieldMaskAreIgnored', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -356,7 +356,7 @@ void main() {
 
   test('testFieldTransformsNotInFieldMaskAreIgnored', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -384,7 +384,7 @@ void main() {
 
   test('testFieldMaskEmpty', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -401,7 +401,7 @@ void main() {
 
   test('testFieldInFieldMaskMultipleTimes', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -430,7 +430,7 @@ void main() {
 
   test('testCanDeleteAFieldWithAnUpdate', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> initialValue = map(<dynamic>[
       'desc',
       'Description',
@@ -452,7 +452,7 @@ void main() {
 
   test('testCanUpdateFieldsWithDots', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     await documentReference.set(map(<String>['a.b', 'old', 'c.d', 'old']));
 
     await documentReference.updateFromList(<dynamic>[
@@ -470,7 +470,7 @@ void main() {
 
   test('testCanUpdateNestedFields', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     await documentReference.set(map(<dynamic>[
       'a',
       map<String>(<String>['b', 'old']),
@@ -494,7 +494,7 @@ void main() {
 
   test('testDeleteDocument', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final Map<String, Object> data = map(<String>['value', 'bar']);
     await documentReference.set(data);
     DocumentSnapshot doc = await documentReference.get();
@@ -506,7 +506,7 @@ void main() {
 
   test('testCannotUpdateNonexistentDocument', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document();
+        (await testCollection('rooms')).document();
 
     bool hadError = false;
     try {
@@ -524,7 +524,7 @@ void main() {
 
   test('testCanRetrieveNonexistentDocument', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document();
+        (await testCollection('rooms')).document();
     final DocumentSnapshot documentSnapshot = await documentReference.get();
     expect(documentSnapshot.exists, isFalse);
     expect(documentSnapshot.data, isNull);
@@ -554,7 +554,7 @@ void main() {
   test('testAddingToACollectionYieldsTheCorrectDocumentReference', () async {
     final Map<String, Object> data = map(<dynamic>['foo', 1.0]);
     final DocumentReference documentReference =
-    await (await testCollection('rooms')).add(data);
+        await (await testCollection('rooms')).add(data);
     final DocumentSnapshot document = await documentReference.get();
     expect(document.data, data);
   });
@@ -686,8 +686,8 @@ void main() {
   test('testDocumentSnapshotEventsForDelete', () async {
     final Map<String, Object> initialData = map(<dynamic>['a', 1.0]);
     final DocumentReference docRef =
-    (await testCollectionWithDocs(map(<dynamic>['doc', initialData])))
-        .document('doc');
+        (await testCollectionWithDocs(map(<dynamic>['doc', initialData])))
+            .document('doc');
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
     final AwaitHelper<void> latch = AwaitHelper<void>(2);
 
@@ -763,7 +763,7 @@ void main() {
     final Map<String, Object> updateData = map(<dynamic>['b', 2.0]);
 
     final CollectionReference collection =
-    await testCollectionWithDocs(map(<dynamic>['doc', initialData]));
+        await testCollectionWithDocs(map(<dynamic>['doc', initialData]));
     final DocumentReference docRef = collection.document('doc');
 
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
@@ -812,7 +812,7 @@ void main() {
   test('testQuerySnapshotEventsForDelete', () async {
     final Map<String, Object> initialData = map(<dynamic>['a', 1.0]);
     final CollectionReference collection =
-    await testCollectionWithDocs(map(<dynamic>['doc', initialData]));
+        await testCollectionWithDocs(map(<dynamic>['doc', initialData]));
     final DocumentReference docRef = collection.document('doc');
 
     final AwaitHelper<void> initialLatch = AwaitHelper<void>(1);
@@ -901,18 +901,18 @@ void main() {
   test('testQueryReferenceEquality', () async {
     final FirebaseFirestore firestore = await testFirestore();
     final Query query =
-    firestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
+        firestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
     final Query query2 =
-    firestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
+        firestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
     expect(query2, query);
 
     final Query query3 =
-    firestore.collection('foo').orderBy('BAR').whereEqualTo('baz', 42);
+        firestore.collection('foo').orderBy('BAR').whereEqualTo('baz', 42);
     expect(query, isNot(query3));
 
     final FirebaseFirestore otherFirestore = await testFirestore();
     final Query query4 =
-    otherFirestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
+        otherFirestore.collection('foo').orderBy('bar').whereEqualTo('baz', 42);
     expect(query4, isNot(query));
   });
 
@@ -947,7 +947,7 @@ void main() {
   test('testCanQueueWritesWhileOffline', () async {
     // Arrange
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document('eros');
+        (await testCollection('rooms')).document('eros');
     final FirebaseFirestore firestore = documentReference.firestore;
 
     final Map<String, Object> data = map(<dynamic>[
@@ -972,7 +972,7 @@ void main() {
 
   test('testCantGetDocumentsWhileOffline', () async {
     final DocumentReference documentReference =
-    (await testCollection('rooms')).document();
+        (await testCollection('rooms')).document();
     final FirebaseFirestore firestore = documentReference.firestore;
     await firestore.disableNetwork();
 

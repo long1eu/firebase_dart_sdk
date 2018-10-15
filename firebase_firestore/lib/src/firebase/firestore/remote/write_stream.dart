@@ -164,8 +164,8 @@ class WriteStreamCallback extends StreamCallback {
   final OnWriteResponse onWriteResponse;
 
   const WriteStreamCallback({
-                              @required Task<void> onOpen,
-                              @required OnClose onClose,
+    @required Task<void> onOpen,
+    @required OnClose onClose,
     @required this.onHandshakeComplete,
     @required this.onWriteResponse,
   }) : super(onOpen: onOpen, onClose: onClose);

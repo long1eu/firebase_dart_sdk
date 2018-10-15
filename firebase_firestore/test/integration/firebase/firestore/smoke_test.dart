@@ -82,7 +82,7 @@ void main() {
 
   test('testWillFireValueEventsForEmptyCollections', () async {
     final CollectionReference collection =
-    await testCollection('empty-collection');
+        await testCollection('empty-collection');
     final EventAccumulator<QuerySnapshot> accumulator =
         EventAccumulator<QuerySnapshot>();
     final StreamSubscription<QuerySnapshot> listener = collection

@@ -27,7 +27,6 @@ class User {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
-      ..add('uid', uid)).toString();
+    return (ToStringHelper(runtimeType)..add('uid', uid)).toString();
   }
 }

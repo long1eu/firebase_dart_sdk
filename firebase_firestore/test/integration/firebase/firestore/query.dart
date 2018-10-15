@@ -30,7 +30,7 @@ void main() {
 
   test('testLimitQueries', () async {
     final CollectionReference collection =
-    await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+        await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
       'a',
       map<String>(<String>['k', 'a']),
       'b',
@@ -51,7 +51,7 @@ void main() {
 
   test('testLimitQueriesUsingDescendingSortOrder', () async {
     final CollectionReference collection =
-    await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+        await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['k', 'a', 'sort', 0]),
       'b',
@@ -75,7 +75,7 @@ void main() {
 
   test('testKeyOrderIsDescendingForDescendingInequality', () async {
     final CollectionReference collection =
-    await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+        await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['foo', 42]),
       'b',
@@ -101,7 +101,7 @@ void main() {
 
   test('testUnaryFilterQueries', () async {
     final CollectionReference collection =
-    await testCollectionWithDocs(map(<dynamic>[
+        await testCollectionWithDocs(map(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['null', null, 'nan', double.nan]),
       'b',
@@ -123,7 +123,7 @@ void main() {
 
   test('testFilterOnInfinity', () async {
     final CollectionReference collection =
-    await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+        await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['inf', double.infinity]),
       'b',
@@ -190,9 +190,9 @@ void main() {
     final StreamSubscription<QuerySnapshot> listener =
         collection.snapshots.listen(
       (QuerySnapshot snapshot) {
-            print('listenerlistenerlistenerlistenerlistener');
-            snapshots.add(snapshot);
-            testCounter.completeNext();
+        print('listenerlistenerlistenerlistenerlistener');
+        snapshots.add(snapshot);
+        testCounter.completeNext();
       },
       onError: (dynamic error) {
         assert(false, 'This should never be reached.');
@@ -202,9 +202,9 @@ void main() {
     final StreamSubscription<QuerySnapshot> listenerFull =
         collection.getSnapshots(MetadataChanges.include).listen(
       (QuerySnapshot snapshot) {
-            print('snapshotsFullsnapshotsFullsnapshotsFullsnapshotsFull');
-            snapshotsFull.add(snapshot);
-            testCounterFull.completeNext();
+        print('snapshotsFullsnapshotsFullsnapshotsFullsnapshotsFull');
+        snapshotsFull.add(snapshot);
+        testCounterFull.completeNext();
       },
       onError: (dynamic error) {
         assert(false, 'This should never be reached.');
@@ -295,7 +295,7 @@ void main() {
       map<dynamic>(<dynamic>['sort', 3.0, 'filter', false, 'key', '4'])
     ]);
     final CollectionReference collection =
-    await testCollectionWithDocs(testDocs);
+        await testCollectionWithDocs(testDocs);
     final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
 
     final AwaitHelper<dynamic> testCounter = AwaitHelper<dynamic>(3);
@@ -347,7 +347,7 @@ void main() {
     ]);
 
     final CollectionReference collection =
-    await testCollectionWithDocs(testDocs);
+        await testCollectionWithDocs(testDocs);
     // Ideally this would be descending to validate it's different than
     // the default, but that requires an extra index
     final QuerySnapshot docs =
@@ -370,7 +370,7 @@ void main() {
     ]);
 
     final CollectionReference collection =
-    await testCollectionWithDocs(testDocs);
+        await testCollectionWithDocs(testDocs);
     QuerySnapshot docs =
         await collection.whereEqualToField(FieldPath.documentId(), 'ab').get();
     expect(querySnapshotToValues(docs), <Map<String, dynamic>>[testDocs['ab']]);
@@ -395,7 +395,7 @@ void main() {
       map<String>(<String>['key', 'bb'])
     ]);
     final CollectionReference collection =
-    await testCollectionWithDocs(testDocs);
+        await testCollectionWithDocs(testDocs);
     QuerySnapshot docs = await collection
         .whereEqualToField(FieldPath.documentId(), collection.document('ab'))
         .get();
@@ -452,7 +452,7 @@ void main() {
       map<dynamic>(<dynamic>['foo', 1])
     ]);
     final CollectionReference collection =
-    await testCollectionWithDocs(testDocs);
+        await testCollectionWithDocs(testDocs);
     final EventAccumulator<QuerySnapshot> accum =
         EventAccumulator<QuerySnapshot>();
 
