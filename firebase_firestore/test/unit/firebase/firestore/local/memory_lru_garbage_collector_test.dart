@@ -273,7 +273,8 @@ void main() {
     // * One blind write is gone, the first one not added to oldest target
     // * Documents removed from middle target are gone, except ones added to
     //   oldest target
-    // * Documents from newest target are gone, except
+    // * Documents from newest target are gone, except those added to the old
+    //   target as well
 
     // Through the various steps, track which documents we expect to be removed
     // vs documents we expect to be retained.

@@ -33,7 +33,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  ReferenceSet additionalReferences;
+  ReferenceSet inMemoryPins;
 
   @override
   LruGarbageCollector garbageCollector;
@@ -128,7 +128,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       return true;
     }
 
-    if (additionalReferences.containsKey(key)) {
+    if (inMemoryPins.containsKey(key)) {
       return true;
     }
 

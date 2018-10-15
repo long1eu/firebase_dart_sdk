@@ -23,7 +23,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   MemoryEagerReferenceDelegate(this.persistence);
 
   @override
-  ReferenceSet additionalReferences;
+  ReferenceSet inMemoryPins;
 
   @override
   int get currentSequenceNumber => ListenSequence.invalid;
@@ -102,7 +102,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
       return true;
     }
 
-    if (additionalReferences != null && additionalReferences.containsKey(key)) {
+    if (inMemoryPins != null && inMemoryPins.containsKey(key)) {
       return true;
     }
 

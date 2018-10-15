@@ -143,7 +143,7 @@ class LocalStore {
     final SimpleQueryEngine queryEngine = SimpleQueryEngine(localDocuments);
 
     final ReferenceSet localViewReferences = ReferenceSet();
-    persistence.referenceDelegate.additionalReferences = localViewReferences;
+    persistence.referenceDelegate.inMemoryPins = localViewReferences;
 
     return LocalStore._(
       persistence,

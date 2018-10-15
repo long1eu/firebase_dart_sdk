@@ -28,7 +28,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  ReferenceSet additionalReferences;
+  ReferenceSet inMemoryPins;
 
   @override
   LruGarbageCollector garbageCollector;
@@ -124,7 +124,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   /// targets and has a sequence number less than or equal to the upper bound
   /// for the collection run.
   Future<bool> _isPinned(DocumentKey key) async {
-    if (additionalReferences.containsKey(key)) {
+    if (inMemoryPins.containsKey(key)) {
       return true;
     }
 

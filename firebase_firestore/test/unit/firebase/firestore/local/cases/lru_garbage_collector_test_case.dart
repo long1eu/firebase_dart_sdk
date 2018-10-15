@@ -58,7 +58,7 @@ class LruGarbageCollectorTestCase {
   Future<void> newTestResources() async {
     persistence = await getPersistence();
 
-    persistence.referenceDelegate.additionalReferences = ReferenceSet();
+    persistence.referenceDelegate.inMemoryPins = ReferenceSet();
     queryCache = persistence.queryCache;
     documentCache = persistence.remoteDocumentCache;
     const User user = const User('user');

@@ -22,7 +22,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 abstract class ReferenceDelegate {
   /// Registers a [ReferenceSet] of documents that should be considered
   /// 'referenced' and not eligible for removal during garbage collection.
-  set additionalReferences(ReferenceSet additionalReferences);
+  set inMemoryPins(ReferenceSet inMemoryPins);
 
   /// Notify the delegate that the given document was added to a target.
   Future<void> addReference(DocumentKey key);
