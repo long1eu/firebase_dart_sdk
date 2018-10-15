@@ -10,6 +10,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dar
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
     as core;
 import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
@@ -22,7 +23,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precond
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
 import 'package:firebase_firestore/src/firebase/firestore/source.dart';
-import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:rxdart/rxdart.dart';
@@ -87,7 +87,7 @@ class DocumentReference {
     Assert.checkNotNull(
         collectionPath, 'Provided collection path must not be null.');
     return CollectionReference(
-        key.path.appendPath(ResourcePath.fromString(collectionPath)),
+        key.path.appendField(ResourcePath.fromString(collectionPath)),
         firestore);
   }
 
@@ -103,7 +103,7 @@ class DocumentReference {
     options ??= SetOptions.overwrite;
     Assert.checkNotNull(data, 'Provided data must not be null.');
     Assert.checkNotNull(options, 'Provided options must not be null.');
-    final ParsedDocumentData parsed = options.merge
+    final UserDataParsedSetData parsed = options.merge
         ? firestore.dataConverter.parseMergeData(data, options.fieldMask)
         : firestore.dataConverter.parseSetData(data);
 
@@ -121,7 +121,7 @@ class DocumentReference {
   /// @return A Task that will be resolved when the write finishes.
   @publicApi
   Future<void> updateFromList(List<Object> data) async {
-    final ParsedUpdateData parsedData = firestore.dataConverter
+    final UserDataParsedUpdateData parsedData = firestore.dataConverter
         .parseUpdateDataFromList(Util.collectUpdateArguments(1, data));
     await Util.voidErrorTransformer(() => firestore.client
         .write(parsedData.toMutationList(key, Precondition.fromExists(true))));
@@ -135,7 +135,7 @@ class DocumentReference {
   /// Returns a Future that will be resolved when the write finishes.
   @publicApi
   Future<void> update(Map<String, Object> data) async {
-    final ParsedUpdateData parsedData =
+    final UserDataParsedUpdateData parsedData =
         firestore.dataConverter.parseUpdateData(data);
     await Util.voidErrorTransformer(() => firestore.client
         .write(parsedData.toMutationList(key, Precondition.fromExists(true))));

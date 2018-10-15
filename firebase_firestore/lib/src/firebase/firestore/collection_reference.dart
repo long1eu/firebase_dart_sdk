@@ -67,7 +67,7 @@ class CollectionReference extends Query {
     Assert.checkNotNull(
         documentPath, 'Provided document path must not be null.');
     return DocumentReference.forPath(
-        query.path.appendPath(ResourcePath.fromString(documentPath)),
+        query.path.appendField(ResourcePath.fromString(documentPath)),
         firestore);
   }
 

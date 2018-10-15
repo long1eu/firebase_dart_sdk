@@ -2,10 +2,8 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-import 'dart:collection';
-
-import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/field_path.dart'
     as firestore;
@@ -13,17 +11,10 @@ import 'package:firebase_firestore/src/firebase/firestore/field_value.dart'
     as firestore;
 import 'package:firebase_firestore/src/firebase/firestore/geo_point.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/array_transform_operation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_mask.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_transform.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/patch_mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/set_mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/array_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/blob_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/bool_value.dart';
@@ -47,67 +38,44 @@ class UserDataConverter {
   UserDataConverter(this.databaseId);
 
   /// Parse document data from a non-merge set() call.
-  ParsedDocumentData parseSetData(Map<String, Object> input) {
-    final _ParseContext context =
-        _ParseContext(UserDataSource.set, FieldPath.emptyPath);
-    final FieldValue parsed = _parseData(input, context);
-    Assert.hardAssert(
-        parsed is ObjectValue, 'Parse result should be an object.');
-
-    return ParsedDocumentData(
-      parsed as ObjectValue,
-      /* fieldMask= */ null,
-      context.fieldTransforms,
-    );
+  UserDataParsedSetData parseSetData(Map<String, Object> input) {
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.set);
+    final FieldValue updateData = _parseData(input, accumulator.rootContext);
+    return accumulator.toSetData(updateData as ObjectValue);
   }
 
   /// Parse document data from a set() call with SetOptions.merge() set.
-  ParsedDocumentData parseMergeData(
+  UserDataParsedSetData parseMergeData(
       Map<String, Object> input, FieldMask fieldMask) {
-    final _ParseContext context =
-        _ParseContext(UserDataSource.mergeSet, FieldPath.emptyPath);
-    final FieldValue parsed = _parseData(input, context);
-    Assert.hardAssert(
-        parsed is ObjectValue, 'Parse result should be an object.');
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.mergeSet);
+    final ObjectValue updateData = _parseData(input, accumulator.rootContext);
 
-    List<FieldTransform> fieldTransforms;
-
-    if (fieldMask == null) {
-      fieldMask = FieldMask(context.fieldMask.toList());
-      fieldTransforms = context.fieldTransforms;
-    } else {
-      // Verify that all elements specified in the field mask are part of the parsed context.
+    if (fieldMask != null) {
+      // Verify that all elements specified in the field mask are part of the
+      // parsed context.
       for (FieldPath field in fieldMask.mask) {
-        if (!context.contains(field)) {
+        if (!accumulator.contains(field)) {
           throw ArgumentError(
               'Field \'$field\' is specified in your field mask but not in your input data.');
         }
       }
 
-      fieldTransforms = <FieldTransform>[];
-
-      for (FieldTransform parsedTransform in context.fieldTransforms) {
-        if (fieldMask.covers(parsedTransform.fieldPath)) {
-          fieldTransforms.add(parsedTransform);
-        }
-      }
+      return accumulator.toMergeData(updateData, fieldMask);
+    } else {
+      return accumulator.toMergeData(updateData);
     }
-
-    return ParsedDocumentData(
-      parsed as ObjectValue,
-      fieldMask,
-      fieldTransforms,
-    );
   }
 
   /// Parse update data from an update() call.
-  ParsedUpdateData parseUpdateData(Map<String, Object> data) {
+  UserDataParsedUpdateData parseUpdateData(Map<String, Object> data) {
     Assert.checkNotNull(data, 'Provided update data must not be null.');
-    final List<FieldPath> fieldMaskPaths = <FieldPath>[];
-    ObjectValue updateData = ObjectValue.empty;
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.update);
+    final UserDataParseContext context = accumulator.rootContext;
 
-    final _ParseContext context =
-        _ParseContext(UserDataSource.update, FieldPath.emptyPath);
+    ObjectValue updateData = ObjectValue.empty;
     for (MapEntry<String, Object> entry in data.entries) {
       final FieldPath fieldPath =
           firestore.FieldPath.fromDotSeparatedPath(entry.key).internalPath;
@@ -115,39 +83,36 @@ class UserDataConverter {
 
       if (fieldValue is firestore.FieldValue && fieldValue.isDelete) {
         // Add it to the field mask, but don't add anything to updateData.
-        fieldMaskPaths.add(fieldPath);
+        context.addToFieldMask(fieldPath);
       } else {
         final FieldValue parsedValue =
             _parseData(fieldValue, context.childContextForField(fieldPath));
         if (parsedValue != null) {
-          fieldMaskPaths.add(fieldPath);
+          context.addToFieldMask(fieldPath);
           updateData = updateData.set(fieldPath, parsedValue);
         }
       }
     }
 
-    final FieldMask mask = FieldMask(fieldMaskPaths);
-    return ParsedUpdateData(
-      updateData,
-      mask,
-      context.fieldTransforms,
-    );
+    return accumulator.toUpdateData(updateData);
   }
 
   /// Parses the update data from the update(field, value, field, value...)
   /// varargs call, accepting both strings and FieldPaths.
-  ParsedUpdateData parseUpdateDataFromList(List<Object> fieldsAndValues) {
-    final _ParseContext context =
-        _ParseContext(UserDataSource.update, FieldPath.emptyPath);
-    final List<FieldPath> fieldMaskPaths = <FieldPath>[];
-    ObjectValue updateData = ObjectValue.empty;
-
+  UserDataParsedUpdateData parseUpdateDataFromList(
+      List<Object> fieldsAndValues) {
     // fieldsAndValues.length and alternating types should already be validated
     // by Util.collectUpdateArguments().
-    Assert.hardAssert(fieldsAndValues.length.remainder(2) == 0,
+    final int length = fieldsAndValues.length;
+    Assert.hardAssert(length.remainder(2) == 0,
         'Expected fieldAndValues to contain an even number of elements');
 
-    for (int i = 0; i < fieldsAndValues.length; i += 2) {
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.update);
+    final UserDataParseContext context = accumulator.rootContext;
+    ObjectValue updateData = ObjectValue.empty;
+
+    for (int i = 0; i < length; i += 2) {
       final Object fieldPath = fieldsAndValues[i];
       final Object fieldValue = fieldsAndValues[i + 1];
 
@@ -165,34 +130,29 @@ class UserDataConverter {
 
       if (fieldValue is firestore.FieldValue && fieldValue.isDelete) {
         // Add it to the field mask, but don't add anything to updateData.
-        fieldMaskPaths.add(parsedField);
+        context.addToFieldMask(parsedField);
       } else {
         final FieldValue parsedValue =
             _parseData(fieldValue, context.childContextForField(parsedField));
         if (parsedValue != null) {
-          fieldMaskPaths.add(parsedField);
+          context.addToFieldMask(parsedField);
           updateData = updateData.set(parsedField, parsedValue);
         }
       }
     }
 
-    final FieldMask mask = FieldMask(fieldMaskPaths);
-    return ParsedUpdateData(
-      updateData,
-      mask,
-      context.fieldTransforms,
-    );
+    return accumulator.toUpdateData(updateData);
   }
 
   /// Parse a 'query value' (e.g. value in a where filter or a value in a cursor
   /// bound).
   FieldValue parseQueryValue(Object input) {
-    final _ParseContext context =
-        _ParseContext(UserDataSource.argument, FieldPath.emptyPath);
-    final FieldValue parsed = _parseData(input, context);
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.argument);
+    final FieldValue parsed = _parseData(input, accumulator.rootContext);
 
     Assert.hardAssert(parsed != null, 'Parsed data should not be null.');
-    Assert.hardAssert(context.fieldTransforms.isEmpty,
+    Assert.hardAssert(accumulator.fieldTransforms.isEmpty,
         'Field transforms should have been disallowed.');
     return parsed;
   }
@@ -203,7 +163,7 @@ class UserDataConverter {
   /// of the data being parsed, etc. Returns parsed value, or null if the value
   /// was a FieldValue sentinel that should not be included in the resulting
   /// parsed data.
-  FieldValue _parseData(Object input, _ParseContext context) {
+  FieldValue _parseData(Object input, UserDataParseContext context) {
     if (input is Map) {
       return _parseMap<dynamic, dynamic>(input, context);
     } else if (input is firestore.FieldValue) {
@@ -215,10 +175,10 @@ class UserDataConverter {
       _parseSentinelFieldValue(input, context);
       return null;
     } else {
-      // If [context.path] is null we are inside an array and we don't support
+      // If the context path is null we are inside an array and we don't support
       // field mask paths more granular than the top-level array.
       if (context.path != null) {
-        context.fieldMask.add(context.path);
+        context.addToFieldMask(context.path);
       }
 
       if (input is List) {
@@ -233,7 +193,7 @@ class UserDataConverter {
     }
   }
 
-  ObjectValue _parseMap<K, V>(Map<K, V> map, _ParseContext context) {
+  ObjectValue _parseMap<K, V>(Map<K, V> map, UserDataParseContext context) {
     final Map<String, FieldValue> result = <String, FieldValue>{};
     for (MapEntry<K, V> entry in map.entries) {
       if (entry.key is! String) {
@@ -242,7 +202,7 @@ class UserDataConverter {
       }
       final String key = entry.key as String;
       final FieldValue parsedValue =
-          _parseData(entry.value, context.childContextForName(key));
+          _parseData(entry.value, context.childContextForSegment(key));
       if (parsedValue != null) {
         result[key] = parsedValue;
       }
@@ -250,12 +210,12 @@ class UserDataConverter {
     return ObjectValue.fromMap(result);
   }
 
-  ArrayValue _parseList<T>(List<T> list, _ParseContext context) {
+  ArrayValue _parseList<T>(List<T> list, UserDataParseContext context) {
     final List<FieldValue> result = List<FieldValue>(list.length);
     int entryIndex = 0;
     for (T entry in list) {
       FieldValue parsedEntry =
-          _parseData(entry, context.childContextForArray(entryIndex));
+          _parseData(entry, context.childContextForArrayIndex(entryIndex));
       // Just include nulls in the array for fields being replaced with a
       // sentinel.
       parsedEntry ??= NullValue.nullValue();
@@ -266,11 +226,11 @@ class UserDataConverter {
   }
 
   /// 'Parses' the provided FieldValue, adding any necessary transforms to
-  /// [context.fieldTransforms].
+  /// [context._fieldTransforms].
   void _parseSentinelFieldValue(
-      firestore.FieldValue value, _ParseContext context) {
+      firestore.FieldValue value, UserDataParseContext context) {
     // Sentinels are only supported with writes, and not within arrays.
-    if (!_isWrite(context.dataSource)) {
+    if (!context.isWrite) {
       throw context.createError(
           '${value.methodName}() can only be used with set() and update()');
     }
@@ -283,7 +243,7 @@ class UserDataConverter {
       if (context.dataSource == UserDataSource.mergeSet) {
         // No transform to add for a delete, but we need to add it to our
         // fieldMask so it gets deleted.
-        context.fieldMask.add(context.path);
+        context.addToFieldMask(context.path);
       } else if (context.dataSource == UserDataSource.update) {
         Assert.hardAssert(context.path.isNotEmpty,
             'FieldValue.delete() at the top level should have already been handled.');
@@ -296,22 +256,19 @@ class UserDataConverter {
             'FieldValue.delete() can only be used with update() and set() with SetOptions.merge()');
       }
     } else if (value.isServerTimestamp) {
-      context.fieldTransforms.add(FieldTransform(
-        context.path,
-        ServerTimestampOperation(),
-      ));
+      context.addToFieldTransforms(context.path, ServerTimestampOperation());
     } else if (value.isArrayUnion) {
       final List<FieldValue> parsedElements =
           _parseArrayTransformElements(value.elements);
       final ArrayTransformOperation arrayUnion =
           ArrayTransformOperationUnion(parsedElements);
-      context.fieldTransforms.add(FieldTransform(context.path, arrayUnion));
+      context.addToFieldTransforms(context.path, arrayUnion);
     } else if (value.isArrayRemove) {
       final List<FieldValue> parsedElements =
           _parseArrayTransformElements(value.elements);
       final ArrayTransformOperation arrayRemove =
           ArrayTransformOperationRemove(parsedElements);
-      context.fieldTransforms.add(FieldTransform(context.path, arrayRemove));
+      context.addToFieldTransforms(context.path, arrayRemove);
     } else {
       throw Assert.fail('Unknown FieldValue type: ${value.runtimeType}');
     }
@@ -322,7 +279,7 @@ class UserDataConverter {
   /// Returns the parsed value, or null if the value was a FieldValue sentinel
   /// that should not be included in the resulting parsed data.
   //p
-  FieldValue _parseScalarValue(Object input, _ParseContext context) {
+  FieldValue _parseScalarValue(Object input, UserDataParseContext context) {
     if (input == null) {
       return NullValue.nullValue();
     } else if (input is int) {
@@ -364,232 +321,17 @@ class UserDataConverter {
   }
 
   List<FieldValue> _parseArrayTransformElements(List<Object> elements) {
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.argument);
     final List<FieldValue> result = List<FieldValue>(elements.length);
     for (int i = 0; i < elements.length; i++) {
       final Object element = elements[i];
       // Although array transforms are used with writes, the actual elements
       // being unioned or removed are not considered writes since they cannot
       // contain any FieldValue sentinels, etc.
-      final _ParseContext context =
-          _ParseContext(UserDataSource.argument, FieldPath.emptyPath);
-      result[i] = _parseData(element, context.childContextForArray(i));
+      final UserDataParseContext context = accumulator.rootContext;
+      result[i] = _parseData(element, context.childContextForArrayIndex(i));
     }
     return result;
-  }
-}
-
-/// The result of parsing document data (e.g. for a setData call).
-class ParsedDocumentData {
-  final ObjectValue _data;
-  final FieldMask _fieldMask;
-  final List<FieldTransform> _fieldTransforms;
-
-  ParsedDocumentData(this._data, this._fieldMask, this._fieldTransforms);
-
-  List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
-    final List<Mutation> mutations = <Mutation>[];
-    if (_fieldMask != null) {
-      mutations.add(PatchMutation(key, _data, _fieldMask, precondition));
-    } else {
-      mutations.add(SetMutation(key, _data, precondition));
-    }
-    if (_fieldTransforms.isNotEmpty) {
-      mutations.add(TransformMutation(key, _fieldTransforms));
-    }
-    return mutations;
-  }
-}
-
-/// The result of parsing 'update' data (i.e. for an updateData call).
-class ParsedUpdateData {
-  final ObjectValue _data;
-  final FieldMask _fieldMask;
-  final List<FieldTransform> fieldTransforms;
-
-  const ParsedUpdateData(this._data, this._fieldMask, this.fieldTransforms);
-
-  List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
-    final List<Mutation> mutations = <Mutation>[];
-    mutations.add(PatchMutation(key, _data, _fieldMask, precondition));
-    if (fieldTransforms.isNotEmpty) {
-      mutations.add(TransformMutation(key, fieldTransforms));
-    }
-    return mutations;
-  }
-
-  @override
-  String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('data', _data)
-          ..add('fieldMask', _fieldMask)
-          ..add('fieldTransforms', fieldTransforms))
-        .toString();
-  }
-}
-
-/// Represents what type of API method provided the data being parsed; useful
-/// for determining which error conditions apply during parsing and providing
-/// better error messages.
-enum UserDataSource {
-  set,
-  mergeSet,
-  update,
-
-  /// Indicates the source is a where clause, cursor bound, arrayUnion()
-  /// element, etc. Of note, isWrite(Argument) will return false.
-  argument
-}
-
-/// A 'context' object passed around while parsing user data.
-class _ParseContext {
-  final RegExp reservedFieldRegex = RegExp('^__.*__\$');
-
-  /// The current path being parsed.
-  /// TODO: path should never be null, but we don't support array paths right now.
-  final FieldPath path;
-
-  /// Whether or not this context corresponds to an element of an array.
-  final bool arrayElement;
-
-  /// What type of API method provided the data being parsed; useful for
-  /// determining which error conditions apply during parsing and providing
-  /// better error messages.
-  final UserDataSource dataSource;
-
-  /// Accumulates a list of field transforms found while parsing the data.
-  final List<FieldTransform> fieldTransforms;
-
-  /// Accumulates a list of the field paths found while parsing the data.
-  final SplayTreeSet<FieldPath> fieldMask;
-
-  factory _ParseContext(UserDataSource dataSource, FieldPath path) {
-    return _ParseContext._(
-      dataSource,
-      path,
-      /*arrayElement:*/ false,
-      <FieldTransform>[],
-      SplayTreeSet<FieldPath>(),
-    );
-  }
-
-  /// Initializes a ParseContext with the given source and path.
-  ///
-  /// [dataSource] Indicates what kind of API method this data came from.
-  /// [path] A path within the object being parsed. This could be an empty path
-  /// (in which case the context represents the root of the data being parsed),
-  /// or a nonempty path (indicating the context represents a nested location
-  /// within the data).
-  ///
-  ///   * TODO: We don't support array paths right now, so path can be null to
-  ///   indicate the context represents any location within an array (in which
-  ///   case certain features will not work and errors will be somewhat
-  ///   compromised).
-  ///
-  /// [arrayElement] Whether or not this context corresponds to an element of an
-  /// array.
-  /// [fieldTransforms] A mutable list of field transforms encountered while
-  /// parsing the data.
-  /// [fieldMask] A mutable list of field paths encountered while parsing the
-  /// data.
-  _ParseContext._(
-    this.dataSource,
-    this.path,
-    this.arrayElement,
-    this.fieldTransforms,
-    this.fieldMask,
-  ) {
-    _validatePath();
-  }
-
-  _ParseContext childContextForName(String fieldName) {
-    final FieldPath childPath =
-        path == null ? null : path.appendSegment(fieldName);
-    final _ParseContext context = _ParseContext._(
-      dataSource,
-      childPath,
-      /*arrayElement:*/ false,
-      fieldTransforms,
-      fieldMask,
-    );
-    context._validatePathSegment(fieldName);
-    return context;
-  }
-
-  _ParseContext childContextForField(FieldPath fieldPath) {
-    final FieldPath childPath =
-        path == null ? null : path.appendPath(fieldPath);
-    final _ParseContext context = _ParseContext._(
-      dataSource,
-      childPath,
-      /*arrayElement:*/ false,
-      fieldTransforms,
-      fieldMask,
-    );
-    context._validatePath();
-    return context;
-  }
-
-  _ParseContext childContextForArray(int arrayIndex) {
-    // TODO: We don't support array paths right now; so make path null.
-    return _ParseContext._(
-      dataSource,
-      /*path:*/ null,
-      /*arrayElement:*/ true,
-      fieldTransforms,
-      fieldMask,
-    );
-  }
-
-  /// Creates an error including the given reason and the current field path.
-  StateError createError(String reason) {
-    final String fieldDescription =
-        (path == null || path.isEmpty) ? '' : ' (found in field $path)';
-    return StateError('Invalid data. $reason$fieldDescription');
-  }
-
-  /// Returns 'true' if 'fieldPath' was traversed when creating this context.
-  bool contains(FieldPath fieldPath) {
-    for (FieldPath field in fieldMask) {
-      if (fieldPath.isPrefixOf(field)) {
-        return true;
-      }
-    }
-
-    for (FieldTransform fieldTransform in fieldTransforms) {
-      if (fieldPath.isPrefixOf(fieldTransform.fieldPath)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  void _validatePath() {
-    // TODO: Remove null check once we have proper paths for fields within arrays.
-    if (path == null) {
-      return;
-    }
-    for (int i = 0; i < path.length; i++) {
-      _validatePathSegment(path.getSegment(i));
-    }
-  }
-
-  void _validatePathSegment(String segment) {
-    if (_isWrite(dataSource) && reservedFieldRegex.hasMatch(segment)) {
-      throw createError('Document fields cannot begin and end with __');
-    }
-  }
-}
-
-bool _isWrite(UserDataSource dataSource) {
-  switch (dataSource) {
-    case UserDataSource.set: // fall through
-    case UserDataSource.mergeSet: // fall through
-    case UserDataSource.update:
-      return true;
-    case UserDataSource.argument:
-      return false;
-    default:
-      throw Assert.fail('Unexpected case for UserDataSource: $dataSource');
   }
 }

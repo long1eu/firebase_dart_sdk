@@ -5,13 +5,13 @@
 import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/delete_mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
@@ -51,7 +51,7 @@ class WriteBatch {
     _firestore.validateReference(documentRef);
     Assert.checkNotNull(data, 'Provided data must not be null.');
     _verifyNotCommitted();
-    final ParsedDocumentData parsed = options.merge
+    final UserDataParsedSetData parsed = options.merge
         ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
         : _firestore.dataConverter.parseSetData(data);
     _mutations
@@ -69,7 +69,7 @@ class WriteBatch {
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
   @publicApi
   WriteBatch updateFromList(DocumentReference documentRef, List<Object> data) {
-    final ParsedUpdateData parsedData = _firestore.dataConverter
+    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
         .parseUpdateDataFromList(Util.collectUpdateArguments(1, data));
 
     _firestore.validateReference(documentRef);
@@ -88,7 +88,7 @@ class WriteBatch {
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
   @publicApi
   WriteBatch update(DocumentReference documentRef, Map<String, Object> data) {
-    final ParsedUpdateData parsedData =
+    final UserDataParsedUpdateData parsedData =
         _firestore.dataConverter.parseUpdateData(data);
 
     _firestore.validateReference(documentRef);

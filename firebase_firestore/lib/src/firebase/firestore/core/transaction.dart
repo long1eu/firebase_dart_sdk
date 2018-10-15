@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
@@ -13,7 +14,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precond
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 
 /// Internal transaction object responsible for accumulating the mutations to
 /// perform and the base versions for any documents read.
@@ -102,13 +102,13 @@ class Transaction {
 
   /// Stores a set mutation for the given key and value, to be committed when
   /// [commit] is called.
-  void set(DocumentKey key, ParsedDocumentData data) {
+  void set(DocumentKey key, UserDataParsedSetData data) {
     _write(data.toMutationList(key, _precondition(key)));
   }
 
   /// Stores an update mutation for the given key and values, to be committed
   /// when [commit] is called.
-  void update(DocumentKey key, ParsedUpdateData data) {
+  void update(DocumentKey key, UserDataParsedUpdateData data) {
     _write(data.toMutationList(key, _preconditionForUpdate(key)));
   }
 

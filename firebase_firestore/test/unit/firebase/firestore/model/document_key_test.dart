@@ -43,7 +43,6 @@ void main() {
   });
 
   test('testUnevenNumberOfSegmentsAreRejected', () {
-    expect(() => DocumentKey.fromSegments(<String>['a']),
-        throwsA(const TypeMatcher<AssertionError>()));
+    expect(() => DocumentKey.fromSegments(<String>['a']), throwsStateError);
   });
 }

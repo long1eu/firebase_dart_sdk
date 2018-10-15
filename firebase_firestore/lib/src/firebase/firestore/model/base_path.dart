@@ -28,7 +28,7 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   /// Returns a new path whose segments are the current path plus another's
   ///
   /// Returns a new path with this segments path plus the new one
-  B appendPath(B path) {
+  B appendField(B path) {
     final List<String> newPath = List<String>.from(segments)
       ..addAll(path.segments);
     return createPathWithSegments(newPath);

@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/transaction.dart'
     as core;
+import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
@@ -15,7 +16,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/user_data_converter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
@@ -56,7 +56,7 @@ class Transaction {
     _firestore.validateReference(documentRef);
     Assert.checkNotNull(data, 'Provided data must not be null.');
     Assert.checkNotNull(options, 'Provided options must not be null.');
-    final ParsedDocumentData parsed = options.merge
+    final UserDataParsedSetData parsed = options.merge
         ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
         : _firestore.dataConverter.parseSetData(data);
     _transaction.set(documentRef.key, parsed);
@@ -72,7 +72,7 @@ class Transaction {
   /// Return this [Transaction] instance. Used for chaining method calls.
   @publicApi
   Transaction updateFromList(DocumentReference documentRef, List<Object> data) {
-    final ParsedUpdateData parsedData = _firestore.dataConverter
+    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
         .parseUpdateDataFromList(Util.collectUpdateArguments(1, data));
     return _update(documentRef, parsedData);
   }
@@ -86,13 +86,13 @@ class Transaction {
   /// Return this [Transaction] instance. Used for chaining method calls.
   @publicApi
   Transaction update(DocumentReference documentRef, Map<String, Object> data) {
-    final ParsedUpdateData parsedData =
+    final UserDataParsedUpdateData parsedData =
         _firestore.dataConverter.parseUpdateData(data);
     return _update(documentRef, parsedData);
   }
 
   Transaction _update(
-      DocumentReference documentRef, ParsedUpdateData updateData) {
+      DocumentReference documentRef, UserDataParsedUpdateData updateData) {
     _firestore.validateReference(documentRef);
     _transaction.update(documentRef.key, updateData);
     return this;

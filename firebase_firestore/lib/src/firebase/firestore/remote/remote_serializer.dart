@@ -160,7 +160,7 @@ class RemoteSerializer {
   String _encodeResourceName(DatabaseId databaseId, ResourcePath path) {
     return _encodedDatabaseId(databaseId)
         .appendSegment('documents')
-        .appendPath(path)
+        .appendField(path)
         .canonicalString;
   }
 

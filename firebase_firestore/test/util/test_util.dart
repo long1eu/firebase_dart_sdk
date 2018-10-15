@@ -12,6 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/order_by.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
@@ -382,7 +383,7 @@ class TestUtil {
       String path, Map<String, Object> data) {
     final UserDataConverter dataConverter =
         UserDataConverter(DatabaseId.forProject('project'));
-    final ParsedUpdateData result = dataConverter.parseUpdateData(data);
+    final UserDataParsedUpdateData result = dataConverter.parseUpdateData(data);
 
     // The order of the transforms doesn't matter, but we sort them so tests can
     // assume a particular order.
