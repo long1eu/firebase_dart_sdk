@@ -126,7 +126,8 @@ void main() {
 
   /// Verifies a snapshot containing setData but using the previous field value
   /// for the timestamps.
-  void verifyTimestampsUsePreviousValue(DocumentSnapshot current, DocumentSnapshot previous) {
+  void verifyTimestampsUsePreviousValue(DocumentSnapshot current,
+                                        DocumentSnapshot previous) {
     expect(current.exists, isTrue);
     if (previous != null) {
       final Timestamp when = previous.getTimestamp('when');
@@ -274,7 +275,8 @@ void main() {
           () async {
         bool hadError = false;
         try {
-          await docRef.firestore.runTransaction<void>((Transaction transaction) {
+          await docRef.firestore.runTransaction<void>((
+              Transaction transaction) {
             transaction.update(docRef, updateData);
             return null;
           });

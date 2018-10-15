@@ -98,7 +98,7 @@ abstract class AbstractStream<
     Assert.hardAssert(_state == StreamState.Initial, 'Already started');
 
     final CloseGuardedRunner closeGuardedRunner =
-        CloseGuardedRunner(_closeCount, () => _closeCount);
+    CloseGuardedRunner(_workerQueue, _closeCount, () => _closeCount);
     final StreamObserver<ReqT, RespT, CallbackT> streamObserver =
         StreamObserver<ReqT, RespT, CallbackT>(closeGuardedRunner, this);
 
@@ -285,11 +285,13 @@ abstract class AbstractStream<
 /// only expose a run() method which asserts that we're already on the
 /// [_workerQueue].
 class CloseGuardedRunner {
-  final AsyncQueue asyncQueue = AsyncQueue();
+  final AsyncQueue asyncQueue;
   final int initialCloseCount;
   final int Function() closeCount;
 
-  CloseGuardedRunner(this.initialCloseCount, this.closeCount);
+  CloseGuardedRunner(this.asyncQueue,
+                     this.initialCloseCount,
+                     this.closeCount,);
 
   Future<void> run(Task<void> task, String caller) async {
     if (closeCount() == initialCloseCount) {

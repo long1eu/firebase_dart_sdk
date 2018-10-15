@@ -375,8 +375,8 @@ class ViewDocumentChanges {
   String toString() {
     return (ToStringHelper(runtimeType)
           ..add('documentSet', documentSet)
-          ..add('changeSet', changeSet)
-          ..add('mutatedKeys', mutatedKeys)..add('needsRefill', needsRefill))
+          ..add('changeSet', changeSet)..add('mutatedKeys', mutatedKeys)..add(
+          'needsRefill', needsRefill))
         .toString();
   }
 }

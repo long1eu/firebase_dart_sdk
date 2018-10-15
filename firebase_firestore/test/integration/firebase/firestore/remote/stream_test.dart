@@ -21,15 +21,6 @@ import 'package:test/test.dart';
 import '../../../../util/integration_test_util.dart';
 import '../../../../util/test_util.dart';
 
-const map = TestUtil.map;
-const setMutation = TestUtil.setMutation;
-const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
-const testFirestore = IntegrationTestUtil.testFirestore;
-const writeAllDocs = IntegrationTestUtil.writeAllDocs;
-const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;
-const testCollection = IntegrationTestUtil.testCollection;
-
 class MockCredentialsProvider extends EmptyCredentialsProvider {
   final List<String> states = <String>[];
 
@@ -207,6 +198,7 @@ void main() {
   });
 
   //todo
+  // This behaviour is hard to replicate right now, I will get back on this.
   test('testStreamRefreshesTokenUponExpiration', () async {
     final AsyncQueue testQueue = AsyncQueue();
     final MockCredentialsProvider mockCredentialsProvider =
@@ -341,3 +333,20 @@ class _StreamStatusCallback
     );
   }
 }
+
+// ignore: always_specify_types
+const map = TestUtil.map;
+// ignore: always_specify_types
+const setMutation = TestUtil.setMutation;
+// ignore: always_specify_types
+const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
+// ignore: always_specify_types
+const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
+// ignore: always_specify_types
+const testFirestore = IntegrationTestUtil.testFirestore;
+// ignore: always_specify_types
+const writeAllDocs = IntegrationTestUtil.writeAllDocs;
+// ignore: always_specify_types
+const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;
+// ignore: always_specify_types
+const testCollection = IntegrationTestUtil.testCollection;

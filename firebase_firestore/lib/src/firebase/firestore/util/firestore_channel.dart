@@ -92,8 +92,7 @@ class FirestoreChannel {
 
     observer.onReady();
 
-    return BidiChannel<ReqT, RespT>(
-        controller, call, () => _channel.terminate());
+    return BidiChannel<ReqT, RespT>(controller, call);
   }
 
   /// Creates and starts a streaming response RPC.
@@ -175,9 +174,8 @@ class FirestoreChannel {
 class BidiChannel<ReqT, RespT> {
   final Sink<ReqT> _sink;
   final ClientCall<ReqT, RespT> _call;
-  final Future<void> Function() onClose;
 
-  BidiChannel(this._sink, this._call, this.onClose);
+  const BidiChannel(this._sink, this._call);
 
   void add(ReqT data) => _sink.add(data);
 
@@ -195,8 +193,5 @@ class BidiChannel<ReqT, RespT> {
     );
   }
 
-  Future<void> cancel() async {
-    _sink.close();
-    await onClose();
-  }
+  void cancel() => _sink.close();
 }

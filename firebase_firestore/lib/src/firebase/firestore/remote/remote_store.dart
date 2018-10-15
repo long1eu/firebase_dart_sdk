@@ -142,14 +142,13 @@ class RemoteStore implements TargetMetadataProvider {
   /// [enableNetwork].
   Future<void> disableNetwork() async {
     _networkEnabled = false;
-    await disableNetworkInternal();
+    await _disableNetworkInternal();
 
     // Set the OnlineState to OFFLINE so get()s return from cache, etc.
     await _onlineStateTracker.updateState(OnlineState.offline);
   }
 
-  /*private*/
-  Future<void> disableNetworkInternal() async {
+  Future<void> _disableNetworkInternal() async {
     await _watchStream.stop();
     await _writeStream.stop();
 
@@ -178,7 +177,7 @@ class RemoteStore implements TargetMetadataProvider {
     // For now, all shutdown logic is handled by disableNetworkInternal(). We
     // might expand on this in the future.
     _networkEnabled = false;
-    await disableNetworkInternal();
+    await _disableNetworkInternal();
     // Set the OnlineState to UNKNOWN (rather than OFFLINE) to avoid potentially
     // triggering spurious listener events with cached data, etc.
     await _onlineStateTracker.updateState(OnlineState.unknown);
@@ -198,7 +197,7 @@ class RemoteStore implements TargetMetadataProvider {
       // new mutations from the [LocalStore] (since mutations are per-user).
       Log.d(_tag, 'Restarting streams for new credential.');
       _networkEnabled = false;
-      await disableNetworkInternal();
+      await _disableNetworkInternal();
       await _onlineStateTracker.updateState(OnlineState.unknown);
       await enableNetwork();
     }

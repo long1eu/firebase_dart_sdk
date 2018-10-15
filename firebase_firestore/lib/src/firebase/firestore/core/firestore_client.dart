@@ -53,9 +53,11 @@ class FirestoreClient implements RemoteStoreCallback {
   SyncEngine syncEngine;
   EventManager eventManager;
 
-  FirestoreClient._(this.databaseInfo,
-                    this.credentialsProvider,
-                    this.asyncQueue,);
+  FirestoreClient._(
+    this.databaseInfo,
+    this.credentialsProvider,
+    this.asyncQueue,
+  );
 
   static Future<FirestoreClient> initialize(
       DatabaseInfo databaseInfo,

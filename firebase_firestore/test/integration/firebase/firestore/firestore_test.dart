@@ -26,9 +26,7 @@ import '../../../util/test_util.dart';
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/firestore';
 
-  setUp(() async {
-    await testFirestore();
-  });
+  setUp(() => testFirestore());
 
   tearDown(() async {
     await Future<void>.delayed(const Duration(milliseconds: 100));

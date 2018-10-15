@@ -37,21 +37,8 @@ class IntegrationTestUtil {
   static final Map<FirebaseFirestore, bool> firestoreStatus =
   <FirebaseFirestore, bool>{};
 
-  static const int SEMAPHORE_WAIT_TIMEOUT_MS = 30000;
-
-  static const int SHUTDOWN_WAIT_TIMEOUT_MS = 10000;
-
-  static const int BATCH_WAIT_TIMEOUT_MS = 120000;
-
   static final FirestoreProvider provider = FirestoreProvider();
 
-  /// TODO: There's some flakiness with hexa / emulator / whatever that causes
-  /// the first write in a run to frequently time out. So for now we always send
-  /// an initial write with an extra long timeout to improve test reliability.
-  /*p*/
-  static const int FIRST_WRITE_TIMEOUT_MS = 60000;
-
-  /*p*/
   static bool sentFirstWrite = false;
 
   static String currentDatabasePath;
@@ -92,7 +79,11 @@ class IntegrationTestUtil {
   /// project.
   static Future<FirebaseFirestore> testAlternateFirestore() async {
     return testFirestoreInstance(
-        BAD_PROJECT_ID, LogLevel.d, newTestSettings(), 'bad/projectId/path.db');
+      BAD_PROJECT_ID,
+      LogLevel.d,
+      newTestSettings(),
+      'bad/projectId/path.db',
+    );
   }
 
   /*p*/
@@ -195,7 +186,8 @@ class IntegrationTestUtil {
   }
 
   static Future<void> writeAllDocs(CollectionReference collection,
-                                   Map<String, Map<String, Object>> docs) async {
+                                   Map<String,
+                                       Map<String, Object>> docs) async {
     for (MapEntry<String, Map<String, Object>> doc in docs.entries) {
       await collection.document(doc.key).set(doc.value);
     }
