@@ -10,19 +10,18 @@ import 'test_util.dart';
 void main() {
   test('testEquals', () {
     final DocumentSnapshot base =
-        TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['a', 1]), false);
+        documentSnapshot('rooms/foo', util.map(<dynamic>['a', 1]), false);
     final DocumentSnapshot baseDup =
-        TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['a', 1]), false);
-    final DocumentSnapshot noData =
-        TestUtil.documentSnapshot('rooms/foo', null, false);
+        documentSnapshot('rooms/foo', util.map(<dynamic>['a', 1]), false);
+    final DocumentSnapshot noData = documentSnapshot('rooms/foo', null, false);
     final DocumentSnapshot noDataDup =
-        TestUtil.documentSnapshot('rooms/foo', null, false);
+        documentSnapshot('rooms/foo', null, false);
     final DocumentSnapshot differentPath =
-        TestUtil.documentSnapshot('rooms/bar', map(<dynamic>['a', 1]), false);
+        documentSnapshot('rooms/bar', util.map(<dynamic>['a', 1]), false);
     final DocumentSnapshot differentData =
-        TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['b', 1]), false);
+        documentSnapshot('rooms/foo', util.map(<dynamic>['b', 1]), false);
     final DocumentSnapshot fromCache =
-        TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['a', 1]), true);
+        documentSnapshot('rooms/foo', util.map(<dynamic>['a', 1]), true);
 
     expect(baseDup, base);
     expect(noDataDup, noData);
@@ -43,6 +42,3 @@ void main() {
     expect(fromCache.hashCode, isNot(base.hashCode));
   });
 }
-
-// ignore: always_specify_types
-const map = util.TestUtil.map;

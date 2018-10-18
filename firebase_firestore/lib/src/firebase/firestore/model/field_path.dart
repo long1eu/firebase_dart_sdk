@@ -10,7 +10,7 @@ class FieldPath extends BasePath<FieldPath> {
   static final FieldPath keyPath =
       FieldPath.fromSingleSegment(DocumentKey.keyFieldName);
 
-  static const FieldPath emptyPath = FieldPath._(const <String>[]);
+  static const FieldPath emptyPath = FieldPath._(<String>[]);
 
   const FieldPath._(List<String> segments) : super(segments);
 
@@ -19,23 +19,13 @@ class FieldPath extends BasePath<FieldPath> {
     return FieldPath._(List<String>.unmodifiable(<String>[fieldName]));
   }
 
-  /// Creates a [FieldPath] from a list of parsed field path segments.
-  factory FieldPath.fromSegments(List<String> segments) {
-    return segments.isEmpty ? FieldPath.emptyPath : FieldPath._(segments);
-  }
-
-  @override
-  FieldPath createPathWithSegments(List<String> segments) {
-    return FieldPath._(segments);
-  }
-
   /// Creates a [FieldPath] from a server-encoded field path.
-  static FieldPath fromServerFormat(String path) {
+  factory FieldPath.fromServerFormat(String path) {
     final List<String> res = <String>[];
     StringBuffer buffer = StringBuffer();
     // TODO: We should make this more strict.
-    // Right now, it allows non-identifier path components, even if they aren't escaped.
-
+    // Right now, it allows non-identifier path components, even if they aren't
+    // escaped.
     int i = 0;
 
     // If we're inside '`' backticks, then we should ignore '.' dots.
@@ -85,6 +75,16 @@ class FieldPath extends BasePath<FieldPath> {
     return FieldPath._(res);
   }
 
+  /// Creates a [FieldPath] from a list of parsed field path segments.
+  factory FieldPath.fromSegments(List<String> segments) {
+    return segments.isEmpty ? FieldPath.emptyPath : FieldPath._(segments);
+  }
+
+  @override
+  FieldPath createPathWithSegments(List<String> segments) {
+    return FieldPath._(segments);
+  }
+
   /// Return true if the string could be used as a segment in a field path
   /// without escaping. Valid identifies follow the regex [a-zA-Z_][a-zA-Z0-9_]
   static bool _isValidIdentifier(String identifier) {
@@ -123,7 +123,7 @@ class FieldPath extends BasePath<FieldPath> {
       escaped = escaped.replaceAll('\\', '\\\\').replaceAll('`', '\\`');
 
       if (!_isValidIdentifier(escaped)) {
-        escaped = '`' + escaped + '`';
+        escaped = '`$escaped`';
       }
 
       builder.write(escaped);

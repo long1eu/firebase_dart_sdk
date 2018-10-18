@@ -39,7 +39,7 @@ void main() {
       'array',
       FieldValue.arrayUnion(<int>[1, 2])
     ]));
-    final DocumentSnapshot snapshot = await docRef.get(Source.CACHE);
+    final DocumentSnapshot snapshot = await docRef.get(Source.cache);
     expect(
         snapshot.data,
         map<List<int>>(<dynamic>[
@@ -66,7 +66,7 @@ void main() {
 
     // Nothing should be cached since it was an update and we had no base doc.
     try {
-      await docRef.get(Source.CACHE);
+      await docRef.get(Source.cache);
     } on FirebaseFirestoreError catch (e) {
       expect(e.code, FirebaseFirestoreErrorCode.unavailable);
     }
@@ -75,7 +75,7 @@ void main() {
   test('mergeSetWithNoCachedBaseDoc', () async {
     // Write an initial document in an isolated Firestore instance so it's not
     // stored in our cache.
-    (await testFirestore(newTestSettings(),
+    await (await testFirestore(newTestSettings(),
             'integration/array_transforms_mergeSetWithNoCachedBaseDoc.db'))
         .document(docRef.path)
         .set(map(<dynamic>[
@@ -91,7 +91,7 @@ void main() {
         SetOptions.mergeAllFields);
 
     // Document will be cached but we'll be missing 42.
-    final DocumentSnapshot snapshot = await docRef.get(Source.CACHE);
+    final DocumentSnapshot snapshot = await docRef.get(Source.cache);
     expect(
         snapshot.data,
         map<List<int>>(<dynamic>[
@@ -109,7 +109,7 @@ void main() {
       'array',
       FieldValue.arrayUnion(<int>[1, 2])
     ]));
-    final DocumentSnapshot snapshot = await docRef.get(Source.CACHE);
+    final DocumentSnapshot snapshot = await docRef.get(Source.cache);
     expect(
         snapshot.data,
         map<List<int>>(<dynamic>[
@@ -127,7 +127,7 @@ void main() {
       'array',
       FieldValue.arrayRemove(<int>[1, 2])
     ]));
-    final DocumentSnapshot snapshot = await docRef.get(Source.CACHE);
+    final DocumentSnapshot snapshot = await docRef.get(Source.cache);
     expect(
         snapshot.data,
         map<List<int>>(<dynamic>[
@@ -137,11 +137,9 @@ void main() {
   });
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testDocument = IntegrationTestUtil.testDocument;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const newTestSettings = IntegrationTestUtil.newTestSettings;

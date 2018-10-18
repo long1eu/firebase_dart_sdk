@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value_options.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/timestamp_value.dart';
@@ -14,8 +15,8 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// * Notes:
 ///   - ServerTimestampValue instances are created as the result of
 ///   applying a TransformMutation (see [TransformMutation.applyTo]). They can
-///   only exist in the local view of a document. Therefore they do not need to be
-///   parsed or serialized.
+///   only exist in the local view of a document. Therefore they do not need to
+///   be parsed or serialized.
 ///   - When evaluated locally (e.g. via [DocumentSnapshot.data]), they evaluate
 ///   to null.
 ///   - They sort after all TimestampValues. With respect to other
@@ -43,8 +44,8 @@ class ServerTimestampValue extends FieldValue {
         return null;
 
       default:
-        throw Assert.fail(
-            'Unexpected case for ServerTimestampBehavior: ${options.serverTimestampBehavior}');
+        throw Assert.fail('Unexpected case for ServerTimestampBehavior: '
+            '${options.serverTimestampBehavior}');
     }
   }
 

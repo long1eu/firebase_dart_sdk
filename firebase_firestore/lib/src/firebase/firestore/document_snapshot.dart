@@ -273,7 +273,8 @@ class DocumentSnapshot {
     }
 
     try {
-      return value as T;
+      final T result = value;
+      return result;
     } on CastError catch (_) {
       throw StateError(
           'Field \'$field\' is not a $T, but it is ${value.runtimeType}');
@@ -294,9 +295,11 @@ class DocumentSnapshot {
         // TODO: Somehow support foreign references.
         Log.w(
             'DocumentSnapshot',
-            'Document ${key.path} contains a document reference within a different database '
-            '(${refDatabase.projectId}/${refDatabase.databaseId}) which is not supported. It will be treated as a reference in '
-            'the current database (${database.projectId}/${database.databaseId}) instead.');
+            'Document ${key.path} contains a document reference within a '
+            'different database '
+            '(${refDatabase.projectId}/${refDatabase.databaseId}) which is not '
+            'supported. It will be treated as a reference in the current '
+            'database (${database.projectId}/${database.databaseId}) instead.');
       }
       return DocumentReference(key, _firestore);
     } else {

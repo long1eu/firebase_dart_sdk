@@ -29,7 +29,7 @@ class Bound {
   /// The index position of this bound
   final List<FieldValue> position;
 
-  Bound(this.position, this.before);
+  Bound({this.position, this.before});
 
   String canonicalString() {
     // TODO: Make this collision robust.
@@ -43,7 +43,8 @@ class Bound {
     return builder.toString();
   }
 
-  /// Returns true if a document sorts before a bound using the provided sort order.
+  /// Returns true if a document sorts before a bound using the provided sort
+  /// order.
   bool sortsBeforeDocument(List<OrderBy> orderBy, Document document) {
     Assert.hardAssert(position.length <= orderBy.length,
         'Bound has more components than query\'s orderBy');
@@ -53,8 +54,10 @@ class Bound {
       final FieldValue component = position[i];
       if (orderByComponent.field == FieldPath.keyPath) {
         final Object refValue = component.value;
-        Assert.hardAssert(refValue is DocumentKey,
-            'Bound has a non-key value where the key path is being used $component');
+        Assert.hardAssert(
+            refValue is DocumentKey,
+            'Bound has a non-key value '
+            'where the key path is being used $component');
         comparison = (refValue as DocumentKey).compareTo(document.key);
       } else {
         final FieldValue docValue = document.getField(orderByComponent.field);

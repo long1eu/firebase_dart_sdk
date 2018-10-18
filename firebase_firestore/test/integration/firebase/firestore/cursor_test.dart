@@ -214,8 +214,8 @@ void main() {
     ]));
 
     final Query query = testCollection
-        .orderBy('sort', Direction.DESCENDING)
-        .orderByField(FieldPath.documentId(), Direction.DESCENDING);
+        .orderBy('sort', Direction.descending)
+        .orderByField(FieldPath.documentId(), Direction.descending);
 
     QuerySnapshot snapshot = await query.startAt(<double>[2.0]).get();
 
@@ -304,17 +304,15 @@ void main() {
   });
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const newTestSettings = IntegrationTestUtil.newTestSettings;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const writeAllDocs = IntegrationTestUtil.writeAllDocs;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;

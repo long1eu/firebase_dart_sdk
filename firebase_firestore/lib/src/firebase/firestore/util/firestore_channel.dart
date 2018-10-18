@@ -120,7 +120,7 @@ class FirestoreChannel {
       onError: (dynamic status) {
         hadError = true;
         controller.close();
-        completer.completeError(Util.exceptionFromStatus(status as GrpcError));
+        completer.completeError(exceptionFromStatus(status as GrpcError));
       },
     );
 
@@ -152,7 +152,7 @@ class FirestoreChannel {
       },
       onError: (dynamic status) {
         controller.close();
-        completer.completeError(Util.exceptionFromStatus(status as GrpcError));
+        completer.completeError(exceptionFromStatus(status as GrpcError));
       },
     );
 

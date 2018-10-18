@@ -69,14 +69,12 @@ class MockDatastore extends Datastore {
 
   @override
   WatchStream createWatchStream(WatchStreamCallback listener) {
-    _watchStream = _MockWatchStream(this, workerQueue, listener);
-    return _watchStream;
+    return _watchStream = _MockWatchStream(this, workerQueue, listener);
   }
 
   @override
   WriteStream createWriteStream(WriteStreamCallback listener) {
-    _writeStream = _MockWriteStream(this, workerQueue, listener);
-    return _writeStream;
+    return _writeStream = _MockWriteStream(this, workerQueue, listener);
   }
 
   int get writeStreamRequestCount => _writeStreamRequestCount;
@@ -145,7 +143,7 @@ class _MockWatchStream extends WatchStream {
 
   @override
   Future<void> stop() async {
-    super.stop();
+    await super.stop();
     _activeTargets.clear();
     _open = false;
   }
@@ -162,9 +160,10 @@ class _MockWatchStream extends WatchStream {
 
   @override
   void watchQuery(QueryData queryData) {
-    final String resumeToken = Util.toDebugString(queryData.resumeToken);
+    final String resumeToken = toDebugString(queryData.resumeToken);
     SpecTestCase.log(
-        '      watchQuery(${queryData.query}, ${queryData.targetId}, $resumeToken)');
+        '      watchQuery(${queryData.query}, ${queryData.targetId}, '
+        '$resumeToken)');
     // Snapshot version is ignored on the wire
     final QueryData sentQueryData = queryData.copyWith(
         snapshotVersion: SnapshotVersion.none,
@@ -238,7 +237,7 @@ class _MockWriteStream extends WriteStream {
 
   @override
   Future<void> stop() async {
-    super.stop();
+    await super.stop();
     sentWrites.clear();
     _open = false;
     handshakeComplete = false;

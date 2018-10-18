@@ -24,12 +24,10 @@ void main() {
 
   setUp(() async {
     print('setUp');
-    final SQLitePersistence persistence =
-        await PersistenceTestHelpers.openSQLitePersistence(
-            'firebase/firestore/local/sqlite_query_cache_${PersistenceTestHelpers.nextSQLiteDatabaseName()}.db');
+    final SQLitePersistence persistence = await openSQLitePersistence(
+        'firebase/firestore/local/sqlite_query_cache_${nextSQLiteDatabaseName()}.db');
 
-    testCase = QueryCacheTestCase(persistence);
-    testCase.setUp();
+    testCase = QueryCacheTestCase(persistence)..setUp();
 
     queryCache = testCase.queryCache;
     print('setUpDone');
@@ -141,21 +139,21 @@ void main() {
   });
 
   test('testAddOrRemoveMatchingKeys', () async {
-    final DocumentKey key = TestUtil.key('foo/bar');
+    final DocumentKey _key = key('foo/bar');
 
-    expect(await queryCache.containsKey(key), isFalse);
+    expect(await queryCache.containsKey(_key), isFalse);
 
-    await testCase.addMatchingKey(key, 1);
-    expect(await queryCache.containsKey(key), isTrue);
+    await testCase.addMatchingKey(_key, 1);
+    expect(await queryCache.containsKey(_key), isTrue);
 
-    await testCase.addMatchingKey(key, 2);
-    expect(await queryCache.containsKey(key), isTrue);
+    await testCase.addMatchingKey(_key, 2);
+    expect(await queryCache.containsKey(_key), isTrue);
 
-    await testCase.removeMatchingKey(key, 1);
-    expect(await queryCache.containsKey(key), isTrue);
+    await testCase.removeMatchingKey(_key, 1);
+    expect(await queryCache.containsKey(_key), isTrue);
 
-    await testCase.removeMatchingKey(key, 2);
-    expect(await queryCache.containsKey(key), isFalse);
+    await testCase.removeMatchingKey(_key, 2);
+    expect(await queryCache.containsKey(_key), isFalse);
   });
 
   test('testRemoveMatchingKeysForTargetId', () async {
@@ -295,10 +293,3 @@ void main() {
     expect(queryCache.lastRemoteSnapshotVersion, version(42));
   });
 }
-
-// ignore: always_specify_types
-const query = TestUtil.query;
-// ignore: always_specify_types
-const filter = TestUtil.filter;
-// ignore: always_specify_types
-const key = TestUtil.key;

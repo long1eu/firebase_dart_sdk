@@ -10,6 +10,8 @@ import 'package:test/test.dart';
 
 import 'mock/database_mock.dart';
 
+// ignore_for_file: prefer_interpolation_to_compose_strings
+
 void main() {
   const String _sep = '\u0001\u0001';
   Database db;
@@ -33,7 +35,7 @@ void main() {
     expect(decoded, path);
 
     // Verify that the value round trips through the SQLite API too.
-    db.execute('INSERT INTO keys VALUES (?)', <String>[encoded]);
+    await db.execute('INSERT INTO keys VALUES (?)', <String>[encoded]);
     final List<Map<String, dynamic>> result =
         await db.query('SELECT key FROM keys WHERE key = ?', <String>[encoded]);
 
@@ -64,7 +66,8 @@ void main() {
 
     int i = 0;
     for (Map<String, dynamic> row in result) {
-      selected[i] = row.values.first as String;
+      final String key = row.values.first;
+      selected[i] = key;
       i++;
     }
 

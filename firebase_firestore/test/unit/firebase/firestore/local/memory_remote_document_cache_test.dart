@@ -26,10 +26,9 @@ void main() {
     print('setUp');
 
     final MemoryPersistence persistence =
-        await PersistenceTestHelpers.createEagerGCMemoryPersistence();
+        await createEagerGCMemoryPersistence();
 
-    testCase = RemoteDocumentCacheTestCase(persistence);
-    testCase.setUp();
+    testCase = RemoteDocumentCacheTestCase(persistence)..setUp();
     remoteDocumentCache = testCase.remoteDocumentCache;
 
     print('setUpDone');
@@ -53,9 +52,9 @@ void main() {
 
   test('testSetAndReadDeletedDocument', () async {
     const String path = 'a/b';
-    final NoDocument deletedDoc = TestUtil.deletedDoc(path, 42);
-    await testCase.add(deletedDoc);
-    expect(await testCase.get(path), deletedDoc);
+    final NoDocument deletedDocument = deletedDoc(path, 42);
+    await testCase.add(deletedDocument);
+    expect(await testCase.get(path), deletedDocument);
   });
 
   test('testSetDocumentToNewValue', () async {
@@ -105,10 +104,3 @@ void main() {
     expect(values(results), expected);
   });
 }
-
-// ignore: always_specify_types
-const path = TestUtil.path;
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const values = TestUtil.values;

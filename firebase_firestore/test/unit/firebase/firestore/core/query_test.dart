@@ -100,7 +100,8 @@ void main() {
     document = doc('collection/1', 0, map(<dynamic>['array', <dynamic>[]]));
     expect(query.matches(document), isFalse);
 
-    // array without element (and make sure it doesn't match in a nested field or a different field)
+    // array without element (and make sure it doesn't match in a nested field
+    // or a different field)
     document = doc(
         'collection/1',
         0,
@@ -575,18 +576,3 @@ void main() {
         ]);
   });
 }
-
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const filter = TestUtil.filter;
-// ignore: always_specify_types
-const orderBy = TestUtil.orderBy;
-// ignore: always_specify_types
-const testEquality = TestUtil.testEquality;
-// ignore: always_specify_types
-const ref = TestUtil.ref;
-// ignore: always_specify_types
-const path = TestUtil.path;

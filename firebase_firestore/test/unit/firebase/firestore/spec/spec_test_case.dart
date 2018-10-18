@@ -260,20 +260,20 @@ class SpecTestCase implements RemoteStoreCallback {
       if (queryDict.containsKey('filters')) {
         final List<dynamic> array = queryDict['filters'];
         for (int i = 0; i < array.length; i++) {
-          final List<dynamic> filter = array[i];
-          final String field = filter[0];
-          final String op = filter[1];
-          final Object value = filter[2];
-          query = query.filter(TestUtil.filter(field, op, value));
+          final List<dynamic> _filter = array[i];
+          final String field = _filter[0];
+          final String op = _filter[1];
+          final Object value = _filter[2];
+          query = query.filter(filter(field, op, value));
         }
       }
       if (queryDict.containsKey('orderBys')) {
         final List<dynamic> array = queryDict['orderBys'];
         for (int i = 0; i < array.length; i++) {
-          final List<dynamic> orderBy = array[i];
-          final String field = orderBy[0];
-          final String direction = orderBy[1];
-          query = query.orderBy(TestUtil.orderBy(field, direction));
+          final List<dynamic> _orderBy = array[i];
+          final String field = _orderBy[0];
+          final String direction = _orderBy[1];
+          query = query.orderBy(orderBy(field, direction));
         }
       }
       return query;
@@ -288,16 +288,16 @@ class SpecTestCase implements RemoteStoreCallback {
     final Map<String, dynamic> options = jsonDoc['options'];
     final DocumentState documentState =
         ((options['hasLocalMutations'] ?? false) as bool)
-            ? DocumentState.LOCAL_MUTATIONS
+            ? DocumentState.localMutations
             : (((options['hasCommittedMutations'] ?? false) as bool)
-                ? DocumentState.COMMITTED_MUTATIONS
-                : DocumentState.SYNCED);
+                ? DocumentState.committedMutations
+                : DocumentState.synced);
 
     final Map<String, Object> values =
         _parseMap(jsonDoc['value'] as Map<String, dynamic>);
-    final Document doc =
-        TestUtil.doc(jsonDoc['key'] as String, version, values, documentState);
-    return DocumentViewChange(type, doc);
+    final Document document =
+        doc(jsonDoc['key'] as String, version, values, documentState);
+    return DocumentViewChange(type, document);
   }
 
   Object _parseObject(Object obj) {
@@ -348,7 +348,7 @@ class SpecTestCase implements RemoteStoreCallback {
     final Query query = _parseQuery(listenSpec[1]);
 
     // TODO: Allow customizing listen options in spec tests
-    const ListenOptions options = const ListenOptions(
+    const ListenOptions options = ListenOptions(
       includeDocumentMetadataChanges: true,
       includeQueryMetadataChanges: true,
     );
@@ -359,8 +359,10 @@ class SpecTestCase implements RemoteStoreCallback {
           _events.add(QueryEvent(query: query, view: value));
         },
         onError: (dynamic error) {
-          Assert.hardAssert(error is FirebaseFirestoreError,
-              'The recived error is not a FirebaseFirestoreError it is ${error.runtimeType}.');
+          Assert.hardAssert(
+              error is FirebaseFirestoreError,
+              'The recived error is not a FirebaseFirestoreError it is '
+              '${error.runtimeType}.');
           _events.add(
               QueryEvent(query: query, error: error as FirebaseFirestoreError));
         },
@@ -418,7 +420,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _doWatchAck(List<dynamic> ackedTargets) async {
     final WatchChangeWatchTargetChange change = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.Added, _parseIntList(ackedTargets));
+        WatchTargetChangeType.added, _parseIntList(ackedTargets));
     await _writeWatchChange(change, SnapshotVersion.none);
   }
 
@@ -428,7 +430,7 @@ class SpecTestCase implements RemoteStoreCallback {
     final Uint8List resumeToken =
         Uint8List.fromList(utf8.encode(currentSpec[1] as String));
     final WatchChangeWatchTargetChange change = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.Current, currentTargets, resumeToken);
+        WatchTargetChangeType.current, currentTargets, resumeToken);
     await _writeWatchChange(change, SnapshotVersion.none);
   }
 
@@ -445,7 +447,7 @@ class SpecTestCase implements RemoteStoreCallback {
     final List<int> targetIds =
         _parseIntList(watchRemoveSpec['targetIds'].cast<int>() as List<int>);
     final WatchChangeWatchTargetChange change = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.Removed,
+        WatchTargetChangeType.removed,
         targetIds,
         WatchStream.emptyResumeToken,
         error);
@@ -483,24 +485,23 @@ class SpecTestCase implements RemoteStoreCallback {
           : _parseMap(docSpec['value'] as Map<String, dynamic>);
       final int version = docSpec['version'];
 
-      final MaybeDocument doc = value != null
-          ? TestUtil.doc(key, version, value)
-          : TestUtil.deletedDoc(key, version);
+      final MaybeDocument document =
+          value != null ? doc(key, version, value) : deletedDoc(key, version);
 
       final List<int> updated = _parseIntList(
           (watchEntity['targets'] ?? <int>[]).cast<int>() as List<int>);
       final List<int> removed = _parseIntList(
           (watchEntity['removedTargets'] ?? <int>[]).cast<int>() as List<int>);
       final WatchChange change =
-          WatchChangeDocumentChange(updated, removed, doc.key, doc);
+          WatchChangeDocumentChange(updated, removed, document.key, document);
 
       await _writeWatchChange(change, SnapshotVersion.none);
     } else if (watchEntity.containsKey('key')) {
-      final String key = watchEntity['key'];
+      final String _key = watchEntity['key'];
       final List<int> removed =
           _parseIntList(watchEntity['removedTargets'].cast<int>() as List<int>);
       final WatchChange change =
-          WatchChangeDocumentChange(<int>[], removed, TestUtil.key(key), null);
+          WatchChangeDocumentChange(<int>[], removed, key(_key), null);
       await _writeWatchChange(change, SnapshotVersion.none);
     } else {
       throw Assert.fail('Either key, doc or docs must be set.');
@@ -526,7 +527,7 @@ class SpecTestCase implements RemoteStoreCallback {
   Future<void> _doWatchReset(List<dynamic> targetIds) async {
     final List<int> targets = _parseIntList(targetIds);
     final WatchChange change =
-        WatchChangeWatchTargetChange(WatchTargetChangeType.Reset, targets);
+        WatchChangeWatchTargetChange(WatchTargetChangeType.reset, targets);
     await _writeWatchChange(change, SnapshotVersion.none);
   }
 
@@ -538,7 +539,7 @@ class SpecTestCase implements RemoteStoreCallback {
     final String resumeToken = watchSnapshot['resumeToken'] ?? '';
 
     final WatchChange change = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.NoChange,
+        WatchTargetChangeType.noChange,
         targets,
         Uint8List.fromList(utf8.encode(resumeToken)));
 
@@ -563,18 +564,20 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   Future<void> _doWriteAck(Map<String, dynamic> writeAckSpec) async {
-    final int version = writeAckSpec['version'];
+    final int _version = writeAckSpec['version'];
     final bool keepInQueue = writeAckSpec['keepInQueue'] ?? false;
-    assert(!keepInQueue,
-        '"keepInQueue=true" is not supported on Android and should only be set in multi-client tests');
+    assert(
+        !keepInQueue,
+        '"keepInQueue=true" is not supported on Android and should only be set'
+        ' in multi-client tests');
     final Pair<Mutation, Future<void>> write =
         _getCurrentOutstandingWrites().removeAt(0);
     _validateNextWriteSent(write.first);
 
     final MutationResult mutationResult =
-        MutationResult(TestUtil.version(version), /*transformResults:*/ null);
+        MutationResult(version(_version), /*transformResults:*/ null);
     await _datastore
-        .ackWrite(TestUtil.version(version), <MutationResult>[mutationResult]);
+        .ackWrite(version(_version), <MutationResult>[mutationResult]);
   }
 
   Future<void> _doFailWrite(Map<String, dynamic> writeFailureSpec) async {
@@ -725,7 +728,8 @@ class SpecTestCase implements RemoteStoreCallback {
       await _doRestart();
     } else if (step.containsKey('applyClientState')) {
       throw Assert.fail(
-          '"applyClientState"is not supported on Android and should only be used in multi-client tests');
+          '"applyClientState"is not supported on Android and should only be '
+          'used in multi-client tests');
     } else {
       throw Assert.fail('Unknown step: $step');
     }
@@ -834,7 +838,7 @@ class SpecTestCase implements RemoteStoreCallback {
         _expectedLimboDocs = Set<DocumentKey>();
         final List<dynamic> limboDocs = expected['limboDocs'];
         for (int i = 0; i < limboDocs.length; i++) {
-          _expectedLimboDocs.add(TestUtil.key(limboDocs[i] as String));
+          _expectedLimboDocs.add(key(limboDocs[i] as String));
         }
       }
 
@@ -856,7 +860,7 @@ class SpecTestCase implements RemoteStoreCallback {
           _expectedActiveTargets[targetId] = QueryData(
             query,
             targetId,
-            TestUtil.arbitrarySequenceNumber,
+            arbitrarySequenceNumber,
             QueryPurpose.listen,
             SnapshotVersion.none,
             Uint8List.fromList(utf8.encode(resumeToken)),
@@ -1028,21 +1032,6 @@ class SpecTestCase implements RemoteStoreCallback {
   ImmutableSortedSet<DocumentKey> Function(int) get getRemoteKeysForTarget =>
       (int targetId) => _syncEngine.getRemoteKeysForTarget(targetId);
 }
-
-// ignore: always_specify_types
-const filter = TestUtil.filter;
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const setMutation = TestUtil.setMutation;
-// ignore: always_specify_types
-const patchMutation = TestUtil.patchMutation;
-// ignore: always_specify_types
-const deleteMutation = TestUtil.deleteMutation;
-// ignore: always_specify_types
-const version = TestUtil.version;
-// ignore: always_specify_types
-const key = TestUtil.key;
 
 class Pair<F, S> {
   final F first;

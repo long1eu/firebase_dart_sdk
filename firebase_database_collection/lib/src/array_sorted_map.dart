@@ -7,11 +7,11 @@ import 'package:firebase_database_collection/src/rb_tree_sorted_map.dart';
 
 import 'immutable_sorted_map.dart';
 
-/// This is an array backed implementation of ImmutableSortedMap. It uses arrays
-/// and linear lookups to achieve good memory efficiency while maintaining good
-/// performance for small collections. To avoid degrading performance with
-/// increasing collection size it will automatically convert to a RBTreeSortedMap
-/// after an insert call above a certain threshold.
+/// This is an array backed implementation of [ImmutableSortedMap]. It uses
+/// arrays and linear lookups to achieve good memory efficiency while
+/// maintaining good performance for small collections. To avoid degrading
+/// performance with increasing collection size it will automatically convert to
+/// a [RBTreeSortedMap] after an insert call above a certain threshold.
 class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   ArraySortedMap(this.comparator, [List<K> keys, List<V> values])
       : keys = keys ?? <K>[],

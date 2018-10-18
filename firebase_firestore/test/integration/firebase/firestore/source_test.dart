@@ -117,7 +117,7 @@ void main() {
 
     await docRef.get();
 
-    final DocumentSnapshot doc = await docRef.get(Source.CACHE);
+    final DocumentSnapshot doc = await docRef.get(Source.cache);
 
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isTrue);
@@ -139,7 +139,7 @@ void main() {
 
     await colRef.get();
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.CACHE);
+    final QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
     expect(qrySnap.documentChanges.length, 3);
@@ -153,7 +153,7 @@ void main() {
     await docRef.get();
     await docRef.firestore.disableNetwork();
 
-    final DocumentSnapshot doc = await docRef.get(Source.CACHE);
+    final DocumentSnapshot doc = await docRef.get(Source.cache);
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isTrue);
     expect(doc.metadata.hasPendingWrites, isFalse);
@@ -182,7 +182,7 @@ void main() {
     colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
     colRef.document('doc4').set(map(<String>['key4', 'value4']));
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.CACHE);
+    final QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isTrue);
     expect(qrySnap.documentChanges.length, 4);
@@ -204,7 +204,7 @@ void main() {
     final Map<String, Object> initialData = map(<String>['key', 'value']);
     final DocumentReference docRef = await testDocumentWithData(initialData);
 
-    final DocumentSnapshot doc = await docRef.get(Source.SERVER);
+    final DocumentSnapshot doc = await docRef.get(Source.server);
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isFalse);
     expect(doc.metadata.hasPendingWrites, isFalse);
@@ -224,7 +224,7 @@ void main() {
     final CollectionReference colRef =
         await testCollectionWithDocs(initialDocs);
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.SERVER);
+    final QuerySnapshot qrySnap = await colRef.get(Source.server);
     expect(qrySnap.metadata.isFromCache, isFalse);
     expect(qrySnap.metadata.hasPendingWrites, isFalse);
     expect(qrySnap.documentChanges.length, 3);
@@ -238,7 +238,7 @@ void main() {
     await docRef.get();
     await docRef.firestore.disableNetwork();
 
-    expect(() => docRef.get(Source.SERVER), throwsA(anything));
+    expect(() => docRef.get(Source.server), throwsA(anything));
   });
 
   test('getCollectionWhileOfflineWithSourceEqualToServer', () async {
@@ -256,7 +256,7 @@ void main() {
     await colRef.get();
     await colRef.firestore.disableNetwork();
 
-    expect(() => colRef.get(Source.SERVER), throwsA(anything));
+    expect(() => colRef.get(Source.server), throwsA(anything));
   });
 
   test('getDocumentWhileOfflineWithDifferentGetOptions', () async {
@@ -280,7 +280,7 @@ void main() {
     );
     await source.future;
 
-    DocumentSnapshot doc = await docRef.get(Source.CACHE);
+    DocumentSnapshot doc = await docRef.get(Source.cache);
     expect(doc.exists, isTrue);
     expect(doc.metadata.isFromCache, isTrue);
     expect(doc.metadata.hasPendingWrites, isFalse);
@@ -292,7 +292,7 @@ void main() {
     expect(doc.metadata.hasPendingWrites, isFalse);
     expect(doc.data, initialData);
 
-    expect(() => docRef.get(Source.SERVER), throwsA(anything));
+    expect(() => docRef.get(Source.server), throwsA(anything));
   });
 
   test('getCollectionWhileOfflineWithDifferentGetOptions', () async {
@@ -317,20 +317,19 @@ void main() {
     colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
     colRef.document('doc4').set(map(<String>['key4', 'value4']));
 
-    // Create an initial listener for this query (to attempt to disrupt the gets below) and wait for
-    // the listener to deliver its initial snapshot before continuing.
+    // Create an initial listener for this query (to attempt to disrupt the gets
+    // below) and wait for the listener to deliver its initial snapshot before
+    // continuing.
     final Completer<void> source = Completer<void>();
     colRef.snapshots.listen(
       (QuerySnapshot qrySnap) {
         source.complete(null);
       },
-      onError: (dynamic error) {
-        source.completeError(error);
-      },
+      onError: source.completeError,
     );
     await source.future;
 
-    QuerySnapshot qrySnap = await colRef.get(Source.CACHE);
+    QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap.metadata.isFromCache, isTrue);
     expect(qrySnap.metadata.hasPendingWrites, isTrue);
     expect(qrySnap.documentChanges.length, 4);
@@ -364,7 +363,7 @@ void main() {
           map<String>(<String>['key4', 'value4'])
         ]));
 
-    expect(() => colRef.get(Source.SERVER), throwsA(anything));
+    expect(() => colRef.get(Source.server), throwsA(anything));
   });
 
   test('getNonExistingDocWhileOnlineWithDefaultGetOptions', () async {
@@ -429,13 +428,13 @@ void main() {
     final DocumentReference docRef = await testDocument();
 
     // Attempt to get doc. This will fail since there's nothing in cache.
-    expect(() => docRef.get(Source.CACHE), throwsA(anything));
+    expect(() => docRef.get(Source.cache), throwsA(anything));
   });
 
   test('getNonExistingCollectionWhileOnlineWithSourceEqualToCache', () async {
     final CollectionReference colRef = await testCollection();
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.CACHE);
+    final QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap, isEmpty);
     expect(qrySnap.documentChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isTrue);
@@ -448,7 +447,7 @@ void main() {
     await docRef.firestore.disableNetwork();
 
     // Attempt to get doc. This will fail since there's nothing in cache.
-    expect(() => docRef.get(Source.CACHE), throwsA(anything));
+    expect(() => docRef.get(Source.cache), throwsA(anything));
   });
 
   test('getDeletedDocWhileOfflineWithSourceEqualToCache', () async {
@@ -457,7 +456,7 @@ void main() {
 
     await docRef.firestore.disableNetwork();
 
-    final DocumentSnapshot doc = await docRef.get(Source.CACHE);
+    final DocumentSnapshot doc = await docRef.get(Source.cache);
     expect(doc.exists, isFalse);
     expect(doc.data, isNull);
     expect(doc.metadata.isFromCache, isTrue);
@@ -469,7 +468,7 @@ void main() {
 
     await colRef.firestore.disableNetwork();
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.CACHE);
+    final QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap, isEmpty);
     expect(qrySnap.documentChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isTrue);
@@ -479,7 +478,7 @@ void main() {
   test('getNonExistingDocWhileOnlineWithSourceEqualToServer', () async {
     final DocumentReference docRef = await testDocument();
 
-    final DocumentSnapshot doc = await docRef.get(Source.SERVER);
+    final DocumentSnapshot doc = await docRef.get(Source.server);
     expect(doc.exists, isFalse);
     expect(doc.metadata.isFromCache, isFalse);
     expect(doc.metadata.hasPendingWrites, isFalse);
@@ -488,7 +487,7 @@ void main() {
   test('getNonExistingCollectionWhileOnlineWithSourceEqualToServer', () async {
     final CollectionReference colRef = await testCollection();
 
-    final QuerySnapshot qrySnap = await colRef.get(Source.SERVER);
+    final QuerySnapshot qrySnap = await colRef.get(Source.server);
     expect(qrySnap, isEmpty);
     expect(qrySnap.documentChanges.length, 0);
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -500,28 +499,26 @@ void main() {
 
     await docRef.firestore.disableNetwork();
 
-    expect(() => docRef.get(Source.SERVER), throwsA(anything));
+    expect(() => docRef.get(Source.server), throwsA(anything));
   });
 
   test('getNonExistingCollectionWhileOfflineWithSourceEqualToServer', () async {
     final CollectionReference colRef = await testCollection();
 
     await colRef.firestore.disableNetwork();
-    expect(() => colRef.get(Source.SERVER), throwsA(anything));
+    expect(() => colRef.get(Source.server), throwsA(anything));
   });
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollection = IntegrationTestUtil.testCollection;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testDocumentWithData = IntegrationTestUtil.testDocumentWithData;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const toDataMap = IntegrationTestUtil.toDataMap;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testDocument = IntegrationTestUtil.testDocument;

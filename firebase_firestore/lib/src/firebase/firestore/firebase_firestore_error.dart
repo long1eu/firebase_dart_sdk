@@ -45,7 +45,7 @@ class FirebaseFirestoreErrorCode {
       FirebaseFirestoreErrorCode._(16);
 
   static const List<FirebaseFirestoreErrorCode> values =
-      const <FirebaseFirestoreErrorCode>[
+      <FirebaseFirestoreErrorCode>[
     ok,
     canceled,
     unknown,

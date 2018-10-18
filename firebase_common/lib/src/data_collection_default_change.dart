@@ -12,5 +12,5 @@ class DataCollectionDefaultChange {
   final bool enabled;
 
   @keepForSdk
-  const DataCollectionDefaultChange(this.enabled);
+  const DataCollectionDefaultChange({this.enabled});
 }

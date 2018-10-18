@@ -13,19 +13,15 @@ class DocumentViewChangeType implements Comparable<DocumentViewChangeType> {
 
   const DocumentViewChangeType._(this._i);
 
-  static const DocumentViewChangeType removed =
-      const DocumentViewChangeType._(0);
-  static const DocumentViewChangeType added = //
-      const DocumentViewChangeType._(1);
-  static const DocumentViewChangeType modified =
-      const DocumentViewChangeType._(2);
-  static const DocumentViewChangeType metadata =
-      const DocumentViewChangeType._(3);
+  static const DocumentViewChangeType removed = DocumentViewChangeType._(0);
+  static const DocumentViewChangeType added = DocumentViewChangeType._(1);
+  static const DocumentViewChangeType modified = DocumentViewChangeType._(2);
+  static const DocumentViewChangeType metadata = DocumentViewChangeType._(3);
 
   @override
   int compareTo(DocumentViewChangeType other) => _i.compareTo(other._i);
 
-  static const List<String> _values = const <String>[
+  static const List<String> _values = <String>[
     'removed',
     'added',
     'modified',

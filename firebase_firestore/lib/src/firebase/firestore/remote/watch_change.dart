@@ -13,7 +13,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:grpc/grpc.dart';
 
 /// The kind of change that happened to the watch target.
-enum WatchTargetChangeType { NoChange, Added, Removed, Current, Reset }
+enum WatchTargetChangeType { noChange, added, removed, current, reset }
 
 /// A Watch Change is the internal representation of the watcher API protocol
 /// buffers. This is an empty abstract class so that all the different kinds of
@@ -23,8 +23,9 @@ abstract class WatchChange {
   const WatchChange._();
 }
 
-/// An [WatchChangeExistenceFilterWatchChange] applies to the targets and is required to
-/// verify the current client state against expected state sent from the server.
+/// An [WatchChangeExistenceFilterWatchChange] applies to the targets and is
+/// required to verify the current client state against expected state sent from
+/// the server.
 class WatchChangeExistenceFilterWatchChange extends WatchChange {
   final int targetId;
 
@@ -51,7 +52,7 @@ class WatchChangeDocumentChange extends WatchChange {
   /// The key of the document for this change.
   final DocumentKey documentKey;
 
-  /// The new document or [DeletedDocument] if it was deleted. Is null if the
+  /// The new document or DeletedDocument if it was deleted. Is null if the
   /// document went out of view without the server sending a new document.
   final MaybeDocument newDocument;
 
@@ -78,7 +79,12 @@ class WatchChangeDocumentChange extends WatchChange {
 
   @override
   String toString() {
-    return 'DocumentChange{updatedTargetIds: $updatedTargetIds, removedTargetIds: $removedTargetIds, documentKey: $documentKey, newDocument: $newDocument}';
+    return (ToStringHelper(runtimeType)
+          ..add('updatedTargetIds', updatedTargetIds)
+          ..add('removedTargetIds', removedTargetIds)
+          ..add('documentKey', documentKey)
+          ..add('newDocument', newDocument))
+        .toString();
   }
 }
 
@@ -106,14 +112,14 @@ class WatchChangeWatchTargetChange extends WatchChange {
     Uint8List resumeToken,
     GrpcError cause,
   ])  : resumeToken = resumeToken ?? WatchStream.emptyResumeToken,
-        // We can get a cause that is considered ok, but everywhere we assume that
-        // any non-null cause is an error.
+        // We can get a cause that is considered ok, but everywhere we assume
+        // that any non-null cause is an error.
         this.cause =
             cause != null && cause.code != StatusCode.ok ? cause : null,
         super._() {
     // cause != null implies removal
     Assert.hardAssert(
-        cause == null || changeType == WatchTargetChangeType.Removed,
+        cause == null || changeType == WatchTargetChangeType.removed,
         'Got cause for a target change that was not a removal');
   }
 

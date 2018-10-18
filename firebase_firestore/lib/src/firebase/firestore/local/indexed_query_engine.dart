@@ -117,8 +117,8 @@ class IndexedQueryEngine implements QueryEngine {
     return filteredResults;
   }
 
-  /// Applies 'filter' to the index cursor, looks up the relevant documents from the local documents
-  /// view and returns all matches.
+  /// Applies 'filter' to the index cursor, looks up the relevant documents from
+  /// the local documents view and returns all matches.
   Future<ImmutableSortedMap<DocumentKey, Document>> _performQueryUsingIndex(
       Query query, IndexRange indexRange) async {
     ImmutableSortedMap<DocumentKey, Document> results =
@@ -190,8 +190,9 @@ class IndexedQueryEngine implements QueryEngine {
       Assert.hardAssert(selectedFilter != null, 'Filter should be defined');
       return _convertFilterToIndexRange(selectedFilter);
     } else {
-      // If there are no filters, use the first orderBy constraint when performing the index lookup.
-      // This index lookup will remove results that do not contain the field we use for ordering.
+      // If there are no filters, use the first orderBy constraint when
+      // performing the index lookup. This index lookup will remove results that
+      // do not contain the field we use for ordering.
       final FieldPath orderPath = query.getOrderBy()[0].field;
       if (orderPath != FieldPath.keyPath) {
         return IndexRangeBuilder(fieldPath: query.getOrderBy()[0].field)

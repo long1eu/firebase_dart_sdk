@@ -10,27 +10,27 @@ import '../../../../util/test_util.dart';
 
 void main() {
   test('testAddOrRemoveReferences', () {
-    final DocumentKey key = TestUtil.key('foo/bar');
+    final DocumentKey _key = key('foo/bar');
 
     final ReferenceSet set = ReferenceSet();
-    expect(set.containsKey(key), isFalse);
+    expect(set.containsKey(_key), isFalse);
     expect(set, isEmpty);
 
-    set.addReference(key, 1);
-    expect(set.containsKey(key), isTrue);
+    set.addReference(_key, 1);
+    expect(set.containsKey(_key), isTrue);
     expect(set, isNotEmpty);
 
-    set.addReference(key, 2);
-    expect(set.containsKey(key), isTrue);
+    set.addReference(_key, 2);
+    expect(set.containsKey(_key), isTrue);
 
-    set.removeReference(key, 1);
-    expect(set.containsKey(key), isTrue);
+    set.removeReference(_key, 1);
+    expect(set.containsKey(_key), isTrue);
 
-    set.removeReference(key, 3);
-    expect(set.containsKey(key), isTrue);
+    set.removeReference(_key, 3);
+    expect(set.containsKey(_key), isTrue);
 
-    set.removeReference(key, 2);
-    expect(set.containsKey(key), isFalse);
+    set.removeReference(_key, 2);
+    expect(set.containsKey(_key), isFalse);
     expect(set, isEmpty);
   });
 
@@ -38,11 +38,11 @@ void main() {
     final DocumentKey key1 = key('foo/bar');
     final DocumentKey key2 = key('foo/baz');
     final DocumentKey key3 = key('foo/blah');
-    final ReferenceSet set = ReferenceSet();
+    final ReferenceSet set = ReferenceSet()
+      ..addReference(key1, 1)
+      ..addReference(key2, 1)
+      ..addReference(key3, 2);
 
-    set.addReference(key1, 1);
-    set.addReference(key2, 1);
-    set.addReference(key3, 2);
     expect(set, isNotEmpty);
     expect(set.containsKey(key1), isTrue);
     expect(set.containsKey(key2), isTrue);
@@ -61,6 +61,3 @@ void main() {
     expect(set.containsKey(key3), isFalse);
   });
 }
-
-// ignore: always_specify_types
-const key = TestUtil.key;

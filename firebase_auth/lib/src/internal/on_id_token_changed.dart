@@ -9,4 +9,4 @@ import 'package:firebase_common/firebase_common.dart';
 /// [tokenResult] represents the [InternalTokenResult], which can be used to
 /// obtain a cached access token.
 @keepForSdk
-typedef void OnIdTokenChanged(InternalTokenResult tokenResult);
+typedef OnIdTokenChanged = void Function(InternalTokenResult tokenResult);

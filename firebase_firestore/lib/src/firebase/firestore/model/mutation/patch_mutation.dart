@@ -22,10 +22,14 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// given values. The values are applied through a field mask:
 ///
 ///     <ul>
-///       <li>When a field is in both the mask and the values, the corresponding field is updated.
-///       <li>When a field is in neither the mask nor the values, the corresponding field is unmodified.
-///       <li>When a field is in the mask but not in the values, the corresponding field is deleted.
-///       <li>When a field is not in the mask but is in the values, the values map is ignored.
+///       <li>When a field is in both the mask and the values, the corresponding
+///           field is updated.
+///       <li>When a field is in neither the mask nor the values, the
+///           corresponding field is unmodified.
+///       <li>When a field is in the mask but not in the values, the
+///           corresponding field is deleted.
+///       <li>When a field is not in the mask but is in the values, the values
+///           map is ignored.
 ///     </ul>
 class PatchMutation extends Mutation {
   /// Returns the fields and associated values to use when patching the
@@ -58,7 +62,7 @@ class PatchMutation extends Mutation {
 
     final SnapshotVersion version = mutationResult.version;
     final ObjectValue newData = patchDocument(maybeDoc);
-    return Document(key, version, newData, DocumentState.COMMITTED_MUTATIONS);
+    return Document(key, version, newData, DocumentState.committedMutations);
   }
 
   @override
@@ -72,7 +76,7 @@ class PatchMutation extends Mutation {
 
     final SnapshotVersion version = Mutation.getPostMutationVersion(maybeDoc);
     final ObjectValue newData = patchDocument(maybeDoc);
-    return Document(key, version, newData, DocumentState.LOCAL_MUTATIONS);
+    return Document(key, version, newData, DocumentState.localMutations);
   }
 
   /// Patches the data of document if available or creates a new document. Note

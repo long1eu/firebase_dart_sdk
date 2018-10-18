@@ -30,8 +30,7 @@ class LruGarbageCollector {
         _RollingSequenceNumberBuffer(count);
     await delegate.forEachTarget(
         (QueryData queryData) => buffer.addElement(queryData.sequenceNumber));
-    await delegate.forEachOrphanedDocumentSequenceNumber(
-        (int it) => buffer.addElement(it));
+    await delegate.forEachOrphanedDocumentSequenceNumber(buffer.addElement);
     return buffer.maxValue;
   }
 
@@ -52,13 +51,14 @@ class LruGarbageCollector {
 /// lowest n values passed to [addElement], and finally reports the largest of
 /// them in [maxValue].
 class _RollingSequenceNumberBuffer {
-  // Invert the comparison because we want to keep the smallest values.
-  static final Comparator<int> comparator = (int a, int b) => b.compareTo(a);
   final PriorityQueue<int> queue;
   final int maxElements;
 
   _RollingSequenceNumberBuffer(this.maxElements)
       : queue = PriorityQueue<int>(comparator);
+
+  // Invert the comparison because we want to keep the smallest values.
+  static int comparator(int a, int b) => b.compareTo(a);
 
   void addElement(int sequenceNumber) {
     if (queue.length < maxElements) {
@@ -66,8 +66,9 @@ class _RollingSequenceNumberBuffer {
     } else {
       final int highestValue = queue.first;
       if (sequenceNumber < highestValue) {
-        queue.removeFirst();
-        queue.add(sequenceNumber);
+        queue
+          ..removeFirst()
+          ..add(sequenceNumber);
       }
     }
   }

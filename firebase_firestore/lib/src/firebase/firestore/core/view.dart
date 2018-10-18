@@ -34,8 +34,8 @@ class View {
 
   DocumentSet documentSet;
 
-  /// The set of documents that the server has told us belongs to the target associated with
-  /// this view.
+  /// The set of documents that the server has told us belongs to the target
+  /// associated with this view.
   ImmutableSortedSet<DocumentKey> syncedDocuments;
 
   /// Documents in the view but not in the remote target
@@ -110,8 +110,8 @@ class View {
       final bool oldDocHadPendingMutations =
           oldDoc != null && mutatedKeys.contains(oldDoc.key);
 
-      // We only consider committed mutations for documents that were mutated during the lifetime of
-      // the view.
+      // We only consider committed mutations for documents that were mutated
+      // during the lifetime of the view.
       final bool newDocHasPendingMutations = newDoc != null &&
           (newDoc.hasLocalMutations ||
               (mutatedKeys.contains(newDoc.key) &&
@@ -130,8 +130,9 @@ class View {
           }
           if (lastDocInLimit != null &&
               query.comparator(newDoc, lastDocInLimit) > 0) {
-            // This doc moved from inside the limit to after the limit. That means there may be some
-            // doc in the local cache that's actually less than this one.
+            // This doc moved from inside the limit to after the limit. That
+            // means there may be some doc in the local cache that's actually
+            // less than this one.
             needsRefill = true;
           }
         } else if (oldDocHadPendingMutations != newDocHasPendingMutations) {
@@ -148,8 +149,9 @@ class View {
             DocumentViewChange(DocumentViewChangeType.removed, oldDoc));
         changeApplied = true;
         if (lastDocInLimit != null) {
-          // A doc was removed from a full limit query. We'll need to requery from the local cache
-          // to see if we know about some other doc that should be in the results.
+          // A doc was removed from a full limit query. We'll need to requery
+          // from the local cache to see if we know about some other doc that
+          // should be in the results.
           needsRefill = true;
         }
       }
@@ -213,17 +215,16 @@ class View {
 
     // Sort changes based on type and query comparator.
     final List<DocumentViewChange> viewChanges =
-        docChanges.changeSet.getChanges();
-
-    viewChanges.sort((DocumentViewChange a, DocumentViewChange b) {
-      final int typeComp =
-          View._changeTypeOrder(a).compareTo(View._changeTypeOrder(b));
-      a.type.compareTo(b.type);
-      if (typeComp != 0) {
-        return typeComp;
-      }
-      return query.comparator(a.document, b.document);
-    });
+        docChanges.changeSet.getChanges()
+          ..sort((DocumentViewChange a, DocumentViewChange b) {
+            final int typeComp =
+                View._changeTypeOrder(a).compareTo(View._changeTypeOrder(b));
+            a.type.compareTo(b.type);
+            if (typeComp != 0) {
+              return typeComp;
+            }
+            return query.comparator(a.document, b.document);
+          });
 
     _applyTargetChange(targetChange);
 

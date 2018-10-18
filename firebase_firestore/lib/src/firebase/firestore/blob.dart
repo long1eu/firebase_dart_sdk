@@ -48,5 +48,5 @@ class Blob implements Comparable<Blob> {
   int get hashCode => const DeepCollectionEquality().hash(bytes);
 
   @override
-  String toString() => 'Blob { bytes= ${Util.toDebugString(bytes)} }';
+  String toString() => 'Blob { bytes= ${toDebugString(bytes)} }';
 }

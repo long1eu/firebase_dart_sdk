@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
@@ -30,13 +31,14 @@ class OnlineStateTracker {
   /// [OnlineState.offline].
   ///
   /// TODO(mikelehen): This used to be set to 2 as a mitigation for b/66228394.
-  /// @jdimond thinks that bug is sufficiently fixed so that we can set this back
-  /// to 1. If that works okay, we could potentially remove this logic entirely.
+  /// @jdimond thinks that bug is sufficiently fixed so that we can set this
+  /// back to 1. If that works okay, we could potentially remove this logic
+  /// entirely.
   static const int _maxWatchStreamFailures = 1;
 
-  /// To deal with stream attempts that don't succeed or fail in a timely manner,
-  /// we have a timeout for [OnlineState] to reach [OnlineState.online] or
-  /// [OnlineState.offline]. If the timeout is reached, we transition to
+  /// To deal with stream attempts that don't succeed or fail in a timely
+  /// manner, we have a timeout for [OnlineState] to reach [OnlineState.online]
+  /// or [OnlineState.offline]. If the timeout is reached, we transition to
   /// [OnlineState.offline] rather than waiting indefinitely.
   static const int _onlineStateTimeoutMs = 10 * 1000;
 
@@ -88,10 +90,13 @@ class OnlineStateTracker {
           TimerId.onlineStateTimeout,
           Duration(milliseconds: _onlineStateTimeoutMs), () async {
         _onlineStateTimer = null;
-        Assert.hardAssert(_state == OnlineState.unknown,
-            'Timer should be canceled if we transitioned to a different state.');
+        Assert.hardAssert(
+            _state == OnlineState.unknown,
+            'Timer should be canceled if we transitioned to a different '
+            'state.');
         _logClientOfflineWarningIfNecessary(
-            'Backend didn\'t respond within ${_onlineStateTimeoutMs / 1000} seconds\n');
+            'Backend didn\'t respond within ${_onlineStateTimeoutMs / 1000} '
+            'seconds\n');
         await _setAndBroadcastState(OnlineState.offline);
 
         // NOTE: [handleWatchStreamFailure] will continue to increment
@@ -122,7 +127,8 @@ class OnlineStateTracker {
       if (_watchStreamFailures >= _maxWatchStreamFailures) {
         _clearOnlineStateTimer();
         _logClientOfflineWarningIfNecessary(
-            'Connection failed $_maxWatchStreamFailures times. Most recent error: $status');
+            'Connection failed $_maxWatchStreamFailures times. Most recent '
+            'error: $status');
         await _setAndBroadcastState(OnlineState.offline);
       }
     }

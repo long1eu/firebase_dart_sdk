@@ -41,7 +41,8 @@ class RelationFilter extends Filter {
     if (operator == FilterOperator.arrayContains) {
       return other is ArrayValue && other.internalValue.contains(value);
     } else {
-      // Only compare types with matching backend order (such as double and int).
+      // Only compare types with matching backend order (such as double and
+      // int).
       return value.typeOrder == other.typeOrder &&
           _matchesComparison(other.compareTo(value));
     }

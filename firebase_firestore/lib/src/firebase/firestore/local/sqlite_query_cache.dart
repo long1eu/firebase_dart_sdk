@@ -311,7 +311,8 @@ class SQLiteQueryCache implements QueryCache {
   @override
   Future<void> removeMatchingKeys(
       ImmutableSortedSet<DocumentKey> keys, int targetId) async {
-    // PORTING NOTE: The reverse index (document_targets) is maintained by SQLite.
+    // PORTING NOTE: The reverse index (document_targets) is maintained by
+    // SQLite.
     const String statement =
         // @formatter:off
         '''

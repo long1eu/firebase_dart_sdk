@@ -21,7 +21,7 @@ import 'package:firebase_common/src/util/prefs.dart';
 import 'package:firebase_common/src/util/to_string_helper.dart';
 import 'package:meta/meta.dart';
 
-typedef void InitializeApis(FirebaseApp firebaseApp);
+typedef InitializeApis = void Function(FirebaseApp firebaseApp);
 
 @publicApi
 class FirebaseApp {
@@ -255,12 +255,13 @@ class FirebaseApp {
 
       final bool inBackground = lifecycleHandler.isBackground;
       if (enabled && inBackground) {
-        // Automatic resource management has been enabled while the app is in the
-        // background, notify the listeners of the app being in the background.
+        // Automatic resource management has been enabled while the app is in
+        // the background, notify the listeners of the app being in the
+        // background.
         notifyBackgroundStateChangeObservers(true);
       } else if (!enabled && inBackground) {
-        // Automatic resource management has been disabled while the app is in the
-        // background, act as if we were in the foreground.
+        // Automatic resource management has been disabled while the app is in
+        // the background, act as if we were in the foreground.
         notifyBackgroundStateChangeObservers(false);
       }
     }
@@ -283,14 +284,14 @@ class FirebaseApp {
   /// * Note: this value is respected by all SDKs unless overridden by the
   /// developer via SDK specific mechanisms.
   @keepForSdk
-  void setDataCollectionDefaultEnabled(bool enabled) {
+  void setDataCollectionDefaultEnabled({bool enabled = false}) {
     _checkNotDeleted();
     if (_dataCollectionDefaultEnabled != enabled) {
       _dataCollectionDefaultEnabled = enabled;
 
       _prefs.setBool(_dataCollectionDefaultEnabledPreferenceKey, enabled);
 
-      _events.add(DataCollectionDefaultChange(enabled));
+      _events.add(DataCollectionDefaultChange(enabled: enabled));
     }
   }
 
@@ -397,8 +398,12 @@ class FirebaseApp {
   /// Use this key to store data per FirebaseApp.
   @keepForSdk
   String get persistenceKey {
-    return '${Base64Utils.encodeUrlSafeNoPadding(name.codeUnits)}+'
-        '${Base64Utils.encodeUrlSafeNoPadding(options.applicationId.codeUnits)}';
+    final String encodedName =
+        Base64Utils.encodeUrlSafeNoPadding(name.codeUnits);
+    final String encodedApplicationId =
+        Base64Utils.encodeUrlSafeNoPadding(options.applicationId.codeUnits);
+
+    return '$encodedName+$encodedApplicationId';
   }
 
   /// If an API has locally stored data it must register lifecycle listeners at
@@ -435,8 +440,12 @@ class FirebaseApp {
   /// persistence key after the app has been deleted.
   @keepForSdk
   static String getPersistenceKeyFor(String name, FirebaseOptions options) {
-    return '${Base64Utils.encodeUrlSafeNoPadding(name.codeUnits)}+'
-        '${Base64Utils.encodeUrlSafeNoPadding(options.applicationId.codeUnits)}';
+    final String encodedName =
+        Base64Utils.encodeUrlSafeNoPadding(name.codeUnits);
+    final String encodedApplicationId =
+        Base64Utils.encodeUrlSafeNoPadding(options.applicationId.codeUnits);
+
+    return '$encodedName+$encodedApplicationId';
   }
 
   static List<String> _getAllAppNames() {
@@ -458,10 +467,14 @@ class FirebaseApp {
   void initializeAllApis() {
     initializeApis(this);
     /* Initialize this(call getInstance()):
-      private static final String MEASUREMENT_CLASSNAME = "com.google.android.gms.measurement.AppMeasurement";
-      private static final String AUTH_CLASSNAME = "com.google.firebase.auth.FirebaseAuth";
-      private static final String IID_CLASSNAME = "com.google.firebase.iid.FirebaseInstanceId";
-      private static final String CRASH_CLASSNAME = "com.google.firebase.crash.FirebaseCrash";
+      private static final String MEASUREMENT_CLASSNAME =
+       "com.google.android.gms.measurement.AppMeasurement";
+      private static final String AUTH_CLASSNAME = 
+      "com.google.firebase.auth.FirebaseAuth";
+      private static final String IID_CLASSNAME =
+      "com.google.firebase.iid.FirebaseInstanceId";
+      private static final String CRASH_CLASSNAME = 
+      "com.google.firebase.crash.FirebaseCrash";
     */
   }
 

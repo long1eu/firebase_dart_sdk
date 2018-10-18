@@ -125,8 +125,7 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
   @override
   String toString() {
-    final StringBuffer b = StringBuffer();
-    b..write(runtimeType)..write('{');
+    final StringBuffer b = StringBuffer()..write(runtimeType)..write('{');
     bool first = true;
     for (MapEntry<K, V> entry in this) {
       if (first) {
@@ -147,7 +146,9 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
   static bool _areEqual<K, V>(MapEntry<K, V> a, MapEntry<K, V> b) {
     final bool cmp = a.key == b.key;
-    if (!cmp) return false;
+    if (!cmp) {
+      return false;
+    }
     return a.value == b.value;
   }
 }

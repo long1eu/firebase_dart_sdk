@@ -58,9 +58,9 @@ void main() {
         setMutation('foo/bar', map(<dynamic>['a', 'b', 'num', 1]));
     final Mutation patch = PatchMutation(
         key('bar/baz'),
-        wrapObject(map(<dynamic>['a', 'b', 'num', 1])),
+        wrapMap(map(<dynamic>['a', 'b', 'num', 1])),
         FieldMask(<FieldPath>[field('a')]),
-        Precondition.fromExists(true));
+        Precondition(exists: true));
 
     final Mutation del = deleteMutation('baz/quux');
     final Timestamp writeTime = Timestamp.now();
@@ -134,7 +134,7 @@ void main() {
   });
 
   test('testEncodesDeletedDocumentAsMaybeDocument', () {
-    final NoDocument deletedDoc = TestUtil.deletedDoc('some/path', 42);
+    final NoDocument deletedDocument = deletedDoc('some/path', 42);
 
     final proto.MaybeDocument maybeDocProto = (proto.MaybeDocument.create()
           ..noDocument = (proto.NoDocument.create()
@@ -145,13 +145,13 @@ void main() {
           ..hasCommittedMutations = false)
         .freeze();
 
-    expect(serializer.encodeMaybeDocument(deletedDoc), maybeDocProto);
+    expect(serializer.encodeMaybeDocument(deletedDocument), maybeDocProto);
     final MaybeDocument decoded = serializer.decodeMaybeDocument(maybeDocProto);
-    expect(decoded, deletedDoc);
+    expect(decoded, deletedDocument);
   });
 
   test('testEncodesUnknownDocumentAsMaybeDocument', () {
-    final UnknownDocument unknownDoc = TestUtil.unknownDoc('some/path', 42);
+    final UnknownDocument unknownDocument = unknownDoc('some/path', 42);
 
     final proto.MaybeDocument maybeDocProto = proto.MaybeDocument.create()
       ..unknownDocument = (proto.UnknownDocument.create()
@@ -162,30 +162,30 @@ void main() {
       ..hasCommittedMutations = true
       ..freeze();
 
-    expect(serializer.encodeMaybeDocument(unknownDoc), maybeDocProto);
+    expect(serializer.encodeMaybeDocument(unknownDocument), maybeDocProto);
     final MaybeDocument decoded = serializer.decodeMaybeDocument(maybeDocProto);
-    expect(decoded, unknownDoc);
+    expect(decoded, unknownDocument);
   });
 
   test('testEncodesQueryData', () {
-    final Query query = TestUtil.query('room');
+    final Query _query = query('room');
     const int targetId = 42;
     const int sequenceNumber = 10;
-    final SnapshotVersion version = TestUtil.version(1039);
-    final Uint8List resumeToken = TestUtil.resumeToken(1039);
+    final SnapshotVersion _version = version(1039);
+    final Uint8List _resumeToken = resumeToken(1039);
 
     final QueryData queryData = QueryData(
-      query,
+      _query,
       targetId,
       sequenceNumber,
       QueryPurpose.listen,
-      version,
-      resumeToken,
+      _version,
+      _resumeToken,
     );
 
     // Let the RPC serializer test various permutations of query serialization.
     final proto.Target_QueryTarget queryTarget =
-        remoteSerializer.encodeQueryTarget(query);
+        remoteSerializer.encodeQueryTarget(_query);
 
     final proto.Target expected = (proto.Target.create()
           ..targetId = targetId
@@ -193,7 +193,7 @@ void main() {
           ..snapshotVersion = (proto.Timestamp.create()
             ..seconds = Int64()
             ..nanos = 1039000)
-          ..resumeToken = resumeToken
+          ..resumeToken = _resumeToken
           ..query = (proto.Target_QueryTarget.create()
             ..parent = queryTarget.parent
             ..structuredQuery = queryTarget.structuredQuery))
@@ -204,22 +204,3 @@ void main() {
     expect(decoded, queryData);
   });
 }
-
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const unknownDoc = TestUtil.unknownDoc;
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const setMutation = TestUtil.setMutation;
-// ignore: always_specify_types
-const wrapObject = TestUtil.wrapMap;
-// ignore: always_specify_types
-const key = TestUtil.key;
-// ignore: always_specify_types
-const field = TestUtil.field;
-// ignore: always_specify_types
-const deleteMutation = TestUtil.deleteMutation;
-// ignore: always_specify_types
-const deletedDoc = TestUtil.deletedDoc;

@@ -47,7 +47,7 @@ class SetOptions {
   /// [fields] the list of fields to merge. Fields can contain dots to reference
   /// nested fields within the document.
   @publicApi
-  static SetOptions mergeFields(List<String> fields) {
+  factory SetOptions.mergeFields(List<String> fields) {
     final List<model.FieldPath> fieldPaths = <model.FieldPath>[];
     for (String field in fields) {
       fieldPaths.add(FieldPath.fromDotSeparatedPath(field).internalPath);
@@ -61,9 +61,10 @@ class SetOptions {
   /// and remains untouched.
   ///
   /// * It is an error to pass a SetOptions object to a set() call that is
-  /// missing a value for any of the fields specified here in its to data argument.
+  /// missing a value for any of the fields specified here in its to data
+  /// argument.
   @publicApi
-  static SetOptions mergeFieldPaths(List<FieldPath> fields) {
+  factory SetOptions.mergeFieldPaths(List<FieldPath> fields) {
     final List<model.FieldPath> fieldPaths = <model.FieldPath>[];
 
     for (FieldPath field in fields) {

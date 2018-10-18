@@ -24,14 +24,14 @@ abstract class Filter {
       FieldPath path, FilterOperator operator, FieldValue value) {
     if (value == NullValue.nullValue()) {
       if (operator != FilterOperator.equal) {
-        throw ArgumentError(
-            'Invalid Query. You can only perform equality comparisons on null (via whereEqualTo()).');
+        throw ArgumentError('Invalid Query. You can only perform equality '
+            'comparisons on null (via whereEqualTo()).');
       }
       return NullFilter(path);
     } else if (value == DoubleValue.nan) {
       if (operator != FilterOperator.equal) {
-        throw ArgumentError(
-            'Invalid Query. You can only perform equality comparisons on NaN (via whereEqualTo()).');
+        throw ArgumentError('Invalid Query. You can only perform equality '
+            'comparisons on NaN (via whereEqualTo()).');
       }
       return NaNFilter(path);
     } else {

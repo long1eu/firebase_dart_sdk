@@ -46,7 +46,8 @@ void main() {
   // Accumulator used to capture events during the test.
   EventAccumulator<DocumentSnapshot> accumulator;
 
-  // Listener registration for a listener maintained during the course of the test.
+  // Listener registration for a listener maintained during the course of the
+  // test.
   StreamSubscription<DocumentSnapshot> listenerRegistration;
 
   setUp(() async {
@@ -107,7 +108,8 @@ void main() {
     final Timestamp now = Timestamp.now();
     expect((when.seconds - now.seconds).abs() < deltaSec, isTrue,
         reason:
-            'resolved timestamp ($when) should be within $deltaSec\s of now ($now)');
+            'resolved timestamp ($when) should be within $deltaSec\s of now '
+            '($now)');
 
     // Validate the rest of the document.
     expect(snapshot.data, expectedDataWithTimestamp(when));
@@ -292,9 +294,7 @@ void main() {
   });
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testDocument = IntegrationTestUtil.testDocument;

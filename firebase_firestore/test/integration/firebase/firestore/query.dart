@@ -63,7 +63,7 @@ void main() {
     ]));
 
     final Query query =
-        collection.limit(2).orderBy('sort', Direction.DESCENDING);
+        collection.limit(2).orderBy('sort', Direction.descending);
     final QuerySnapshot set = await query.get();
     final List<Map<String, Object>> data = querySnapshotToValues(set);
 
@@ -94,7 +94,7 @@ void main() {
 
     final Query query = collection
         .whereGreaterThan('foo', 21.0)
-        .orderBy('foo', Direction.DESCENDING);
+        .orderBy('foo', Direction.descending);
     final QuerySnapshot result = await query.get();
     expect(querySnapshotToIds(result), <String>['g', 'f', 'c', 'b', 'a']);
   });
@@ -415,7 +415,7 @@ void main() {
     final CollectionReference collection = await testCollection();
     collection.add(map());
     final Future<QuerySnapshot> query1 = collection
-        .orderByField(FieldPath.documentId(), Direction.ASCENDING)
+        .orderByField(FieldPath.documentId(), Direction.ascending)
         .get();
     final Future<QuerySnapshot> query2 = collection.get();
 
@@ -521,15 +521,13 @@ void main() {
   });
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollection = IntegrationTestUtil.testCollection;

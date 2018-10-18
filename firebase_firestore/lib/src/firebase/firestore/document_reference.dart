@@ -46,11 +46,13 @@ class DocumentReference {
   // and setting it to null.
   DocumentReference(this.key, this.firestore) : assert(key != null);
 
-  static DocumentReference forPath(
+  factory DocumentReference.forPath(
       ResourcePath path, FirebaseFirestore firestore) {
     if (path.length.remainder(2) != 0) {
       throw ArgumentError(
-          'Invalid document reference. Document references must have an even number of segments, but ${path.canonicalString} has ${path.length}');
+          'Invalid document reference. Document references must '
+          'have an even number of segments, but ${path.canonicalString} has '
+          '${path.length}');
     }
 
     return DocumentReference(DocumentKey.fromPath(path), firestore);
@@ -59,7 +61,8 @@ class DocumentReference {
   @publicApi
   String get id => key.path.last;
 
-  /// Gets a [CollectionReference] to the collection that contains this document.
+  /// Gets a [CollectionReference] to the collection that contains this
+  /// document.
   ///
   /// Returns the [CollectionReference] that contains this document.
 
@@ -107,7 +110,7 @@ class DocumentReference {
         ? firestore.dataConverter.parseMergeData(data, options.fieldMask)
         : firestore.dataConverter.parseSetData(data);
 
-    await Util.voidErrorTransformer(() =>
+    await voidErrorTransformer(() =>
         firestore.client.write(parsed.toMutationList(key, Precondition.none)));
   }
 
@@ -122,9 +125,9 @@ class DocumentReference {
   @publicApi
   Future<void> updateFromList(List<Object> data) async {
     final UserDataParsedUpdateData parsedData = firestore.dataConverter
-        .parseUpdateDataFromList(Util.collectUpdateArguments(1, data));
-    await Util.voidErrorTransformer(() => firestore.client
-        .write(parsedData.toMutationList(key, Precondition.fromExists(true))));
+        .parseUpdateDataFromList(collectUpdateArguments(1, data));
+    await voidErrorTransformer(() => firestore.client
+        .write(parsedData.toMutationList(key, Precondition(exists: true))));
   }
 
   /// Updates fields in the document referred to by this [DocumentReference]. If
@@ -137,8 +140,8 @@ class DocumentReference {
   Future<void> update(Map<String, Object> data) async {
     final UserDataParsedUpdateData parsedData =
         firestore.dataConverter.parseUpdateData(data);
-    await Util.voidErrorTransformer(() => firestore.client
-        .write(parsedData.toMutationList(key, Precondition.fromExists(true))));
+    await voidErrorTransformer(() => firestore.client
+        .write(parsedData.toMutationList(key, Precondition(exists: true))));
   }
 
   /// Deletes the document referred to by this [DocumentReference].
@@ -146,7 +149,7 @@ class DocumentReference {
   /// Returns a Future that will be resolved when the delete completes.
   @publicApi
   Future<void> delete() {
-    return Util.voidErrorTransformer(() => firestore.client
+    return voidErrorTransformer(() => firestore.client
         .write(<DeleteMutation>[DeleteMutation(key, Precondition.none)]));
   }
 
@@ -162,9 +165,9 @@ class DocumentReference {
   /// at this [DocumentReference].
   @publicApi
   Future<DocumentSnapshot> get([Source source]) async {
-    source ??= Source.DEFAULT;
+    source ??= Source.defaultSource;
 
-    if (source == Source.CACHE) {
+    if (source == Source.cache) {
       final Document doc =
           await firestore.client.getDocumentFromLocalCache(key);
       final bool hasPendingWrites = doc != null && doc.hasLocalMutations;
@@ -195,11 +198,11 @@ class DocumentReference {
             FirebaseFirestoreErrorCode.unavailable);
       } else if (snapshot.exists &&
           snapshot.metadata.isFromCache &&
-          source == Source.SERVER) {
+          source == Source.server) {
         throw FirebaseFirestoreError(
-            'Failed to get document from server. (However, this document does exist '
-            'in the local cache. Run again without setting source to SERVER to '
-            'retrieve the cached document.)',
+            'Failed to get document from server. (However, this document does '
+            'exist in the local cache. Run again without setting source to '
+            'Source.SERVER to retrieve the cached document.)',
             FirebaseFirestoreErrorCode.unavailable);
       } else {
         return snapshot;
@@ -242,7 +245,7 @@ class DocumentReference {
         );
       } else {
         // We don't raise `hasPendingWrites` for deleted documents.
-        final bool hasPendingWrites = false;
+        const bool hasPendingWrites = false;
         return DocumentSnapshot.fromNoDocument(
           firestore,
           key,

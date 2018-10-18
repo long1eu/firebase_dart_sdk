@@ -35,11 +35,30 @@ class FieldPath {
         'Invalid field path. Provided path must not be null or empty.');
 
     for (int i = 0; i < fieldNames.length; ++i) {
-      Assert.checkArgument(fieldNames[i] != null && fieldNames[i].isNotEmpty,
-          'Invalid field name at argument ${i + 1}. Field names must not be null or empty.');
+      Assert.checkArgument(
+          fieldNames[i] != null && fieldNames[i].isNotEmpty,
+          'Invalid field name at argument ${i + 1}. '
+          'Field names must not be null or empty.');
     }
 
     return FieldPath.fromSegments(fieldNames);
+  }
+
+  /// Parses a field path string into a [FieldPath], treating dots as
+  /// separators.
+  factory FieldPath.fromDotSeparatedPath(String path) {
+    Assert.checkNotNull(path, 'Provided field path must not be null.');
+    Assert.checkArgument(
+        !reserved.hasMatch(path),
+        'Invalid field path ($path). '
+        'Paths must not contain \'~\', \'*\', \'/\', \'[\', or \']\'');
+    try {
+      return FieldPath.of(path.split('.'));
+    } on ArgumentError catch (_) {
+      throw ArgumentError(
+          'Invalid field path ($path). Paths must not be empty, '
+          'begin with \'.\', end with \'.\', or contain \'..\'');
+    }
   }
 
   static final FieldPath documentIdInstance =
@@ -49,23 +68,6 @@ class FieldPath {
   /// It can be used in queries to sort or filter by the document id.
   @publicApi
   static FieldPath documentId() => documentIdInstance;
-
-  /// Parses a field path string into a [FieldPath], treating dots as
-  /// separators.
-  static FieldPath fromDotSeparatedPath(String path) {
-    Assert.checkNotNull(path, 'Provided field path must not be null.');
-    Assert.checkArgument(!reserved.hasMatch(path),
-        'Invalid field path ($path). Paths must not contain \'~\', \'*\', \'/\', \'[\', or \']\'');
-    try {
-      // By default, split() doesn't return empty leading and trailing segments. This can be enabled
-      // by passing '-1' as the  limit.
-      // todo handle the above
-      return FieldPath.of(path.split('.'));
-    } on ArgumentError catch (_) {
-      throw ArgumentError(
-          'Invalid field path ($path). Paths must not be empty, begin with \'.\', end with \'.\', or contain \'..\'');
-    }
-  }
 
   @override
   String toString() {

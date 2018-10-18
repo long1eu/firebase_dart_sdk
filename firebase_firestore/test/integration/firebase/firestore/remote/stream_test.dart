@@ -125,7 +125,8 @@ void main() {
     await testQueue.enqueue(writeStream.stop);
   });
 
-  /// Verifies that the stream issues an onClose callback after a call to stop().
+  /// Verifies that the stream issues an [onClose] callback after a call to
+  /// [stop].
   test('testWriteStreamStopPartial', () async {
     final AsyncQueue testQueue = AsyncQueue();
     final Datastore datastore = Datastore(
@@ -176,8 +177,9 @@ void main() {
         await createAndOpenWriteStream(testQueue, _StreamStatusCallback());
 
     await testQueue.enqueue(() async {
-      writeStream.markIdle();
-      writeStream.writeMutations(mutations);
+      writeStream
+        ..markIdle()
+        ..writeMutations(mutations);
     });
 
     expect(testQueue.containsDelayedTask(TimerId.writeStreamIdle), isFalse);
@@ -333,19 +335,15 @@ class _StreamStatusCallback
   }
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const setMutation = TestUtil.setMutation;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const writeAllDocs = IntegrationTestUtil.writeAllDocs;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollection = IntegrationTestUtil.testCollection;

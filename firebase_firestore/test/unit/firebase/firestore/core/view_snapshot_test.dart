@@ -18,15 +18,14 @@ void main() {
   test('testConstructor', () {
     final Query query = Query.atPath(ResourcePath.fromString('a'));
     final DocumentSet docs = DocumentSet.emptySet(Document.keyComparator)
-        .add(TestUtil.doc('c/foo', 1, TestUtil.map()));
+        .add(doc('c/foo', 1, map()));
     final DocumentSet oldDocs = DocumentSet.emptySet(Document.keyComparator);
     final List<DocumentViewChange> changes = <DocumentViewChange>[
-      DocumentViewChange(DocumentViewChangeType.added,
-          TestUtil.doc('c/foo', 1, TestUtil.map()))
+      DocumentViewChange(DocumentViewChangeType.added, doc('c/foo', 1, map()))
     ];
 
     final ImmutableSortedSet<DocumentKey> mutatedKeys =
-        TestUtil.keySet(<DocumentKey>[TestUtil.key('c/foo')]);
+        keySet(<DocumentKey>[key('c/foo')]);
     const bool fromCache = true;
     const bool hasPendingWrites = true;
     const bool syncStateChanges = true;

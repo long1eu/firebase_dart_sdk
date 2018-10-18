@@ -70,6 +70,3 @@ void main() {
     expect(blob1 == blob3, isFalse); // Not equal because array changed
   });
 }
-
-// ignore: always_specify_types
-const blob = TestUtil.blob;

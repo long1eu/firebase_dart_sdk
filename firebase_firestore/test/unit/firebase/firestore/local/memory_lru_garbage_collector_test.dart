@@ -24,8 +24,7 @@ void main() {
 
   setUp(() async {
     print('setUp');
-    testCase = LruGarbageCollectorTestCase(
-        () => PersistenceTestHelpers.createLRUMemoryPersistence());
+    testCase = LruGarbageCollectorTestCase(createLRUMemoryPersistence);
     await testCase.setUp();
 
     garbageCollector = testCase.garbageCollector;
@@ -400,9 +399,9 @@ void main() {
     // Update a doc in the middle target
     await testCase.persistence
         .runTransaction('Update a doc in the middle target', () async {
-      final SnapshotVersion newVersion = TestUtil.version(3);
+      final SnapshotVersion newVersion = version(3);
       final Document doc = Document(middleDocToUpdate, newVersion,
-          testCase.testValue, DocumentState.SYNCED);
+          testCase.testValue, DocumentState.synced);
       await testCase.documentCache.add(doc);
       await testCase.updateTargetInTransaction(middleTarget);
     });
@@ -426,8 +425,7 @@ void main() {
 
     // Finally, do the garbage collection, up to but not including the removal
     // of middleTarget
-    final Set<int> activeTargetIds = Set<int>();
-    activeTargetIds.add(oldestTarget.targetId);
+    final Set<int> activeTargetIds = Set<int>()..add(oldestTarget.targetId);
     final int targetsRemoved = await testCase.garbageCollector
         .removeTargets(upperBound, activeTargetIds);
     // Expect to remove newest target
@@ -446,10 +444,3 @@ void main() {
     });
   });
 }
-
-// ignore: always_specify_types
-const query = TestUtil.query;
-// ignore: always_specify_types
-const filter = TestUtil.filter;
-// ignore: always_specify_types
-const key = TestUtil.key;

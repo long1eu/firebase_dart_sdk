@@ -73,8 +73,11 @@ class ExponentialBackoff {
         max(0, desiredDelayWithJitterMs - delaySoFarMs);
 
     if (_currentBaseMs > 0) {
-      Log.d(runtimeType.toString(),
-          'Backing off for $remainingDelayMs ms (base delay: $_currentBaseMs ms, delay with jitter: $desiredDelayWithJitterMs ms, last attempt: $delaySoFarMs ms ago)');
+      Log.d(
+          runtimeType.toString(),
+          'Backing off for $remainingDelayMs ms (base delay: '
+          '$_currentBaseMs ms, delay with jitter: $desiredDelayWithJitterMs ms,'
+          ' last attempt: $delaySoFarMs ms ago)');
     }
 
     _timerTask = _queue.enqueueAfterDelay<void>(

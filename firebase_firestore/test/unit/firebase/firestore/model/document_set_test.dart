@@ -10,11 +10,11 @@ import 'package:test/test.dart';
 import '../../../../util/test_util.dart';
 
 void main() {
-  final Comparator<Document> testComparator = (Document left, Document right) {
+  int testComparator(Document left, Document right) {
     final FieldValue leftValue = left.getField(field('sort'));
     final FieldValue rightValue = right.getField(field('sort'));
     return leftValue.compareTo(rightValue);
-  };
+  }
 
   final Document _kDoc1 = doc('docs/1', 0, map(<dynamic>['sort', 2]));
   final Document _kDoc2 = doc('docs/2', 0, map(<dynamic>['sort', 3]));
@@ -127,12 +127,3 @@ void main() {
     expect(sortedSet1, isNot(set1));
   });
 }
-
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const field = TestUtil.field;
-// ignore: always_specify_types
-const docSet = TestUtil.docSet;

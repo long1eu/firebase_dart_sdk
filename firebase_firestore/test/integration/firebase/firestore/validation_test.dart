@@ -85,7 +85,8 @@ void main() {
 
     // Query filter / order fields
     final CollectionReference coll = await testCollection();
-    // whereLessThan(), etc. omitted for brevity since the code path is trivially shared.
+    // whereLessThan(), etc. omitted for brevity since the code path is
+    // trivially shared.
     await expectError(() => coll.whereEqualTo(path, 1), reason);
     await expectError(() => coll.orderBy(path), reason);
 
@@ -99,8 +100,10 @@ void main() {
   });
 
   test('disableSslWithoutSettingHostFails', () async {
-    await expectError(() => FirebaseFirestoreSettings(sslEnabled: false),
-        'You can\'t set the \'sslEnabled\' setting unless you also set a non-default \'host\'.');
+    await expectError(
+        () => FirebaseFirestoreSettings(sslEnabled: false),
+        'You can\'t set the \'sslEnabled\' setting unless you also set a '
+        'non-default \'host\'.');
   });
 
   test('firestoreGetInstanceWithNullAppFails', () async {
@@ -151,8 +154,8 @@ void main() {
       final String path = badAbsolutePaths[i];
       final String relativePath = badRelativePaths[i];
       final String error =
-          'Invalid collection reference. Collection references must have an odd number '
-          'of segments, but $path has ${badPathLengths[i]}';
+          'Invalid collection reference. Collection references must have an odd'
+          ' number of segments, but $path has ${badPathLengths[i]}';
 
       await expectError(() => firestore.collection(path), error);
       await expectError(() => baseDocRef.collection(relativePath), error);
@@ -160,11 +163,11 @@ void main() {
   });
 
   test('pathsMustNotHaveEmptySegments', () async {
-    final FirebaseFirestore firestore = await testFirestore();
-    // NOTE: leading / trailing slashes are okay.
-    firestore.collection('/foo/');
-    firestore.collection('/foo');
-    firestore.collection('foo/');
+    final FirebaseFirestore firestore = await testFirestore()
+      // NOTE: leading / trailing slashes are okay.
+      ..collection('/foo/')
+      ..collection('/foo')
+      ..collection('foo/');
 
     final List<String> badPaths = <String>['foo//bar//baz', '//foo', 'foo//'];
     final CollectionReference collection =
@@ -192,8 +195,8 @@ void main() {
       final String path = badAbsolutePaths[i];
       final String relativePath = badRelativePaths[i];
       final String error =
-          'Invalid document reference. Document references must have an even number '
-          'of segments, but $path has ${badPathLengths[i]}';
+          'Invalid document reference. Document references must have an even'
+          ' number of segments, but $path has ${badPathLengths[i]}';
       await expectError(() => firestore.document(path), error);
       await expectError(() => baseCollectionRef.document(relativePath), error);
     }
@@ -235,8 +238,9 @@ void main() {
 
     await ref.firestore.runTransaction<void>((Transaction transaction) {
       // Note ref2 does not exist at this point so set that and update ref.
-      transaction.update(ref, data);
-      transaction.set(ref2, data);
+      transaction
+        ..update(ref, data)
+        ..set(ref2, data);
       return null;
     });
   });
@@ -249,29 +253,35 @@ void main() {
     await expectWriteError(
         data,
         'Invalid data. Document reference is for database '
-        '${IntegrationTestUtil.BAD_PROJECT_ID}/(default) but should be for '
+        '${IntegrationTestUtil.badProjectId}/(default) but should be for '
         'database ${IntegrationTestUtil.provider.projectId}/(default) '
         '(found in field foo)');
   });
 
   test('writesMustNotContainReservedFieldNames', () async {
-    await expectWriteError(map<dynamic>(<dynamic>['__baz__', 1]),
-        'Invalid data. Document fields cannot begin and end with __ (found in field __baz__)');
+    await expectWriteError(
+        map<dynamic>(<dynamic>['__baz__', 1]),
+        'Invalid data. Document fields cannot begin and end with __ '
+        '(found in field __baz__)');
     await expectWriteError(
         map<dynamic>(<dynamic>[
           'foo',
           map<dynamic>(<dynamic>['__baz__', 1])
         ]),
-        'Invalid data. Document fields cannot begin and end with __ (found in field foo.__baz__)');
+        'Invalid data. Document fields cannot begin and end with __ '
+        '(found in field foo.__baz__)');
     await expectWriteError(
         map<dynamic>(<dynamic>[
           '__baz__',
           map<dynamic>(<dynamic>['foo', 1])
         ]),
-        'Invalid data. Document fields cannot begin and end with __ (found in field __baz__)');
+        'Invalid data. Document fields cannot begin and end with __ '
+        '(found in field __baz__)');
 
-    expectUpdateError(map<dynamic>(<dynamic>['__baz__', 1]),
-        'Invalid data. Document fields cannot begin and end with __ (found in field __baz__)');
+    expectUpdateError(
+        map<dynamic>(<dynamic>['__baz__', 1]),
+        'Invalid data. Document fields cannot begin and end with __ '
+        '(found in field __baz__)');
     expectUpdateError(
         map<dynamic>(<dynamic>['baz.__foo__', 1]),
         'Invalid data. Document fields cannot begin and end with '
@@ -282,8 +292,8 @@ void main() {
     final DocumentReference ref = await testDocument();
     await expectError(
         () => ref.set(map(<dynamic>['foo', FieldValue.delete()])),
-        'Invalid data. FieldValue.delete() can only be used with update() and set() with '
-        'SetOptions.merge() (found in field foo)');
+        'Invalid data. FieldValue.delete() can only be used with update() and'
+        ' set() with SetOptions.merge() (found in field foo)');
   });
 
   test('updatesMustNotContainNestedFieldValueDeletes', () async {
@@ -293,8 +303,8 @@ void main() {
               'foo',
               map<dynamic>(<dynamic>['bar', FieldValue.delete()])
             ])),
-        'Invalid data. FieldValue.delete() can only appear at the top level of your update data '
-        '(found in field foo.bar)');
+        'Invalid data. FieldValue.delete() can only appear at the top level of'
+        ' your update data (found in field foo.bar)');
   });
 
   test('batchWritesRequireCorrectDocumentReferences', () async {
@@ -316,7 +326,7 @@ void main() {
         'Provided document reference is from a different Firestore instance.';
     final Map<String, Object> data = map<dynamic>(<dynamic>['foo', 1]);
 
-    (await testFirestore())
+    await (await testFirestore())
         .runTransaction<void>((Transaction transaction) async {
       await expectError(() async {
         // Because .get() throws a checked exception for missing docs, we have
@@ -339,8 +349,8 @@ void main() {
     final List<String> badFieldPaths = <String>['', 'foo..baz', '.foo', 'foo.'];
     for (String fieldPath in badFieldPaths) {
       final String reason =
-          'Invalid field path ($fieldPath). Paths must not be empty, begin with '
-          '\'.\', end with \'.\', or contain \'..\'';
+          'Invalid field path ($fieldPath). Paths must not be empty, begin '
+          'with \'.\', end with \'.\', or contain \'..\'';
       await verifyFieldPathThrows(fieldPath, reason);
     }
   });
@@ -367,12 +377,14 @@ void main() {
     await expectError(() => FieldPath.of(<String>[]), reason);
 
     reason =
-        'Invalid field name at argument 1. Field names must not be null or empty.';
+        'Invalid field name at argument 1. Field names must not be null or '
+        'empty.';
     await expectError(() => FieldPath.of(<String>[null]), reason);
     await expectError(() => FieldPath.of(<String>['']), reason);
 
     reason =
-        'Invalid field name at argument 2. Field names must not be null or empty.';
+        'Invalid field name at argument 2. Field names must not be null or '
+        'empty.';
     await expectError(() => FieldPath.of(<String>['foo', '']), reason);
     await expectError(() => FieldPath.of(<String>['foo', null]), reason);
   });
@@ -380,7 +392,8 @@ void main() {
   test('arrayTransformsFailInQueries', () async {
     final CollectionReference collection = await testCollection();
     String reason =
-        'Invalid data. FieldValue.arrayUnion() can only be used with set() and update() (found in field test)';
+        'Invalid data. FieldValue.arrayUnion() can only be used with set() and '
+        'update() (found in field test)';
     await expectError(
         () => collection.whereEqualTo(
             'test',
@@ -391,8 +404,8 @@ void main() {
         reason);
 
     reason =
-        'Invalid data. FieldValue.arrayRemove() can only be used with set() and update() '
-        '(found in field test)';
+        'Invalid data. FieldValue.arrayRemove() can only be used with set() '
+        'and update() (found in field test)';
     await expectError(
         () => collection.whereEqualTo(
             'test',
@@ -457,15 +470,23 @@ void main() {
 
   test('queriesWithNullOrNaNFiltersOtherThanEqualityFail', () async {
     final CollectionReference collection = await testCollection();
-    await expectError(() => collection.whereGreaterThan('a', null),
-        'Invalid Query. You can only perform equality comparisons on null (via whereEqualTo()).');
-    await expectError(() => collection.whereArrayContains('a', null),
-        'Invalid Query. You can only perform equality comparisons on null (via whereEqualTo()).');
+    await expectError(
+        () => collection.whereGreaterThan('a', null),
+        'Invalid Query. You can only perform equality comparisons on null '
+        '(via whereEqualTo()).');
+    await expectError(
+        () => collection.whereArrayContains('a', null),
+        'Invalid Query. You can only perform equality comparisons on null '
+        '(via whereEqualTo()).');
 
-    await expectError(() => collection.whereGreaterThan('a', double.nan),
-        'Invalid Query. You can only perform equality comparisons on NaN (via whereEqualTo()).');
-    await expectError(() => collection.whereArrayContains('a', double.nan),
-        'Invalid Query. You can only perform equality comparisons on NaN (via whereEqualTo()).');
+    await expectError(
+        () => collection.whereGreaterThan('a', double.nan),
+        'Invalid Query. You can only perform equality comparisons on NaN '
+        '(via whereEqualTo()).');
+    await expectError(
+        () => collection.whereArrayContains('a', double.nan),
+        'Invalid Query. You can only perform equality comparisons on NaN '
+        '(via whereEqualTo()).');
   });
 
   test('queriesCannotBeCreatedFromDocumentsMissingSortValues', () async {
@@ -481,8 +502,9 @@ void main() {
     expect(snapshot.data, map<dynamic>(<dynamic>['k', 'f', 'nosort', 1.0]));
 
     const String reason =
-        'Invalid query. You are trying to start or end a query using a document '
-        'for which the field \'sort\' (used as the orderBy) does not exist.';
+        'Invalid query. You are trying to start or end a query using a '
+        'document for which the field \'sort\' (used as the orderBy) does not'
+        ' exist.';
 
     await expectError(() => query.startAtDocument(snapshot), reason);
     await expectError(() => query.startAfterDocument(snapshot), reason);
@@ -505,8 +527,10 @@ void main() {
   test('queryOrderByKeyBoundsMustBeStringsWithoutSlashes', () async {
     final CollectionReference collection = await testCollection();
     final Query query = collection.orderByField(FieldPath.documentId());
-    await expectError(() => query.startAt(<int>[1]),
-        'Invalid query. Expected a string for document ID in startAt(), but got 1.');
+    await expectError(
+        () => query.startAt(<int>[1]),
+        'Invalid query. Expected a string for document ID in startAt(), but'
+        ' got 1.');
     await expectError(() => query.startAt(<String>['foo/bar']),
         'Invalid query. Document ID \'foo/bar\' contains a slash in startAt().');
   });
@@ -516,16 +540,17 @@ void main() {
         () async => (await testCollection())
             .whereGreaterThan('x', 32)
             .whereLessThan('y', 'cat'),
-        'All where filters other than whereEqualTo() must be on the same field. But you have filters on \'x\' and \'y\'');
+        'All where filters other than whereEqualTo() must be on the same '
+        'field. But you have filters on \'x\' and \'y\'');
   });
 
   test('queriesWithInequalityDifferentThanFirstOrderByFail', () async {
     final CollectionReference collection = await testCollection();
     const String reason =
         'Invalid query. You have an inequality where filter (whereLessThan(), '
-        'whereGreaterThan(), etc.) on field \'x\' and so you must also have \'x\' as '
-        'your first orderBy() field, but your first orderBy() is currently on field \'y\' '
-        'instead.';
+        'whereGreaterThan(), etc.) on field \'x\' and so you must also have '
+        '\'x\' as your first orderBy() field, but your first orderBy() is '
+        'currently on field \'y\' instead.';
 
     await expectError(
         () => collection.whereGreaterThan('x', 32).orderBy('y'), reason);
@@ -544,15 +569,15 @@ void main() {
         () async => (await testCollection())
             .whereArrayContains('foo', 1)
             .whereArrayContains('foo', 2),
-        'Invalid Query. Queries only support having a single array-contains filter.');
+        'Invalid Query. Queries only support having a single array-contains'
+        ' filter.');
   });
 
   test('queriesMustNotSpecifyStartingOrEndingPointAfterOrderBy', () async {
     final CollectionReference collection = await testCollection();
     final Query query = collection.orderBy('foo');
-    String reason =
-        'Invalid query. You must not call Query.startAt() or Query.startAfter() '
-        'before calling Query.orderBy().';
+    String reason = 'Invalid query. You must not call Query.startAt() or '
+        'Query.startAfter() before calling Query.orderBy().';
     await expectError(() => query.startAt(<int>[1]).orderBy('bar'), reason);
     await expectError(() => query.startAfter(<int>[1]).orderBy('bar'), reason);
     reason =
@@ -566,49 +591,45 @@ void main() {
       () async {
     final CollectionReference collection = await testCollection();
     String reason =
-        'Invalid query. When querying with FieldPath.documentId() you must provide '
-        'a valid document ID, but it was an empty string.';
+        'Invalid query. When querying with FieldPath.documentId() you must '
+        'provide a valid document ID, but it was an empty string.';
     await expectError(
         () => collection.whereGreaterThanOrEqualToField(
             FieldPath.documentId(), ''),
         reason);
 
     reason =
-        'Invalid query. When querying with FieldPath.documentId() you must provide '
-        'a valid document ID, but \'foo/bar/baz\' contains a \'/\' character.';
+        'Invalid query. When querying with FieldPath.documentId() you must '
+        'provide a valid document ID, but \'foo/bar/baz\' contains a \'/\' '
+        'character.';
     await expectError(
         () => collection.whereGreaterThanOrEqualToField(
             FieldPath.documentId(), 'foo/bar/baz'),
         reason);
 
     reason =
-        'Invalid query. When querying with FieldPath.documentId() you must provide '
-        'a valid String or DocumentReference, but it was of type: int';
+        'Invalid query. When querying with FieldPath.documentId() you must '
+        'provide a valid String or DocumentReference, but it was of type: int';
     await expectError(
         () => collection.whereGreaterThanOrEqualToField(
             FieldPath.documentId(), 1),
         reason);
 
-    reason =
-        'Invalid query. You can\'t perform array-contains queries on FieldPath.documentId() since '
-        'document IDs are not arrays.';
+    reason = 'Invalid query. You can\'t perform array-contains queries on '
+        'FieldPath.documentId() since document IDs are not arrays.';
     await expectError(
         () => collection.whereArrayContainsField(FieldPath.documentId(), 1),
         reason);
   });
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const expectError = TestUtil.expectError;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollection = IntegrationTestUtil.testCollection;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testDocument = IntegrationTestUtil.testDocument;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testAlternateFirestore = IntegrationTestUtil.testAlternateFirestore;

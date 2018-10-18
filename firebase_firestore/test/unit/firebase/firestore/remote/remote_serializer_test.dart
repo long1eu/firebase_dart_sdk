@@ -54,7 +54,7 @@ import 'package:test/test.dart';
 import '../../../../util/test_util.dart';
 
 void main() {
-  final Uint8List resumeToken = Uint8List.fromList(<int>[]);
+  final Uint8List _resumeToken = Uint8List.fromList(<int>[]);
 
   DatabaseId databaseId;
   RemoteSerializer serializer;
@@ -137,7 +137,7 @@ void main() {
   void unaryFilterTest(Object equalityValue,
       proto.StructuredQuery_UnaryFilter_Operator unaryOperator) {
     final Query q = Query.atPath(ResourcePath.fromString('docs'))
-        .filter(TestUtil.filter('prop', '==', equalityValue));
+        .filter(filter('prop', '==', equalityValue));
     final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
@@ -176,7 +176,7 @@ void main() {
   test('testEncodesBoolean', () {
     final List<bool> tests = <bool>[true, false];
     for (bool test in tests) {
-      final FieldValue value = TestUtil.wrap(test);
+      final FieldValue value = wrap(test);
       final proto.Value data = valueBuilder()
         ..booleanValue = test
         ..freeze();
@@ -196,7 +196,7 @@ void main() {
     ];
 
     for (int test in tests) {
-      final FieldValue value = TestUtil.wrap(test);
+      final FieldValue value = wrap(test);
       final proto.Value data = valueBuilder()
         ..integerValue = Int64(test)
         ..freeze();
@@ -293,12 +293,12 @@ void main() {
   });
 
   test('testEncodesBlobs', () {
-    final FieldValue blob = wrap(TestUtil.blob(<int>[0, 1, 2, 3]));
+    final FieldValue _blob = wrap(blob(<int>[0, 1, 2, 3]));
     final proto.Value data = valueBuilder()
       ..bytesValue = <int>[0, 1, 2, 3]
       ..freeze();
 
-    assertRoundTrip(blob, data, ValueTypeCase.bytesValue);
+    assertRoundTrip(_blob, data, ValueTypeCase.bytesValue);
   });
 
   test('testEncodesReferences', () {
@@ -326,7 +326,7 @@ void main() {
   });
 
   test('testEncodesNestedObjects', () {
-    final FieldValue model = TestUtil.wrapMap(map<dynamic>(<dynamic>[
+    final FieldValue model = wrapMap(map<dynamic>(<dynamic>[
       'b',
       true,
       'd',
@@ -533,20 +533,20 @@ void main() {
   });
 
   test('testEncodesListenRequestLabels', () {
-    final Query query = TestUtil.query('collection/key');
-    QueryData queryData = QueryData.init(query, 2, 3, QueryPurpose.listen);
+    final Query _query = query('collection/key');
+    QueryData queryData = QueryData.init(_query, 2, 3, QueryPurpose.listen);
 
     MapEntry<String, String> result =
         serializer.encodeListenRequestLabels(queryData);
     expect(result, isNull);
 
-    queryData = QueryData.init(query, 2, 3, QueryPurpose.limboResolution);
+    queryData = QueryData.init(_query, 2, 3, QueryPurpose.limboResolution);
     result = serializer.encodeListenRequestLabels(queryData);
     expect(result,
         const MapEntry<String, String>('goog-listen-tags', 'limbo-document'));
 
     queryData =
-        QueryData.init(query, 2, 3, QueryPurpose.existenceFilterMismatch);
+        QueryData.init(_query, 2, 3, QueryPurpose.existenceFilterMismatch);
     result = serializer.encodeListenRequestLabels(queryData);
     expect(
         result,
@@ -571,7 +571,7 @@ void main() {
     final proto.Target expected = proto.Target.create()
       ..documents = docs
       ..targetId = 1
-      ..resumeToken = resumeToken
+      ..resumeToken = _resumeToken
       ..freeze();
 
     expect(actual, expected);
@@ -597,7 +597,7 @@ void main() {
     final proto.Target expected = proto.Target.create()
       ..query = queryBuilder
       ..targetId = 1
-      ..resumeToken = resumeToken
+      ..resumeToken = _resumeToken
       ..freeze();
 
     expect(actual, expected);
@@ -624,7 +624,7 @@ void main() {
     final proto.Target expected = proto.Target.create()
       ..query = queryBuilder
       ..targetId = 1
-      ..resumeToken = resumeToken
+      ..resumeToken = _resumeToken
       ..freeze();
 
     expect(actual, expected);
@@ -660,7 +660,7 @@ void main() {
     final proto.Target expected = proto.Target.create()
       ..query = queryBuilder
       ..targetId = 1
-      ..resumeToken = resumeToken
+      ..resumeToken = _resumeToken
       ..freeze();
 
     expect(actual, expected);
@@ -714,7 +714,7 @@ void main() {
     final proto.Target expected = proto.Target.create()
       ..query = queryBuilder
       ..targetId = 1
-      ..resumeToken = resumeToken
+      ..resumeToken = _resumeToken
       ..freeze();
 
     expect(actual, expected);
@@ -760,7 +760,7 @@ void main() {
     final proto.Target expected = proto.Target.create()
       ..query = queryBuilder
       ..targetId = 1
-      ..resumeToken = resumeToken
+      ..resumeToken = _resumeToken
       ..freeze();
 
     expect(actual, expected);
@@ -829,12 +829,12 @@ void main() {
 
   test('testEncodesBounds', () {
     final Query q = Query.atPath(ResourcePath.fromString('docs'))
-        .startAt(Bound(<ReferenceValue>[
+        .startAt(Bound(position: <ReferenceValue>[
           ReferenceValue.valueOf(databaseId, key('foo/bar'))
-        ], true))
-        .endAt(Bound(<ReferenceValue>[
+        ], before: true))
+        .endAt(Bound(position: <ReferenceValue>[
           ReferenceValue.valueOf(databaseId, key('foo/baz'))
-        ], false));
+        ], before: false));
 
     final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
@@ -860,7 +860,7 @@ void main() {
     final proto.Target expected = proto.Target.create()
       ..query = queryBuilder
       ..targetId = 1
-      ..resumeToken = resumeToken
+      ..resumeToken = _resumeToken
       ..freeze();
 
     expect(actual, expected);
@@ -869,8 +869,8 @@ void main() {
 
   test('testEncodesResumeTokens', () {
     final Query q = Query.atPath(ResourcePath.fromString('docs'));
-    final proto.Target actual = serializer.encodeTarget(QueryData(q, 1, 2,
-        QueryPurpose.listen, SnapshotVersion.none, TestUtil.resumeToken(1000)));
+    final proto.Target actual = serializer.encodeTarget(QueryData(
+        q, 1, 2, QueryPurpose.listen, SnapshotVersion.none, resumeToken(1000)));
 
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create()
@@ -886,7 +886,7 @@ void main() {
     final proto.Target expected = proto.Target.create()
       ..query = queryBuilder
       ..targetId = 1
-      ..resumeToken = TestUtil.resumeToken(1000)
+      ..resumeToken = resumeToken(1000)
       ..freeze();
 
     expect(actual, expected);
@@ -895,7 +895,7 @@ void main() {
 
   test('testConvertsTargetChangeWithAdded', () {
     final WatchChangeWatchTargetChange expected =
-        WatchChangeWatchTargetChange(WatchTargetChangeType.Added, <int>[1, 4]);
+        WatchChangeWatchTargetChange(WatchTargetChangeType.added, <int>[1, 4]);
 
     final WatchChangeWatchTargetChange actual =
         serializer.decodeWatchChange(proto.ListenResponse.create()
@@ -910,7 +910,7 @@ void main() {
 
   test('testConvertsTargetChangeWithRemoved', () {
     final WatchChangeWatchTargetChange expected = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.Removed,
+        WatchTargetChangeType.removed,
         <int>[1, 4],
         Uint8List.fromList(<int>[0, 1, 2]),
         GrpcError.permissionDenied());
@@ -930,7 +930,7 @@ void main() {
 
   test('testConvertsTargetChangeWithNoChange', () {
     final WatchChangeWatchTargetChange expected = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.NoChange, <int>[1, 4]);
+        WatchTargetChangeType.noChange, <int>[1, 4]);
 
     final WatchChangeWatchTargetChange actual =
         serializer.decodeWatchChange(proto.ListenResponse()
@@ -1034,32 +1034,3 @@ enum ValueTypeCase {
   arrayValue,
   mapValue,
 }
-
-// ignore: always_specify_types
-const wrap = TestUtil.wrap;
-// ignore: always_specify_types
-const ref = TestUtil.ref;
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const deleteMutation = TestUtil.deleteMutation;
-// ignore: always_specify_types
-const setMutation = TestUtil.setMutation;
-// ignore: always_specify_types
-const patchMutation = TestUtil.patchMutation;
-// ignore: always_specify_types
-const field = TestUtil.field;
-// ignore: always_specify_types
-const transformMutation = TestUtil.transformMutation;
-// ignore: always_specify_types
-const query = TestUtil.query;
-// ignore: always_specify_types
-const filter = TestUtil.filter;
-// ignore: always_specify_types
-const key = TestUtil.key;
-// ignore: always_specify_types
-const orderBy = TestUtil.orderBy;
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const deletedDoc = TestUtil.deletedDoc;

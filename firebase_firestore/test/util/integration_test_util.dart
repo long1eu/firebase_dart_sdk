@@ -30,7 +30,7 @@ class IntegrationTestUtil {
 
   // Alternate project ID for creating 'bad' references. Doesn't actually need
   // to work.
-  static const String BAD_PROJECT_ID = 'test-project-2';
+  static const String badProjectId = 'test-project-2';
 
   /// Online status of all active Firestore clients.
   static final Map<FirebaseFirestore, bool> firestoreStatus =
@@ -71,7 +71,7 @@ class IntegrationTestUtil {
   /// project.
   static Future<FirebaseFirestore> testAlternateFirestore() async {
     return testFirestoreInstance(
-      BAD_PROJECT_ID,
+      badProjectId,
       LogLevel.d,
       newTestSettings(),
       'bad/projectId/path.db',
@@ -81,13 +81,17 @@ class IntegrationTestUtil {
   /*p*/
   static void clearPersistence(String path) {
     final String sqlLitePath = path;
-    final String journalPath = sqlLitePath + '-journal';
+    final String journalPath = '$sqlLitePath-journal';
 
     final File db = File(sqlLitePath);
-    if (db.existsSync()) db.deleteSync();
+    if (db.existsSync()) {
+      db.deleteSync();
+    }
 
     final File journal = File(journalPath);
-    if (journal.existsSync()) journal.deleteSync();
+    if (journal.existsSync()) {
+      journal.deleteSync();
+    }
   }
 
   /// Initializes a new Firestore instance that can be used in testing. It is
@@ -98,8 +102,9 @@ class IntegrationTestUtil {
       LogLevel logLevel,
       FirebaseFirestoreSettings settings,
       String dbPath) async {
-    // This unfortunately is a global setting that affects existing Firestore clients.
-    Log.setLogLevel(logLevel);
+    // This unfortunately is a global setting that affects existing Firestore
+    // clients.
+    Log.level = logLevel;
 
     // TODO: Remove this once this is ready to ship.
     Persistence.indexingSupportEnabled = true;
@@ -165,7 +170,7 @@ class IntegrationTestUtil {
 
   static Future<CollectionReference> testCollection([String name]) async {
     return (await testFirestore())
-        .collection(name == null ? Util.autoId() : '$name${Util.autoId()}');
+        .collection(name == null ? autoId() : '$name${autoId()}');
   }
 
   static Future<CollectionReference> testCollectionWithDocs(

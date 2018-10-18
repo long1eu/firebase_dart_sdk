@@ -7,6 +7,8 @@ import 'dart:async';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/firestore_client.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/limbo_document_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
@@ -394,7 +396,7 @@ class SyncEngine implements RemoteStoreCallback {
       final Completer<void> userTask = userTasks[boxedBatchId];
       if (userTask != null) {
         if (status != null) {
-          userTask.completeError(Util.exceptionFromStatus(status));
+          userTask.completeError(exceptionFromStatus(status));
         } else {
           userTask.complete(null);
         }

@@ -55,7 +55,6 @@ class TargetIdGenerator {
 
   /// Returns the next id in the sequence
   int nextId() {
-    _previousId += 1 << _reservedBits;
-    return _previousId;
+    return _previousId += 1 << _reservedBits;
   }
 }

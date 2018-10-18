@@ -45,16 +45,15 @@ class MemoryPersistence extends Persistence {
     queryCache = MemoryQueryCache(this);
   }
 
-  static MemoryPersistence createEagerGcMemoryPersistence() {
+  factory MemoryPersistence.createEagerGcMemoryPersistence() {
     final MemoryPersistence persistence = MemoryPersistence._();
-    persistence
-        ._setReferenceDelegate(MemoryEagerReferenceDelegate(persistence));
+    persistence.referenceDelegate = MemoryEagerReferenceDelegate(persistence);
     return persistence;
   }
 
-  static MemoryPersistence createLruGcMemoryPersistence() {
+  factory MemoryPersistence.createLruGcMemoryPersistence() {
     final MemoryPersistence persistence = MemoryPersistence._();
-    persistence._setReferenceDelegate(MemoryLruReferenceDelegate(persistence));
+    persistence.referenceDelegate = MemoryLruReferenceDelegate(persistence);
     return persistence;
   }
 
@@ -70,10 +69,6 @@ class MemoryPersistence extends Persistence {
     // the finally block after failing to initialize.
     Assert.hardAssert(started, 'MemoryPersistence shutdown without start');
     started = false;
-  }
-
-  void _setReferenceDelegate(ReferenceDelegate delegate) {
-    referenceDelegate = delegate;
   }
 
   @override

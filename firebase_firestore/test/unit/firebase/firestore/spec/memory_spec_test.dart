@@ -21,9 +21,9 @@ void main() {
     testCase = SpecTestCase(
       (bool garbageCollectionEnabled, _) {
         if (garbageCollectionEnabled) {
-          return PersistenceTestHelpers.createEagerGCMemoryPersistence();
+          return createEagerGCMemoryPersistence();
         } else {
-          return PersistenceTestHelpers.createLRUMemoryPersistence();
+          return createLRUMemoryPersistence();
         }
       },
       (Set<String> tags) => tags.contains(durablePersistance),
@@ -47,8 +47,8 @@ void main() {
         .listSync()
         .where((FileSystemEntity it) => it is File && it.path.endsWith('.json'))
         .cast<File>()
-        .toList();
-    jsonFiles.sort((File a, File b) => a.path.compareTo(b.path));
+        .toList()
+          ..sort((File a, File b) => a.path.compareTo(b.path));
 
     bool exclusiveMode = false;
     for (File f in jsonFiles) {
@@ -66,7 +66,7 @@ void main() {
 
       // Print the names of the files and tests regardless of whether verbose
       // logging is enabled.
-      SpecTestCase.info('Spec test file: ' + fileName);
+      SpecTestCase.info('Spec test file: $fileName');
 
       // Iterate over the tests in the file and run them.
 
@@ -76,7 +76,7 @@ void main() {
         final Map<String, dynamic> testJSON = fileJSON[key];
         final String describeName = testJSON['describeName'];
         final String itName = testJSON['itName'];
-        final String name = describeName + ' ' + itName;
+        final String name = '$describeName $itName';
         final Map<String, dynamic> config = testJSON['config'];
         final List<dynamic> steps = testJSON['steps'];
         final Set<String> tags = SpecTestCase.getTestTags(testJSON);
@@ -86,21 +86,22 @@ void main() {
         if (runTest) {
           try {
             SpecTestCase.info(
-                '------------------------------------------------------------------');
-            SpecTestCase.info('  Spec test: ' + name);
+                '--------------------------------------------------------------'
+                '----');
+            SpecTestCase.info('  Spec test: $name');
             SpecTestCase.info(
-                '------------------------------------------------------------------');
+                '--------------------------------------------------------------'
+                '----');
             testCase.currentName = name;
             await testCase.runSteps(steps, config);
             ranAtLeastOneTest = true;
           } on TestFailure catch (_) {
             await testCase.specTearDown(true);
 
-            //throw StateError('Spec test failure: $name\n  $e');
             rethrow;
           }
         } else {
-          SpecTestCase.info('  [SKIPPED] Spec test: ' + name);
+          SpecTestCase.info('  [SKIPPED] Spec test: $name');
         }
       }
     }

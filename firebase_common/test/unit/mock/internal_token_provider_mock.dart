@@ -10,10 +10,9 @@ import 'package:firebase_common/src/internal/internal_token_provider.dart';
 class InternalTokenProviderMock implements InternalTokenProvider {
   const InternalTokenProviderMock();
 
-  static const InternalTokenProviderMock instance =
-      const InternalTokenProviderMock();
+  static const InternalTokenProviderMock instance = InternalTokenProviderMock();
 
-  static const GetTokenResult accessTokenResult = const GetTokenResult('');
+  static const GetTokenResult accessTokenResult = GetTokenResult('');
   static const String uidResult = 'uid';
 
   @override

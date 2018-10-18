@@ -101,8 +101,10 @@ class MemoryMutationQueue implements MutationQueue {
 
     // Verify that the batch in the queue is the one to be acknowledged.
     final MutationBatch check = queue[batchIndex];
-    Assert.hardAssert(batchId == check.batchId,
-        'Queue ordering failure: expected batch $batchId, got batch ${check.batchId}');
+    Assert.hardAssert(
+        batchId == check.batchId,
+        'Queue ordering failure: expected batch $batchId, '
+        'got batch ${check.batchId}');
     Assert.hardAssert(
         !check.isTombstone, 'Can\'t acknowledge a previously removed batch');
 
@@ -250,8 +252,8 @@ class MemoryMutationQueue implements MutationQueue {
     final DocumentReference start =
         DocumentReference(DocumentKey.fromPath(startPath), 0);
 
-    // Find unique [batchId]s referenced by all documents potentially matching the
-    // query.
+    // Find unique [batchId]s referenced by all documents potentially matching
+    // the query.
     ImmutableSortedSet<int> uniqueBatchIDs =
         ImmutableSortedSet<int>(<int>[], standardComparator<num>());
 
@@ -267,7 +269,8 @@ class MemoryMutationQueue implements MutationQueue {
       // Rows with document keys more than one segment longer than the query
       // path can't be matches. For example, a query on 'rooms' can't match the
       // document /rooms/abc/messages/xyx.
-      // TODO: we'll need a different scanner when we implement ancestor queries.
+      // TODO: we'll need a different scanner when we implement ancestor
+      // queries.
       if (rowKeyPath.length == immediateChildrenPathLength) {
         uniqueBatchIDs = uniqueBatchIDs.insert(reference.id);
       }
@@ -333,8 +336,10 @@ class MemoryMutationQueue implements MutationQueue {
   @override
   Future<void> performConsistencyCheck() async {
     if (queue.isEmpty) {
-      Assert.hardAssert(batchesByDocumentKey.isEmpty,
-          'Document leak -- detected dangling mutation references when queue is empty.');
+      Assert.hardAssert(
+          batchesByDocumentKey.isEmpty,
+          'Document leak -- detected dangling mutation references when queue '
+          'is empty.');
     }
   }
 

@@ -381,7 +381,7 @@ class RemoteSerializer {
     final SnapshotVersion version = decodeVersion(response.found.updateTime);
     Assert.hardAssert(version != SnapshotVersion.none,
         'Got a document response with no snapshot version');
-    return Document(key, version, value, DocumentState.SYNCED);
+    return Document(key, version, value, DocumentState.synced);
   }
 
   NoDocument _decodeMissingDocument(proto.BatchGetDocumentsResponse response) {
@@ -480,10 +480,9 @@ class RemoteSerializer {
 
   Precondition _decodePrecondition(proto.Precondition precondition) {
     if (precondition.hasUpdateTime()) {
-      return Precondition.fromUpdateTime(
-          decodeVersion(precondition.updateTime));
+      return Precondition(updateTime: decodeVersion(precondition.updateTime));
     } else if (precondition.hasExists()) {
-      return Precondition.fromExists(precondition.exists);
+      return Precondition(exists: precondition.exists);
     } else {
       return Precondition.none;
     }
@@ -545,7 +544,8 @@ class RemoteSerializer {
       Assert.hardAssert(
           fieldTransform.setToServerValue ==
               proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME,
-          'Unknown transform setToServerValue: ${fieldTransform.setToServerValue}');
+          'Unknown transform setToServerValue:'
+          ' ${fieldTransform.setToServerValue}');
       return FieldTransform(
           FieldPath.fromServerFormat(fieldTransform.fieldPath),
           ServerTimestampOperation.sharedInstance);
@@ -658,7 +658,8 @@ class RemoteSerializer {
   }
 
   proto.Target_QueryTarget encodeQueryTarget(Query query) {
-    // Dissect the path into [parent], [collectionId], and optional [key] filter.
+    // Dissect the path into [parent], [collectionId], and optional [key]
+    // filter.
     final proto.Target_QueryTarget builder = proto.Target_QueryTarget.create();
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create();
@@ -711,8 +712,10 @@ class RemoteSerializer {
     final proto.StructuredQuery query = target.structuredQuery;
     final int fromCount = query.from.length;
     if (fromCount > 0) {
-      Assert.hardAssert(fromCount == 1,
-          'StructuredQuery.from with more than one collection is not supported.');
+      Assert.hardAssert(
+          fromCount == 1,
+          'StructuredQuery.from with more than one collection is not '
+          'supported.');
 
       final proto.StructuredQuery_CollectionSelector from = query.from[0];
       path = path.appendSegment(from.collectionId);
@@ -788,7 +791,8 @@ class RemoteSerializer {
       Assert.hardAssert(
           value.compositeFilter.op ==
               proto.StructuredQuery_CompositeFilter_Operator.AND,
-          'Only AND-type composite filters are supported, got ${value.compositeFilter.op}');
+          'Only AND-type composite filters are supported, got '
+          '${value.compositeFilter.op}');
       filters = value.compositeFilter.filters;
     } else {
       filters = <proto.StructuredQuery_Filter>[value];
@@ -968,7 +972,7 @@ class RemoteSerializer {
       final proto.Value valueProto = value.values[i];
       indexComponents[i] = decodeValue(valueProto);
     }
-    return Bound(indexComponents, value.before);
+    return Bound(position: indexComponents, before: value.before);
   }
 
   // Watch changes
@@ -982,20 +986,20 @@ class RemoteSerializer {
       GrpcError cause;
       switch (targetChange.targetChangeType) {
         case proto.TargetChange_TargetChangeType.NO_CHANGE:
-          changeType = WatchTargetChangeType.NoChange;
+          changeType = WatchTargetChangeType.noChange;
           break;
         case proto.TargetChange_TargetChangeType.ADD:
-          changeType = WatchTargetChangeType.Added;
+          changeType = WatchTargetChangeType.added;
           break;
         case proto.TargetChange_TargetChangeType.REMOVE:
-          changeType = WatchTargetChangeType.Removed;
+          changeType = WatchTargetChangeType.removed;
           cause = _fromStatus(targetChange.cause);
           break;
         case proto.TargetChange_TargetChangeType.CURRENT:
-          changeType = WatchTargetChangeType.Current;
+          changeType = WatchTargetChangeType.current;
           break;
         case proto.TargetChange_TargetChangeType.RESET:
-          changeType = WatchTargetChangeType.Reset;
+          changeType = WatchTargetChangeType.reset;
           break;
         default:
           throw ArgumentError('Unknown target change type');
@@ -1017,14 +1021,15 @@ class RemoteSerializer {
           'Got a document change without an update time');
       final ObjectValue data = decodeDocumentFields(docChange.document.fields);
       final Document document = Document(
-          key, version, data, /*hasLocalMutations:*/ DocumentState.SYNCED);
+          key, version, data, /*hasLocalMutations:*/ DocumentState.synced);
       watchChange =
           WatchChangeDocumentChange(added, removed, document.key, document);
     } else if (protoChange.hasDocumentDelete()) {
       final proto.DocumentDelete docDelete = protoChange.documentDelete;
       final List<int> removed = docDelete.removedTargetIds;
       final DocumentKey key = decodeKey(docDelete.document);
-      // Note that version might be unset in which case we use SnapshotVersion.none
+      // Note that version might be unset in which case we use
+      // SnapshotVersion.none
       final SnapshotVersion version = decodeVersion(docDelete.readTime);
       final NoDocument doc =
           NoDocument(key, version, /*hasCommittedMutations:*/ false);

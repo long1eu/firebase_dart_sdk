@@ -24,9 +24,9 @@ class RemoteDocumentCacheTestCase {
   Future<void> tearDown() async => persistence.shutdown();
 
   Future<Document> addTestDocumentAtPath(String path) async {
-    final Document doc = TestUtil.doc(path, 42, map(<dynamic>['data', 2]));
-    await add(doc);
-    return doc;
+    final Document document = doc(path, 42, map(<dynamic>['data', 2]));
+    await add(document);
+    return document;
   }
 
   Future<void> add(MaybeDocument doc) async {
@@ -43,8 +43,3 @@ class RemoteDocumentCacheTestCase {
         'remove entry', () => remoteDocumentCache.remove(key(path)));
   }
 }
-
-// ignore: always_specify_types
-const key = TestUtil.key;
-// ignore: always_specify_types
-const map = TestUtil.map;

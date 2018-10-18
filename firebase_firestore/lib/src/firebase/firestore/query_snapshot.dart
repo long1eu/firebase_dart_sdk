@@ -105,7 +105,9 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   Iterator<QueryDocumentSnapshot> get iterator {
     return () sync* {
       final Iterator<core.Document> it = snapshot.documents.iterator;
-      while (it.moveNext()) yield _convertDocument(it.current);
+      while (it.moveNext()) {
+        yield _convertDocument(it.current);
+      }
     }()
         .iterator;
   }

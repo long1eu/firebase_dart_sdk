@@ -15,12 +15,11 @@ class ObjectValue extends FieldValue {
   const ObjectValue(this._value);
 
   static final ObjectValue empty = ObjectValue(
-      ImmutableSortedMap<String, FieldValue>.emptyMap(Util.comparator()));
+      ImmutableSortedMap<String, FieldValue>.emptyMap(comparator()));
 
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
     return ObjectValue.fromImmutableMap(
-        ImmutableSortedMap<String, FieldValue>.fromMap(
-            value, Util.comparator()));
+        ImmutableSortedMap<String, FieldValue>.fromMap(value, comparator()));
   }
 
   factory ObjectValue.fromImmutableMap(

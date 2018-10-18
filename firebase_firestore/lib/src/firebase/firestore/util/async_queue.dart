@@ -5,7 +5,9 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/version.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/online_state_tracker.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
@@ -53,7 +55,7 @@ class TimerId implements Comparable<TimerId> {
   @override
   int get hashCode => _i.hashCode;
 
-  static const List<String> _values = const <String>[
+  static const List<String> _values = <String>[
     'all',
     'listenStreamIdle',
     'listenStreamConnectionBackoff',
@@ -154,7 +156,8 @@ class AsyncQueue {
     //
     // While not necessarily harmful, we currently don't expect to have multiple
     // tasks with the same timer id in the queue, so defensively reject them.
-    // Assert.hardAssert(!containsDelayedTask(timerId), 'Attempted to schedule multiple operations with timer id $timerId.');
+    // Assert.hardAssert(!containsDelayedTask(timerId), 'Attempted to schedule
+    // multiple operations with timer id $timerId.');
 
     final DelayedTask<T> delayedTask =
         _createAndScheduleDelayedTask(timerId, delay, task, caller);

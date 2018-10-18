@@ -33,7 +33,8 @@ class Transaction {
     if (doc is Document) {
       docVersion = doc.version;
     } else if (doc is NoDocument) {
-      // For nonexistent docs, we must use precondition with version 0 when we overwrite them.
+      // For nonexistent docs, we must use precondition with version 0 when we
+      // overwrite them.
       docVersion = SnapshotVersion.none;
     } else {
       throw Assert.fail(
@@ -84,7 +85,7 @@ class Transaction {
   Precondition _precondition(DocumentKey key) {
     final SnapshotVersion version = readVersions[key];
     if (version != null) {
-      return Precondition.fromUpdateTime(version);
+      return Precondition(updateTime: version);
     } else {
       return Precondition.none;
     }
@@ -99,11 +100,11 @@ class Transaction {
       throw StateError('Can\'t update a document that doesn\'t exist.');
     } else if (version != null) {
       // Document exists, base precondition on document update time.
-      return Precondition.fromUpdateTime(version);
+      return Precondition(updateTime: version);
     } else {
       // Document was not read, so we just use the preconditions for a blind
       // write.
-      return Precondition.fromExists(true);
+      return Precondition(exists: true);
     }
   }
 

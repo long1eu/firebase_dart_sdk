@@ -38,7 +38,7 @@ void main() {
         transform.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
 
     final Document expectedDoc =
-        doc('collection/key', 0, expectedData, DocumentState.LOCAL_MUTATIONS);
+        doc('collection/key', 0, expectedData, DocumentState.localMutations);
     expect(expectedDoc, transformedDoc);
   }
 
@@ -54,7 +54,7 @@ void main() {
     expect(
         setDoc,
         doc('collection/key', 0, map(<String>['bar', 'bar-value']),
-            DocumentState.LOCAL_MUTATIONS));
+            DocumentState.localMutations));
   });
 
   test('testAppliesPatchToDocuments', () {
@@ -79,7 +79,7 @@ void main() {
       'baz-value'
     ]);
     expect(local,
-        doc('collection/key', 0, expectedData, DocumentState.LOCAL_MUTATIONS));
+        doc('collection/key', 0, expectedData, DocumentState.localMutations));
   });
 
   test('testAppliesPatchWithMergeToDocuments', () {
@@ -95,7 +95,7 @@ void main() {
       map<String>(<String>['bar', 'new-bar-value'])
     ]);
     expect(newDoc,
-        doc('collection/key', 0, expectedData, DocumentState.LOCAL_MUTATIONS));
+        doc('collection/key', 0, expectedData, DocumentState.localMutations));
   });
 
   test('testAppliesPatchToNullDocWithMergeToDocuments', () {
@@ -111,7 +111,7 @@ void main() {
       map<String>(<String>['bar', 'new-bar-value'])
     ]);
     expect(newDoc,
-        doc('collection/key', 0, expectedData, DocumentState.LOCAL_MUTATIONS));
+        doc('collection/key', 0, expectedData, DocumentState.localMutations));
   });
 
   test('testDeletesValuesFromTheFieldMask', () {
@@ -121,10 +121,10 @@ void main() {
     ]);
     final Document baseDoc = doc('collection/key', 0, data);
 
-    final DocumentKey key = TestUtil.key('collection/key');
+    final DocumentKey _key = key('collection/key');
     final FieldMask mask = FieldMask(<FieldPath>[field('foo.bar')]);
     final Mutation patch =
-        PatchMutation(key, ObjectValue.empty, mask, Precondition.none);
+        PatchMutation(_key, ObjectValue.empty, mask, Precondition.none);
 
     final MaybeDocument patchDoc =
         patch.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
@@ -133,7 +133,7 @@ void main() {
       map<String>(<String>['baz', 'baz-value'])
     ]);
     expect(patchDoc,
-        doc('collection/key', 0, expectedData, DocumentState.LOCAL_MUTATIONS));
+        doc('collection/key', 0, expectedData, DocumentState.localMutations));
   });
 
   test('testPatchesPrimitiveValue', () {
@@ -152,7 +152,7 @@ void main() {
       'baz-value'
     ]);
     expect(patchedDoc,
-        doc('collection/key', 0, expectedData, DocumentState.LOCAL_MUTATIONS));
+        doc('collection/key', 0, expectedData, DocumentState.localMutations));
   });
 
   test('testPatchingDeletedDocumentsDoesNothing', () {
@@ -180,7 +180,7 @@ void main() {
         transform.applyToLocalView(baseDoc, baseDoc, timestamp);
 
     // Server timestamps aren't parsed, so we manually insert it.
-    ObjectValue expectedData = wrapObject(map(<dynamic>[
+    ObjectValue expectedData = wrapMap(map(<dynamic>[
       'foo',
       map<String>(<String>['bar', '<server-timestamp>']),
       'baz',
@@ -190,7 +190,7 @@ void main() {
         ServerTimestampValue(timestamp, StringValue.valueOf('bar-value')));
 
     final Document expectedDoc = Document(key('collection/key'), version(0),
-        expectedData, DocumentState.LOCAL_MUTATIONS);
+        expectedData, DocumentState.localMutations);
     expect(transformedDoc, expectedDoc);
   });
 
@@ -228,7 +228,7 @@ void main() {
         second.operation,
         ArrayTransformOperationUnion(<FieldValue>[
           wrap(true),
-          wrapObject(map(<dynamic>[
+          wrapMap(map(<dynamic>[
             'nested',
             map<dynamic>(<dynamic>[
               'a',
@@ -506,7 +506,7 @@ void main() {
     expect(
         transformedDoc,
         doc('collection/key', 1, expectedData,
-            DocumentState.COMMITTED_MUTATIONS));
+            DocumentState.committedMutations));
   });
 
   test('testAppliesServerAckedArrayTransformsToDocuments', () {
@@ -541,7 +541,7 @@ void main() {
     expect(
         transformedDoc,
         doc('collection/key', 1, expectedData,
-            DocumentState.COMMITTED_MUTATIONS));
+            DocumentState.committedMutations));
   });
 
   test('testDeleteDeletes', () {
@@ -549,9 +549,9 @@ void main() {
     final Document baseDoc = doc('collection/key', 0, data);
 
     final Mutation delete = deleteMutation('collection/key');
-    final MaybeDocument deletedDoc =
+    final MaybeDocument deletedDocument =
         delete.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
-    expect(deletedDoc, TestUtil.deletedDoc('collection/key', 0));
+    expect(deletedDocument, deletedDoc('collection/key', 0));
   });
 
   test('testSetWithMutationResult', () {
@@ -566,7 +566,7 @@ void main() {
     expect(
         setDoc,
         doc('collection/key', 4, map(<String>['foo', 'new-bar']),
-            DocumentState.COMMITTED_MUTATIONS));
+            DocumentState.committedMutations));
   });
 
   test('testPatchWithMutationResult', () {
@@ -581,7 +581,7 @@ void main() {
     expect(
         patchDoc,
         doc('collection/key', 4, map(<String>['foo', 'new-bar']),
-            DocumentState.COMMITTED_MUTATIONS));
+            DocumentState.committedMutations));
   });
 
   void _assertVersionTransitions(Mutation mutation, MaybeDocument base,
@@ -603,9 +603,8 @@ void main() {
     final NoDocument docV7Deleted =
         deletedDoc('collection/key', 7, /*hasCommittedMutations=*/ true);
     final Document docV7Committed =
-        doc('collection/key', 7, map(), DocumentState.COMMITTED_MUTATIONS);
-    final UnknownDocument docV7Unknown =
-        TestUtil.unknownDoc('collection/key', 7);
+        doc('collection/key', 7, map(), DocumentState.committedMutations);
+    final UnknownDocument docV7Unknown = unknownDoc('collection/key', 7);
 
     final MutationResult mutationResult =
         MutationResult(version(7), /*transformResults:*/ null);
@@ -631,30 +630,3 @@ void main() {
     _assertVersionTransitions(delete, null, mutationResult, docV7Deleted);
   });
 }
-
-// ignore: always_specify_types
-const wrap = TestUtil.wrap;
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const deletedDoc = TestUtil.deletedDoc;
-// ignore: always_specify_types
-const version = TestUtil.version;
-// ignore: always_specify_types
-const field = TestUtil.field;
-// ignore: always_specify_types
-const setMutation = TestUtil.setMutation;
-// ignore: always_specify_types
-const patchMutation = TestUtil.patchMutation;
-// ignore: always_specify_types
-const deleteMutation = TestUtil.deleteMutation;
-// ignore: always_specify_types
-const transformMutation = TestUtil.transformMutation;
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const wrapObject = TestUtil.wrapMap;
-// ignore: always_specify_types
-const key = TestUtil.key;
-// ignore: always_specify_types
-const mutationResult = TestUtil.mutationResult;

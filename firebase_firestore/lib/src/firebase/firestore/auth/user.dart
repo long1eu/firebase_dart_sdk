@@ -7,7 +7,7 @@ import 'package:firebase_common/firebase_common.dart';
 /// Simple wrapper around a nullable UID. Mostly exists to make code more
 /// readable and for use as a key in maps (since keys cannot be null).
 class User {
-  static const User unauthenticated = const User();
+  static const User unauthenticated = User();
 
   // Porting note: no GOOGLE_CREDENTIALS or FIRST_PARTY on Android, see Token
   // for more details.

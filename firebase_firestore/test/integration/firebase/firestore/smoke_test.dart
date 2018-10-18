@@ -140,7 +140,7 @@ void main() {
       await Future.wait(tasks);
       final Query query = collection
           .whereEqualTo('filter', true)
-          .orderBy('sort', Direction.DESCENDING);
+          .orderBy('sort', Direction.descending);
 
       final QuerySnapshot set = await query.get();
       final List<DocumentSnapshot> documents = set.documents;
@@ -153,9 +153,7 @@ void main() {
   );
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollection = IntegrationTestUtil.testCollection;

@@ -38,7 +38,9 @@ void main() {
   ObjectValue fromMap(List<Object> entries) {
     final Map<String, FieldValue> res = <String, FieldValue>{};
     for (int i = 0; i < entries.length; i += 2) {
-      res[entries[i] as String] = entries[i + 1] as FieldValue;
+      final String key = entries[i];
+      final FieldValue value = entries[i + 1];
+      res[key] = value;
     }
     return ObjectValue.fromMap(res);
   }
@@ -171,8 +173,6 @@ void main() {
   });
 
   test('testWrapsSimpleObjects', () {
-    // Guava doesn't like null values, so we create a copy of the Immutable map without
-    // the null value and then add the null value later.
     final Map<String, Object> actual =
         map(<dynamic>['a', 'foo', 'b', 1, 'c', true, 'd', null]);
 
@@ -187,7 +187,7 @@ void main() {
       NullValue.nullValue()
     ]);
 
-    final FieldValue wrappedActual = wrapObject(actual);
+    final FieldValue wrappedActual = wrapMap(actual);
     final ObjectValue wrappedExpected = ObjectValue.fromMap(expected);
     expect(wrappedExpected, wrappedActual);
   });
@@ -369,11 +369,11 @@ void main() {
         map<dynamic>(<dynamic>['d', 2, 'e', 3])
       ])
     ]);
-    ObjectValue old = wrapObject(orig);
+    ObjectValue old = wrapMap(orig);
     ObjectValue mod = old.delete(field('a.c.d'));
 
     expect(old, isNot(mod));
-    expect(old, wrapObject(orig));
+    expect(old, wrapMap(orig));
 
     final Map<String, Object> second = map(<dynamic>[
       'a',
@@ -384,25 +384,25 @@ void main() {
         map<dynamic>(<dynamic>['e', 3])
       ])
     ]);
-    expect(mod, wrapObject(second));
+    expect(mod, wrapMap(second));
 
     old = mod;
     mod = old.delete(field('a.c'));
 
     expect(mod, isNot(old));
-    expect(old, wrapObject(second));
+    expect(old, wrapMap(second));
 
     final Map<String, Object> third = map(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['b', 1])
     ]);
-    expect(mod, wrapObject(third));
+    expect(mod, wrapMap(third));
 
     old = mod;
     mod = old.delete(field('a'));
 
     expect(mod, isNot(old));
-    expect(old, wrapObject(third));
+    expect(old, wrapMap(third));
     expect(mod, ObjectValue.empty);
   });
 
@@ -470,12 +470,12 @@ void main() {
         .addItem(wrap(<String>['foo', 'bar', 'baz']))
         .addItem(wrap(<String>['foo']))
         .addEqualityGroup(<FieldValue>[
-          wrapObject(map(<dynamic>['bar', 1, 'foo', 2])),
-          wrapObject(map(<dynamic>['foo', 2, 'bar', 1]))
+          wrapMap(map(<dynamic>['bar', 1, 'foo', 2])),
+          wrapMap(map(<dynamic>['foo', 2, 'bar', 1]))
         ])
-        .addItem(wrapObject(map(<dynamic>['bar', 2, 'foo', 1])))
-        .addItem(wrapObject(map(<dynamic>['bar', 1])))
-        .addItem(wrapObject(map(<dynamic>['foo', 1])))
+        .addItem(wrapMap(map(<dynamic>['bar', 2, 'foo', 1])))
+        .addItem(wrapMap(map(<dynamic>['bar', 1])))
+        .addItem(wrapMap(map(<dynamic>['foo', 1])))
         .testEquals();
   });
 
@@ -564,30 +564,11 @@ void main() {
         .addItem(wrap(<dynamic>['foo', '0']))
 
         // objects
-        .addItem(wrapObject(map(<dynamic>['bar', 0])))
-        .addItem(wrapObject(map(<dynamic>['bar', 0, 'foo', 1])))
-        .addItem(wrapObject(map(<dynamic>['foo', 1])))
-        .addItem(wrapObject(map(<dynamic>['foo', 2])))
-        .addItem(wrapObject(map(<String>['foo', '0'])))
+        .addItem(wrapMap(map(<dynamic>['bar', 0])))
+        .addItem(wrapMap(map(<dynamic>['bar', 0, 'foo', 1])))
+        .addItem(wrapMap(map(<dynamic>['foo', 1])))
+        .addItem(wrapMap(map(<dynamic>['foo', 2])))
+        .addItem(wrapMap(map(<String>['foo', '0'])))
         .testCompare();
   });
 }
-
-// ignore: always_specify_types
-const wrap = TestUtil.wrap;
-// ignore: always_specify_types
-const blob = TestUtil.blob;
-// ignore: always_specify_types
-const field = TestUtil.field;
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const wrapObject = TestUtil.wrapMap;
-// ignore: always_specify_types
-const wrapList = TestUtil.wrapList;
-// ignore: always_specify_types
-const ref = TestUtil.ref;
-// ignore: always_specify_types
-const dbId = TestUtil.dbId;
-// ignore: always_specify_types
-const key = TestUtil.key;

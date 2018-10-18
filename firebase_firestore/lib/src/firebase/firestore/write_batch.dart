@@ -36,14 +36,13 @@ class WriteBatch {
 
   WriteBatch(this._firestore) : assert(_firestore != null);
 
-  /// Writes to the document referred to by the provided DocumentReference. If the document does not
-  /// yet exist, it will be created. If you pass {@link SetOptions}, the provided data can be merged
-  /// into an existing document.
+  /// Writes to the document referred to by the provided [DocumentReference]. If
+  /// the document does not yet exist, it will be created. If you pass
+  /// [SetOptions], the provided data can be merged into an existing document.
   ///
-  /// @param documentRef The DocumentReference to overwrite.
-  /// @param data A map of the fields and values for the document.
-  /// @param options An object to configure the set behavior.
-  /// @return This WriteBatch instance. Used for chaining method calls.
+  /// The documentRef to overwrite, [data] is a map of the fields and values for
+  /// the document. adn [options] is an object to configure the set behavior.
+  /// Returns this [WriteBatch] instance. Used for chaining method calls.
   @publicApi
   WriteBatch set(DocumentReference documentRef, Map<String, Object> data,
       [SetOptions options]) {
@@ -70,12 +69,12 @@ class WriteBatch {
   @publicApi
   WriteBatch updateFromList(DocumentReference documentRef, List<Object> data) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
-        .parseUpdateDataFromList(Util.collectUpdateArguments(1, data));
+        .parseUpdateDataFromList(collectUpdateArguments(1, data));
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
-    _mutations.addAll(parsedData.toMutationList(
-        documentRef.key, Precondition.fromExists(true)));
+    _mutations.addAll(
+        parsedData.toMutationList(documentRef.key, Precondition(exists: true)));
     return this;
   }
 
@@ -93,8 +92,8 @@ class WriteBatch {
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
-    _mutations.addAll(parsedData.toMutationList(
-        documentRef.key, Precondition.fromExists(true)));
+    _mutations.addAll(
+        parsedData.toMutationList(documentRef.key, Precondition(exists: true)));
     return this;
   }
 
@@ -123,7 +122,8 @@ class WriteBatch {
   void _verifyNotCommitted() {
     if (_committed) {
       throw StateError(
-          'A write batch can no longer be used after commit() has been called.');
+          'A write batch can no longer be used after commit() has been '
+          'called.');
     }
   }
 }

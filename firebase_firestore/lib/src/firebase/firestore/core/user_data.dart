@@ -26,28 +26,28 @@ class UserDataSource {
   const UserDataSource._(this._value);
 
   /// The data comes from a regular Set operation, without merge.
-  static const UserDataSource set = const UserDataSource._(0);
+  static const UserDataSource set = UserDataSource._(0);
 
   /// The data comes from a Set operation with merge enabled.
-  static const UserDataSource mergeSet = const UserDataSource._(1);
+  static const UserDataSource mergeSet = UserDataSource._(1);
 
   /// The data comes from an Update operation.
-  static const UserDataSource update = const UserDataSource._(2);
+  static const UserDataSource update = UserDataSource._(2);
 
   /// Indicates the source is a where clause, cursor bound, arrayUnion()
   /// element, etc. Of note,  UserDataParseContext.isWrite() will return false.
-  static const UserDataSource argument = const UserDataSource._(3);
+  static const UserDataSource argument = UserDataSource._(3);
 
   String get name => _stringValues[_value];
 
-  static const List<UserDataSource> values = const <UserDataSource>[
+  static const List<UserDataSource> values = <UserDataSource>[
     set,
     mergeSet,
     update,
     argument
   ];
 
-  static const List<String> _stringValues = const <String>[
+  static const List<String> _stringValues = <String>[
     'set',
     'mergeSet',
     'update',
@@ -55,10 +55,10 @@ class UserDataSource {
   ];
 }
 
-/// A [context] object that wraps a [UserDataParseAccumulator] and refers to a specific
-/// location in a user-supplied document. Instances are created and passed
-/// around while traversing user data during parsing in order to conveniently
-/// accumulate data in the [UserDataParseAccumulator].
+/// A [context] object that wraps a [UserDataParseAccumulator] and refers to a
+/// specific location in a user-supplied document. Instances are created and
+/// passed around while traversing user data during parsing in order to
+/// conveniently accumulate data in the [UserDataParseAccumulator].
 class UserDataParseContext {
   final Pattern _reservedFieldRegex = RegExp('^__.*__\$');
 
@@ -74,7 +74,7 @@ class UserDataParseContext {
 
   /// Initializes a [UserDataParseContext] with the given source and path.
   ///
-  /// [accumulator] on which to add results. [path] within the object being
+  /// [_accumulator] on which to add results. [path] within the object being
   /// parsed. This could be an empty path (in which case the context represents
   /// the root of the data being parsed), or a nonempty path (indicating the
   /// context represents a nested location within the data). [arrayElement]
@@ -101,8 +101,8 @@ class UserDataParseContext {
       case UserDataSource.argument:
         return false;
       default:
-        throw Assert.fail(
-            'Unexpected case for UserDataSource: ${_accumulator.dataSource.name}');
+        throw Assert.fail('Unexpected case for UserDataSource: '
+            '${_accumulator.dataSource.name}');
     }
   }
 
@@ -111,8 +111,7 @@ class UserDataParseContext {
         path == null ? null : path.appendSegment(fieldName);
     final UserDataParseContext context = UserDataParseContext._(
         _accumulator, childPath, /*arrayElement:*/ false);
-    context._validatePathSegment(fieldName);
-    return context;
+    return context.._validatePathSegment(fieldName);
   }
 
   UserDataParseContext childContextForField(FieldPath fieldPath) {
@@ -120,8 +119,7 @@ class UserDataParseContext {
         path == null ? null : path.appendField(fieldPath);
     final UserDataParseContext context = UserDataParseContext._(
         _accumulator, childPath, /*arrayElement:*/ false);
-    context._validatePath();
-    return context;
+    return context.._validatePath();
   }
 
   UserDataParseContext childContextForArrayIndex(int arrayIndex) {
@@ -145,7 +143,7 @@ class UserDataParseContext {
   Error createError(String reason) {
     final String fieldDescription =
         (path == null || path.isEmpty) ? '' : ' (found in field $path)';
-    return ArgumentError('Invalid data. ' + reason + fieldDescription);
+    return ArgumentError('Invalid data. $reason$fieldDescription');
   }
 
   void _validatePath() {
@@ -199,8 +197,8 @@ class UserDataParsedUpdateData {
   UserDataParsedUpdateData(this._data, this._fieldMask, this.fieldTransforms);
 
   List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
-    final List<Mutation> mutations = <Mutation>[];
-    mutations.add(PatchMutation(key, _data, _fieldMask, precondition));
+    final List<Mutation> mutations = <Mutation>[]
+      ..add(PatchMutation(key, _data, _fieldMask, precondition));
     if (fieldTransforms.isNotEmpty) {
       mutations.add(TransformMutation(key, fieldTransforms));
     }
@@ -241,7 +239,7 @@ class UserDataParseAccumulator {
         this, FieldPath.emptyPath, /*arrayElement:*/ false);
   }
 
-  /// Returns [true] if the given [fieldPath] was encountered in the current
+  /// Returns true if the given [fieldPath] was encountered in the current
   /// document.
   bool contains(FieldPath fieldPath) {
     for (FieldPath field in _fieldMask) {

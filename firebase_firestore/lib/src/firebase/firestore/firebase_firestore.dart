@@ -46,12 +46,8 @@ class FirebaseFirestore {
 
   @visibleForTesting
   FirebaseFirestore(
-    this.databaseId,
-    this._asyncQueue,
-    this.firebaseApp,
-    this.client, [
-    FirebaseFirestoreSettings settings,
-  ]) : dataConverter = UserDataConverter(databaseId);
+      this.databaseId, this._asyncQueue, this.firebaseApp, this.client)
+      : dataConverter = UserDataConverter(databaseId);
 
   @publicApi
   static FirebaseFirestore get instance {
@@ -91,8 +87,10 @@ class FirebaseFirestore {
 
     CredentialsProvider provider;
     if (authProvider == null) {
-      Log.d(_tag,
-          'Firebase Auth not available, falling back to unauthenticated usage.');
+      Log.d(
+          _tag,
+          'Firebase Auth not available, falling back to unauthenticated '
+          'usage.');
       provider = EmptyCredentialsProvider();
     } else {
       provider = FirebaseAuthCredentialsProvider(authProvider);
@@ -119,7 +117,7 @@ class FirebaseFirestore {
       openDatabase,
     );
 
-    return FirebaseFirestore(databaseId, queue, app, client, settings);
+    return FirebaseFirestore(databaseId, queue, app, client);
   }
 
   @visibleForTesting
@@ -143,7 +141,7 @@ class FirebaseFirestore {
       openDatabase,
     );
 
-    return FirebaseFirestore(databaseId, queue, null, client, settings);
+    return FirebaseFirestore(databaseId, queue, null, client);
   }
 
   void _ensureClientConfigured() {
@@ -185,7 +183,6 @@ class FirebaseFirestore {
   /// to commit after 5 attempts, the transaction will fail.
   ///
   /// [updateFunction] the function to execute within the transaction context.
-  /*p*/
   Future<TResult> runTransaction<TResult>(
       TransactionCallback<TResult> updateFunction) {
     _ensureClientConfigured();
@@ -245,11 +242,11 @@ class FirebaseFirestore {
 
   /// Globally enables / disables Firestore logging for the SDK.
   @publicApi
-  static void setLoggingEnabled(bool loggingEnabled) {
+  static void setLoggingEnabled({bool loggingEnabled = false}) {
     if (loggingEnabled) {
-      Log.setLogLevel(LogLevel.d);
+      Log.level = LogLevel.d;
     } else {
-      Log.setLogLevel(LogLevel.w);
+      Log.level = LogLevel.w;
     }
   }
 
@@ -258,8 +255,8 @@ class FirebaseFirestore {
   void validateReference(DocumentReference docRef) {
     Assert.checkNotNull(docRef, 'Provided DocumentReference must not be null.');
     if (docRef.firestore != this) {
-      throw ArgumentError(
-          'Provided document reference is from a different Firestore instance.');
+      throw ArgumentError('Provided document reference is from a different '
+          'Firestore instance.');
     }
   }
 }

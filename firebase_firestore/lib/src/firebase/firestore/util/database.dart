@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-typedef Future<Database> OpenDatabase(String path,
+typedef OpenDatabase = Future<Database> Function(String path,
     {int version,
     OnConfigure onConfigure,
     OnCreate onCreate,
@@ -12,11 +12,11 @@ typedef Future<Database> OpenDatabase(String path,
     OnVersionChange onDowngrade,
     OnOpen onOpen});
 
-typedef Future<void> OnVersionChange(
+typedef OnVersionChange = Future<void> Function(
     Database db, int oldVersion, int newVersion);
-typedef Future<void> OnCreate(Database db, int version);
-typedef Future<void> OnOpen(Database db);
-typedef Future<void> OnConfigure(Database db);
+typedef OnCreate = Future<void> Function(Database db, int version);
+typedef OnOpen = Future<void> Function(Database db);
+typedef OnConfigure = Future<void> Function(Database db);
 
 abstract class Database {
   /// Runs SQLite statement without return values

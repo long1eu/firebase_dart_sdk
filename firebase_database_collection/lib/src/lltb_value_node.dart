@@ -148,7 +148,6 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
     return false;
   }
 
-  // For use by the builder, which is package local
   @override
   LLRBNode<K, V> get left => _left;
 

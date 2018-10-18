@@ -8,9 +8,9 @@ import 'test_util.dart';
 
 void main() {
   test('testEquals', () {
-    final CollectionReference foo = TestUtil.collectionReference('foo');
-    final CollectionReference fooDup = TestUtil.collectionReference('foo');
-    final CollectionReference bar = TestUtil.collectionReference('bar');
+    final CollectionReference foo = collectionReference('foo');
+    final CollectionReference fooDup = collectionReference('foo');
+    final CollectionReference bar = collectionReference('bar');
     expect(foo, fooDup);
     expect(foo, isNot(bar));
 

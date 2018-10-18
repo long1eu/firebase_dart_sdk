@@ -41,14 +41,18 @@ class MutationBatch {
   MaybeDocument applyToRemoteDocument(DocumentKey documentKey,
       MaybeDocument maybeDoc, MutationBatchResult batchResult) {
     if (maybeDoc != null) {
-      Assert.hardAssert(maybeDoc.key == documentKey,
-          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
+      Assert.hardAssert(
+          maybeDoc.key == documentKey,
+          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key '
+          '${maybeDoc.key}');
     }
 
     final int size = mutations.length;
     final List<MutationResult> mutationResults = batchResult.mutationResults;
-    Assert.hardAssert(mutationResults.length == size,
-        'Mismatch between mutations length ($size) and results length (${mutationResults.length})');
+    Assert.hardAssert(
+        mutationResults.length == size,
+        'Mismatch between mutations length ($size) and results length '
+        '(${mutationResults.length})');
 
     for (int i = 0; i < size; i++) {
       final Mutation mutation = mutations[i];
@@ -65,8 +69,10 @@ class MutationBatch {
   MaybeDocument applyToLocalView(
       DocumentKey documentKey, MaybeDocument maybeDoc) {
     if (maybeDoc != null) {
-      Assert.hardAssert(maybeDoc.key == documentKey,
-          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
+      Assert.hardAssert(
+          maybeDoc.key == documentKey,
+          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key '
+          '${maybeDoc.key}');
     }
 
     final MaybeDocument baseDoc = maybeDoc;

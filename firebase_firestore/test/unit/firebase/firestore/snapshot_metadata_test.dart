@@ -6,10 +6,10 @@ import 'package:test/test.dart';
 
 void main() {
   test('testEquals', () {
-    const SnapshotMetadata foo = const SnapshotMetadata(true, true);
-    const SnapshotMetadata fooDup = const SnapshotMetadata(true, true);
-    const SnapshotMetadata bar = const SnapshotMetadata(true, false);
-    const SnapshotMetadata baz = const SnapshotMetadata(false, true);
+    const SnapshotMetadata foo = SnapshotMetadata(true, true);
+    const SnapshotMetadata fooDup = SnapshotMetadata(true, true);
+    const SnapshotMetadata bar = SnapshotMetadata(true, false);
+    const SnapshotMetadata baz = SnapshotMetadata(false, true);
 
     expect(fooDup, foo);
     expect(bar, isNot(foo));

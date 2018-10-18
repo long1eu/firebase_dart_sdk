@@ -4,6 +4,7 @@
 
 import 'package:firebase_common/src/annotations.dart';
 import 'package:firebase_common/src/firebase_options.dart';
+import 'package:firebase_common/src/firebase_app.dart';
 
 /// A observer which gets notified when [FirebaseApp] gets deleted.
 // TODO: consider making it public in a future release.

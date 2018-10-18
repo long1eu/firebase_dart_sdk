@@ -9,12 +9,12 @@ import '../../../../util/test_util.dart';
 
 void main() {
   test('testToDebugString', () {
-    expect('', Util.toDebugString(TestUtil.blob().bytes));
-    expect('00ff', Util.toDebugString(TestUtil.blob(<int>[0, 0xFF]).bytes));
-    expect('1f3b', Util.toDebugString(TestUtil.blob(<int>[0x1F, 0x3B]).bytes));
+    expect('', toDebugString(blob().bytes));
+    expect('00ff', toDebugString(blob(<int>[0, 0xFF]).bytes));
+    expect('1f3b', toDebugString(blob(<int>[0x1F, 0x3B]).bytes));
     expect(
         '000102030405060708090a0b0c0d0e0f',
-        Util.toDebugString(TestUtil.blob(<int>[
+        toDebugString(blob(<int>[
           0,
           1,
           2,

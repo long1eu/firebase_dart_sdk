@@ -87,7 +87,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
     for (MapEntry<DocumentKey, MaybeDocument> entry in cache.documents) {
       final DocumentKey key = entry.key;
       if (!(await _isPinned(key, upperBound))) {
-        cache.remove(key);
+        await cache.remove(key);
         orphanedSequenceNumbers.remove(key);
         count++;
       }

@@ -20,19 +20,19 @@ import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
 
-/// A Stream that implements the [StreamingWrite] RPC.
+/// A Stream that implements the StreamingWrite RPC.
 ///
-/// * The [StreamingWrite] RPC requires the caller to maintain special
-/// [streamToken] state in between calls, to help the server understand which
+/// * The StreamingWrite RPC requires the caller to maintain special
+/// streamToken state in between calls, to help the server understand which
 /// responses the client has processed by the time the next request is made.
-/// Every response may contain a [streamToken]; this value must be passed to the
+/// Every response may contain a streamToken; this value must be passed to the
 /// next request.
 ///
-/// * After calling [start] on this stream, the next request must be a handshake,
-/// containing whatever [streamToken] is on hand. Once a response to this request
-/// is received, all pending mutations may be submitted. When submitting multiple
-/// batches of mutations at the same time, it's okay to use the same
-/// [streamToken] for the calls to [writeMutations].
+/// * After calling [start] on this stream, the next request must be a
+/// handshake, containing whatever streamToken is on hand. Once a response to
+/// this request is received, all pending mutations may be submitted. When
+/// submitting multiple batches of mutations at the same time, it's okay to use
+/// the same streamToken for the calls to [writeMutations].
 ///
 /// @see <a
 /// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L139'>firestore.proto</a>
@@ -51,7 +51,7 @@ class WriteStream
   /// * WriteStream implementations manage propagating this value from responses
   /// to the next request.
   ///
-  /// NOTE: A null [streamToken] is not allowed: use the empty array for the
+  /// NOTE: A null streamToken is not allowed: use the empty array for the
   /// unset value.
   Uint8List lastStreamToken = emptyStreamToken;
 
@@ -91,8 +91,8 @@ class WriteStream
   /// stream is ready to accept mutations.
   bool get isHandshakeComplete => handshakeComplete;
 
-  /// Sends an initial [streamToken] to the server, performing the handshake
-  /// required to make the [StreamingWrite] RPC work. Subsequent
+  /// Sends an initial streamToken to the server, performing the handshake
+  /// required to make the StreamingWrite RPC work. Subsequent
   /// [writeMutations] calls should wait until a response has been delivered to
   /// [WriteStreamCallback.onHandshakeComplete].
   Future<void> writeHandshake() async {
@@ -111,8 +111,8 @@ class WriteStream
     Assert.hardAssert(isOpen, 'Writing mutations requires an opened stream');
     Assert.hardAssert(handshakeComplete,
         'Handshake must be complete before writing mutations');
-    final WriteRequest request = WriteRequest.create();
-    request.streamToken = lastStreamToken;
+    final WriteRequest request = WriteRequest.create()
+      ..streamToken = lastStreamToken;
 
     for (Mutation mutation in mutations) {
       request.writes.add(_serializer.encodeMutation(mutation));

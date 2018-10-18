@@ -27,10 +27,11 @@ import 'package:protobuf/protobuf.dart';
 /// RPC layer. It:
 ///
 /// <ul>
-/// <li>Manages connections to the server
-/// <li>Authenticates to the server
-/// <li>Manages threading and keeps higher-level code running on the worker queue
-/// <li>Serializes internal model objects to and from protocol buffers
+///   <li>Manages connections to the server
+///   <li>Authenticates to the server
+///   <li>Manages threading and keeps higher-level code running on the worker
+///       queue
+///   <li>Serializes internal model objects to and from protocol buffers
 /// </ul>
 ///
 /// <p>The Datastore is generally not responsible for understanding the
@@ -90,8 +91,8 @@ class Datastore {
   }
 
   Future<List<MutationResult>> commit(List<Mutation> mutations) async {
-    final CommitRequest builder = CommitRequest.create();
-    builder.database = serializer.databaseName;
+    final CommitRequest builder = CommitRequest.create()
+      ..database = serializer.databaseName;
 
     for (Mutation mutation in mutations) {
       builder.writes.add(serializer.encodeMutation(mutation));

@@ -13,17 +13,17 @@ import '../local/persistence_test_helpers.dart';
 import 'spec_test_case.dart';
 
 void main() {
-  const String EAGER_GC = 'eager-gc';
+  const String eagerGc = 'eager-gc';
 
   SpecTestCase testCase;
 
   setUp(() async {
     testCase = SpecTestCase(
       (_, String name) {
-        return PersistenceTestHelpers.openSQLitePersistence(
+        return openSQLitePersistence(
             'firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}b');
       },
-      (Set<String> tags) => tags.contains(EAGER_GC),
+      (Set<String> tags) => tags.contains(eagerGc),
     );
     await testCase.specSetUp(<String, dynamic>{});
   });
@@ -44,9 +44,8 @@ void main() {
         .listSync()
         .where((FileSystemEntity it) => it is File && it.path.endsWith('.json'))
         .cast<File>()
-        .toList();
-
-    jsonFiles.sort((File a, File b) => a.path.compareTo(b.path));
+        .toList()
+          ..sort((File a, File b) => a.path.compareTo(b.path));
 
     bool exclusiveMode = false;
     for (File f in jsonFiles) {
@@ -64,7 +63,7 @@ void main() {
 
       // Print the names of the files and tests regardless of whether verbose
       // logging is enabled.
-      SpecTestCase.info('Spec test file: ' + fileName);
+      SpecTestCase.info('Spec test file: $fileName');
 
       // Iterate over the tests in the file and run them.
 
@@ -74,7 +73,7 @@ void main() {
         final Map<String, dynamic> testJSON = fileJSON[key];
         final String describeName = testJSON['describeName'];
         final String itName = testJSON['itName'];
-        final String name = describeName + ' ' + itName;
+        final String name = '$describeName $itName';
         final Map<String, dynamic> config = testJSON['config'];
         final List<dynamic> steps = testJSON['steps'];
         final Set<String> tags = SpecTestCase.getTestTags(testJSON);
@@ -83,11 +82,11 @@ void main() {
             (!exclusiveMode || tags.contains(SpecTestCase.exclusiveTag));
         if (runTest) {
           try {
-            SpecTestCase.info(
-                '------------------------------------------------------------------');
-            SpecTestCase.info('  Spec test: ' + name);
-            SpecTestCase.info(
-                '------------------------------------------------------------------');
+            SpecTestCase.info('------------------------------------------------'
+                '------------------');
+            SpecTestCase.info('  Spec test: $name');
+            SpecTestCase.info('------------------------------------------------'
+                '------------------');
             testCase.currentName = name;
             await testCase.runSteps(steps, config);
             ranAtLeastOneTest = true;
@@ -98,7 +97,7 @@ void main() {
             rethrow;
           }
         } else {
-          SpecTestCase.info('  [SKIPPED] Spec test: ' + name);
+          SpecTestCase.info('  [SKIPPED] Spec test: $name');
         }
       }
     }

@@ -10,30 +10,30 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
 
-/// Describes the [hasPendingWrites] state of a document.
+/// Describes the hasPendingWrites state of a document.
 enum DocumentState {
   /// Local mutations applied via the mutation queue. Document is potentially
   /// inconsistent.
-  LOCAL_MUTATIONS,
+  localMutations,
 
   /// Mutations applied based on a write acknowledgment. Document is potentially
   /// inconsistent.
-  COMMITTED_MUTATIONS,
+  committedMutations,
 
   /// No mutations applied. Document was sent to us by Watch.
-  SYNCED
+  synced
 }
 
 class Document extends MaybeDocument implements Comparable<Document> {
   final ObjectValue data;
   final DocumentState documentState;
 
-  static final Comparator<Document> keyComparator =
-      (Document left, Document right) => left.key.compareTo(right.key);
-
   const Document(
       DocumentKey key, SnapshotVersion version, this.data, this.documentState)
       : super(key, version);
+
+  static int keyComparator(Document left, Document right) =>
+      left.key.compareTo(right.key);
 
   FieldValue getField(FieldPath path) => data.get(path);
 
@@ -43,11 +43,11 @@ class Document extends MaybeDocument implements Comparable<Document> {
   }
 
   bool get hasLocalMutations {
-    return documentState == DocumentState.LOCAL_MUTATIONS;
+    return documentState == DocumentState.localMutations;
   }
 
   bool get hasCommittedMutations {
-    return documentState == DocumentState.COMMITTED_MUTATIONS;
+    return documentState == DocumentState.committedMutations;
   }
 
   @override

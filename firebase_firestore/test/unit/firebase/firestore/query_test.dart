@@ -9,9 +9,9 @@ import 'test_util.dart';
 
 void main() {
   test('testEquals', () {
-    final Query foo = TestUtil.query('foo');
-    final Query fooDup = TestUtil.query('foo');
-    final Query bar = TestUtil.query('bar');
+    final Query foo = query('foo');
+    final Query fooDup = query('foo');
+    final Query bar = query('bar');
     expect(fooDup, foo);
     expect(bar, isNot(foo));
 

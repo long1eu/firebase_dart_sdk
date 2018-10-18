@@ -60,8 +60,8 @@ abstract class Stream<CallbackType extends StreamCallback> {
   void inhibitBackoff();
 }
 
-/// AbstractStream can be in one of 5 states (each described in detail below) based on the
-/// following state transition diagram:
+/// AbstractStream can be in one of 5 states (each described in detail below)
+/// based on the following state transition diagram:
 ///
 /// ```
 ///          start() called             auth & connection succeeded
@@ -82,7 +82,7 @@ enum StreamState {
   /// The streaming RPC is not yet running and there is no error condition.
   /// Calling [Stream.start]  will start the stream immediately without backoff.
   /// While in this state [isStarted] will return false.
-  Initial,
+  initial,
 
   /// The stream is starting, either waiting for an auth token or for the stream
   /// to successfully open. While in this state, [Stream.isStarted] will return
@@ -91,21 +91,21 @@ enum StreamState {
   /// * Porting Note: Auth is handled transparently by gRPC in this
   /// implementation, so this state is used as intermediate state until the
   /// [Stream.onOpen] callback is called.
-  Starting,
+  starting,
 
   /// The streaming RPC is up and running. Requests and responses can flow
   /// freely. Both [Stream.isStarted] and [Stream.isOpen] will return true.
-  Open,
+  open,
 
   /// The stream encountered an error. The next start attempt will back off.
   /// While in this state [Stream.isStarted] will return false.
-  Error,
+  error,
 
   /// An in-between state after an error where the stream is waiting before
   /// re-starting. After waiting is complete, the stream will try to open. While
   /// in this state [Stream.isStarted] will return true but [Stream.isOpen] will
   /// return false.
-  Backoff,
+  backoff,
 }
 
 typedef OnClose = Future<void> Function(GrpcError error);

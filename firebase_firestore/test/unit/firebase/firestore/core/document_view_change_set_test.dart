@@ -31,31 +31,30 @@ void main() async {
     final Document modifiedThenRemoved = doc('b/4', 0, emptyMap);
     final Document modifiedThenModified = doc('b/5', 0, emptyMap);
 
-    set.addChange(DocumentViewChange(DocumentViewChangeType.added, added));
-    set.addChange(DocumentViewChange(DocumentViewChangeType.removed, removed));
-    set.addChange(
-        DocumentViewChange(DocumentViewChangeType.modified, modified));
-
-    set.addChange(
-        DocumentViewChange(DocumentViewChangeType.added, addedThenModified));
-    set.addChange(
-        DocumentViewChange(DocumentViewChangeType.modified, addedThenModified));
-    set.addChange(
-        DocumentViewChange(DocumentViewChangeType.added, addedThenRemoved));
-    set.addChange(
-        DocumentViewChange(DocumentViewChangeType.removed, addedThenRemoved));
-    set.addChange(
-        DocumentViewChange(DocumentViewChangeType.removed, removedThenAdded));
-    set.addChange(
-        DocumentViewChange(DocumentViewChangeType.added, removedThenAdded));
-    set.addChange(DocumentViewChange(
-        DocumentViewChangeType.modified, modifiedThenRemoved));
-    set.addChange(DocumentViewChange(
-        DocumentViewChangeType.removed, modifiedThenRemoved));
-    set.addChange(DocumentViewChange(
-        DocumentViewChangeType.modified, modifiedThenModified));
-    set.addChange(DocumentViewChange(
-        DocumentViewChangeType.modified, modifiedThenModified));
+    set
+      ..addChange(DocumentViewChange(DocumentViewChangeType.added, added))
+      ..addChange(DocumentViewChange(DocumentViewChangeType.removed, removed))
+      ..addChange(DocumentViewChange(DocumentViewChangeType.modified, modified))
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.added, addedThenModified))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.modified, addedThenModified))
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.added, addedThenRemoved))
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.removed, addedThenRemoved))
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.removed, removedThenAdded))
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.added, removedThenAdded))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.modified, modifiedThenRemoved))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.removed, modifiedThenRemoved))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.modified, modifiedThenModified))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.modified, modifiedThenModified));
 
     final List<DocumentViewChange> changes = set.getChanges();
 
@@ -76,8 +75,3 @@ void main() async {
     expect(changes[6].type, DocumentViewChangeType.modified);
   });
 }
-
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-final emptyMap = TestUtil.emptyMap;

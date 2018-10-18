@@ -10,8 +10,10 @@ import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.d
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_operation.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/unknown_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
@@ -24,7 +26,8 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 ///
 /// * It is somewhat similar to a [PatchMutation] in that it patches specific
 /// fields and has no effect when applied to null or a [NoDocument] (see comment
-/// on [Mutation.applyTo] for rationale).
+/// on [Mutation.applyToRemoteDocument] and [Mutation.applyToLocalView] for
+/// rationale).
 class TransformMutation extends Mutation {
   final List<FieldTransform> fieldTransforms;
 
@@ -32,7 +35,7 @@ class TransformMutation extends Mutation {
   // always combine TransformMutations with a SetMutation or PatchMutation which
   // (if successful) should end up with an existing document.
   TransformMutation(DocumentKey key, this.fieldTransforms)
-      : super(key, Precondition.fromExists(true));
+      : super(key, Precondition(exists: true));
 
   @override
   MaybeDocument applyToRemoteDocument(
@@ -54,8 +57,8 @@ class TransformMutation extends Mutation {
     final List<FieldValue> transformResults =
         _serverTransformResults(doc, mutationResult.transformResults);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
-    return Document(key, mutationResult.version, newData,
-        DocumentState.COMMITTED_MUTATIONS);
+    return Document(
+        key, mutationResult.version, newData, DocumentState.committedMutations);
   }
 
   @override
@@ -71,7 +74,7 @@ class TransformMutation extends Mutation {
     final List<FieldValue> transformResults =
         _localTransformResults(localWriteTime, baseDoc);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
-    return Document(key, doc.version, newData, DocumentState.LOCAL_MUTATIONS);
+    return Document(key, doc.version, newData, DocumentState.localMutations);
   }
 
   /// Asserts that the given [MaybeDocument] is actually a [Document] and
@@ -81,7 +84,7 @@ class TransformMutation extends Mutation {
   Document _requireDocument(MaybeDocument maybeDoc) {
     Assert.hardAssert(
         maybeDoc is Document, 'Unknown MaybeDocument type $maybeDoc');
-    final Document doc = maybeDoc as Document;
+    final Document doc = maybeDoc;
     Assert.hardAssert(
         doc.key == key, 'Can only transform a document with the same key');
     return doc;
@@ -98,8 +101,10 @@ class TransformMutation extends Mutation {
       MaybeDocument baseDoc, List<FieldValue> serverTransformResults) {
     final List<FieldValue> transformResults =
         List<FieldValue>(fieldTransforms.length);
-    Assert.hardAssert(fieldTransforms.length == serverTransformResults.length,
-        'server transform count (${serverTransformResults.length}) should match field transform count (${fieldTransforms.length})');
+    Assert.hardAssert(
+        fieldTransforms.length == serverTransformResults.length,
+        'server transform count (${serverTransformResults.length}) should '
+        'match field transform count (${fieldTransforms.length})');
 
     for (int i = 0; i < serverTransformResults.length; i++) {
       final FieldTransform fieldTransform = fieldTransforms[i];

@@ -2,10 +2,11 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+//ignore_for_file: avoid_positional_boolean_parameters
 /// A helper class to provide static runtime assertion helpers.
 class Assert {
-  /// Triggers a hard assertion. The condition is guaranteed to be checked at runtime. If the
-  /// condition is false an AssertionError will be thrown.
+  /// Triggers a hard assertion. The condition is guaranteed to be checked at
+  /// runtime. If the condition is false an AssertionError will be thrown.
   static void hardAssert(bool condition, String message) {
     if (!condition) {
       throw fail(message);

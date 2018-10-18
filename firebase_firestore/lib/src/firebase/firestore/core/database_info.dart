@@ -30,7 +30,9 @@ class DatabaseInfo {
   String toString() {
     return (ToStringHelper(runtimeType)
           ..add('databaseId', databaseId)
-          ..add('host', host))
+          ..add('persistenceKey', persistenceKey)
+          ..add('host', host)
+          ..add('sslEnabled', sslEnabled))
         .toString();
   }
 }

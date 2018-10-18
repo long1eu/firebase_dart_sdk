@@ -16,14 +16,15 @@ import 'package:grpc/grpc.dart';
 /// It handles 'fan-out.' (Identical queries will re-use the same watch on the
 /// backend.)
 class EventManager implements SyncEngineCallback {
-  final SyncEngine syncEngine;
+  final SyncEngine _syncEngine;
 
-  final Map<Query, QueryListenersInfo> queries;
+  final Map<Query, QueryListenersInfo> _queries;
 
-  OnlineState onlineState = OnlineState.unknown;
+  OnlineState _onlineState = OnlineState.unknown;
 
-  EventManager(this.syncEngine) : this.queries = <Query, QueryListenersInfo>{} {
-    syncEngine.callback = this;
+  EventManager(this._syncEngine)
+      : this._queries = <Query, QueryListenersInfo>{} {
+    _syncEngine.callback = this;
   }
 
   /// Adds a query listener that will be called with new snapshots for the
@@ -35,43 +36,43 @@ class EventManager implements SyncEngineCallback {
   Future<int> addQueryListener(QueryListener queryListener) async {
     final Query query = queryListener.query;
 
-    QueryListenersInfo queryInfo = queries[query];
+    QueryListenersInfo queryInfo = _queries[query];
     final bool firstListen = queryInfo == null;
 
     if (firstListen) {
       queryInfo = QueryListenersInfo();
-      queries[query] = queryInfo;
+      _queries[query] = queryInfo;
     }
 
-    queryInfo.listeners.add(queryListener);
+    queryInfo._listeners.add(queryListener);
 
-    queryListener.onOnlineStateChanged(onlineState);
+    queryListener.onOnlineStateChanged(_onlineState);
 
-    if (queryInfo.viewSnapshot != null) {
-      await queryListener.onViewSnapshot(queryInfo.viewSnapshot);
+    if (queryInfo._viewSnapshot != null) {
+      await queryListener.onViewSnapshot(queryInfo._viewSnapshot);
     }
 
     if (firstListen) {
-      queryInfo.targetId = await syncEngine.listen(query);
+      queryInfo._targetId = await _syncEngine.listen(query);
     }
-    return queryInfo.targetId;
+    return queryInfo._targetId;
   }
 
   /// Removes a previously added listener and returns true if the listener was
   /// found.
   Future<bool> removeQueryListener(QueryListener listener) async {
     final Query query = listener.query;
-    final QueryListenersInfo queryInfo = queries[query];
+    final QueryListenersInfo queryInfo = _queries[query];
     bool lastListen = false;
     bool found = false;
     if (queryInfo != null) {
-      found = queryInfo.listeners.remove(listener);
-      lastListen = queryInfo.listeners.isEmpty;
+      found = queryInfo._listeners.remove(listener);
+      lastListen = queryInfo._listeners.isEmpty;
     }
 
     if (lastListen) {
-      queries.remove(query);
-      await syncEngine.stopListening(query);
+      _queries.remove(query);
+      await _syncEngine.stopListening(query);
     }
 
     return found;
@@ -81,31 +82,31 @@ class EventManager implements SyncEngineCallback {
   Future<void> onViewSnapshots(List<ViewSnapshot> snapshotList) async {
     for (ViewSnapshot viewSnapshot in snapshotList) {
       final Query query = viewSnapshot.query;
-      final QueryListenersInfo info = queries[query];
+      final QueryListenersInfo info = _queries[query];
       if (info != null) {
-        for (QueryListener listener in info.listeners) {
+        for (QueryListener listener in info._listeners) {
           await listener.onViewSnapshot(viewSnapshot);
         }
-        info.viewSnapshot = viewSnapshot;
+        info._viewSnapshot = viewSnapshot;
       }
     }
   }
 
   @override
   void onError(Query query, GrpcError error) {
-    final QueryListenersInfo info = queries[query];
+    final QueryListenersInfo info = _queries[query];
     if (info != null) {
-      for (QueryListener listener in info.listeners) {
-        listener.onError(Util.exceptionFromStatus(error));
+      for (QueryListener listener in info._listeners) {
+        listener.onError(exceptionFromStatus(error));
       }
     }
-    queries.remove(query);
+    _queries.remove(query);
   }
 
   void handleOnlineStateChange(OnlineState onlineState) {
-    this.onlineState = onlineState;
-    for (QueryListenersInfo info in queries.values) {
-      for (QueryListener listener in info.listeners) {
+    _onlineState = onlineState;
+    for (QueryListenersInfo info in _queries.values) {
+      for (QueryListener listener in info._listeners) {
         listener.onOnlineStateChanged(onlineState);
       }
     }
@@ -113,12 +114,12 @@ class EventManager implements SyncEngineCallback {
 }
 
 class QueryListenersInfo {
-  final List<QueryListener> listeners;
-  ViewSnapshot viewSnapshot;
+  final List<QueryListener> _listeners;
 
-  int targetId;
+  ViewSnapshot _viewSnapshot;
+  int _targetId;
 
-  QueryListenersInfo() : listeners = <QueryListener>[];
+  QueryListenersInfo() : _listeners = <QueryListener>[];
 }
 
 /// Holds (internal) options for listening

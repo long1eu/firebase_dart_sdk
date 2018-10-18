@@ -170,8 +170,8 @@ class RemoteStore implements TargetMetadataProvider {
     await enableNetwork();
   }
 
-  /// Shuts down the remote store, tearing down connections and otherwise cleaning up. This is not
-  /// reversible and renders the Remote Store unusable.
+  /// Shuts down the remote store, tearing down connections and otherwise
+  /// cleaning up. This is not reversible and renders the Remote Store unusable.
   Future<void> shutdown() async {
     Log.d(_tag, 'Shutting down');
     // For now, all shutdown logic is handled by disableNetworkInternal(). We
@@ -306,7 +306,7 @@ class RemoteStore implements TargetMetadataProvider {
         watchChange is WatchChangeWatchTargetChange ? watchChange : null;
 
     if (watchTargetChange != null &&
-        watchTargetChange.changeType == WatchTargetChangeType.Removed &&
+        watchTargetChange.changeType == WatchTargetChangeType.removed &&
         watchTargetChange.cause != null) {
       // There was an error on a target, don't wait for a consistent snapshot to
       // raise events
@@ -568,9 +568,11 @@ class RemoteStore implements TargetMetadataProvider {
     // signaling the write stream is no longer valid.
     if (Datastore.isPermanentWriteError(status) ||
         status.code == StatusCode.aborted) {
-      final String token = Util.toDebugString(_writeStream.lastStreamToken);
-      Log.d(_tag,
-          'RemoteStore error before completed handshake; resetting stream token $token: $status');
+      final String token = toDebugString(_writeStream.lastStreamToken);
+      Log.d(
+          _tag,
+          'RemoteStore error before completed handshake; resetting stream token'
+          ' $token: $status');
       _writeStream.lastStreamToken = WriteStream.emptyStreamToken;
       await _localStore.setLastStreamToken(WriteStream.emptyStreamToken);
     }

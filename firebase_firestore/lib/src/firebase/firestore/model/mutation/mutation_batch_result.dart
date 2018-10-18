@@ -37,8 +37,10 @@ class MutationBatchResult {
       SnapshotVersion commitVersion,
       List<MutationResult> mutationResults,
       Uint8List streamToken) {
-    Assert.hardAssert(batch.mutations.length == mutationResults.length,
-        'Mutations sent ${batch.mutations.length} must equal results received ${mutationResults.length}');
+    Assert.hardAssert(
+        batch.mutations.length == mutationResults.length,
+        'Mutations sent ${batch.mutations.length} must equal results received '
+        '${mutationResults.length}');
 
     ImmutableSortedMap<DocumentKey, SnapshotVersion> docVersions =
         DocumentCollections.emptyVersionMap();

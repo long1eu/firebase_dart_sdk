@@ -167,7 +167,8 @@ void main() {
     // Make a transaction that will fail
     final Future<void> transactionTask =
         firestore.runTransaction<void>((Transaction transaction) async {
-      // Get and update a document that doesn't exist so that the transaction fails
+      // Get and update a document that doesn't exist so that the transaction
+      // fails
       final DocumentSnapshot doc =
           await transaction.get(firestore.collection('nonexistent').document());
       transaction.updateFromList(doc.reference, <String>['foo', 'bar']);
@@ -467,17 +468,15 @@ void main() {
   });
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollection = IntegrationTestUtil.testCollection;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testDocumentWithData = IntegrationTestUtil.testDocumentWithData;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const toDataMap = IntegrationTestUtil.toDataMap;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testDocument = IntegrationTestUtil.testDocument;

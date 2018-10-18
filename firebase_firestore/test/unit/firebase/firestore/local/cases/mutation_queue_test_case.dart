@@ -107,16 +107,3 @@ class MutationQueueTestCase {
     expect(batch, count);
   }
 }
-
-// ignore: always_specify_types
-const setMutation = TestUtil.setMutation;
-// ignore: always_specify_types
-const patchMutation = TestUtil.patchMutation;
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const key = TestUtil.key;
-// ignore: always_specify_types
-const path = TestUtil.path;
-// ignore: always_specify_types
-const streamToken = TestUtil.resumeToken;

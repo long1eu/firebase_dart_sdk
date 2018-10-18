@@ -69,7 +69,7 @@ class SQLiteMutationQueue implements MutationQueue {
   Future<void> start() async {
     await _loadNextBatchIdAcrossAllUsers();
 
-    // On restart, [_nextBatchId] may end up lower than [lastAcknowledgedBatchId]
+    // On restart, _nextBatchId may end up lower than lastAcknowledgedBatchId
     // since it's computed from the queue contents, and there may be no
     // mutations in the queue. In this case, we need to reset
     // [lastAcknowledgedBatchId] (which is safe since the queue must be empty).
@@ -87,8 +87,11 @@ class SQLiteMutationQueue implements MutationQueue {
 
     if (result.isNotEmpty) {
       final Map<String, dynamic> row = result.first;
-      _lastAcknowledgedBatchId = row['last_acknowledged_batch_id'] as int;
-      _lastStreamToken = row['last_stream_token'] as Uint8List;
+      final int lastAcknowledgedBatchId = row['last_acknowledged_batch_id'];
+      final Uint8List lastStreamToken = row['last_stream_token'];
+
+      _lastAcknowledgedBatchId = lastAcknowledgedBatchId;
+      _lastStreamToken = lastStreamToken;
     }
 
     if (result.isEmpty) {
@@ -112,7 +115,8 @@ class SQLiteMutationQueue implements MutationQueue {
     //
     // naive: SELECT MAX(batch_id) FROM mutations
     // group: SELECT uid, MAX(batch_id) FROM mutations GROUP BY uid
-    // join:  SELECT q.uid, MAX(b.batch_id) FROM mutation_queues q, mutations b WHERE q.uid = b.uid
+    // join:  SELECT q.uid, MAX(b.batch_id) FROM mutation_queues q, mutations b
+    //        WHERE q.uid = b.uid
     //
     // Given 1E9 mutations divvied up among 10 queues, timings looked like this:
     //
@@ -538,8 +542,10 @@ class SQLiteMutationQueue implements MutationQueue {
         danglingMutationReferences.add(path);
       }
 
-      Assert.hardAssert(danglingMutationReferences.isEmpty,
-          'Document leak -- detected dangling mutation references when queue is empty. Dangling keys: $danglingMutationReferences');
+      Assert.hardAssert(
+          danglingMutationReferences.isEmpty,
+          'Document leak -- detected dangling mutation references when queue '
+          'is empty. Dangling keys: $danglingMutationReferences');
     }
   }
 

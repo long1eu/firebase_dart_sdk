@@ -34,14 +34,14 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// An enum for the direction of a sort.
-enum Direction { ASCENDING, DESCENDING }
+enum Direction { ascending, descending }
 
-/// A Query which you can read or listen to. You can also construct refined Query objects by adding
-/// filters and ordering.
+/// A [Query] which you can read or listen to. You can also construct refined
+/// [Query] objects by adding filters and ordering.
 ///
-/// * <b>Subclassing Note</b>: Firestore classes are not meant to be subclassed except for use in
-/// test mocks. Subclassing is not supported in production code and new SDK releases may break code
-/// that does so.
+/// * <b>Subclassing Note</b>: Firestore classes are not meant to be subclassed
+/// except for use in test mocks. Subclassing is not supported in production
+/// code and new SDK releases may break code that does so.
 @publicApi
 class Query {
   final core.Query query;
@@ -56,11 +56,12 @@ class Query {
       core.FieldPath orderBy, core.FieldPath inequality) {
     if (orderBy != inequality) {
       final String inequalityString = inequality.canonicalString;
-      throw ArgumentError(
-          'Invalid query. You have an inequality where filter (whereLessThan(), '
-          'whereGreaterThan(), etc.) on field \'$inequalityString\' and so you must also have \'$inequalityString\' as '
-          'your first orderBy() field, but your first orderBy() is currently on field '
-          '\'${orderBy.canonicalString}\' instead.');
+      throw ArgumentError('Invalid query. You have an inequality where filter '
+          '(whereLessThan(), whereGreaterThan(), etc.) on field '
+          '\'$inequalityString\' and so you must also have '
+          '\'$inequalityString\' as your first orderBy() field, but your first '
+          'orderBy() is currently on field \'${orderBy.canonicalString}\' '
+          'instead.');
     }
   }
 
@@ -73,8 +74,10 @@ class Query {
 
         if (existingInequality != null && existingInequality != newInequality) {
           throw ArgumentError(
-            'All where filters other than whereEqualTo() must be on the same field. '
-                'But you have filters on \'${existingInequality.canonicalString}\' and \'${newInequality.canonicalString}\'',
+            'All where filters other than whereEqualTo() must be on the same '
+                'field. But you have filters on '
+                '\'${existingInequality.canonicalString}\' and '
+                '\'${newInequality.canonicalString}\'',
           );
         }
         final core.FieldPath firstOrderByField = query.getFirstOrderByField();
@@ -85,7 +88,8 @@ class Query {
       } else if (relationFilter.operator == FilterOperator.arrayContains) {
         if (query.hasArrayContainsFilter()) {
           throw ArgumentError(
-              'Invalid Query. Queries only support having a single array-contains filter.');
+              'Invalid Query. Queries only support having a single '
+              'array-contains filter.');
         }
       }
     }
@@ -191,9 +195,9 @@ class Query {
     return _whereHelper(fieldPath, FilterOperator.graterThan, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents
-  /// must contain the specified field and the value should be greater than or
-  /// equal to the specified value.
+  /// Creates and returns a new [Query] with the additional filter that
+  /// documents must contain the specified field and the value should be greater
+  /// than or equal to the specified value.
   ///
   /// [field] The name of the field to compare
   /// [value] The value for comparison
@@ -204,9 +208,9 @@ class Query {
         FilterOperator.graterThanOrEqual, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents
-  /// must contain the specified field and the value should be greater than or
-  /// equal to the specified value.
+  /// Creates and returns a new [Query] with the additional filter that
+  /// documents must contain the specified field and the value should be greater
+  /// than or equal to the specified value.
   ///
   /// [fieldPath] The path of the field to compare
   /// [value] The value for comparison
@@ -260,18 +264,21 @@ class Query {
     if (internalPath.isKeyField) {
       if (op == FilterOperator.arrayContains) {
         throw ArgumentError(
-            'Invalid query. You can\'t perform array-contains queries on FieldPath.documentId() since document IDs are not arrays.');
+            'Invalid query. You can\'t perform array-contains queries on '
+            'FieldPath.documentId() since document IDs are not arrays.');
       }
       if (value is String) {
         final String documentKey = value;
         if (documentKey.contains('/')) {
           // TODO: Allow slashes once ancestor queries are supported
           throw ArgumentError(
-              'Invalid query. When querying with FieldPath.documentId() you must provide a valid '
-              'document ID, but \'$documentKey\' contains a \'/\' character.');
+              'Invalid query. When querying with FieldPath.documentId() you '
+              'must provide a valid document ID, but \'$documentKey\' '
+              'contains a \'/\' character.');
         } else if (documentKey.isEmpty) {
           throw ArgumentError(
-              'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.');
+              'Invalid query. When querying with FieldPath.documentId() you '
+              'must provide a valid document ID, but it was an empty string.');
         }
         final ResourcePath path = query.path.appendSegment(documentKey);
         Assert.hardAssert(
@@ -283,7 +290,9 @@ class Query {
         fieldValue = ReferenceValue.valueOf(firestore.databaseId, ref.key);
       } else {
         throw ArgumentError(
-            'Invalid query. When querying with FieldPath.documentId() you must provide a valid String or DocumentReference, but it was of type: ${Util.typeName(value)}');
+            'Invalid query. When querying with FieldPath.documentId() you '
+            'must provide a valid String or DocumentReference, but it was of '
+            'type: ${typeName(value)}');
       }
     } else {
       fieldValue = firestore.dataConverter.parseQueryValue(value);
@@ -307,7 +316,7 @@ class Query {
   /// [direction] the direction to sort.
   /// Returns the created Query.
   @publicApi
-  Query orderBy(String field, [Direction direction = Direction.ASCENDING]) {
+  Query orderBy(String field, [Direction direction = Direction.ascending]) {
     return orderByField(FieldPath.fromDotSeparatedPath(field), direction);
   }
 
@@ -319,7 +328,7 @@ class Query {
   /// Returns the created Query.
   @publicApi
   Query orderByField(FieldPath fieldPath,
-      [Direction direction = Direction.ASCENDING]) {
+      [Direction direction = Direction.ascending]) {
     Assert.checkNotNull(fieldPath, 'Provided field path must not be null.');
     return _orderBy(fieldPath.internalPath, direction);
   }
@@ -328,14 +337,16 @@ class Query {
     Assert.checkNotNull(direction, 'Provided direction must not be null.');
     if (query.getStartAt() != null) {
       throw AssertionError(
-          'Invalid query. You must not call Query.startAt() or Query.startAfter() before calling Query.orderBy().');
+          'Invalid query. You must not call Query.startAt() or '
+          'Query.startAfter() before calling Query.orderBy().');
     }
     if (query.getEndAt() != null) {
       throw ArgumentError(
-          'Invalid query. You must not call Query.endAt() or Query.endAfter() before calling Query.orderBy().');
+          'Invalid query. You must not call Query.endAt() or Query.endAfter() '
+          'before calling Query.orderBy().');
     }
     _validateOrderByField(fieldPath);
-    final OrderByDirection dir = direction == Direction.ASCENDING
+    final OrderByDirection dir = direction == Direction.ascending
         ? OrderByDirection.ascending
         : OrderByDirection.descending;
     return Query(query.orderBy(OrderBy.getInstance(dir, fieldPath)), firestore);
@@ -350,7 +361,8 @@ class Query {
   Query limit(int limit) {
     if (limit <= 0) {
       throw ArgumentError(
-          'Invalid Query. Query limit ($limit) is invalid. Limit must be positive.');
+          'Invalid Query. Query limit ($limit) is invalid. Limit must be '
+          'positive.');
     }
     return Query(query.limit(limit), firestore);
   }
@@ -480,7 +492,8 @@ class Query {
         snapshot, 'Provided snapshot must not be null.');
     if (!snapshot.exists) {
       throw ArgumentError(
-          'Can\'t use a DocumentSnapshot for a document that doesn\'t exist for $methodName().');
+          'Can\'t use a DocumentSnapshot for a document that doesn\'t exist '
+          'for $methodName().');
     }
     final Document document = snapshot.document;
     final List<FieldValue> components = <FieldValue>[];
@@ -501,13 +514,13 @@ class Query {
         if (value != null) {
           components.add(value);
         } else {
-          throw ArgumentError(
-              'Invalid query. You are trying to start or end a query using a document for which '
-              'the field \'${orderBy.field}\' (used as the orderBy) does not exist.');
+          throw ArgumentError('Invalid query. You are trying to start or end a '
+              'query using a document for which the field \'${orderBy.field}\' '
+              '(used as the orderBy) does not exist.');
         }
       }
     }
-    return Bound(components, before);
+    return Bound(position: components, before: before);
   }
 
   /// Converts a list of field values to Bound.
@@ -515,8 +528,9 @@ class Query {
     // Use explicit order by's because it has to match the query the user made
     final List<OrderBy> explicitOrderBy = query.explicitSortOrder;
     if (values.length > explicitOrderBy.length) {
-      throw ArgumentError(
-          'Too many arguments provided to $methodName(). The number of arguments must be less than or equal to the number of orderBy() clauses.');
+      throw ArgumentError('Too many arguments provided to $methodName(). The '
+          'number of arguments must be less than or equal to the number of '
+          'orderBy() clauses.');
     }
 
     final List<FieldValue> components = <FieldValue>[];
@@ -526,12 +540,13 @@ class Query {
       if (orderBy.field == core.FieldPath.keyPath) {
         if (rawValue is! String) {
           throw ArgumentError(
-              'Invalid query. Expected a string for document ID in $methodName(), but got $rawValue.');
+              'Invalid query. Expected a string for document ID in '
+              '$methodName(), but got $rawValue.');
         }
         final String documentId = rawValue;
         if (documentId.contains('/')) {
-          throw ArgumentError(
-              'Invalid query. Document ID \'$documentId\' contains a slash in $methodName().');
+          throw ArgumentError('Invalid query. Document ID \'$documentId\' '
+              'contains a slash in $methodName().');
         }
         final DocumentKey key =
             DocumentKey.fromPath(query.path.appendSegment(documentId));
@@ -543,7 +558,7 @@ class Query {
       }
     }
 
-    return Bound(components, before);
+    return Bound(position: components, before: before);
   }
 
   /// Executes the query and returns the results as a [QuerySnapshot].
@@ -556,8 +571,8 @@ class Query {
   /// [source] a value to configure the get behavior.
   /// Returns a Future that will be resolved with the results of the [Query].
   @publicApi
-  Future<QuerySnapshot> get([Source source = Source.DEFAULT]) async {
-    if (source == Source.CACHE) {
+  Future<QuerySnapshot> get([Source source = Source.defaultSource]) async {
+    if (source == Source.cache) {
       final ViewSnapshot viewSnap =
           await firestore.client.getDocumentsFromLocalCache(query);
 
@@ -568,13 +583,14 @@ class Query {
   }
 
   Future<QuerySnapshot> _getViaSnapshotListener(Source source) {
-    const ListenOptions options = const ListenOptions.all();
+    const ListenOptions options = ListenOptions.all();
 
     return _getSnapshotsInternal(options).map((QuerySnapshot snapshot) {
-      if (snapshot.metadata.isFromCache && source == Source.SERVER) {
+      if (snapshot.metadata.isFromCache && source == Source.server) {
         throw FirebaseFirestoreError(
             'Failed to get documents from server. (However, these documents '
-            'may exist in the local cache. Run again without setting source to SERVER to retrieve the cached documents.)',
+            'may exist in the local cache. Run again without setting source to '
+            'Source.server to retrieve the cached documents.)',
             FirebaseFirestoreErrorCode.unavailable);
       } else {
         return snapshot;

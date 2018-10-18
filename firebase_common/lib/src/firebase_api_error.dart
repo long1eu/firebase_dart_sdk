@@ -14,118 +14,104 @@ class FirebaseApiError {
 
   /// Firebase auth specific error codes.
 
-  /* bring your own auth error codes. */
+  /// bring your own auth error codes.
   @keepForSdk
   static const FirebaseApiError errorInvalidCustomToken =
-      const FirebaseApiError(17000);
+      FirebaseApiError(17000);
 
   @keepForSdk
   static const FirebaseApiError errorCustomTokenMismatch =
-      const FirebaseApiError(17002);
+      FirebaseApiError(17002);
 
-  /* sign in with credential error codes. */
+  /// sign in with credential error codes.
   @keepForSdk
   static const FirebaseApiError errorInvalidCredential =
-      const FirebaseApiError(17004);
+      FirebaseApiError(17004);
   @keepForSdk
-  static const FirebaseApiError errorUserDisabled =
-      const FirebaseApiError(17005);
+  static const FirebaseApiError errorUserDisabled = FirebaseApiError(17005);
 
-  /* set account info error codes. */
+  /// set account info error codes.
   @keepForSdk
   static const FirebaseApiError errorOperationNotAllowed =
-      const FirebaseApiError(17006);
+      FirebaseApiError(17006);
   @keepForSdk
   static const FirebaseApiError errorEmailAlreadyInUse =
-      const FirebaseApiError(17007);
+      FirebaseApiError(17007);
 
   /* sign in with password error codes*/
   @keepForSdk
-  static const FirebaseApiError errorInvalidEmail =
-      const FirebaseApiError(17008);
+  static const FirebaseApiError errorInvalidEmail = FirebaseApiError(17008);
   @keepForSdk
-  static const FirebaseApiError errorWrongPassword =
-      const FirebaseApiError(17009);
+  static const FirebaseApiError errorWrongPassword = FirebaseApiError(17009);
   @keepForSdk
-  static const FirebaseApiError errorTooManyRequests =
-      const FirebaseApiError(17010);
+  static const FirebaseApiError errorTooManyRequests = FirebaseApiError(17010);
 
-  /* send password request email error codes */
+  /// send password request email error codes
   @keepForSdk
-  static const FirebaseApiError errorUserNotFound =
-      const FirebaseApiError(17011);
+  static const FirebaseApiError errorUserNotFound = FirebaseApiError(17011);
 
-  /* sign in with credential error codes. */
+  /// sign in with credential error codes.
   @keepForSdk
   static const FirebaseApiError errorAccountExistsWithDifferentCredential =
-      const FirebaseApiError(17012);
+      FirebaseApiError(17012);
 
-  /* set account info error codes. */
+  /// set account info error codes.
   @keepForSdk
   static const FirebaseApiError errorRequiresRecentLogin =
-      const FirebaseApiError(17014);
+      FirebaseApiError(17014);
 
-  /* link credential error codes */
+  /// link credential error codes
   @keepForSdk
   static const FirebaseApiError errorProviderAlreadyLinked =
-      const FirebaseApiError(17015);
+      FirebaseApiError(17015);
 
-  /* unlink credential */
+  /// unlink credential
   @keepForSdk
-  static const FirebaseApiError errorNoSuchProvider =
-      const FirebaseApiError(17016);
+  static const FirebaseApiError errorNoSuchProvider = FirebaseApiError(17016);
 
-  /* STS codes, any request with STS id token */
+  /// STS codes, any request with STS id token
   @keepForSdk
-  static const FirebaseApiError errorInvalidUserToken =
-      const FirebaseApiError(17017);
+  static const FirebaseApiError errorInvalidUserToken = FirebaseApiError(17017);
 
-  /* network request failed */
+  /// network request failed
   @keepForSdk
   static const FirebaseApiError errorNetworkRequestFailed =
-      const FirebaseApiError(17020);
+      FirebaseApiError(17020);
 
-  /* STS code */
+  /// STS code
   @keepForSdk
-  static const FirebaseApiError errorUserTokenExpired =
-      const FirebaseApiError(17021);
+  static const FirebaseApiError errorUserTokenExpired = FirebaseApiError(17021);
 
   /// For GmsCore implementation on physical device, Droid Guard takes care of
   /// mapping api key. So for now, we are not handling this (2016 v3 release)
   @keepForSdk
-  static const FirebaseApiError errorInvalidApiKey =
-      const FirebaseApiError(17023);
+  static const FirebaseApiError errorInvalidApiKey = FirebaseApiError(17023);
 
-  /* re-auth error codes */
+  /// re-auth error codes
   @keepForSdk
-  static const FirebaseApiError errorUserMismatch =
-      const FirebaseApiError(17024);
+  static const FirebaseApiError errorUserMismatch = FirebaseApiError(17024);
 
-  /* setAccountInfo(...) error codes. */
+  /// setAccountInfo(...) error codes.
   @keepForSdk
   static const FirebaseApiError errorCredentialAlreadyInUse =
-      const FirebaseApiError(17025);
+      FirebaseApiError(17025);
 
-  /* weak passwords */
+  /// weak passwords
   @keepForSdk
-  static const FirebaseApiError errorWeakPassword =
-      const FirebaseApiError(17026);
+  static const FirebaseApiError errorWeakPassword = FirebaseApiError(17026);
 
   /// For GmsCore implementation on physical device, Droid Guard takes care of
   /// mapping api key. So for now, we are not handling this (2016 v3 release)
   @keepForSdk
-  static const FirebaseApiError errorAppNotAuthorized =
-      const FirebaseApiError(17028);
+  static const FirebaseApiError errorAppNotAuthorized = FirebaseApiError(17028);
 
   /// Internal api usage error codes (no signed-in user, and getAccessToken is
   /// called). This will map to ApiNotAvailableException and please
   /// DO NOT REUSE.
   @keepForSdk
-  static const FirebaseApiError errorNoSignedInUser =
-      const FirebaseApiError(17495);
+  static const FirebaseApiError errorNoSignedInUser = FirebaseApiError(17495);
 
-  /* General backend error. */
+  /// General backend error.
   @keepForSdk
-  static const FirebaseApiError errorInternalError =
-      const FirebaseApiError(17499);
+  static const FirebaseApiError errorInternalError = FirebaseApiError(17499);
 }

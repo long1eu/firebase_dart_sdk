@@ -4,8 +4,10 @@
 
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/src/annotations.dart';
 import 'package:firebase_common/src/auth/get_token_result.dart';
+import 'package:firebase_common/src/firebase_app.dart';
 
 /// (Deprecated, use [InternalAuthProvider] from firebase-auth)
 ///

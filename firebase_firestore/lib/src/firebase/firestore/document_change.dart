@@ -52,7 +52,8 @@ class DocumentChange {
   /// this [DocumentChange] (i.e. supposing that all prior [DocumentChange]
   /// objects have been applied). Returns -1 for 'added' events.
   ///
-  /// Returns the index in the old snapshot, after processing all previous changes.
+  /// Returns the index in the old snapshot, after processing all previous
+  /// changes.
   final int oldIndex;
 
   /// The index of the changed document in the result set immediately after this

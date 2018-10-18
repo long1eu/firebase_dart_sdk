@@ -196,22 +196,3 @@ void main() {
 }
 
 class FirebaseFirestoreMock extends Mock implements FirebaseFirestore {}
-
-// ignore: always_specify_types
-const ackTarget = TestUtil.ackTarget;
-// ignore: always_specify_types
-const targetChange = TestUtil.targetChange;
-// ignore: always_specify_types
-const docUpdates = TestUtil.docUpdates;
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const deletedDoc = TestUtil.deletedDoc;
-// ignore: always_specify_types
-const path = TestUtil.path;
-// ignore: always_specify_types
-const orderBy = TestUtil.orderBy;
-// ignore: always_specify_types
-const key = TestUtil.key;
-// ignore: always_specify_types
-const doc = TestUtil.doc;

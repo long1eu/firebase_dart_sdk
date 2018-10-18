@@ -148,6 +148,3 @@ void main() {
     expect(path.popLast().popFirst().toString(), 'bar');
   });
 }
-
-// ignore: always_specify_types
-const field = TestUtil.field;

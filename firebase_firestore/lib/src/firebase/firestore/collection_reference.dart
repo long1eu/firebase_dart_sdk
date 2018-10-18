@@ -25,8 +25,11 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 @publicApi
 class CollectionReference extends Query {
   CollectionReference(ResourcePath path, FirebaseFirestore firestore)
-      : assert(path.length.remainder(2) == 1,
-            'Invalid collection reference. Collection references must have an odd number of segments, but ${path.canonicalString} has ${path.length}'),
+      : assert(
+            path.length.remainder(2) == 1,
+            'Invalid collection reference. Collection references must have an '
+            'odd number of segments, but ${path.canonicalString} has '
+            '${path.length}'),
         super(core.Query.atPath(path), firestore);
 
   /// Return The id of the collection.
@@ -63,7 +66,7 @@ class CollectionReference extends Query {
   /// Returns the [DocumentReference] instance.
   @publicApi
   DocumentReference document([String documentPath]) {
-    documentPath ??= Util.autoId();
+    documentPath ??= autoId();
     Assert.checkNotNull(
         documentPath, 'Provided document path must not be null.');
     return DocumentReference.forPath(

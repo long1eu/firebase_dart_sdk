@@ -364,8 +364,11 @@ class LocalStore {
             doc.version.compareTo(existingDoc.version) >= 0) {
           await _remoteDocuments.add(doc);
         } else {
-          Log.d('LocalStore',
-              'Ignoring outdated watch update for $key. Current version: ${existingDoc.version}  Watch version: ${doc.version}');
+          Log.d(
+              'LocalStore',
+              'Ignoring outdated watch update for $key. '
+              'Current version: ${existingDoc.version}  '
+              'Watch version: ${doc.version}');
         }
 
         if (limboDocuments.contains(key)) {
@@ -381,8 +384,10 @@ class LocalStore {
           _queryCache.lastRemoteSnapshotVersion;
       final SnapshotVersion remoteVersion = remoteEvent.snapshotVersion;
       if (remoteVersion != SnapshotVersion.none) {
-        Assert.hardAssert(remoteVersion.compareTo(lastRemoteVersion) >= 0,
-            'Watch stream reverted to previous snapshot?? ($remoteVersion < $lastRemoteVersion)');
+        Assert.hardAssert(
+            remoteVersion.compareTo(lastRemoteVersion) >= 0,
+            'Watch stream reverted to previous snapshot?? '
+            '($remoteVersion < $lastRemoteVersion)');
         await _queryCache.setLastRemoteSnapshotVersion(remoteVersion);
       }
 
@@ -402,10 +407,14 @@ class LocalStore {
   static bool _shouldPersistQueryData(
       QueryData oldQueryData, QueryData newQueryData, TargetChange change) {
     // Avoid clearing any existing value
-    if (newQueryData.resumeToken.isEmpty) return false;
+    if (newQueryData.resumeToken.isEmpty) {
+      return false;
+    }
 
     // Any resume token is interesting if there isn't one already.
-    if (oldQueryData.resumeToken.isEmpty) return true;
+    if (oldQueryData.resumeToken.isEmpty) {
+      return true;
+    }
 
     // Don't allow resume token changes to be buffered indefinitely. This allows
     // us to be reasonably up-to-date after a crash and avoids needing to loop
@@ -414,7 +423,9 @@ class LocalStore {
     final int newSeconds = newQueryData.snapshotVersion.timestamp.seconds;
     final int oldSeconds = oldQueryData.snapshotVersion.timestamp.seconds;
     final int timeDelta = newSeconds - oldSeconds;
-    if (timeDelta >= _resultTokenMaxAgeSeconds) return true;
+    if (timeDelta >= _resultTokenMaxAgeSeconds) {
+      return true;
+    }
 
     // Otherwise if the only thing that has changed about a target is its resume
     // token it's not worth persisting. Note that the [RemoteStore] keeps an
@@ -552,10 +563,12 @@ class LocalStore {
       if (doc == null || doc.version.compareTo(ackVersion) < 0) {
         doc = batch.applyToRemoteDocument(docKey, doc, batchResult);
         if (doc == null) {
-          Assert.hardAssert(remoteDoc == null,
-              'Mutation batch $batch applied to document $remoteDoc resulted in null.');
+          Assert.hardAssert(
+              remoteDoc == null,
+              'Mutation batch $batch applied to document $remoteDoc resulted '
+              'in null.');
         } else {
-          _remoteDocuments.add(doc);
+          await _remoteDocuments.add(doc);
         }
       }
     }

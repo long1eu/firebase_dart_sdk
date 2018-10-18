@@ -194,9 +194,9 @@ class Query {
       final FieldPath inequalityField = this.inequalityField();
       final FieldPath firstOrderByField = getFirstOrderByField();
       if (inequalityField != null && firstOrderByField == null) {
-        // In order to implicitly add key ordering, we must also add the inequality filter field for
-        // it to be a valid query. Note that the default inequality field and key ordering is
-        // ascending.
+        // In order to implicitly add key ordering, we must also add the
+        // inequality filter field for it to be a valid query. Note that the
+        // default inequality field and key ordering is ascending.
         if (inequalityField.isKeyField) {
           memoizedOrderBy = <OrderBy>[keyOrderingAsc];
         } else {
@@ -215,8 +215,8 @@ class Query {
           }
         }
         if (!foundKeyOrdering) {
-          // The direction of the implicit key ordering always matches the direction of the last
-          // explicit sort order
+          // The direction of the implicit key ordering always matches the
+          // direction of the last explicit sort order
           final OrderByDirection lastDirection = explicitSortOrder.isNotEmpty
               ? explicitSortOrder[explicitSortOrder.length - 1].direction
               : OrderByDirection.ascending;

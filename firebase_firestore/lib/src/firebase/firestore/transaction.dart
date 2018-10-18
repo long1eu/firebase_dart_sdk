@@ -73,7 +73,7 @@ class Transaction {
   @publicApi
   Transaction updateFromList(DocumentReference documentRef, List<Object> data) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
-        .parseUpdateDataFromList(Util.collectUpdateArguments(1, data));
+        .parseUpdateDataFromList(collectUpdateArguments(1, data));
     return _update(documentRef, parsedData);
   }
 
@@ -140,7 +140,8 @@ class Transaction {
       );
     } else {
       throw Assert.fail(
-          'BatchGetDocumentsRequest returned unexpected document type: ${doc.runtimeType}');
+          'BatchGetDocumentsRequest returned unexpected document type: '
+          '${doc.runtimeType}');
     }
   }
 }

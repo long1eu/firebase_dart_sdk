@@ -11,7 +11,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// the backend accepts with the special case of an explicit 'empty'
 /// precondition (meaning no precondition).
 class Precondition {
-  static const Precondition none = const Precondition._();
+  static const Precondition none = Precondition._();
 
   /// If set, preconditions a mutation based on the last updateTime.
   final SnapshotVersion updateTime;
@@ -19,23 +19,15 @@ class Precondition {
   /// If set, preconditions a mutation based on whether the document exists.
   final bool exists;
 
-  Precondition(this.updateTime, this.exists)
-      : assert(updateTime == null || exists == null,
-            'Precondition can specify \'exists\' or \'updateTime\' but not both');
+  Precondition({this.updateTime, this.exists})
+      : assert(
+            updateTime == null || exists == null,
+            'Precondition can specify '
+            '\'exists\' or \'updateTime\' but not both');
 
   const Precondition._()
       : updateTime = null,
         exists = null;
-
-  /// Creates a new Precondition with an exists flag.
-  factory Precondition.fromExists(bool exists) {
-    return Precondition(null, exists);
-  }
-
-  /// Creates a new Precondition based on a version a document exists at.
-  factory Precondition.fromUpdateTime(SnapshotVersion updateTime) {
-    return Precondition(updateTime, null);
-  }
 
   /// Returns whether this Precondition is empty.
   bool get isNone => updateTime == null && exists == null;

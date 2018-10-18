@@ -61,30 +61,32 @@ class LruGarbageCollectorTestCase {
     persistence.referenceDelegate.inMemoryPins = ReferenceSet();
     queryCache = persistence.queryCache;
     documentCache = persistence.remoteDocumentCache;
-    const User user = const User('user');
+    const User user = User('user');
     mutationQueue = persistence.getMutationQueue(user);
     await mutationQueue.start();
 
     initialSequenceNumber = queryCache.highestListenSequenceNumber;
-    garbageCollector =
-        (persistence.referenceDelegate as LruDelegate).garbageCollector;
+    // ignore: avoid_as
+    final LruDelegate delegate = persistence.referenceDelegate as LruDelegate;
+    garbageCollector = delegate.garbageCollector;
   }
 
   QueryData nextQueryData() {
     final int targetId = ++previousTargetId;
     final int sequenceNumber =
         persistence.referenceDelegate.currentSequenceNumber;
-    final Query query = TestUtil.query('path$targetId');
-    return QueryData.init(query, targetId, sequenceNumber, QueryPurpose.listen);
+    final Query _query = query('path$targetId');
+    return QueryData.init(
+        _query, targetId, sequenceNumber, QueryPurpose.listen);
   }
 
   Future<void> updateTargetInTransaction(QueryData queryData) async {
-    final SnapshotVersion version = TestUtil.version(2);
-    final Uint8List resumeToken = TestUtil.resumeToken(2);
+    final SnapshotVersion _version = version(2);
+    final Uint8List _resumeToken = resumeToken(2);
     final QueryData updated = queryData.copyWith(
       sequenceNumber: persistence.referenceDelegate.currentSequenceNumber,
-      snapshotVersion: version,
-      resumeToken: resumeToken,
+      snapshotVersion: _version,
+      resumeToken: _resumeToken,
     );
     await queryCache.updateQueryData(updated);
   }
@@ -157,10 +159,3 @@ class LruGarbageCollectorTestCase {
     return SetMutation(key, testValue, Precondition.none);
   }
 }
-
-// ignore: always_specify_types
-const keySet = TestUtil.keySet;
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const wrapMap = TestUtil.wrapMap;

@@ -24,7 +24,7 @@ class NaNFilter extends Filter {
   }
 
   @override
-  String get canonicalId => fieldPath.canonicalString + ' IS NaN';
+  String get canonicalId => '${fieldPath.canonicalString} IS NaN';
 
   @override
   String toString() => canonicalId;

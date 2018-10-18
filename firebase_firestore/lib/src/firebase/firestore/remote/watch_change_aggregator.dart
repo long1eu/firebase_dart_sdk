@@ -69,12 +69,12 @@ class WatchChangeAggregator {
       final TargetState targetState = _ensureTargetState(targetId);
 
       switch (targetChange.changeType) {
-        case WatchTargetChangeType.NoChange:
+        case WatchTargetChangeType.noChange:
           if (_isActiveTarget(targetId)) {
             targetState.updateResumeToken(targetChange.resumeToken);
           }
           break;
-        case WatchTargetChangeType.Added:
+        case WatchTargetChangeType.added:
           // We need to decrement the number of pending acks needed from watch
           // for this [targetId].
           targetState.recordTargetResponse();
@@ -86,7 +86,7 @@ class WatchChangeAggregator {
           }
           targetState.updateResumeToken(targetChange.resumeToken);
           break;
-        case WatchTargetChangeType.Removed:
+        case WatchTargetChangeType.removed:
           // We need to keep track of removed targets to we can post-filter and
           // remove any target changes.
           // We need to decrement the number of pending acks needed from watch
@@ -98,13 +98,13 @@ class WatchChangeAggregator {
           Assert.hardAssert(targetChange.cause == null,
               'WatchChangeAggregator does not handle errored targets');
           break;
-        case WatchTargetChangeType.Current:
+        case WatchTargetChangeType.current:
           if (_isActiveTarget(targetId)) {
             targetState.markCurrent();
             targetState.updateResumeToken(targetChange.resumeToken);
           }
           break;
-        case WatchTargetChangeType.Reset:
+        case WatchTargetChangeType.reset:
           if (_isActiveTarget(targetId)) {
             // Reset the target and synthesizes removes for all existing
             // documents. The backend will re-add any documents that still match

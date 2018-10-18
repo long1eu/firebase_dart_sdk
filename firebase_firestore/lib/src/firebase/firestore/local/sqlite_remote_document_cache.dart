@@ -74,7 +74,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         // @formatter:on
         <String>[path]);
 
-    if (result.isEmpty) return null;
+    if (result.isEmpty) {
+      return null;
+    }
     final Map<String, dynamic> row = result.first;
     final Uint8List contents = row['contents'];
     return decodeMaybeDocument(contents);
@@ -112,17 +114,24 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       // a query on 'rooms' will return rooms/abc/messages/xyx but we shouldn't
       // match it. Fix this by discarding rows with document keys more than one
       // segment longer than the query path.
-      final ResourcePath path =
-          EncodedPath.decodeResourcePath(row['path'] as String);
-      if (path.length != immediateChildrenPathLength) continue;
+
+      final String _path = row['path'];
+      final ResourcePath path = EncodedPath.decodeResourcePath(_path);
+      if (path.length != immediateChildrenPathLength) {
+        continue;
+      }
 
       final Uint8List contents = row['contents'];
       final MaybeDocument maybeDoc = decodeMaybeDocument(contents);
 
-      if (maybeDoc is! Document) continue;
+      if (maybeDoc is! Document) {
+        continue;
+      }
 
       final Document doc = maybeDoc;
-      if (!query.matches(doc)) continue;
+      if (!query.matches(doc)) {
+        continue;
+      }
 
       results[doc.key] = doc;
     }

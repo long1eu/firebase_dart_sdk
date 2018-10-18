@@ -13,7 +13,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/exponential_backo
 import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/incoming_stream_observer.dart';
 import 'package:grpc/grpc.dart';
-import 'package:http2/transport.dart';
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
 
@@ -27,8 +26,8 @@ abstract class AbstractStream<
     ReqT extends GeneratedMessage,
     RespT extends GeneratedMessage,
     CallbackT extends StreamCallback> implements Stream<CallbackT> {
-  /// Initial backoff time in milliseconds after an error. Set to 1s according to
-  /// https://cloud.google.com/apis/design/errors.
+  /// Initial backoff time in milliseconds after an error. Set to 1s according
+  /// to https://cloud.google.com/apis/design/errors.
 
   static final int _backoffInitialDelayMs = Duration(seconds: 1).inMilliseconds;
   static final int _backoffMaxDelayMs = Duration(minutes: 1).inMilliseconds;
@@ -48,7 +47,7 @@ abstract class AbstractStream<
 
   final TimerId _idleTimerId;
 
-  StreamState _state = StreamState.Initial;
+  StreamState _state = StreamState.initial;
 
   /// A close count that's incremented every time the stream is closed; used by
   /// [CloseGuardedRunner] to invalidate callbacks that happen after close.
@@ -75,14 +74,14 @@ abstract class AbstractStream<
 
   @override
   bool get isStarted {
-    return _state == StreamState.Starting ||
-        _state == StreamState.Open ||
-        _state == StreamState.Backoff;
+    return _state == StreamState.starting ||
+        _state == StreamState.open ||
+        _state == StreamState.backoff;
   }
 
   @override
   bool get isOpen {
-    return _state == StreamState.Open;
+    return _state == StreamState.open;
   }
 
   @override
@@ -90,27 +89,25 @@ abstract class AbstractStream<
     Assert.hardAssert(_call == null, 'Last call still set');
     Assert.hardAssert(_idleTimer == null, 'Idle timer still set');
 
-    if (_state == StreamState.Error) {
+    if (_state == StreamState.error) {
       _performBackoff();
       return;
     }
 
-    Assert.hardAssert(_state == StreamState.Initial, 'Already started');
+    Assert.hardAssert(_state == StreamState.initial, 'Already started');
 
     final CloseGuardedRunner closeGuardedRunner =
-    CloseGuardedRunner(_workerQueue, _closeCount, () => _closeCount);
+        CloseGuardedRunner(_workerQueue, _closeCount, () => _closeCount);
     final StreamObserver<ReqT, RespT, CallbackT> streamObserver =
         StreamObserver<ReqT, RespT, CallbackT>(closeGuardedRunner, this);
-
-    ClientTransportConnection;
 
     _call = _firestoreChannel.runBidiStreamingRpc(
         _methodDescriptor, streamObserver);
 
     // Note that Starting is only used as intermediate state until onOpen is
     // called asynchronously, since auth handled transparently by gRPC
-    _state = StreamState.Starting;
-    _state = StreamState.Open;
+    _state = StreamState.starting;
+    _state = StreamState.open;
 
     await listener.onOpen();
   }
@@ -128,7 +125,7 @@ abstract class AbstractStream<
   Future<void> _close(StreamState finalState, GrpcError status) async {
     Assert.hardAssert(isStarted, 'Only started streams should be closed.');
     Assert.hardAssert(
-        finalState == StreamState.Error || status.code == StatusCode.ok,
+        finalState == StreamState.error || status.code == StatusCode.ok,
         'Can\'t provide an error when not in an error state.');
 
     // Cancel any outstanding timers (they're guaranteed not to execute).
@@ -145,8 +142,10 @@ abstract class AbstractStream<
       // connection attempt.
       backoff.reset();
     } else if (code == StatusCode.resourceExhausted) {
-      Log.d(runtimeType.toString(),
-          '($hashCode) Using maximum backoff delay to prevent overloading the backend.');
+      Log.d(
+          runtimeType.toString(),
+          '($hashCode) Using maximum backoff delay to prevent overloading the '
+          'backend.');
       backoff.resetToMax();
     } else if (code == StatusCode.unauthenticated) {
       // 'unauthenticated' error means the token was rejected. Try force
@@ -154,7 +153,7 @@ abstract class AbstractStream<
       _firestoreChannel.invalidateToken();
     }
 
-    if (finalState != StreamState.Error) {
+    if (finalState != StreamState.error) {
       Log.d(runtimeType.toString(), '($hashCode) Performing stream teardown');
       tearDown();
     }
@@ -164,7 +163,7 @@ abstract class AbstractStream<
       // error, don't attempt to call half-close to avoid secondary failures.
       if (status.code == StatusCode.ok) {
         Log.d(runtimeType.toString(), '($hashCode) Closing stream client-side');
-        await _call.cancel();
+        _call.cancel();
       }
       _call = null;
     }
@@ -185,7 +184,7 @@ abstract class AbstractStream<
   @override
   Future<void> stop() async {
     if (isStarted) {
-      await _close(StreamState.Initial, GrpcError.ok());
+      await _close(StreamState.initial, GrpcError.ok());
     }
   }
 
@@ -194,7 +193,7 @@ abstract class AbstractStream<
     Assert.hardAssert(
         !isStarted, 'Can only inhibit backoff after in a stopped state');
 
-    _state = StreamState.Initial;
+    _state = StreamState.initial;
     backoff.reset();
   }
 
@@ -211,7 +210,7 @@ abstract class AbstractStream<
       // When timing out an idle stream there's no reason to force the stream
       // into backoff when it restarts so set the stream state to Initial
       // instead of Error.
-      await _close(StreamState.Initial, GrpcError.ok());
+      await _close(StreamState.initial, GrpcError.ok());
     }
   }
 
@@ -226,21 +225,21 @@ abstract class AbstractStream<
     // we never expect this to happen because if we stop a stream ourselves,
     // this callback will never be called. To prevent cases where we retry
     // without a backoff accidentally, we set the stream to error in all cases.
-    await _close(StreamState.Error, status);
+    await _close(StreamState.error, status);
   }
 
   Future<void> onNext(RespT change);
 
   void _performBackoff() {
-    Assert.hardAssert(_state == StreamState.Error,
+    Assert.hardAssert(_state == StreamState.error,
         'Should only perform backoff in an error state');
-    _state = StreamState.Backoff;
+    _state = StreamState.backoff;
 
     backoff.backoffAndRun(() async {
-      Assert.hardAssert(_state == StreamState.Backoff,
+      Assert.hardAssert(_state == StreamState.backoff,
           'State should still be backoff but was $_state');
       // Momentarily set state to Initial as start() expects it.
-      _state = StreamState.Initial;
+      _state = StreamState.initial;
       await start();
       Assert.hardAssert(isStarted, 'Stream should have started');
     });
@@ -252,7 +251,7 @@ abstract class AbstractStream<
   /// then be in a [!isStarted] state, requiring the caller to start the stream
   /// again before further use.
   ///
-  /// * Only streams that are in state [StreamState.Open] can be marked idle, as
+  /// * Only streams that are in state [StreamState.open] can be marked idle, as
   /// all other states imply pending network operations.
   void markIdle() {
     // Starts the idle timer if we are in state [StreamState.Open] and are not
@@ -281,17 +280,19 @@ abstract class AbstractStream<
 /// closed / re-opened, etc.
 ///
 /// * PORTING NOTE: Because all the stream callbacks already happen on the
-/// [_workerQueue], we don't need to dispatch onto the queue, and so we instead
+/// [asyncQueue], we don't need to dispatch onto the queue, and so we instead
 /// only expose a run() method which asserts that we're already on the
-/// [_workerQueue].
+/// [asyncQueue].
 class CloseGuardedRunner {
   final AsyncQueue asyncQueue;
   final int initialCloseCount;
   final int Function() closeCount;
 
-  CloseGuardedRunner(this.asyncQueue,
-                     this.initialCloseCount,
-                     this.closeCount,);
+  CloseGuardedRunner(
+    this.asyncQueue,
+    this.initialCloseCount,
+    this.closeCount,
+  );
 
   Future<void> run(Task<void> task, String caller) async {
     if (closeCount() == initialCloseCount) {
@@ -314,7 +315,7 @@ class StreamObserver<
   const StreamObserver(this._dispatcher, this.stream);
 
   @override
-  void onHeaders(Map<String, String> headers) async {
+  void onHeaders(Map<String, String> headers) {
     _dispatcher.run(() async {
       if (Log.isDebugEnabled) {
         final Map<String, String> whitelistedHeaders = <String, String>{};
@@ -341,7 +342,7 @@ class StreamObserver<
   }
 
   @override
-  void onReady() async {
+  void onReady() {
     _dispatcher.run(
         () async => Log.d('AbstractStream', '($hashCode) Stream is ready'),
         'onReady');

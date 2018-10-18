@@ -9,9 +9,9 @@ import 'test_util.dart';
 
 void main() {
   test('testEquals', () {
-    final DocumentReference foo = TestUtil.documentReference('rooms/foo');
-    final DocumentReference fooDup = TestUtil.documentReference('rooms/foo');
-    final DocumentReference bar = TestUtil.documentReference('rooms/bar');
+    final DocumentReference foo = documentReference('rooms/foo');
+    final DocumentReference fooDup = documentReference('rooms/foo');
+    final DocumentReference bar = documentReference('rooms/bar');
     expect(fooDup, foo);
     expect(foo == bar, isFalse);
 

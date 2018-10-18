@@ -17,6 +17,7 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.da
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
+import '../../../../util/test_util.dart';
 import 'cases/mutation_queue_test_case.dart';
 import 'persistence_test_helpers.dart';
 
@@ -26,9 +27,8 @@ void main() {
 
   setUp(() async {
     print('setUp');
-    final SQLitePersistence persistence =
-        await PersistenceTestHelpers.openSQLitePersistence(
-            'firebase/firestore/local/sqlite_mutation_queue_${PersistenceTestHelpers.nextSQLiteDatabaseName()}.db');
+    final SQLitePersistence persistence = await openSQLitePersistence(
+        'firebase/firestore/local/sqlite_mutation_queue_${nextSQLiteDatabaseName()}.db');
 
     testCase = MutationQueueTestCase(persistence);
     await testCase.setUp();
@@ -369,8 +369,8 @@ void main() {
   });
 
   test('testStreamToken', () async {
-    final Uint8List streamToken1 = streamToken('token1');
-    final Uint8List streamToken2 = streamToken('token2');
+    final Uint8List streamToken1 = resumeToken('token1');
+    final Uint8List streamToken2 = resumeToken('token2');
 
     await testCase.persistence.runTransaction('initial stream token',
         () => mutationQueue.setLastStreamToken(streamToken1));

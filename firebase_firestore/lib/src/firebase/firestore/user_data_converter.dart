@@ -58,7 +58,8 @@ class UserDataConverter {
       for (FieldPath field in fieldMask.mask) {
         if (!accumulator.contains(field)) {
           throw ArgumentError(
-              'Field \'$field\' is specified in your field mask but not in your input data.');
+              'Field \'$field\' is specified in your field mask but not in your'
+              ' input data.');
         }
       }
 
@@ -102,7 +103,7 @@ class UserDataConverter {
   UserDataParsedUpdateData parseUpdateDataFromList(
       List<Object> fieldsAndValues) {
     // fieldsAndValues.length and alternating types should already be validated
-    // by Util.collectUpdateArguments().
+    // by collectUpdateArguments().
     final int length = fieldsAndValues.length;
     Assert.hardAssert(length.remainder(2) == 0,
         'Expected fieldAndValues to contain an even number of elements');
@@ -116,8 +117,10 @@ class UserDataConverter {
       final Object fieldPath = fieldsAndValues[i];
       final Object fieldValue = fieldsAndValues[i + 1];
 
-      Assert.hardAssert(fieldPath is String || fieldPath is firestore.FieldPath,
-          'Expected argument to be String or FieldPath, but it was ${fieldPath.runtimeType}.');
+      Assert.hardAssert(
+          fieldPath is String || fieldPath is firestore.FieldPath,
+          'Expected argument to be String or FieldPath, but it was '
+          '${fieldPath.runtimeType}.');
 
       FieldPath parsedField;
 
@@ -254,15 +257,17 @@ class UserDataConverter {
         // fieldMask so it gets deleted.
         context.addToFieldMask(context.path);
       } else if (context.dataSource == UserDataSource.update) {
-        Assert.hardAssert(context.path.isNotEmpty,
-            'FieldValue.delete() at the top level should have already been handled.');
-        throw context.createError(
-            'FieldValue.delete() can only appear at the top level of your update data');
+        Assert.hardAssert(
+            context.path.isNotEmpty,
+            'FieldValue.delete() at the '
+            'top level should have already been handled.');
+        throw context.createError('FieldValue.delete() can only appear at the '
+            'top level of your update data');
       } else {
         // We shouldn't encounter delete sentinels for queries or non-merge
         // [set()] calls.
-        throw context.createError(
-            'FieldValue.delete() can only be used with update() and set() with SetOptions.merge()');
+        throw context.createError('FieldValue.delete() can only be used with '
+            'update() and set() with SetOptions.merge()');
       }
     } else if (value.isServerTimestamp) {
       context.addToFieldTransforms(context.path, ServerTimestampOperation());

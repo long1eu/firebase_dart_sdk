@@ -106,6 +106,3 @@ void main() {
     expect(events, <OnlineState>[OnlineState.unknown, OnlineState.online]);
   });
 }
-
-// ignore: always_specify_types
-const path = TestUtil.path;

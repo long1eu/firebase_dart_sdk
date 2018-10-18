@@ -30,10 +30,10 @@ class QueryCacheTestCase {
 
   /// Creates a new [QueryData] object from the the given parameters,
   /// synthesizing a resume token from the snapshot version.
-  QueryData newQueryData(Query query, int targetId, int version) {
+  QueryData newQueryData(Query query, int targetId, int theVersion) {
     final int sequenceNumber = ++previousSequenceNumber;
     return QueryData(query, targetId, sequenceNumber, QueryPurpose.listen,
-        TestUtil.version(version), resumeToken(version));
+        version(theVersion), resumeToken(theVersion));
   }
 
   /// Adds the given query data to the [queryCache] under test, committing
@@ -74,8 +74,3 @@ class QueryCacheTestCase {
             await queryCache.getMatchingKeysForTargetId(targetId), targetId));
   }
 }
-
-// ignore: always_specify_types
-const version = TestUtil.version;
-// ignore: always_specify_types
-const resumeToken = TestUtil.resumeToken;

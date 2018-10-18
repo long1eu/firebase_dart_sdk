@@ -2,28 +2,33 @@
 // Lung Razvan <long1eu>
 // on 16/09/2018
 
+// ignore: avoid_classes_with_only_static_members
 class Log {
-  static bool get isDebugEnabled => _level >= LogLevel.d;
-  static LogLevel _level = LogLevel.d;
+  static bool get isDebugEnabled => level >= LogLevel.d;
+  static LogLevel level = LogLevel.d;
 
   static void i(String tag, dynamic message) {
-    if (_level >= LogLevel.i) print('${_formatTag('I:$tag')}||$message');
+    if (level >= LogLevel.i) {
+      print('${_formatTag('I:$tag')}||$message');
+    }
   }
 
   static void d(String tag, dynamic message) {
-    if (_level >= LogLevel.d) print('${_formatTag('D:$tag')}||$message');
+    if (level >= LogLevel.d) {
+      print('${_formatTag('D:$tag')}||$message');
+    }
   }
 
   static void w(String tag, dynamic message) {
-    if (_level >= LogLevel.w) print('${_formatTag('W:$tag')}||$message');
+    if (level >= LogLevel.w) {
+      print('${_formatTag('W:$tag')}||$message');
+    }
   }
 
   static void e(String tag, dynamic message) {
-    if (_level >= LogLevel.e) print('${_formatTag('E:$tag')}||$message');
-  }
-
-  static void setLogLevel(LogLevel level) {
-    _level = level;
+    if (level >= LogLevel.e) {
+      print('${_formatTag('E:$tag')}||$message');
+    }
   }
 
   static String _formatTag(String tag) => tag.padRight(30, ' ');
@@ -34,10 +39,10 @@ class LogLevel implements Comparable<LogLevel> {
 
   const LogLevel(this._i);
 
-  static const LogLevel i = const LogLevel(0);
-  static const LogLevel d = const LogLevel(1);
-  static const LogLevel w = const LogLevel(2);
-  static const LogLevel e = const LogLevel(3);
+  static const LogLevel i = LogLevel(0);
+  static const LogLevel d = LogLevel(1);
+  static const LogLevel w = LogLevel(2);
+  static const LogLevel e = LogLevel(3);
 
   @override
   int compareTo(LogLevel other) => _i.compareTo(other._i);

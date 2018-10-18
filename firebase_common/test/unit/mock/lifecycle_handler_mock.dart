@@ -7,7 +7,7 @@ import 'package:firebase_common/src/flutter/lifecycle_handler.dart';
 class LifecycleHandlerMock implements LifecycleHandler {
   const LifecycleHandlerMock();
 
-  static const LifecycleHandlerMock instance = const LifecycleHandlerMock();
+  static const LifecycleHandlerMock instance = LifecycleHandlerMock();
 
   @override
   bool get isBackground => false;

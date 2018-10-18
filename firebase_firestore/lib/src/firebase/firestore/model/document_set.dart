@@ -19,15 +19,14 @@ class DocumentSet extends Iterable<Document> {
   factory DocumentSet.emptySet(Comparator<Document> comparator) {
     // We have to add the document key comparator to the passed in comparator,
     // as it's the only guaranteed unique property of a document.
-    final Comparator<Document> adjustedComparator =
-        (Document left, Document right) {
+    int adjustedComparator(Document left, Document right) {
       final int comparison = comparator(left, right);
       if (comparison == 0) {
         return Document.keyComparator(left, right);
       } else {
         return comparison;
       }
-    };
+    }
 
     return DocumentSet._(
       DocumentCollections.emptyDocumentMap(),
@@ -47,7 +46,7 @@ class DocumentSet extends Iterable<Document> {
   /// Returns true iff this set contains a document with the given key.
   @override
   bool contains(Object key) {
-    return key is DocumentKey ? _keyIndex.containsKey(key) : false;
+    return key is DocumentKey && _keyIndex.containsKey(key);
   }
 
   /// Returns the document from this set with the given key if it exists or
@@ -123,7 +122,7 @@ class DocumentSet extends Iterable<Document> {
   /// size of the set.
   // TODO:Consider making this backed by the set instead to achieve O(1)?
   @override
-  List<Document> toList({bool growable: true}) {
+  List<Document> toList({bool growable = true}) {
     final List<Document> documents = <Document>[];
     forEach(documents.add);
     return documents;

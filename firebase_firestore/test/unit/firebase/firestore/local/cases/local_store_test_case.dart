@@ -68,12 +68,12 @@ class LocalStoreTestCase {
 
   Future<void> acknowledgeMutation(int documentVersion) async {
     final MutationBatch batch = _batches.removeAt(0);
-    final SnapshotVersion version = TestUtil.version(documentVersion);
+    final SnapshotVersion _version = version(documentVersion);
     final MutationResult mutationResult =
-        MutationResult(version, /*transformResults:*/ null);
+        MutationResult(_version, /*transformResults:*/ null);
     final MutationBatchResult result = MutationBatchResult.create(
         batch,
-        version,
+        _version,
         <MutationResult>[mutationResult],
         WriteStream.emptyStreamToken);
     _lastChanges = await localStore.acknowledgeBatch(result);
@@ -140,30 +140,3 @@ class LocalStoreTestCase {
     expect(actual, isNull);
   }
 }
-
-// ignore: always_specify_types
-const version = TestUtil.version;
-// ignore: always_specify_types
-const key = TestUtil.key;
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const setMutation = TestUtil.setMutation;
-// ignore: always_specify_types
-const patchMutation = TestUtil.patchMutation;
-// ignore: always_specify_types
-const deleteMutation = TestUtil.deleteMutation;
-// ignore: always_specify_types
-const updateRemoteEvent = TestUtil.updateRemoteEvent;
-// ignore: always_specify_types
-const addedRemoteEvent = TestUtil.addedRemoteEvent;
-// ignore: always_specify_types
-const query = TestUtil.query;
-// ignore: always_specify_types
-const viewChanges = TestUtil.viewChanges;
-// ignore: always_specify_types
-const deletedDoc = TestUtil.deletedDoc;
-// ignore: always_specify_types
-const values = TestUtil.values;

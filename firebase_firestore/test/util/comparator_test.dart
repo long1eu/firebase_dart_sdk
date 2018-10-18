@@ -86,16 +86,8 @@ class ComparatorTester<T> {
             otherIndex < _equalityGroups.length;
             otherIndex++) {
           for (T other in _equalityGroups[otherIndex]) {
-            if (_compare(reference, other).sign ==
-                referenceIndex.compareTo(otherIndex).sign) {
-              assert(
-                  _compare(reference, other).sign ==
-                      referenceIndex.compareTo(otherIndex).sign,
-                  '\n$reference $other => ${_compare(reference, other)}\n$referenceIndex $otherIndex => ${referenceIndex.compareTo(otherIndex)}');
-            } else {
-              print(
-                  '\n$reference $other => ${_compare(reference, other)}\n$referenceIndex $otherIndex => ${referenceIndex.compareTo(otherIndex)}');
-            }
+            assert(_compare(reference, other).sign ==
+                referenceIndex.compareTo(otherIndex).sign);
           }
         }
       }
@@ -109,8 +101,9 @@ class ComparatorTester<T> {
           for (T other in otherGroup) {
             assert(
                 reference == other && _compare(reference, other) == 0,
-                'Testing equals() for compatibility with compare()/compareTo(), '
-                'add a call to doNotRequireEqualsCompatibility() if this is not required');
+                'Testing equals() for compatibility with '
+                'compare()/compareTo(), add a call to '
+                'doNotRequireEqualsCompatibility() if this is not required');
           }
         }
       }

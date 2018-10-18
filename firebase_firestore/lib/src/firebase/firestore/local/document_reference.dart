@@ -29,17 +29,15 @@ class DocumentReference {
   int get id => _targetOrBatchId;
 
   /// Sorts document references by key then ID.
-  static final Comparator<DocumentReference> byKey =
-      (DocumentReference a, DocumentReference b) {
+  static int byKey(DocumentReference a, DocumentReference b) {
     final int keyComp = a.key.compareTo(b.key);
     return keyComp != 0
         ? keyComp
         : a._targetOrBatchId.compareTo(b._targetOrBatchId);
-  };
+  }
 
-  static final Comparator<DocumentReference> byTarget =
-      (DocumentReference a, DocumentReference b) {
+  static int byTarget(DocumentReference a, DocumentReference b) {
     final int targetComp = a._targetOrBatchId.compareTo(b._targetOrBatchId);
     return targetComp != 0 ? targetComp : a.key.compareTo(b.key);
-  };
+  }
 }

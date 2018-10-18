@@ -122,18 +122,17 @@ class LocalSerializer {
       version,
       value,
       hasCommittedMutations
-          ? DocumentState.COMMITTED_MUTATIONS
-          : DocumentState.SYNCED,
+          ? DocumentState.committedMutations
+          : DocumentState.synced,
     );
   }
 
   /// Encodes a NoDocument value to the equivalent proto.
   proto.NoDocument _encodeNoDocument(NoDocument document) {
-    final proto.NoDocument builder = proto.NoDocument.create();
-    builder.name = rpcSerializer.encodeKey(document.key);
-    builder.readTime =
-        rpcSerializer.encodeTimestamp(document.version.timestamp);
-    return builder..freeze();
+    return proto.NoDocument.create()
+      ..name = rpcSerializer.encodeKey(document.key)
+      ..readTime = rpcSerializer.encodeTimestamp(document.version.timestamp)
+      ..freeze();
   }
 
   /// Decodes a NoDocument proto to the equivalent model.
@@ -187,12 +186,12 @@ class LocalSerializer {
   }
 
   proto.Target encodeQueryData(QueryData queryData) {
-    Assert.hardAssert(queryData.purpose == QueryPurpose.listen,
-        'Only queries with purpose ${QueryPurpose.listen} may be stored, got ${queryData.purpose}');
+    Assert.hardAssert(
+        queryData.purpose == QueryPurpose.listen,
+        'Only queries with purpose ${QueryPurpose.listen} '
+        'may be stored, got ${queryData.purpose}');
 
-    final proto.Target result = proto.Target.create();
-
-    result
+    final proto.Target result = proto.Target.create()
       ..targetId = queryData.targetId
       ..lastListenSequenceNumber = Int64(queryData.sequenceNumber)
       ..snapshotVersion = rpcSerializer.encodeVersion(queryData.snapshotVersion)

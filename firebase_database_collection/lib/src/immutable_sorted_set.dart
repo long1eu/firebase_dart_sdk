@@ -20,7 +20,7 @@ class ImmutableSortedSet<T> extends Iterable<T> {
 
   @override
   bool contains(Object element) {
-    return element is T ? _map.containsKey(element) : false;
+    return element is T && _map.containsKey(element);
   }
 
   ImmutableSortedSet<T> remove(T entry) {

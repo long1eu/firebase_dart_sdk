@@ -35,7 +35,7 @@ class SetMutation extends Mutation {
     // document the server has accepted the mutation so the precondition must
     // have held.
     final SnapshotVersion version = mutationResult.version;
-    return Document(key, version, value, DocumentState.COMMITTED_MUTATIONS);
+    return Document(key, version, value, DocumentState.committedMutations);
   }
 
   @override
@@ -48,7 +48,7 @@ class SetMutation extends Mutation {
     }
 
     final SnapshotVersion version = Mutation.getPostMutationVersion(maybeDoc);
-    return Document(key, version, value, DocumentState.LOCAL_MUTATIONS);
+    return Document(key, version, value, DocumentState.localMutations);
   }
 
   @override

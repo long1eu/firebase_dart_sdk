@@ -9,9 +9,9 @@ import 'package:test/test.dart';
 
 void main() {
   // In these generic tests the specific TimerIDs don't matter.
-  const TimerId TIMER_ID_1 = TimerId.listenStreamConnectionBackoff;
-  const TimerId TIMER_ID_2 = TimerId.listenStreamIdle;
-  const TimerId TIMER_ID_3 = TimerId.writeStreamConnectionBackoff;
+  const TimerId timerId1 = TimerId.listenStreamConnectionBackoff;
+  const TimerId timerId2 = TimerId.listenStreamIdle;
+  const TimerId timerId3 = TimerId.writeStreamConnectionBackoff;
 
   AsyncQueue queue;
   List<int> completedSteps;
@@ -42,10 +42,10 @@ void main() {
 
     queue.enqueueAndForget(runnableForStep(1));
     queue.enqueueAfterDelay(
-        TIMER_ID_1, const Duration(milliseconds: 5), runnableForStep(4));
+        timerId1, const Duration(milliseconds: 5), runnableForStep(4));
     queue.enqueueAndForget(runnableForStep(2));
     queue.enqueueAfterDelay(
-        TIMER_ID_2, const Duration(milliseconds: 1), runnableForStep(3));
+        timerId2, const Duration(milliseconds: 1), runnableForStep(3));
 
     await Future<void>.delayed(const Duration(seconds: 5));
   });
@@ -58,14 +58,14 @@ void main() {
       queue.enqueueAndForget(runnableForStep(1));
 
       final DelayedTask<void> step2Timer = queue.enqueueAfterDelay<void>(
-          TIMER_ID_1, const Duration(milliseconds: 1), runnableForStep(2));
+          timerId1, const Duration(milliseconds: 1), runnableForStep(2));
 
       queue.enqueueAfterDelay(
-          TIMER_ID_3, const Duration(milliseconds: 3), runnableForStep(3));
+          timerId3, const Duration(milliseconds: 3), runnableForStep(3));
 
-      expect(queue.containsDelayedTask(TIMER_ID_1), isTrue);
+      expect(queue.containsDelayedTask(timerId1), isTrue);
       step2Timer.cancel();
-      expect(queue.containsDelayedTask(TIMER_ID_1), isFalse);
+      expect(queue.containsDelayedTask(timerId1), isFalse);
     });
 
     await Future<void>.delayed(const Duration(seconds: 5));
@@ -74,9 +74,9 @@ void main() {
   test('canManuallyDrainAllDelayedTasksForTesting', () async {
     queue.enqueueAndForget(runnableForStep(1));
     queue.enqueueAfterDelay(
-        TIMER_ID_1, const Duration(milliseconds: 20), runnableForStep(4));
+        timerId1, const Duration(milliseconds: 20), runnableForStep(4));
     queue.enqueueAfterDelay(
-        TIMER_ID_2, const Duration(milliseconds: 10), runnableForStep(3));
+        timerId2, const Duration(milliseconds: 10), runnableForStep(3));
     queue.enqueueAndForget(runnableForStep(2));
 
     await queue.runDelayedTasksUntil(TimerId.all);
@@ -86,14 +86,14 @@ void main() {
   test('canManuallyDrainSpecificDelayedTasksForTesting', () async {
     queue.enqueueAndForget(runnableForStep(1));
     queue.enqueueAfterDelay(
-        TIMER_ID_1, const Duration(milliseconds: 20), runnableForStep(5));
+        timerId1, const Duration(milliseconds: 20), runnableForStep(5));
     queue.enqueueAfterDelay(
-        TIMER_ID_2, const Duration(milliseconds: 10), runnableForStep(3));
+        timerId2, const Duration(milliseconds: 10), runnableForStep(3));
     queue.enqueueAfterDelay(
-        TIMER_ID_3, const Duration(milliseconds: 15), runnableForStep(4));
+        timerId3, const Duration(milliseconds: 15), runnableForStep(4));
     queue.enqueueAndForget(runnableForStep(2));
 
-    await queue.runDelayedTasksUntil(TIMER_ID_3);
+    await queue.runDelayedTasksUntil(timerId3);
     expect(completedSteps, <int>[1, 2, 3, 4]);
   });
 }

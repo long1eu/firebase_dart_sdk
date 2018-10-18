@@ -24,7 +24,7 @@ class NullFilter extends Filter {
   }
 
   @override
-  String get canonicalId => fieldPath.canonicalString + ' IS NULL';
+  String get canonicalId => '${fieldPath.canonicalString} IS NULL';
 
   @override
   String toString() => canonicalId;

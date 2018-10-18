@@ -84,8 +84,10 @@ class QueryListener extends Stream<ViewSnapshot> {
 
   bool _shouldRaiseInitialEvent(
       ViewSnapshot snapshot, OnlineState onlineState) {
-    Assert.hardAssert(!raisedInitialEvent,
-        'Determining whether to raise first event but already had first event.');
+    Assert.hardAssert(
+      !raisedInitialEvent,
+      'Determining whether to raise first event but already had first event.',
+    );
 
     // Always raise the first event when we're synced
     if (!snapshot.isFromCache) {

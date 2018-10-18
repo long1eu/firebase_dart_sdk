@@ -11,7 +11,7 @@ import '../../../../util/test_util.dart';
 void main() {
   test('testConstructor', () {
     final Document document = Document(key('messages/first'), version(1),
-        wrapList(<dynamic>['a', 1]), DocumentState.SYNCED);
+        wrapList(<dynamic>['a', 1]), DocumentState.synced);
 
     expect(document.key, key('messages/first'));
     expect(document.version, version(1));
@@ -27,7 +27,7 @@ void main() {
       map<String>(<String>['name', 'Jonny', 'title', 'scallywag'])
     ]);
     final Document document =
-        Document(key('rooms/eros'), version(1), data, DocumentState.SYNCED);
+        Document(key('rooms/eros'), version(1), data, DocumentState.synced);
 
     expect(document.getFieldValue(field('desc')),
         'Discuss all the project related stuff');
@@ -48,19 +48,6 @@ void main() {
     expect(doc(key1, 1, data2) == doc1, isFalse);
     expect(doc(key2, 1, data1) == doc1, isFalse);
     expect(doc(key1, 2, data1) == doc1, isFalse);
-    expect(doc(key1, 1, data1, DocumentState.LOCAL_MUTATIONS) == doc1, isFalse);
+    expect(doc(key1, 1, data1, DocumentState.localMutations) == doc1, isFalse);
   });
 }
-
-// ignore: always_specify_types
-const doc = TestUtil.doc;
-// ignore: always_specify_types
-const key = TestUtil.key;
-// ignore: always_specify_types
-const version = TestUtil.version;
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
-const field = TestUtil.field;
-// ignore: always_specify_types
-const wrapList = TestUtil.wrapList;

@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-typedef void Runnable();
-typedef Future<T> Supplier<T>();
-typedef void Consumer<T>(T value);
+typedef Runnable = void Function();
+typedef Supplier<T> = Future<T> Function();
+typedef Consumer<T> = void Function(T value);
 typedef Transaction<T> = Future<T> Function();

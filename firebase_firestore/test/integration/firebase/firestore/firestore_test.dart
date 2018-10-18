@@ -65,16 +65,16 @@ void main() {
 
     await writerRef.set(map(<String>['a', 'a']));
     await readerRef.update(map(<String>['b', 'b']));
-    DocumentSnapshot writerSnap = await writerRef.get(Source.CACHE);
+    DocumentSnapshot writerSnap = await writerRef.get(Source.cache);
     expect(writerSnap.exists, isTrue);
 
     try {
-      await readerRef.get(Source.CACHE);
+      await readerRef.get(Source.cache);
       fail('Should have thrown exception');
-    } catch (e) {
-      expect((e as FirebaseFirestoreError).code,
-          FirebaseFirestoreErrorCode.unavailable);
+    } on FirebaseFirestoreError catch (e) {
+      expect(e.code, FirebaseFirestoreErrorCode.unavailable);
     }
+
     writerSnap = await writerRef.get();
     expect(writerSnap.data, map<String>(<String>['a', 'a', 'b', 'b']));
     final DocumentSnapshot readerSnap = await readerRef.get();
@@ -156,12 +156,12 @@ void main() {
         map<dynamic>(
             <dynamic>['a', <String, dynamic>{}, 'b', <String, dynamic>{}]));
 
-    snapshot = await documentReference.get(Source.SERVER);
+    snapshot = await documentReference.get(Source.server);
     expect(
         snapshot.data,
         map<dynamic>(
             <dynamic>['a', <String, dynamic>{}, 'b', <String, dynamic>{}]));
-    subscription.cancel();
+    await subscription.cancel();
   });
 
   test('testCanDeleteFieldUsingMerge', () async {
@@ -359,8 +359,10 @@ void main() {
           SetOptions.mergeFields(<String>['desc', 'owner']));
     } on ArgumentError catch (e) {
       hadError = true;
-      expect(e.message,
-          'Field \'owner\' is specified in your field mask but not in your input data.');
+      expect(
+          e.message,
+          'Field \'owner\' is specified in your field mask but not '
+          'in your input data.');
     } catch (e) {
       assert(false, 'This should not happen.');
     }
@@ -637,7 +639,7 @@ void main() {
     // inequality same as first order by works
     query.orderBy('x').orderBy('y');
     collection.orderBy('x').orderBy('y').whereGreaterThanOrEqualTo('x', 32);
-    collection.orderBy('x', Direction.DESCENDING).whereEqualTo('y', 'true');
+    collection.orderBy('x', Direction.descending).whereEqualTo('y', 'true');
 
     // Equality different than orderBy works
     collection.orderBy('x').whereEqualTo('y', 'cat');
@@ -986,7 +988,7 @@ void main() {
     // doc path from CollectionReference.
     expect(firestore.collection('a').document('b/c/d').path, expected);
     // collection path from DocumentReference.
-    expect(expected + '/e', firestore.document('a/b').collection('c/d/e').path);
+    expect('$expected/e', firestore.document('a/b').collection('c/d/e').path);
   });
 
   test('testCanTraverseCollectionAndDocumentParents', () async {
@@ -1094,15 +1096,13 @@ void main() {
   });
 }
 
-// ignore: always_specify_types
-const map = TestUtil.map;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollection = IntegrationTestUtil.testCollection;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const testDocument = IntegrationTestUtil.testDocument;
-// ignore: always_specify_types
+// ignore: always_specify_types, type_annotate_public_apis
 const waitForOnlineSnapshot = IntegrationTestUtil.waitForOnlineSnapshot;

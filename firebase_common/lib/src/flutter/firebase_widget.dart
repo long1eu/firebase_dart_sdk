@@ -49,8 +49,8 @@ class _FirebaseWidgetState extends State<FirebaseWidget> {
         } catch (e) {
           Log.d(
               'FirebaseWidget',
-              'Default FirebaseApp failed to initialize because no default options '
-              'were found. This usually means that you don\'t have the '
+              'Default FirebaseApp failed to initialize because no default
+              options were found. This usually means that you don\'t have the '
               'google-services.json into you assets folder or you didn\'t add'
               'it to your pubspec.yaml file.');
         }
