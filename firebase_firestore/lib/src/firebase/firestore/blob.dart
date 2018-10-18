@@ -9,6 +9,7 @@ import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
+@publicApi
 class Blob implements Comparable<Blob> {
   final Uint8List bytes;
 
