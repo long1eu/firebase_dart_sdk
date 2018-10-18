@@ -24,6 +24,6 @@ void main() async {
         '--dart_out=$lib',
       ],
       workingDirectory: path,
-    );
+    ).then((_) => print(it));
   }).toList();
 }
