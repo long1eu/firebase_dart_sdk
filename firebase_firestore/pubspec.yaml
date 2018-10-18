@@ -22,5 +22,4 @@ dev_dependencies:
   test: ^1.0.0
   mockito: ^3.0.0
   sqlite:
-    #git: https://github.com/long1eu/dart-sqlite
-    path: ../../../IdeaProjects/dart-sqlite
+    git: https://github.com/long1eu/dart-sqlite

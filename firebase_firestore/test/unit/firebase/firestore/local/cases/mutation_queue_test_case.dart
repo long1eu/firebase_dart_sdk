@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
@@ -22,6 +23,7 @@ class MutationQueueTestCase {
   MutationQueueTestCase(this.persistence);
 
   Future<void> setUp() async {
+    persistence.referenceDelegate.inMemoryPins = ReferenceSet();
     mutationQueue = persistence.getMutationQueue(User.unauthenticated);
     await mutationQueue.start();
   }

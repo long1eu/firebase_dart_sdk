@@ -18,7 +18,6 @@ import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
 import 'package:firebase_firestore/src/firebase/firestore/source.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:grpc/grpc.dart';
 import 'package:test/test.dart';
 
 import '../../../util/await_helper.dart';
@@ -73,7 +72,8 @@ void main() {
       await readerRef.get(Source.CACHE);
       fail('Should have thrown exception');
     } catch (e) {
-      expect((e as FirebaseFirestoreError).code, StatusCode.unavailable);
+      expect((e as FirebaseFirestoreError).code,
+          FirebaseFirestoreErrorCode.unavailable);
     }
     writerSnap = await writerRef.get();
     expect(writerSnap.data, map<String>(<String>['a', 'a', 'b', 'b']));

@@ -6,7 +6,7 @@ import 'dart:typed_data';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
-as core;
+    as core;
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
@@ -24,17 +24,18 @@ import 'package:test/test.dart';
 import '../../../util/test_util.dart';
 
 void main() {
-  void validatePositions(core.Query query,
-                         List<Document> initialDocsList,
-                         List<Document> addedList,
-                         List<Document> modifiedList,
-                         List<NoDocument> removedList) {
+  void validatePositions(
+      core.Query query,
+      List<Document> initialDocsList,
+      List<Document> addedList,
+      List<Document> modifiedList,
+      List<NoDocument> removedList) {
     final ImmutableSortedMap<DocumentKey, MaybeDocument> initialDocs =
-    docUpdates(initialDocsList);
+        docUpdates(initialDocsList);
 
     ImmutableSortedMap<DocumentKey, MaybeDocument> updates =
-    ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(
-        DocumentKey.comparator);
+        ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(
+            DocumentKey.comparator);
     for (Document doc in addedList) {
       updates = updates.insert(doc.key, doc);
     }
@@ -47,12 +48,10 @@ void main() {
 
     final View view = View(query, DocumentKey.emptyKeySet);
     final ViewDocumentChanges initialChanges =
-    view.computeDocChanges(initialDocs);
+        view.computeDocChanges(initialDocs);
     final TargetChange initialTargetChange = ackTarget(initialDocsList);
     final ViewSnapshot initialSnapshot =
-        view
-            .applyChanges(initialChanges, initialTargetChange)
-            .snapshot;
+        view.applyChanges(initialChanges, initialTargetChange).snapshot;
 
     final ViewDocumentChanges updateChanges = view.computeDocChanges(updates);
     final TargetChange updateTargetChange = targetChange(
@@ -62,9 +61,7 @@ void main() {
         modifiedList,
         removedList);
     final ViewSnapshot updatedSnapshot =
-        view
-            .applyChanges(updateChanges, updateTargetChange)
-            .snapshot;
+        view.applyChanges(updateChanges, updateTargetChange).snapshot;
 
     if (updatedSnapshot == null) {
       // Nothing changed, no positions to verify

@@ -23,7 +23,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 import '../unit/firebase/firestore/local/mock/database_mock.dart';
 import 'prod_provider/firestore_provider.dart';
-import 'test_util.dart';
 
 /// A set of helper methods for tests
 class IntegrationTestUtil {
@@ -60,19 +59,12 @@ class IntegrationTestUtil {
   static Future<FirebaseFirestore> testFirestore(
       [FirebaseFirestoreSettings settings, String dbPath]) async {
     settings ??= newTestSettings();
-    final FirebaseFirestore firestore = await testFirestoreInstance(
-        provider.projectId,
-        LogLevel.d,
-        settings,
-        dbPath ?? currentDatabasePath);
-
-    if (!sentFirstWrite) {
-      sentFirstWrite = true;
-      await firestore
-          .document('test-collection/initial-write-doc')
-          .set(TestUtil.map(<dynamic>['foo', 1]));
-    }
-    return firestore;
+    return testFirestoreInstance(
+      provider.projectId,
+      LogLevel.d,
+      settings,
+      dbPath ?? currentDatabasePath,
+    );
   }
 
   /// Initializes a new Firestore instance that uses a non-existing default

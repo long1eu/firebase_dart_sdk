@@ -511,6 +511,7 @@ class SQLiteMutationQueue implements MutationQueue {
       final DocumentKey key = mutation.key;
       final String path = EncodedPath.encode(key.path);
       await db.execute(indexDeleter, <dynamic>[uid, path, batchId]);
+      await db.referenceDelegate.removeMutationReference(key);
     }
   }
 

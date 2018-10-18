@@ -10,19 +10,19 @@ import 'test_util.dart';
 void main() {
   test('testEquals', () {
     final DocumentSnapshot base =
-    TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['a', 1]), false);
+        TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['a', 1]), false);
     final DocumentSnapshot baseDup =
-    TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['a', 1]), false);
+        TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['a', 1]), false);
     final DocumentSnapshot noData =
-    TestUtil.documentSnapshot('rooms/foo', null, false);
+        TestUtil.documentSnapshot('rooms/foo', null, false);
     final DocumentSnapshot noDataDup =
-    TestUtil.documentSnapshot('rooms/foo', null, false);
+        TestUtil.documentSnapshot('rooms/foo', null, false);
     final DocumentSnapshot differentPath =
-    TestUtil.documentSnapshot('rooms/bar', map(<dynamic>['a', 1]), false);
+        TestUtil.documentSnapshot('rooms/bar', map(<dynamic>['a', 1]), false);
     final DocumentSnapshot differentData =
-    TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['b', 1]), false);
+        TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['b', 1]), false);
     final DocumentSnapshot fromCache =
-    TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['a', 1]), true);
+        TestUtil.documentSnapshot('rooms/foo', map(<dynamic>['a', 1]), true);
 
     expect(baseDup, base);
     expect(noDataDup, noData);
