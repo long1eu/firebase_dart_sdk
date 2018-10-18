@@ -174,9 +174,6 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  int get highestAcknowledgedBatchId => _lastAcknowledgedBatchId;
-
-  @override
   Future<void> acknowledgeBatch(
       MutationBatch batch, Uint8List streamToken) async {
     final int batchId = batch.batchId;
@@ -314,29 +311,6 @@ class SQLiteMutationQueue implements MutationQueue {
         ''',
         // @formatter:on
         <dynamic>[uid]);
-
-    for (Map<String, dynamic> row in rows) {
-      result.add(decodeMutationBatch(row['mutations'] as List<int>));
-    }
-
-    return result;
-  }
-
-  @override
-  Future<List<MutationBatch>> getAllMutationBatchesThroughBatchId(
-      int batchId) async {
-    final List<MutationBatch> result = <MutationBatch>[];
-    final List<Map<String, dynamic>> rows = await db.query(
-        // @formatter:off
-        '''
-          SELECT mutations
-          FROM mutations
-          WHERE uid = ?
-            AND batch_id <= ?
-          ORDER BY batch_id ASC;
-        ''',
-        // @formatter:on
-        <dynamic>[uid, batchId]);
 
     for (Map<String, dynamic> row in rows) {
       result.add(decodeMutationBatch(row['mutations'] as List<int>));
@@ -504,7 +478,7 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> removeMutationBatches(List<MutationBatch> batches) async {
+  Future<void> removeMutationBatch(MutationBatch batch) async {
     const String mutationDeleter =
         // @formatter:off
         '''
@@ -526,19 +500,17 @@ class SQLiteMutationQueue implements MutationQueue {
         ''';
     // @formatter:on
 
-    for (MutationBatch batch in batches) {
-      final int batchId = batch.batchId;
-      final int deleted =
-          await db.delete(mutationDeleter, <dynamic>[uid, batchId]);
+    final int batchId = batch.batchId;
+    final int deleted =
+        await db.delete(mutationDeleter, <dynamic>[uid, batchId]);
 
-      Assert.hardAssert(deleted != 0,
-          'Mutation batch ($uid, ${batch.batchId}) did not exist');
+    Assert.hardAssert(
+        deleted != 0, 'Mutation batch ($uid, ${batch.batchId}) did not exist');
 
-      for (Mutation mutation in batch.mutations) {
-        final DocumentKey key = mutation.key;
-        final String path = EncodedPath.encode(key.path);
-        await db.execute(indexDeleter, <dynamic>[uid, path, batchId]);
-      }
+    for (Mutation mutation in batch.mutations) {
+      final DocumentKey key = mutation.key;
+      final String path = EncodedPath.encode(key.path);
+      await db.execute(indexDeleter, <dynamic>[uid, path, batchId]);
     }
   }
 

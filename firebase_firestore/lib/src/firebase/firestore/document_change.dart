@@ -80,7 +80,12 @@ class DocumentChange {
         final Document document = change.document;
         final QueryDocumentSnapshot documentSnapshot =
             QueryDocumentSnapshot.fromDocument(
-                firestore, document, snapshot.isFromCache);
+          firestore,
+          document,
+          snapshot.isFromCache,
+          snapshot.mutatedKeys.contains(document.key),
+        );
+
         Assert.hardAssert(change.type == DocumentViewChangeType.added,
             'Invalid added event for first snapshot');
         Assert.hardAssert(
@@ -102,7 +107,11 @@ class DocumentChange {
         final Document document = change.document;
         final QueryDocumentSnapshot documentSnapshot =
             QueryDocumentSnapshot.fromDocument(
-                firestore, document, snapshot.isFromCache);
+          firestore,
+          document,
+          snapshot.isFromCache,
+          snapshot.mutatedKeys.contains(document.key),
+        );
         int oldIndex, newIndex;
         final DocumentChangeType type = _getType(change);
         if (type != DocumentChangeType.added) {

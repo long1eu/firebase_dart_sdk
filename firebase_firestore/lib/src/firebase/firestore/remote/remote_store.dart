@@ -316,11 +316,11 @@ class RemoteStore implements TargetMetadataProvider {
         _watchChangeAggregator.handleDocumentChange(watchChange);
       } else if (watchChange is WatchChangeExistenceFilterWatchChange) {
         _watchChangeAggregator.handleExistenceFilter(watchChange);
+      } else if (watchChange is WatchChangeWatchTargetChange) {
+        _watchChangeAggregator.handleTargetChange(watchChange);
       } else {
-        Assert.hardAssert(watchChange is WatchChangeWatchTargetChange,
+        Assert.fail(
             'Expected watchChange to be an instance of WatchTargetChange');
-        _watchChangeAggregator
-            .handleTargetChange(watchChange as WatchChangeWatchTargetChange);
       }
 
       if (snapshotVersion != SnapshotVersion.none) {

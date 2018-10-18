@@ -32,11 +32,6 @@ abstract class MutationQueue {
   /// [highestAcknowledgedBatchId] is less than [nextBatchId].
   int get nextBatchId;
 
-  /// Returns the highest batchId that has been acknowledged. If no batches have
-  /// been acknowledged or if there are no batches in the queue this can return
-  /// [MutationBatch.unknown].
-  int get highestAcknowledgedBatchId;
-
   /// Acknowledges the given [batch].
   Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken);
 
@@ -65,14 +60,6 @@ abstract class MutationQueue {
   // TODO: PERF: Current consumer only needs mutated keys; if we can provide
   // that cheaply, we should replace this.
   Future<List<MutationBatch>> getAllMutationBatches();
-
-  /// Finds all mutations with a batch id less than or equal to the given
-  /// [batchId].
-  ///
-  /// * Generally the caller should be asking for the next unacknowledged
-  /// [batchId] and the number of acknowledged batches should be very small when
-  /// things are functioning well.
-  Future<List<MutationBatch>> getAllMutationBatchesThroughBatchId(int batchId);
 
   /// Finds all mutation batches that could <b>possibly<b> affect the given
   /// document key. Not all mutations in a batch will necessarily affect the
@@ -115,18 +102,14 @@ abstract class MutationQueue {
   /// need to match).
   Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(Query query);
 
-  /// Removes the given mutation batches from the queue. This is useful in two
+  /// Removes the given mutation batch from the queue. This is useful in two
   /// circumstances:
   ///
   /// <ul>
   /// <li>Removing applied mutations from the head of the queue
   /// <li>Removing rejected mutations from anywhere in the queue
   /// </ul>
-  ///
-  /// * In both cases, the array of mutations to remove must be a contiguous
-  /// range of batchIds. This is most easily accomplished by loading mutations
-  /// with [getAllMutationBatchesThroughBatchId].
-  Future<void> removeMutationBatches(List<MutationBatch> batches);
+  Future<void> removeMutationBatch(MutationBatch batch);
 
   /// Performs a consistency check, examining the mutation queue for any leaks,
   /// if possible.

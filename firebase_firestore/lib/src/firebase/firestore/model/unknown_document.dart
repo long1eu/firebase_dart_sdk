@@ -1,42 +1,37 @@
 // File created by
 // Lung Razvan <long1eu>
-// on 17/09/2018
+// on 15/10/2018
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 
-/// Represents that no documents exists for the key at the given version.
-class NoDocument extends MaybeDocument {
-  final bool hasCommittedMutations;
-
-  const NoDocument(
-      DocumentKey key, SnapshotVersion version, this.hasCommittedMutations)
+/// A class representing an existing document whose data is unknown (e.g. a
+/// document that was updated without a known base document).
+class UnknownDocument extends MaybeDocument {
+  UnknownDocument(DocumentKey key, SnapshotVersion version)
       : super(key, version);
 
   @override
-  bool get hasPendingWrites => hasCommittedMutations;
+  bool get hasPendingWrites => true;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is NoDocument &&
+      other is UnknownDocument &&
           runtimeType == other.runtimeType &&
-          key == other.key &&
           version == other.version &&
-          hasCommittedMutations == other.hasCommittedMutations;
+          key == other.key;
 
   @override
-  int get hashCode =>
-      key.hashCode ^ version.hashCode ^ (hasCommittedMutations ? 1 : 0);
+  int get hashCode => key.hashCode ^ version.hashCode;
 
   @override
   String toString() {
     return (ToStringHelper(runtimeType)
           ..add('key', key)
-          ..add('version', version)
-          ..add('hasCommittedMutations', hasCommittedMutations))
+          ..add('version', version))
         .toString();
   }
 }

@@ -18,11 +18,11 @@ void main() {
     final ResourcePath queryPath =
         ResourcePath.fromString('rooms/eros/messages/1');
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']), false);
+        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
     final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']), false);
+        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
     final Document doc3 =
-        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']), false);
+        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
 
     final Query query = Query.atPath(queryPath);
     expect(query.matches(doc1), isTrue);
@@ -34,13 +34,13 @@ void main() {
     final ResourcePath queryPath =
         ResourcePath.fromString('rooms/eros/messages');
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']), false);
+        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
     final Document doc1meta = doc('rooms/eros/messages/1/meta/1', 0,
-        map(<dynamic>['meta', 'meta-value']), false);
+        map(<dynamic>['meta', 'meta-value']));
     final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']), false);
+        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
     final Document doc3 =
-        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']), false);
+        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
 
     final Query query = Query.atPath(queryPath);
     expect(query.matches(doc1), isTrue);
@@ -53,9 +53,8 @@ void main() {
     final ResourcePath queryPath =
         ResourcePath.fromString('rooms/eros/messages');
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']), false);
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>[]), false);
+        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
+    final Document doc2 = doc('rooms/eros/messages/2', 0, map(<String>[]));
 
     final Query query =
         Query.atPath(queryPath).filter(filter('text', '==', 'msg1'));
@@ -69,16 +68,12 @@ void main() {
     final Query query2 = Query.atPath(ResourcePath.fromString('collection'))
         .filter(filter('sort', '<=', 2));
 
-    final Document doc1 =
-        doc('collection/1', 0, map(<dynamic>['sort', 1]), false);
-    final Document doc2 =
-        doc('collection/2', 0, map(<dynamic>['sort', 2]), false);
-    final Document doc3 =
-        doc('collection/3', 0, map(<dynamic>['sort', 3]), false);
-    final Document doc4 =
-        doc('collection/4', 0, map(<dynamic>['sort', false]), false);
+    final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 1]));
+    final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', 2]));
+    final Document doc3 = doc('collection/3', 0, map(<dynamic>['sort', 3]));
+    final Document doc4 = doc('collection/4', 0, map(<dynamic>['sort', false]));
     final Document doc5 =
-        doc('collection/5', 0, map(<dynamic>['sort', 'string']), false);
+        doc('collection/5', 0, map(<dynamic>['sort', 'string']));
 
     expect(query1.matches(doc1), isFalse);
     expect(query1.matches(doc2), isTrue);
@@ -203,15 +198,12 @@ void main() {
     final Query query = Query.atPath(ResourcePath.fromString('collection'))
         .filter(filter('sort', '==', double.nan));
     final Document doc1 =
-        doc('collection/1', 0, map(<dynamic>['sort', double.nan]), false);
-    final Document doc2 =
-        doc('collection/2', 0, map(<dynamic>['sort', 2]), false);
-    final Document doc3 =
-        doc('collection/3', 0, map(<dynamic>['sort', 3.1]), false);
-    final Document doc4 =
-        doc('collection/4', 0, map(<dynamic>['sort', false]), false);
+        doc('collection/1', 0, map(<dynamic>['sort', double.nan]));
+    final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', 2]));
+    final Document doc3 = doc('collection/3', 0, map(<dynamic>['sort', 3.1]));
+    final Document doc4 = doc('collection/4', 0, map(<dynamic>['sort', false]));
     final Document doc5 =
-        doc('collection/5', 0, map(<dynamic>['sort', 'string']), false);
+        doc('collection/5', 0, map(<dynamic>['sort', 'string']));
 
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isFalse);
@@ -223,16 +215,12 @@ void main() {
   test('testNullFilter', () {
     final Query query = Query.atPath(ResourcePath.fromString('collection'))
         .filter(filter('sort', '==', null));
-    final Document doc1 =
-        doc('collection/1', 0, map(<dynamic>['sort', null]), false);
-    final Document doc2 =
-        doc('collection/2', 0, map(<dynamic>['sort', 2]), false);
-    final Document doc3 =
-        doc('collection/3', 0, map(<dynamic>['sort', 3.1]), false);
-    final Document doc4 =
-        doc('collection/4', 0, map(<dynamic>['sort', false]), false);
+    final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', null]));
+    final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', 2]));
+    final Document doc3 = doc('collection/3', 0, map(<dynamic>['sort', 3.1]));
+    final Document doc4 = doc('collection/4', 0, map(<dynamic>['sort', false]));
     final Document doc5 =
-        doc('collection/5', 0, map(<dynamic>['sort', 'string']), false);
+        doc('collection/5', 0, map(<dynamic>['sort', 'string']));
 
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isFalse);
@@ -255,44 +243,39 @@ void main() {
     final Query query2 = Query.atPath(ResourcePath.fromString('collection'))
         .filter(filter('sort', '>=', 2));
 
-    final Document doc1 =
-        doc('collection/1', 0, map(<dynamic>['sort', 2]), false);
+    final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 2]));
     final Document doc2 =
-        doc('collection/2', 0, map(<dynamic>['sort', <int>[]]), false);
+        doc('collection/2', 0, map(<dynamic>['sort', <int>[]]));
     final Document doc3 = doc(
         'collection/3',
         0,
         map(<dynamic>[
           'sort',
           <int>[1]
-        ]),
-        false);
+        ]));
     final Document doc4 = doc(
         'collection/4',
         0,
         map(<dynamic>[
           'sort',
           map<dynamic>(<dynamic>['foo', 2])
-        ]),
-        false);
+        ]));
     final Document doc5 = doc(
         'collection/5',
         0,
         map(<dynamic>[
           'sort',
           map<String>(<String>['foo', 'bar'])
-        ]),
-        false);
-    final Document doc6 = doc(
-        'collection/6', 0, map(<dynamic>['sort', map<int>(<int>[])]), false);
+        ]));
+    final Document doc6 =
+        doc('collection/6', 0, map(<dynamic>['sort', map<int>(<int>[])]));
     final Document doc7 = doc(
         'collection/7',
         0,
         map(<dynamic>[
           'sort',
           <int>[3, 1]
-        ]),
-        false);
+        ]));
 
     expect(query1.matches(doc1), isTrue);
     expect(query1.matches(doc2), isFalse);
@@ -315,34 +298,30 @@ void main() {
     final Query query = Query.atPath(ResourcePath.fromString('collection'))
         .orderBy(orderBy('sort'));
 
-    final Document doc1 =
-        doc('collection/1', 0, map(<dynamic>['sort', 2]), false);
+    final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 2]));
     final Document doc2 =
-        doc('collection/2', 0, map(<dynamic>['sort', <int>[]]), false);
+        doc('collection/2', 0, map(<dynamic>['sort', <int>[]]));
     final Document doc3 = doc(
         'collection/3',
         0,
         map(<dynamic>[
           'sort',
           <int>[1]
-        ]),
-        false);
+        ]));
     final Document doc4 = doc(
         'collection/4',
         0,
         map(<dynamic>[
           'sort',
           map<dynamic>(<dynamic>['foo', 2])
-        ]),
-        false);
+        ]));
     final Document doc5 = doc(
         'collection/5',
         0,
         map(<dynamic>[
           'sort',
           map<String>(<String>['foo', 'bar'])
-        ]),
-        false);
+        ]));
 
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isTrue);
@@ -359,8 +338,7 @@ void main() {
         map(<dynamic>[
           'tags',
           <dynamic>['foo', 1, true]
-        ]),
-        false);
+        ]));
     final List<Filter> matchingFilters = <Filter>[
       filter('tags', '==', <dynamic>['foo', 1, true])
     ];
@@ -389,8 +367,7 @@ void main() {
           'tags',
           map<dynamic>(
               <dynamic>['foo', 'foo', 'a', 0, 'b', true, 'c', double.nan])
-        ]),
-        false);
+        ]));
 
     final List<Filter> matchingFilters = <Filter>[
       filter(

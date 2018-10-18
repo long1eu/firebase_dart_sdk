@@ -12,6 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/unknown_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
@@ -47,18 +48,17 @@ class PatchMutation extends Mutation {
     Assert.hardAssert(mutationResult.transformResults == null,
         'Transform results received by PatchMutation.');
 
-    // TODO: Relax enforcement of this precondition
-    // We shouldn't actually enforce the precondition since it already passed on
-    // the backend, but we may not have a local version of the document to
-    // patch, so we use the precondition to prevent incorrectly putting a
-    // partial document into our cache.
     if (!precondition.isValidFor(maybeDoc)) {
-      return maybeDoc;
+      // Since the mutation was not rejected, we know that the precondition
+      // matched on the backend. We therefore must not have the expected version
+      // of the document in our cache and return an [UnknownDocument] with the
+      // known [updateTime].
+      return UnknownDocument(key, mutationResult.version);
     }
 
-    final SnapshotVersion version = Mutation.getPostMutationVersion(maybeDoc);
+    final SnapshotVersion version = mutationResult.version;
     final ObjectValue newData = patchDocument(maybeDoc);
-    return Document(key, version, newData, /* hasLocalMutations= */ false);
+    return Document(key, version, newData, DocumentState.COMMITTED_MUTATIONS);
   }
 
   @override
@@ -72,7 +72,7 @@ class PatchMutation extends Mutation {
 
     final SnapshotVersion version = Mutation.getPostMutationVersion(maybeDoc);
     final ObjectValue newData = patchDocument(maybeDoc);
-    return Document(key, version, newData, /* hasLocalMutations= */ true);
+    return Document(key, version, newData, DocumentState.LOCAL_MUTATIONS);
   }
 
   /// Patches the data of document if available or creates a new document. Note

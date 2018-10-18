@@ -6,7 +6,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
-import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
@@ -57,37 +56,6 @@ void main() {
     await testCase.expectCount(count: 0, isEmpty: true);
   });
 
-  test('testAcknowledgeBatchId', () async {
-    // Initial state of an empty queue
-    expect(mutationQueue.highestAcknowledgedBatchId, MutationBatch.unknown);
-
-    // Adding mutation batches should not change the highest acked batchId.
-    final MutationBatch batch1 = await testCase.addMutationBatch();
-    final MutationBatch batch2 = await testCase.addMutationBatch();
-    final MutationBatch batch3 = await testCase.addMutationBatch();
-    expect(batch1.batchId, greaterThan(MutationBatch.unknown));
-    expect(batch2.batchId, greaterThan(batch1.batchId));
-    expect(batch3.batchId, greaterThan(batch2.batchId));
-
-    expect(mutationQueue.highestAcknowledgedBatchId, MutationBatch.unknown);
-
-    await testCase.acknowledgeBatch(batch1);
-    expect(mutationQueue.highestAcknowledgedBatchId, batch1.batchId);
-
-    await testCase.acknowledgeBatch(batch2);
-    expect(mutationQueue.highestAcknowledgedBatchId, batch2.batchId);
-
-    await testCase.removeMutationBatches(<MutationBatch>[batch1]);
-    expect(mutationQueue.highestAcknowledgedBatchId, batch2.batchId);
-
-    await testCase.removeMutationBatches(<MutationBatch>[batch2]);
-    expect(mutationQueue.highestAcknowledgedBatchId, batch2.batchId);
-
-    // Batch 3 never acknowledged.
-    await testCase.removeMutationBatches(<MutationBatch>[batch3]);
-    expect(mutationQueue.highestAcknowledgedBatchId, batch2.batchId);
-  });
-
   test('testAcknowledgeThenRemove', () async {
     final MutationBatch batch1 = await testCase.addMutationBatch();
 
@@ -95,50 +63,10 @@ void main() {
         () async {
       await mutationQueue.acknowledgeBatch(
           batch1, WriteStream.emptyStreamToken);
-      await mutationQueue.removeMutationBatches(<MutationBatch>[batch1]);
+      await mutationQueue.removeMutationBatch(batch1);
     });
 
     await testCase.expectCount(count: 0, isEmpty: true);
-    expect(mutationQueue.highestAcknowledgedBatchId, batch1.batchId);
-  });
-
-  test('testHighestAcknowledgedBatchIdNeverExceedsNextBatchId', () async {
-    final MutationBatch batch1 = await testCase.addMutationBatch();
-    final MutationBatch batch2 = await testCase.addMutationBatch();
-    await testCase.acknowledgeBatch(batch1);
-    await testCase.acknowledgeBatch(batch2);
-    expect(mutationQueue.highestAcknowledgedBatchId, batch2.batchId);
-
-    await testCase.removeMutationBatches(<MutationBatch>[batch1, batch2]);
-    expect(mutationQueue.highestAcknowledgedBatchId, batch2.batchId);
-
-    // Restart the queue so that nextBatchId will be reset.
-    mutationQueue = testCase.persistence.getMutationQueue(User.unauthenticated);
-    testCase.mutationQueue = mutationQueue;
-    await mutationQueue.start();
-
-    await testCase.persistence
-        .runTransaction('Start mutationQueue', () => mutationQueue.start());
-
-    // Verify that on restart with an empty queue, nextBatchId falls to a lower value.
-    expect(mutationQueue.nextBatchId, lessThan(batch2.batchId));
-
-    // As a result highestAcknowledgedBatchId must also reset lower.
-    expect(mutationQueue.highestAcknowledgedBatchId, MutationBatch.unknown);
-
-    // The mutation queue will reset the next batchId after all mutations are
-    // removed so adding another mutation will cause a collision.
-    final MutationBatch newBatch = await testCase.addMutationBatch();
-    expect(newBatch.batchId, batch1.batchId);
-
-    // Restart the queue with one unacknowledged batch in it.
-    await testCase.persistence
-        .runTransaction('Start mutationQueue', () => mutationQueue.start());
-
-    expect(mutationQueue.nextBatchId, newBatch.batchId + 1);
-
-    // highestAcknowledgedBatchId must still be MutationBatch.unknown.
-    expect(mutationQueue.highestAcknowledgedBatchId, MutationBatch.unknown);
   });
 
   test('testLookupMutationBatch', () async {
@@ -230,25 +158,6 @@ void main() {
     result = await mutationQueue
         .getNextMutationBatchAfterBatchId(batches[1].batchId);
     expect(result, batches[2]);
-  });
-
-  test('testAllMutationBatchesThroughBatchID', () async {
-    final List<MutationBatch> batches = await testCase.createBatches(10);
-    await testCase.makeHoles(<int>[2, 6, 7], batches);
-
-    List<MutationBatch> found;
-    List<MutationBatch> expected;
-
-    found = await mutationQueue
-        .getAllMutationBatchesThroughBatchId(batches[0].batchId - 1);
-    expect(found, isEmpty);
-
-    for (int i = 0; i < batches.length; i++) {
-      found = await mutationQueue
-          .getAllMutationBatchesThroughBatchId(batches[i].batchId);
-      expected = batches.sublist(0, i + 1);
-      expect(found, expected);
-    }
   });
 
   test('testAllMutationBatchesAffectingDocumentKey', () async {
@@ -413,15 +322,13 @@ void main() {
 
   test('testRemoveMutationBatches', () async {
     final List<MutationBatch> batches = await testCase.createBatches(10);
-    final MutationBatch last = batches[batches.length - 1];
 
     await testCase.removeMutationBatches(<MutationBatch>[batches.removeAt(0)]);
     expect(await testCase.batchCount(), 9);
 
     List<MutationBatch> found;
 
-    found =
-        await mutationQueue.getAllMutationBatchesThroughBatchId(last.batchId);
+    found = await mutationQueue.getAllMutationBatches();
     expect(found, batches);
     expect(found.length, 9);
 
@@ -432,8 +339,7 @@ void main() {
     batches.remove(batches[0]);
     expect(await testCase.batchCount(), 6);
 
-    found =
-        await mutationQueue.getAllMutationBatchesThroughBatchId(last.batchId);
+    found = await mutationQueue.getAllMutationBatches();
     expect(found, batches);
     expect(found.length, 6);
 
@@ -441,8 +347,7 @@ void main() {
         <MutationBatch>[batches.removeAt(batches.length - 1)]);
     expect(await testCase.batchCount(), 5);
 
-    found =
-        await mutationQueue.getAllMutationBatchesThroughBatchId(last.batchId);
+    found = await mutationQueue.getAllMutationBatches();
     expect(found, batches);
     expect(found.length, 5);
 
@@ -452,14 +357,12 @@ void main() {
     await testCase.removeMutationBatches(<MutationBatch>[batches.removeAt(1)]);
     expect(await testCase.batchCount(), 3);
 
-    found =
-        await mutationQueue.getAllMutationBatchesThroughBatchId(last.batchId);
+    found = await mutationQueue.getAllMutationBatches();
     expect(found, batches);
     expect(found.length, 3);
 
     await testCase.removeMutationBatches(batches);
-    found =
-        await mutationQueue.getAllMutationBatchesThroughBatchId(last.batchId);
+    found = await mutationQueue.getAllMutationBatches();
     expect(found, isEmpty);
     expect(found.length, 0);
     await testCase.expectCount(count: 0, isEmpty: true);
@@ -480,7 +383,6 @@ void main() {
     await testCase.persistence.runTransaction('acknowledgeBatchId',
         () => mutationQueue.acknowledgeBatch(batch1, streamToken2));
 
-    expect(mutationQueue.highestAcknowledgedBatchId, batch1.batchId);
     expect(mutationQueue.lastStreamToken, streamToken2);
   });
 }

@@ -115,9 +115,8 @@ void main() {
     final Map<int, QueryData> targetMap =
         activeQueries(<int>[1, 2, 3, 4, 5, 6]);
 
-    final Document existingDoc =
-        doc('docs/1', 1, map(<dynamic>['value', 1]), false);
-    final Document newDoc = doc('docs/2', 2, map(<dynamic>['value', 2]), false);
+    final Document existingDoc = doc('docs/1', 1, map(<dynamic>['value', 1]));
+    final Document newDoc = doc('docs/2', 2, map(<dynamic>['value', 2]));
 
     final WatchChange change1 = WatchChangeDocumentChange(
         <int>[1, 2, 3], <int>[4, 5, 6], existingDoc.key, existingDoc);
@@ -166,8 +165,8 @@ void main() {
   test('testWillIgnoreEventsForPendingTargets', () {
     final Map<int, QueryData> targetMap = activeQueries(<int>[1]);
 
-    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]), false);
-    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]), false);
+    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]));
+    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]));
 
     // We're waiting for the watch and unwatch ack
     final Map<int, int> outstanding = <int, int>{};
@@ -206,7 +205,7 @@ void main() {
   test('testWillIgnoreEventsForRemovedTargets', () {
     final Map<int, QueryData> targetMap = activeQueries();
 
-    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]), false);
+    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]));
 
     // We're waiting for the unwatch ack
     final Map<int, int> outstanding = <int, int>{};
@@ -237,9 +236,9 @@ void main() {
   test('testWillKeepResetMappingEvenWithUpdates', () {
     final Map<int, QueryData> targetMap = activeQueries(<int>[1]);
 
-    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]), false);
-    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]), false);
-    final Document doc3 = doc('docs/3', 3, map(<dynamic>['value', 3]), false);
+    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]));
+    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]));
+    final Document doc3 = doc('docs/3', 3, map(<dynamic>['value', 3]));
 
     final WatchChange change1 =
         WatchChangeDocumentChange(<int>[1], <int>[], doc1.key, doc1);
@@ -310,8 +309,8 @@ void main() {
   test('testWillHandleTargetAddAndRemovalInSameBatch', () {
     final Map<int, QueryData> targetMap = activeQueries(<int>[1, 2]);
 
-    final Document doc1a = doc('docs/1', 1, map(<dynamic>['value', 1]), false);
-    final Document doc1b = doc('docs/1', 1, map(<dynamic>['value', 2]), false);
+    final Document doc1a = doc('docs/1', 1, map(<dynamic>['value', 1]));
+    final Document doc1b = doc('docs/1', 1, map(<dynamic>['value', 2]));
 
     final WatchChange change1 =
         WatchChangeDocumentChange(<int>[1], <int>[2], doc1a.key, doc1a);
@@ -359,8 +358,8 @@ void main() {
   test('testTargetAddedChangeWillResetPreviousState', () {
     final Map<int, QueryData> targetMap = activeQueries(<int>[1, 3]);
 
-    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]), false);
-    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]), false);
+    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]));
+    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]));
 
     final WatchChange change1 =
         WatchChangeDocumentChange(<int>[1, 3], <int>[2], doc1.key, doc1);
@@ -430,8 +429,8 @@ void main() {
   test('testExistenceFilterMismatchClearsTarget', () {
     final Map<int, QueryData> targetMap = activeQueries(<int>[1, 2]);
 
-    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]), false);
-    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]), false);
+    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]));
+    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]));
 
     final WatchChange change1 =
         WatchChangeDocumentChange(<int>[1], <int>[], doc1.key, doc1);
@@ -486,7 +485,7 @@ void main() {
         WatchChangeWatchTargetChange(WatchTargetChangeType.Current, <int>[1]);
     aggregator.handleTargetChange(markCurrent);
 
-    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]), false);
+    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]));
     final WatchChangeDocumentChange addDoc =
         WatchChangeDocumentChange(<int>[1], <int>[], doc1.key, doc1);
     aggregator.handleDocumentChange(addDoc);
@@ -514,11 +513,11 @@ void main() {
   test('testDocumentUpdate', () {
     final Map<int, QueryData> targetMap = activeQueries(<int>[1]);
 
-    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]), false);
+    final Document doc1 = doc('docs/1', 1, map(<dynamic>['value', 1]));
     final WatchChange change1 =
         WatchChangeDocumentChange(<int>[1], <int>[], doc1.key, doc1);
 
-    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]), false);
+    final Document doc2 = doc('docs/2', 2, map(<dynamic>['value', 2]));
     final WatchChange change2 =
         WatchChangeDocumentChange(<int>[1], <int>[], doc2.key, doc2);
 
@@ -541,13 +540,12 @@ void main() {
         <int>[1], <int>[], deletedDoc1.key, deletedDoc1);
     aggregator.handleDocumentChange(change3);
 
-    final Document updatedDoc2 =
-        doc('docs/2', 3, map(<dynamic>['value', 3]), false);
+    final Document updatedDoc2 = doc('docs/2', 3, map(<dynamic>['value', 3]));
     final WatchChangeDocumentChange change4 = WatchChangeDocumentChange(
         <int>[1], <int>[], updatedDoc2.key, updatedDoc2);
     aggregator.handleDocumentChange(change4);
 
-    final Document doc3 = doc('docs/3', 3, map(<dynamic>['value', 3]), false);
+    final Document doc3 = doc('docs/3', 3, map(<dynamic>['value', 3]));
     final WatchChangeDocumentChange change5 =
         WatchChangeDocumentChange(<int>[1], <int>[], doc3.key, doc3);
     aggregator.handleDocumentChange(change5);

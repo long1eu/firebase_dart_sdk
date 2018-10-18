@@ -4,7 +4,6 @@
 
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
@@ -47,11 +46,7 @@ class Precondition {
     if (updateTime != null) {
       return maybeDoc is Document && maybeDoc.version == updateTime;
     } else if (exists != null) {
-      if (exists) {
-        return maybeDoc is Document;
-      } else {
-        return maybeDoc == null || maybeDoc is NoDocument;
-      }
+      return exists == (maybeDoc is Document);
     } else {
       Assert.hardAssert(isNone, 'Precondition should be empty');
       return true;

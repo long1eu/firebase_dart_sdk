@@ -116,17 +116,6 @@ class LocalStore {
   /// Used to generate targetIds for queries tracked locally.
   final TargetIdGenerator _targetIdGenerator;
 
-  /// A [heldBatchResult] is a mutation batch result (from a write
-  /// acknowledgement) that arrived before the watch stream got notified of a
-  /// snapshot that includes the write. So we 'hold' it until the watch stream
-  /// catches up. It ensures that the local write remains visible (latency
-  /// compensation) and doesn't temporarily appear reverted because the watch
-  /// stream is slower than the write stream and so wasn't reflecting it.
-  ///
-  /// * NOTE: Eventually we want to move this functionality into the remote
-  /// store.
-  final List<MutationBatchResult> _heldBatchResults;
-
   factory LocalStore(Persistence persistence, User initialUser) {
     Assert.hardAssert(persistence.started,
         'LocalStore was passed an unstarted persistence implementation');
@@ -155,55 +144,22 @@ class LocalStore {
       queryEngine,
       localViewReferences,
       <int, QueryData>{},
-      <MutationBatchResult>[],
     );
   }
 
   LocalStore._(
-    this._persistence,
-    this._queryCache,
-    this._targetIdGenerator,
-    this._mutationQueue,
-    this._remoteDocuments,
-    this._localDocuments,
-    this._queryEngine,
-    this._localViewReferences,
-    this._targetIds,
-    this._heldBatchResults,
-  );
+      this._persistence,
+      this._queryCache,
+      this._targetIdGenerator,
+      this._mutationQueue,
+      this._remoteDocuments,
+      this._localDocuments,
+      this._queryEngine,
+      this._localViewReferences,
+      this._targetIds);
 
   Future<void> start() async {
-    await _startMutationQueue();
-  }
-
-  Future<void> _startMutationQueue() async {
-    await _persistence.runTransaction(
-      'Start MutationQueue',
-      () async {
-        await _mutationQueue.start();
-
-        // If we have any leftover mutation batch results from a prior run,
-        // just drop them.
-        // TODO: We may need to repopulate [heldBatchResults] or similar
-        // instead, but that is not straightforward since we're not persisting
-        // the write ack versions.
-        _heldBatchResults.clear();
-
-        // TODO: This is the only usage of [getAllMutationBatchesThroughBatchId]
-        // Consider removing it in favor of a [getAcknowledgedBatches] method.
-        final int highestAck = _mutationQueue.highestAcknowledgedBatchId;
-        if (highestAck != MutationBatch.unknown) {
-          final List<MutationBatch> batches = await _mutationQueue
-              .getAllMutationBatchesThroughBatchId(highestAck);
-          if (batches.isNotEmpty) {
-            // NOTE: This could be more efficient if we had a
-            // [removeBatchesThroughBatchID], but this set should be very small
-            // and this code should go away eventually.
-            await _mutationQueue.removeMutationBatches(batches);
-          }
-        }
-      },
-    );
+    await _mutationQueue.start();
   }
 
   // PORTING NOTE: no shutdown for [LocalStore] or persistence components on
@@ -217,7 +173,7 @@ class LocalStore {
         await _mutationQueue.getAllMutationBatches();
 
     _mutationQueue = _persistence.getMutationQueue(user);
-    await _startMutationQueue();
+    await _mutationQueue.start();
 
     final List<MutationBatch> newBatches =
         await _mutationQueue.getAllMutationBatches();
@@ -278,20 +234,11 @@ class LocalStore {
     return _persistence.runTransactionAndReturn<
         ImmutableSortedMap<DocumentKey,
             MaybeDocument>>('Acknowledge batch', () async {
-      await _mutationQueue.acknowledgeBatch(
-          batchResult.batch, batchResult.streamToken);
-
-      Set<DocumentKey> affected;
-      if (_shouldHoldBatchResult(batchResult.commitVersion)) {
-        _heldBatchResults.add(batchResult);
-        affected = Set<DocumentKey>();
-      } else {
-        affected =
-            await _releaseBatchResults(<MutationBatchResult>[batchResult]);
-      }
-
+      final MutationBatch batch = batchResult.batch;
+      await _mutationQueue.acknowledgeBatch(batch, batchResult.streamToken);
+      await _applyWriteToRemoteDocuments(batchResult);
       await _mutationQueue.performConsistencyCheck();
-      return _localDocuments.getDocuments(affected);
+      return _localDocuments.getDocuments(batch.keys);
     });
   }
 
@@ -308,14 +255,9 @@ class LocalStore {
       Assert.hardAssert(
           toReject != null, 'Attempt to reject nonexistent batch!');
 
-      final int lastAcked = _mutationQueue.highestAcknowledgedBatchId;
-      Assert.hardAssert(
-          batchId > lastAcked, 'Acknowledged batches can\'t be rejected.');
-
-      final Set<DocumentKey> affectedKeys =
-          await _removeMutationBatch(toReject);
+      await _mutationQueue.removeMutationBatch(toReject);
       await _mutationQueue.performConsistencyCheck();
-      return _localDocuments.getDocuments(affectedKeys);
+      return _localDocuments.getDocuments(toReject.keys);
     });
   }
 
@@ -417,7 +359,8 @@ class LocalStore {
         // resolution failing).
         if (existingDoc == null ||
             doc.version == SnapshotVersion.none ||
-            authoritativeUpdates.contains(doc.key) ||
+            (authoritativeUpdates.contains(doc.key) &&
+                !existingDoc.hasPendingWrites) ||
             doc.version.compareTo(existingDoc.version) >= 0) {
           await _remoteDocuments.add(doc);
         } else {
@@ -443,11 +386,6 @@ class LocalStore {
         await _queryCache.setLastRemoteSnapshotVersion(remoteVersion);
       }
 
-      final Set<DocumentKey> releasedWriteKeys =
-          await _releaseHeldBatchResults();
-
-      // Union the two key sets.
-      changedDocKeys.addAll(releasedWriteKeys);
       return _localDocuments.getDocuments(changedDocKeys);
     });
   }
@@ -585,12 +523,6 @@ class LocalStore {
       }
       await _persistence.referenceDelegate.removeTarget(queryData);
       _targetIds.remove(queryData.targetId);
-
-      // If this was the last watch target, then we won't get any more watch
-      // snapshots, so we should release any held batch results.
-      if (_targetIds.isEmpty) {
-        await _releaseHeldBatchResults();
-      }
     });
   }
 
@@ -606,74 +538,8 @@ class LocalStore {
     return _queryCache.getMatchingKeysForTargetId(targetId);
   }
 
-  /// Releases all the held batch results up to the current remote version
-  /// received, and applies their mutations to the docs in the remote documents
-  /// cache.
-  Future<Set<DocumentKey>> _releaseHeldBatchResults() async {
-    final List<MutationBatchResult> toRelease = <MutationBatchResult>[];
-    for (MutationBatchResult batchResult in _heldBatchResults) {
-      if (!_isRemoteUpToVersion(batchResult.commitVersion)) {
-        break;
-      }
-      toRelease.add(batchResult);
-    }
-
-    if (toRelease.isEmpty) {
-      return Set<DocumentKey>();
-    } else {
-      _heldBatchResults.removeRange(0, toRelease.length);
-      return _releaseBatchResults(toRelease);
-    }
-  }
-
-  bool _isRemoteUpToVersion(SnapshotVersion snapshotVersion) {
-    // If there are no watch targets, then we won't get remote snapshots, and
-    // are always 'up-to-date.'
-    return snapshotVersion.compareTo(_queryCache.lastRemoteSnapshotVersion) <=
-            0 ||
-        _targetIds.isEmpty;
-  }
-
-  bool _shouldHoldBatchResult(SnapshotVersion snapshotVersion) {
-    // Check if watcher isn't up to date or prior results are already held.
-    return !_isRemoteUpToVersion(snapshotVersion) ||
-        _heldBatchResults.isNotEmpty;
-  }
-
-  Future<Set<DocumentKey>> _releaseBatchResults(
-      List<MutationBatchResult> batchResults) async {
-    final List<MutationBatch> batches =
-        List<MutationBatch>(batchResults.length);
-    // TODO: Call queryEngine.handleDocumentChange() as appropriate.
-    int i = 0;
-    for (MutationBatchResult batchResult in batchResults) {
-      await _applyBatchResult(batchResult);
-      batches[i] = batchResult.batch;
-      i++;
-    }
-
-    return _removeMutationBatches(batches);
-  }
-
-  Future<Set<DocumentKey>> _removeMutationBatch(MutationBatch batch) {
-    return _removeMutationBatches(<MutationBatch>[batch]);
-  }
-
-  /// Removes the given mutation batches.
-  Future<Set<DocumentKey>> _removeMutationBatches(
-      List<MutationBatch> batches) async {
-    final Set<DocumentKey> affectedDocs = Set<DocumentKey>();
-    for (MutationBatch batch in batches) {
-      for (Mutation mutation in batch.mutations) {
-        affectedDocs.add(mutation.key);
-      }
-    }
-
-    await _mutationQueue.removeMutationBatches(batches);
-    return affectedDocs;
-  }
-
-  Future<void> _applyBatchResult(MutationBatchResult batchResult) async {
+  Future<void> _applyWriteToRemoteDocuments(
+      MutationBatchResult batchResult) async {
     final MutationBatch batch = batchResult.batch;
     final Set<DocumentKey> docKeys = batch.keys;
     for (DocumentKey docKey in docKeys) {
@@ -689,9 +555,11 @@ class LocalStore {
           Assert.hardAssert(remoteDoc == null,
               'Mutation batch $batch applied to document $remoteDoc resulted in null.');
         } else {
-          await _remoteDocuments.add(doc);
+          _remoteDocuments.add(doc);
         }
       }
     }
+
+    await _mutationQueue.removeMutationBatch(batch);
   }
 }

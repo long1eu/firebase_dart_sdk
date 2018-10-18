@@ -107,59 +107,73 @@ class View {
         }
       }
 
-      if (newDoc != null) {
-        newDocumentSet = newDocumentSet.add(newDoc);
-        if (newDoc.hasLocalMutations) {
-          newMutatedKeys = newMutatedKeys.insert(newDoc.key);
-        } else {
-          newMutatedKeys = newMutatedKeys.remove(newDoc.key);
-        }
-      } else {
-        newDocumentSet = newDocumentSet.remove(key);
-        newMutatedKeys = newMutatedKeys.remove(key);
-      }
+      final bool oldDocHadPendingMutations =
+          oldDoc != null && mutatedKeys.contains(oldDoc.key);
+
+      // We only consider committed mutations for documents that were mutated during the lifetime of
+      // the view.
+      final bool newDocHasPendingMutations = newDoc != null &&
+          (newDoc.hasLocalMutations ||
+              (mutatedKeys.contains(newDoc.key) &&
+                  newDoc.hasCommittedMutations));
+
+      bool changeApplied = false;
+
       // Calculate change
       if (oldDoc != null && newDoc != null) {
         final bool docsEqual = oldDoc.data == newDoc.data;
-        if (!docsEqual ||
-            oldDoc.hasLocalMutations != newDoc.hasLocalMutations) {
-          // only report a change if document actually changed.
-          if (docsEqual) {
-            changeSet.addChange(
-                DocumentViewChange(DocumentViewChangeType.metadata, newDoc));
-          } else {
+        if (!docsEqual) {
+          if (!shouldWaitForSyncedDocument(oldDoc, newDoc)) {
             changeSet.addChange(
                 DocumentViewChange(DocumentViewChangeType.modified, newDoc));
+            changeApplied = true;
           }
-
           if (lastDocInLimit != null &&
               query.comparator(newDoc, lastDocInLimit) > 0) {
-            // This doc moved from inside the limit to after the limit. That
-            // means there may be some doc in the local cache that's actually
-            // less than this one.
+            // This doc moved from inside the limit to after the limit. That means there may be some
+            // doc in the local cache that's actually less than this one.
             needsRefill = true;
           }
+        } else if (oldDocHadPendingMutations != newDocHasPendingMutations) {
+          changeSet.addChange(
+              DocumentViewChange(DocumentViewChangeType.metadata, newDoc));
+          changeApplied = true;
         }
       } else if (oldDoc == null && newDoc != null) {
         changeSet.addChange(
             DocumentViewChange(DocumentViewChangeType.added, newDoc));
+        changeApplied = true;
       } else if (oldDoc != null && newDoc == null) {
         changeSet.addChange(
             DocumentViewChange(DocumentViewChangeType.removed, oldDoc));
+        changeApplied = true;
         if (lastDocInLimit != null) {
-          // A doc was removed from a full limit query. We'll need to requery
-          // from the local cache to see if we know about some other doc that
-          // should be in the results.
+          // A doc was removed from a full limit query. We'll need to requery from the local cache
+          // to see if we know about some other doc that should be in the results.
           needsRefill = true;
+        }
+      }
+
+      if (changeApplied) {
+        if (newDoc != null) {
+          newDocumentSet = newDocumentSet.add(newDoc);
+          if (newDoc.hasLocalMutations) {
+            newMutatedKeys = newMutatedKeys.insert(newDoc.key);
+          } else {
+            newMutatedKeys = newMutatedKeys.remove(newDoc.key);
+          }
+        } else {
+          newDocumentSet = newDocumentSet.remove(key);
+          newMutatedKeys = newMutatedKeys.remove(key);
         }
       }
     }
 
     if (query.hasLimit) {
-      // TODO: Make QuerySnapshot size be constant time.
-      while (newDocumentSet.length > query.getLimit()) {
+      for (int i = newDocumentSet.length - query.getLimit(); i > 0; --i) {
         final Document oldDoc = newDocumentSet.last;
         newDocumentSet = newDocumentSet.remove(oldDoc.key);
+        newMutatedKeys = newMutatedKeys.remove(oldDoc.key);
         changeSet.addChange(
             DocumentViewChange(DocumentViewChangeType.removed, oldDoc));
       }
@@ -170,6 +184,19 @@ class View {
 
     return ViewDocumentChanges._(
         newDocumentSet, changeSet, newMutatedKeys, needsRefill);
+  }
+
+  bool shouldWaitForSyncedDocument(Document oldDoc, Document newDoc) {
+    // We suppress the initial change event for documents that were modified as
+    // part of a write acknowledgment (e.g. when the value of a server transform
+    // is applied) as Watch will send us the same document again. By suppressing
+    // the event, we only raise two user visible events (one with
+    // [hasPendingWrites] and the final state of the document) instead of three
+    // (one with [hasPendingWrites], the modified document with
+    // [hasPendingWrites] and the final state of the document).
+    return oldDoc.hasLocalMutations &&
+        newDoc.hasCommittedMutations &&
+        !newDoc.hasLocalMutations;
   }
 
   /// Updates the view with the given [ViewDocumentChanges] and updates limbo
@@ -212,14 +239,14 @@ class View {
     ViewSnapshot snapshot;
     if (viewChanges.isNotEmpty || syncStatedChanged) {
       final bool fromCache = newSyncState == ViewSnapshotSyncState.local;
-      final bool hasPendingWrites = !docChanges.mutatedKeys.isEmpty;
+
       snapshot = ViewSnapshot(
         query,
         docChanges.documentSet,
         oldDocumentSet,
         viewChanges,
         fromCache,
-        hasPendingWrites,
+        docChanges.mutatedKeys,
         syncStatedChanged,
       );
     }
@@ -341,10 +368,13 @@ class View {
   @override
   String toString() {
     return (ToStringHelper(runtimeType)
-      ..add('query', query)..add('syncState', syncState)..add(
-          'current', current)..add('documentSet', documentSet)..add(
-          'syncedDocuments', syncedDocuments)..add(
-          'limboDocuments', limboDocuments)..add('mutatedKeys', mutatedKeys))
+          ..add('query', query)
+          ..add('syncState', syncState)
+          ..add('current', current)
+          ..add('documentSet', documentSet)
+          ..add('syncedDocuments', syncedDocuments)
+          ..add('limboDocuments', limboDocuments)
+          ..add('mutatedKeys', mutatedKeys))
         .toString();
   }
 }
@@ -375,8 +405,9 @@ class ViewDocumentChanges {
   String toString() {
     return (ToStringHelper(runtimeType)
           ..add('documentSet', documentSet)
-          ..add('changeSet', changeSet)..add('mutatedKeys', mutatedKeys)..add(
-          'needsRefill', needsRefill))
+          ..add('changeSet', changeSet)
+          ..add('mutatedKeys', mutatedKeys)
+          ..add('needsRefill', needsRefill))
         .toString();
   }
 }

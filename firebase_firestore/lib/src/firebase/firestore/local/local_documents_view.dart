@@ -16,7 +16,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// A readonly view of the local state of all documents we're tracking (i.e. we
 /// have a cached version in [remoteDocumentCache] or local mutations for the
@@ -66,7 +65,11 @@ class LocalDocumentsView {
       // one-by-one.
       MaybeDocument maybeDoc = await _getDocument(key, batches);
       // TODO: Don't conflate missing / deleted.
-      maybeDoc ??= NoDocument(key, SnapshotVersion.none);
+      maybeDoc ??= NoDocument(
+        key,
+        SnapshotVersion.none,
+        /*hasCommittedMutations:*/ false,
+      );
       results = results.insert(key, maybeDoc);
     }
     return results;
@@ -121,12 +124,10 @@ class LocalDocumentsView {
         final MaybeDocument baseDoc = results[key];
         final MaybeDocument mutatedDoc =
             mutation.applyToLocalView(baseDoc, baseDoc, batch.localWriteTime);
-        if (mutatedDoc == null || mutatedDoc is NoDocument) {
-          results = results.remove(key);
-        } else if (mutatedDoc is Document) {
+        if (mutatedDoc is Document) {
           results = results.insert(key, mutatedDoc);
         } else {
-          throw Assert.fail('Unknown document type: $mutatedDoc');
+          results = results.remove(key);
         }
       }
     }

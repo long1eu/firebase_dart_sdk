@@ -59,8 +59,11 @@ class MutationQueueTestCase {
   /// Calls [removeMutationBatches] on the mutation queue in a new transaction
   /// and commits.
   Future<void> removeMutationBatches(List<MutationBatch> batches) async {
-    await persistence.runTransaction('Remove mutation batches',
-        () => mutationQueue.removeMutationBatches(batches));
+    await persistence.runTransaction('Remove mutation batches', () async {
+      for (MutationBatch batch in batches) {
+        await mutationQueue.removeMutationBatch(batch);
+      }
+    });
   }
 
   /// Returns the number of mutation batches in the mutation queue.

@@ -381,7 +381,7 @@ class RemoteSerializer {
     final SnapshotVersion version = decodeVersion(response.found.updateTime);
     Assert.hardAssert(version != SnapshotVersion.none,
         'Got a document response with no snapshot version');
-    return Document(key, version, value, false);
+    return Document(key, version, value, DocumentState.SYNCED);
   }
 
   NoDocument _decodeMissingDocument(proto.BatchGetDocumentsResponse response) {
@@ -391,7 +391,7 @@ class RemoteSerializer {
     final SnapshotVersion version = decodeVersion(response.readTime);
     Assert.hardAssert(version != SnapshotVersion.none,
         'Got a no document response with no snapshot version');
-    return NoDocument(key, version);
+    return NoDocument(key, version, /*hasCommittedMutations:*/ false);
   }
 
   // Mutations
@@ -1016,8 +1016,8 @@ class RemoteSerializer {
       Assert.hardAssert(version != SnapshotVersion.none,
           'Got a document change without an update time');
       final ObjectValue data = decodeDocumentFields(docChange.document.fields);
-      final Document document =
-          Document(key, version, data, /*hasLocalMutations:*/ false);
+      final Document document = Document(
+          key, version, data, /*hasLocalMutations:*/ DocumentState.SYNCED);
       watchChange =
           WatchChangeDocumentChange(added, removed, document.key, document);
     } else if (protoChange.hasDocumentDelete()) {
@@ -1026,7 +1026,8 @@ class RemoteSerializer {
       final DocumentKey key = decodeKey(docDelete.document);
       // Note that version might be unset in which case we use SnapshotVersion.none
       final SnapshotVersion version = decodeVersion(docDelete.readTime);
-      final NoDocument doc = NoDocument(key, version);
+      final NoDocument doc =
+          NoDocument(key, version, /*hasCommittedMutations:*/ false);
       watchChange = WatchChangeDocumentChange(<int>[], removed, doc.key, doc);
     } else if (protoChange.hasDocumentRemove()) {
       final proto.DocumentRemove docRemove = protoChange.documentRemove;

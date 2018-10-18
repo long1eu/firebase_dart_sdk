@@ -402,8 +402,8 @@ void main() {
     await testCase.persistence
         .runTransaction('Update a doc in the middle target', () async {
       final SnapshotVersion newVersion = TestUtil.version(3);
-      final Document doc =
-          Document(middleDocToUpdate, newVersion, testCase.testValue, false);
+      final Document doc = Document(middleDocToUpdate, newVersion,
+          testCase.testValue, DocumentState.SYNCED);
       await testCase.documentCache.add(doc);
       await testCase.updateTargetInTransaction(middleTarget);
     });

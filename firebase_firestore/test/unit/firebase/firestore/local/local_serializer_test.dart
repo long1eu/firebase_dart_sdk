@@ -19,6 +19,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/patch_m
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/unknown_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:firebase_firestore/src/proto/firestore/local/maybe_document.pb.dart'
@@ -114,8 +115,7 @@ void main() {
   });
 
   test('testEncodesDocumentAsMaybeDocument', () {
-    final Document document =
-        doc('some/path', 42, map(<String>['foo', 'bar']), false);
+    final Document document = doc('some/path', 42, map(<String>['foo', 'bar']));
 
     final proto.MaybeDocument maybeDocProto = proto.MaybeDocument.create()
       ..document = (proto.Document.create()
@@ -125,7 +125,8 @@ void main() {
           ..value = (proto.Value.create()..stringValue = 'bar'))
         ..updateTime = (proto.Timestamp.create()
           ..seconds = Int64()
-          ..nanos = 42000));
+          ..nanos = 42000))
+      ..hasCommittedMutations = false;
 
     expect(serializer.encodeMaybeDocument(document), maybeDocProto);
     final MaybeDocument decoded = serializer.decodeMaybeDocument(maybeDocProto);
@@ -140,12 +141,30 @@ void main() {
             ..name = 'projects/p/databases/d/documents/some/path'
             ..readTime = (proto.Timestamp.create()
               ..seconds = Int64()
-              ..nanos = 42000)))
+              ..nanos = 42000))
+          ..hasCommittedMutations = false)
         .freeze();
 
     expect(serializer.encodeMaybeDocument(deletedDoc), maybeDocProto);
     final MaybeDocument decoded = serializer.decodeMaybeDocument(maybeDocProto);
     expect(decoded, deletedDoc);
+  });
+
+  test('testEncodesUnknownDocumentAsMaybeDocument', () {
+    final UnknownDocument unknownDoc = TestUtil.unknownDoc('some/path', 42);
+
+    final proto.MaybeDocument maybeDocProto = proto.MaybeDocument.create()
+      ..unknownDocument = (proto.UnknownDocument.create()
+        ..name = 'projects/p/databases/d/documents/some/path'
+        ..version = (proto.Timestamp.create()
+          ..seconds = Int64()
+          ..nanos = 42000))
+      ..hasCommittedMutations = true
+      ..freeze();
+
+    expect(serializer.encodeMaybeDocument(unknownDoc), maybeDocProto);
+    final MaybeDocument decoded = serializer.decodeMaybeDocument(maybeDocProto);
+    expect(decoded, unknownDoc);
   });
 
   test('testEncodesQueryData', () {
@@ -188,6 +207,8 @@ void main() {
 
 // ignore: always_specify_types
 const map = TestUtil.map;
+// ignore: always_specify_types
+const unknownDoc = TestUtil.unknownDoc;
 // ignore: always_specify_types
 const doc = TestUtil.doc;
 // ignore: always_specify_types

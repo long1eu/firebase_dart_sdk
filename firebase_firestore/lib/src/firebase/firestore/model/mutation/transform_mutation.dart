@@ -12,6 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_operation.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/unknown_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
@@ -41,20 +42,20 @@ class TransformMutation extends Mutation {
     Assert.hardAssert(mutationResult.transformResults != null,
         'Transform results missing for TransformMutation.');
 
-    // TODO: Relax enforcement of this precondition
-    // We shouldn't actually enforce the precondition since it already passed on
-    // the backend, but we may not have a local version of the document to
-    // patch, so we use the precondition to prevent incorrectly putting a
-    // partial document into our cache.
     if (!precondition.isValidFor(maybeDoc)) {
-      return maybeDoc;
+      // Since the mutation was not rejected, we know that the precondition
+      // matched on the backend. We therefore must not have the expected version
+      // of the document in our cache and return an [UnknownDocument] with the
+      // known [updateTime].
+      return UnknownDocument(key, mutationResult.version);
     }
 
     final Document doc = _requireDocument(maybeDoc);
     final List<FieldValue> transformResults =
         _serverTransformResults(doc, mutationResult.transformResults);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
-    return Document(key, doc.version, newData, /* hasLocalMutations= */ false);
+    return Document(key, mutationResult.version, newData,
+        DocumentState.COMMITTED_MUTATIONS);
   }
 
   @override
@@ -70,7 +71,7 @@ class TransformMutation extends Mutation {
     final List<FieldValue> transformResults =
         _localTransformResults(localWriteTime, baseDoc);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
-    return Document(key, doc.version, newData, /* hasLocalMutations= */ true);
+    return Document(key, doc.version, newData, DocumentState.LOCAL_MUTATIONS);
   }
 
   /// Asserts that the given [MaybeDocument] is actually a [Document] and

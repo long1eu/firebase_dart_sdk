@@ -18,6 +18,7 @@ import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
 import 'package:firebase_firestore/src/firebase/firestore/source.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:grpc/grpc.dart';
 import 'package:test/test.dart';
 
 import '../../../util/await_helper.dart';
@@ -55,6 +56,29 @@ void main() {
         <dynamic>['desc', 'NewDescription', 'owner.email', 'new@xyz.com']);
     final DocumentSnapshot doc = await documentReference.get();
     expect(doc.data, finalData);
+  });
+
+  test('testCanUpdateAnUnknownDocument', () async {
+    final DocumentReference writerRef =
+        (await testFirestore()).collection('collection').document();
+    final DocumentReference readerRef =
+        (await testFirestore()).collection('collection').document(writerRef.id);
+
+    await writerRef.set(map(<String>['a', 'a']));
+    await readerRef.update(map(<String>['b', 'b']));
+    DocumentSnapshot writerSnap = await writerRef.get(Source.CACHE);
+    expect(writerSnap.exists, isTrue);
+
+    try {
+      await readerRef.get(Source.CACHE);
+      fail('Should have thrown exception');
+    } catch (e) {
+      expect((e as FirebaseFirestoreError).code, StatusCode.unavailable);
+    }
+    writerSnap = await writerRef.get();
+    expect(writerSnap.data, map<String>(<String>['a', 'a', 'b', 'b']));
+    final DocumentSnapshot readerSnap = await readerRef.get();
+    expect(readerSnap.data, map<String>(<String>['a', 'a', 'b', 'b']));
   });
 
   test('testCanMergeDataWithAnExistingDocumentUsingSet', () async {

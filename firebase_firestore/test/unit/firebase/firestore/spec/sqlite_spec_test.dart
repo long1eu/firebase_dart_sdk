@@ -40,11 +40,12 @@ void main() {
         <Pair<String, Map<String, dynamic>>>[];
     final Directory jsonDir =
         Directory('${Directory.current.path}/test/res/json');
-    final List<File> jsonFiles = jsonDir
+    final List<File> jsonFiles = jsonDir //
         .listSync()
         .where((FileSystemEntity it) => it is File && it.path.endsWith('.json'))
         .cast<File>()
         .toList();
+
     jsonFiles.sort((File a, File b) => a.path.compareTo(b.path));
 
     bool exclusiveMode = false;

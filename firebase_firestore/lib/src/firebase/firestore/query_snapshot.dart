@@ -112,7 +112,11 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
 
   QueryDocumentSnapshot _convertDocument(Document document) {
     return QueryDocumentSnapshot.fromDocument(
-        _firestore, document, snapshot.isFromCache);
+      _firestore,
+      document,
+      snapshot.isFromCache,
+      snapshot.mutatedKeys.contains(document.key),
+    );
   }
 
   @override

@@ -19,18 +19,6 @@ class DeleteMutation extends Mutation {
       : super(key, precondition);
 
   @override
-  MaybeDocument applyToLocalView(
-      MaybeDocument maybeDoc, MaybeDocument baseDoc, Timestamp localWriteTime) {
-    verifyKeyMatches(maybeDoc);
-
-    if (!precondition.isValidFor(maybeDoc)) {
-      return maybeDoc;
-    }
-
-    return NoDocument(key, SnapshotVersion.none);
-  }
-
-  @override
   MaybeDocument applyToRemoteDocument(
       MaybeDocument maybeDoc, MutationResult mutationResult) {
     verifyKeyMatches(maybeDoc);
@@ -41,7 +29,27 @@ class DeleteMutation extends Mutation {
     // Unlike applyToLocalView, if we're applying a mutation to a remote
     // document the server has accepted the mutation so the precondition must
     // have held.
-    return NoDocument(key, SnapshotVersion.none);
+    return NoDocument(
+      key,
+      mutationResult.version,
+      /*hasCommittedMutations:*/ true,
+    );
+  }
+
+  @override
+  MaybeDocument applyToLocalView(
+      MaybeDocument maybeDoc, MaybeDocument baseDoc, Timestamp localWriteTime) {
+    verifyKeyMatches(maybeDoc);
+
+    if (!precondition.isValidFor(maybeDoc)) {
+      return maybeDoc;
+    }
+
+    return NoDocument(
+      key,
+      SnapshotVersion.none,
+      /*hasCommittedMutations:*/ false,
+    );
   }
 
   @override

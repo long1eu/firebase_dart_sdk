@@ -153,7 +153,14 @@ class WatchChangeAggregator {
           // queries.
           final DocumentKey key = DocumentKey.fromPath(query.path);
           _removeDocumentFromTarget(
-              targetId, key, NoDocument(key, SnapshotVersion.none));
+            targetId,
+            key,
+            NoDocument(
+              key,
+              SnapshotVersion.none,
+              /*hasCommittedMutations:*/ false,
+            ),
+          );
         } else {
           Assert.hardAssert(expectedCount == 1,
               'Single document existence filter with count: $expectedCount');
@@ -192,7 +199,14 @@ class WatchChangeAggregator {
           if (_pendingDocumentUpdates[key] == null &&
               !_targetContainsDocument(targetId, key)) {
             _removeDocumentFromTarget(
-                targetId, key, NoDocument(key, snapshotVersion));
+              targetId,
+              key,
+              NoDocument(
+                key,
+                snapshotVersion,
+                /*hasCommittedMutations:*/ false,
+              ),
+            );
           }
         }
 

@@ -46,10 +46,6 @@ class MemoryMutationQueue implements MutationQueue {
   @override
   int nextBatchId;
 
-  /// The highest acknowledged mutation in the queue.
-  @override
-  int highestAcknowledgedBatchId;
-
   /// The last received stream token from the server, used to acknowledge which
   /// responses the client has processed. Stream tokens are opaque checkpoint
   /// markers whose only real value is their inclusion in the next request.
@@ -57,6 +53,9 @@ class MemoryMutationQueue implements MutationQueue {
   Uint8List lastStreamToken;
 
   final MemoryPersistence persistence;
+
+  /// The highest acknowledged mutation in the queue.
+  int highestAcknowledgedBatchId;
 
   MemoryMutationQueue(this.persistence)
       : queue = <MutationBatch>[],
@@ -188,25 +187,6 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<List<MutationBatch>> getAllMutationBatchesThroughBatchId(
-      int batchId) async {
-    final int count = queue.length;
-
-    int endIndex = indexOfBatchId(batchId);
-    if (endIndex < 0) {
-      endIndex = 0;
-    } else if (endIndex >= count) {
-      endIndex = count;
-    } else {
-      // The endIndex is in the queue so increment to pull everything in the
-      // queue including it.
-      endIndex += 1;
-    }
-
-    return getAllLiveMutationBatchesBeforeIndex(endIndex);
-  }
-
-  @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
       DocumentKey documentKey) async {
     final DocumentReference start = DocumentReference(documentKey, 0);
@@ -312,67 +292,39 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> removeMutationBatches(List<MutationBatch> batches) async {
-    final int batchCount = batches.length;
-    Assert.hardAssert(
-        batchCount > 0, 'Should not remove mutations when none exist.');
-
-    final int firstBatchId = batches[0].batchId;
-
-    final int queueCount = queue.length;
-
+  Future<void> removeMutationBatch(MutationBatch batch) async {
     // Find the position of the first batch for removal. This need not be the
     // first entry in the queue.
-    final int startIndex = indexOfExistingBatchId(firstBatchId, 'removed');
-    Assert.hardAssert(queue[startIndex].batchId == firstBatchId,
+    final int batchIndex = indexOfExistingBatchId(batch.batchId, 'removed');
+    Assert.hardAssert(queue[batchIndex].batchId == batch.batchId,
         'Removed batches must exist in the queue');
-
-    // Check that removed batches are contiguous (while excluding tombstones).
-    int batchIndex = 1;
-    int queueIndex = startIndex + 1;
-    while (batchIndex < batchCount && queueIndex < queueCount) {
-      final MutationBatch batch = queue[queueIndex];
-      if (batch.isTombstone) {
-        queueIndex++;
-        continue;
-      }
-
-      Assert.hardAssert(batch.batchId == batches[batchIndex].batchId,
-          'Removed batches must be contiguous in the queue');
-      batchIndex++;
-      queueIndex++;
-    }
 
     // Only actually remove batches if removing at the front of the queue.
     // Previously rejected batches may have left tombstones in the queue, so
     // expand the removal range to include any tombstones.
-    if (startIndex == 0) {
-      for (; queueIndex < queueCount; queueIndex++) {
-        final MutationBatch batch = queue[queueIndex];
-        if (!batch.isTombstone) {
+    if (batchIndex == 0) {
+      int endIndex = 1;
+      for (; endIndex < queue.length; endIndex++) {
+        final MutationBatch currentBatch = queue[endIndex];
+        if (!currentBatch.isTombstone) {
           break;
         }
       }
 
-      queue.removeRange(startIndex, queueIndex);
+      queue.removeRange(batchIndex, endIndex);
     } else {
       // Mark tombstones
-      for (int i = startIndex; i < queueIndex; i++) {
-        queue[i] = queue[i].toTombstone();
-      }
+      queue[batchIndex] = queue[batchIndex].toTombstone();
     }
 
     // Remove entries from the index too.
     ImmutableSortedSet<DocumentReference> references = batchesByDocumentKey;
-    for (MutationBatch batch in batches) {
-      final int batchId = batch.batchId;
-      for (Mutation mutation in batch.mutations) {
-        final DocumentKey key = mutation.key;
-        await persistence.referenceDelegate.removeMutationReference(key);
+    for (Mutation mutation in batch.mutations) {
+      final DocumentKey key = mutation.key;
+      await persistence.referenceDelegate.removeMutationReference(key);
 
-        final DocumentReference reference = DocumentReference(key, batchId);
-        references = references.remove(reference);
-      }
+      final DocumentReference reference = DocumentReference(key, batch.batchId);
+      references = references.remove(reference);
     }
 
     batchesByDocumentKey = references;

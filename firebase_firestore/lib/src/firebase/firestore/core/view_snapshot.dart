@@ -4,8 +4,10 @@
 
 import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
 
 /// The possibly states a document can be in w.r.t syncing from local storage to
@@ -22,7 +24,7 @@ class ViewSnapshot {
   final DocumentSet oldDocuments;
   final List<DocumentViewChange> changes;
   final bool isFromCache;
-  final bool hasPendingWrites;
+  final ImmutableSortedSet<DocumentKey> mutatedKeys;
   final bool didSyncStateChange;
 
   ViewSnapshot(
@@ -31,9 +33,11 @@ class ViewSnapshot {
     this.oldDocuments,
     this.changes,
     this.isFromCache,
-    this.hasPendingWrites,
+    this.mutatedKeys,
     this.didSyncStateChange,
   );
+
+  bool get hasPendingWrites => mutatedKeys.isNotEmpty;
 
   ViewSnapshot copyWith({
     Query query,
@@ -41,7 +45,7 @@ class ViewSnapshot {
     DocumentSet oldDocuments,
     List<DocumentViewChange> changes,
     bool isFromCache,
-    bool hasPendingWrites,
+    ImmutableSortedSet<DocumentKey> mutatedKeys,
     bool didSyncStateChange,
   }) {
     return ViewSnapshot(
@@ -50,7 +54,7 @@ class ViewSnapshot {
       oldDocuments ?? this.oldDocuments,
       changes ?? this.changes,
       isFromCache ?? this.isFromCache,
-      hasPendingWrites ?? this.hasPendingWrites,
+      mutatedKeys ?? this.mutatedKeys,
       didSyncStateChange ?? this.didSyncStateChange,
     );
   }
@@ -63,7 +67,7 @@ class ViewSnapshot {
 
     if (other is ViewSnapshot && runtimeType == other.runtimeType) {
       return isFromCache == other.isFromCache &&
-          hasPendingWrites == other.hasPendingWrites &&
+          mutatedKeys == other.mutatedKeys &&
           didSyncStateChange == other.didSyncStateChange &&
           query == other.query &&
           documents == other.documents &&
@@ -80,9 +84,9 @@ class ViewSnapshot {
       documents.hashCode * 31 +
       oldDocuments.hashCode * 31 +
       const DeepCollectionEquality().hash(changes) * 31 +
+      mutatedKeys.hashCode +
       (isFromCache ? 0 : 1) +
-      (hasPendingWrites ? 2 : 3) +
-      (didSyncStateChange ? 4 : 5);
+      (didSyncStateChange ? 2 : 3);
 
   @override
   String toString() {
@@ -92,7 +96,7 @@ class ViewSnapshot {
           ..add('oldDocuments', oldDocuments)
           ..add('changes', changes)
           ..add('isFromCache', isFromCache)
-          ..add('hasPendingWrites', hasPendingWrites)
+          ..add('mutatedKeys', mutatedKeys)
           ..add('didSyncStateChange', didSyncStateChange))
         .toString();
   }

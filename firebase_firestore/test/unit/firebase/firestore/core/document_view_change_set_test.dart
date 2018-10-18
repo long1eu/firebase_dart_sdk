@@ -11,7 +11,7 @@ import '../../../../util/test_util.dart';
 
 void main() async {
   test('testDocumentViewChangeConstructor', () {
-    final Document doc1 = doc('a/b', 0, emptyMap, false);
+    final Document doc1 = doc('a/b', 0, emptyMap);
     const DocumentViewChangeType type = DocumentViewChangeType.modified;
     final DocumentViewChange change = DocumentViewChange(type, doc1);
     expect(doc1, change.document);
@@ -21,15 +21,15 @@ void main() async {
   test('testTrack', () {
     final DocumentViewChangeSet set = DocumentViewChangeSet();
 
-    final Document added = doc('a/1', 0, emptyMap, false);
-    final Document removed = doc('a/2', 0, emptyMap, false);
-    final Document modified = doc('a/3', 0, emptyMap, false);
+    final Document added = doc('a/1', 0, emptyMap);
+    final Document removed = doc('a/2', 0, emptyMap);
+    final Document modified = doc('a/3', 0, emptyMap);
 
-    final Document addedThenModified = doc('b/1', 0, emptyMap, false);
-    final Document addedThenRemoved = doc('b/2', 0, emptyMap, false);
-    final Document removedThenAdded = doc('b/3', 0, emptyMap, false);
-    final Document modifiedThenRemoved = doc('b/4', 0, emptyMap, false);
-    final Document modifiedThenModified = doc('b/5', 0, emptyMap, false);
+    final Document addedThenModified = doc('b/1', 0, emptyMap);
+    final Document addedThenRemoved = doc('b/2', 0, emptyMap);
+    final Document removedThenAdded = doc('b/3', 0, emptyMap);
+    final Document modifiedThenRemoved = doc('b/4', 0, emptyMap);
+    final Document modifiedThenModified = doc('b/5', 0, emptyMap);
 
     set.addChange(DocumentViewChange(DocumentViewChangeType.added, added));
     set.addChange(DocumentViewChange(DocumentViewChangeType.removed, removed));

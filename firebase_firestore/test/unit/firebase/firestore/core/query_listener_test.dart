@@ -49,12 +49,10 @@ void main() {
     final List<ViewSnapshot> otherAccum = <ViewSnapshot>[];
 
     final Query query = Query.atPath(path('rooms'));
-    final Document doc1 =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
-    final Document doc2 =
-        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
-    final Document doc2prime = doc('rooms/hades', 3,
-        map(<String>['name', 'hades', 'owner', 'Jonny']), false);
+    final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']));
+    final Document doc2 = doc('rooms/hades', 2, map(<String>['name', 'hades']));
+    final Document doc2prime =
+        doc('rooms/hades', 3, map(<String>['name', 'hades', 'owner', 'Jonny']));
 
     final QueryListener listener = queryListenerDefault(query, accum);
     final QueryListener otherListener = queryListenerDefault(query, otherAccum);
@@ -89,7 +87,7 @@ void main() {
         DocumentSet.emptySet(snap2.query.comparator),
         <DocumentViewChange>[change1, change4],
         snap2.isFromCache,
-        snap2.hasPendingWrites,
+        snap2.mutatedKeys,
         /*didSyncStateChange:*/
         true);
     expect(otherAccum, <ViewSnapshot>[snap2Prime]);
@@ -143,10 +141,8 @@ void main() {
     final List<ViewSnapshot> filteredAccum = <ViewSnapshot>[];
     final List<ViewSnapshot> fullAccum = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
-    final Document doc1 =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
-    final Document doc2 =
-        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
+    final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']));
+    final Document doc2 = doc('rooms/hades', 2, map(<String>['name', 'hades']));
     const ListenOptions options1 = const ListenOptions();
     const ListenOptions options2 =
         const ListenOptions(includeQueryMetadataChanges: true);
@@ -182,14 +178,11 @@ void main() {
     final List<ViewSnapshot> filteredAccum = <ViewSnapshot>[];
     final List<ViewSnapshot> fullAccum = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
-    final Document doc1 =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
-    final Document doc1Prime =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), true);
-    final Document doc2 =
-        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
-    final Document doc3 =
-        doc('rooms/other', 3, map(<String>['name', 'other']), false);
+    final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']));
+    final Document doc1Prime = doc('rooms/eros', 1,
+        map(<String>['name', 'eros']), DocumentState.LOCAL_MUTATIONS);
+    final Document doc2 = doc('rooms/hades', 2, map(<String>['name', 'hades']));
+    final Document doc3 = doc('rooms/other', 3, map(<String>['name', 'other']));
 
     const ListenOptions options1 = const ListenOptions();
     const ListenOptions options2 =
@@ -223,16 +216,15 @@ void main() {
       () async {
     final List<ViewSnapshot> fullAccum = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
-    final Document doc1 =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), true);
-    final Document doc2 =
-        doc('rooms/hades', 2, map(<String>['name', 'hades']), true);
+    final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']),
+        DocumentState.LOCAL_MUTATIONS);
+    final Document doc2 = doc('rooms/hades', 2, map(<String>['name', 'hades']),
+        DocumentState.LOCAL_MUTATIONS);
     final Document doc1Prime =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
+        doc('rooms/eros', 1, map(<String>['name', 'eros']));
     final Document doc2Prime =
-        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
-    final Document doc3 =
-        doc('rooms/other', 3, map(<String>['name', 'other']), false);
+        doc('rooms/hades', 2, map(<String>['name', 'hades']));
+    final Document doc3 = doc('rooms/other', 3, map(<String>['name', 'other']));
 
     const ListenOptions options =
         const ListenOptions(includeQueryMetadataChanges: true);
@@ -256,7 +248,7 @@ void main() {
         snap3.documents,
         <DocumentViewChange>[],
         snap4.isFromCache,
-        snap4.hasPendingWrites,
+        snap4.mutatedKeys,
         snap4.didSyncStateChange);
     expect(fullAccum, <ViewSnapshot>[snap1, snap3, expectedSnapshot4]);
   });
@@ -264,14 +256,11 @@ void main() {
   test('testMetadataOnlyDocumentChangesAreFilteredOut', () async {
     final List<ViewSnapshot> filteredAccum = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
-    final Document doc1 =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
+    final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']));
     final Document doc1Prime =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), true);
-    final Document doc2 =
-        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
-    final Document doc3 =
-        doc('rooms/other', 3, map(<String>['name', 'other']), false);
+        doc('rooms/eros', 1, map(<String>['name', 'eros']));
+    final Document doc2 = doc('rooms/hades', 2, map(<String>['name', 'hades']));
+    final Document doc3 = doc('rooms/other', 3, map(<String>['name', 'other']));
 
     const ListenOptions options = const ListenOptions();
 
@@ -294,7 +283,7 @@ void main() {
         snap1.documents,
         <DocumentViewChange>[change3],
         snap2.isFromCache,
-        snap2.hasPendingWrites,
+        snap2.mutatedKeys,
         snap2.didSyncStateChange);
     expect(filteredAccum, <ViewSnapshot>[snap1, expectedSnapshot2]);
   });
@@ -303,10 +292,8 @@ void main() {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
 
-    final Document doc1 =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
-    final Document doc2 =
-        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
+    final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']));
+    final Document doc2 = doc('rooms/hades', 2, map(<String>['name', 'hades']));
 
     const ListenOptions options =
         const ListenOptions(waitForSyncWhenOnline: true);
@@ -343,7 +330,7 @@ void main() {
         /*isFromCache:*/
         false,
         /*hasPendingWrites:*/
-        false,
+        snap3.mutatedKeys,
         /*didSyncStateChange:*/
         true);
     expect(events, <ViewSnapshot>[expectedSnapshot]);
@@ -353,10 +340,8 @@ void main() {
     final List<ViewSnapshot> events = <ViewSnapshot>[];
     final Query query = Query.atPath(path('rooms'));
 
-    final Document doc1 =
-        doc('rooms/eros', 1, map(<String>['name', 'eros']), false);
-    final Document doc2 =
-        doc('rooms/hades', 2, map(<String>['name', 'hades']), false);
+    final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']));
+    final Document doc2 = doc('rooms/hades', 2, map(<String>['name', 'hades']));
 
     const ListenOptions options =
         const ListenOptions(waitForSyncWhenOnline: true);
@@ -387,9 +372,10 @@ void main() {
         /* sFromCache:*/
         true,
         /*hasPendingWrites:*/
-        false,
+        snap1.mutatedKeys,
         /*didSyncStateChange:*/
         true);
+
     final ViewSnapshot expectedSnapshot2 = ViewSnapshot(
         snap2.query,
         snap2.documents,
@@ -398,7 +384,7 @@ void main() {
         /*isFromCache:*/
         true,
         /*hasPendingWrites=:*/
-        false,
+        snap2.mutatedKeys,
         /*didSyncStateChange:*/
         false);
     expect(events, <ViewSnapshot>[expectedSnapshot1, expectedSnapshot2]);
@@ -427,7 +413,7 @@ void main() {
         /*isFromCache:*/
         true,
         /*hasPendingWrites:*/
-        false,
+        snap1.mutatedKeys,
         /*didSyncStateChange:*/
         true);
     expect(events, <ViewSnapshot>[expectedSnapshot]);
@@ -456,7 +442,7 @@ void main() {
         /*isFromCache:*/
         true,
         /*hasPendingWrites:*/
-        false,
+        snap1.mutatedKeys,
         /*didSyncStateChange:*/
         true);
     expect(events, <ViewSnapshot>[expectedSnapshot]);

@@ -14,6 +14,15 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 /// [MutationResults].
 class MutationResult {
   /// The version at which the mutation was committed.
+  ///
+  /// <ul>
+  /// <li>For most operations, this is the [updateTime] in the [WriteResult].
+  /// <li>For deletes, it is the [commitTime] of the [WriteResponse] (because
+  /// deletes are not stored and have no updateTime).
+  /// </ul>
+  ///
+  /// * Note that these versions can be different: No-op writes will not change
+  /// the updateTime even though the [commitTime] advances.
   final SnapshotVersion version;
 
   /// The resulting fields returned from the backend after a [TransformMutation]

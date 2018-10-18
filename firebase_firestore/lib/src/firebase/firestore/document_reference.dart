@@ -167,8 +167,10 @@ class DocumentReference {
     if (source == Source.CACHE) {
       final Document doc =
           await firestore.client.getDocumentFromLocalCache(key);
+      final bool hasPendingWrites = doc != null && doc.hasLocalMutations;
 
-      return DocumentSnapshot(firestore, key, doc, /*isFromCache:*/ true);
+      return DocumentSnapshot(
+          firestore, key, doc, /*isFromCache:*/ true, hasPendingWrites);
     } else {
       return _getViaSnapshotListener(source);
     }
@@ -228,11 +230,26 @@ class DocumentReference {
       Assert.hardAssert(snapshot.documents.length <= 1,
           'Too many documents returned on a document query');
       final Document document = snapshot.documents.getDocument(key);
-      return document != null
-          ? DocumentSnapshot.fromDocument(
-              firestore, document, snapshot.isFromCache)
-          : DocumentSnapshot.fromNoDocument(
-              firestore, key, snapshot.isFromCache);
+
+      if (document != null) {
+        final bool hasPendingWrites =
+            snapshot.mutatedKeys.contains(document.key);
+        return DocumentSnapshot.fromDocument(
+          firestore,
+          document,
+          snapshot.isFromCache,
+          hasPendingWrites,
+        );
+      } else {
+        // We don't raise `hasPendingWrites` for deleted documents.
+        final bool hasPendingWrites = false;
+        return DocumentSnapshot.fromNoDocument(
+          firestore,
+          key,
+          snapshot.isFromCache,
+          hasPendingWrites,
+        );
+      }
     });
   }
 

@@ -37,10 +37,11 @@ class TestUtil {
   static DocumentSnapshot documentSnapshot(
       String path, Map<String, Object> data, bool isFromCache) {
     if (data == null) {
-      return DocumentSnapshot.fromNoDocument(firestore, key(path), isFromCache);
+      return DocumentSnapshot.fromNoDocument(
+          firestore, key(path), isFromCache, false);
     } else {
       return DocumentSnapshot.fromDocument(
-          firestore, doc(path, 1, data), isFromCache);
+          firestore, doc(path, 1, data), isFromCache, false);
     }
   }
 
@@ -66,19 +67,40 @@ class TestUtil {
       bool hasPendingWrites,
       bool isFromCache) {
     DocumentSet oldDocuments = docSet(Document.keyComparator);
+    ImmutableSortedSet<DocumentKey> mutatedKeys = DocumentKey.emptyKeySet;
     for (MapEntry<String, ObjectValue> pair in oldDocs.entries) {
-      oldDocuments = oldDocuments.add(
-          docForValue('$path/${pair.key}', 1, pair.value, hasPendingWrites));
+      final String docKey = '$path/${pair.key}';
+      oldDocuments = oldDocuments.add(docForValue(
+          docKey,
+          1,
+          pair.value,
+          hasPendingWrites
+              ? DocumentState.SYNCED
+              : DocumentState.LOCAL_MUTATIONS));
+
+      if (hasPendingWrites) {
+        mutatedKeys = mutatedKeys.insert(key(docKey));
+      }
     }
 
     DocumentSet newDocuments = docSet(Document.keyComparator);
     final List<DocumentViewChange> documentChanges = <DocumentViewChange>[];
     for (MapEntry<String, ObjectValue> pair in docsToAdd.entries) {
-      final Document docToAdd =
-          docForValue('$path/${pair.key}', 1, pair.value, hasPendingWrites);
+      final String docKey = '$path/${pair.key}';
+      final Document docToAdd = docForValue(
+          docKey,
+          1,
+          pair.value,
+          hasPendingWrites
+              ? DocumentState.SYNCED
+              : DocumentState.LOCAL_MUTATIONS);
       newDocuments = newDocuments.add(docToAdd);
       documentChanges
           .add(DocumentViewChange(DocumentViewChangeType.added, docToAdd));
+
+      if (hasPendingWrites) {
+        mutatedKeys = mutatedKeys.insert(key(docKey));
+      }
     }
 
     final ViewSnapshot viewSnapshot = ViewSnapshot(
@@ -87,7 +109,7 @@ class TestUtil {
       oldDocuments,
       documentChanges,
       isFromCache,
-      hasPendingWrites,
+      mutatedKeys,
       true,
     );
 

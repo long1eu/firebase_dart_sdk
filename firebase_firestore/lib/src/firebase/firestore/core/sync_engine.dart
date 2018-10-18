@@ -318,7 +318,11 @@ class SyncEngine implements RemoteStoreCallback {
       // local store's invariants with another method.
       final Map<DocumentKey, MaybeDocument> documentUpdates =
           <DocumentKey, MaybeDocument>{
-        limboKey: NoDocument(limboKey, SnapshotVersion.none)
+        limboKey: NoDocument(
+          limboKey,
+          SnapshotVersion.none,
+          /*hasCommittedMutations:*/ false,
+        )
       };
       final Set<DocumentKey> limboDocuments =
           Set<DocumentKey>.from(<DocumentKey>[limboKey]);

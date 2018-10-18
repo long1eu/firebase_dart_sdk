@@ -14,6 +14,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/unknown_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
@@ -56,9 +57,17 @@ class LocalSerializer {
   proto.MaybeDocument encodeMaybeDocument(MaybeDocument document) {
     final proto.MaybeDocument builder = proto.MaybeDocument.create();
     if (document is NoDocument) {
-      builder.noDocument = _encodeNoDocument(document);
+      builder
+        ..noDocument = _encodeNoDocument(document)
+        ..hasCommittedMutations = document.hasCommittedMutations;
     } else if (document is Document) {
-      builder.document = _encodeDocument(document);
+      builder
+        ..document = _encodeDocument(document)
+        ..hasCommittedMutations = document.hasCommittedMutations;
+    } else if (document is UnknownDocument) {
+      builder
+        ..unknownDocument = _encodeUnknownDocument(document)
+        ..hasCommittedMutations = true;
     } else {
       throw Assert.fail('Unknown document type ${document.runtimeType}');
     }
@@ -69,9 +78,11 @@ class LocalSerializer {
   /// Decodes a MaybeDocument proto to the equivalent model.
   MaybeDocument decodeMaybeDocument(proto.MaybeDocument data) {
     if (data.hasDocument()) {
-      return _decodeDocument(data.document);
+      return _decodeDocument(data.document, data.hasCommittedMutations);
     } else if (data.hasNoDocument()) {
-      return _decodeNoDocument(data.noDocument);
+      return _decodeNoDocument(data.noDocument, data.hasCommittedMutations);
+    } else if (data.hasUnknownDocument()) {
+      return _decodeUnknownDocument(data.unknownDocument);
     } else {
       throw Assert.fail('Unknown MaybeDocument $data');
     }
@@ -99,13 +110,21 @@ class LocalSerializer {
   }
 
   /// Decodes a Document proto to the equivalent model.
-  Document _decodeDocument(proto.Document document) {
+  Document _decodeDocument(
+      proto.Document document, bool hasCommittedMutations) {
     final DocumentKey key = rpcSerializer.decodeKey(document.name);
     final ObjectValue value =
         rpcSerializer.decodeDocumentFields(document.fields);
     final SnapshotVersion version =
         rpcSerializer.decodeVersion(document.updateTime);
-    return Document(key, version, value, false);
+    return Document(
+      key,
+      version,
+      value,
+      hasCommittedMutations
+          ? DocumentState.COMMITTED_MUTATIONS
+          : DocumentState.SYNCED,
+    );
   }
 
   /// Encodes a NoDocument value to the equivalent proto.
@@ -118,10 +137,27 @@ class LocalSerializer {
   }
 
   /// Decodes a NoDocument proto to the equivalent model.
-  NoDocument _decodeNoDocument(proto.NoDocument proto) {
+  NoDocument _decodeNoDocument(
+      proto.NoDocument proto, bool hasCommittedMutations) {
     final DocumentKey key = rpcSerializer.decodeKey(proto.name);
     final SnapshotVersion version = rpcSerializer.decodeVersion(proto.readTime);
-    return NoDocument(key, version);
+    return NoDocument(key, version, hasCommittedMutations);
+  }
+
+  /// Encodes a [UnknownDocument] value to the equivalent proto.
+  proto.UnknownDocument _encodeUnknownDocument(UnknownDocument document) {
+    final proto.UnknownDocument builder = proto.UnknownDocument.create()
+      ..name = rpcSerializer.encodeKey(document.key)
+      ..version = rpcSerializer.encodeTimestamp(document.version.timestamp);
+
+    return builder..freeze();
+  }
+
+  /// Decodes a [UnknownDocument] proto to the equivalent model.
+  UnknownDocument _decodeUnknownDocument(proto.UnknownDocument proto) {
+    final DocumentKey key = rpcSerializer.decodeKey(proto.name);
+    final SnapshotVersion version = rpcSerializer.decodeVersion(proto.version);
+    return UnknownDocument(key, version);
   }
 
   /// Encodes a MutationBatch model for local storage in the mutation queue.

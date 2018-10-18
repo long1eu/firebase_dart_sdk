@@ -23,13 +23,22 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// code and new SDK releases may break code that does so.
 @publicApi
 class QueryDocumentSnapshot extends DocumentSnapshot {
-  QueryDocumentSnapshot._(FirebaseFirestore firestore, DocumentKey key,
-      Document doc, bool isFromCache)
-      : super(firestore, key, doc, isFromCache);
+  QueryDocumentSnapshot._(
+    FirebaseFirestore firestore,
+    DocumentKey key,
+    Document doc,
+    bool isFromCache,
+    bool hasPendingWrites,
+  ) : super(firestore, key, doc, isFromCache, hasPendingWrites);
 
   factory QueryDocumentSnapshot.fromDocument(
-      FirebaseFirestore firestore, Document doc, bool fromCache) {
-    return QueryDocumentSnapshot._(firestore, doc.key, doc, fromCache);
+    FirebaseFirestore firestore,
+    Document doc,
+    bool fromCache,
+    bool hasPendingWrites,
+  ) {
+    return QueryDocumentSnapshot._(
+        firestore, doc.key, doc, fromCache, hasPendingWrites);
   }
 
   /// Returns the fields of the document as a Map. Field values will be

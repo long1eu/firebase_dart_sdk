@@ -36,11 +36,11 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']), false);
+        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
     final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']), false);
+        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
     final Document doc3 =
-        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']), false);
+        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
 
     final ImmutableSortedMap<DocumentKey, Document> updates =
         docUpdates(<Document>[doc1, doc2, doc3]);
@@ -64,11 +64,11 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']), false);
+        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
     final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']), false);
+        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
     final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<String>['text', 'msg3']), false);
+        doc('rooms/eros/messages/3', 0, map(<String>['text', 'msg3']));
 
     // initial state
     applyChanges(view, <Document>[doc1, doc2]);
@@ -96,9 +96,9 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']), false);
+        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
     final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']), false);
+        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
 
     // initial state
     applyChanges(view, <Document>[doc1, doc2]);
@@ -121,15 +121,15 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['sort', 1]), false);
+        doc('rooms/eros/messages/1', 0, map(<dynamic>['sort', 1]));
     final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['sort', 2]), false);
+        doc('rooms/eros/messages/2', 0, map(<dynamic>['sort', 2]));
     final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<dynamic>['sort', 3]), false);
+        doc('rooms/eros/messages/3', 0, map(<dynamic>['sort', 3]));
     final Document doc4 =
-        doc('rooms/eros/messages/4', 0, map(), false); // no sort, no match
+        doc('rooms/eros/messages/4', 0, map()); // no sort, no match
     final Document doc5 =
-        doc('rooms/eros/messages/5', 0, map(<dynamic>['sort', 1]), false);
+        doc('rooms/eros/messages/5', 0, map(<dynamic>['sort', 1]));
 
     final ViewSnapshot snapshot =
         applyChanges(view, <Document>[doc1, doc2, doc3, doc4, doc5]).snapshot;
@@ -150,12 +150,12 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['sort', 1]), false);
+        doc('rooms/eros/messages/1', 0, map(<dynamic>['sort', 1]));
     final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['sort', 3]), false);
+        doc('rooms/eros/messages/2', 0, map(<dynamic>['sort', 3]));
     final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<dynamic>['sort', 2]), false);
-    final Document doc4 = doc('rooms/eros/messages/4', 0, map(), false);
+        doc('rooms/eros/messages/3', 0, map(<dynamic>['sort', 2]));
+    final Document doc4 = doc('rooms/eros/messages/4', 0, map());
 
     ViewSnapshot snapshot =
         applyChanges(view, <Document>[doc1, doc2, doc3, doc4]).snapshot;
@@ -164,11 +164,11 @@ void main() {
     expect(snapshot.documents.toList(), <Document>[doc1, doc3]);
 
     final Document newDoc2 =
-        doc('rooms/eros/messages/2', 1, map(<dynamic>['sort', 2]), false);
+        doc('rooms/eros/messages/2', 1, map(<dynamic>['sort', 2]));
     final Document newDoc3 =
-        doc('rooms/eros/messages/3', 1, map(<dynamic>['sort', 3]), false);
+        doc('rooms/eros/messages/3', 1, map(<dynamic>['sort', 3]));
     final Document newDoc4 =
-        doc('rooms/eros/messages/4', 1, map(<dynamic>['sort', 0]), false);
+        doc('rooms/eros/messages/4', 1, map(<dynamic>['sort', 0]));
 
     snapshot =
         applyChanges(view, <Document>[newDoc2, newDoc3, newDoc4]).snapshot;
@@ -190,11 +190,11 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']), false);
+        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
     final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']), false);
+        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
     final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<String>['text', 'msg3']), false);
+        doc('rooms/eros/messages/3', 0, map(<String>['text', 'msg3']));
 
     // initial state
     applyChanges(view, <Document>[doc1, doc3]);
@@ -219,13 +219,12 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['num', 1]), false);
-    Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['num', 2]), false);
+        doc('rooms/eros/messages/1', 0, map(<dynamic>['num', 1]));
+    Document doc2 = doc('rooms/eros/messages/2', 0, map(<dynamic>['num', 2]));
     final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<dynamic>['num', 3]), false);
+        doc('rooms/eros/messages/3', 0, map(<dynamic>['num', 3]));
     final Document doc4 =
-        doc('rooms/eros/messages/4', 0, map(<dynamic>['num', 4]), false);
+        doc('rooms/eros/messages/4', 0, map(<dynamic>['num', 4]));
 
     applyChanges(view, <Document>[doc1, doc2]);
 
@@ -233,7 +232,7 @@ void main() {
     // doc2 will be modified + removed = removed
     // doc3 will be added
     // doc4 will be added + removed = nothing
-    doc2 = doc('rooms/eros/messages/2', 1, map(<dynamic>['num', 5]), false);
+    doc2 = doc('rooms/eros/messages/2', 1, map(<dynamic>['num', 5]));
     ViewDocumentChanges viewDocChanges =
         view.computeDocChanges(docUpdates(<Document>[doc2, doc3, doc4]));
     expect(viewDocChanges.needsRefill, isTrue);
@@ -259,9 +258,9 @@ void main() {
   test('testKeepsTrackOfLimboDocuments', () {
     final Query query = messageQuery();
     final View view = View(query, DocumentKey.emptyKeySet);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), false);
-    final Document doc3 = doc('rooms/eros/messages/2', 0, map(), false);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 = doc('rooms/eros/messages/1', 0, map());
+    final Document doc3 = doc('rooms/eros/messages/2', 0, map());
 
     ViewChange change = applyChanges(view, <Document>[doc1]);
     expect(change.limboChanges.isEmpty, isTrue);
@@ -302,8 +301,8 @@ void main() {
 
   test('testResumingQueryCreatesNoLimbos', () {
     final Query query = messageQuery();
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), false);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 = doc('rooms/eros/messages/1', 0, map());
 
     // Unlike other cases, here the view is initialized with a set of previously synced documents
     // which happens when listening to a previously listened-to query.
@@ -317,8 +316,8 @@ void main() {
 
   test('testReturnsNeedsRefillOnDeleteInLimitQuery', () {
     final Query query = messageQuery().limit(2);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), false);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 = doc('rooms/eros/messages/1', 0, map());
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -346,11 +345,10 @@ void main() {
   test('testReturnsNeedsRefillOnReorderInLimitQuery', () {
     final Query query = messageQuery().orderBy(orderBy('order')).limit(2);
     final Document doc1 =
-        doc('rooms/eros/messages/0', 0, map(<dynamic>['order', 1]), false);
-    Document doc2 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['order', 2]), false);
+        doc('rooms/eros/messages/0', 0, map(<dynamic>['order', 1]));
+    Document doc2 = doc('rooms/eros/messages/1', 0, map(<dynamic>['order', 2]));
     final Document doc3 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['order', 3]), false);
+        doc('rooms/eros/messages/2', 0, map(<dynamic>['order', 3]));
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -362,8 +360,7 @@ void main() {
     view.applyChanges(changes);
 
     // Move one of the docs.
-    doc2 =
-        doc('rooms/eros/messages/1', 1, map(<dynamic>['order', 2000]), false);
+    doc2 = doc('rooms/eros/messages/1', 1, map(<dynamic>['order', 2000]));
     changes = view.computeDocChanges(docUpdates(<Document>[doc2]));
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isTrue);
@@ -379,16 +376,15 @@ void main() {
 
   test('testDoesNotNeedRefillOnReorderWithinLimit', () {
     final Query query = messageQuery().orderBy(orderBy('order')).limit(3);
-    Document doc1 =
-        doc('rooms/eros/messages/0', 0, map(<dynamic>['order', 1]), false);
+    Document doc1 = doc('rooms/eros/messages/0', 0, map(<dynamic>['order', 1]));
     final Document doc2 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['order', 2]), false);
+        doc('rooms/eros/messages/1', 0, map(<dynamic>['order', 2]));
     final Document doc3 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['order', 3]), false);
+        doc('rooms/eros/messages/2', 0, map(<dynamic>['order', 3]));
     final Document doc4 =
-        doc('rooms/eros/messages/3', 0, map(<dynamic>['order', 4]), false);
+        doc('rooms/eros/messages/3', 0, map(<dynamic>['order', 4]));
     final Document doc5 =
-        doc('rooms/eros/messages/4', 0, map(<dynamic>['order', 5]), false);
+        doc('rooms/eros/messages/4', 0, map(<dynamic>['order', 5]));
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -400,7 +396,7 @@ void main() {
     view.applyChanges(changes);
 
     // Move one of the docs.
-    doc1 = doc('rooms/eros/messages/0', 1, map(<dynamic>['order', 3]), false);
+    doc1 = doc('rooms/eros/messages/0', 1, map(<dynamic>['order', 3]));
     changes = view.computeDocChanges(docUpdates(<Document>[doc1]));
     expect(changes.documentSet.length, 3);
     expect(changes.needsRefill, isFalse);
@@ -411,15 +407,14 @@ void main() {
   test('testDoesNotNeedRefillOnReorderAfterLimitQuery', () {
     final Query query = messageQuery().orderBy(orderBy('order')).limit(3);
     final Document doc1 =
-        doc('rooms/eros/messages/0', 0, map(<dynamic>['order', 1]), false);
+        doc('rooms/eros/messages/0', 0, map(<dynamic>['order', 1]));
     final Document doc2 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['order', 2]), false);
+        doc('rooms/eros/messages/1', 0, map(<dynamic>['order', 2]));
     final Document doc3 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['order', 3]), false);
-    Document doc4 =
-        doc('rooms/eros/messages/3', 0, map(<dynamic>['order', 4]), false);
+        doc('rooms/eros/messages/2', 0, map(<dynamic>['order', 3]));
+    Document doc4 = doc('rooms/eros/messages/3', 0, map(<dynamic>['order', 4]));
     final Document doc5 =
-        doc('rooms/eros/messages/4', 0, map(<dynamic>['order', 5]), false);
+        doc('rooms/eros/messages/4', 0, map(<dynamic>['order', 5]));
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -431,7 +426,7 @@ void main() {
     view.applyChanges(changes);
 
     // Move one of the docs.
-    doc4 = doc('rooms/eros/messages/3', 1, map(<dynamic>['order', 6]), false);
+    doc4 = doc('rooms/eros/messages/3', 1, map(<dynamic>['order', 6]));
     changes = view.computeDocChanges(docUpdates(<Document>[doc4]));
     expect(changes.documentSet.length, 3);
     expect(changes.needsRefill, isFalse);
@@ -441,8 +436,8 @@ void main() {
 
   test('testDoesNotNeedRefillForAdditionAfterTheLimit', () {
     final Query query = messageQuery().limit(2);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), false);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 = doc('rooms/eros/messages/1', 0, map());
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -464,8 +459,8 @@ void main() {
 
   test('testDoesNotNeedRefillForDeletionsWhenNotNearTheLimit', () {
     final Query query = messageQuery().limit(20);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), false);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 = doc('rooms/eros/messages/1', 0, map());
     final View view = View(query, DocumentKey.emptyKeySet);
 
     ViewDocumentChanges changes =
@@ -486,8 +481,8 @@ void main() {
 
   test('testHandlesApplyingIrrelevantDocs', () {
     final Query query = messageQuery().limit(2);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), false);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 = doc('rooms/eros/messages/1', 0, map());
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -508,9 +503,9 @@ void main() {
   });
 
   test('testComputesMutatedDocumentKeys', () {
-    final Query query = messageQuery().limit(2);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), false);
+    final Query query = messageQuery();
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 = doc('rooms/eros/messages/1', 0, map());
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -519,7 +514,8 @@ void main() {
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet());
 
-    final Document doc3 = doc('rooms/eros/messages/2', 0, map(), true);
+    final Document doc3 =
+        doc('rooms/eros/messages/2', 0, map(), DocumentState.LOCAL_MUTATIONS);
     changes = view.computeDocChanges(docUpdates(<Document>[doc3]));
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc3.key]));
@@ -528,8 +524,9 @@ void main() {
   test('testRemovesKeysFromMutatedDocumentKeysWhenNewDocDoesNotHaveChanges',
       () {
     final Query query = messageQuery().limit(2);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), true);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 =
+        doc('rooms/eros/messages/1', 0, map(), DocumentState.LOCAL_MUTATIONS);
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -538,7 +535,7 @@ void main() {
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
 
-    final Document doc2Prime = doc('rooms/eros/messages/1', 0, map(), false);
+    final Document doc2Prime = doc('rooms/eros/messages/1', 0, map());
 
     changes = view.computeDocChanges(docUpdates(<Document>[doc2Prime]));
     view.applyChanges(changes);
@@ -547,8 +544,9 @@ void main() {
 
   test('testRemembersLocalMutationsFromPreviousSnapshot', () {
     final Query query = messageQuery().limit(2);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), true);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 =
+        doc('rooms/eros/messages/1', 0, map(), DocumentState.LOCAL_MUTATIONS);
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -557,15 +555,16 @@ void main() {
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
 
-    final Document doc3 = doc('rooms/eros/messages/2', 0, map(), false);
+    final Document doc3 = doc('rooms/eros/messages/2', 0, map());
     changes = view.computeDocChanges(docUpdates(<Document>[doc3]));
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
   });
 
   test('testRemembersLocalMutationsFromPreviousCallToComputeChanges', () {
     final Query query = messageQuery().limit(2);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map(), false);
-    final Document doc2 = doc('rooms/eros/messages/1', 0, map(), true);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 =
+        doc('rooms/eros/messages/1', 0, map(), DocumentState.LOCAL_MUTATIONS);
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
@@ -573,9 +572,85 @@ void main() {
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
 
-    final Document doc3 = doc('rooms/eros/messages/2', 0, map(), false);
+    final Document doc3 = doc('rooms/eros/messages/2', 0, map());
     changes = view.computeDocChanges(docUpdates(<Document>[doc3]), changes);
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
+  });
+
+  test('testRaisesHasPendingWritesForPendingMutationsInInitialSnapshot', () {
+    final Query query = messageQuery();
+    final Document doc1 =
+        doc('rooms/eros/messages/1', 0, map(), DocumentState.LOCAL_MUTATIONS);
+    final View view = View(query, DocumentKey.emptyKeySet);
+
+    final ViewDocumentChanges changes =
+        view.computeDocChanges(docUpdates(<MaybeDocument>[doc1]));
+    final ViewChange viewChange = view.applyChanges(changes);
+
+    expect(viewChange.snapshot.hasPendingWrites, isTrue);
+  });
+
+  test('testDoesntRaiseHasPendingWritesForCommittedMutationsInInitialSnapshot',
+      () {
+    final Query query = messageQuery();
+    final Document doc1 = doc(
+        'rooms/eros/messages/1', 0, map(), DocumentState.COMMITTED_MUTATIONS);
+    final View view = View(query, DocumentKey.emptyKeySet);
+
+    final ViewDocumentChanges changes =
+        view.computeDocChanges(docUpdates(<MaybeDocument>[doc1]));
+    final ViewChange viewChange = view.applyChanges(changes);
+
+    expect(viewChange.snapshot.hasPendingWrites, isFalse);
+  });
+
+  test('testSuppressesWriteAcknowledgementIfWatchHasNotCaughtUp', () {
+    // This test verifies that we don't get three events for a ServerTimestamp mutation. We suppress
+    // the event generated by the write acknowledgement and instead wait for Watch to catch up.
+    final Query query = messageQuery();
+
+    final Document doc1 = doc('rooms/eros/messages/1', 1,
+        map(<dynamic>['time', 1]), DocumentState.LOCAL_MUTATIONS);
+    final Document doc1Committed = doc('rooms/eros/messages/1', 2,
+        map(<dynamic>['time', 2]), DocumentState.COMMITTED_MUTATIONS);
+    final Document doc1Acknowledged = doc('rooms/eros/messages/1', 2,
+        map(<dynamic>['time', 2]), DocumentState.SYNCED);
+
+    final Document doc2 = doc('rooms/eros/messages/2', 1,
+        map(<dynamic>['time', 1]), DocumentState.LOCAL_MUTATIONS);
+    final Document doc2Modified = doc('rooms/eros/messages/2', 2,
+        map(<dynamic>['time', 3]), DocumentState.LOCAL_MUTATIONS);
+    final Document doc2Acknowledged = doc('rooms/eros/messages/2', 2,
+        map(<dynamic>['time', 3]), DocumentState.SYNCED);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+
+    ViewDocumentChanges changes =
+        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+    ViewChange snap = view.applyChanges(changes);
+
+    expect(snap.snapshot.changes, <DocumentViewChange>[
+      DocumentViewChange(DocumentViewChangeType.added, doc1),
+      DocumentViewChange(DocumentViewChangeType.added, doc2)
+    ]);
+
+    changes = view
+        .computeDocChanges(docUpdates(<Document>[doc1Committed, doc2Modified]));
+    snap = view.applyChanges(changes);
+
+    // The 'doc1Committed' update is suppressed
+    expect(snap.snapshot.changes, <DocumentViewChange>[
+      DocumentViewChange(DocumentViewChangeType.modified, doc2Modified)
+    ]);
+
+    changes = view.computeDocChanges(
+        docUpdates(<Document>[doc1Acknowledged, doc2Acknowledged]));
+    snap = view.applyChanges(changes);
+
+    expect(snap.snapshot.changes, <DocumentViewChange>[
+      DocumentViewChange(DocumentViewChangeType.modified, doc1Acknowledged),
+      DocumentViewChange(DocumentViewChangeType.metadata, doc2Acknowledged)
+    ]);
   });
 }
 

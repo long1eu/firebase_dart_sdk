@@ -47,21 +47,31 @@ class DocumentSnapshot {
   @publicApi
   final SnapshotMetadata metadata;
 
-  DocumentSnapshot(this._firestore, this._key, this.document, bool isFromCache)
-      : metadata = SnapshotMetadata(
-            document != null && document.hasLocalMutations, isFromCache),
+  DocumentSnapshot(
+    this._firestore,
+    this._key,
+    this.document,
+    bool isFromCache,
+    bool hasPendingWrites,
+  )   : metadata = SnapshotMetadata(hasPendingWrites, isFromCache),
         assert(_firestore != null),
         assert(_key != null);
 
   factory DocumentSnapshot.fromDocument(
-      FirebaseFirestore firestore, Document doc, bool fromCache) {
-    return DocumentSnapshot(firestore, doc.key, doc, fromCache);
-  }
+    FirebaseFirestore firestore,
+    Document doc,
+    bool fromCache,
+    bool hasPendingWrites,
+  ) =>
+      DocumentSnapshot(firestore, doc.key, doc, fromCache, hasPendingWrites);
 
   factory DocumentSnapshot.fromNoDocument(
-      FirebaseFirestore firestore, DocumentKey key, bool fromCache) {
-    return DocumentSnapshot(firestore, key, null, fromCache);
-  }
+    FirebaseFirestore firestore,
+    DocumentKey key,
+    bool fromCache,
+    bool hasPendingWrites,
+  ) =>
+      DocumentSnapshot(firestore, key, null, fromCache, hasPendingWrites);
 
   /// @return The id of the document.
   @publicApi

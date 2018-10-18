@@ -16,9 +16,9 @@ void main() {
     return leftValue.compareTo(rightValue);
   };
 
-  final Document _kDoc1 = doc('docs/1', 0, map(<dynamic>['sort', 2]), false);
-  final Document _kDoc2 = doc('docs/2', 0, map(<dynamic>['sort', 3]), false);
-  final Document _kDoc3 = doc('docs/3', 0, map(<dynamic>['sort', 1]), false);
+  final Document _kDoc1 = doc('docs/1', 0, map(<dynamic>['sort', 2]));
+  final Document _kDoc2 = doc('docs/2', 0, map(<dynamic>['sort', 3]));
+  final Document _kDoc3 = doc('docs/3', 0, map(<dynamic>['sort', 1]));
 
   test('testCount', () {
     expect(docSet(testComparator).length, 0);
@@ -88,8 +88,7 @@ void main() {
   test('testUpdates', () {
     DocumentSet set =
         docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
-    final Document doc2Prime =
-        doc('docs/2', 0, map(<dynamic>['sort', 9]), false);
+    final Document doc2Prime = doc('docs/2', 0, map(<dynamic>['sort', 9]));
 
     set = set.add(doc2Prime);
     expect(set.length, 3);
@@ -97,8 +96,8 @@ void main() {
     expect(set.toList(), <Document>[_kDoc3, _kDoc1, doc2Prime]);
   });
   test('testAddsDocsWithEqualComparisonValues', () {
-    final Document doc1 = doc('docs/1', 0, map(<dynamic>['sort', 2]), false);
-    final Document doc2 = doc('docs/2', 0, map(<dynamic>['sort', 2]), false);
+    final Document doc1 = doc('docs/1', 0, map(<dynamic>['sort', 2]));
+    final Document doc2 = doc('docs/2', 0, map(<dynamic>['sort', 2]));
 
     final DocumentSet set = docSet(testComparator, <Document>[doc1, doc2]);
     expect(set.toList(), <Document>[doc1, doc2]);

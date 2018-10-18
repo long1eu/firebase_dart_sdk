@@ -190,10 +190,8 @@ class _MockWatchStream extends WatchStream {
   Future<void> writeWatchChange(
       WatchChange change, SnapshotVersion snapshotVersion) async {
     if (change is WatchChangeWatchTargetChange) {
-      final WatchChangeWatchTargetChange targetChange = change;
-      if (targetChange.cause != null &&
-          targetChange.cause.code != StatusCode.ok) {
-        for (int targetId in targetChange.targetIds) {
+      if (change.cause != null && change.cause.code != StatusCode.ok) {
+        for (int targetId in change.targetIds) {
           if (!_activeTargets.containsKey(targetId)) {
             // Technically removing an unknown target is valid (e.g. it could
             // race with a server-side removal), but we want to pay extra
@@ -204,7 +202,8 @@ class _MockWatchStream extends WatchStream {
           _activeTargets.remove(targetId);
         }
       }
-      if (targetChange.targetIds.isNotEmpty) {
+
+      if (change.targetIds.isNotEmpty) {
         // If the list of target IDs is not empty, we reset the snapshot version
         // to [none] as done in
         // `RemoteSerializer.decodeVersionFromListenResponse()`.

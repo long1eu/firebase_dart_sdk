@@ -122,13 +122,25 @@ class Transaction {
     if (result.length != 1) {
       throw Assert.fail('Mismatch in docs returned from document lookup.');
     }
+
     final MaybeDocument doc = result.first;
-    if (doc is NoDocument) {
-      return DocumentSnapshot.fromNoDocument(
-          _firestore, doc.key, /*fromCache:*/ false);
-    } else {
+    if (doc is Document) {
       return DocumentSnapshot.fromDocument(
-          _firestore, doc as Document, /*fromCache:*/ false);
+        _firestore,
+        doc,
+        /*fromCache:*/ false,
+        /*hasPendingWrites:*/ false,
+      );
+    } else if (doc is NoDocument) {
+      return DocumentSnapshot.fromNoDocument(
+        _firestore,
+        doc.key,
+        /*fromCache:*/ false,
+        /*hasPendingWrites:*/ false,
+      );
+    } else {
+      throw Assert.fail(
+          'BatchGetDocumentsRequest returned unexpected document type: ${doc.runtimeType}');
     }
   }
 }

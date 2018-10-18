@@ -12,6 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.da
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/set_mutation.dart';
@@ -61,15 +62,17 @@ void main() {
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
 
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
 
     await testCase.acknowledgeMutation(0);
+
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), false)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.COMMITTED_MUTATIONS)
     ]);
 
     if (testCase.garbageCollectorIsEager) {
@@ -77,8 +80,8 @@ void main() {
       // are no targets active.
       await testCase.assertNotContains('foo/bar');
     } else {
-      await testCase.assertContains(
-          doc('foo/bar', 0, map(<String>['foo', 'bar']), false));
+      await testCase.assertContains(doc('foo/bar', 0,
+          map(<String>['foo', 'bar']), DocumentState.COMMITTED_MUTATIONS));
     }
   });
 
@@ -86,22 +89,62 @@ void main() {
     await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
     final int targetId = await testCase.allocateQuery(query);
     await testCase.applyRemoteEvent(TestUtil.updateRemoteEvent(
-        doc('foo/bar', 2, map(<String>['it', 'changed']), true),
+        doc('foo/bar', 2, map(<String>['it', 'changed']),
+            DocumentState.LOCAL_MUTATIONS),
         <int>[targetId],
         <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 2, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 2, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
+    await testCase.assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
+  });
+
+  test('testHandlesSetMutationThenAckThenRelease', () async {
+    final Query query =
+        Query.atPath(ResourcePath.fromSegments(<String>['foo']));
+    await testCase.allocateQuery(query);
+
     await testCase
-        .assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']), true));
+        .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
+    await testCase.notifyLocalViewChanges(
+        viewChanges(2, <String>['foo/bar'], <String>[]));
+
+    testCase.assertChanged(<Document>[
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
+    ]);
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
+
+    await testCase.acknowledgeMutation(1);
+
+    testCase.assertChanged(<Document>[
+      doc('foo/bar', 1, map(<String>['foo', 'bar']),
+          DocumentState.COMMITTED_MUTATIONS)
+    ]);
+    await testCase.assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']),
+        DocumentState.COMMITTED_MUTATIONS));
+
+    await testCase.releaseQuery(query);
+
+    // It has been acknowledged, and should no longer be retained as there is no target and mutation
+    if (testCase.garbageCollectorIsEager) {
+      await testCase.assertNotContains('foo/bar');
+    } else {
+      await testCase.assertContains(doc('foo/bar', 1,
+          map(<String>['foo', 'bar']), DocumentState.COMMITTED_MUTATIONS));
+    }
   });
 
   test('testHandlesAckThenRejectThenRemoteEvent', () async {
@@ -113,38 +156,45 @@ void main() {
     await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
 
     // The last seen version is zero, so this ack must be held.
     await testCase.acknowledgeMutation(1);
-    testCase.assertChanged();
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
+    if (testCase.garbageCollectorIsEager) {
+      // Nothing is pinning this anymore, as it has been acknowledged and there are no targets
+      // active.
+      await testCase.assertNotContains('foo/bar');
+    } else {
+      await testCase.assertContains(doc('foo/bar', 1,
+          map(<String>['foo', 'bar']), DocumentState.COMMITTED_MUTATIONS));
+    }
 
     await testCase
         .writeMutation(setMutation('bar/baz', map(<String>['bar', 'baz'])));
     testCase.assertChanged(<Document>[
-      doc('bar/baz', 0, map(<String>['bar', 'baz']), true)
+      doc('bar/baz', 0, map(<String>['bar', 'baz']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('bar/baz', 0, map(<String>['bar', 'baz']), true));
+    await testCase.assertContains(doc('bar/baz', 0, map(<String>['bar', 'baz']),
+        DocumentState.LOCAL_MUTATIONS));
 
     await testCase.rejectMutation();
     testCase.assertRemoved(<String>['bar/baz']);
     await testCase.assertNotContains('bar/baz');
 
     await testCase.applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 2, map(<String>['it', 'changed']), false),
+        doc('foo/bar', 2, map(<String>['it', 'changed'])),
         <int>[targetId],
         <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 2, map(<String>['it', 'changed']), false)
+      doc('foo/bar', 2, map(<String>['it', 'changed']))
     ]);
-    await testCase.assertContains(
-        doc('foo/bar', 2, map(<String>['it', 'changed']), false));
+    await testCase
+        .assertContains(doc('foo/bar', 2, map(<String>['it', 'changed'])));
     await testCase.assertNotContains('bar/baz');
   });
 
@@ -165,15 +215,17 @@ void main() {
     await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
 
     await testCase.releaseQuery(query);
     await testCase.acknowledgeMutation(3);
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), false)
+      doc('foo/bar', 3, map(<String>['foo', 'bar']),
+          DocumentState.COMMITTED_MUTATIONS)
     ]);
     // It has been acknowledged, and should no longer be retained as there is no
     // target and mutation
@@ -188,55 +240,60 @@ void main() {
     await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
 
     await testCase.applyRemoteEvent(
         updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
   });
 
   test('testHandlesDocumentThenSetMutationThenAckThenDocument', () async {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
     final int targetId = await testCase.allocateQuery(query);
     await testCase.applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 2, map(<String>['it', 'base']), false),
+        doc('foo/bar', 2, map(<String>['it', 'base'])),
         <int>[targetId],
         <int>[]));
 
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 2, map(<String>['it', 'base']), false)
+      doc('foo/bar', 2, map(<String>['it', 'base']))
     ]);
     await testCase
-        .assertContains(doc('foo/bar', 2, map(<String>['it', 'base']), false));
+        .assertContains(doc('foo/bar', 2, map(<String>['it', 'base'])));
 
     await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 2, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 2, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
 
     await testCase.acknowledgeMutation(3);
-    // We haven't seen the remote event yet.
-    testCase.assertChanged();
-    await testCase
-        .assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']), true));
+    testCase.assertChanged(<Document>[
+      doc('foo/bar', 3, map(<String>['foo', 'bar']),
+          DocumentState.COMMITTED_MUTATIONS)
+    ]);
+    await testCase.assertContains(doc('foo/bar', 3, map(<String>['foo', 'bar']),
+        DocumentState.COMMITTED_MUTATIONS));
 
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 3, map(<String>['it', 'changed']), false),
+        doc('foo/bar', 3, map(<String>['it', 'changed'])),
         <int>[targetId],
         <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 3, map(<String>['it', 'changed']), false)
+      doc('foo/bar', 3, map(<String>['it', 'changed']))
     ]);
-    await testCase.assertContains(
-        doc('foo/bar', 3, map(<String>['it', 'changed']), false));
+    await testCase
+        .assertContains(doc('foo/bar', 3, map(<String>['it', 'changed'])));
   });
 
   test('testHandlesPatchWithoutPriorDocument', () async {
@@ -246,8 +303,15 @@ void main() {
     await testCase.assertNotContains('foo/bar');
 
     await testCase.acknowledgeMutation(1);
-    testCase.assertRemoved(<String>['foo/bar']);
-    await testCase.assertNotContains('foo/bar');
+    testCase.assertChanged(<MaybeDocument>[TestUtil.unknownDoc('foo/bar', 1)]);
+
+    if (testCase.garbageCollectorIsEager) {
+      // Nothing is pinning this anymore, as it has been acknowledged and there are no targets
+      // active.
+      await testCase.assertNotContains('foo/bar');
+    } else {
+      await testCase.assertContains(TestUtil.unknownDoc('foo/bar', 1));
+    }
   });
 
   test('testHandlesPatchMutationThenDocumentThenAck', () async {
@@ -259,30 +323,41 @@ void main() {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
     final int targetId = await testCase.allocateQuery(query);
     await testCase.applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base']), true),
+        doc('foo/bar', 1, map(<String>['it', 'base']),
+            DocumentState.LOCAL_MUTATIONS),
         <int>[targetId],
         <int>[]));
-    testCase.assertChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['foo', 'bar', 'it', 'base']), true)
+    testCase.assertChanged(<MaybeDocument>[
+      doc('foo/bar', 1, map(<String>['foo', 'bar', 'it', 'base']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase.assertContains(
-        doc('foo/bar', 1, map(<String>['foo', 'bar', 'it', 'base']), true));
+    await testCase.assertContains(doc(
+        'foo/bar',
+        1,
+        map(<String>['foo', 'bar', 'it', 'base']),
+        DocumentState.LOCAL_MUTATIONS));
 
     await testCase.acknowledgeMutation(2);
 
-    testCase.assertChanged();
-    await testCase.assertContains(
-        doc('foo/bar', 1, map(<String>['foo', 'bar', 'it', 'base']), true));
+    testCase.assertChanged(<Document>[
+      doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']),
+          DocumentState.COMMITTED_MUTATIONS)
+    ]);
+    await testCase.assertContains(doc(
+        'foo/bar',
+        2,
+        map(<String>['foo', 'bar', 'it', 'base']),
+        DocumentState.COMMITTED_MUTATIONS));
 
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']), false),
+        doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base'])),
         <int>[targetId],
         <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']), false)
+      doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']))
     ]);
     await testCase.assertContains(
-        doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base']), false));
+        doc('foo/bar', 2, map(<String>['foo', 'bar', 'it', 'base'])));
   });
 
   test('testHandlesPatchMutationThenAckThenDocument', () async {
@@ -292,20 +367,25 @@ void main() {
     await testCase.assertNotContains('foo/bar');
 
     await testCase.acknowledgeMutation(1);
-    testCase.assertRemoved(<String>['foo/bar']);
-    await testCase.assertNotContains('foo/bar');
+    testCase.assertChanged(<MaybeDocument>[TestUtil.unknownDoc('foo/bar', 1)]);
+    // There's no target pinning the doc, and we've ack'd the mutation.
+    if (testCase.garbageCollectorIsEager) {
+      await testCase.assertNotContains('foo/bar');
+    } else {
+      await testCase.assertContains(unknownDoc('foo/bar', 1));
+    }
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
     final int targetId = await testCase.allocateQuery(query);
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base']), false),
+        doc('foo/bar', 1, map(<String>['it', 'base'])),
         <int>[targetId],
         <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['it', 'base']), false)
+      doc('foo/bar', 1, map(<String>['it', 'base']))
     ]);
     await testCase
-        .assertContains(doc('foo/bar', 1, map(<String>['it', 'base']), false));
+        .assertContains(doc('foo/bar', 1, map(<String>['it', 'base'])));
   });
 
   test('testHandlesDeleteMutationThenAck', () async {
@@ -319,7 +399,7 @@ void main() {
     if (testCase.garbageCollectorIsEager) {
       await testCase.assertNotContains('foo/bar');
     } else {
-      await testCase.assertContains(deletedDoc('foo/bar', 0));
+      await testCase.assertContains(deletedDoc('foo/bar', 1, true));
     }
   });
 
@@ -327,14 +407,14 @@ void main() {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
     final int targetId = await testCase.allocateQuery(query);
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base']), false),
+        doc('foo/bar', 1, map(<String>['it', 'base'])),
         <int>[targetId],
         <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['it', 'base']), false)
+      doc('foo/bar', 1, map(<String>['it', 'base']))
     ]);
     await testCase
-        .assertContains(doc('foo/bar', 1, map(<String>['it', 'base']), false));
+        .assertContains(doc('foo/bar', 1, map(<String>['it', 'base'])));
 
     await testCase.writeMutation(deleteMutation('foo/bar'));
     testCase.assertRemoved(<String>['foo/bar']);
@@ -347,7 +427,7 @@ void main() {
       // Neither the target nor the mutation pin the document, it should be gone.
       await testCase.assertNotContains('foo/bar');
     } else {
-      await testCase.assertContains(deletedDoc('foo/bar', 0));
+      await testCase.assertContains(deletedDoc('foo/bar', 2, true));
     }
   });
 
@@ -359,7 +439,7 @@ void main() {
     await testCase.assertContains(deletedDoc('foo/bar', 0));
 
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base']), false),
+        doc('foo/bar', 1, map(<String>['it', 'base'])),
         <int>[targetId],
         <int>[]));
     testCase.assertRemoved(<String>['foo/bar']);
@@ -373,7 +453,7 @@ void main() {
       // It shouldn't exist anymore.
       await testCase.assertNotContains('foo/bar');
     } else {
-      await testCase.assertContains(deletedDoc('foo/bar', 0));
+      await testCase.assertContains(deletedDoc('foo/bar', 2, true));
     }
   });
 
@@ -381,14 +461,14 @@ void main() {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
     final int targetId = await testCase.allocateQuery(query);
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base']), false),
+        doc('foo/bar', 1, map(<String>['it', 'base'])),
         <int>[targetId],
         <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['it', 'base']), false)
+      doc('foo/bar', 1, map(<String>['it', 'base']))
     ]);
     await testCase
-        .assertContains(doc('foo/bar', 1, map(<String>['it', 'base']), false));
+        .assertContains(doc('foo/bar', 1, map(<String>['it', 'base'])));
 
     await testCase.applyRemoteEvent(
         updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
@@ -398,14 +478,14 @@ void main() {
     }
 
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 3, map(<String>['it', 'changed']), false),
+        doc('foo/bar', 3, map(<String>['it', 'changed'])),
         <int>[targetId],
         <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 3, map(<String>['it', 'changed']), false)
+      doc('foo/bar', 3, map(<String>['it', 'changed']))
     ]);
-    await testCase.assertContains(
-        doc('foo/bar', 3, map(<String>['it', 'changed']), false));
+    await testCase
+        .assertContains(doc('foo/bar', 3, map(<String>['it', 'changed'])));
   });
 
   test('testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck',
@@ -413,49 +493,57 @@ void main() {
     await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'old'])));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'old']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'old']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'old']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'old']),
+        DocumentState.LOCAL_MUTATIONS));
 
     await testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
 
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
+
     final int targetId = await testCase.allocateQuery(query);
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['it', 'base']), true),
+        doc('foo/bar', 1, map(<String>['it', 'base']),
+            DocumentState.LOCAL_MUTATIONS),
         <int>[targetId],
         <int>[]));
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 1, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
 
     await testCase.releaseQuery(query);
     await testCase.acknowledgeMutation(2); // delete mutation
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 2, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
 
     await testCase.acknowledgeMutation(3); // patch mutation
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 1, map(<String>['foo', 'bar']), false)
+      doc('foo/bar', 3, map(<String>['foo', 'bar']),
+          DocumentState.COMMITTED_MUTATIONS)
     ]);
+
     if (testCase.garbageCollectorIsEager) {
       // we've ack'd all of the mutations, nothing is keeping this pinned anymore
       await testCase.assertNotContains('foo/bar');
     } else {
-      await testCase.assertContains(
-          doc('foo/bar', 1, map(<String>['foo', 'bar']), false));
+      await testCase.assertContains(doc('foo/bar', 3,
+          map(<String>['foo', 'bar']), DocumentState.COMMITTED_MUTATIONS));
     }
   });
 
@@ -466,10 +554,11 @@ void main() {
     ]);
 
     testCase.assertChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
   });
 
   test('testHandlesSetMutationThenPatchMutationThenReject', () async {
@@ -479,12 +568,12 @@ void main() {
 
     await testCase
         .writeMutation(setMutation('foo/bar', map(<String>['foo', 'old'])));
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'old']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'old']),
+        DocumentState.LOCAL_MUTATIONS));
     await testCase.acknowledgeMutation(1);
     await testCase.assertNotContains('foo/bar');
 
-    testCase
+    await testCase
         .writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
     // A blind patch is not visible in the cache
     await testCase.assertNotContains('foo/bar');
@@ -501,14 +590,16 @@ void main() {
     ]);
 
     testCase.assertChanged(<Document>[
-      doc('bar/baz', 0, map(<String>['bar', 'baz']), true),
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('bar/baz', 0, map(<String>['bar', 'baz']),
+          DocumentState.LOCAL_MUTATIONS),
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
 
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
-    await testCase
-        .assertContains(doc('bar/baz', 0, map(<String>['bar', 'baz']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
+    await testCase.assertContains(doc('bar/baz', 0, map(<String>['bar', 'baz']),
+        DocumentState.LOCAL_MUTATIONS));
   });
 
   test('testHandlesDeleteMutationThenPatchMutationThenAckThenAck', () async {
@@ -523,15 +614,15 @@ void main() {
 
     await testCase.acknowledgeMutation(2); // delete mutation
     testCase.assertRemoved(<String>['foo/bar']);
-    await testCase.assertContains(deletedDoc('foo/bar', 0));
+    await testCase.assertContains(deletedDoc('foo/bar', 2, true));
 
     await testCase.acknowledgeMutation(3); // patch mutation
-    testCase.assertRemoved(<String>['foo/bar']);
+    testCase.assertChanged(<MaybeDocument>[unknownDoc('foo/bar', 3)]);
     if (testCase.garbageCollectorIsEager) {
       // There are no more pending mutations, the doc has been dropped
       await testCase.assertNotContains('foo/bar');
     } else {
-      await testCase.assertContains(deletedDoc('foo/bar', 0));
+      await testCase.assertContains(unknownDoc('foo/bar', 3));
     }
   });
 
@@ -546,7 +637,7 @@ void main() {
     await testCase.assertNotContains('foo/bar');
 
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 2, map(<String>['foo', 'bar']), false),
+        doc('foo/bar', 2, map(<String>['foo', 'bar'])),
         <int>[],
         <int>[],
         <int>[targetId]));
@@ -565,12 +656,12 @@ void main() {
     final List<int> none = <int>[];
     final List<int> two = <int>[2];
     await testCase.applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 2, map(<String>['foo', 'bar']), false), two, none));
+        doc('foo/bar', 2, map(<String>['foo', 'bar'])), two, none));
     await testCase
-        .assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar']), false));
+        .assertContains(doc('foo/bar', 2, map(<String>['foo', 'bar'])));
 
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 2, map(<String>['foo', 'baz']), false), none, two));
+        doc('foo/bar', 2, map(<String>['foo', 'baz'])), none, two));
 
     await testCase.assertNotContains('foo/bar');
   });
@@ -583,7 +674,7 @@ void main() {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
     final int targetId = await testCase.allocateQuery(query);
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 0, map(<String>['foo', 'old']), false),
+        doc('foo/bar', 0, map(<String>['foo', 'old'])),
         <int>[targetId],
         <int>[]));
     await testCase
@@ -592,16 +683,16 @@ void main() {
     await testCase
         .writeMutation(setMutation('foo/bah', map(<String>['foo', 'bah'])));
     await testCase.writeMutation(deleteMutation('foo/baz'));
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
-    await testCase
-        .assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
+    await testCase.assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']),
+        DocumentState.LOCAL_MUTATIONS));
     await testCase.assertContains(deletedDoc('foo/baz', 0));
 
     await testCase.acknowledgeMutation(3);
     await testCase.assertNotContains('foo/bar');
-    await testCase
-        .assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']), true));
+    await testCase.assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']),
+        DocumentState.LOCAL_MUTATIONS));
     await testCase.assertContains(deletedDoc('foo/baz', 0));
 
     await testCase.acknowledgeMutation(4);
@@ -623,7 +714,7 @@ void main() {
     final Query query = Query.atPath(ResourcePath.fromString('foo'));
     final int targetId = await testCase.allocateQuery(query);
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 0, map(<String>['foo', 'old']), false),
+        doc('foo/bar', 0, map(<String>['foo', 'old'])),
         <int>[targetId],
         <int>[]));
     await testCase
@@ -634,16 +725,16 @@ void main() {
     await testCase
         .writeMutation(setMutation('foo/bah', map(<String>['foo', 'bah'])));
     await testCase.writeMutation(deleteMutation('foo/baz'));
-    await testCase
-        .assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), true));
-    await testCase
-        .assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']), true));
+    await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+        DocumentState.LOCAL_MUTATIONS));
+    await testCase.assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']),
+        DocumentState.LOCAL_MUTATIONS));
     await testCase.assertContains(deletedDoc('foo/baz', 0));
 
     await testCase.rejectMutation(); // patch mutation
     await testCase.assertNotContains('foo/bar');
-    await testCase
-        .assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']), true));
+    await testCase.assertContains(doc('foo/bah', 0, map(<String>['foo', 'bah']),
+        DocumentState.LOCAL_MUTATIONS));
     await testCase.assertContains(deletedDoc('foo/baz', 0));
 
     await testCase.rejectMutation(); // set mutation
@@ -669,25 +760,25 @@ void main() {
     final List<int> none = <int>[];
     final List<int> two = <int>[2];
     await testCase.applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 1, map(<String>['foo', 'bar']), false), two, none));
+        doc('foo/bar', 1, map(<String>['foo', 'bar'])), two, none));
     await testCase
         .writeMutation(setMutation('foo/baz', map(<String>['foo', 'baz'])));
     await testCase
-        .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']), false));
-    await testCase
-        .assertContains(doc('foo/baz', 0, map(<String>['foo', 'baz']), true));
+        .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar'])));
+    await testCase.assertContains(doc('foo/baz', 0, map(<String>['foo', 'baz']),
+        DocumentState.LOCAL_MUTATIONS));
 
     await testCase.notifyLocalViewChanges(
         viewChanges(2, <String>['foo/bar', 'foo/baz'], <String>[]));
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(<String>['foo', 'bar']), false), none, two));
+        doc('foo/bar', 1, map(<String>['foo', 'bar'])), none, two));
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/baz', 2, map(<String>['foo', 'baz']), false), two, none));
+        doc('foo/baz', 2, map(<String>['foo', 'baz'])), two, none));
     await testCase.acknowledgeMutation(2);
     await testCase
-        .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']), false));
+        .assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar'])));
     await testCase
-        .assertContains(doc('foo/baz', 2, map(<String>['foo', 'baz']), false));
+        .assertContains(doc('foo/baz', 2, map(<String>['foo', 'baz'])));
 
     await testCase.notifyLocalViewChanges(
         viewChanges(2, <String>[], <String>['foo/bar', 'foo/baz']));
@@ -704,7 +795,7 @@ void main() {
 
     const int targetID = 321;
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 1, map(), false), <int>[], <int>[], <int>[targetID]));
+        doc('foo/bar', 1, map()), <int>[], <int>[], <int>[targetID]));
 
     await testCase.assertNotContains('foo/bar');
   });
@@ -721,7 +812,8 @@ void main() {
     final ImmutableSortedMap<DocumentKey, Document> docs =
         await testCase.localStore.executeQuery(query);
     expect(values(docs), <Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
   });
 
@@ -739,8 +831,10 @@ void main() {
         await testCase.localStore.executeQuery(query);
 
     expect(values(docs), <Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']), true),
-      doc('foo/baz', 0, map(<String>['foo', 'baz']), true)
+      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+          DocumentState.LOCAL_MUTATIONS),
+      doc('foo/baz', 0, map(<String>['foo', 'baz']),
+          DocumentState.LOCAL_MUTATIONS)
     ]);
   });
 
@@ -750,9 +844,9 @@ void main() {
     testCase.assertTargetId(2);
 
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/baz', 10, map(<String>['a', 'b']), false), <int>[2], <int>[]));
+        doc('foo/baz', 10, map(<String>['a', 'b'])), <int>[2], <int>[]));
     await testCase.applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 20, map(<String>['a', 'b']), false), <int>[2], <int>[]));
+        doc('foo/bar', 20, map(<String>['a', 'b'])), <int>[2], <int>[]));
     await testCase
         .writeMutation(setMutation('foo/bonk', map(<String>['a', 'b'])));
 
@@ -760,9 +854,9 @@ void main() {
         await testCase.localStore.executeQuery(query);
 
     expect(values(docs), <Document>[
-      doc('foo/bar', 20, map(<String>['a', 'b']), false),
-      doc('foo/baz', 10, map(<String>['a', 'b']), false),
-      doc('foo/bonk', 0, map(<String>['a', 'b']), true)
+      doc('foo/bar', 20, map(<String>['a', 'b'])),
+      doc('foo/baz', 10, map(<String>['a', 'b'])),
+      doc('foo/bonk', 0, map(<String>['a', 'b']), DocumentState.LOCAL_MUTATIONS)
     ]);
   });
 
@@ -856,9 +950,9 @@ void main() {
     testCase.assertTargetId(2);
 
     await testCase.applyRemoteEvent(addedRemoteEvent(
-        doc('foo/baz', 10, map(<String>['a', 'b']), false), <int>[2], <int>[]));
+        doc('foo/baz', 10, map(<String>['a', 'b'])), <int>[2], <int>[]));
     await testCase.applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 20, map(<String>['a', 'b']), false), <int>[2], <int>[]));
+        doc('foo/bar', 20, map(<String>['a', 'b'])), <int>[2], <int>[]));
     await testCase
         .writeMutation(setMutation('foo/bonk', map(<String>['a', 'b'])));
 
@@ -879,6 +973,8 @@ const key = TestUtil.key;
 const map = TestUtil.map;
 // ignore: always_specify_types
 const doc = TestUtil.doc;
+// ignore: always_specify_types
+const unknownDoc = TestUtil.unknownDoc;
 // ignore: always_specify_types
 const setMutation = TestUtil.setMutation;
 // ignore: always_specify_types

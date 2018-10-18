@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/delete_mutation.dart';
@@ -14,6 +15,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precond
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Internal transaction object responsible for accumulating the mutations to
 /// perform and the base versions for any documents read.
@@ -27,10 +29,15 @@ class Transaction {
   Transaction(this.datastore);
 
   void _recordVersion(MaybeDocument doc) {
-    SnapshotVersion docVersion = doc.version;
-    if (doc is NoDocument) {
+    SnapshotVersion docVersion;
+    if (doc is Document) {
+      docVersion = doc.version;
+    } else if (doc is NoDocument) {
       // For nonexistent docs, we must use precondition with version 0 when we overwrite them.
       docVersion = SnapshotVersion.none;
+    } else {
+      throw Assert.fail(
+          'Unexpected document type in transaction: ${doc.runtimeType}');
     }
 
     if (readVersions.containsKey(doc.key)) {
@@ -46,8 +53,8 @@ class Transaction {
     }
   }
 
-  /// Takes a set of keys and asynchronously attempts to fetch all the documents from the backend,
-  /// ignoring any local changes.
+  /// Takes a set of keys and asynchronously attempts to fetch all the documents
+  /// from the backend, ignoring any local changes.
   Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
     if (committed) {
       return Future<List<MaybeDocument>>.error(FirebaseFirestoreError(

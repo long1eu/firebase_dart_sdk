@@ -3,8 +3,7 @@
 // on 28/09/2018
 
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
-    as core;
+import 'package:firebase_firestore/src/firebase/firestore/core/query.dart' as core;
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
@@ -52,35 +51,20 @@ void main() {
   });
 
   test('testIncludeMetadataChanges', () {
-    final Document doc1Old = doc(
-        'foo/bar',
-        1,
-        wrapList(<String>['a', 'b']),
-        /*hasLocalMutations:*/ true);
+    final Document doc1Old = doc('foo/bar', 1, wrapList(<String>['a', 'b']),
+        DocumentState.LOCAL_MUTATIONS);
     final Document doc1New = doc(
-        'foo/bar',
-        1,
-        wrapList(<String>['a', 'b']),
-        /*hasLocalMutations:*/
-        false);
+        'foo/bar', 1, wrapList(<String>['a', 'b']), DocumentState.SYNCED);
 
     final Document doc2Old = doc(
-        'foo/baz',
-        1,
-        wrapList(<String>['a', 'b']),
-        /*hasLocalMutations:*/
-        false);
+        'foo/baz', 1, wrapList(<String>['a', 'b']), DocumentState.SYNCED);
     final Document doc2New = doc(
-        'foo/baz',
-        1,
-        wrapList(<String>['a', 'c']),
-        /*hasLocalMutations:*/
-        false);
+        'foo/baz', 1, wrapList(<String>['a', 'c']), DocumentState.SYNCED);
 
-    final DocumentSet oldDocuments =
-        docSet(Document.keyComparator, <Document>[doc1Old, doc2Old]);
-    final DocumentSet newDocuments =
-        docSet(Document.keyComparator, <Document>[doc1New, doc2New]);
+    final DocumentSet oldDocuments = docSet(
+        Document.keyComparator, <Document>[doc1Old, doc2Old]);
+    final DocumentSet newDocuments = docSet(
+        Document.keyComparator, <Document>[doc1New, doc2New]);
 
     final List<DocumentViewChange> documentChanges = <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.metadata, doc1New),
@@ -96,18 +80,25 @@ void main() {
         documentChanges,
         /*isFromCache:*/
         false,
-        /*hasPendingWrites:*/
-        false,
+        keySet(),
         /*didSyncStateChange:*/
         true);
 
-    final QuerySnapshot snapshot =
-        QuerySnapshot(Query(fooQuery, firestore), viewSnapshot, firestore);
+    final QuerySnapshot snapshot = QuerySnapshot(
+        Query(fooQuery, firestore), viewSnapshot, firestore);
 
     final QueryDocumentSnapshot doc1Snap = QueryDocumentSnapshot.fromDocument(
-        firestore, doc1New, /*fromCache:*/ false);
+      firestore,
+      doc1New,
+      /*fromCache:*/ false,
+      /*keySet:*/ false,
+    );
     final QueryDocumentSnapshot doc2Snap = QueryDocumentSnapshot.fromDocument(
-        firestore, doc2New, /*fromCache:*/ false);
+      firestore,
+      doc2New,
+      /*fromCache:*/ false,
+      /*keySet:*/ false,
+    );
 
     expect(snapshot.documentChanges.length, 1);
     final List<DocumentChange> changesWithoutMetadata = <DocumentChange>[
@@ -149,3 +140,5 @@ const map = util.TestUtil.map;
 const docSet = util.TestUtil.docSet;
 // ignore: always_specify_types
 const query = util.TestUtil.query;
+// ignore: always_specify_types
+const keySet = util.TestUtil.keySet;

@@ -16,4 +16,8 @@ abstract class MaybeDocument {
   final SnapshotVersion version;
 
   const MaybeDocument(this.key, this.version);
+
+  /// Whether this document has a local mutation applied that has not yet been
+  /// acknowledged by Watch.
+  bool get hasPendingWrites;
 }

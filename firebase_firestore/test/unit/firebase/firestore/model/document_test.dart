@@ -10,8 +10,8 @@ import '../../../../util/test_util.dart';
 
 void main() {
   test('testConstructor', () {
-    final Document document = Document(
-        key('messages/first'), version(1), wrapList(<dynamic>['a', 1]), false);
+    final Document document = Document(key('messages/first'), version(1),
+        wrapList(<dynamic>['a', 1]), DocumentState.SYNCED);
 
     expect(document.key, key('messages/first'));
     expect(document.version, version(1));
@@ -27,7 +27,7 @@ void main() {
       map<String>(<String>['name', 'Jonny', 'title', 'scallywag'])
     ]);
     final Document document =
-        Document(key('rooms/eros'), version(1), data, false);
+        Document(key('rooms/eros'), version(1), data, DocumentState.SYNCED);
 
     expect(document.getFieldValue(field('desc')),
         'Discuss all the project related stuff');
@@ -39,16 +39,16 @@ void main() {
     const String key2 = 'messages/second';
     final Map<String, Object> data1 = map(<dynamic>['a', 1]);
     final Map<String, Object> data2 = map(<dynamic>['a', 2]);
-    final Document doc1 = doc(key1, 1, data1, false);
-    final Document doc2 = doc(key1, 1, data1, false);
+    final Document doc1 = doc(key1, 1, data1);
+    final Document doc2 = doc(key1, 1, data1);
 
     expect(doc2, doc1);
-    expect(doc('messages/first', 1, map(<dynamic>['a', 1]), false), doc1);
+    expect(doc('messages/first', 1, map(<dynamic>['a', 1])), doc1);
 
-    expect(doc(key1, 1, data2, false) == doc1, isFalse);
-    expect(doc(key2, 1, data1, false) == doc1, isFalse);
-    expect(doc(key1, 2, data1, false) == doc1, isFalse);
-    expect(doc(key1, 1, data1, true) == doc1, isFalse);
+    expect(doc(key1, 1, data2) == doc1, isFalse);
+    expect(doc(key2, 1, data1) == doc1, isFalse);
+    expect(doc(key1, 2, data1) == doc1, isFalse);
+    expect(doc(key1, 1, data1, DocumentState.LOCAL_MUTATIONS) == doc1, isFalse);
   });
 }
 
