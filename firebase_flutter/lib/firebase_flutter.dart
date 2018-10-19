@@ -12,9 +12,10 @@ import 'package:firebase_flutter/database.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-Future<void> runFirebaseApp(
-  Widget app, {
-  String googleServicesKey = 'google-services.json',
+Future<void> runFirebaseApp({
+  @required Widget app,
+  String googleServicesKey,
+  FirebaseOptions options,
   bool firestore = true,
 }) async {
   final Map<String, String> googleConfig = await FirebaseFlutter.googleConfig;
@@ -31,12 +32,22 @@ Future<void> runFirebaseApp(
   final SharedPreferences prefs = await SharedPreferences.getInstance(
       '$documentsDirectory/shared_prefs/${FirebaseApp.firebaseAppPrefs}.json');
 
-  final FirebaseApp firebaseApp = FirebaseApp(
-    googleConfig,
-    _TokenProvider(uid),
-    (FirebaseApp app) {},
-    prefs,
-  );
+  FirebaseApp firebaseApp;
+  if (options != null) {
+    firebaseApp = FirebaseApp.withOptions(
+      options,
+      _TokenProvider(uid),
+      (_) {},
+      prefs,
+    );
+  } else {
+    firebaseApp = FirebaseApp(
+      googleConfig,
+      _TokenProvider(uid),
+      (_) {},
+      prefs,
+    );
+  }
 
   if (firestore) {
     await FirebaseFirestore.getInstance(
@@ -87,6 +98,12 @@ class __LifecycleHandlerState extends State<_LifecycleHandler>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     isBackground = state == AppLifecycleState.paused;
+  }
+
+  @override
+  void deactivate() {
+    FirebaseFirestore.instance.client.shutdown();
+    super.deactivate();
   }
 
   @override

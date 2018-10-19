@@ -2,46 +2,65 @@ import 'package:firebase_firestore/firebase_firestore.dart';
 import 'package:firebase_flutter/firebase_flutter.dart';
 import 'package:flutter/material.dart';
 
-void main() =>
-    runFirebaseApp(MyApp(), googleServicesKey: 'res/google-services.json');
-
-class MyApp extends StatefulWidget {
-  @override
-  _MyAppState createState() => _MyAppState();
+void main() {
+  runFirebaseApp(
+    app: const MaterialApp(title: 'Firestore Example', home: MyHomePage()),
+    googleServicesKey: 'res/google-services.json',
+  );
 }
 
-class _MyAppState extends State<MyApp> {
+class MessageList extends StatelessWidget {
+  const MessageList();
+
   @override
-  void initState() {
-    super.initState();
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('messages').snapshots,
+      builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+        if (!snapshot.hasData) {
+          return const Text('Loading...');
+        }
+        final int messageCount = snapshot.data.documents.length;
+        return ListView.builder(
+          itemCount: messageCount,
+          itemBuilder: (_, int index) {
+            final DocumentSnapshot document = snapshot.data.documents[index];
+            return ListTile(
+              title: Text(
+                  document.getString('message') ?? '<No message retrieved>'),
+              subtitle: Text('Message ${index + 1} of $messageCount'),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class MyHomePage extends StatelessWidget {
+  const MyHomePage();
+
+  CollectionReference get messages =>
+      FirebaseFirestore.instance.collection('messages');
+
+  Future<void> _addMessage() async {
+    await messages.add(<String, dynamic>{
+      'message': 'Hello world!',
+      'created_at': FieldValue.serverTimestamp(),
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
-        ),
-        body: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.document('rooms/1').snapshots,
-          builder:
-              (BuildContext context, AsyncSnapshot<DocumentSnapshot> snapshot) {
-            if (snapshot.hasError) {
-              return Text('Error: ${snapshot.error}');
-            }
-            switch (snapshot.connectionState) {
-              case ConnectionState.none:
-                return const Text('Select lot');
-              case ConnectionState.waiting:
-                return const Text('Awaiting bids...');
-              case ConnectionState.active:
-                return Text('\$${snapshot.data}');
-              case ConnectionState.done:
-                return Text('\$${snapshot.data} (closed)');
-            }
-          },
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Firestore Example'),
+      ),
+      body: const MessageList(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addMessage,
+        tooltip: 'Increment',
+        child: const Icon(Icons.add),
       ),
     );
   }
