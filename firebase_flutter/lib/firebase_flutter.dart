@@ -28,24 +28,14 @@ Future<void> runFirebaseApp({
     databaseDirectory = '$documentsDirectory/databases';
   }
 
-  final SharedPreferences prefs = await SharedPreferences.getInstance(
+  await SharedPreferences.getInstance(
       '$documentsDirectory/shared_prefs/${FirebaseApp.firebaseAppPrefs}.json');
 
   FirebaseApp firebaseApp;
   if (options != null) {
-    firebaseApp = FirebaseApp.withOptions(
-      options,
-      _TokenProvider(uid),
-      (_) {},
-      prefs,
-    );
+    firebaseApp = FirebaseApp.withOptions(options, _TokenProvider(uid));
   } else {
-    firebaseApp = FirebaseApp(
-      googleConfig,
-      _TokenProvider(uid),
-      (_) {},
-      prefs,
-    );
+    firebaseApp = FirebaseApp(googleConfig, _TokenProvider(uid));
   }
 
   if (firestore) {
@@ -100,12 +90,6 @@ class __LifecycleHandlerState extends State<_LifecycleHandler>
   }
 
   @override
-  void deactivate() {
-    FirebaseFirestore.instance.client.shutdown();
-    super.deactivate();
-  }
-
-  @override
   Widget build(BuildContext context) => widget.app;
 }
 
@@ -134,11 +118,6 @@ class _TokenProvider extends InternalTokenProvider {
 
 class FirebaseFlutter {
   static const MethodChannel _channel = MethodChannel('firebase_flutter');
-
-  static Future<String> get platformVersion async {
-    final String version = await _channel.invokeMethod('getPlatformVersion');
-    return version;
-  }
 
   static Future<Map<String, String>> get googleConfig async {
     final Map<dynamic, dynamic> data =

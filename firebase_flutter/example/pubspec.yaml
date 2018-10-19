@@ -1,6 +1,6 @@
 name: firebase_flutter_example
-description: Demonstrates how to use the firebase_flutter plugin.
-version: 1.0.0+1
+description: Demonstrates how to use the firebase_flutter wrapper.
+version: 0.0.1
 
 environment:
   sdk: ">=2.0.0-dev.68.0 <3.0.0"
@@ -16,7 +16,6 @@ dev_dependencies:
 
   firebase_flutter:
     path: ../
+
 flutter:
   uses-material-design: true
-  assets:
-    - res/google-services.json
