@@ -119,8 +119,6 @@ void main() {
         projectId: 'projectId',
       ),
       null,
-      (_) {},
-      null,
       name,
     );
 

@@ -1,16 +1,13 @@
 name: firebase_database_collection
 description: A starting point for Dart libraries or applications.
 version: 0.0.1
-# homepage: https://www.example.com
-# author: long1eu <email@example.com>
+homepage: https://github.com/fluttercommunity/firebase_flutter_sdk/tree/master/firebase_database_collection
+author: long1eu <home@long1.eu>
 
 environment:
   sdk: '>=2.0.0 <3.0.0'
 
-#dependencies:
-#  path: ^1.4.1
-
 dev_dependencies:
   test: ^1.0.0
   dart_quickcheck:
-    path: /Users/long1eu/IdeaProjects/dart_quickcheck
+    git: https://github.com/long1eu/dart_quickcheck.git

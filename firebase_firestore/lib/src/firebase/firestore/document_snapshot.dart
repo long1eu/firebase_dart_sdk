@@ -180,6 +180,17 @@ class DocumentSnapshot {
     return val != null ? val.toDouble() : null;
   }
 
+  /// Returns the value of the field as a int.
+  ///
+  /// [field] the path to the field.
+  /// Throws [StateError] if the value is not a number.
+  /// Returns the value of the field
+  @publicApi
+  int getInt(String field) {
+    final num val = _getTypedValue(field);
+    return val != null ? val.toInt() : null;
+  }
+
   /// Returns the value of the field as a String.
   ///
   /// [field] the path to the field.

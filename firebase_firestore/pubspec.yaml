@@ -8,13 +8,18 @@ environment:
 
 dependencies:
   firebase_common:
-    path: ../firebase_common
+    git:
+      url: git://github.com/fluttercommunity/firebase_flutter_sdk.git
+      path: firebase_common
+
   firebase_database_collection:
-    path: ../firebase_database_collection
+    git:
+      url: git://github.com/fluttercommunity/firebase_flutter_sdk.git
+      path: firebase_database_collection
 
   protobuf: ^0.10.2
   grpc: ^0.6.4
-  rxdart: any
+  rxdart: ^0.19.0
 
 dev_dependencies:
   test: ^1.0.0

@@ -70,7 +70,21 @@
         <entry key="dart_quickcheck">
           <value>
             <list>
-              <option value="$USER_HOME$/IdeaProjects/dart_quickcheck/lib" />
+              <option value="$USER_HOME$/.pub-cache/git/dart_quickcheck-9b0011074aba303a544ad2fa8f186669420e3884/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_common">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/git/firebase_flutter_sdk-bb9a7d0a35e1a3b0b63d099bd330aaf909fdf643/firebase_common/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_database_collection">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/git/firebase_flutter_sdk-bb9a7d0a35e1a3b0b63d099bd330aaf909fdf643/firebase_database_collection/lib" />
             </list>
           </value>
         </entry>
@@ -428,6 +442,9 @@
     </properties>
     <CLASSES>
       <root url="file://$USER_HOME$/.pub-cache/git/dart-sqlite-29c2f4c57caeb59da975e2a66fa5513c87e0fc3e/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/dart_quickcheck-9b0011074aba303a544ad2fa8f186669420e3884/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/firebase_flutter_sdk-bb9a7d0a35e1a3b0b63d099bd330aaf909fdf643/firebase_common/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/firebase_flutter_sdk-bb9a7d0a35e1a3b0b63d099bd330aaf909fdf643/firebase_database_collection/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/analyzer-0.32.5/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/analyzer-0.33.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/args-1.5.0/lib" />
@@ -494,7 +511,6 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/watcher-0.9.7+10/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/web_socket_channel-1.0.9/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/yaml-2.1.15/lib" />
-      <root url="file://$USER_HOME$/IdeaProjects/dart_quickcheck/lib" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
