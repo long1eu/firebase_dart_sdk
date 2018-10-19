@@ -4,9 +4,7 @@ import 'package:flutter/material.dart';
 
 void main() {
   runFirebaseApp(
-    app: const MaterialApp(title: 'Firestore Example', home: MyHomePage()),
-    googleServicesKey: 'res/google-services.json',
-  );
+      app: const MaterialApp(title: 'Firestore Example', home: MyHomePage()));
 }
 
 class MessageList extends StatelessWidget {

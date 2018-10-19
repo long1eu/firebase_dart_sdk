@@ -14,7 +14,6 @@ import 'package:flutter/widgets.dart';
 
 Future<void> runFirebaseApp({
   @required Widget app,
-  String googleServicesKey,
   FirebaseOptions options,
   bool firestore = true,
 }) async {
