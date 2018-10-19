@@ -118,6 +118,7 @@ void main() {
         applicationId: 'appId',
         projectId: 'projectId',
       ),
+      null,
       (_) {},
       null,
       name,

@@ -5,6 +5,7 @@
       <w>bidi</w>
       <w>datastore</w>
       <w>firestore</w>
+      <w>fsync</w>
       <w>geopoint</w>
       <w>goog</w>
       <w>growable</w>

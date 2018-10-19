@@ -57,13 +57,14 @@ class GetTokenResult {
     // Sign in provider lives inside the 'firebase' element of the JSON
     final Map<String, dynamic> firebaseElem = claims[_firebaseKey];
     if (firebaseElem != null) {
-      return firebaseElem[_signInProvider] as String;
+      final String provider = firebaseElem[_signInProvider];
+      return provider;
     }
     return null;
   }
 
   DateTime _getTimeFromClaimsSafely(String key) {
-    final int milliseconds = (claims[key] as int) ?? 0;
+    final int milliseconds = claims[key] ?? 0;
     return DateTime.fromMillisecondsSinceEpoch(milliseconds);
   }
 

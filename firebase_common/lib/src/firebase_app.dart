@@ -4,24 +4,36 @@
 
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/src/annotations.dart';
-import 'package:firebase_common/src/auth/get_token_result.dart';
 import 'package:firebase_common/src/data_collection_default_change.dart';
-import 'package:firebase_common/src/errors/firebase_api_not_available_error.dart';
-import 'package:firebase_common/src/firebase_app_lifecycle_observer.dart';
 import 'package:firebase_common/src/firebase_options.dart';
-import 'package:firebase_common/src/flutter/lifecycle_handler.dart';
 import 'package:firebase_common/src/internal/internal_token_provider.dart';
-import 'package:firebase_common/src/internal/internal_token_result.dart';
+import 'package:firebase_common/src/internal/shared_preferences.dart';
 import 'package:firebase_common/src/util/base64_utils.dart';
 import 'package:firebase_common/src/util/log.dart';
 import 'package:firebase_common/src/util/preconditions.dart';
-import 'package:firebase_common/src/util/prefs.dart';
 import 'package:firebase_common/src/util/to_string_helper.dart';
 import 'package:meta/meta.dart';
 
 typedef InitializeApis = void Function(FirebaseApp firebaseApp);
+
+/// The signature that gets called when [FirebaseApp] gets deleted. This is
+/// triggered when [FirebaseApp.delete] is called. [FirebaseApp] public
+/// methods start throwing after delete is called, so name and options are
+/// passed in to be able to identify the instance.
+typedef OnFirebaseAppDelete = void Function(
+    String firebaseAppName, FirebaseOptions options);
+
+/// Used to deliver notifications about whether the app is in the background.
+/// The first callback is invoked inline if the app is in the background.
+///
+/// [isInBackground] is true, if the app is in the background and automatic
+/// resource management is enabled.
+@keepForSdk
+typedef OnBackgroundStateChanged = void Function(
+    {@required bool isInBackground});
+
+typedef IsBackground = bool Function();
 
 @publicApi
 class FirebaseApp {
@@ -38,25 +50,22 @@ class FirebaseApp {
   final String _name;
   final FirebaseOptions _options;
   final InitializeApis initializeApis;
-  final Prefs _prefs;
-  final LifecycleHandler lifecycleHandler;
+  final SharedPreferences _prefs;
+  final InternalTokenProvider getAuthProvider;
 
   final StreamController<dynamic> _events =
       StreamController<dynamic>.broadcast();
-  final List<IdTokenObserver> _idTokenObservers = <IdTokenObserver>[];
-  final List<BackgroundStateChangeObserver> backgroundStateChangeObservers =
-      <BackgroundStateChangeObserver>[];
-  final List<FirebaseAppLifecycleObserver> _lifecycleObservers =
-      <FirebaseAppLifecycleObserver>[];
+  final List<OnBackgroundStateChanged> backgroundStateChangeObservers =
+      <OnBackgroundStateChanged>[];
+  final List<OnFirebaseAppDelete> _onDeleteObservers = <OnFirebaseAppDelete>[];
+
+  IsBackground isInBackground;
 
   // Default disabled. We released Firebase publicly without this feature, so
   // making it default enabled is a backwards incompatible change.
   bool automaticResourceManagementEnabled = false;
   bool deleted = false;
   bool _dataCollectionDefaultEnabled;
-
-  InternalTokenProvider _tokenProvider;
-  IdTokenObserversCountChangedObserver _idTokenObserversCountChangedObserver;
 
   /// Initializes the default FirebaseApp instance using string resource values
   /// populated from the map you provide. It also initializes Firebase
@@ -70,9 +79,10 @@ class FirebaseApp {
   @publicApi
   factory FirebaseApp(
     Map<String, String> json,
+    InternalTokenProvider tokenProvider,
     InitializeApis appInit,
-    Prefs prefs, [
-    LifecycleHandler lifecycleHandler,
+    SharedPreferences prefs, [
+    IsBackground lifecycleHandler,
   ]) {
     if (instances.containsKey(defaultAppName)) {
       return instance;
@@ -88,15 +98,16 @@ class FirebaseApp {
           'it to your pubspec.yaml file. \n We tried $json.');
     }
 
-    return FirebaseApp.withOptions(
-        firebaseOptions, appInit, prefs, defaultAppName, lifecycleHandler);
+    return FirebaseApp.withOptions(firebaseOptions, tokenProvider, appInit,
+        prefs, defaultAppName, lifecycleHandler);
   }
 
-  FirebaseApp._(this._name, this._options, this._prefs, this.initializeApis,
-      [this.lifecycleHandler]);
+  FirebaseApp._(this._name, this._options, this.getAuthProvider, this._prefs,
+      this.initializeApis,
+      [this.isInBackground]);
 
   /// Initializes the default [FirebaseApp] instance. Same as
-  /// [FirebaseApp.initializeApp], but it uses [FirebaseApp.defaultAppName] as
+  /// [initializeApp], but it uses [FirebaseApp.defaultAppName] as
   /// name.
   /// [options] represents the global [FirebaseOptions]
   /// [name] unique name for the app. It is an error to initialize an app with
@@ -105,20 +116,21 @@ class FirebaseApp {
   /// Returns an instance of [FirebaseApp]
   factory FirebaseApp.withOptions(
     FirebaseOptions options,
+    InternalTokenProvider tokenProvider,
     InitializeApis appInit,
-    Prefs prefs, [
+    SharedPreferences prefs, [
     String name = defaultAppName,
-    LifecycleHandler lifecycleHandler,
+    IsBackground lifecycleHandler,
   ]) {
     final String normalizedName = _normalize(name);
 
     Preconditions.checkState(!instances.containsKey(normalizedName),
         'FirebaseApp name $normalizedName already exists!');
 
-    final FirebaseApp firebaseApp = FirebaseApp._(
-        normalizedName, options, prefs, appInit, lifecycleHandler);
+    final FirebaseApp firebaseApp = FirebaseApp._(normalizedName, options,
+        tokenProvider, prefs, appInit, lifecycleHandler);
     instances[normalizedName] = firebaseApp;
-    firebaseApp.initializeAllApis();
+    firebaseApp.initializeApp();
 
     return firebaseApp;
   }
@@ -174,61 +186,6 @@ class FirebaseApp {
   /// Returns a mutable list of all FirebaseApps.
   List<FirebaseApp> get apps => List<FirebaseApp>.from(instances.values);
 
-  InternalAuthProvider getAuthProvider() {
-    return null;
-  }
-
-  @deprecated
-  @keepForSdk
-  set tokenProvider(InternalTokenProvider tokenProvider) {
-    _tokenProvider = Preconditions.checkNotNull(tokenProvider);
-  }
-
-  set idTokenObserversCountChangedObserver(
-      IdTokenObserversCountChangedObserver observer) {
-    _idTokenObserversCountChangedObserver =
-        Preconditions.checkNotNull(observer);
-    // Immediately trigger so that the observer observer can properly decide if
-    // it needs to start out as active.
-    _idTokenObserversCountChangedObserver
-        .onObserversCountChanged(_idTokenObservers.length);
-  }
-
-  /// (deprecated, use [InternalAuthProvider.getToken] from firebase_auth)
-  ///
-  /// Fetch a valid STS Token.
-  ///
-  /// [forceRefresh] force refreshes the token. Should only be set to true if
-  /// the token is invalidated out of band.
-  @deprecated
-  @keepForSdk
-  Future<GetTokenResult> getToken(bool forceRefresh) {
-    _checkNotDeleted();
-
-    if (_tokenProvider == null) {
-      return Future<GetTokenResult>.error(
-          const FirebaseApiNotAvailableError('firebase_auth is not linked,'
-              ' please fall back to unauthenticated mode.'));
-    } else {
-      return _tokenProvider.getAccessToken(forceRefresh);
-    }
-  }
-
-  /// (deprecated, use [InternalAuthProvider.uid] from firebase_auth)
-  ///
-  /// Fetch the UID of the currently logged-in user.
-  @deprecated
-  @keepForSdk
-  String get uid {
-    _checkNotDeleted();
-    if (_tokenProvider == null) {
-      throw const FirebaseApiNotAvailableError('firebase_auth is not linked,'
-          ' please fall back to unauthenticated mode.');
-    } else {
-      return _tokenProvider.uid;
-    }
-  }
-
   @publicApi
   void delete() {
     if (deleted) {
@@ -247,22 +204,22 @@ class FirebaseApp {
   /// connections automatically when the app is in the background.
   /// Disabled by default.
   @publicApi
-  void setAutomaticResourceManagementEnabled(bool enabled) {
+  void setAutomaticResourceManagementEnabled({bool enabled}) {
     _checkNotDeleted();
 
     if (automaticResourceManagementEnabled != enabled) {
       automaticResourceManagementEnabled = enabled;
 
-      final bool inBackground = lifecycleHandler.isBackground;
+      final bool inBackground = isInBackground();
       if (enabled && inBackground) {
         // Automatic resource management has been enabled while the app is in
         // the background, notify the listeners of the app being in the
         // background.
-        notifyBackgroundStateChangeObservers(true);
+        notifyBackgroundStateChangeObservers(background: true);
       } else if (!enabled && inBackground) {
         // Automatic resource management has been disabled while the app is in
         // the background, act as if we were in the foreground.
-        notifyBackgroundStateChangeObservers(false);
+        notifyBackgroundStateChangeObservers(background: false);
       }
     }
   }
@@ -289,7 +246,9 @@ class FirebaseApp {
     if (_dataCollectionDefaultEnabled != enabled) {
       _dataCollectionDefaultEnabled = enabled;
 
-      _prefs.setBool(_dataCollectionDefaultEnabledPreferenceKey, enabled);
+      _prefs.edit()
+        ..putBool(_dataCollectionDefaultEnabledPreferenceKey, enabled)
+        ..apply();
 
       _events.add(DataCollectionDefaultChange(enabled: enabled));
     }
@@ -297,7 +256,8 @@ class FirebaseApp {
 
   bool _readAutoDataCollectionEnabled() {
     if (_prefs.contains(_dataCollectionDefaultEnabledPreferenceKey)) {
-      return _prefs.getBool(_dataCollectionDefaultEnabledPreferenceKey) ?? true;
+      return _prefs.getBool(_dataCollectionDefaultEnabledPreferenceKey,
+          defValue: true);
     }
 
     return options.dataCollectionEnabled ?? true;
@@ -307,90 +267,36 @@ class FirebaseApp {
     Preconditions.checkState(!deleted, 'FirebaseApp was deleted');
   }
 
-  @deprecated
-  @keepForSdk
-  List<IdTokenObserver> get observers {
-    _checkNotDeleted();
-    return _idTokenObservers;
-  }
-
   @keepForSdk
   @visibleForTesting
   bool get isDefaultApp => defaultAppName == name;
 
-  @deprecated
-  @keepForSdk
-  void notifyIdTokenListeners(InternalTokenResult tokenResult) {
-    Log.d(logTag, 'Notifying auth state observers.');
-    int size = 0;
-    for (IdTokenObserver observer in _idTokenObservers) {
-      observer.onIdTokenChanged(tokenResult);
-      size++;
-    }
-    Log.d(logTag, 'Notified $size auth state listeners.');
-  }
-
-  void notifyBackgroundStateChangeObservers(bool background) {
+  void notifyBackgroundStateChangeObservers({bool background}) {
     Log.d(logTag, 'Notifying background state change observers.');
-    for (BackgroundStateChangeObserver observer
-        in backgroundStateChangeObservers) {
-      observer.onBackgroundStateChanged(background);
+    for (OnBackgroundStateChanged observer in backgroundStateChangeObservers) {
+      observer(isInBackground: background);
     }
-  }
-
-  /// (Deprecated, use [InternalAuthProvider.addIdTokenListener]) from
-  /// firebase_auth)
-  ///
-  /// Adds a [IdTokenListener] to the list of interested observers. [observer]
-  /// represents the [IdTokenListener] that needs to be notified when we have
-  /// changes in user state.
-  @deprecated
-  @keepForSdk
-  void addIdTokenObserver(IdTokenObserver observer) {
-    _checkNotDeleted();
-    Preconditions.checkNotNull(observer);
-    _idTokenObservers.add(observer);
-    _idTokenObserversCountChangedObserver
-        .onObserversCountChanged(_idTokenObservers.length);
-  }
-
-  /// (Deprecated, use [InternalAuthProvider.removeIdTokenListener]) from
-  /// firebase_auth)
-  ///
-  /// Removes a [IdTokenListener] from the list of interested observers.
-  /// [observerToRemove] represents the instance of [IdTokenListener] to be
-  /// removed.
-  @deprecated
-  @keepForSdk
-  void removeIdTokenObserver(IdTokenObserver observerToRemove) {
-    _checkNotDeleted();
-    Preconditions.checkNotNull(observerToRemove);
-    _idTokenObservers.remove(observerToRemove);
-    _idTokenObserversCountChangedObserver
-        .onObserversCountChanged(_idTokenObservers.length);
   }
 
   /// Registers a background state change observer. Make sure to call
-  /// [removeBackgroundStateChangeListener] as appropriate to avoid memory
+  /// [removeBackgroundStateChangeObserver] as appropriate to avoid memory
   /// leaks.
   ///
   /// * If automatic resource management is enabled and the app is in the
   /// background a callback is triggered immediately.
-  /// see [BackgroundStateChangeListener]
+  /// see [OnBackgroundStateChanged]
   @keepForSdk
-  void addBackgroundStateChangeObserver(
-      BackgroundStateChangeObserver observer) {
+  void addBackgroundStateChangeObserver(OnBackgroundStateChanged observer) {
     _checkNotDeleted();
-    if (automaticResourceManagementEnabled && lifecycleHandler.isBackground) {
-      observer.onBackgroundStateChanged(true /* isInBackground */);
+    if (automaticResourceManagementEnabled && isInBackground()) {
+      observer(isInBackground: true);
     }
     backgroundStateChangeObservers.add(observer);
   }
 
   /// Unregisters the background state change listener.
   @keepForSdk
-  void removeBackgroundStateChangeObserver(
-      BackgroundStateChangeObserver observer) {
+  void removeBackgroundStateChangeObserver(OnBackgroundStateChanged observer) {
     _checkNotDeleted();
     backgroundStateChangeObservers.remove(observer);
   }
@@ -409,24 +315,24 @@ class FirebaseApp {
   /// If an API has locally stored data it must register lifecycle listeners at
   /// initialization time.
   @keepForSdk
-  void addLifecycleEventListener(FirebaseAppLifecycleObserver observer) {
+  void addLifecycleEventListener(OnFirebaseAppDelete observer) {
     _checkNotDeleted();
     Preconditions.checkNotNull(observer);
-    _lifecycleObservers.add(observer);
+    _onDeleteObservers.add(observer);
   }
 
   @keepForSdk
-  void removeLifecycleEventListener(FirebaseAppLifecycleObserver observer) {
+  void removeLifecycleEventListener(OnFirebaseAppDelete observer) {
     _checkNotDeleted();
     Preconditions.checkNotNull(observer);
-    _lifecycleObservers.remove(observer);
+    _onDeleteObservers.remove(observer);
   }
 
   /// Notifies all observers with the name and options of the deleted
   /// [FirebaseApp] instance.
   void _notifyOnAppDeleted() {
-    for (FirebaseAppLifecycleObserver observer in _lifecycleObservers) {
-      observer.onDeleted(name, options);
+    for (OnFirebaseAppDelete observer in _onDeleteObservers) {
+      observer(name, options);
     }
   }
 
@@ -464,7 +370,7 @@ class FirebaseApp {
     return name.trim();
   }
 
-  void initializeAllApis() {
+  void initializeApp() {
     initializeApis(this);
     /* Initialize this(call getInstance()):
       private static final String MEASUREMENT_CLASSNAME =
@@ -495,43 +401,4 @@ class FirebaseApp {
           ..add('options', options))
         .toString();
   }
-}
-
-/// (deprecated, use [IdTokenObserver] in firebase-auth)
-///
-/// Used to deliver notifications when authentication state changes.
-@deprecated
-@keepForSdk
-abstract class IdTokenObserver {
-  /// The method which gets invoked authentication state has changed.
-  ///
-  /// [tokenResult] represents the [InternalTokenResult], which can be used to
-  /// obtain a cached access token.
-  @keepForSdk
-  void onIdTokenChanged(InternalTokenResult tokenResult);
-}
-
-/// Used to signal to FirebaseAuth when there are internal observers, so that we
-/// know whether or not to do proactive token refreshing.
-@deprecated
-@keepForSdk
-abstract class IdTokenObserversCountChangedObserver {
-  /// To be called with the new number of auth state observers on any events
-  /// which change the number of observers. Also triggered when
-  /// [FirebaseApp.idTokenObserversCountChangedObserver] is called.
-  @keepForSdk
-  void onObserversCountChanged(int numObservers);
-}
-
-/// Used to deliver notifications about whether the app is in the background.
-/// The first callback is invoked inline if the app is in the background.
-///
-/// * If the app is in the background and
-/// [FirebaseApp.setAutomaticResourceManagementEnabled] is set to false.
-@keepForSdk
-abstract class BackgroundStateChangeObserver {
-  /// [background] is true, if the app is in the background and automatic
-  /// resource management is enabled.
-  @keepForSdk
-  void onBackgroundStateChanged(bool background);
 }

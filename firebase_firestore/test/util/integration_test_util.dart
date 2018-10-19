@@ -6,9 +6,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/database_info.dart';
+import 'package:firebase_firestore/src/firebase/firestore/core/firestore_client.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
@@ -94,6 +96,29 @@ class IntegrationTestUtil {
     }
   }
 
+  static Future<FirebaseFirestore> forTests(
+      DatabaseId databaseId,
+      String persistenceKey,
+      CredentialsProvider provider,
+      AsyncQueue queue,
+      OpenDatabase openDatabase,
+      FirebaseFirestoreSettings settings) async {
+    final FirestoreClient client = await FirestoreClient.initialize(
+      DatabaseInfo(
+        databaseId,
+        persistenceKey,
+        settings.host,
+        settings.sslEnabled,
+      ),
+      settings.persistenceEnabled,
+      provider,
+      queue,
+      openDatabase,
+    );
+
+    return FirebaseFirestore(databaseId, queue, null, client);
+  }
+
   /// Initializes a new Firestore instance that can be used in testing. It is
   /// guaranteed to not share state with other instances returned from this
   /// call.
@@ -121,7 +146,7 @@ class IntegrationTestUtil {
 
     final AsyncQueue asyncQueue = AsyncQueue();
 
-    final FirebaseFirestore firestore = await FirebaseFirestore.forTests(
+    final FirebaseFirestore firestore = await forTests(
       databaseId,
       persistenceKey,
       EmptyCredentialsProvider(),

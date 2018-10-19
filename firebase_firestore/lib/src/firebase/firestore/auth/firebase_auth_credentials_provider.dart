@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
@@ -13,34 +12,23 @@ import 'package:rxdart/rxdart.dart';
 
 /// [FirebaseAuthCredentialsProvider] uses Firebase Auth via [FirebaseApp] to
 /// get an auth token.
-///
-/// * NOTE: To simplify the implementation, it requires that you call
-/// [setChangeListener] no more than once and don't call [getToken] after
-/// calling [removeChangeListener].
 class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   /// Stream that will receive credential changes (sign-in / sign-out, token
   /// changes).
   final BehaviorSubject<User> _onUserChange;
 
-  final InternalAuthProvider _authProvider;
+  final InternalTokenProvider _authProvider;
 
   /// Counter used to detect if the token changed while a getToken request was
   /// outstanding.
-  int _tokenCounter;
-
-  bool _forceRefresh;
+  int _tokenCounter = 0;
+  bool _forceRefresh = false;
 
   FirebaseAuthCredentialsProvider(this._authProvider)
       : _onUserChange = BehaviorSubject<User>(
             seedValue: _authProvider.uid != null
                 ? User(_authProvider.uid)
-                : User.unauthenticated) {
-    _tokenCounter = 0;
-    _onUserChange.onListen =
-        () => _authProvider.addIdTokenObserver(tokenObserver);
-    _onUserChange.onCancel =
-        () => _authProvider.removeIdTokenObserver(tokenObserver);
-  }
+                : User.unauthenticated);
 
   /// The listener registered with FirebaseApp; used to stop receiving auth
   /// changes once changeListener is removed.

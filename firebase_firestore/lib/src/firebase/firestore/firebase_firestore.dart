@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/empty_credentials_provider.dart';
@@ -67,7 +66,7 @@ class FirebaseFirestore {
         openDatabase, 'Provided openDatabase must not be null.');
 
     final FirestoreMultiDbComponent component =
-        FirestoreMultiDbComponent(app, app.getAuthProvider());
+        FirestoreMultiDbComponent(app, app.getAuthProvider);
     Assert.checkNotNull(component, 'Firestore component is not present.');
 
     final FirebaseFirestore firestore =
@@ -76,7 +75,7 @@ class FirebaseFirestore {
   }
 
   static Future<FirebaseFirestore> newInstance(FirebaseApp app, String database,
-      [InternalAuthProvider authProvider, OpenDatabase openDatabase]) async {
+      [InternalTokenProvider authProvider, OpenDatabase openDatabase]) async {
     final String projectId = app.options.projectId;
     if (projectId == null) {
       throw ArgumentError('FirebaseOptions.getProjectId() cannot be null');
@@ -118,30 +117,6 @@ class FirebaseFirestore {
     );
 
     return FirebaseFirestore(databaseId, queue, app, client);
-  }
-
-  @visibleForTesting
-  static Future<FirebaseFirestore> forTests(
-      DatabaseId databaseId,
-      String persistenceKey,
-      CredentialsProvider provider,
-      AsyncQueue queue,
-      OpenDatabase openDatabase,
-      FirebaseFirestoreSettings settings) async {
-    final FirestoreClient client = await FirestoreClient.initialize(
-      DatabaseInfo(
-        databaseId,
-        persistenceKey,
-        settings.host,
-        settings.sslEnabled,
-      ),
-      settings.persistenceEnabled,
-      provider,
-      queue,
-      openDatabase,
-    );
-
-    return FirebaseFirestore(databaseId, queue, null, client);
   }
 
   void _ensureClientConfigured() {

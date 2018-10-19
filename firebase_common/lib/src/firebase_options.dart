@@ -7,13 +7,13 @@ import 'package:firebase_common/src/util/to_string_helper.dart';
 import 'package:meta/meta.dart';
 
 class FirebaseOptions {
-  static const String _apiKeyResourceName = 'google_api_key';
-  static const String _appIdResourceName = 'google_app_id';
-  static const String _databaseUrlResourceName = 'firebase_database_url';
-  static const String _gaTrackingIdResourceName = 'ga_trackingId';
-  static const String _gcmSenderIdResourceName = 'gcm_defaultSenderId';
-  static const String _storageBucketResourceName = 'google_storage_bucket';
-  static const String _projectIdResourceName = 'project_id';
+  static const String _apiKey = 'google_api_key';
+  static const String _appId = 'google_app_id';
+  static const String _databaseUrl = 'firebase_database_url';
+  static const String _gaTrackingId = 'ga_trackingId';
+  static const String _gcmSenderId = 'gcm_defaultSenderId';
+  static const String _storageBucket = 'google_storage_bucket';
+  static const String _projectId = 'project_id';
 
   /// API key used for authenticating requests from your app, e.g.
   /// AIzaSyDdVgKwhZl0sTTTLZ7iTmt1r3N2cJLnaDk, used to identify your app to
@@ -73,20 +73,14 @@ class FirebaseOptions {
   /// Returns the populated options or null if applicationId is missing from
   /// the map.
   factory FirebaseOptions.fromJson(Map<String, String> json) {
-    final String applicationId = json[_appIdResourceName];
-
-    if (applicationId == null || applicationId.trim().isEmpty) {
-      return null;
-    }
-
     return FirebaseOptions(
-      applicationId: applicationId,
-      apiKey: json[_apiKeyResourceName],
-      databaseUrl: json[_databaseUrlResourceName],
-      gaTrackingId: json[_gaTrackingIdResourceName],
-      gcmSenderId: json[_gcmSenderIdResourceName],
-      storageBucket: json[_storageBucketResourceName],
-      projectId: json[_projectIdResourceName],
+      applicationId: json[_appId],
+      apiKey: json[_apiKey],
+      databaseUrl: json[_databaseUrl],
+      gaTrackingId: json[_gaTrackingId],
+      gcmSenderId: json[_gcmSenderId],
+      storageBucket: json[_storageBucket],
+      projectId: json[_projectId],
     );
   }
 

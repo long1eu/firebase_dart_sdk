@@ -187,17 +187,16 @@ class SQLitePersistence extends Persistence {
     void ensureConfigured(Database db) async {
       if (!configured) {
         configured = true;
-        await db.execute('PRAGMA locking_mode = EXCLUSIVE;');
+        await db.query('PRAGMA locking_mode = EXCLUSIVE;');
       }
     }
 
-    // TODO:{30/09/2018 00:08}-long1eu: add path
     final Database db = await openDatabase(
       databaseName,
       version: SQLiteSchema.version,
       onConfigure: (Database db) async {
         configured = true;
-        await db.execute('PRAGMA locking_mode = EXCLUSIVE;');
+        await db.query('PRAGMA locking_mode = EXCLUSIVE;');
       },
       onCreate: (Database db, int version) async {
         ensureConfigured(db);

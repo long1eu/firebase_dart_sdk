@@ -19,4 +19,5 @@ export 'src/firebase/firestore/query_snapshot.dart';
 export 'src/firebase/firestore/set_options.dart';
 export 'src/firebase/firestore/snapshot_metadata.dart';
 export 'src/firebase/firestore/transaction.dart';
+export 'src/firebase/firestore/util/database.dart';
 export 'src/firebase/firestore/write_batch.dart';

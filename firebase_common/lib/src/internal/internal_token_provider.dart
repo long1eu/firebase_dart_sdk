@@ -4,16 +4,13 @@
 
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/src/annotations.dart';
 import 'package:firebase_common/src/auth/get_token_result.dart';
 import 'package:firebase_common/src/firebase_app.dart';
+import 'package:firebase_common/src/internal/internal_token_result.dart';
 
-/// (Deprecated, use [InternalAuthProvider] from firebase-auth)
-///
 /// Provides a way for [FirebaseApp] to get an access token if there exists
 /// a logged in user.
-@deprecated
 @keepForSdk
 abstract class InternalTokenProvider {
   /// Fetch a valid STS Token.
@@ -28,4 +25,8 @@ abstract class InternalTokenProvider {
   /// is not linked, or if there is no currently signed-in user.
   @keepForSdk
   String get uid;
+
+  /// Stream that will emit when the user auth state changes, when the user logs
+  /// out or the token has been invalidated and it's refreshed.
+  Stream<InternalTokenResult> get onTokenChanged;
 }

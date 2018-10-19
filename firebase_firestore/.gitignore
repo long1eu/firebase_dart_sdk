@@ -13,3 +13,4 @@ doc/api/
 proto/
 
 res/google-services.json
+res/GoogleService-Info.plist

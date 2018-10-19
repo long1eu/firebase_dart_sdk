@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
@@ -18,7 +17,7 @@ class FirestoreMultiDbComponent {
 
   final FirebaseApp app;
 
-  final InternalAuthProvider authProvider;
+  final InternalTokenProvider authProvider;
 
   FirestoreMultiDbComponent(this.app, this.authProvider);
 

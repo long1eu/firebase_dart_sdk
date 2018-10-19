@@ -9,8 +9,6 @@ environment:
 dependencies:
   firebase_common:
     path: ../firebase_common
-  firebase_auth:
-    path: ../firebase_auth
   firebase_database_collection:
     path: ../firebase_database_collection
 

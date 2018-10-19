@@ -1,0 +1,26 @@
+name: firebase_flutter
+description: A Flutter wrapper over the Firebase SDK.
+version: 0.0.1
+author: long1eu
+homepage:
+
+environment:
+  sdk: ">=2.0.0-dev.68.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  path_provider: ^0.4.1
+  firebase_auth: ^0.6.2+1
+  sqflite: ^0.12.2+1
+
+  firebase_common:
+    path: ../firebase_common
+  firebase_firestore:
+    path: ../firebase_firestore
+
+flutter:
+  plugin:
+    androidPackage: com.google.firebase.firebaseflutter
+    pluginClass: FirebaseFlutterPlugin
