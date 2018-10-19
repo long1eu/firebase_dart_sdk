@@ -1,22 +1,11 @@
-A library for Dart developers.
+# Firebase Common for Dart
 
-Created from templates made available by Stagehand under a BSD-style
-[license](https://github.com/dart-lang/stagehand/blob/master/LICENSE).
+A Dart implementation of the Firebase Core API, which enables connecting to multiple Firebase apps.
+
+*Note*: This library is still under development, and some APIs might not be available yet or work correctly. 
+Please feel free to open an issue [here](https://github.com/fluttercommunity/firebase_flutter_sdk/issues) or even a
+[pull requests](https://github.com/fluttercommunity/firebase_flutter_sdk/pulls) if you feel brave.
+
 
 ## Usage
-
-A simple usage example:
-
-```dart
-import 'package:firebase_common/firebase_common.dart';
-
-main() {
-  var awesome = new Awesome();
-}
-```
-
-## Features and bugs
-
-Please file feature requests and bugs at the [issue tracker][tracker].
-
-[tracker]: http://example.com/issues/replaceme
+To use this plugin, add `firebase_common` as a [dependency in your pubspec.yaml file](https://flutter.io/platform-plugins/).

@@ -5,7 +5,6 @@
 import 'dart:async';
 
 import 'package:firebase_common/src/annotations.dart';
-import 'package:firebase_common/src/data_collection_default_change.dart';
 import 'package:firebase_common/src/firebase_options.dart';
 import 'package:firebase_common/src/internal/internal_token_provider.dart';
 import 'package:firebase_common/src/internal/shared_preferences.dart';
@@ -14,8 +13,6 @@ import 'package:firebase_common/src/util/log.dart';
 import 'package:firebase_common/src/util/preconditions.dart';
 import 'package:firebase_common/src/util/to_string_helper.dart';
 import 'package:meta/meta.dart';
-
-typedef InitializeApis = void Function(FirebaseApp firebaseApp);
 
 /// The signature that gets called when [FirebaseApp] gets deleted. This is
 /// triggered when [FirebaseApp.delete] is called. [FirebaseApp] public
@@ -49,21 +46,17 @@ class FirebaseApp {
 
   final String _name;
   final FirebaseOptions _options;
-  final InitializeApis initializeApis;
-  final SharedPreferences _prefs;
   final InternalTokenProvider getAuthProvider;
 
-  final StreamController<dynamic> _events =
-      StreamController<dynamic>.broadcast();
+  final StreamController<bool> _dataColectionChangeSink =
+      StreamController<bool>.broadcast();
   final List<OnBackgroundStateChanged> backgroundStateChangeObservers =
       <OnBackgroundStateChanged>[];
   final List<OnFirebaseAppDelete> _onDeleteObservers = <OnFirebaseAppDelete>[];
 
   IsBackground isInBackground;
 
-  // Default disabled. We released Firebase publicly without this feature, so
-  // making it default enabled is a backwards incompatible change.
-  bool automaticResourceManagementEnabled = false;
+  bool automaticResourceManagementEnabled = true;
   bool deleted = false;
   bool _dataCollectionDefaultEnabled;
 
@@ -79,9 +72,7 @@ class FirebaseApp {
   @publicApi
   factory FirebaseApp(
     Map<String, String> json,
-    InternalTokenProvider tokenProvider,
-    InitializeApis appInit,
-    SharedPreferences prefs, [
+    InternalTokenProvider tokenProvider, [
     IsBackground lifecycleHandler,
   ]) {
     if (instances.containsKey(defaultAppName)) {
@@ -98,17 +89,15 @@ class FirebaseApp {
           'it to your pubspec.yaml file. \n We tried $json.');
     }
 
-    return FirebaseApp.withOptions(firebaseOptions, tokenProvider, appInit,
-        prefs, defaultAppName, lifecycleHandler);
+    return FirebaseApp.withOptions(
+        firebaseOptions, tokenProvider, defaultAppName, lifecycleHandler);
   }
 
-  FirebaseApp._(this._name, this._options, this.getAuthProvider, this._prefs,
-      this.initializeApis,
+  FirebaseApp._(this._name, this._options, this.getAuthProvider,
       [this.isInBackground]);
 
-  /// Initializes the default [FirebaseApp] instance. Same as
-  /// [initializeApp], but it uses [FirebaseApp.defaultAppName] as
-  /// name.
+  /// Initializes the default [FirebaseApp] instance. Same as but it uses
+  /// [FirebaseApp.defaultAppName] as name.
   /// [options] represents the global [FirebaseOptions]
   /// [name] unique name for the app. It is an error to initialize an app with
   /// an already existing name. Starting and ending whitespace characters in the
@@ -116,9 +105,7 @@ class FirebaseApp {
   /// Returns an instance of [FirebaseApp]
   factory FirebaseApp.withOptions(
     FirebaseOptions options,
-    InternalTokenProvider tokenProvider,
-    InitializeApis appInit,
-    SharedPreferences prefs, [
+    InternalTokenProvider tokenProvider, [
     String name = defaultAppName,
     IsBackground lifecycleHandler,
   ]) {
@@ -127,10 +114,9 @@ class FirebaseApp {
     Preconditions.checkState(!instances.containsKey(normalizedName),
         'FirebaseApp name $normalizedName already exists!');
 
-    final FirebaseApp firebaseApp = FirebaseApp._(normalizedName, options,
-        tokenProvider, prefs, appInit, lifecycleHandler);
+    final FirebaseApp firebaseApp =
+        FirebaseApp._(normalizedName, options, tokenProvider, lifecycleHandler);
     instances[normalizedName] = firebaseApp;
-    firebaseApp.initializeApp();
 
     return firebaseApp;
   }
@@ -152,8 +138,7 @@ class FirebaseApp {
   /// Returns the instance identified by the unique name, or throws if it does
   /// not exist.
   ///
-  /// [name] represents the name of the [FirebaseApp] instance. It throws
-  /// [StateError] if the [FirebaseApp] was not initialized, via [initializeApp]
+  /// [name] represents the name of the [FirebaseApp] instance.
   @publicApi
   static FirebaseApp getInstance(String name) {
     final FirebaseApp firebaseApp = instances[_normalize(name)];
@@ -198,7 +183,7 @@ class FirebaseApp {
   }
 
   @keepForSdk
-  Stream<dynamic> get events => _events.stream;
+  Stream<dynamic> get onDataCollectionChange => _dataColectionChangeSink.stream;
 
   /// If set to true it indicates that Firebase should close database
   /// connections automatically when the app is in the background.
@@ -246,18 +231,19 @@ class FirebaseApp {
     if (_dataCollectionDefaultEnabled != enabled) {
       _dataCollectionDefaultEnabled = enabled;
 
-      _prefs.edit()
+      SharedPreferences.instance.edit()
         ..putBool(_dataCollectionDefaultEnabledPreferenceKey, enabled)
         ..apply();
 
-      _events.add(DataCollectionDefaultChange(enabled: enabled));
+      _dataColectionChangeSink.add(enabled);
     }
   }
 
   bool _readAutoDataCollectionEnabled() {
-    if (_prefs.contains(_dataCollectionDefaultEnabledPreferenceKey)) {
-      return _prefs.getBool(_dataCollectionDefaultEnabledPreferenceKey,
-          defValue: true);
+    if (SharedPreferences.instance
+        .contains(_dataCollectionDefaultEnabledPreferenceKey)) {
+      return SharedPreferences.instance
+          .getBool(_dataCollectionDefaultEnabledPreferenceKey, defValue: true);
     }
 
     return options.dataCollectionEnabled ?? true;
@@ -368,20 +354,6 @@ class FirebaseApp {
   static String _normalize(String name) {
     assert(name != null);
     return name.trim();
-  }
-
-  void initializeApp() {
-    initializeApis(this);
-    /* Initialize this(call getInstance()):
-      private static final String MEASUREMENT_CLASSNAME =
-       "com.google.android.gms.measurement.AppMeasurement";
-      private static final String AUTH_CLASSNAME = 
-      "com.google.firebase.auth.FirebaseAuth";
-      private static final String IID_CLASSNAME =
-      "com.google.firebase.iid.FirebaseInstanceId";
-      private static final String CRASH_CLASSNAME = 
-      "com.google.firebase.crash.FirebaseCrash";
-    */
   }
 
   @override
