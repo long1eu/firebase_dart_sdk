@@ -9,11 +9,19 @@ class Preconditions {
     }
   }
 
-  static T checkNotNull<T>(T object) {
+  static T checkNotNull<T>(T object, [String message]) {
     if (object == null) {
-      throw ArgumentError('${T.toString()}');
+      throw ArgumentError('$message ${T.toString()}');
     } else {
       return object;
+    }
+  }
+
+  static String checkNotEmpty(String value, String message) {
+    if (value == null || value.isEmpty) {
+      throw ArgumentError(message);
+    } else {
+      return value;
     }
   }
 

@@ -1,0 +1,22 @@
+name: firebase_storage
+description: A starting point for Dart libraries or applications.
+version: 0.0.1
+# homepage: https://www.example.com
+author: long1eu <home@long1.eu>
+
+environment:
+  sdk: '>=2.0.0 <3.0.0'
+
+dependencies:
+  isolate: ^2.0.2
+  rxdart: ^0.19.0
+  googleapis: 0.52.0
+  firebase_common:
+    path: ../firebase_common
+    #git:
+      #url: git://github.com/fluttercommunity/firebase_flutter_sdk.git
+      #path: firebase_common
+
+dev_dependencies:
+  test: ^1.0.0
+  mockito: ^3.0.0

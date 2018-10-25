@@ -3,6 +3,7 @@
 // on 16/09/2018
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_common/src/annotations.dart';
 import 'package:firebase_common/src/firebase_options.dart';
@@ -13,6 +14,8 @@ import 'package:firebase_common/src/util/log.dart';
 import 'package:firebase_common/src/util/preconditions.dart';
 import 'package:firebase_common/src/util/to_string_helper.dart';
 import 'package:meta/meta.dart';
+
+typedef IsNetworkConnected = Future<bool> Function();
 
 /// The signature that gets called when [FirebaseApp] gets deleted. This is
 /// triggered when [FirebaseApp.delete] is called. [FirebaseApp] public
@@ -47,6 +50,7 @@ class FirebaseApp {
   final String _name;
   final FirebaseOptions _options;
   final InternalTokenProvider getAuthProvider;
+  final IsNetworkConnected isNetworkConnected;
 
   final StreamController<bool> _dataColectionChangeSink =
       StreamController<bool>.broadcast();
@@ -72,7 +76,8 @@ class FirebaseApp {
   @publicApi
   factory FirebaseApp(
     Map<String, String> json,
-    InternalTokenProvider tokenProvider, [
+    InternalTokenProvider tokenProvider,
+    IsNetworkConnected isNetworkConnected, [
     IsBackground lifecycleHandler,
   ]) {
     if (instances.containsKey(defaultAppName)) {
@@ -84,16 +89,16 @@ class FirebaseApp {
       Log.d(
           logTag,
           'Default FirebaseApp failed to initialize because no default options '
-          'were found. This usually means that you don\'t have the '
-          'google-services.json into you assets folder or you didn\'t add'
-          'it to your pubspec.yaml file. \n We tried $json.');
+          'were found. Make you you\'ve added the configuration files on both '
+          'for ${Platform.operatingSystem}');
     }
 
-    return FirebaseApp.withOptions(
-        firebaseOptions, tokenProvider, defaultAppName, lifecycleHandler);
+    return FirebaseApp.withOptions(firebaseOptions, tokenProvider,
+        isNetworkConnected, defaultAppName, lifecycleHandler);
   }
 
-  FirebaseApp._(this._name, this._options, this.getAuthProvider,
+  FirebaseApp._(
+      this._name, this._options, this.getAuthProvider, this.isNetworkConnected,
       [this.isInBackground]);
 
   /// Initializes the default [FirebaseApp] instance. Same as but it uses
@@ -105,7 +110,8 @@ class FirebaseApp {
   /// Returns an instance of [FirebaseApp]
   factory FirebaseApp.withOptions(
     FirebaseOptions options,
-    InternalTokenProvider tokenProvider, [
+    InternalTokenProvider tokenProvider,
+    IsNetworkConnected isNetworkConnected, [
     String name = defaultAppName,
     IsBackground lifecycleHandler,
   ]) {
@@ -114,8 +120,8 @@ class FirebaseApp {
     Preconditions.checkState(!instances.containsKey(normalizedName),
         'FirebaseApp name $normalizedName already exists!');
 
-    final FirebaseApp firebaseApp =
-        FirebaseApp._(normalizedName, options, tokenProvider, lifecycleHandler);
+    final FirebaseApp firebaseApp = FirebaseApp._(normalizedName, options,
+        tokenProvider, isNetworkConnected, lifecycleHandler);
     instances[normalizedName] = firebaseApp;
 
     return firebaseApp;
@@ -129,7 +135,7 @@ class FirebaseApp {
     if (defaultApp == null) {
       throw StateError(
           'Default FirebaseApp is not initialized. Make sure to call '
-          '[FirebaseApp.initializeApp()] first.');
+          '[FirebaseApp()] first.');
     }
 
     return defaultApp;

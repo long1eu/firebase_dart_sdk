@@ -14,6 +14,7 @@ class FirebaseOptions {
   static const String _gcmSenderId = 'gcm_defaultSenderId';
   static const String _storageBucket = 'google_storage_bucket';
   static const String _projectId = 'project_id';
+  static const String _dataColectionEnabled = 'data_colection_enabled';
 
   /// API key used for authenticating requests from your app, e.g.
   /// AIzaSyDdVgKwhZl0sTTTLZ7iTmt1r3N2cJLnaDk, used to identify your app to
@@ -82,6 +83,18 @@ class FirebaseOptions {
       storageBucket: json[_storageBucket],
       projectId: json[_projectId],
     );
+  }
+
+  Map<String, String> toJson() {
+    return <String, String>{
+      _appId: applicationId,
+      _apiKey: apiKey,
+      _databaseUrl: databaseUrl,
+      _gaTrackingId: gaTrackingId,
+      _gcmSenderId: gcmSenderId,
+      _storageBucket: storageBucket,
+      _projectId: projectId,
+    };
   }
 
   @override

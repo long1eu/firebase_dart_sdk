@@ -8,27 +8,27 @@ class Log {
   static LogLevel level = LogLevel.d;
 
   static void i(String tag, dynamic message) {
-    if (level >= LogLevel.i) {
-      print('${_formatTag('I:$tag')}||$message');
-    }
+    //if (level <= LogLevel.i) {
+    print('${_formatTag('I:$tag')}||$message');
+    //}
   }
 
   static void d(String tag, dynamic message) {
-    if (level >= LogLevel.d) {
-      print('${_formatTag('D:$tag')}||$message');
-    }
+    //if (level <= LogLevel.d) {
+    print('${_formatTag('D:$tag')}||$message');
+    //}
   }
 
   static void w(String tag, dynamic message) {
-    if (level >= LogLevel.w) {
-      print('${_formatTag('W:$tag')}||$message');
-    }
+    //if (level <= LogLevel.w) {
+    print('${_formatTag('W:$tag')}||$message');
+    //}
   }
 
   static void e(String tag, dynamic message) {
-    if (level >= LogLevel.e) {
-      print('${_formatTag('E:$tag')}||$message');
-    }
+    //if (level <= LogLevel.e) {
+    print('${_formatTag('E:$tag')}||$message');
+    //}
   }
 
   static String _formatTag(String tag) => tag.padRight(30, ' ');

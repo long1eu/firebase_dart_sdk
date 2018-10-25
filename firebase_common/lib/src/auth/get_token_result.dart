@@ -3,6 +3,7 @@
 // on 16/09/2018
 
 import 'package:firebase_common/src/annotations.dart';
+import 'package:firebase_common/src/util/to_string_helper.dart';
 
 /// Result object that contains a Firebase Auth ID Token. */
 @publicApi
@@ -28,8 +29,16 @@ class GetTokenResult {
   final Map<String, dynamic> claims;
 
   /// Token represents the {@link String} access token.
+  // TODO:{24/10/2018 09:48}-long1eu: make sure that claims does not contain
+  // anything that could not go through a SendPort.send.
   @keepForSdk
   const GetTokenResult(this.token, [this.claims = const <String, dynamic>{}]);
+
+  factory GetTokenResult.fromJson(Map<String, dynamic> json) {
+    final String token = json['token'];
+    final Map<String, dynamic> claims = json['claims'] ?? <String, dynamic>{};
+    return GetTokenResult(token, claims);
+  }
 
   /// Returns the time at which this ID token will expire
   @publicApi
@@ -78,4 +87,19 @@ class GetTokenResult {
 
   @override
   int get hashCode => token.hashCode * 31 ^ claims.hashCode * 31;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'token': token,
+      'claims': claims,
+    };
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('token', token)
+          ..add('claims', claims))
+        .toString();
+  }
 }

@@ -27,14 +27,14 @@ class ExponentialBackoff {
   /// base delay. This prevents clients from accidentally synchronizing their
   /// delays causing spikes of load to the backend.
   ///
-  /// The async [queue] to run tasks on. [timerId] to use when queuing backoff
-  /// tasks in the [AsyncQueue]. [initialDelayMs] is the initial delay (used as
+  /// The async [_queue] to run tasks on. [_timerId] to use when queuing backoff
+  /// tasks in the [AsyncQueue]. [_initialDelayMs] is the initial delay (used as
   /// the base delay on the first retry attempt). Note that jitter will still be
-  /// applied, so the actual delay could be as little as 0.5*[initialDelayMs].
-  /// [backoffFactor] is the multiplier to use to determine the extended base
-  /// delay after each attempt. [maxDelayMs] is the maximum base delay after
+  /// applied, so the actual delay could be as little as 0.5*[_initialDelayMs].
+  /// [_backoffFactor] is the multiplier to use to determine the extended base
+  /// delay after each attempt. [_maxDelayMs] is the maximum base delay after
   /// which no further backoff is performed. Note that jitter will still be
-  /// applied, so the actual delay could be as much as 1.5*[maxDelayMs].
+  /// applied, so the actual delay could be as much as 1.5*[_maxDelayMs].
   ExponentialBackoff(this._queue, this._timerId, this._initialDelayMs,
       this._backoffFactor, this._maxDelayMs) {
     _lastAttemptTime = DateTime.now().millisecondsSinceEpoch;
@@ -45,8 +45,8 @@ class ExponentialBackoff {
   /// Resets the backoff delay.
   ///
   /// * The very next [backoffAndRun] will have no delay. If it is called again
-  /// (i.e. due to an error), [initialDelayMs] (plus jitter) will be used, and
-  /// subsequent ones will increase according to the [backoffFactor].
+  /// (i.e. due to an error), [_initialDelayMs] (plus jitter) will be used, and
+  /// subsequent ones will increase according to the [_backoffFactor].
   void reset() => _currentBaseMs = 0;
 
   /// Resets the backoff delay to the maximum delay (e.g. for use after a

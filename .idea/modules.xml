@@ -8,6 +8,7 @@
       <module fileurl="file://$PROJECT_DIR$/firebase_firestore/firebase_firestore.iml" filepath="$PROJECT_DIR$/firebase_firestore/firebase_firestore.iml" />
       <module fileurl="file://$PROJECT_DIR$/firebase_flutter/firebase_flutter.iml" filepath="$PROJECT_DIR$/firebase_flutter/firebase_flutter.iml" />
       <module fileurl="file://$PROJECT_DIR$/firebase_flutter/firebase_flutter_android.iml" filepath="$PROJECT_DIR$/firebase_flutter/firebase_flutter_android.iml" />
+      <module fileurl="file://$PROJECT_DIR$/firebase_storage/firebase_storage.iml" filepath="$PROJECT_DIR$/firebase_storage/firebase_storage.iml" />
       <module fileurl="file://$PROJECT_DIR$/protolite_well_known_types/protolite_well_known_types.iml" filepath="$PROJECT_DIR$/protolite_well_known_types/protolite_well_known_types.iml" />
     </modules>
   </component>

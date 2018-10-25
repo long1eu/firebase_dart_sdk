@@ -14,6 +14,7 @@ dependencies:
   path_provider: ^0.4.1
   firebase_auth: ^0.6.2+1
   sqflite: ^0.12.2+1
+  firebase_storage: any
 
   firebase_common:
     git:
