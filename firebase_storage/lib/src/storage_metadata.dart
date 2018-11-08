@@ -64,8 +64,6 @@ class StorageMetadata {
   @publicApi
   final String md5Hash;
 
-  // TODO: Change the default value to 'identity' with the next major API
-  // version.
   final _MetadataValue<String> _contentEncoding;
   final _MetadataValue<String> _cacheControl;
   final _MetadataValue<String> _contentDisposition;
@@ -76,7 +74,6 @@ class StorageMetadata {
   // TODO:{23/10/2018 15:11}-long1eu: find a way to create metadata for update
   /// Creates a [StorageMetadata] object to hold metadata for a
   /// [StorageReference]
-  @publicApi
   StorageMetadata._({
     String path,
     FirebaseStorage storage,
@@ -111,6 +108,7 @@ class StorageMetadata {
             _MetadataValue<Map<String, String>>.withDefaultValue(
                 <String, String>{});
 
+  @publicApi
   factory StorageMetadata.update({
     String contentEncoding,
     String cacheControl,
@@ -312,30 +310,32 @@ class StorageMetadata {
   }
 
   Map<String, dynamic> createJson() {
-    final Map<String, dynamic> jsonData = <String, dynamic>{};
+    final Map<String, dynamic> data = <String, dynamic>{};
 
     if (_contentType.userProvided) {
-      jsonData[_kContentTypeKey] = contentType;
+      data[_kContentTypeKey] = contentType;
     }
     if (_customMetadata.userProvided) {
-      jsonData[_kCustomMetadataKey] = _customMetadata.value;
+      data[_kCustomMetadataKey] = _customMetadata.value;
     }
     if (_cacheControl.userProvided) {
-      jsonData[_kCacheControl] = cacheControl;
+      data[_kCacheControl] = cacheControl;
     }
     if (_contentDisposition.userProvided) {
-      jsonData[_kContentDisposition] = contentDisposition;
+      data[_kContentDisposition] = contentDisposition;
     }
     if (_contentEncoding.userProvided) {
-      jsonData[_kContentEncoding] = contentEncoding;
+      data[_kContentEncoding] = contentEncoding;
     }
     if (_contentLanguage.userProvided) {
-      jsonData[_kContentLanguage] = contentLanguage;
+      data[_kContentLanguage] = contentLanguage;
     }
 
-    return jsonData;
+    return data;
   }
 }
+
+class MetadataUpdate {}
 
 /// Stores metadata values and indicates whether these are defaults or
 /// user-provided.

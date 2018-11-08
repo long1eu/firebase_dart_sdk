@@ -4,17 +4,21 @@
 
 import 'dart:async';
 
-import 'package:firebase_storage/src/future_handle.dart';
-import 'package:firebase_storage/src/util/wrapped_future.dart';
+import 'package:firebase_storage/src/internal/task_events.dart';
+import 'package:firebase_storage/src/internal/task_proxy.dart';
+import 'package:firebase_storage/src/task.dart';
 
-class FutureHandleImpl<TState> extends WrappedFuture<TState>
-    implements FutureHandler<TState> {
-  final void Function(dynamic) _send;
+class TaskImpl<TState extends StorageTaskState> extends Task<TState> {
+  final Sender _send;
   final Stream<dynamic> _received;
+  final Completer<dynamic> _completer;
 
   int _id = 0;
 
-  FutureHandleImpl(this._send, this._received);
+  TaskImpl(this._send, this._received, this._completer);
+
+  @override
+  Future<void> get future => _completer.future;
 
   @override
   Future<bool> cancel() => _callMethod('cancel');
@@ -43,4 +47,10 @@ class FutureHandleImpl<TState> extends WrappedFuture<TState>
         .first)[2];
     return result;
   }
+
+  @override
+  Stream<TaskEvent<TState>> get events => _received
+      .where((dynamic data) => data is TaskPayload)
+      .cast<TaskPayload>()
+      .map(TaskEvent.deserialized);
 }

@@ -46,6 +46,7 @@ class TestHttpClientProvider implements HttpClientProviderImpl {
     //verifyOldMock();
 
     final MockHttpClient mock = MockHttpClient();
+
     completer = Completer<void>();
     requestMock = MockHttpClientRequest();
     when(requestMock.method).thenReturn(method);
@@ -54,6 +55,7 @@ class TestHttpClientProvider implements HttpClientProviderImpl {
     responseMock = MockHttpClientResponse();
 
     final Map<String, List<String>> headers = <String, List<String>>{};
+    final MockHeaders responseHeaders = MockHeaders(headers);
 
     _file.transform(utf8.decoder).transform(const LineSplitter()).listen(
         (String line) {
@@ -63,7 +65,7 @@ class TestHttpClientProvider implements HttpClientProviderImpl {
         return;
       }
 
-      Log.d(_tag, line);
+      Log.d(_tag, line.padRight(200).substring(0, 200));
 
       final int colon = line.indexOf(':');
       if (colon == -1) {
@@ -88,8 +90,7 @@ class TestHttpClientProvider implements HttpClientProviderImpl {
       } else if (key == 'getResponseCode') {
         when(responseMock.statusCode).thenReturn(int.parse(value));
       } else if (key == 'getHeaderFields') {
-        final MockHeaders mockHeaders = MockHeaders(headers);
-        when(responseMock.headers).thenReturn(mockHeaders);
+        when(responseMock.headers).thenReturn(responseHeaders);
       } else if (key == 'getInputStream') {
         List<dynamic> responseData;
         bool injectException = false;
@@ -110,7 +111,9 @@ class TestHttpClientProvider implements HttpClientProviderImpl {
           responseData.insert(responseData.length, 'Exception');
         }
 
-        responseMock._controller.add(responseData);
+        responseMock._controller
+          ..add(responseData)
+          ..close();
       } else if (key.codeUnitAt(0) == /*' '*/ 0x20) {
         key = key.substring(1);
         value = value.substring(1, value.length - 1);
@@ -118,7 +121,7 @@ class TestHttpClientProvider implements HttpClientProviderImpl {
           final int integerLength = int.parse(value);
           when(responseMock.contentLength).thenReturn(integerLength);
         } else if (key == 'Content-Type') {
-          when(responseMock.headers.contentType)
+          when(responseHeaders.contentType)
               .thenReturn(ContentType.parse(value));
         }
         headers[key] = <String>[value];
@@ -215,24 +218,30 @@ class MockHttpClientResponse extends Mock implements HttpClientResponse {
 
   MockHttpClientResponse() : _controller = StreamController<List<dynamic>>();
 
+  Stream<List<int>> get _builtStream =>
+      Observable<List<dynamic>>(_controller.stream) //
+          .expand<dynamic>((List<dynamic> data) => data)
+          .map<dynamic>((dynamic it) {
+            if (it == 'Exception') {
+              throw Exception('Exception thrown by mock');
+            }
+
+            return it;
+          })
+          .cast<int>()
+          .toList()
+          .asStream();
+
+  @override
+  Stream<S> expand<S>(Iterable<S> Function(List<int> element) convert) {
+    return _builtStream.expand<S>(convert);
+  }
+
   @override
   StreamSubscription<List<int>> listen(void Function(List<int> event) onData,
       {Function onError, void Function() onDone, bool cancelOnError}) {
-    return Observable<List<dynamic>>(_controller.stream) //
-        .expand<dynamic>((List<dynamic> data) => data)
-        .map<int>((dynamic it) {
-          if (it == 'Exception') {
-            throw Exception('Exception thrown by mock');
-          }
-
-          // ignore: avoid_as
-          return it as int;
-        })
-        .cast<int>()
-        .toList()
-        .asStream()
-        .listen(onData,
-            onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+    return _builtStream.listen(onData,
+        onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }
 }
 

@@ -28,15 +28,7 @@ Future<void> setUp() async {
     () async => true,
   );
 
-  /*
-  This should be used when we want to the tests on Isolates.
-  class MockAuthProvider extends Mock implements InternalTokenProvider {}
-  final MockAuthProvider authProvider = MockAuthProvider();
-  when(authProvider.getAccessToken(any)).thenAnswer(
-      (_) => Future<GetTokenResult>.value(const GetTokenResult('token')));
- 
-  await StorageTaskScheduler.initialize();
-  */
+  //await StorageTaskScheduler.initialize();
 }
 
 void tearDown() => FirebaseStorage.clearInstancesForTest();
@@ -108,7 +100,7 @@ Future<void> _verifyTaskStateChanges(
     line++;
   }).listen(null, onDone: completer.complete);
 
-  await completer.future.timeout(const Duration(seconds: 1),
+  await completer.future.timeout(const Duration(seconds: 2),
       onTimeout: () => throw 'Last line check at $line');
 }
 

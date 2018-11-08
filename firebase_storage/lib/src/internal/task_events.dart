@@ -2,11 +2,15 @@
 // Lung Razvan <long1eu>
 // on 22/10/2018
 
+import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_storage/src/file_download_task.dart';
 import 'package:firebase_storage/src/storage_exception.dart';
 import 'package:firebase_storage/src/storage_reference.dart';
 import 'package:firebase_storage/src/storage_task.dart';
+import 'package:meta/meta.dart';
+
+// ignore_for_file: prefer_constructors_over_static_methods
 
 class TaskEventType {
   final int _i;
@@ -35,6 +39,17 @@ class TaskEventType {
         throw StateError('$i is not a valid value.');
     }
   }
+
+  static const List<String> _values = <String>[
+    'progress',
+    'paused',
+    'success',
+    'error',
+    'complete',
+  ];
+
+  @override
+  String toString() => _values[_i];
 }
 
 class TaskEvent<TResult extends StorageTaskState> {
@@ -56,38 +71,51 @@ class TaskEvent<TResult extends StorageTaskState> {
   factory TaskEvent.error(TResult data) =>
       TaskEvent<TResult>(TaskEventType.error, data: data);
 
-  factory TaskEvent.deserialized(List<dynamic> values) {
+  static TaskEvent<TResult> deserialized<TResult extends StorageTaskState>(
+      List<dynamic> values) {
     final int typeValue = values[0];
     final TaskEventType type = TaskEventType.fromValue(typeValue);
 
-    final List<dynamic> dataValues = values[1];
-
-    if (dataValues[1] == null) {
+    if (values[1] == null) {
       return TaskEvent<TResult>(type);
     }
 
-    final String constructor = dataValues[0];
-    final List<dynamic> args = dataValues[1];
+    final String constructor = values[1];
+    final List<dynamic> args = values[2];
 
     final TResult object = StorageTaskState.constructors[constructor](args);
     return TaskEvent<TResult>(type, data: object);
   }
 
-  List<dynamic> get serialize => <dynamic>[
-        type._i,
-        <dynamic>['${data?.runtimeType}', data?.serialized]
-      ];
+  TaskPayload get serialize {
+    return TaskPayload(
+      type: type._i,
+      eventType: data != null ? '${data.runtimeType}' : null,
+      data: data?._serialized,
+    );
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)..add('type', type)..add('data', data))
+        .toString();
+  }
 }
 
 abstract class StorageTaskState {
   dynamic get error;
 
-  List<dynamic> get serialized;
+  List<dynamic> get _serialized;
 
   static Map<String, Function> constructors = <String, Function>{
     'SnapshotBase': SnapshotBase.deserialized,
     'DownloadTaskSnapshot': DownloadTaskSnapshot.deserialized,
+    'StreamDownloadTaskSnapshot': DownloadStreamTaskSnapshot.deserialized,
   };
+}
+
+abstract class StorageStreamedTaskState implements StorageTaskState {
+  List<int> get data;
 }
 
 /// Base class for state.
@@ -97,26 +125,24 @@ class SnapshotBase<TResult extends StorageTaskState>
   final dynamic error;
   final String referenceUrl;
 
-  // This should be private
-  SnapshotBase(this.error, this.referenceUrl);
-
-  // This is the default constructor
-  factory SnapshotBase.base(
+  factory SnapshotBase(
       String referenceUrl,
       int currentState,
       // ignore: avoid_positional_boolean_parameters
       bool isCanceled,
       dynamic error) {
-    return SnapshotBase<TResult>(
+    return SnapshotBase<TResult>._(
         errorFor(currentState, isCanceled, error), referenceUrl);
   }
+
+  SnapshotBase._(this.error, this.referenceUrl);
 
   static SnapshotBase<TResult> deserialized<TResult extends StorageTaskState>(
       List<dynamic> values) {
     final dynamic error = values[0];
     final String referenceUrl = values[1];
 
-    return SnapshotBase<TResult>(error, referenceUrl);
+    return SnapshotBase<TResult>._(error, referenceUrl);
   }
 
   static dynamic errorFor(
@@ -140,7 +166,8 @@ class SnapshotBase<TResult extends StorageTaskState>
   }
 
   @override
-  List<dynamic> get serialized => <dynamic>[error.toString(), referenceUrl];
+  List<dynamic> get _serialized =>
+      <dynamic>[error == null ? null : error.toString(), referenceUrl];
 
   /// Returns the target of the upload.
   @publicApi
@@ -162,13 +189,7 @@ class DownloadTaskSnapshot extends SnapshotBase<DownloadTaskSnapshot> {
   @publicApi
   final int totalByteCount;
 
-  // This should be private
-  DownloadTaskSnapshot(dynamic error, String referenceUrl,
-      this.bytesTransferred, this.totalByteCount)
-      : super(error, referenceUrl);
-
-  // This is the default constructor
-  factory DownloadTaskSnapshot.base(
+  factory DownloadTaskSnapshot(
       String referenceUrl,
       int currentState,
       // ignore: avoid_positional_boolean_parameters
@@ -176,12 +197,16 @@ class DownloadTaskSnapshot extends SnapshotBase<DownloadTaskSnapshot> {
       dynamic error,
       int bytesTransferred,
       int totalByteCount) {
-    return DownloadTaskSnapshot(
+    return DownloadTaskSnapshot._(
         SnapshotBase.errorFor(currentState, isCanceled, error),
         referenceUrl,
         bytesTransferred,
         totalByteCount);
   }
+
+  DownloadTaskSnapshot._(dynamic error, String referenceUrl,
+      this.bytesTransferred, this.totalByteCount)
+      : super._(error, referenceUrl);
 
   static DownloadTaskSnapshot deserialized(List<dynamic> values) {
     final dynamic error = values[0];
@@ -189,11 +214,93 @@ class DownloadTaskSnapshot extends SnapshotBase<DownloadTaskSnapshot> {
     final int bytesTransferred = values[2];
     final int totalByteCount = values[3];
 
-    return DownloadTaskSnapshot(
+    return DownloadTaskSnapshot._(
         error, referenceUrl, bytesTransferred, totalByteCount);
   }
 
   @override
-  List<dynamic> get serialized =>
-      super.serialized..addAll(<dynamic>[bytesTransferred, totalByteCount]);
+  List<dynamic> get _serialized =>
+      super._serialized..addAll(<dynamic>[bytesTransferred, totalByteCount]);
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('error', error)
+          ..add('referenceUrl', referenceUrl)
+          ..add('totalByteCount', totalByteCount)
+          ..add('bytesTransferred', bytesTransferred))
+        .toString();
+  }
+}
+
+class DownloadStreamTaskSnapshot
+    extends SnapshotBase<DownloadStreamTaskSnapshot>
+    implements StorageStreamedTaskState {
+  @publicApi
+  final int bytesTransferred;
+
+  /// Returns the total bytes to upload.
+  @publicApi
+  final int totalByteCount;
+
+  @override
+  final List<int> data;
+
+  factory DownloadStreamTaskSnapshot(
+      String referenceUrl,
+      int currentState,
+      // ignore: avoid_positional_boolean_parameters
+      bool isCanceled,
+      dynamic error,
+      int bytesTransferred,
+      int totalByteCount,
+      List<int> data) {
+    return DownloadStreamTaskSnapshot._(
+      SnapshotBase.errorFor(currentState, isCanceled, error),
+      referenceUrl,
+      bytesTransferred,
+      totalByteCount,
+      data,
+    );
+  }
+
+  DownloadStreamTaskSnapshot._(dynamic error, String referenceUrl,
+      this.bytesTransferred, this.totalByteCount, this.data)
+      : super._(error, referenceUrl);
+
+  static DownloadStreamTaskSnapshot deserialized(List<dynamic> values) {
+    final dynamic error = values[0];
+    final String referenceUrl = values[1];
+    final int bytesTransferred = values[2];
+    final int totalByteCount = values[3];
+    final List<int> data = values[4];
+
+    return DownloadStreamTaskSnapshot._(
+        error, referenceUrl, bytesTransferred, totalByteCount, data);
+  }
+
+  @override
+  List<dynamic> get _serialized => super._serialized
+    ..addAll(<dynamic>[bytesTransferred, totalByteCount, data]);
+}
+
+class TaskPayload extends DelegatingList<dynamic> {
+  final int type;
+  final String eventType;
+  final List<dynamic> data;
+
+  TaskPayload({
+    @required this.type,
+    @required this.eventType,
+    @required this.data,
+  }) : super(<dynamic>[type, eventType, data]);
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('type', '$type(${TaskEventType.fromValue(type)})')
+          ..add('eventType', eventType)
+          ..add('data', data))
+        .toString();
+  }
 }

@@ -4,9 +4,10 @@
 import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_storage/src/internal/task_events.dart';
 
 @publicApi
-abstract class FutureHandler<TState> implements Future<TState> {
+abstract class Task<TState extends StorageTaskState> {
   /// Attempts to cancel the task. A canceled task cannot be resumed later. A
   /// canceled task throws an exception that indicates the task was canceled.
   ///
@@ -43,4 +44,10 @@ abstract class FutureHandler<TState> implements Future<TState> {
   /// Returns true if the task has been paused.
   @publicApi
   Future<bool> get isPaused;
+
+  /// Return this task as a future so you can wait for it to complete.
+  Future<void> get future;
+
+  /// Return a stream witch emits events related to the state of this task
+  Stream<TaskEvent<TState>> get events;
 }

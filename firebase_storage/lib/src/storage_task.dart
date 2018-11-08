@@ -9,13 +9,11 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_storage/src/internal/task_events.dart';
 import 'package:firebase_storage/src/storage_reference.dart';
 import 'package:firebase_storage/src/storage_task_manager.dart';
-import 'package:firebase_storage/src/util/wrapped_future.dart';
 import 'package:meta/meta.dart';
 
 /// A controllable Task that has a synchronized state machine.
 @publicApi
-abstract class StorageTask<TResult extends StorageTaskState>
-    extends WrappedFuture<TResult> {
+abstract class StorageTask<TResult extends StorageTaskState> {
   static const String _tag = 'StorageTask';
 
   static const int kInternalStateNotStarted = 1;
@@ -76,11 +74,13 @@ abstract class StorageTask<TResult extends StorageTaskState>
   };
 
   final SendPort _sendPort;
-
+  final Completer<void> _completer;
   int _currentState = kInternalStateNotStarted;
   TResult _finalResult;
 
-  StorageTask(this._sendPort);
+  StorageTask(this._sendPort) : _completer = Completer<void>();
+
+  Future<void> get future => _completer.future;
 
   int get internalState => _currentState;
 
@@ -99,7 +99,7 @@ abstract class StorageTask<TResult extends StorageTaskState>
   void resetState() {}
 
   //@visibleForTesting
-  StorageReference get storage;
+  StorageReference get reference;
 
   //@visibleForTesting
   Future<void> scheduleTask();
@@ -123,6 +123,7 @@ abstract class StorageTask<TResult extends StorageTaskState>
   /// Returns true if this task is successfully being paused. Note that a task
   /// may not be immediately paused if it was executing another action and can
   /// still fail or complete.
+  @publicApi
   bool pause() {
     return tryChangeState(
         states: <int>[kInternalStatePaused, kInternalStatePausing],
@@ -159,29 +160,6 @@ abstract class StorageTask<TResult extends StorageTaskState>
   @publicApi
   bool get isPaused => (_currentState & kStatesPaused) != 0;
 
-  /// Gets the result of the Task, if it has already completed.
-  @publicApi
-  TResult getResult() {
-    if (_getFinalResult() == null) {
-      throw StateError('The task is not completed');
-    }
-    final dynamic t = _getFinalResult().error;
-    if (t != null) {
-      throw t;
-    }
-    return _getFinalResult();
-  }
-
-  /// Returns the exception that caused the Task to fail. Returns null if the
-  /// Task is not yet complete, or completed successfully.
-  @publicApi
-  dynamic get error {
-    if (_getFinalResult() == null) {
-      return null;
-    }
-    return _getFinalResult().error;
-  }
-
   /// Returns the current state of the task. This method will return state at
   /// any point of the tasks execution and may not be the final result..
   @publicApi
@@ -208,6 +186,7 @@ abstract class StorageTask<TResult extends StorageTaskState>
     for (int newState in _states) {
       final Set<int> validStates = table[_currentState];
       if (validStates != null && validStates.contains(newState)) {
+        final int oldState = _currentState;
         _currentState = newState;
         switch (_currentState) {
           case kInternalStateQueued:
@@ -236,7 +215,7 @@ abstract class StorageTask<TResult extends StorageTaskState>
             _tag,
             'changed internal state to: ${_getStateString(state: newState)} '
             'isUser: $userInitiated from state: '
-            '${_getStateString(state: _currentState)}');
+            '${_getStateString(state: oldState)}');
 
         return true;
       }
@@ -254,38 +233,38 @@ abstract class StorageTask<TResult extends StorageTaskState>
   void _onInternalStateChanged() {
     TaskEvent<TResult> event;
     if ((internalState & kStatesSuccess) != 0) {
-      StorageTaskManager.instance.unRegister(this);
-      event = TaskEvent<TResult>.success(snapStateImpl);
+      event = TaskEvent<TResult>.success(_getFinalResult());
       _sendPort.send(event.serialize);
-      complete(_getFinalResult());
     }
 
     if ((internalState & kStatesFailure) != 0) {
-      StorageTaskManager.instance.unRegister(this);
-      event = TaskEvent<TResult>.error(snapStateImpl);
-      completeError(_getFinalResult().error);
+      event = TaskEvent<TResult>.error(_getFinalResult());
+      _sendPort.send(event.serialize);
+    }
+
+    if ((internalState & kStatesCanceled) != 0) {
+      event = TaskEvent<TResult>.error(_getFinalResult());
+      _sendPort.send(event.serialize);
     }
 
     if ((internalState & kStateComplete) != 0) {
       StorageTaskManager.instance.unRegister(this);
       event = TaskEvent<TResult>.complete();
-    }
-
-    if ((internalState & kStatesCanceled) != 0) {
-      StorageTaskManager.instance.unRegister(this);
-      event = TaskEvent<TResult>.error(snapStateImpl);
-      completeError(_getFinalResult().error);
+      _sendPort.send(event.serialize);
+      _completer.complete();
     }
 
     if ((internalState & kStatesInprogress) != 0) {
       event = TaskEvent<TResult>.progressed(snapStateImpl);
+      _sendPort.send(event.serialize);
     }
 
     if ((internalState & kStatesPaused) != 0) {
       event = TaskEvent<TResult>.paused();
+      _sendPort.send(event.serialize);
     }
 
-    _sendPort.send(event.serialize);
+    Log.d(_tag, 'Event sent: ${event.type}');
   }
 
   @publicApi
@@ -317,8 +296,6 @@ abstract class StorageTask<TResult extends StorageTaskState>
 
     return _finalResult ??= snapState;
   }
-
-  // endregion
 
   @visibleForTesting
   Future<void> run();

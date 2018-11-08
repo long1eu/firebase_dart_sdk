@@ -9,10 +9,10 @@ import 'dart:math';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_storage/src/cancel_exception.dart';
 import 'package:firebase_storage/src/firebase_storage.dart';
-import 'package:firebase_storage/src/future_handle.dart';
 import 'package:firebase_storage/src/internal/task_events.dart';
 import 'package:firebase_storage/src/storage_reference.dart';
 import 'package:firebase_storage/src/storage_task_manager.dart';
+import 'package:firebase_storage/src/task.dart';
 import 'package:test/test.dart';
 
 const String _tag = 'TestDownloadHelper';
@@ -30,9 +30,11 @@ Future<StringBuffer> fileDownload(
   expect(StorageTaskManager.instance.getDownloadTasksUnder(storage.parent),
       isEmpty);
 
-  FutureHandler<DownloadTaskSnapshot> task;
-  task = storage.getFile(file, (TaskEvent<DownloadTaskSnapshot> event) {
+  bool success;
+  final Task<DownloadTaskSnapshot> task = storage.getFile(file);
+  task.events.listen((TaskEvent<DownloadTaskSnapshot> event) async {
     if (event.type == TaskEventType.success) {
+      success = true;
       final String statusMessage =
           '\nonSuccess:\n${fileTaskToString(event.data)}';
       Log.i(_tag, statusMessage);
@@ -45,35 +47,41 @@ Future<StringBuffer> fileDownload(
       builder.write(statusMessage);
 
       if (cancelAfter != -1 && event.data.bytesTransferred > cancelAfter) {
-        task.cancel();
+        await task.cancel();
       }
     } else if (event.type == TaskEventType.complete) {
-      final String statusMessage =
-          '\nonComplete:Success=\n${task.isInProgress}';
+      final String statusMessage = '\nonComplete:Success=\n$success';
       Log.i(_tag, statusMessage);
       builder.write(statusMessage);
-    }
-  }).catchError((dynamic error) {
-    if (error is CancelException) {
-      const String statusMessage = '\nonCanceled:';
-      Log.i(_tag, statusMessage);
-      builder.write(statusMessage);
+    } else if (event.type == TaskEventType.error) {
+      success = false;
+      final dynamic error = event.data.error;
+      if (error is CancelException) {
+        const String statusMessage = '\nonCanceled:';
+        Log.i(_tag, statusMessage);
+        builder.write(statusMessage);
+      } else {
+        const String statusMessage = '\nonFailure:\n$e';
+        Log.i(_tag, statusMessage);
+        builder.write(statusMessage);
+      }
     } else {
-      const String statusMessage = '\nonFailure:\n$e';
-      Log.i(_tag, statusMessage);
-      builder.write(statusMessage);
+      throw StateError('Unhandeled event type $event.');
     }
-  }) as FutureHandler<DownloadTaskSnapshot>;
+  });
 
   expect(storage.activeDownloadTasks.length, 1);
-  expect(StorageTaskManager.instance.getDownloadTasksUnder(storage.parent),
-      isNotEmpty);
+  expect(
+      StorageTaskManager.instance
+          .getDownloadTasksUnder(storage.parent)
+          .isNotEmpty,
+      isTrue);
 
   if (cancelAfter == 0) {
     await task.cancel();
   }
 
-  return task.then((_) => builder);
+  return task.future.then((_) => builder);
 }
 
 String fileTaskToString(DownloadTaskSnapshot state) {

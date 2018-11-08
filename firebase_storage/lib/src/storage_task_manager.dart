@@ -6,18 +6,19 @@ import 'package:firebase_storage/src/file_download_task.dart';
 import 'package:firebase_storage/src/storage_reference.dart';
 import 'package:firebase_storage/src/storage_task.dart';
 
+// ignore: always_specify_types
 class StorageTaskManager {
   static final StorageTaskManager instance = StorageTaskManager._();
 
   StorageTaskManager._();
 
-  final Map<String, StorageTask> mInProgressTasks = <String, StorageTask>{};
+  final Map<String, StorageTask> _inProgressTasks = <String, StorageTask>{};
 
   /*
   List<UploadTask> getUploadTasksUnder(StorageReference parent) {
     final List<UploadTask> inProgressList = <UploadTask>[];
     final String parentPath = parent.toString();
-    for (MapEntry<String, StorageTask> entry in mInProgressTasks.entries) {
+    for (MapEntry<String, StorageTask> entry in _inProgressTasks.entries) {
       if (entry.key.startsWith(parentPath)) {
         final StorageTask task = entry.value;
         if (task is UploadTask) {
@@ -32,8 +33,8 @@ class StorageTaskManager {
 
   List<FileDownloadTask> getDownloadTasksUnder(StorageReference parent) {
     final List<FileDownloadTask> inProgressList = <FileDownloadTask>[];
-    String parentPath = parent.toString();
-    for (MapEntry<String, StorageTask> entry in mInProgressTasks.entries) {
+    final String parentPath = parent.toString();
+    for (MapEntry<String, StorageTask> entry in _inProgressTasks.entries) {
       if (entry.key.startsWith(parentPath)) {
         final StorageTask task = entry.value;
         if (task is FileDownloadTask) {
@@ -45,16 +46,18 @@ class StorageTaskManager {
   }
 
   void ensureRegistered(StorageTask targetTask) {
+    print('#ensureRegistered called with: targetTask:[$targetTask]');
     // ensure *this* is added to the in progress list
-    mInProgressTasks[targetTask.storage.toString()] = targetTask;
+    _inProgressTasks[targetTask.reference.toString()] = targetTask;
   }
 
   void unRegister(StorageTask targetTask) {
+    print('#unRegister called with: targetTask:[$targetTask]');
     // ensure *this* is added to the in progress list
-    final String key = targetTask.storage.toString();
-    final StorageTask task = mInProgressTasks[key];
+    final String key = targetTask.reference.toString();
+    final StorageTask task = _inProgressTasks[key];
     if (task == null || task == targetTask) {
-      mInProgressTasks.remove(key);
+      _inProgressTasks.remove(key);
     }
   }
 }

@@ -5,60 +5,19 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/controllable_future_handle.dart';
-import 'package:firebase_storage/src/firebase_storage.dart';
 import 'package:firebase_storage/src/internal/exponential_backoff_sender.dart';
 import 'package:firebase_storage/src/internal/task_events.dart';
+import 'package:firebase_storage/src/internal/task_impl.dart';
+import 'package:firebase_storage/src/internal/task_proxy.dart';
 import 'package:firebase_storage/src/network/get_network_request.dart';
 import 'package:firebase_storage/src/network/network_request.dart';
 import 'package:firebase_storage/src/storage_exception.dart';
 import 'package:firebase_storage/src/storage_reference.dart';
 import 'package:firebase_storage/src/storage_task.dart';
-import 'package:firebase_storage/src/storage_task_scheduler.dart';
-import 'package:rxdart/rxdart.dart';
-
-Future<void> _execute(List<dynamic> arguments) async {
-  final SendPort sendPort = arguments[0];
-  final ReceivePort receivePort = ReceivePort();
-  sendPort.send(receivePort.sendPort);
-
-  final String referenceUrl = arguments[1];
-  final String path = arguments[2];
-
-  // TODO:{22/10/2018 14:15}-long1eu: this is not good since we don't know if
-  // this is the right FirestoreStorage instance
-  final StorageReference storage =
-      FirebaseStorage.instance.getReferenceFromUrl(referenceUrl);
-  final File destinationFile = File(path);
-
-  final FileDownloadTask task =
-      FileDownloadTask._(storage, destinationFile, sendPort);
-
-  receivePort.cast<List<dynamic>>().listen((List<dynamic> args) {
-    final int id = args[0];
-    final String method = args[1];
-    bool result;
-    if (method == 'cancel') {
-      result = task.cancel();
-    } else if (method == 'pause') {
-      result = task.pause();
-    } else if (method == 'resume') {
-      result = task.resume();
-    } else if (method == 'isCanceled') {
-      result = task.isCompleted;
-    } else if (method == 'isInProgress') {
-      result = task.isInProgress;
-    } else if (method == 'isPaused') {
-      result = task.isPaused;
-    }
-
-    sendPort.send(<dynamic>[id, method, result]);
-  });
-
-  return task;
-}
+import 'package:firebase_storage/src/task.dart';
 
 /// A task that downloads bytes of a GCS blob to a specified File.
 @publicApi
@@ -67,7 +26,7 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
   static const String _tag = 'FileDownloadTask';
 
   @override
-  final StorageReference storage;
+  final StorageReference reference;
   final File _destinationFile;
 
   dynamic _error;
@@ -76,49 +35,33 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
   int _resumeOffset = 0;
   int _totalBytes = -1;
   int _resultCode = 0;
-  int _bytesDownloaded;
+  int _bytesDownloaded = 0;
 
-  FileDownloadTask._(this.storage, this._destinationFile, SendPort sendPort)
+  FileDownloadTask._(this.reference, this._destinationFile, SendPort sendPort)
       : _sender = ExponentialBackoffSender(
-            storage.app, storage.storage.maxDownloadRetry),
+            reference.app, reference.storage.maxDownloadRetry),
         super(sendPort) {
     queue();
   }
 
-  static Future<DownloadTaskSnapshot> schedule(
-      StorageReference storage,
-      File destinationFile,
-      void onEvent(TaskEvent<DownloadTaskSnapshot> event)) {
-    final ReceivePort receivePort = ReceivePort();
-    final Stream<dynamic> received = receivePort.asBroadcastStream();
+  static Task<DownloadTaskSnapshot> schedule(
+      StorageReference storage, File destinationFile) {
+    return proxySchedule(
+      args: <String>[destinationFile.toString()],
+      storage: storage,
+      taskBuilder: (Sender sender, Stream<dynamic> received,
+          Completer<dynamic> completer) {
+        return TaskImpl<DownloadTaskSnapshot>(sender, received, completer);
+      },
+      storageTaskBuilder: _execute,
+    );
+  }
 
-    FutureHandleImpl<DownloadTaskSnapshot> handle;
-    SendPort taskPort;
-    received.listen((dynamic data) {
-      if (data is TaskEvent<DownloadTaskSnapshot>) {
-        onEvent?.call(data);
-
-        if (data.type == TaskEventType.success) {
-          handle.complete(data.data);
-        } else if (data.type == TaskEventType.error) {
-          handle.completeError(data.data);
-        }
-      } else if (data is SendPort) {
-        taskPort = data;
-      } else if (data is List) {
-        // this are method calls handled by the [FutureHandleImpl]
-      } else {
-        throw StateError('Something wrong came of the task ReceivePort. $data');
-      }
-    });
-
-    StorageTaskScheduler.instance.scheduleDownload(_execute, <dynamic>[
-      receivePort.sendPort,
-      storage.toString(),
-      destinationFile.path,
-    ]).then((_) => receivePort.close());
-    return handle = FutureHandleImpl<DownloadTaskSnapshot>(
-        (dynamic message) => taskPort.send(message), received);
+  static FileDownloadTask _execute(
+      StorageReference reference, SendPort sendPort, List<dynamic> args) {
+    final String path = args.first;
+    final File destinationFile = File(path);
+    return FileDownloadTask._(reference, destinationFile, sendPort);
   }
 
   @override
@@ -133,8 +76,8 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
 
   @override
   DownloadTaskSnapshot get snapStateImpl {
-    return DownloadTaskSnapshot.base(
-      storage.toString(),
+    return DownloadTaskSnapshot(
+      reference.toString(),
       internalState,
       isCanceled,
       StorageException.fromExceptionAndHttpCode(_error, _resultCode),
@@ -180,23 +123,29 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
 
       try {
         final Completer<void> completer = Completer<void>();
-        Observable<List<int>>(stream)
-            .bufferCount(kPreferredChunkSize)
-            .expand((List<List<int>> it) => it)
-            .listen(
+        stream.listen(
           (List<int> data) {
-            output.add(data);
-            _bytesDownloaded += data.length;
-            if (_error != null) {
-              Log.d(_tag, 'Exception occurred during file download. Retrying.');
-              _error = null;
-              success = false;
-            }
+            int index = 0;
+            while (index < data.length) {
+              final int end = min(data.length, index + kPreferredChunkSize);
+              final List<int> chunk = data.sublist(index, end);
 
-            if (!tryChangeState(
-                state: StorageTask.kInternalStateInProgress,
-                userInitiated: false)) {
-              success = false;
+              output.add(chunk);
+              _bytesDownloaded += chunk.length;
+              if (_error != null) {
+                Log.d(
+                    _tag, 'Exception occurred during file download. Retrying.');
+                _error = null;
+                success = false;
+              }
+
+              if (!tryChangeState(
+                  state: StorageTask.kInternalStateInProgress,
+                  userInitiated: false)) {
+                success = false;
+              }
+
+              index = end;
             }
           },
           onDone: completer.complete,
@@ -234,10 +183,9 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
       _error = null;
       _sender.reset();
       final NetworkRequest request =
-          GetNetworkRequest(storage.storageUri, storage.app, _resumeOffset);
+          GetNetworkRequest(reference.storageUri, reference.app, _resumeOffset);
 
       await _sender.sendWithExponentialBackoff(request, closeRequest: false);
-
       _resultCode = request.resultCode;
       _error = request.error != null ? request.error : _error;
 
@@ -267,7 +215,10 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
         try {
           success = await _processResponse(request);
         } catch (e) {
-          Log.e(_tag, 'Exception occurred during file write.  Aborting.');
+          Log.e(
+              _tag,
+              'Exception occurred during file write. Aborting. $e'
+              '\n${e.stackTrace}');
           _error = e;
         }
       }
@@ -317,5 +268,20 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
 
   bool _isValidHttpResponseCode(int code) {
     return code == 308 || (code >= 200 && code < 300);
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('storage', reference)
+          ..add('destinationFile', _destinationFile)
+          ..add('error', _error)
+          ..add('sender', _sender)
+          ..add('eTagVerification', _eTagVerification)
+          ..add('resumeOffset', _resumeOffset)
+          ..add('totalBytes', _totalBytes)
+          ..add('resultCode', _resultCode)
+          ..add('bytesDownloaded', _bytesDownloaded))
+        .toString();
   }
 }

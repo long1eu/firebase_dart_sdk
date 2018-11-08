@@ -9,13 +9,15 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_storage/src/delete_storage_task.dart';
 import 'package:firebase_storage/src/file_download_task.dart';
 import 'package:firebase_storage/src/firebase_storage.dart';
-import 'package:firebase_storage/src/future_handle.dart';
 import 'package:firebase_storage/src/get_download_url_task.dart';
 import 'package:firebase_storage/src/get_metadata_task.dart';
 import 'package:firebase_storage/src/internal/slash_util.dart';
 import 'package:firebase_storage/src/internal/task_events.dart';
 import 'package:firebase_storage/src/storage_metadata.dart';
 import 'package:firebase_storage/src/storage_task_manager.dart';
+import 'package:firebase_storage/src/stream_download_task.dart';
+import 'package:firebase_storage/src/streamed_task.dart';
+import 'package:firebase_storage/src/task.dart';
 import 'package:firebase_storage/src/update_metadata_task.dart';
 
 /// Represents a reference to a Google Cloud Storage object. Developers can
@@ -77,7 +79,8 @@ class StorageReference {
   @publicApi
   StorageReference get parent {
     String path = storageUri.path;
-    if ((path != null && path.isNotEmpty) || path == '/') {
+
+    if ((path == null && path.isEmpty) || path == '/') {
       return null;
     }
 
@@ -301,129 +304,57 @@ class StorageReference {
     return UpdateMetadataTask.execute(this, metadata);
   }
 
-  /*
-  /// Downloads the object from this [StorageReference]. A byte array will be
+  /// Downloads the object from this [StorageReference]. A [List<int>] will be
   /// allocated large enough to hold the entire file in memory. Therefore, using
-  /// this method will impact memory usage of your process. If you are 
-  /// downloading many large files, 
-  /// {@link StorageReference#getStream(StreamDownloadTaskStreamProcessor)} may 
-  /// be a better option.
+  /// this method will impact memory usage of your process. If you are
+  /// downloading many large files, [stream] may be a better option.
   ///
-  /// [maxDownloadSizeBytes] The maximum allowed size in bytes that will be 
-  /// allocated. Set this parameter to prevent out of memory conditions from 
-  /// occurring. If the download exceeds this limit, the task will fail and an 
+  /// [maxDownloadSizeBytes] The maximum allowed size in bytes that will be
+  /// allocated. Set this parameter to prevent out of memory conditions from
+  /// occurring. If the download exceeds this limit, the task will fail and an
   /// [RangeError] will be returned.
-  /// 
+  ///
   /// Returns the bytes downloaded.
   @publicApi
-  Future<List<int>> getBytes(final long maxDownloadSizeBytes) {
-    final Completer<List<int>> pendingResult = new Completer();
+  Future<List<int>> getBytes(final int maxDownloadSizeBytes) {
+    final Completer<List<int>> pendingResult = Completer<List<int>>();
+    final StreamedTask<DownloadStreamTaskSnapshot> task =
+        StreamDownloadTask.schedule(this);
 
-    StreamDownloadTask task = new StreamDownloadTask(this);
-    task.setStreamProcessor(
-            new StreamDownloadTaskStreamProcessor() {
-              @override
-              @publicApi
-               void doInBackground(StreamDownloadTask.TaskSnapshot state, InputStream stream)
-                  throws IOException {
-                try {
-                  ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-
-                  int totalRead = 0;
-                  int nRead;
-                  List<int> data = new byte[16384];
-                  while ((nRead = stream.read(data, 0, data.length)) != -1) {
-                    totalRead += nRead;
-                    if (totalRead > maxDownloadSizeBytes) {
-                      Log.e(_tag, 'the maximum allowed buffer size was exceeded.');
-                      throw new IndexOutOfBoundsException(
-                          'the maximum allowed buffer size was exceeded.');
-                    }
-                    buffer.write(data, 0, nRead);
-                  }
-                  buffer.flush();
-                  pendingResult.setResult(buffer.toByteArray());
-                } finally {
-                  stream.close();
-                }
-              }
-            })
-        .addOnSuccessListener(
-            new OnSuccessListener<StreamDownloadTask.TaskSnapshot>() {
-              @override
-              @publicApi
-               void onSuccess(StreamDownloadTask.TaskSnapshot state) {
-                if (!pendingResult.future.isComplete()) {
-                  // something went wrong and we didn't set results, but we think it worked.
-                  Log.e(_tag, 'getBytes 'succeeded', but failed to set a Result.');
-                  pendingResult.setException(
-                      StorageException.fromErrorStatus(Status.RESULT_INTERNAL_ERROR));
-                }
-              }
-            })
-        .addOnFailureListener(
-            new OnFailureListener() {
-              @override
-              @publicApi
-               void onFailure( Exception e) {
-                StorageException se = StorageException.fromExceptionAndHttpCode(e, 0);
-                assert se != null;
-                pendingResult.setException(se);
-              }
-            });
-    task.queue();
+    task.data
+        .reduce((List<int> p, List<int> e) {
+          if (e.length > maxDownloadSizeBytes) {
+            Log.e(_tag, 'the maximum allowed buffer size was exceeded.');
+            throw RangeError('the maximum allowed buffer size was exceeded.');
+          }
+          p.addAll(e);
+          return p;
+        })
+        .then(pendingResult.complete)
+        .catchError(pendingResult.completeError);
 
     return pendingResult.future;
   }
 
-    
-  }*/
-
   /// Downloads the object at this [StorageReference] to a specified system
   /// filepath.
+  ///
+  /// Returns a [Task] that can be used to monitor or manage the
+  /// download.
   @publicApi
-  FutureHandler<DownloadTaskSnapshot> getFile(File destinationFile,
-      void onEvent(TaskEvent<DownloadTaskSnapshot> event)) {
-    final FutureHandler<DownloadTaskSnapshot> handle =
-        FileDownloadTask.schedule(this, destinationFile, onEvent);
-    return handle;
+  Task<DownloadTaskSnapshot> getFile(File destinationFile) {
+    return FileDownloadTask.schedule(this, destinationFile);
   }
 
-  /*
-  /**
-   * Asynchronously downloads the object at this {@link StorageReference} via a {@link InputStream}.
-   * The InputStream should be read on an {@link OnSuccessListener} registered to run on a
-   * background thread via {@link StreamDownloadTask#addOnSuccessListener(Executor,
-   * OnSuccessListener)}
-   *
-   * @return A {@link FileDownloadTask} that can be used to monitor or manage the download.
-   */
-
+  /// Asynchronously downloads the object at this [StorageReference] via a
+  /// [Stream<List<int>>].
+  ///
+  /// Returns a [StreamedTask] that can be used to monitor or manage the
+  /// download.
   @publicApi
-  StreamDownloadTask getStream() {
-    StreamDownloadTask task = new StreamDownloadTask(this);
-    task.queue();
-    return task;
+  StreamedTask<DownloadStreamTaskSnapshot> get stream {
+    return StreamDownloadTask.schedule(this);
   }
-
-  /**
-   * Asynchronously downloads the object at this {@link StorageReference} via a {@link InputStream}.
-   *
-   * @param processor A {@link StreamDownloadTaskStreamProcessor} that is responsible for reading
-   *     data from the {@link InputStream}. The {@link StreamDownloadTaskStreamProcessor} is called
-   *     on a background thread and checked exceptions thrown from this object will be returned as a
-   *     failure to the {@link OnFailureListener} registered on the {@link StreamDownloadTask}.
-   * @return A {@link FileDownloadTask} that can be used to monitor or manage the download.
-   */
-
-  @publicApi
-  StreamDownloadTask getStream(StreamDownloadTaskStreamProcessor processor) {
-    StreamDownloadTask task = new StreamDownloadTask(this);
-    task.setStreamProcessor(processor);
-    task.queue();
-    return task;
-  }
-  */
 
   /// Deletes the object at this [StorageReference].
   ///

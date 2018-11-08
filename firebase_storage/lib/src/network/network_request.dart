@@ -162,7 +162,7 @@ abstract class NetworkRequest {
 
       Log.d(_tag, 'network request result $resultCode');
     } catch (e) {
-      print('#error: $e');
+      print('#error performRequestStart: $e ${e.stackTrace}');
       Log.w(_tag, 'error sending network request $action $url');
 
       error = e;
@@ -176,7 +176,7 @@ abstract class NetworkRequest {
     try {
       await _parseResponseStream();
     } catch (e) {
-      print('#error: $e');
+      print('#error _performRequest: $e ${e.stackTrace}');
       Log.w(_tag, 'error sending network request $action $url');
 
       error = e;
@@ -277,7 +277,7 @@ abstract class NetworkRequest {
   Future<void> _parseResponseStream() async {
     final Stream<String> stream = _response.transform(utf8.decoder);
     rawResponse = stream != null ? await stream.first : null;
-    print('#rawResponse: $rawResponse');
+    //print('#rawResponse: $rawResponse');
 
     if (!isResultSuccess) {
       error = Exception(rawResponse);

@@ -9,8 +9,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/firebase_firestore.dart';
 import 'package:firebase_flutter/database.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 
 Future<void> runFirebaseApp({
   @required Widget app,
