@@ -8,8 +8,8 @@ import 'dart:isolate';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_storage/src/cancel_exception.dart';
 import 'package:firebase_storage/src/internal/exponential_backoff_sender.dart';
-import 'package:firebase_storage/src/internal/streamed_task_impl.dart';
 import 'package:firebase_storage/src/internal/task_events.dart';
+import 'package:firebase_storage/src/internal/task_impl.dart';
 import 'package:firebase_storage/src/internal/task_proxy.dart';
 import 'package:firebase_storage/src/network/get_network_request.dart';
 import 'package:firebase_storage/src/network/network_request.dart';
@@ -49,16 +49,13 @@ class StreamDownloadTask extends StorageTask<DownloadStreamTaskSnapshot> {
     final StreamedTask<DownloadStreamTaskSnapshot> task =
         proxySchedule<DownloadStreamTaskSnapshot>(
       storage: storage,
-      taskBuilder: (Sender send, Stream<dynamic> received,
-          Completer<dynamic> completer) {
-        return StreamedTaskImpl<DownloadStreamTaskSnapshot>(
-            send, received, completer);
-      },
+      taskBuilder: StreamedTaskImpl.create,
       storageTaskBuilder: _createTask,
     );
     return task;
   }
 
+  // ignore: prefer_constructors_over_static_methods
   static StreamDownloadTask _createTask(
       StorageReference reference, SendPort sendPort, List<dynamic> args) {
     return StreamDownloadTask._(reference, sendPort);

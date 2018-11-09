@@ -46,13 +46,11 @@ class StorageTaskManager {
   }
 
   void ensureRegistered(StorageTask targetTask) {
-    print('#ensureRegistered called with: targetTask:[$targetTask]');
     // ensure *this* is added to the in progress list
     _inProgressTasks[targetTask.reference.toString()] = targetTask;
   }
 
   void unRegister(StorageTask targetTask) {
-    print('#unRegister called with: targetTask:[$targetTask]');
     // ensure *this* is added to the in progress list
     final String key = targetTask.reference.toString();
     final StorageTask task = _inProgressTasks[key];

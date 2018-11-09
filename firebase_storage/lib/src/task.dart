@@ -46,8 +46,12 @@ abstract class Task<TState extends StorageTaskState> {
   Future<bool> get isPaused;
 
   /// Return this task as a future so you can wait for it to complete.
-  Future<void> get future;
+  ///
+  /// When [events] emits a [TaskEvent] event with
+  /// [TaskEvent.type] == [TaskEventType.complete], this [Task] is completed and
+  /// this [future] completes with [TaskEvent.data] of that event.
+  Future<TState> get future;
 
-  /// Return a stream witch emits events related to the state of this task
+  /// Return a stream witch emits events related to the state of this task.
   Stream<TaskEvent<TState>> get events;
 }

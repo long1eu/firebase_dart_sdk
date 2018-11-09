@@ -3,22 +3,35 @@
 // on 22/10/2018
 
 import 'dart:async';
+import 'dart:isolate';
 
 import 'package:firebase_storage/src/internal/task_events.dart';
-import 'package:firebase_storage/src/internal/task_proxy.dart';
+import 'package:firebase_storage/src/streamed_task.dart';
 import 'package:firebase_storage/src/task.dart';
 
 class TaskImpl<TState extends StorageTaskState> extends Task<TState> {
-  final Sender _send;
   final Stream<dynamic> _received;
-  final Completer<dynamic> _completer;
+  final Completer<TState> _completer;
 
+  List<dynamic> _queue = <dynamic>[];
+  SendPort _port;
   int _id = 0;
 
-  TaskImpl(this._send, this._received, this._completer);
+  TaskImpl._(this._received, this._completer) {
+    _received
+        .where((dynamic data) => data is SendPort)
+        .cast<SendPort>()
+        .first
+        .then((SendPort data) => _port = data);
+  }
+
+  static TaskImpl<TState> create<TState extends StorageTaskState>(
+      Stream<dynamic> received, Completer<TState> completer) {
+    return TaskImpl<TState>._(received, completer);
+  }
 
   @override
-  Future<void> get future => _completer.future;
+  Future<TState> get future => _completer.future;
 
   @override
   Future<bool> cancel() => _callMethod('cancel');
@@ -48,9 +61,53 @@ class TaskImpl<TState extends StorageTaskState> extends Task<TState> {
     return result;
   }
 
+  void _send(dynamic message) {
+    if (_queue == null) {
+      _port.send(message);
+    }
+    _queue.add(message);
+
+    if (_port != null) {
+      final List<dynamic> queue = _queue.toList();
+      _queue = null;
+      queue.forEach(_port.send);
+    }
+  }
+
   @override
   Stream<TaskEvent<TState>> get events => _received
       .where((dynamic data) => data is TaskPayload)
       .cast<TaskPayload>()
       .map(TaskEvent.deserialized);
+}
+
+class StreamedTaskImpl<TState extends StorageStreamedTaskState>
+    extends TaskImpl<TState> implements StreamedTask<TState> {
+  StreamedTaskImpl._(Stream<dynamic> received, Completer<TState> completer)
+      : super._(received, completer);
+
+  static StreamedTaskImpl<TState>
+      create<TState extends StorageStreamedTaskState>(
+          Stream<dynamic> received, Completer<TState> completer) {
+    return StreamedTaskImpl<TState>._(received, completer);
+  }
+
+  @override
+  Future<bool> resume() {
+    throw StateError('This operation is not support on StreamedTask.');
+  }
+
+  @override
+  Future<bool> pause() {
+    throw StateError('This operation is not support on StreamedTask.');
+  }
+
+  @override
+  Stream<List<int>> get data => _received
+      .where((dynamic data) => data is TaskPayload)
+      .cast<TaskPayload>()
+      .map<TaskEvent<StorageStreamedTaskState>>(TaskEvent.deserialized)
+      .where((TaskEvent<StorageStreamedTaskState> it) =>
+          it.type == TaskEventType.progress)
+      .map((TaskEvent<StorageStreamedTaskState> it) => it.data.data);
 }

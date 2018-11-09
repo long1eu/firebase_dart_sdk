@@ -47,16 +47,14 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
   static Task<DownloadTaskSnapshot> schedule(
       StorageReference storage, File destinationFile) {
     return proxySchedule(
-      args: <String>[destinationFile.toString()],
+      args: <String>[destinationFile.path],
       storage: storage,
-      taskBuilder: (Sender sender, Stream<dynamic> received,
-          Completer<dynamic> completer) {
-        return TaskImpl<DownloadTaskSnapshot>(sender, received, completer);
-      },
+      taskBuilder: TaskImpl.create,
       storageTaskBuilder: _execute,
     );
   }
 
+  // ignore: prefer_constructors_over_static_methods
   static FileDownloadTask _execute(
       StorageReference reference, SendPort sendPort, List<dynamic> args) {
     final String path = args.first;

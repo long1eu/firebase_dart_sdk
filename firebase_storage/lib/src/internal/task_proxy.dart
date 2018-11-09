@@ -14,7 +14,7 @@ import 'package:firebase_storage/src/task.dart';
 import 'package:meta/meta.dart';
 
 typedef TaskBuilder<T extends StorageTaskState> = Task<T> Function(
-    Sender sender, Stream<dynamic> received, Completer<dynamic> completer);
+    Stream<dynamic> received, Completer<T> completer);
 
 typedef Sender = void Function(dynamic);
 
@@ -32,21 +32,18 @@ Task<TState> proxySchedule<TState extends StorageTaskState>({
 }) {
   final ReceivePort receivePort = ReceivePort();
   final Stream<dynamic> received = receivePort.asBroadcastStream();
-  final Completer<DownloadTaskSnapshot> completer =
-      Completer<DownloadTaskSnapshot>();
+  final Completer<TState> completer = Completer<TState>();
 
-  SendPort taskPort;
   received.listen((dynamic data) {
     if (data is TaskPayload) {
-      final TaskEvent<DownloadTaskSnapshot> event =
-          TaskEvent.deserialized<DownloadTaskSnapshot>(data);
+      final TaskEvent<TState> event = TaskEvent.deserialized<TState>(data);
 
       if (event.type == TaskEventType.complete) {
         receivePort.close();
-        completer.complete();
+        completer.complete(event.data);
       }
     } else if (data is SendPort) {
-      taskPort = data;
+      // this is handled by the [TaskImpl]
     } else if (data is List) {
       // this are method calls handled by the [TaskImpl]
     } else {
@@ -63,7 +60,7 @@ Task<TState> proxySchedule<TState extends StorageTaskState>({
     ]..addAll(args),
   );
 
-  return taskBuilder(taskPort.send, received, completer);
+  return taskBuilder(received, completer);
 }
 
 Future<void> _execute<TState extends StorageTaskState>(
@@ -71,6 +68,7 @@ Future<void> _execute<TState extends StorageTaskState>(
   final SendPort sendPort = arguments[0];
   final ReceivePort receivePort = ReceivePort();
   sendPort.send(receivePort.sendPort);
+
   final String referenceUrl = arguments[1];
 
   // TODO:{22/10/2018 14:15}-long1eu: this is not good since we don't know if
