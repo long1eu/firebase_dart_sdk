@@ -17,7 +17,7 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 ///   applying a TransformMutation (see [TransformMutation.applyTo]). They can
 ///   only exist in the local view of a document. Therefore they do not need to
 ///   be parsed or serialized.
-///   - When evaluated locally (e.g. via [DocumentSnapshot.data]), they evaluate
+///   - When evaluated locally (e.g. via [DocumentSnapshot.ata]), they evaluate
 ///   to null.
 ///   - They sort after all TimestampValues. With respect to other
 ///   ServerTimestampValues, they sort by their localWriteTime.
