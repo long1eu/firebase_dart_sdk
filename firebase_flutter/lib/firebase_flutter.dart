@@ -5,12 +5,14 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:connectivity/connectivity.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/firebase_firestore.dart';
 import 'package:firebase_flutter/database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:user_preferences/user_preferences.dart';
 
 Future<void> runFirebaseApp({
   @required Widget app,
@@ -28,14 +30,24 @@ Future<void> runFirebaseApp({
     databaseDirectory = '$documentsDirectory/databases';
   }
 
-  await SharedPreferences.getInstance(
-      '$documentsDirectory/shared_prefs/${FirebaseApp.firebaseAppPrefs}.json');
+  await UserPreferences.getInstance(
+    'user_prefs/${FirebaseApp.firebaseAppPrefs}.json',
+    Directory(documentsDirectory),
+  );
 
   FirebaseApp firebaseApp;
   if (options != null) {
-    firebaseApp = FirebaseApp.withOptions(options, _TokenProvider(uid));
+    firebaseApp = FirebaseApp.withOptions(
+      options,
+      _TokenProvider(uid),
+      connectivity,
+    );
   } else {
-    firebaseApp = FirebaseApp(googleConfig, _TokenProvider(uid));
+    firebaseApp = FirebaseApp(
+      googleConfig,
+      _TokenProvider(uid),
+      connectivity,
+    );
   }
 
   if (firestore) {
@@ -64,6 +76,10 @@ Future<void> runFirebaseApp({
 
   runApp(_LifecycleHandler(app: app));
 }
+
+Future<bool> connectivity() => Connectivity()
+    .checkConnectivity()
+    .then((ConnectivityResult it) => it != ConnectivityResult.none);
 
 class _LifecycleHandler extends StatefulWidget {
   const _LifecycleHandler({Key key, this.app}) : super(key: key);
