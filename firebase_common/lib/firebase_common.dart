@@ -14,7 +14,6 @@ export 'src/firebase_options.dart';
 export 'src/internal/api/firebase_no_signed_in_user_error.dart';
 export 'src/internal/internal_token_provider.dart';
 export 'src/internal/internal_token_result.dart';
-export 'src/internal/shared_preferences.dart' show SharedPreferences, Editor;
 export 'src/util/log.dart';
 export 'src/util/preconditions.dart';
 export 'src/util/to_string_helper.dart';

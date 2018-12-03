@@ -8,12 +8,12 @@ import 'dart:io';
 import 'package:firebase_common/src/annotations.dart';
 import 'package:firebase_common/src/firebase_options.dart';
 import 'package:firebase_common/src/internal/internal_token_provider.dart';
-import 'package:firebase_common/src/internal/shared_preferences.dart';
 import 'package:firebase_common/src/util/base64_utils.dart';
 import 'package:firebase_common/src/util/log.dart';
 import 'package:firebase_common/src/util/preconditions.dart';
 import 'package:firebase_common/src/util/to_string_helper.dart';
 import 'package:meta/meta.dart';
+import 'package:user_preferences/user_preferences.dart';
 
 typedef IsNetworkConnected = Future<bool> Function();
 
@@ -237,7 +237,7 @@ class FirebaseApp {
     if (_dataCollectionDefaultEnabled != enabled) {
       _dataCollectionDefaultEnabled = enabled;
 
-      SharedPreferences.instance.edit()
+      UserPreferences.instance.edit()
         ..putBool(_dataCollectionDefaultEnabledPreferenceKey, enabled)
         ..apply();
 
@@ -246,10 +246,10 @@ class FirebaseApp {
   }
 
   bool _readAutoDataCollectionEnabled() {
-    if (SharedPreferences.instance
+    if (UserPreferences.instance
         .contains(_dataCollectionDefaultEnabledPreferenceKey)) {
-      return SharedPreferences.instance
-          .getBool(_dataCollectionDefaultEnabledPreferenceKey, defValue: true);
+      return UserPreferences.instance
+          .getBool(_dataCollectionDefaultEnabledPreferenceKey, true);
     }
 
     return options.dataCollectionEnabled ?? true;
