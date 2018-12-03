@@ -66,9 +66,9 @@ Future<void> runFirebaseApp({
 }
 
 class _LifecycleHandler extends StatefulWidget {
-  final Widget app;
-
   const _LifecycleHandler({Key key, this.app}) : super(key: key);
+
+  final Widget app;
 
   @override
   __LifecycleHandlerState createState() => __LifecycleHandlerState();
@@ -94,9 +94,9 @@ class __LifecycleHandlerState extends State<_LifecycleHandler>
 }
 
 class _TokenProvider extends InternalTokenProvider {
-  String _uid;
-
   _TokenProvider(this._uid);
+
+  String _uid;
 
   @override
   Future<GetTokenResult> getAccessToken(bool forceRefresh) async {

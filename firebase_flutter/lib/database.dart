@@ -8,11 +8,11 @@ import 'package:firebase_firestore/firebase_firestore.dart';
 import 'package:sqflite/sqflite.dart' as sql;
 
 class DatabaseImplementation extends Database {
+  DatabaseImplementation._(this.database);
+
   sql.Database database;
 
   bool renamePath = true;
-
-  DatabaseImplementation._(this.database);
 
   static Future<DatabaseImplementation> create(String name, String filePath,
       {int version,
