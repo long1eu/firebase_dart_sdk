@@ -8,11 +8,7 @@ environment:
   sdk: '>=2.0.0 <3.0.0'
 
 dependencies:
-  isolate: ^2.0.2
   user_preferences: ^0.1.0
 
 dev_dependencies:
   test: ^1.0.0
-
-flutter:
-  uses-material-design: true
