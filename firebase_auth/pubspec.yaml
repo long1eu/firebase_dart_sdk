@@ -9,7 +9,7 @@ environment:
 
 dependencies:
   firebase_common:
-    path: ../firebase_common
+    path: ../firebase_common 
 
 dev_dependencies:
   test: ^1.0.0
