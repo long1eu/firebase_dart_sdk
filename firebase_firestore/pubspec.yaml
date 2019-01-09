@@ -8,10 +8,14 @@ environment:
 
 dependencies:
   firebase_common:
-    path: ../firebase_common
+    git:
+      url: https://github.com/putraxor/firebase_dart_sdk
+      path: firebase_common
 
   firebase_database_collection:
-    path: ../firebase_database_collection 
+    git:
+      url: https://github.com/putraxor/firebase_dart_sdk
+      path: firebase_database_collection 
  
   protobuf: ^0.10.2
   grpc: ^0.6.4
