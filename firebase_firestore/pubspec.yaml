@@ -1,6 +1,6 @@
 name: firebase_firestore
 description: A starting point for Dart libraries or applications.
-version: 0.0.1
+version: 0.0.1+1
 author: long1eu <home@long.1eu>
 
 environment:
@@ -9,14 +9,14 @@ environment:
 dependencies:
   firebase_common:
     git:
-      url: git://github.com/fluttercommunity/firebase_flutter_sdk.git
+      url: https://github.com/putraxor/firebase_dart_sdk
       path: firebase_common
 
   firebase_database_collection:
     git:
-      url: git://github.com/fluttercommunity/firebase_flutter_sdk.git
-      path: firebase_database_collection
-
+      url: https://github.com/putraxor/firebase_dart_sdk
+      path: firebase_database_collection 
+ 
   protobuf: ^0.10.2
   grpc: ^0.6.4
   rxdart: ^0.19.0
@@ -25,4 +25,4 @@ dev_dependencies:
   test: ^1.0.0
   mockito: ^3.0.0
   sqlite:
-    git: https://github.com/long1eu/dart-sqlite
+    git: https://github.com/putraxor/dart-sqlite

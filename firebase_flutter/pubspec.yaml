@@ -17,13 +17,9 @@ dependencies:
   connectivity: ^0.3.2
 
   firebase_common:
-    git:
-      url: git://github.com/fluttercommunity/firebase_flutter_sdk.git
-      path: firebase_common
+    path: ../firebase_common
   firebase_firestore:
-    git:
-      url: git://github.com/fluttercommunity/firebase_flutter_sdk.git
-      path: firebase_firestore
+    path: ../firebase_firestore
 
 flutter:
   plugin:

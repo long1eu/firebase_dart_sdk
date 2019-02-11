@@ -1,0 +1,20 @@
+name: vm_example
+description: Firestore example for VM
+version: 0.0.1
+
+environment:
+  sdk: '>=2.1.0-dev <3.0.0'
+
+dependencies:
+  crypto: ^2.0.6
+  googleapis_auth: ^0.2.6
+  sqlite:
+    git: https://github.com/long1eu/dart-sqlite
+  firebase_common:
+    git:
+      url: https://github.com/putraxor/firebase_dart_sdk
+      path: firebase_common
+  firebase_firestore:
+    git:
+      url: https://github.com/putraxor/firebase_dart_sdk
+      path: firebase_firestore 

@@ -9,7 +9,9 @@ environment:
 
 dependencies:
   firebase_common:
-    path: ../firebase_common
+    git:
+      url: https://github.com/putraxor/firebase_dart_sdk
+      path: firebase_common
 
 dev_dependencies:
   test: ^1.0.0
