@@ -2,49 +2,48 @@
 //  Generated code. Do not modify.
 //  source: google/protobuf/any.proto
 ///
-// ignore_for_file: non_constant_identifier_names,library_prefixes,unused_import
+// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name
 
-// ignore: UNUSED_SHOWN_NAME
-import 'dart:core' show int, bool, double, String, List, override;
+import 'dart:core' as $core show bool, Deprecated, double, int, List, Map, override, pragma, String;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
 class Any extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = new $pb.BuilderInfo('Any', package: const $pb.PackageName('google.protobuf'))
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo('Any', package: const $pb.PackageName('google.protobuf'))
     ..aOS(1, 'typeUrl')
-    ..a<List<int>>(2, 'value', $pb.PbFieldType.OY)
+    ..a<$core.List<$core.int>>(2, 'value', $pb.PbFieldType.OY)
     ..hasRequiredFields = false
   ;
 
-  Any() : super();
-  Any.fromBuffer(List<int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) : super.fromBuffer(i, r);
-  Any.fromJson(String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) : super.fromJson(i, r);
-  Any clone() => new Any()..mergeFromMessage(this);
+  Any._() : super();
+  factory Any() => create();
+  factory Any.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory Any.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  Any clone() => Any()..mergeFromMessage(this);
   Any copyWith(void Function(Any) updates) => super.copyWith((message) => updates(message as Any));
   $pb.BuilderInfo get info_ => _i;
-  static Any create() => new Any();
-  static $pb.PbList<Any> createRepeated() => new $pb.PbList<Any>();
+  @$core.pragma('dart2js:noInline')
+  static Any create() => Any._();
+  Any createEmptyInstance() => create();
+  static $pb.PbList<Any> createRepeated() => $pb.PbList<Any>();
   static Any getDefault() => _defaultInstance ??= create()..freeze();
   static Any _defaultInstance;
-  static void $checkItem(Any v) {
-    if (v is! Any) $pb.checkItemFailed(v, _i.messageName);
-  }
 
-  String get typeUrl => $_getS(0, '');
-  set typeUrl(String v) { $_setString(0, v); }
-  bool hasTypeUrl() => $_has(0);
+  $core.String get typeUrl => $_getS(0, '');
+  set typeUrl($core.String v) { $_setString(0, v); }
+  $core.bool hasTypeUrl() => $_has(0);
   void clearTypeUrl() => clearField(1);
 
-  List<int> get value => $_getN(1);
-  set value(List<int> v) { $_setBytes(1, v); }
-  bool hasValue() => $_has(1);
+  $core.List<$core.int> get value => $_getN(1);
+  set value($core.List<$core.int> v) { $_setBytes(1, v); }
+  $core.bool hasValue() => $_has(1);
   void clearValue() => clearField(2);
     /// Unpacks the message in [value] into [instance].
     ///
     /// Throws a [InvalidProtocolBufferException] if [typeUrl] does not correspond
     /// to the type of [instance].
     ///
-    /// A typical usage would be `any.unpackInto(new Message())`.
+    /// A typical usage would be `any.unpackInto(Message())`.
     ///
     /// Returns [instance].
     T unpackInto<T extends $pb.GeneratedMessage>(T instance,
@@ -58,7 +57,7 @@ class Any extends $pb.GeneratedMessage {
     ///
     /// Can be used with a default instance:
     /// `any.canUnpackInto(Message.getDefault())`
-    bool canUnpackInto($pb.GeneratedMessage instance) {
+    $core.bool canUnpackInto($pb.GeneratedMessage instance) {
       return $pb.canUnpackIntoHelper(instance, typeUrl);
     }
 
@@ -67,10 +66,10 @@ class Any extends $pb.GeneratedMessage {
     /// The [typeUrl] will be [typeUrlPrefix]/`fullName` where `fullName` is
     /// the fully qualified name of the type of [message].
     static Any pack($pb.GeneratedMessage message,
-        {String typeUrlPrefix = 'type.googleapis.com'}) {
-      return new Any()
+        {$core.String typeUrlPrefix = 'type.googleapis.com'}) {
+      return Any()
         ..value = message.writeToBuffer()
-        ..typeUrl = '${typeUrlPrefix}/${message.info_.messageName}';
+        ..typeUrl = '${typeUrlPrefix}/${message.info_.qualifiedMessageName}';
     }
 }
 

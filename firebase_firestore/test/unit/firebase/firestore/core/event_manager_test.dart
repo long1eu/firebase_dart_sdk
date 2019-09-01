@@ -77,7 +77,7 @@ void main() {
     final ViewSnapshot snap2 = ViewSnapshotMock();
     when(snap2.query).thenReturn(query2);
 
-    eventManager.onViewSnapshots(<ViewSnapshot>[snap1, snap2]);
+    await eventManager.onViewSnapshots(<ViewSnapshot>[snap1, snap2]);
 
     verifyInOrder(<void>[
       await spy1.onViewSnapshot(snap1),

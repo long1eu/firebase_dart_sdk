@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
@@ -168,10 +169,13 @@ class TransformMutation extends Mutation {
       other is TransformMutation &&
           runtimeType == other.runtimeType &&
           hasSameKeyAndPrecondition(other) &&
-          fieldTransforms == other.fieldTransforms;
+          const ListEquality<FieldTransform>()
+              .equals(fieldTransforms, other.fieldTransforms);
 
   @override
-  int get hashCode => fieldTransforms.hashCode ^ keyAndPreconditionHashCode();
+  int get hashCode =>
+      const ListEquality<FieldTransform>().hash(fieldTransforms) ^
+      keyAndPreconditionHashCode();
 
   @override
   String toString() {

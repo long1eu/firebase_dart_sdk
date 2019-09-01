@@ -2,7 +2,7 @@
 //  Generated code. Do not modify.
 //  source: google/firestore/v1beta1/write.proto
 ///
-// ignore_for_file: non_constant_identifier_names,library_prefixes,unused_import
+// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name
 
 const Write$json = const {
   '1': 'Write',
@@ -32,6 +32,9 @@ const DocumentTransform_FieldTransform$json = const {
   '2': const [
     const {'1': 'field_path', '3': 1, '4': 1, '5': 9, '10': 'fieldPath'},
     const {'1': 'set_to_server_value', '3': 2, '4': 1, '5': 14, '6': '.google.firestore.v1beta1.DocumentTransform.FieldTransform.ServerValue', '9': 0, '10': 'setToServerValue'},
+    const {'1': 'increment', '3': 3, '4': 1, '5': 11, '6': '.google.firestore.v1beta1.Value', '9': 0, '10': 'increment'},
+    const {'1': 'maximum', '3': 4, '4': 1, '5': 11, '6': '.google.firestore.v1beta1.Value', '9': 0, '10': 'maximum'},
+    const {'1': 'minimum', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1beta1.Value', '9': 0, '10': 'minimum'},
     const {'1': 'append_missing_elements', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1beta1.ArrayValue', '9': 0, '10': 'appendMissingElements'},
     const {'1': 'remove_all_from_array', '3': 7, '4': 1, '5': 11, '6': '.google.firestore.v1beta1.ArrayValue', '9': 0, '10': 'removeAllFromArray'},
   ],

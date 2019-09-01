@@ -1,8 +1,8 @@
 ///
 //  Generated code. Do not modify.
-//  source: firestore/local/mutation.proto
+//  source: google/firebase/firestore/proto/mutation.proto
 ///
-// ignore_for_file: non_constant_identifier_names,library_prefixes,unused_import
+// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name
 
 const MutationQueue$json = const {
   '1': 'MutationQueue',

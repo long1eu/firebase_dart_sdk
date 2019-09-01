@@ -4,6 +4,7 @@
 
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
@@ -65,15 +66,17 @@ class WatchChangeDocumentChange extends WatchChange {
       identical(this, other) ||
       other is WatchChangeDocumentChange &&
           runtimeType == other.runtimeType &&
-          updatedTargetIds == other.updatedTargetIds &&
-          removedTargetIds == other.removedTargetIds &&
+          const ListEquality<int>()
+              .equals(updatedTargetIds, other.updatedTargetIds) &&
+          const ListEquality<int>()
+              .equals(removedTargetIds, other.removedTargetIds) &&
           documentKey == other.documentKey &&
           newDocument == other.newDocument;
 
   @override
   int get hashCode =>
-      updatedTargetIds.hashCode ^
-      removedTargetIds.hashCode ^
+      const ListEquality<int>().hash(updatedTargetIds) ^
+      const ListEquality<int>().hash(removedTargetIds) ^
       documentKey.hashCode ^
       newDocument.hashCode;
 
@@ -128,15 +131,15 @@ class WatchChangeWatchTargetChange extends WatchChange {
       other is WatchChangeWatchTargetChange &&
           runtimeType == other.runtimeType &&
           changeType == other.changeType &&
-          targetIds == other.targetIds &&
-          resumeToken == other.resumeToken &&
+          const ListEquality<int>().equals(targetIds, other.targetIds) &&
+          const ListEquality<int>().equals(resumeToken, other.resumeToken) &&
           cause == other.cause;
 
   @override
   int get hashCode =>
       changeType.hashCode ^
-      targetIds.hashCode ^
-      resumeToken.hashCode ^
+      const ListEquality<int>().hash(targetIds) ^
+      const ListEquality<int>().hash(resumeToken) ^
       cause.hashCode;
 
   @override

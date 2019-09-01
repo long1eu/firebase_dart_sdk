@@ -2,18 +2,18 @@
 //  Generated code. Do not modify.
 //  source: google/firestore/v1beta1/firestore.proto
 ///
-// ignore_for_file: non_constant_identifier_names,library_prefixes,unused_import
+// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name
 
-import 'common.pbjson.dart' as $0;
-import '../../protobuf/timestamp.pbjson.dart' as $1;
-import 'document.pbjson.dart' as $2;
-import '../../type/latlng.pbjson.dart' as $7;
-import '../../protobuf/empty.pbjson.dart' as $6;
-import 'write.pbjson.dart' as $3;
-import 'query.pbjson.dart' as $4;
-import '../../protobuf/wrappers.pbjson.dart' as $8;
-import '../../rpc/status.pbjson.dart' as $5;
-import '../../protobuf/any.pbjson.dart' as $9;
+import 'common.pbjson.dart' as $5;
+import '../../protobuf/timestamp.pbjson.dart' as $0;
+import 'document.pbjson.dart' as $4;
+import '../../type/latlng.pbjson.dart' as $1;
+import '../../protobuf/empty.pbjson.dart' as $9;
+import 'write.pbjson.dart' as $6;
+import 'query.pbjson.dart' as $7;
+import '../../protobuf/wrappers.pbjson.dart' as $3;
+import '../../rpc/status.pbjson.dart' as $8;
+import '../../protobuf/any.pbjson.dart' as $10;
 
 const GetDocumentRequest$json = const {
   '1': 'GetDocumentRequest',
@@ -319,7 +319,7 @@ const ListCollectionIdsResponse$json = const {
   ],
 };
 
-const Firestore$json = const {
+const FirestoreServiceBase$json = const {
   '1': 'Firestore',
   '2': const [
     const {'1': 'GetDocument', '2': '.google.firestore.v1beta1.GetDocumentRequest', '3': '.google.firestore.v1beta1.Document', '4': const {}},
@@ -338,50 +338,50 @@ const Firestore$json = const {
   ],
 };
 
-const Firestore$messageJson = const {
+const FirestoreServiceBase$messageJson = const {
   '.google.firestore.v1beta1.GetDocumentRequest': GetDocumentRequest$json,
-  '.google.firestore.v1beta1.DocumentMask': $0.DocumentMask$json,
-  '.google.protobuf.Timestamp': $1.Timestamp$json,
-  '.google.firestore.v1beta1.Document': $2.Document$json,
-  '.google.firestore.v1beta1.Document.FieldsEntry': $2.Document_FieldsEntry$json,
-  '.google.firestore.v1beta1.Value': $2.Value$json,
-  '.google.firestore.v1beta1.MapValue': $2.MapValue$json,
-  '.google.firestore.v1beta1.MapValue.FieldsEntry': $2.MapValue_FieldsEntry$json,
-  '.google.type.LatLng': $7.LatLng$json,
-  '.google.firestore.v1beta1.ArrayValue': $2.ArrayValue$json,
+  '.google.firestore.v1beta1.DocumentMask': $5.DocumentMask$json,
+  '.google.protobuf.Timestamp': $0.Timestamp$json,
+  '.google.firestore.v1beta1.Document': $4.Document$json,
+  '.google.firestore.v1beta1.Document.FieldsEntry': $4.Document_FieldsEntry$json,
+  '.google.firestore.v1beta1.Value': $4.Value$json,
+  '.google.firestore.v1beta1.MapValue': $4.MapValue$json,
+  '.google.firestore.v1beta1.MapValue.FieldsEntry': $4.MapValue_FieldsEntry$json,
+  '.google.type.LatLng': $1.LatLng$json,
+  '.google.firestore.v1beta1.ArrayValue': $4.ArrayValue$json,
   '.google.firestore.v1beta1.ListDocumentsRequest': ListDocumentsRequest$json,
   '.google.firestore.v1beta1.ListDocumentsResponse': ListDocumentsResponse$json,
   '.google.firestore.v1beta1.CreateDocumentRequest': CreateDocumentRequest$json,
   '.google.firestore.v1beta1.UpdateDocumentRequest': UpdateDocumentRequest$json,
-  '.google.firestore.v1beta1.Precondition': $0.Precondition$json,
+  '.google.firestore.v1beta1.Precondition': $5.Precondition$json,
   '.google.firestore.v1beta1.DeleteDocumentRequest': DeleteDocumentRequest$json,
-  '.google.protobuf.Empty': $6.Empty$json,
+  '.google.protobuf.Empty': $9.Empty$json,
   '.google.firestore.v1beta1.BatchGetDocumentsRequest': BatchGetDocumentsRequest$json,
-  '.google.firestore.v1beta1.TransactionOptions': $0.TransactionOptions$json,
-  '.google.firestore.v1beta1.TransactionOptions.ReadOnly': $0.TransactionOptions_ReadOnly$json,
-  '.google.firestore.v1beta1.TransactionOptions.ReadWrite': $0.TransactionOptions_ReadWrite$json,
+  '.google.firestore.v1beta1.TransactionOptions': $5.TransactionOptions$json,
+  '.google.firestore.v1beta1.TransactionOptions.ReadOnly': $5.TransactionOptions_ReadOnly$json,
+  '.google.firestore.v1beta1.TransactionOptions.ReadWrite': $5.TransactionOptions_ReadWrite$json,
   '.google.firestore.v1beta1.BatchGetDocumentsResponse': BatchGetDocumentsResponse$json,
   '.google.firestore.v1beta1.BeginTransactionRequest': BeginTransactionRequest$json,
   '.google.firestore.v1beta1.BeginTransactionResponse': BeginTransactionResponse$json,
   '.google.firestore.v1beta1.CommitRequest': CommitRequest$json,
-  '.google.firestore.v1beta1.Write': $3.Write$json,
-  '.google.firestore.v1beta1.DocumentTransform': $3.DocumentTransform$json,
-  '.google.firestore.v1beta1.DocumentTransform.FieldTransform': $3.DocumentTransform_FieldTransform$json,
+  '.google.firestore.v1beta1.Write': $6.Write$json,
+  '.google.firestore.v1beta1.DocumentTransform': $6.DocumentTransform$json,
+  '.google.firestore.v1beta1.DocumentTransform.FieldTransform': $6.DocumentTransform_FieldTransform$json,
   '.google.firestore.v1beta1.CommitResponse': CommitResponse$json,
-  '.google.firestore.v1beta1.WriteResult': $3.WriteResult$json,
+  '.google.firestore.v1beta1.WriteResult': $6.WriteResult$json,
   '.google.firestore.v1beta1.RollbackRequest': RollbackRequest$json,
   '.google.firestore.v1beta1.RunQueryRequest': RunQueryRequest$json,
-  '.google.firestore.v1beta1.StructuredQuery': $4.StructuredQuery$json,
-  '.google.firestore.v1beta1.StructuredQuery.Projection': $4.StructuredQuery_Projection$json,
-  '.google.firestore.v1beta1.StructuredQuery.FieldReference': $4.StructuredQuery_FieldReference$json,
-  '.google.firestore.v1beta1.StructuredQuery.CollectionSelector': $4.StructuredQuery_CollectionSelector$json,
-  '.google.firestore.v1beta1.StructuredQuery.Filter': $4.StructuredQuery_Filter$json,
-  '.google.firestore.v1beta1.StructuredQuery.CompositeFilter': $4.StructuredQuery_CompositeFilter$json,
-  '.google.firestore.v1beta1.StructuredQuery.FieldFilter': $4.StructuredQuery_FieldFilter$json,
-  '.google.firestore.v1beta1.StructuredQuery.UnaryFilter': $4.StructuredQuery_UnaryFilter$json,
-  '.google.firestore.v1beta1.StructuredQuery.Order': $4.StructuredQuery_Order$json,
-  '.google.protobuf.Int32Value': $8.Int32Value$json,
-  '.google.firestore.v1beta1.Cursor': $4.Cursor$json,
+  '.google.firestore.v1beta1.StructuredQuery': $7.StructuredQuery$json,
+  '.google.firestore.v1beta1.StructuredQuery.Projection': $7.StructuredQuery_Projection$json,
+  '.google.firestore.v1beta1.StructuredQuery.FieldReference': $7.StructuredQuery_FieldReference$json,
+  '.google.firestore.v1beta1.StructuredQuery.CollectionSelector': $7.StructuredQuery_CollectionSelector$json,
+  '.google.firestore.v1beta1.StructuredQuery.Filter': $7.StructuredQuery_Filter$json,
+  '.google.firestore.v1beta1.StructuredQuery.CompositeFilter': $7.StructuredQuery_CompositeFilter$json,
+  '.google.firestore.v1beta1.StructuredQuery.FieldFilter': $7.StructuredQuery_FieldFilter$json,
+  '.google.firestore.v1beta1.StructuredQuery.UnaryFilter': $7.StructuredQuery_UnaryFilter$json,
+  '.google.firestore.v1beta1.StructuredQuery.Order': $7.StructuredQuery_Order$json,
+  '.google.protobuf.Int32Value': $3.Int32Value$json,
+  '.google.firestore.v1beta1.Cursor': $7.Cursor$json,
   '.google.firestore.v1beta1.RunQueryResponse': RunQueryResponse$json,
   '.google.firestore.v1beta1.WriteRequest': WriteRequest$json,
   '.google.firestore.v1beta1.WriteRequest.LabelsEntry': WriteRequest_LabelsEntry$json,
@@ -393,12 +393,12 @@ const Firestore$messageJson = const {
   '.google.firestore.v1beta1.ListenRequest.LabelsEntry': ListenRequest_LabelsEntry$json,
   '.google.firestore.v1beta1.ListenResponse': ListenResponse$json,
   '.google.firestore.v1beta1.TargetChange': TargetChange$json,
-  '.google.rpc.Status': $5.Status$json,
-  '.google.protobuf.Any': $9.Any$json,
-  '.google.firestore.v1beta1.DocumentChange': $3.DocumentChange$json,
-  '.google.firestore.v1beta1.DocumentDelete': $3.DocumentDelete$json,
-  '.google.firestore.v1beta1.ExistenceFilter': $3.ExistenceFilter$json,
-  '.google.firestore.v1beta1.DocumentRemove': $3.DocumentRemove$json,
+  '.google.rpc.Status': $8.Status$json,
+  '.google.protobuf.Any': $10.Any$json,
+  '.google.firestore.v1beta1.DocumentChange': $6.DocumentChange$json,
+  '.google.firestore.v1beta1.DocumentDelete': $6.DocumentDelete$json,
+  '.google.firestore.v1beta1.ExistenceFilter': $6.ExistenceFilter$json,
+  '.google.firestore.v1beta1.DocumentRemove': $6.DocumentRemove$json,
   '.google.firestore.v1beta1.ListCollectionIdsRequest': ListCollectionIdsRequest$json,
   '.google.firestore.v1beta1.ListCollectionIdsResponse': ListCollectionIdsResponse$json,
 };

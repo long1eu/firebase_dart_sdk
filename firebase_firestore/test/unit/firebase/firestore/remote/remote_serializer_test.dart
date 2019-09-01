@@ -27,26 +27,9 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializ
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/common.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/document.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/query.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/protobuf/struct.pbenum.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/protobuf/timestamp.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/protobuf/wrappers.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/rpc/status.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/type/latlng.pb.dart'
-    as proto;
+import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/index.dart'
+    as proto_beta;
+import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 import 'package:test/test.dart';
@@ -64,11 +47,11 @@ void main() {
     serializer = RemoteSerializer(databaseId);
   });
 
-  proto.Value valueBuilder() => proto.Value.create();
+  proto_beta.Value valueBuilder() => proto_beta.Value.create();
 
   void assertRoundTrip(
-      FieldValue value, proto.Value data, ValueTypeCase typeCase) {
-    final proto.Value actual = serializer.encodeValue(value);
+      FieldValue value, proto_beta.Value data, ValueTypeCase typeCase) {
+    final proto_beta.Value actual = serializer.encodeValue(value);
 
     switch (typeCase) {
       case ValueTypeCase.nullValue:
@@ -138,7 +121,7 @@ void main() {
       proto.StructuredQuery_UnaryFilter_Operator unaryOperator) {
     final Query q = Query.atPath(ResourcePath.fromString('docs'))
         .filter(filter('prop', '==', equalityValue));
-    final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
+    final proto_beta.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create()
@@ -151,12 +134,12 @@ void main() {
               ..op = unaryOperator))
           ..orderBy.add(defaultKeyOrder());
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d'
           ..structuredQuery = structuredQueryBuilder;
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..freeze();
@@ -167,7 +150,7 @@ void main() {
 
   test('testEncodesNull', () {
     final FieldValue value = NullValue.nullValue();
-    final proto.Value data = valueBuilder()
+    final data = valueBuilder()
       ..nullValue = proto.NullValue.NULL_VALUE
       ..freeze();
     assertRoundTrip(value, data, ValueTypeCase.nullValue);
@@ -177,7 +160,7 @@ void main() {
     final List<bool> tests = <bool>[true, false];
     for (bool test in tests) {
       final FieldValue value = wrap(test);
-      final proto.Value data = valueBuilder()
+      final proto_beta.Value data = valueBuilder()
         ..booleanValue = test
         ..freeze();
       assertRoundTrip(value, data, ValueTypeCase.booleanValue);
@@ -197,7 +180,7 @@ void main() {
 
     for (int test in tests) {
       final FieldValue value = wrap(test);
-      final proto.Value data = valueBuilder()
+      final proto_beta.Value data = valueBuilder()
         ..integerValue = Int64(test)
         ..freeze();
       assertRoundTrip(value, data, ValueTypeCase.integerValue);
@@ -227,7 +210,7 @@ void main() {
 
     for (double test in tests) {
       final FieldValue value = wrap(test);
-      final proto.Value data = valueBuilder()
+      final proto_beta.Value data = valueBuilder()
         ..doubleValue = test
         ..freeze();
       assertRoundTrip(value, data, ValueTypeCase.doubleValue);
@@ -245,7 +228,7 @@ void main() {
     ];
     for (String test in tests) {
       final FieldValue value = wrap(test);
-      final proto.Value data = valueBuilder()
+      final proto_beta.Value data = valueBuilder()
         ..stringValue = test
         ..freeze();
       assertRoundTrip(value, data, ValueTypeCase.stringValue);
@@ -266,7 +249,7 @@ void main() {
       ..nanos = 0
       ..seconds = Int64(1466160615);
 
-    final List<proto.Value> expected = <proto.Value>[
+    final List<proto_beta.Value> expected = <proto_beta.Value>[
       valueBuilder()
         ..timestampValue = ts1
         ..freeze(),
@@ -283,7 +266,7 @@ void main() {
 
   test('testEncodesGeoPoints', () {
     final FieldValue geoPoint = wrap(const GeoPoint(1.23, 4.56));
-    final proto.Value data = valueBuilder()
+    final proto_beta.Value data = valueBuilder()
       ..geoPointValue = (proto.LatLng.create()
         ..latitude = 1.23
         ..longitude = 4.56)
@@ -294,7 +277,7 @@ void main() {
 
   test('testEncodesBlobs', () {
     final FieldValue _blob = wrap(blob(<int>[0, 1, 2, 3]));
-    final proto.Value data = valueBuilder()
+    final proto_beta.Value data = valueBuilder()
       ..bytesValue = <int>[0, 1, 2, 3]
       ..freeze();
 
@@ -304,7 +287,7 @@ void main() {
   test('testEncodesReferences', () {
     final DocumentReference value = ref('foo/bar');
     final FieldValue reference = wrap(value);
-    final proto.Value data = valueBuilder()
+    final proto_beta.Value data = valueBuilder()
       ..referenceValue =
           'projects/project/databases/(default)/documents/foo/bar'
       ..freeze();
@@ -318,7 +301,7 @@ void main() {
       ..values.add(valueBuilder()..booleanValue = true)
       ..values.add(valueBuilder()..stringValue = 'foo');
 
-    final proto.Value data = valueBuilder()
+    final proto_beta.Value data = valueBuilder()
       ..arrayValue = builder
       ..freeze();
 
@@ -353,9 +336,7 @@ void main() {
     ]));
 
     proto.MapValue inner = proto.MapValue.create()
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'b'
-        ..value = (valueBuilder()..booleanValue = false));
+      ..fields['b'] = (valueBuilder()..booleanValue = false);
 
     final proto.ArrayValue array = proto.ArrayValue.create()
       ..values.add(valueBuilder()..integerValue = Int64(2))
@@ -363,45 +344,30 @@ void main() {
       ..values.add(valueBuilder()..mapValue = inner);
 
     inner = proto.MapValue.create()
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'e'
-        ..value = (valueBuilder()..integerValue = Int64(IntegerValue.min)));
+      ..fields['e'] = (valueBuilder()..integerValue = Int64(IntegerValue.min));
 
     final proto.MapValue middle = proto.MapValue.create()
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'd'
-        ..value = (valueBuilder()..integerValue = Int64(100)))
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'nested'
-        ..value = (valueBuilder()..mapValue = inner));
+      ..fields['d'] = (valueBuilder()..integerValue = Int64(100))
+      ..fields['nested'] = (valueBuilder()..mapValue = inner);
 
     final proto.MapValue obj = proto.MapValue.create()
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'b'
-        ..value = (valueBuilder()..booleanValue = true))
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'd'
-        ..value = (valueBuilder()..doubleValue = double.maxFinite))
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'i'
-        ..value = (valueBuilder()..integerValue = Int64(1)))
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'n'
-        ..value = (valueBuilder()..nullValue = proto.NullValue.NULL_VALUE))
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 's'
-        ..value = (valueBuilder()..stringValue = 'foo'))
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'a'
-        ..value = (valueBuilder()..arrayValue = array))
-      ..fields.add(proto.MapValue_FieldsEntry.create()
-        ..key = 'o'
-        ..value = (valueBuilder()..mapValue = middle))
-      ..fields.sort(
-          (proto.MapValue_FieldsEntry a, proto.MapValue_FieldsEntry b) =>
-              a.key.compareTo(b.key));
+      ..fields['b'] = (valueBuilder()..booleanValue = true)
+      ..fields['d'] = (valueBuilder()..doubleValue = double.maxFinite)
+      ..fields['i'] = (valueBuilder()..integerValue = Int64(1))
+      ..fields['n'] = (valueBuilder()..nullValue = proto.NullValue.NULL_VALUE)
+      ..fields['s'] = (valueBuilder()..stringValue = 'foo')
+      ..fields['a'] = (valueBuilder()..arrayValue = array)
+      ..fields['o'] = (valueBuilder()..mapValue = middle);
 
-    final proto.Value data = valueBuilder()
+    final Map<String, proto_beta.Value> sortedKey =
+        (obj.fields.keys.toList()..sort()).asMap().map((_, String key) =>
+            MapEntry<String, proto_beta.Value>(key, obj.fields[key]));
+
+    obj.fields
+      ..clear()
+      ..addAll(sortedKey);
+
+    final proto_beta.Value data = valueBuilder()
       ..mapValue = obj
       ..freeze();
 
@@ -424,9 +390,7 @@ void main() {
     final proto.Write expected = proto.Write.create()
       ..update = (proto.Document.create()
         ..name = 'projects/p/databases/d/documents/docs/1'
-        ..fields.add(proto.Document_FieldsEntry.create()
-          ..key = 'key'
-          ..value = (valueBuilder()..stringValue = 'value')))
+        ..fields['key'] = (valueBuilder()..stringValue = 'value'))
       ..freeze();
 
     assertRoundTripForMutation(mutation, expected);
@@ -439,12 +403,8 @@ void main() {
     final proto.Write expected = proto.Write.create()
       ..update = (proto.Document.create()
         ..name = 'projects/p/databases/d/documents/docs/1'
-        ..fields.add(proto.Document_FieldsEntry.create()
-          ..key = 'key'
-          ..value = (valueBuilder()..stringValue = 'value'))
-        ..fields.add(proto.Document_FieldsEntry.create()
-          ..key = 'key2'
-          ..value = (valueBuilder()..booleanValue = true)))
+        ..fields['key'] = (valueBuilder()..stringValue = 'value')
+        ..fields['key2'] = (valueBuilder()..booleanValue = true))
       ..updateMask = (proto.DocumentMask.create()
         ..fieldPaths.addAll(<String>['key', 'key2']))
       ..currentDocument = (proto.Precondition.create()..exists = true)
@@ -462,12 +422,8 @@ void main() {
     final proto.Write expected = proto.Write.create()
       ..update = (proto.Document.create()
         ..name = 'projects/p/databases/d/documents/docs/1'
-        ..fields.add(proto.Document_FieldsEntry.create()
-          ..key = 'key'
-          ..value = (valueBuilder()..stringValue = 'value'))
-        ..fields.add(proto.Document_FieldsEntry.create()
-          ..key = 'key2'
-          ..value = (valueBuilder()..booleanValue = true)))
+        ..fields['key'] = (valueBuilder()..stringValue = 'value')
+        ..fields['key2'] = (valueBuilder()..booleanValue = true))
       ..updateMask = (proto.DocumentMask.create()..fieldPaths.add('key'))
       ..freeze();
 
@@ -542,21 +498,19 @@ void main() {
 
     queryData = QueryData.init(_query, 2, 3, QueryPurpose.limboResolution);
     result = serializer.encodeListenRequestLabels(queryData);
-    expect(result,
-        const MapEntry<String, String>('goog-listen-tags', 'limbo-document'));
+    expect(result.key, 'goog-listen-tags');
+    expect(result.value, 'limbo-document');
 
     queryData =
         QueryData.init(_query, 2, 3, QueryPurpose.existenceFilterMismatch);
     result = serializer.encodeListenRequestLabels(queryData);
-    expect(
-        result,
-        const MapEntry<String, String>(
-            'goog-listen-tags', 'existence-filter-mismatch'));
+    expect(result.key, 'goog-listen-tags');
+    expect(result.value, 'existence-filter-mismatch');
   });
 
   test('testEncodesFirstLevelKeyQueries', () {
     final Query q = Query.atPath(ResourcePath.fromString('docs/1'));
-    final proto.Target actual = serializer.encodeTarget(QueryData(
+    final proto_beta.Target actual = serializer.encodeTarget(QueryData(
         q,
         1,
         2,
@@ -564,11 +518,11 @@ void main() {
         SnapshotVersion.none,
         WatchStream.emptyResumeToken));
 
-    final proto.Target_DocumentsTarget docs =
+    final proto_beta.Target_DocumentsTarget docs =
         proto.Target_DocumentsTarget.create()
           ..documents.add('projects/p/databases/d/documents/docs/1');
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..documents = docs
       ..targetId = 1
       ..resumeToken = _resumeToken
@@ -581,7 +535,7 @@ void main() {
 
   test('testEncodesFirstLevelAncestorQueries', () {
     final Query q = Query.atPath(ResourcePath.fromString('messages'));
-    final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
+    final proto_beta.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create()
@@ -589,12 +543,12 @@ void main() {
             ..collectionId = 'messages')
           ..orderBy.add(defaultKeyOrder());
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d'
           ..structuredQuery = structuredQueryBuilder;
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = _resumeToken
@@ -607,7 +561,7 @@ void main() {
   test('testEncodesNestedAncestorQueries', () {
     final Query q = Query.atPath(
         ResourcePath.fromString('rooms/1/messages/10/attachments'));
-    final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
+    final proto_beta.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create()
@@ -615,13 +569,13 @@ void main() {
             ..collectionId = 'attachments')
           ..orderBy.add(defaultKeyOrder());
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d/documents/rooms/1/messages/10'
           ..structuredQuery = structuredQueryBuilder
           ..freeze();
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = _resumeToken
@@ -634,7 +588,7 @@ void main() {
   test('testEncodesSingleFilterAtFirstLevelCollections', () {
     final Query q = Query.atPath(ResourcePath.fromString('docs'))
         .filter(filter('prop', '<', 42));
-    final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
+    final proto_beta.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create()
@@ -652,12 +606,12 @@ void main() {
             ..direction = proto.StructuredQuery_Direction.ASCENDING)
           ..orderBy.add(defaultKeyOrder());
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d'
           ..structuredQuery = structuredQueryBuilder;
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = _resumeToken
@@ -673,7 +627,7 @@ void main() {
             .filter(filter('prop', '<', 42))
             .filter(filter('author', '==', 'dimond'))
             .filter(filter('tags', 'array-contains', 'pending'));
-    final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
+    final proto_beta.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto
         .StructuredQuery structuredQueryBuilder = proto.StructuredQuery.create()
@@ -706,12 +660,12 @@ void main() {
         ..direction = proto.StructuredQuery_Direction.ASCENDING)
       ..orderBy.add(defaultKeyOrder());
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d/documents/rooms/1/messages/10'
           ..structuredQuery = structuredQueryBuilder;
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = _resumeToken
@@ -740,7 +694,7 @@ void main() {
   test('testEncodesSortOrders', () {
     final Query q =
         Query.atPath(ResourcePath.fromString('docs')).orderBy(orderBy('prop'));
-    final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
+    final proto_beta.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create()
@@ -752,12 +706,12 @@ void main() {
               ..fieldPath = 'prop'))
           ..orderBy.add(defaultKeyOrder());
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d'
           ..structuredQuery = structuredQueryBuilder;
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = _resumeToken
@@ -771,7 +725,7 @@ void main() {
     final Query q =
         Query.atPath(ResourcePath.fromString('rooms/1/messages/10/attachments'))
             .orderBy(orderBy('prop', 'desc'));
-    final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
+    final proto_beta.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create()
@@ -786,12 +740,12 @@ void main() {
             ..field_1 = (proto.StructuredQuery_FieldReference.create()
               ..fieldPath = DocumentKey.keyFieldName));
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d/documents/rooms/1/messages/10'
           ..structuredQuery = structuredQueryBuilder;
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = Int8List.fromList(<int>[])
@@ -803,7 +757,7 @@ void main() {
 
   test('testEncodesLimits', () {
     final Query q = Query.atPath(ResourcePath.fromString('docs')).limit(26);
-    final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
+    final proto_beta.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create()
@@ -812,12 +766,12 @@ void main() {
           ..orderBy.add(defaultKeyOrder())
           ..limit = (proto.Int32Value.create()..value = 26);
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d'
           ..structuredQuery = structuredQueryBuilder;
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = Int8List.fromList(<int>[])
@@ -836,7 +790,7 @@ void main() {
           ReferenceValue.valueOf(databaseId, key('foo/baz'))
         ], before: false));
 
-    final proto.Target actual = serializer.encodeTarget(wrapQueryData(q));
+    final proto_beta.Target actual = serializer.encodeTarget(wrapQueryData(q));
 
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create()
@@ -852,12 +806,12 @@ void main() {
             ..values.add(valueBuilder()
               ..referenceValue = 'projects/p/databases/d/documents/foo/baz'));
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d'
           ..structuredQuery = structuredQueryBuilder;
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = _resumeToken
@@ -869,7 +823,7 @@ void main() {
 
   test('testEncodesResumeTokens', () {
     final Query q = Query.atPath(ResourcePath.fromString('docs'));
-    final proto.Target actual = serializer.encodeTarget(QueryData(
+    final proto_beta.Target actual = serializer.encodeTarget(QueryData(
         q, 1, 2, QueryPurpose.listen, SnapshotVersion.none, resumeToken(1000)));
 
     final proto.StructuredQuery structuredQueryBuilder =
@@ -878,12 +832,12 @@ void main() {
             ..collectionId = 'docs')
           ..orderBy.add(defaultKeyOrder());
 
-    final proto.Target_QueryTarget queryBuilder =
+    final proto_beta.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
           ..parent = 'projects/p/databases/d'
           ..structuredQuery = structuredQueryBuilder;
 
-    final proto.Target expected = proto.Target.create()
+    final proto_beta.Target expected = proto_beta.Target.create()
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = resumeToken(1000)
@@ -900,7 +854,7 @@ void main() {
     final WatchChangeWatchTargetChange actual =
         serializer.decodeWatchChange(proto.ListenResponse.create()
           ..targetChange = (proto.TargetChange.create()
-            ..targetChangeType = proto.TargetChange_TargetChangeType.ADD
+            ..targetChangeType = proto_beta.TargetChange_TargetChangeType.ADD
             ..targetIds.add(1)
             ..targetIds.add(4))
           ..freeze());
@@ -918,7 +872,7 @@ void main() {
     final WatchChangeWatchTargetChange actual =
         serializer.decodeWatchChange(proto.ListenResponse.create()
           ..targetChange = (proto.TargetChange.create()
-            ..targetChangeType = proto.TargetChange_TargetChangeType.REMOVE
+            ..targetChangeType = proto_beta.TargetChange_TargetChangeType.REMOVE
             ..targetIds.add(1)
             ..targetIds.add(4)
             ..cause = (proto.Status.create()..code = 7)
@@ -932,10 +886,11 @@ void main() {
     final WatchChangeWatchTargetChange expected = WatchChangeWatchTargetChange(
         WatchTargetChangeType.noChange, <int>[1, 4]);
 
-    final WatchChangeWatchTargetChange actual =
-        serializer.decodeWatchChange(proto.ListenResponse()
+    final WatchChangeWatchTargetChange actual = serializer.decodeWatchChange(
+        proto.ListenResponse()
           ..targetChange = (proto.TargetChange()
-            ..targetChangeType = proto.TargetChange_TargetChangeType.NO_CHANGE
+            ..targetChangeType =
+                proto_beta.TargetChange_TargetChangeType.NO_CHANGE
             ..targetIds.add(1)
             ..targetIds.add(4))
           ..freeze());
@@ -956,9 +911,7 @@ void main() {
             ..document = (proto.Document.create()
               ..name = serializer.encodeKey(key('coll/1'))
               ..updateTime = serializer.encodeTimestamp(Timestamp(0, 5000))
-              ..fields.add(proto.Document_FieldsEntry()
-                ..key = 'foo'
-                ..value = (proto.Value()..stringValue = 'bar')))
+              ..fields['foo'] = (proto_beta.Value()..stringValue = 'bar'))
             ..targetIds.add(1)
             ..targetIds.add(2))
           ..freeze());
@@ -979,9 +932,7 @@ void main() {
             ..document = (proto.Document()
               ..name = serializer.encodeKey(key('coll/1'))
               ..updateTime = serializer.encodeTimestamp(Timestamp(0, 5000))
-              ..fields.add(proto.Document_FieldsEntry()
-                ..key = 'foo'
-                ..value = (proto.Value()..stringValue = 'bar')))
+              ..fields['foo'] = (proto_beta.Value()..stringValue = 'bar'))
             ..targetIds.add(2)
             ..removedTargetIds.add(1))
           ..freeze());

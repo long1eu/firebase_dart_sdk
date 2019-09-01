@@ -67,6 +67,6 @@ void main() {
 
     final Blob blob3 = Blob(myBytes);
     expect(blob2, blob1); // Equal because array didn't change
-    expect(blob1 == blob3, isFalse); // Not equal because array changed
+    expect(blob1, isNot(blob3)); // Not equal because array changed
   });
 }

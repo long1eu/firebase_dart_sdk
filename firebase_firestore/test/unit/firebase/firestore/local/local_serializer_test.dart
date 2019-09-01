@@ -22,22 +22,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/model/unknown_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/firestore/local/maybe_document.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/firestore/local/mutation.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/firestore/local/target.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/common.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/document.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart'
-    as proto hide Target;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/protobuf/timestamp.pb.dart'
-    as proto;
+import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
+import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/index.dart' as proto_beta;
 import 'package:fixnum/fixnum.dart';
 import 'package:test/test.dart';
 
@@ -70,23 +56,15 @@ void main() {
     final proto.Write setProto = (proto.Write.create()
           ..update = (proto.Document.create()
             ..name = 'projects/p/databases/d/documents/foo/bar'
-            ..fields.add(proto.Document_FieldsEntry.create()
-              ..key = 'a'
-              ..value = (proto.Value.create()..stringValue = 'b'))
-            ..fields.add(proto.Document_FieldsEntry.create()
-              ..key = 'num'
-              ..value = (proto.Value.create()..integerValue = Int64(1)))))
+            ..fields['a'] = (proto_beta.Value.create()..stringValue = 'b')
+            ..fields['num'] = (proto_beta.Value.create()..integerValue = Int64(1))))
         .freeze();
 
     final proto.Write patchProto = (proto.Write.create()
           ..update = (proto.Document.create()
             ..name = 'projects/p/databases/d/documents/bar/baz'
-            ..fields.add(proto.Document_FieldsEntry.create()
-              ..key = 'a'
-              ..value = (proto.Value.create()..stringValue = 'b'))
-            ..fields.add(proto.Document_FieldsEntry.create()
-              ..key = 'num'
-              ..value = (proto.Value.create()..integerValue = Int64(1))))
+            ..fields['a'] = (proto_beta.Value.create()..stringValue = 'b')
+            ..fields['num'] = (proto_beta.Value.create()..integerValue = Int64(1)))
           ..updateMask = (proto.DocumentMask.create()..fieldPaths.add('a'))
           ..currentDocument = (proto.Precondition.create()..exists = true))
         .freeze();
@@ -120,9 +98,7 @@ void main() {
     final proto.MaybeDocument maybeDocProto = proto.MaybeDocument.create()
       ..document = (proto.Document.create()
         ..name = 'projects/p/databases/d/documents/some/path'
-        ..fields.add(proto.Document_FieldsEntry.create()
-          ..key = 'foo'
-          ..value = (proto.Value.create()..stringValue = 'bar'))
+        ..fields['foo'] = (proto_beta.Value.create()..stringValue = 'bar')
         ..updateTime = (proto.Timestamp.create()
           ..seconds = Int64()
           ..nanos = 42000))

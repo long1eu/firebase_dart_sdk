@@ -2,54 +2,55 @@
 //  Generated code. Do not modify.
 //  source: google/firestore/v1beta1/firestore.proto
 ///
-// ignore_for_file: non_constant_identifier_names,library_prefixes,unused_import
+// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name
 
-import 'dart:async';
+import 'dart:async' as $async;
 
-import 'package:protobuf/protobuf.dart';
+import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'firestore.pb.dart';
-import 'document.pb.dart' as $2;
-import '../../protobuf/empty.pb.dart' as $6;
+import 'dart:core' as $core show String, Map, ArgumentError, dynamic;
+import 'firestore.pb.dart' as $11;
+import 'document.pb.dart' as $4;
+import '../../protobuf/empty.pb.dart' as $9;
 import 'firestore.pbjson.dart';
 
 export 'firestore.pb.dart';
 
-abstract class FirestoreServiceBase extends GeneratedService {
-  Future<$2.Document> getDocument(ServerContext ctx, GetDocumentRequest request);
-  Future<ListDocumentsResponse> listDocuments(ServerContext ctx, ListDocumentsRequest request);
-  Future<$2.Document> createDocument(ServerContext ctx, CreateDocumentRequest request);
-  Future<$2.Document> updateDocument(ServerContext ctx, UpdateDocumentRequest request);
-  Future<$6.Empty> deleteDocument(ServerContext ctx, DeleteDocumentRequest request);
-  Future<BatchGetDocumentsResponse> batchGetDocuments(ServerContext ctx, BatchGetDocumentsRequest request);
-  Future<BeginTransactionResponse> beginTransaction(ServerContext ctx, BeginTransactionRequest request);
-  Future<CommitResponse> commit(ServerContext ctx, CommitRequest request);
-  Future<$6.Empty> rollback(ServerContext ctx, RollbackRequest request);
-  Future<RunQueryResponse> runQuery(ServerContext ctx, RunQueryRequest request);
-  Future<WriteResponse> write(ServerContext ctx, WriteRequest request);
-  Future<ListenResponse> listen(ServerContext ctx, ListenRequest request);
-  Future<ListCollectionIdsResponse> listCollectionIds(ServerContext ctx, ListCollectionIdsRequest request);
+abstract class FirestoreServiceBase extends $pb.GeneratedService {
+  $async.Future<$4.Document> getDocument($pb.ServerContext ctx, $11.GetDocumentRequest request);
+  $async.Future<$11.ListDocumentsResponse> listDocuments($pb.ServerContext ctx, $11.ListDocumentsRequest request);
+  $async.Future<$4.Document> createDocument($pb.ServerContext ctx, $11.CreateDocumentRequest request);
+  $async.Future<$4.Document> updateDocument($pb.ServerContext ctx, $11.UpdateDocumentRequest request);
+  $async.Future<$9.Empty> deleteDocument($pb.ServerContext ctx, $11.DeleteDocumentRequest request);
+  $async.Future<$11.BatchGetDocumentsResponse> batchGetDocuments($pb.ServerContext ctx, $11.BatchGetDocumentsRequest request);
+  $async.Future<$11.BeginTransactionResponse> beginTransaction($pb.ServerContext ctx, $11.BeginTransactionRequest request);
+  $async.Future<$11.CommitResponse> commit($pb.ServerContext ctx, $11.CommitRequest request);
+  $async.Future<$9.Empty> rollback($pb.ServerContext ctx, $11.RollbackRequest request);
+  $async.Future<$11.RunQueryResponse> runQuery($pb.ServerContext ctx, $11.RunQueryRequest request);
+  $async.Future<$11.WriteResponse> write($pb.ServerContext ctx, $11.WriteRequest request);
+  $async.Future<$11.ListenResponse> listen($pb.ServerContext ctx, $11.ListenRequest request);
+  $async.Future<$11.ListCollectionIdsResponse> listCollectionIds($pb.ServerContext ctx, $11.ListCollectionIdsRequest request);
 
-  GeneratedMessage createRequest(String method) {
+  $pb.GeneratedMessage createRequest($core.String method) {
     switch (method) {
-      case 'GetDocument': return new GetDocumentRequest();
-      case 'ListDocuments': return new ListDocumentsRequest();
-      case 'CreateDocument': return new CreateDocumentRequest();
-      case 'UpdateDocument': return new UpdateDocumentRequest();
-      case 'DeleteDocument': return new DeleteDocumentRequest();
-      case 'BatchGetDocuments': return new BatchGetDocumentsRequest();
-      case 'BeginTransaction': return new BeginTransactionRequest();
-      case 'Commit': return new CommitRequest();
-      case 'Rollback': return new RollbackRequest();
-      case 'RunQuery': return new RunQueryRequest();
-      case 'Write': return new WriteRequest();
-      case 'Listen': return new ListenRequest();
-      case 'ListCollectionIds': return new ListCollectionIdsRequest();
-      default: throw new ArgumentError('Unknown method: $method');
+      case 'GetDocument': return $11.GetDocumentRequest();
+      case 'ListDocuments': return $11.ListDocumentsRequest();
+      case 'CreateDocument': return $11.CreateDocumentRequest();
+      case 'UpdateDocument': return $11.UpdateDocumentRequest();
+      case 'DeleteDocument': return $11.DeleteDocumentRequest();
+      case 'BatchGetDocuments': return $11.BatchGetDocumentsRequest();
+      case 'BeginTransaction': return $11.BeginTransactionRequest();
+      case 'Commit': return $11.CommitRequest();
+      case 'Rollback': return $11.RollbackRequest();
+      case 'RunQuery': return $11.RunQueryRequest();
+      case 'Write': return $11.WriteRequest();
+      case 'Listen': return $11.ListenRequest();
+      case 'ListCollectionIds': return $11.ListCollectionIdsRequest();
+      default: throw $core.ArgumentError('Unknown method: $method');
     }
   }
 
-  Future<GeneratedMessage> handleCall(ServerContext ctx, String method, GeneratedMessage request) {
+  $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String method, $pb.GeneratedMessage request) {
     switch (method) {
       case 'GetDocument': return this.getDocument(ctx, request);
       case 'ListDocuments': return this.listDocuments(ctx, request);
@@ -64,11 +65,11 @@ abstract class FirestoreServiceBase extends GeneratedService {
       case 'Write': return this.write(ctx, request);
       case 'Listen': return this.listen(ctx, request);
       case 'ListCollectionIds': return this.listCollectionIds(ctx, request);
-      default: throw new ArgumentError('Unknown method: $method');
+      default: throw $core.ArgumentError('Unknown method: $method');
     }
   }
 
-  Map<String, dynamic> get $json => Firestore$json;
-  Map<String, Map<String, dynamic>> get $messageJson => Firestore$messageJson;
+  $core.Map<$core.String, $core.dynamic> get $json => FirestoreServiceBase$json;
+  $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> get $messageJson => FirestoreServiceBase$messageJson;
 }
 

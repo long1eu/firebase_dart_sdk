@@ -2,7 +2,7 @@
 //  Generated code. Do not modify.
 //  source: google/firestore/v1beta1/query.proto
 ///
-// ignore_for_file: non_constant_identifier_names,library_prefixes,unused_import
+// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name
 
 const StructuredQuery$json = const {
   '1': 'StructuredQuery',
@@ -16,7 +16,7 @@ const StructuredQuery$json = const {
     const {'1': 'offset', '3': 6, '4': 1, '5': 5, '10': 'offset'},
     const {'1': 'limit', '3': 5, '4': 1, '5': 11, '6': '.google.protobuf.Int32Value', '10': 'limit'},
   ],
-  '3': const [StructuredQuery_CollectionSelector$json, StructuredQuery_Filter$json, StructuredQuery_CompositeFilter$json, StructuredQuery_FieldFilter$json, StructuredQuery_UnaryFilter$json, StructuredQuery_Order$json, StructuredQuery_FieldReference$json, StructuredQuery_Projection$json],
+  '3': const [StructuredQuery_CollectionSelector$json, StructuredQuery_Filter$json, StructuredQuery_CompositeFilter$json, StructuredQuery_FieldFilter$json, StructuredQuery_Projection$json, StructuredQuery_UnaryFilter$json, StructuredQuery_Order$json, StructuredQuery_FieldReference$json],
   '4': const [StructuredQuery_Direction$json],
 };
 
@@ -80,6 +80,13 @@ const StructuredQuery_FieldFilter_Operator$json = const {
   ],
 };
 
+const StructuredQuery_Projection$json = const {
+  '1': 'Projection',
+  '2': const [
+    const {'1': 'fields', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1beta1.StructuredQuery.FieldReference', '10': 'fields'},
+  ],
+};
+
 const StructuredQuery_UnaryFilter$json = const {
   '1': 'UnaryFilter',
   '2': const [
@@ -113,13 +120,6 @@ const StructuredQuery_FieldReference$json = const {
   '1': 'FieldReference',
   '2': const [
     const {'1': 'field_path', '3': 2, '4': 1, '5': 9, '10': 'fieldPath'},
-  ],
-};
-
-const StructuredQuery_Projection$json = const {
-  '1': 'Projection',
-  '2': const [
-    const {'1': 'fields', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1beta1.StructuredQuery.FieldReference', '10': 'fields'},
   ],
 };
 

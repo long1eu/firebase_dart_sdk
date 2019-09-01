@@ -11,7 +11,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 @publicApi
 class Blob implements Comparable<Blob> {
-  Blob(this.bytes);
+  Blob(Uint8List bytes) : bytes = Uint8List.fromList(bytes);
 
   final Uint8List bytes;
 
@@ -40,10 +40,10 @@ class Blob implements Comparable<Blob> {
       identical(this, other) ||
       other is Blob &&
           runtimeType == other.runtimeType &&
-          const DeepCollectionEquality().equals(bytes, other.bytes);
+          const ListEquality<int>().equals(bytes, other.bytes);
 
   @override
-  int get hashCode => const DeepCollectionEquality().hash(bytes);
+  int get hashCode => const ListEquality<int>().hash(bytes);
 
   @override
   String toString() => 'Blob { bytes= ${toDebugString(bytes)} }';

@@ -17,7 +17,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/proto/firestore/local/maybe_document.pb.dart'
+import 'package:firebase_firestore/src/proto/google/firebase/firestore/proto/maybe_document.pb.dart'
 as proto;
 import 'package:protobuf/protobuf.dart';
 

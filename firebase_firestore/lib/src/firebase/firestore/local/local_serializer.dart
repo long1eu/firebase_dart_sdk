@@ -20,30 +20,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/object_val
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/firestore/local/maybe_document.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/firestore/local/mutation.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/firestore/local/target.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/common.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/document.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart'
-    as proto hide Target;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/query.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/protobuf/timestamp.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/protobuf/wrappers.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/rpc/status.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/type/latlng.pb.dart'
-    as proto;
+import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
 import 'package:fixnum/fixnum.dart';
 
 /// Serializer for values stored in the LocalStore.
@@ -97,11 +74,7 @@ class LocalSerializer {
 
     final ObjectValue value = document.data;
     for (MapEntry<String, FieldValue> entry in value.internalValue) {
-      final proto.Document_FieldsEntry fieldsEntry =
-          proto.Document_FieldsEntry.create()
-            ..key = entry.key
-            ..value = rpcSerializer.encodeValue(entry.value);
-      builder.fields.add(fieldsEntry);
+      builder.fields[entry.key] = rpcSerializer.encodeValue(entry.value);
     }
 
     final Timestamp updateTime = document.version.timestamp;

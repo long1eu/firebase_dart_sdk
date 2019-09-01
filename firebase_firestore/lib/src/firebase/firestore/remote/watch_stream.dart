@@ -14,7 +14,7 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.da
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel.dart';
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart';
+import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
@@ -27,16 +27,16 @@ import 'package:protobuf/protobuf.dart';
 ///
 /// @see <a
 /// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L147'>firestore.proto</a>
-class WatchStream
-    extends AbstractStream<ListenRequest, ListenResponse, WatchStreamCallback> {
+class WatchStream extends AbstractStream<proto.ListenRequest,
+    proto.ListenResponse, WatchStreamCallback> {
   WatchStream(FirestoreChannel channel, AsyncQueue workerQueue, this.serializer,
       WatchStreamCallback listener)
       : super(
           channel,
-          ClientMethod<ListenRequest, ListenResponse>(
+          ClientMethod<proto.ListenRequest, proto.ListenResponse>(
             'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Listen',
             (GeneratedMessage req) => req.writeToBuffer(),
-            (List<int> res) => ListenResponse.fromBuffer(res),
+            (List<int> res) => proto.ListenResponse.fromBuffer(res),
           ),
           workerQueue,
           TimerId.listenStreamConnectionBackoff,
@@ -55,18 +55,14 @@ class WatchStream
   /// reference the [targetId] included in query.
   void watchQuery(QueryData queryData) {
     Assert.hardAssert(isOpen, 'Watching queries requires an open stream');
-    final ListenRequest request = ListenRequest.create()
+    final proto.ListenRequest request = proto.ListenRequest.create()
       ..database = serializer.databaseName
       ..addTarget = serializer.encodeTarget(queryData);
 
     final MapEntry<String, String> labels =
         serializer.encodeListenRequestLabels(queryData);
     if (labels != null) {
-      final ListenRequest_LabelsEntry entry = ListenRequest_LabelsEntry.create()
-        ..key = labels.key
-        ..value = labels.value;
-
-      request.labels.add(entry);
+      request.labels[labels.key] = labels.value;
     }
 
     writeRequest(request..freeze());
@@ -77,7 +73,7 @@ class WatchStream
   void unwatchTarget(int targetId) {
     Assert.hardAssert(isOpen, 'Unwatching targets requires an open stream');
 
-    final ListenRequest request = ListenRequest.create()
+    final proto.ListenRequest request = proto.ListenRequest.create()
       ..database = serializer.databaseName
       ..removeTarget = targetId
       ..freeze();
@@ -86,7 +82,7 @@ class WatchStream
   }
 
   @override
-  Future<void> onNext(ListenResponse change) async {
+  Future<void> onNext(proto.ListenResponse change) async {
     // A successful response means the stream is healthy
     backoff.reset();
 

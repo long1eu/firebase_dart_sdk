@@ -20,7 +20,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.da
 import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/firestore/local/mutation.pb.dart'
+import 'package:firebase_firestore/src/proto/google/firebase/firestore/proto/mutation.pb.dart'
 as proto;
 import 'package:protobuf/protobuf.dart';
 

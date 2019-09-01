@@ -51,27 +51,9 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/existence_filte
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/common.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/document.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/query.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/protobuf/struct.pb.dart'
-    as proto show NullValue;
-import 'package:firebase_firestore/src/proto/google/protobuf/timestamp.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/protobuf/wrappers.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/rpc/status.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/type/latlng.pb.dart'
-    as proto;
-import 'package:firebase_firestore/src/proto/google/type/latlng.pb.dart';
+import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
+import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/index.dart'
+    as proto_beta;
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 
@@ -209,8 +191,8 @@ class RemoteSerializer {
   // Values
 
   /// Converts the [FieldValue] model passed into the [Value] proto equivalent.
-  proto.Value encodeValue(FieldValue value) {
-    final proto.Value builder = proto.Value.create();
+  proto_beta.Value encodeValue(FieldValue value) {
+    final proto_beta.Value builder = proto_beta.Value.create();
 
     if (value is NullValue) {
       return builder //
@@ -250,40 +232,42 @@ class RemoteSerializer {
   }
 
   /// Converts from the proto [Value] format to the model [FieldValue] format
-  FieldValue decodeValue(proto.Value proto) {
-    if (proto.hasNullValue()) {
-      return NullValue.nullValue();
-    } else if (proto.hasBooleanValue()) {
-      return BoolValue.valueOf(proto.booleanValue);
-    } else if (proto.hasIntegerValue()) {
-      return IntegerValue.valueOf(proto.integerValue.toInt());
-    } else if (proto.hasDoubleValue()) {
-      return DoubleValue.valueOf(proto.doubleValue);
-    } else if (proto.hasTimestampValue()) {
-      final Timestamp timestamp = decodeTimestamp(proto.timestampValue);
-      return TimestampValue.valueOf(timestamp);
-    } else if (proto.hasGeoPointValue()) {
-      final LatLng latLng = proto.geoPointValue;
-      return GeoPointValue.valueOf(_decodeGeoPoint(latLng));
-    } else if (proto.hasBytesValue()) {
-      final Blob bytes = Blob(Uint8List.fromList(proto.bytesValue));
-      return BlobValue.valueOf(bytes);
-    } else if (proto.hasReferenceValue()) {
-      final ResourcePath resourceName =
-          _decodeResourceName(proto.referenceValue);
-      final DatabaseId id =
-          DatabaseId.forDatabase(resourceName[1], resourceName[3]);
-      final DocumentKey key =
-          DocumentKey.fromPath(_extractLocalPathFromResourceName(resourceName));
-      return ReferenceValue.valueOf(id, key);
-    } else if (proto.hasStringValue()) {
-      return StringValue.valueOf(proto.stringValue);
-    } else if (proto.hasArrayValue()) {
-      return _decodeArrayValue(proto.arrayValue);
-    } else if (proto.hasMapValue()) {
-      return _decodeMapValue(proto.mapValue);
-    } else {
-      throw Assert.fail('Unknown value $proto');
+  FieldValue decodeValue(proto_beta.Value proto) {
+    switch (proto.whichValueType()) {
+      case proto_beta.Value_ValueType.booleanValue:
+        return BoolValue.valueOf(proto.booleanValue);
+      case proto_beta.Value_ValueType.integerValue:
+        return IntegerValue.valueOf(proto.integerValue.toInt());
+      case proto_beta.Value_ValueType.doubleValue:
+        return DoubleValue.valueOf(proto.doubleValue);
+      case proto_beta.Value_ValueType.referenceValue:
+        final ResourcePath resourceName =
+            _decodeResourceName(proto.referenceValue);
+        final DatabaseId id =
+            DatabaseId.forDatabase(resourceName[1], resourceName[3]);
+        final DocumentKey key = DocumentKey.fromPath(
+            _extractLocalPathFromResourceName(resourceName));
+        return ReferenceValue.valueOf(id, key);
+      case proto_beta.Value_ValueType.mapValue:
+        return _decodeMapValue(proto.mapValue);
+      case proto_beta.Value_ValueType.geoPointValue:
+        final dynamic /*proto.LatLng*/ latLng = proto.geoPointValue;
+        return GeoPointValue.valueOf(_decodeGeoPoint(latLng));
+      case proto_beta.Value_ValueType.arrayValue:
+        return _decodeArrayValue(proto.arrayValue);
+      case proto_beta.Value_ValueType.timestampValue:
+        final Timestamp timestamp = decodeTimestamp(proto.timestampValue);
+        return TimestampValue.valueOf(timestamp);
+      case proto_beta.Value_ValueType.nullValue:
+        return NullValue.nullValue();
+
+      case proto_beta.Value_ValueType.stringValue:
+        return StringValue.valueOf(proto.stringValue);
+      case proto_beta.Value_ValueType.bytesValue:
+        final Blob bytes = Blob(Uint8List.fromList(proto.bytesValue));
+        return BlobValue.valueOf(bytes);
+      default:
+        throw Assert.fail('Unknown value $proto');
     }
   }
 
@@ -310,12 +294,7 @@ class RemoteSerializer {
   proto.MapValue _encodeMapValue(ObjectValue value) {
     final proto.MapValue builder = proto.MapValue.create();
     for (MapEntry<String, FieldValue> entry in value.internalValue) {
-      final proto.MapValue_FieldsEntry value =
-          proto.MapValue_FieldsEntry.create()
-            ..key = entry.key
-            ..value = encodeValue(entry.value);
-
-      builder.fields.add(value);
+      builder.fields[entry.key] = encodeValue(entry.value);
     }
     return builder..freeze();
   }
@@ -326,21 +305,21 @@ class RemoteSerializer {
 
   // PORTING NOTE: There's no encodeFields here because there's no way to write
   // it that doesn't involve creating a temporary map.
-  ObjectValue decodeMapFields(List<proto.MapValue_FieldsEntry> fields) {
+  ObjectValue decodeMapFields(Map<String, proto_beta.Value> fields) {
     ObjectValue result = ObjectValue.empty;
-    for (proto.MapValue_FieldsEntry entry in fields) {
-      final FieldPath path = FieldPath.fromSingleSegment(entry.key);
-      final FieldValue value = decodeValue(entry.value);
+    for (String key in fields.keys) {
+      final FieldPath path = FieldPath.fromSingleSegment(key);
+      final FieldValue value = decodeValue(fields[key]);
       result = result.set(path, value);
     }
     return result;
   }
 
-  ObjectValue decodeDocumentFields(List<proto.Document_FieldsEntry> fields) {
+  ObjectValue decodeDocumentFields(Map<String, proto_beta.Value> fields) {
     ObjectValue result = ObjectValue.empty;
-    for (proto.Document_FieldsEntry entry in fields) {
-      final FieldPath path = FieldPath.fromSingleSegment(entry.key);
-      final FieldValue value = decodeValue(entry.value);
+    for (String key in fields.keys) {
+      final FieldPath path = FieldPath.fromSingleSegment(key);
+      final FieldValue value = decodeValue(fields[key]);
       result = result.set(path, value);
     }
     return result;
@@ -353,12 +332,7 @@ class RemoteSerializer {
     builder.name = encodeKey(key);
 
     for (MapEntry<String, FieldValue> entry in value.internalValue) {
-      final proto.Document_FieldsEntry fieldsEntry =
-          proto.Document_FieldsEntry.create()
-            ..key = entry.key
-            ..value = encodeValue(entry.value);
-
-      builder.fields.add(fieldsEntry);
+      builder.fields[entry.key] = encodeValue(entry.value);
     }
     return builder..freeze();
   }
@@ -624,8 +598,8 @@ class RemoteSerializer {
     }
   }
 
-  proto.Target encodeTarget(QueryData queryData) {
-    final proto.Target builder = proto.Target.create();
+  proto_beta.Target encodeTarget(QueryData queryData) {
+    final proto_beta.Target builder = proto_beta.Target.create();
     final Query query = queryData.query;
 
     if (query.isDocumentQuery) {
@@ -969,7 +943,7 @@ class RemoteSerializer {
     final List<FieldValue> indexComponents = List<FieldValue>(valuesCount);
 
     for (int i = 0; i < valuesCount; i++) {
-      final proto.Value valueProto = value.values[i];
+      final proto_beta.Value valueProto = value.values[i];
       indexComponents[i] = decodeValue(valueProto);
     }
     return Bound(position: indexComponents, before: value.before);
@@ -1070,6 +1044,7 @@ class RemoteSerializer {
 
   GrpcError _fromStatus(proto.Status status) {
     // TODO: Use details?
-    return GrpcError.custom(status.code, status.message);
+    return GrpcError.custom(
+        status.code, status.hasMessage() ? status.message : null);
   }
 }
