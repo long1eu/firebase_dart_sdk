@@ -25,10 +25,9 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   bool _forceRefresh = false;
 
   FirebaseAuthCredentialsProvider(this._authProvider)
-      : _onUserChange = BehaviorSubject<User>(
-            seedValue: _authProvider.uid != null
-                ? User(_authProvider.uid)
-                : User.unauthenticated);
+      : _onUserChange = BehaviorSubject<User>.seeded(_authProvider.uid != null
+            ? User(_authProvider.uid)
+            : User.unauthenticated);
 
   /// The listener registered with FirebaseApp; used to stop receiving auth
   /// changes once changeListener is removed.

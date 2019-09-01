@@ -13,7 +13,7 @@ import 'user.dart';
 class EmptyCredentialsProvider extends CredentialsProvider {
   // ignore: close_sinks
   final BehaviorSubject<User> _onChange =
-      BehaviorSubject<User>(seedValue: User.unauthenticated);
+      BehaviorSubject<User>.seeded(User.unauthenticated);
 
   @override
   Future<String> get token => Future<String>.value(null);

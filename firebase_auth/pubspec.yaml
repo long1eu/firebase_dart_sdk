@@ -1,8 +1,8 @@
 name: firebase_auth
 description: A starting point for Dart libraries or applications.
-# version: 1.0.0
-# homepage: https://www.example.com
-# author: long1eu <email@example.com>
+version: 0.0.1
+homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
+author: long1eu <home@long1.eu>
 
 environment:
   sdk: '>=2.0.0 <3.0.0'
@@ -10,8 +10,8 @@ environment:
 dependencies:
   firebase_common:
     git:
-      url: https://github.com/putraxor/firebase_dart_sdk
+      url: https://github.com/fluttercommunity/firebase_flutter_sdk
       path: firebase_common
 
 dev_dependencies:
-  test: ^1.0.0
+  test: ^1.6.8

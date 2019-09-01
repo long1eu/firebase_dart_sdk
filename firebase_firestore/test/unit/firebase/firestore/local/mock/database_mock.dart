@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
-import 'package:sqlite/sqlite.dart' as sql;
+import 'package:dart_sqlite/dart_sqlite.dart' as sql;
 
 class DatabaseMock extends Database {
   sql.Database database;
@@ -58,24 +58,22 @@ class DatabaseMock extends Database {
 
   @override
   Future<int> delete(String statement, [List<dynamic> arguments]) {
-    return database.execute(statement, params: arguments ?? <dynamic>[]);
+    return database.execute(statement, arguments ?? <dynamic>[]);
   }
 
   @override
   Future<void> execute(String statement, [List<dynamic> arguments]) async {
-    await database.execute(statement, params: arguments ?? <dynamic>[]);
+    await database.execute(statement, arguments ?? <dynamic>[]);
   }
 
   @override
   Future<List<Map<String, dynamic>>> query(String statement,
       [List<void> arguments]) async {
-    return database
-        .query(statement, params: arguments ?? <dynamic>[])
+    return database //
+        .query(statement, arguments ?? <dynamic>[])
         .toList()
-        .then(
-          (List<sql.Row> rows) =>
-              rows.map((sql.Row row) => row.toMap()).toList(),
-        );
+        .then((List<sql.Row> rows) =>
+            rows.map((sql.Row row) => row.toMap()).toList());
   }
 
   @override

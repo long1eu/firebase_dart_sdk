@@ -1,15 +1,15 @@
 name: firebase_common
 description: A starting point for Dart libraries or applications.
 version: 0.0.1
-homepage: https://github.com/fluttercommunity/firebase_flutter_sdk/tree/master/firebase_firestore
+homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
 author: long1eu <home@long1.eu>
 
 environment:
   sdk: '>=2.0.0 <3.0.0'
 
 dependencies:
-  user_preferences: ^0.1.0
+  user_preferences: ^0.1.1+4
 
 dev_dependencies:
-  test: ^1.0.0
+  test: ^1.6.8
  

@@ -94,13 +94,13 @@ void main() {
     streamCallback.copyWith(
       onHandshakeComplete: () {
         expect(writeStreamWrapper.lastStreamToken, isNotEmpty);
-        streamCallback.onHandshakeComplete();
+        return streamCallback.onHandshakeComplete();
       },
       onWriteResponse: (SnapshotVersion commitVersion,
           List<MutationResult> mutationResults) {
         expect(mutationResults.length, 2);
         expect(writeStreamWrapper.lastStreamToken, isNotEmpty);
-        streamCallback.onWriteResponse(commitVersion, mutationResults);
+        return streamCallback.onWriteResponse(commitVersion, mutationResults);
       },
     );
 
