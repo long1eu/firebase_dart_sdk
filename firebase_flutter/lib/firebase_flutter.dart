@@ -30,7 +30,7 @@ Future<void> runFirebaseApp({
     databaseDirectory = '$documentsDirectory/databases';
   }
 
-  await UserPreferences.getInstance(
+  await UserPreferences.initInstance(
     'user_prefs/${FirebaseApp.firebaseAppPrefs}.json',
     Directory(documentsDirectory),
   );
@@ -87,10 +87,10 @@ class _LifecycleHandler extends StatefulWidget {
   final Widget app;
 
   @override
-  __LifecycleHandlerState createState() => __LifecycleHandlerState();
+  _LifecycleHandlerState createState() => _LifecycleHandlerState();
 }
 
-class __LifecycleHandlerState extends State<_LifecycleHandler>
+class _LifecycleHandlerState extends State<_LifecycleHandler>
     with WidgetsBindingObserver {
   bool isBackground = false;
 
@@ -117,8 +117,8 @@ class _TokenProvider extends InternalTokenProvider {
   @override
   Future<GetTokenResult> getAccessToken(bool forceRefresh) async {
     final FirebaseUser user = await FirebaseAuth.instance.currentUser();
-    final String token = await user?.getIdToken(refresh: forceRefresh);
-    return GetTokenResult(token);
+    final IdTokenResult token = await user?.getIdToken(refresh: forceRefresh);
+    return GetTokenResult(token.token);
   }
 
   @override
@@ -126,7 +126,7 @@ class _TokenProvider extends InternalTokenProvider {
       FirebaseAuth.instance.onAuthStateChanged.asyncMap((FirebaseUser user) {
         _uid = user.uid;
         return user?.getIdToken();
-      }).map((String token) => InternalTokenResult(token));
+      }).map((IdTokenResult token) => InternalTokenResult(token.token));
 
   @override
   String get uid => _uid;
