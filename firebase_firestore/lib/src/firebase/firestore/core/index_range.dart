@@ -7,6 +7,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 /// A range of index field values over which a cursor should iterate. If [start]
 /// and [end] are both null, any field value will be considered within range.
 class IndexRange {
+  IndexRange(this.fieldPath, this.start, this.end);
+
   /// [FieldPath] to use for the index lookup.
   final FieldPath fieldPath;
 
@@ -15,8 +17,6 @@ class IndexRange {
 
   /// the inclusive end position of the index lookup.
   final FieldValue end;
-
-  IndexRange(this.fieldPath, this.start, this.end);
 
   IndexRange copyWith({FieldPath fieldPath, FieldValue start, FieldValue end}) {
     return IndexRange(
@@ -28,11 +28,11 @@ class IndexRange {
 }
 
 class IndexRangeBuilder {
+  IndexRangeBuilder({this.fieldPath, this.start, this.end});
+
   FieldPath fieldPath;
   FieldValue start;
   FieldValue end;
-
-  IndexRangeBuilder({this.fieldPath, this.start, this.end});
 
   IndexRange build() => IndexRange(fieldPath, start, end);
 }

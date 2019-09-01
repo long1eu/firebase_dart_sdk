@@ -7,6 +7,13 @@ import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart
 
 /// Contains info about host, project id and database
 class DatabaseInfo {
+  DatabaseInfo(
+    this.databaseId,
+    this.persistenceKey,
+    this.host,
+    this.sslEnabled,
+  );
+
   final DatabaseId databaseId;
   final String persistenceKey;
   final String host;
@@ -19,12 +26,6 @@ class DatabaseInfo {
   /// local storage. Usually derived from [FirebaseApp.name]. [host] is the
   /// hostname of the backend and [sslEnabled] is used to tell whether to use
   /// SSL when connecting.
-  DatabaseInfo(
-    this.databaseId,
-    this.persistenceKey,
-    this.host,
-    this.sslEnabled,
-  );
 
   @override
   String toString() {

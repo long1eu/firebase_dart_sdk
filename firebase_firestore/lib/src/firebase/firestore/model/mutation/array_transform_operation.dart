@@ -10,9 +10,9 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
 abstract class ArrayTransformOperation implements TransformOperation {
-  final List<FieldValue> elements;
-
   const ArrayTransformOperation(this.elements);
+
+  final List<FieldValue> elements;
 
   @override
   FieldValue applyToLocalView(

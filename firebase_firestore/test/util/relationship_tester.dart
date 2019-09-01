@@ -5,14 +5,14 @@
 /// Tests a collection of objects according to the rules specified in a
 /// [RelationshipAssertion].
 class RelationshipTester<T> {
+  RelationshipTester(this._assertion) : _groups = <List<T>>[<T>[]];
+
   static const String itemPlaceholder = '#item';
   static const String relatedPlaceholder = '#related';
   static const String unrelatedPlaceholder = '#unrelated';
 
   final List<List<T>> _groups;
   final RelationshipAssertion<T> _assertion;
-
-  RelationshipTester(this._assertion) : _groups = <List<T>>[<T>[]];
 
   RelationshipTester<T> addRelatedGroup(Iterable<T> group) {
     _groups.add(group.toList(growable: false));
@@ -111,9 +111,9 @@ class RelationshipTester<T> {
 /// replaced with a string that combines the [Object.toString], item number and
 /// group number of the respective item.
 class RelationshipAssertion<T> {
+  const RelationshipAssertion(this.assertRelated, this.assertUnrelated);
+
   final void Function(T item, T related) assertRelated;
 
   final void Function(T item, T unrelated) assertUnrelated;
-
-  const RelationshipAssertion(this.assertRelated, this.assertUnrelated);
 }

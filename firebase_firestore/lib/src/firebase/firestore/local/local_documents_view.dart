@@ -23,10 +23,10 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 /// [MutationQueue] to the [RemoteDocumentCache].
 // TODO: Turn this into the UnifiedDocumentCache / whatever.
 class LocalDocumentsView {
+  LocalDocumentsView(this.remoteDocumentCache, this.mutationQueue);
+
   final RemoteDocumentCache remoteDocumentCache;
   final MutationQueue mutationQueue;
-
-  LocalDocumentsView(this.remoteDocumentCache, this.mutationQueue);
 
   /// Returns the the local view of the document identified by [key]. If we
   /// don't have any cached state it returns null

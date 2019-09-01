@@ -35,6 +35,41 @@ import 'package:grpc/grpc.dart';
 /// clean interface. This class is not thread safe and should be only called
 /// from the worker [AsyncQueue].
 class RemoteStore implements TargetMetadataProvider {
+  RemoteStore(this._remoteStoreCallback, this._localStore, this._datastore,
+      AsyncQueue workerQueue)
+      : _listenTargets = <int, QueryData>{},
+        _writePipeline = Queue<MutationBatch>(),
+        _onlineStateTracker = OnlineStateTracker(
+          workerQueue,
+          _remoteStoreCallback.handleOnlineStateChange,
+        ) {
+    // Create new streams (but note they're not started yet).
+    _watchStream = _datastore.createWatchStream(WatchStreamCallback(
+      onOpen: _handleWatchStreamOpen,
+      onClose: _handleWatchStreamClose,
+      onWatchChange: _handleWatchChange,
+    ));
+
+    _writeStream = _datastore.createWriteStream(WriteStreamCallback(
+      // we use this so that [_writeStream] is not null when called
+      onOpen: () => _writeStream.writeHandshake(),
+      onClose: _handleWriteStreamClose,
+      onHandshakeComplete: _handleWriteStreamHandshakeComplete,
+      onWriteResponse: _handleWriteStreamMutationResults,
+    ));
+  }
+
+  RemoteStore._(
+    this._remoteStoreCallback,
+    this._localStore,
+    this._datastore,
+    this._listenTargets,
+    this._onlineStateTracker,
+    this._watchStream,
+    this._writeStream,
+    this._writePipeline,
+  );
+
   /// The maximum number of pending writes to allow.
   /// TODO: Negotiate this value with the backend.
   static const int _maxPendingWrites = 10;
@@ -83,41 +118,6 @@ class RemoteStore implements TargetMetadataProvider {
   /// purely based on order, and so we can just poll() writes from the front of
   /// the [_writePipeline] as we receive responses.
   final Queue<MutationBatch> _writePipeline;
-
-  RemoteStore(this._remoteStoreCallback, this._localStore, this._datastore,
-      AsyncQueue workerQueue)
-      : _listenTargets = <int, QueryData>{},
-        _writePipeline = Queue<MutationBatch>(),
-        _onlineStateTracker = OnlineStateTracker(
-          workerQueue,
-          _remoteStoreCallback.handleOnlineStateChange,
-        ) {
-    // Create new streams (but note they're not started yet).
-    _watchStream = _datastore.createWatchStream(WatchStreamCallback(
-      onOpen: _handleWatchStreamOpen,
-      onClose: _handleWatchStreamClose,
-      onWatchChange: _handleWatchChange,
-    ));
-
-    _writeStream = _datastore.createWriteStream(WriteStreamCallback(
-      // we use this so that [_writeStream] is not null when called
-      onOpen: () => _writeStream.writeHandshake(),
-      onClose: _handleWriteStreamClose,
-      onHandshakeComplete: _handleWriteStreamHandshakeComplete,
-      onWriteResponse: _handleWriteStreamMutationResults,
-    ));
-  }
-
-  RemoteStore._(
-    this._remoteStoreCallback,
-    this._localStore,
-    this._datastore,
-    this._listenTargets,
-    this._onlineStateTracker,
-    this._watchStream,
-    this._writeStream,
-    this._writePipeline,
-  );
 
   /// Re-enables the network. Only to be called as the counterpart to
   /// [disableNetwork].

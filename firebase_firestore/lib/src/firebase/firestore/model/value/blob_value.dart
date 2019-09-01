@@ -7,11 +7,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 
 /// A wrapper for blob values in Firestore.
 class BlobValue extends FieldValue {
-  final Blob _value;
-
   const BlobValue(this._value);
 
   factory BlobValue.valueOf(Blob blob) => BlobValue(blob);
+
+  final Blob _value;
 
   @override
   int get typeOrder => FieldValue.typeOrderBlob;

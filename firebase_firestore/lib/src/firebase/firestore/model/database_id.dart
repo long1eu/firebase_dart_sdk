@@ -3,11 +3,6 @@
 // on 17/09/2018
 
 class DatabaseId implements Comparable<DatabaseId> {
-  static const String defaultDatabaseId = '(default)';
-
-  final String projectId;
-  final String databaseId;
-
   const DatabaseId._(this.projectId, this.databaseId);
 
   factory DatabaseId.forProject(String projectId) {
@@ -17,6 +12,11 @@ class DatabaseId implements Comparable<DatabaseId> {
   factory DatabaseId.forDatabase(String projectId, String databaseId) {
     return DatabaseId._(projectId, databaseId);
   }
+
+  static const String defaultDatabaseId = '(default)';
+
+  final String projectId;
+  final String databaseId;
 
   @override
   int compareTo(DatabaseId other) {

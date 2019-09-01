@@ -15,11 +15,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import '../../../../../util/test_util.dart';
 
 class QueryCacheTestCase {
+  QueryCacheTestCase(this.persistence);
+
   final Persistence persistence;
   QueryCache queryCache;
   int previousSequenceNumber;
-
-  QueryCacheTestCase(this.persistence);
 
   void setUp() {
     queryCache = persistence.queryCache;

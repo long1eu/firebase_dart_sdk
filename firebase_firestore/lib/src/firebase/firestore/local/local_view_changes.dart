@@ -13,10 +13,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 /// a given query. These changes are sent to the [LocalStore] by the [View]
 /// (via the [SyncEngine]) and are used to pin / unpin documents as appropriate.
 class LocalViewChanges {
-  final int targetId;
-  final ImmutableSortedSet<DocumentKey> added;
-  final ImmutableSortedSet<DocumentKey> removed;
-
   LocalViewChanges(this.targetId, this.added, this.removed);
 
   factory LocalViewChanges.fromViewSnapshot(
@@ -39,4 +35,8 @@ class LocalViewChanges {
 
     return LocalViewChanges(targetId, addedKeys, removedKeys);
   }
+
+  final int targetId;
+  final ImmutableSortedSet<DocumentKey> added;
+  final ImmutableSortedSet<DocumentKey> removed;
 }

@@ -9,9 +9,9 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// The direction of the ordering
 class OrderByDirection {
-  final int _comparisonModifier;
-
   const OrderByDirection._(this._comparisonModifier);
+
+  final int _comparisonModifier;
 
   static const OrderByDirection ascending = OrderByDirection._(1);
   static const OrderByDirection descending = OrderByDirection._(-1);
@@ -29,14 +29,14 @@ class OrderByDirection {
 
 /// Represents a sort order for a Firestore Query
 class OrderBy {
-  final OrderByDirection direction;
-  final FieldPath field;
-
   const OrderBy(this.direction, this.field);
 
   factory OrderBy.getInstance(OrderByDirection direction, FieldPath path) {
     return OrderBy(direction, path);
   }
+
+  final OrderByDirection direction;
+  final FieldPath field;
 
   int compare(Document d1, Document d2) {
     if (field == FieldPath.keyPath) {

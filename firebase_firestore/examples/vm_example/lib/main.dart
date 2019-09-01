@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/firebase_firestore.dart';
-
 import '../../../test/unit/firebase/firestore/local/mock/database_mock.dart';
+
 import 'credentials.dart';
 
 Future<void> main(List<String> args) async {

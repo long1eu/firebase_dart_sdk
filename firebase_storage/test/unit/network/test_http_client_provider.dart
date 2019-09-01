@@ -14,6 +14,10 @@ import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
 
 class TestHttpClientProvider implements HttpClientProviderImpl {
+  TestHttpClientProvider({@required String testName, @required bool isBinary})
+      : _binaryBody = isBinary,
+        _file = _getResFile('$testName\_network.txt');
+
   static const String _tag = 'TestHttpClientProvider';
 
   final bool _binaryBody;
@@ -28,10 +32,6 @@ class TestHttpClientProvider implements HttpClientProviderImpl {
   Stream<List<int>> _file;
   int pauseRecord = 9223372036854775807;
   int _currentRecord = 0;
-
-  TestHttpClientProvider({@required String testName, @required bool isBinary})
-      : _binaryBody = isBinary,
-        _file = _getResFile('$testName\_network.txt');
 
   static Stream<List<int>> _getResFile(String fileName) {
     return File('${Directory.current.path}/test/res/assets/$fileName')
@@ -214,9 +214,9 @@ class MockHttpClient extends Mock implements HttpClient {}
 class MockHttpClientRequest extends Mock implements HttpClientRequest {}
 
 class MockHttpClientResponse extends Mock implements HttpClientResponse {
-  final StreamController<List<dynamic>> _controller;
-
   MockHttpClientResponse() : _controller = StreamController<List<dynamic>>();
+
+  final StreamController<List<dynamic>> _controller;
 
   Stream<List<int>> get _builtStream =>
       Observable<List<dynamic>>(_controller.stream) //
@@ -246,9 +246,9 @@ class MockHttpClientResponse extends Mock implements HttpClientResponse {
 }
 
 class MockHeaders extends Mock implements HttpHeaders {
-  final Map<String, List<String>> _headers;
-
   MockHeaders(this._headers);
+
+  final Map<String, List<String>> _headers;
 
   @override
   void forEach(void f(String name, List<String> values)) => _headers.forEach(f);

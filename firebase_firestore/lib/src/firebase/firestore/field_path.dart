@@ -12,11 +12,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// list of field names (referring to a nested field in the document).
 @publicApi
 class FieldPath {
-  /// Matches any characters in a field path string that are reserved.
-  static final RegExp reserved = RegExp('[~*/\\[\\]]');
-
-  final model.FieldPath internalPath;
-
   const FieldPath(this.internalPath);
 
   factory FieldPath.fromSegments(List<String> segments) {
@@ -60,6 +55,11 @@ class FieldPath {
           'begin with \'.\', end with \'.\', or contain \'..\'');
     }
   }
+
+  /// Matches any characters in a field path string that are reserved.
+  static final RegExp reserved = RegExp('[~*/\\[\\]]');
+
+  final model.FieldPath internalPath;
 
   static final FieldPath documentIdInstance =
       FieldPath(model.FieldPath.keyPath);

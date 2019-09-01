@@ -55,12 +55,12 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// the prior mutation resulted in a [Document] (always true for a
 /// [SetMutation], but not necessarily for an [PatchMutation]).
 abstract class Mutation {
+  const Mutation(this.key, this.precondition);
+
   final DocumentKey key;
 
   /// The precondition for the mutation.
   final Precondition precondition;
-
-  const Mutation(this.key, this.precondition);
 
   /// Applies this mutation to the given [MaybeDocument] for the purposes of
   /// computing a new remote document. If the input document doesn't match the

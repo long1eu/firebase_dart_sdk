@@ -7,11 +7,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 
 /// A dot separated path for navigating sub-objects with in a document
 class FieldPath extends BasePath<FieldPath> {
-  static final FieldPath keyPath =
-      FieldPath.fromSingleSegment(DocumentKey.keyFieldName);
-
-  static const FieldPath emptyPath = FieldPath._(<String>[]);
-
   const FieldPath._(List<String> segments) : super(segments);
 
   /// Creates a [FieldPath] with a single field. Does not split on dots.
@@ -79,6 +74,11 @@ class FieldPath extends BasePath<FieldPath> {
   factory FieldPath.fromSegments(List<String> segments) {
     return segments.isEmpty ? FieldPath.emptyPath : FieldPath._(segments);
   }
+
+  static final FieldPath keyPath =
+      FieldPath.fromSingleSegment(DocumentKey.keyFieldName);
+
+  static const FieldPath emptyPath = FieldPath._(<String>[]);
 
   @override
   FieldPath createPathWithSegments(List<String> segments) {

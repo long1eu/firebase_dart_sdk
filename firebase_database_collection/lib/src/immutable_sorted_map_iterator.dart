@@ -8,10 +8,6 @@ import 'package:firebase_database_collection/src/llrb_node.dart';
 import 'package:firebase_database_collection/src/lltb_value_node.dart';
 
 class ImmutableSortedMapIterator<K, V> implements Iterator<MapEntry<K, V>> {
-  final Queue<LLRBValueNode<K, V>> nodeStack;
-
-  final bool isReverse;
-
   ImmutableSortedMapIterator(
       LLRBNode<K, V> root, K startKey, Comparator<K> comparator, this.isReverse)
       : nodeStack = Queue<LLRBValueNode<K, V>>() {
@@ -35,10 +31,10 @@ class ImmutableSortedMapIterator<K, V> implements Iterator<MapEntry<K, V>> {
       } else if (cmp == 0) {
         // This node is exactly equal to our start key. Push it on the stack,
         // but stop iterating;
-        nodeStack.add(node as LLRBValueNode<K, V>);
+        nodeStack.add(node);
         break;
       } else {
-        nodeStack.add(node as LLRBValueNode<K, V>);
+        nodeStack.add(node);
         if (isReverse) {
           node = node.right;
         } else {
@@ -48,6 +44,10 @@ class ImmutableSortedMapIterator<K, V> implements Iterator<MapEntry<K, V>> {
     }
   }
 
+  final Queue<LLRBValueNode<K, V>> nodeStack;
+
+  final bool isReverse;
+
   @override
   MapEntry<K, V> get current {
     final LLRBValueNode<K, V> node = nodeStack.removeLast();
@@ -55,13 +55,13 @@ class ImmutableSortedMapIterator<K, V> implements Iterator<MapEntry<K, V>> {
     if (isReverse) {
       LLRBNode<K, V> next = node.left;
       while (!next.isEmpty) {
-        nodeStack.add(next as LLRBValueNode<K, V>);
+        nodeStack.add(next);
         next = next.right;
       }
     } else {
       LLRBNode<K, V> next = node.right;
       while (!next.isEmpty) {
-        nodeStack.add(next as LLRBValueNode<K, V>);
+        nodeStack.add(next);
         next = next.left;
       }
     }

@@ -34,6 +34,11 @@ import 'package:meta/meta.dart';
 /// code and new SDK releases may break code that does so.
 @publicApi
 class FirebaseFirestore {
+  @visibleForTesting
+  FirebaseFirestore(
+      this.databaseId, this._asyncQueue, this.firebaseApp, this.client)
+      : dataConverter = UserDataConverter(databaseId);
+
   static const String _tag = 'FirebaseFirestore';
 
   final AsyncQueue _asyncQueue;
@@ -42,11 +47,6 @@ class FirebaseFirestore {
   final FirebaseApp firebaseApp;
   final UserDataConverter dataConverter;
   final FirestoreClient client;
-
-  @visibleForTesting
-  FirebaseFirestore(
-      this.databaseId, this._asyncQueue, this.firebaseApp, this.client)
-      : dataConverter = UserDataConverter(databaseId);
 
   @publicApi
   static FirebaseFirestore get instance {

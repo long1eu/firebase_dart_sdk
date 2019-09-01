@@ -24,10 +24,10 @@ import 'relationship_tester.dart';
 /// <li>the hash code of any two equal objects are equal
 /// </ul>
 class EqualsTester {
+  EqualsTester() : _equalityGroups = <List<Object>>[<Object>[]];
+
   static const int _repetitions = 3;
   final List<List<Object>> _equalityGroups;
-
-  EqualsTester() : _equalityGroups = <List<Object>>[<Object>[]];
 
   /// Adds [equalityGroup] with objects that are supposed to be equal to
   /// each other and not equal to any other equality groups added to this

@@ -11,11 +11,11 @@ import 'package:meta/meta.dart';
 /// Object that contains exactly one of either a view snapshot or an error for
 /// the given query.
 class QueryEvent {
+  QueryEvent({@required this.query, this.view, this.error});
+
   final Query query;
   final ViewSnapshot view;
   final FirebaseFirestoreError error;
-
-  QueryEvent({@required this.query, this.view, this.error});
 
   QueryEvent copyWith({
     Query query,

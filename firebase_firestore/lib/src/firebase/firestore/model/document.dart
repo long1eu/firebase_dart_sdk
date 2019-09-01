@@ -25,12 +25,12 @@ enum DocumentState {
 }
 
 class Document extends MaybeDocument implements Comparable<Document> {
-  final ObjectValue data;
-  final DocumentState documentState;
-
   const Document(
       DocumentKey key, SnapshotVersion version, this.data, this.documentState)
       : super(key, version);
+
+  final ObjectValue data;
+  final DocumentState documentState;
 
   static int keyComparator(Document left, Document right) =>
       left.key.compareTo(right.key);

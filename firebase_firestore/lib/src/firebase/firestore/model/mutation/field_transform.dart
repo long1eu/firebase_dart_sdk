@@ -8,10 +8,10 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transfo
 
 /// A field path and the operation to perform upon it.
 class FieldTransform {
+  const FieldTransform(this.fieldPath, this.operation);
+
   final FieldPath fieldPath;
   final TransformOperation operation;
-
-  const FieldTransform(this.fieldPath, this.operation);
 
   @override
   bool operator ==(Object other) =>

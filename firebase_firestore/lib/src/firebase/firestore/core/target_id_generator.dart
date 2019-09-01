@@ -9,12 +9,6 @@
 /// may group IDs from separate parts of the client into the same ID space.
 
 class TargetIdGenerator {
-  static const int _localStateId = 0;
-  static const int _syncEngineId = 1;
-  static const int _reservedBits = 1;
-
-  int _previousId;
-
   TargetIdGenerator(int generatorId, int after) {
     final int afterWithoutGenerator = after >> _reservedBits << _reservedBits;
     final int afterGenerator = after - afterWithoutGenerator;
@@ -52,6 +46,12 @@ class TargetIdGenerator {
   factory TargetIdGenerator.getSyncEngineGenerator(int after) {
     return TargetIdGenerator(_syncEngineId, after);
   }
+
+  static const int _localStateId = 0;
+  static const int _syncEngineId = 1;
+  static const int _reservedBits = 1;
+
+  int _previousId;
 
   /// Returns the next id in the sequence
   int nextId() {

@@ -16,11 +16,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 
 /// Provides eager garbage collection for [MemoryPersistence].
 class MemoryEagerReferenceDelegate implements ReferenceDelegate {
+  MemoryEagerReferenceDelegate(this.persistence);
+
   final MemoryPersistence persistence;
 
   Set<DocumentKey> orphanedDocuments;
-
-  MemoryEagerReferenceDelegate(this.persistence);
 
   @override
   ReferenceSet inMemoryPins;
@@ -54,7 +54,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
 
   @override
   void onTransactionStarted() {
-    orphanedDocuments = Set<DocumentKey>();
+    orphanedDocuments = <DocumentKey>{};
   }
 
   /// In eager garbage collection, collection is run on transaction commit.

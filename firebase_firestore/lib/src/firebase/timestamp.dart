@@ -16,9 +16,6 @@ import 'package:firebase_common/firebase_common.dart';
 ///
 /// see [The reference timestamp definition](https://github.com/google/protobuf/blob/master/src/google/protobuf/timestamp.proto)
 class Timestamp implements Comparable<Timestamp> {
-  final int seconds;
-  final int nanoseconds;
-
   @publicApi
   Timestamp(this.seconds, this.nanoseconds) {
     validateRange(seconds, nanoseconds);
@@ -42,6 +39,9 @@ class Timestamp implements Comparable<Timestamp> {
   factory Timestamp.now() {
     return Timestamp.fromDate(DateTime.now());
   }
+
+  final int seconds;
+  final int nanoseconds;
 
   DateTime toDate() {
     return DateTime.fromMillisecondsSinceEpoch(

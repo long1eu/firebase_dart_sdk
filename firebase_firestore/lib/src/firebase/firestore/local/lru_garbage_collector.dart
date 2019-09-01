@@ -11,9 +11,9 @@ import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart'
 
 /// Implements the steps for LRU garbage collection.
 class LruGarbageCollector {
-  final LruDelegate delegate;
-
   LruGarbageCollector(this.delegate);
+
+  final LruDelegate delegate;
 
   /// Given a percentile of target to collect, returns the number of targets to
   /// collect.
@@ -51,11 +51,11 @@ class LruGarbageCollector {
 /// lowest n values passed to [addElement], and finally reports the largest of
 /// them in [maxValue].
 class _RollingSequenceNumberBuffer {
-  final PriorityQueue<int> queue;
-  final int maxElements;
-
   _RollingSequenceNumberBuffer(this.maxElements)
       : queue = PriorityQueue<int>(comparator);
+
+  final PriorityQueue<int> queue;
+  final int maxElements;
 
   // Invert the comparison because we want to keep the smallest values.
   static int comparator(int a, int b) => b.compareTo(a);

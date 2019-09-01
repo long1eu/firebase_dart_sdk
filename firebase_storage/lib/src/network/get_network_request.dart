@@ -7,8 +7,6 @@ import 'package:firebase_storage/src/network/network_request.dart';
 
 /// A network request that returns bytes of a gcs object.
 class GetNetworkRequest extends NetworkRequest {
-  static const String _tag = 'GetNetworkRequest';
-
   GetNetworkRequest(Uri gsUri, FirebaseApp app, int startByte)
       : super(gsUri, app) {
     if (startByte != 0) {

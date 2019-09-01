@@ -6,14 +6,14 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 
 /// A wrapper for boolean value in Firestore.
 class BoolValue extends FieldValue {
+  const BoolValue._(this._value);
+
+  factory BoolValue.valueOf(bool value) => value ? trueValue : falseValue;
+
   static const BoolValue trueValue = BoolValue._(true);
   static const BoolValue falseValue = BoolValue._(false);
 
   final bool _value;
-
-  const BoolValue._(this._value);
-
-  factory BoolValue.valueOf(bool value) => value ? trueValue : falseValue;
 
   @override
   int get typeOrder => FieldValue.typeOrderBool;

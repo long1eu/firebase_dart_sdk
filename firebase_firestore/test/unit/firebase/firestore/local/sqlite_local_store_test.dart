@@ -43,7 +43,7 @@ void main() {
   });
 
   tearDown(() => Future<void>.delayed(
-      Duration(milliseconds: 250), () => testCase?.tearDown()));
+      const Duration(milliseconds: 250), () => testCase?.tearDown()));
 
   test('testMutationBatchKeys', () {
     final SetMutation set1 =

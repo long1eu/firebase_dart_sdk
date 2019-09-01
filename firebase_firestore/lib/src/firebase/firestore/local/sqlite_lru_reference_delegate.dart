@@ -18,14 +18,15 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
-  final SQLitePersistence persistence;
-  ListenSequence listenSequence;
-  int _currentSequenceNumber;
-
   SQLiteLruReferenceDelegate(this.persistence)
       : _currentSequenceNumber = ListenSequence.invalid {
     garbageCollector = LruGarbageCollector(this);
   }
+
+  final SQLitePersistence persistence;
+  ListenSequence listenSequence;
+  int _currentSequenceNumber;
+
 
   @override
   ReferenceSet inMemoryPins;
@@ -70,7 +71,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   Future<void> forEachOrphanedDocumentSequenceNumber(
       Consumer<int> consumer) async {
     final List<Map<String, dynamic>> result = await persistence.query(
-        // @formatter:off
+      // @formatter:off
         '''
          SELECT sequence_number
          FROM target_documents
@@ -79,10 +80,10 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
           AND target_id = 0;
         '''
         // @formatter:on
-        );
+    );
 
     for (Map<String, dynamic> row in result) {
-      consumer(row['sequence_number'] as int);
+      consumer(row['sequence_number']);
     }
   }
 
@@ -109,7 +110,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   /// Returns true if any mutation queue contains the given document.
   Future<bool> _mutationQueuesContainKey(DocumentKey key) async {
     return (await persistence.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT 1
           FROM document_mutations
@@ -133,7 +134,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   Future<void> _removeSentinel(DocumentKey key) async {
     await persistence.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           DELETE
           FROM target_documents
@@ -148,7 +149,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   Future<int> removeOrphanedDocuments(int upperBound) async {
     int count = 0;
     final List<Map<String, dynamic>> result = await persistence.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT path
           FROM target_documents
@@ -161,8 +162,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
         <int>[upperBound]);
 
     for (Map<String, dynamic> row in result) {
-      final ResourcePath path =
-          EncodedPath.decodeResourcePath(row['path'] as String);
+      final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
       final DocumentKey key = DocumentKey.fromPath(path);
       if (!await _isPinned(key)) {
         count++;
@@ -193,7 +193,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   Future<void> _writeSentinel(DocumentKey key) async {
     final String path = EncodedPath.encode(key.path);
     await persistence.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           INSERT
           OR REPLACE INTO target_documents (target_id, path, sequence_number)

@@ -183,7 +183,7 @@ void main() {
     // Track documents we expect to be retained so we can verify post-GC. This
     // will contain documents associated with targets that survive GC, as well
     // as any documents with pending mutations.
-    final Set<DocumentKey> expectedRetained = Set<DocumentKey>();
+    final Set<DocumentKey> expectedRetained = <DocumentKey>{};
     // we add two mutations later, for now track them in an array.
     final List<Mutation> mutations = <Mutation>[];
 
@@ -229,7 +229,7 @@ void main() {
     // Mark 5 documents eligible for GC. This simulates documents that were
     // mutated then ack'd. Since they were ack'd, they are no longer in a
     // mutation queue, and there is nothing keeping them alive.
-    final Set<DocumentKey> toBeRemoved = Set<DocumentKey>();
+    final Set<DocumentKey> toBeRemoved = <DocumentKey>{};
     await testCase.persistence.runTransaction(
         'add orphaned docs (previously mutated, then ack\'d)', () async {
       for (int i = 0; i < 5; i++) {
@@ -278,8 +278,8 @@ void main() {
 
     // Through the various steps, track which documents we expect to be removed
     // vs documents we expect to be retained.
-    final Set<DocumentKey> expectedRetained = Set<DocumentKey>();
-    final Set<DocumentKey> expectedRemoved = Set<DocumentKey>();
+    final Set<DocumentKey> expectedRetained = <DocumentKey>{};
+    final Set<DocumentKey> expectedRemoved = <DocumentKey>{};
 
     // Add oldest target, 5 documents, and add those documents to the target.
     // This target will not be removed, so all documents that are part of it
@@ -297,7 +297,7 @@ void main() {
 
     // Add middle target and docs. Some docs will be removed from this target
     // later, which we track here.
-    final Set<DocumentKey> middleDocsToRemove = Set<DocumentKey>();
+    final Set<DocumentKey> middleDocsToRemove = <DocumentKey>{};
     // This will be the document in this target that gets an update later.
     DocumentKey middleDocToUpdateHolder;
     final QueryData middleTarget = await testCase.persistence
@@ -335,7 +335,7 @@ void main() {
     // will additionally be added to the oldest target, which will cause those
     // documents to be retained. The remaining documents are expected to be
     // removed, since this target will be removed.
-    final Set<DocumentKey> newestDocsToAddToOldest = Set<DocumentKey>();
+    final Set<DocumentKey> newestDocsToAddToOldest = <DocumentKey>{};
     await testCase.persistence.runTransaction('Add newest target and docs',
         () async {
       final QueryData queryData = await testCase.addNextQueryInTransaction();
@@ -426,7 +426,7 @@ void main() {
 
     // Finally, do the garbage collection, up to but not including the removal
     // of middleTarget
-    final Set<int> liveQueries = Set<int>()..add(oldestTarget.targetId);
+    final Set<int> liveQueries = <int>{oldestTarget.targetId};
     final int queriesRemoved =
         await testCase.garbageCollector.removeTargets(upperBound, liveQueries);
     // Expect to remove newest target

@@ -20,18 +20,18 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 /// by ids. This one is used to efficiently implement removal of all references
 /// by some target id.
 class ReferenceSet {
+  ReferenceSet()
+      : referencesByKey = ImmutableSortedSet<DocumentReference>(
+            <DocumentReference>[], DocumentReference.byKey),
+        referencesByTarget = ImmutableSortedSet<DocumentReference>(
+            <DocumentReference>[], DocumentReference.byTarget);
+
   /// A set of outstanding references to a document sorted by key.
   ImmutableSortedSet<DocumentReference> referencesByKey;
 
   /// A set of outstanding references to a document sorted by target id
   /// (or batch id).
   ImmutableSortedSet<DocumentReference> referencesByTarget;
-
-  ReferenceSet()
-      : referencesByKey = ImmutableSortedSet<DocumentReference>(
-            <DocumentReference>[], DocumentReference.byKey),
-        referencesByTarget = ImmutableSortedSet<DocumentReference>(
-            <DocumentReference>[], DocumentReference.byTarget);
 
   /// Returns true if the reference set contains no references.
   bool get isEmpty => referencesByKey.isEmpty;

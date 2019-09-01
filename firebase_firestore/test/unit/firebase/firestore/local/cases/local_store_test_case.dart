@@ -27,10 +27,10 @@ import 'package:test/test.dart';
 import '../../../../../util/test_util.dart';
 
 class LocalStoreTestCase {
+  LocalStoreTestCase(this.persistence, this.garbageCollectorIsEager);
+
   final Persistence persistence;
   final bool garbageCollectorIsEager;
-
-  LocalStoreTestCase(this.persistence, this.garbageCollectorIsEager);
 
   List<MutationBatch> _batches;
   ImmutableSortedMap<DocumentKey, MaybeDocument> _lastChanges;

@@ -7,11 +7,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 
 /// A wrapper for geo point values in Firestore.
 class GeoPointValue extends FieldValue {
-  final GeoPoint _value;
-
   const GeoPointValue(this._value);
 
   factory GeoPointValue.valueOf(GeoPoint value) => GeoPointValue(value);
+
+  final GeoPoint _value;
 
   @override
   int get typeOrder => FieldValue.typeOrderGeopoint;

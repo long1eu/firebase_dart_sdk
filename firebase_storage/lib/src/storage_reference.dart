@@ -25,16 +25,16 @@ import 'package:firebase_storage/src/update_metadata_task.dart';
 /// at a specified path. (see <a href='https://cloud.google.com/storage/'>Google Cloud Storage</a>)
 @publicApi
 class StorageReference {
+  // region Constructors
+  StorageReference(this.storageUri, this.storage)
+      : assert(storageUri != null, 'storageUri cannot be null'),
+        assert(storage != null, 'FirebaseApp cannot be null');
+
   static const String _tag = 'StorageReference';
   final Uri storageUri;
 
   /// The [FirebaseStorage] service which created this reference.
   final FirebaseStorage storage;
-
-  // region Constructors
-  StorageReference(this.storageUri, this.storage)
-      : assert(storageUri != null, 'storageUri cannot be null'),
-        assert(storage != null, 'FirebaseApp cannot be null');
 
   /// Returns a new instance of [StorageReference] pointing to a child location
   /// of the current reference. All leading and trailing slashes will be

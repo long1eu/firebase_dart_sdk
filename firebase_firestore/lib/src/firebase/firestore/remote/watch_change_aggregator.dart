@@ -22,6 +22,8 @@ import 'package:meta/meta.dart';
 /// A helper class to accumulate watch changes into a [RemoteEvent] and other
 /// target information.
 class WatchChangeAggregator {
+  WatchChangeAggregator(this._targetMetadataProvider);
+
   final TargetMetadataProvider _targetMetadataProvider;
 
   /// The internal state of all tracked targets.
@@ -38,9 +40,7 @@ class WatchChangeAggregator {
   /// A list of targets with existence filter mismatches. These targets are
   /// known to be inconsistent and their listens needs to be re-established by
   /// [RemoteStore].
-  Set<int> _pendingTargetResets = Set<int>();
-
-  WatchChangeAggregator(this._targetMetadataProvider);
+  Set<int> _pendingTargetResets = <int>{};
 
   /// Processes and adds the [WatchChangeDocumentChange] to the current set of
   /// changes.
@@ -217,7 +217,7 @@ class WatchChangeAggregator {
       }
     }
 
-    final Set<DocumentKey> resolvedLimboDocuments = Set<DocumentKey>();
+    final Set<DocumentKey> resolvedLimboDocuments = <DocumentKey>{};
 
     // We extract the set of limbo-only document updates as the GC logic
     // special-cases documents that do not appear in the query cache.
@@ -254,7 +254,7 @@ class WatchChangeAggregator {
     // generated [RemoteEvent].
     _pendingDocumentUpdates = <DocumentKey, MaybeDocument>{};
     _pendingDocumentTargetMapping = <DocumentKey, Set<int>>{};
-    _pendingTargetResets = Set<int>();
+    _pendingTargetResets = <int>{};
 
     return remoteEvent;
   }
@@ -335,7 +335,7 @@ class WatchChangeAggregator {
     Set<int> targetMapping = _pendingDocumentTargetMapping[key];
 
     if (targetMapping == null) {
-      targetMapping = Set<int>();
+      targetMapping = <int>{};
       _pendingDocumentTargetMapping[key] = targetMapping;
     }
 
@@ -389,6 +389,11 @@ class WatchChangeAggregator {
 /// Interface implemented by [RemoteStore] to expose target metadata to the
 /// [WatchChangeAggregator].
 class TargetMetadataProvider {
+  const TargetMetadataProvider({
+    @required this.getRemoteKeysForTarget,
+    @required this.getQueryDataForTarget,
+  });
+
   /// Returns the set of remote document keys for the given target id as of the
   /// last raised snapshot or an empty set of document keys for unknown targets.
   final ImmutableSortedSet<DocumentKey> Function(int targetId)
@@ -397,8 +402,4 @@ class TargetMetadataProvider {
   /// Returns the [QueryData] for an active target id or 'null' if this query is
   /// unknown or has become inactive.
   final QueryData Function(int targetId) getQueryDataForTarget;
-
-  const TargetMetadataProvider(
-      {@required this.getRemoteKeysForTarget,
-      @required this.getQueryDataForTarget});
 }

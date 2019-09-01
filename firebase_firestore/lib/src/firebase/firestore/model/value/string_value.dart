@@ -7,13 +7,13 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 /// A wrapper for string values in Firestore.
 // TODO: Add truncation support
 class StringValue extends FieldValue {
-  final String _value;
-
   const StringValue(this._value);
 
   factory StringValue.valueOf(String value) {
     return StringValue(value);
   }
+
+  final String _value;
 
   @override
   int get typeOrder => FieldValue.typeOrderString;

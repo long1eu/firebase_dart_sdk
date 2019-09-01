@@ -37,11 +37,6 @@ import 'package:rxdart/rxdart.dart';
 /// code and new SDK releases may break code that does so.
 @publicApi
 class DocumentReference {
-  final DocumentKey key;
-
-  /// Gets the Firestore instance associated with this document reference.
-  final FirebaseFirestore firestore;
-
   // TODO: We should checkNotNull(firestore), but tests are currently cheating
   // and setting it to null.
   DocumentReference(this.key, this.firestore) : assert(key != null);
@@ -57,6 +52,11 @@ class DocumentReference {
 
     return DocumentReference(DocumentKey.fromPath(path), firestore);
   }
+
+  final DocumentKey key;
+
+  /// Gets the Firestore instance associated with this document reference.
+  final FirebaseFirestore firestore;
 
   @publicApi
   String get id => key.path.last;

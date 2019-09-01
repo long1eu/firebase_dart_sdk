@@ -12,10 +12,10 @@ import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.d
 import '../../../../../util/test_util.dart';
 
 class RemoteDocumentCacheTestCase {
+  RemoteDocumentCacheTestCase(this.persistence);
+
   final Persistence persistence;
   RemoteDocumentCache remoteDocumentCache;
-
-  RemoteDocumentCacheTestCase(this.persistence);
 
   void setUp() {
     remoteDocumentCache = persistence.remoteDocumentCache;

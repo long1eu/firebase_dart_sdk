@@ -15,12 +15,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 class MutationBatchResult {
-  final MutationBatch batch;
-  final SnapshotVersion commitVersion;
-  final List<MutationResult> mutationResults;
-  final Uint8List streamToken;
-  final ImmutableSortedMap<DocumentKey, SnapshotVersion> docVersions;
-
   const MutationBatchResult(
     this.batch,
     this.commitVersion,
@@ -58,6 +52,12 @@ class MutationBatchResult {
       docVersions,
     );
   }
+
+  final MutationBatch batch;
+  final SnapshotVersion commitVersion;
+  final List<MutationResult> mutationResults;
+  final Uint8List streamToken;
+  final ImmutableSortedMap<DocumentKey, SnapshotVersion> docVersions;
 
   @override
   String toString() {

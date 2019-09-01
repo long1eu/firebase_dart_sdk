@@ -50,9 +50,9 @@ abstract class Filter {
 }
 
 class FilterOperator {
-  final String _value;
-
   const FilterOperator._(this._value);
+
+  final String _value;
 
   static const FilterOperator lessThan = FilterOperator._('<');
   static const FilterOperator lessThanOrEqual = FilterOperator._('<=');
@@ -64,7 +64,4 @@ class FilterOperator {
 
   @override
   String toString() => _value;
-
-  @override
-  int get hashCode => _value.hashCode;
 }

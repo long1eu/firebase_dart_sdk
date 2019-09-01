@@ -33,13 +33,13 @@ typedef TransactionCallback<TResult> = Future<TResult> Function(Transaction);
 /// [FirebaseFirestore.runTransaction]
 @publicApi
 class Transaction {
-  final core.Transaction _transaction;
-
-  final FirebaseFirestore _firestore;
-
   Transaction(this._transaction, this._firestore)
       : assert(_transaction != null),
         assert(_firestore != null);
+
+  final core.Transaction _transaction;
+
+  final FirebaseFirestore _firestore;
 
   /// Writes to the document referred to by the provided [DocumentReference].
   /// If the document does not yet exist, it will be created. If you pass

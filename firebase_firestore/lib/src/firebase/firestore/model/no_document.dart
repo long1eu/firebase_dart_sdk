@@ -9,11 +9,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 
 /// Represents that no documents exists for the key at the given version.
 class NoDocument extends MaybeDocument {
-  final bool hasCommittedMutations;
-
   const NoDocument(
       DocumentKey key, SnapshotVersion version, this.hasCommittedMutations)
       : super(key, version);
+
+  final bool hasCommittedMutations;
 
   @override
   bool get hasPendingWrites => hasCommittedMutations;

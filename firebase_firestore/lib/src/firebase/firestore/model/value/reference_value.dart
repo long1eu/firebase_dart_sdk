@@ -8,14 +8,14 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 
 /// A wrapper for reference values in Firestore.
 class ReferenceValue extends FieldValue {
-  final DatabaseId databaseId;
-  final DocumentKey key;
-
   const ReferenceValue(this.databaseId, this.key);
 
   factory ReferenceValue.valueOf(DatabaseId databaseId, DocumentKey key) {
     return ReferenceValue(databaseId, key);
   }
+
+  final DatabaseId databaseId;
+  final DocumentKey key;
 
   @override
   int get typeOrder => FieldValue.typeOrderReference;

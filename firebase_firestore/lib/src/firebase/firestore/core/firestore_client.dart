@@ -41,6 +41,12 @@ import 'package:grpc/grpc.dart';
 /// [FirestoreClient] is a top-level class that constructs and owns all of the
 /// pieces of the client SDK architecture.
 class FirestoreClient implements RemoteStoreCallback {
+  FirestoreClient._(
+    this.databaseInfo,
+    this.credentialsProvider,
+    this.asyncQueue,
+  );
+
   static const String logTag = 'FirestoreClient';
 
   final DatabaseInfo databaseInfo;
@@ -53,12 +59,6 @@ class FirestoreClient implements RemoteStoreCallback {
   RemoteStore remoteStore;
   SyncEngine syncEngine;
   EventManager eventManager;
-
-  FirestoreClient._(
-    this.databaseInfo,
-    this.credentialsProvider,
-    this.asyncQueue,
-  );
 
   static Future<FirestoreClient> initialize(
       DatabaseInfo databaseInfo,

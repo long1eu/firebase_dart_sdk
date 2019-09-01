@@ -113,11 +113,11 @@ typedef OnClose = Future<void> Function(GrpcError error);
 /// A (super-interface) for the stream callbacks. Implementations of Stream
 /// should provide their own interface that extends this interface.
 class StreamCallback {
+  const StreamCallback({this.onOpen, this.onClose});
+
   /// The stream is now open and is accepting messages
   final Task<void> onOpen;
 
   /// The stream has closed. If there was an error, the status will be != OK.
   final OnClose onClose;
-
-  const StreamCallback({this.onOpen, this.onClose});
 }

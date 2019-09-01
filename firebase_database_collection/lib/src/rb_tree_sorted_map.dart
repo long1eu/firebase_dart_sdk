@@ -17,10 +17,6 @@ import 'package:firebase_database_collection/src/lltb_value_node.dart';
 /// in practice than an ArraySortedMap for small collections. It also uses about
 /// twice as much memory.
 class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
-  LLRBNode<K, V> _root;
-  @override
-  Comparator<K> comparator;
-
   RBTreeSortedMap(this.comparator, [LLRBNode<K, V> root])
       : _root = root ?? LLRBEmptyNode<K, V>();
 
@@ -32,6 +28,10 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
       comparator,
     );
   }
+
+  LLRBNode<K, V> _root;
+  @override
+  Comparator<K> comparator;
 
   static RBTreeSortedMap<A, C> buildFrom<A, B, C>(
       List<A> keys,
@@ -212,14 +212,14 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
 }
 
 class RBTreeSortedMapBuilder<A, B, C> {
+  RBTreeSortedMapBuilder(this.keys, this.values, this.keyTranslator);
+
   final List<A> keys;
   final Map<B, C> values;
   final KeyTranslator<A, B> keyTranslator;
 
   LLRBValueNode<A, C> _root;
   LLRBValueNode<A, C> _leaf;
-
-  RBTreeSortedMapBuilder(this.keys, this.values, this.keyTranslator);
 
   C getValue(A key) {
     return values[keyTranslator(key)];
@@ -295,10 +295,6 @@ class BooleanChunk {
 
 // ignore: camel_case_types
 class Base1_2 extends Iterable<BooleanChunk> {
-  @override
-  final int length;
-  int value;
-
   factory Base1_2(int size) {
     final int toCalc = size + 1;
     final int length = (log(toCalc) / log(2)).floor();
@@ -310,6 +306,10 @@ class Base1_2 extends Iterable<BooleanChunk> {
   }
 
   Base1_2._(this.length, this.value);
+
+  @override
+  final int length;
+  int value;
 
   /// Iterates over bools for whether or not a particular digit is a '1' in
   /// base {1, 2}

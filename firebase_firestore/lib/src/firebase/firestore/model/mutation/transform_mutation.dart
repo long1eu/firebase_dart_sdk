@@ -29,13 +29,13 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// on [Mutation.applyToRemoteDocument] and [Mutation.applyToLocalView] for
 /// rationale).
 class TransformMutation extends Mutation {
-  final List<FieldTransform> fieldTransforms;
-
   // NOTE: We set a precondition of exists: true as a safety-check, since we
   // always combine TransformMutations with a SetMutation or PatchMutation which
   // (if successful) should end up with an existing document.
   TransformMutation(DocumentKey key, this.fieldTransforms)
       : super(key, Precondition(exists: true));
+
+  final List<FieldTransform> fieldTransforms;
 
   @override
   MaybeDocument applyToRemoteDocument(

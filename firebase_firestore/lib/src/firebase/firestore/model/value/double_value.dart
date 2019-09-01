@@ -7,6 +7,10 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/number_val
 
 /// A wrapper for float/double values in Firestore.
 class DoubleValue extends NumberValue {
+  const DoubleValue(this._value);
+
+  factory DoubleValue.valueOf(double value) => DoubleValue(value);
+
   /// A constant holding the smallest positive normal value of type
   /// [double], 2<sup>-1022</sup>.  It is equal to the
   /// hexadecimal floating-point literal ```0x1.0p-1022```.
@@ -15,10 +19,6 @@ class DoubleValue extends NumberValue {
   static const DoubleValue nan = DoubleValue(double.nan);
 
   final double _value;
-
-  const DoubleValue(this._value);
-
-  factory DoubleValue.valueOf(double value) => DoubleValue(value);
 
   @override
   double get value => _value;
@@ -67,6 +67,6 @@ class DoubleValue extends NumberValue {
       return 0;
     }
 
-    return value.compareTo(other.value as num);
+    return value.compareTo(other.value);
   }
 }

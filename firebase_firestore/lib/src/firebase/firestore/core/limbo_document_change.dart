@@ -9,10 +9,10 @@ enum LimboDocumentChangeType { added, removed }
 
 /// Change to a particular document wrt to whether it is in 'limbo'.
 class LimboDocumentChange {
+  LimboDocumentChange(this.type, this.key);
+
   final LimboDocumentChangeType type;
   final DocumentKey key;
-
-  LimboDocumentChange(this.type, this.key);
 
   @override
   bool operator ==(Object other) =>

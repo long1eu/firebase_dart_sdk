@@ -36,6 +36,9 @@ enum DocumentChangeType {
 /// code and new SDK releases may break code that does so.
 @publicApi
 class DocumentChange {
+  @visibleForTesting
+  DocumentChange(this.document, this.type, this.oldIndex, this.newIndex);
+
   /// An enumeration of snapshot diff types.
   final DocumentChangeType type;
 
@@ -63,9 +66,6 @@ class DocumentChange {
   ///
   /// The index in the new snapshot, after processing all previous changes.
   final int newIndex;
-
-  @visibleForTesting
-  DocumentChange(this.document, this.type, this.oldIndex, this.newIndex);
 
   /// Creates the list of DocumentChanges from a ViewSnapshot.
   static List<DocumentChange> changesFromSnapshot(FirebaseFirestore firestore,

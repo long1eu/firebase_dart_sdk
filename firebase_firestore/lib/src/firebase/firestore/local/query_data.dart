@@ -15,13 +15,6 @@ import 'package:meta/meta.dart';
 /// An immutable set of metadata that the store will need to keep track of for
 /// each query.
 class QueryData {
-  final Query query;
-  final int targetId;
-  final int sequenceNumber;
-  final QueryPurpose purpose;
-  final SnapshotVersion snapshotVersion;
-  final Uint8List resumeToken;
-
   /// Creates a new QueryData with the given values.
   ///
   /// The [query] being listened to. [targetId] to which the query corresponds,
@@ -51,6 +44,13 @@ class QueryData {
       WatchStream.emptyResumeToken,
     );
   }
+
+  final Query query;
+  final int targetId;
+  final int sequenceNumber;
+  final QueryPurpose purpose;
+  final SnapshotVersion snapshotVersion;
+  final Uint8List resumeToken;
 
   /// Creates a new query data instance with an updated snapshot version and
   /// resume token.

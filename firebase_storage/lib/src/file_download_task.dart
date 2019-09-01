@@ -22,6 +22,13 @@ import 'package:firebase_storage/src/task.dart';
 /// A task that downloads bytes of a GCS blob to a specified File.
 @publicApi
 class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
+  FileDownloadTask._(this.reference, this._destinationFile, SendPort sendPort)
+      : _sender = ExponentialBackoffSender(
+            reference.app, reference.storage.maxDownloadRetry),
+        super(sendPort) {
+    queue();
+  }
+
   static const int kPreferredChunkSize = 256 * 1024; // 256KB
   static const String _tag = 'FileDownloadTask';
 
@@ -36,13 +43,6 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
   int _totalBytes = -1;
   int _resultCode = 0;
   int _bytesDownloaded = 0;
-
-  FileDownloadTask._(this.reference, this._destinationFile, SendPort sendPort)
-      : _sender = ExponentialBackoffSender(
-            reference.app, reference.storage.maxDownloadRetry),
-        super(sendPort) {
-    queue();
-  }
 
   static Task<DownloadTaskSnapshot> schedule(
       StorageReference storage, File destinationFile) {

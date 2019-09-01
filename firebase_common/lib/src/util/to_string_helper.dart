@@ -5,12 +5,12 @@
 int _indentingBuiltValueToStringHelperIndent = 0;
 
 class ToStringHelper {
-  StringBuffer _result = StringBuffer();
-
   ToStringHelper(Type className) {
     _result..write(className.toString())..write(' {\n');
     _indentingBuiltValueToStringHelperIndent += 2;
   }
+
+  StringBuffer _result = StringBuffer();
 
   void add(String field, Object value) {
     if (value != null) {

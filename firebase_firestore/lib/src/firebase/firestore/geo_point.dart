@@ -4,9 +4,6 @@
 
 /// Immutable class representing a GeoPoint in Firestore
 class GeoPoint implements Comparable<GeoPoint> {
-  final double latitude;
-  final double longitude;
-
   /// Construct a new GeoPoint using the provided latitude and longitude values.
   ///
   /// The [latitude] of this GeoPoint in the range [-90, 90] and the [longitude]
@@ -24,6 +21,9 @@ class GeoPoint implements Comparable<GeoPoint> {
             'Latitude must be in the range of [-90, 90] but was $latitude'),
         assert(longitude >= -180.0 && longitude <= 180.0,
             'Longitude must be in the range of [-180, 180] but was $longitude');
+
+  final double latitude;
+  final double longitude;
 
   @override
   int compareTo(GeoPoint other) {

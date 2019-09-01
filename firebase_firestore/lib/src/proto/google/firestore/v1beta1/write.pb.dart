@@ -9,10 +9,9 @@ import 'dart:core' show int, bool, double, String, List, override;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'document.pb.dart' as $0;
-import 'common.pb.dart' as $1;
 import '../../protobuf/timestamp.pb.dart' as $2;
-
+import 'common.pb.dart' as $1;
+import 'document.pb.dart' as $0;
 import 'write.pbenum.dart';
 
 export 'write.pbenum.dart';

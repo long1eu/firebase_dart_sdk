@@ -15,9 +15,9 @@ import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart'
 ///     2. foo.bar - Overwrites only the field bar of the object foo. If foo is
 ///     not an object, foo is replaced with an object containing foo.
 class FieldMask {
-  final List<FieldPath> mask;
-
   const FieldMask(this.mask);
+
+  final List<FieldPath> mask;
 
   /// Verifies that [fieldPath] is included by at least one field in this field
   /// mask.

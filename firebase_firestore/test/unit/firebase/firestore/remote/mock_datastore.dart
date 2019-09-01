@@ -28,14 +28,6 @@ import '../spec/spec_test_case.dart';
 /// A mock version of [Datastore] for SpecTest that allows the test to control
 /// the parts that would normally be sent from the backend.
 class MockDatastore extends Datastore {
-  _MockWatchStream _watchStream;
-
-  _MockWriteStream _writeStream;
-
-  int _writeStreamRequestCount = 0;
-
-  int _watchStreamRequestCount = 0;
-
   factory MockDatastore(AsyncQueue workerQueue) {
     final RemoteSerializer serializer =
         RemoteSerializer(DatabaseId.forDatabase('project', 'database'));
@@ -66,6 +58,14 @@ class MockDatastore extends Datastore {
   MockDatastore._(DatabaseInfo databaseInfo, AsyncQueue workerQueue,
       RemoteSerializer serializer, FirestoreChannel channel)
       : super.init(databaseInfo, workerQueue, serializer, channel);
+
+  _MockWatchStream _watchStream;
+
+  _MockWriteStream _writeStream;
+
+  int _writeStreamRequestCount = 0;
+
+  int _watchStreamRequestCount = 0;
 
   @override
   WatchStream createWatchStream(WatchStreamCallback listener) {
@@ -123,16 +123,16 @@ class MockDatastore extends Datastore {
 }
 
 class _MockWatchStream extends WatchStream {
+  _MockWatchStream(
+      this._datastore, AsyncQueue workerQueue, WatchStreamCallback listener)
+      : super(/*channel:*/ null, workerQueue, _datastore.serializer, listener);
+
   final MockDatastore _datastore;
 
   bool _open = false;
 
   /// Tracks the currently active watch targets as sent over the watch stream.
   final Map<int, QueryData> _activeTargets = <int, QueryData>{};
-
-  _MockWatchStream(
-      this._datastore, AsyncQueue workerQueue, WatchStreamCallback listener)
-      : super(/*channel:*/ null, workerQueue, _datastore.serializer, listener);
 
   @override
   Future<void> start() async {
@@ -214,17 +214,17 @@ class _MockWatchStream extends WatchStream {
 }
 
 class _MockWriteStream extends WriteStream {
+  _MockWriteStream(
+      this._datastore, AsyncQueue workerQueue, WriteStreamCallback listener)
+      : sentWrites = <List<Mutation>>[],
+        super(/*channel=*/ null, workerQueue, _datastore.serializer, listener);
+
   final MockDatastore _datastore;
 
   bool _open = false;
 
   /*p*/
   final List<List<Mutation>> sentWrites;
-
-  _MockWriteStream(
-      this._datastore, AsyncQueue workerQueue, WriteStreamCallback listener)
-      : sentWrites = <List<Mutation>>[],
-        super(/*channel=*/ null, workerQueue, _datastore.serializer, listener);
 
   @override
   Future<void> start() async {

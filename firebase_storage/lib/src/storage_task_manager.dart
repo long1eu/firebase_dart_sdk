@@ -8,9 +8,9 @@ import 'package:firebase_storage/src/storage_task.dart';
 
 // ignore: always_specify_types
 class StorageTaskManager {
-  static final StorageTaskManager instance = StorageTaskManager._();
-
   StorageTaskManager._();
+
+  static final StorageTaskManager instance = StorageTaskManager._();
 
   final Map<String, StorageTask> _inProgressTasks = <String, StorageTask>{};
 

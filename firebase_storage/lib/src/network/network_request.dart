@@ -16,6 +16,12 @@ import 'package:meta/meta.dart';
 
 /// Encapsulates a single network request and response
 abstract class NetworkRequest {
+  NetworkRequest(this.gsUri, FirebaseApp app)
+      : assert(gsUri != null),
+        assert(app != null) {
+    setCustomHeader(_xFirebaseGmpid, app.options.applicationId);
+  }
+
   static const String _tag = 'NetworkRequest';
 
   static const String _xFirebaseGmpid = 'x-firebase-gmpid';
@@ -50,12 +56,6 @@ abstract class NetworkRequest {
   HttpClientResponse _response;
   final Map<String, String> _requestHeaders = <String, String>{};
   Map<String, List<String>> _resultHeaders;
-
-  NetworkRequest(this.gsUri, FirebaseApp app)
-      : assert(gsUri != null),
-        assert(app != null) {
-    setCustomHeader(_xFirebaseGmpid, app.options.applicationId);
-  }
 
   static String get authority {
     final Uri uri = Uri.parse(networkRequestUrl);

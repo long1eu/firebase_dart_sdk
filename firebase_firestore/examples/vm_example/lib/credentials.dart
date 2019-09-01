@@ -6,6 +6,8 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:googleapis_auth/auth_io.dart';
 
 class ServiceCredential extends InternalTokenProvider {
+  ServiceCredential([this.tokenPath = 'token.dat']);
+
   final String _tag = 'ServiceCredential';
   final ServiceAccountCredentials _accountCredentials =
       ServiceAccountCredentials.fromJson(<String, dynamic>{
@@ -30,8 +32,6 @@ class ServiceCredential extends InternalTokenProvider {
 
   String _tokenData;
   DateTime _tokenExpiry;
-
-  ServiceCredential([this.tokenPath = 'token.dat']);
 
   @override
   Future<GetTokenResult> getAccessToken(bool forceRefresh) async {

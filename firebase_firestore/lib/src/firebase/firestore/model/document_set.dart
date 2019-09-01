@@ -11,9 +11,6 @@ import 'document.dart';
 /// An immutable set of documents (unique by key) ordered by the given
 /// comparator or ordered by key by default if no document is present.
 class DocumentSet extends Iterable<Document> {
-  final ImmutableSortedMap<DocumentKey, Document> _keyIndex;
-  final ImmutableSortedSet<Document> sortedSet;
-
   const DocumentSet._(this._keyIndex, this.sortedSet);
 
   factory DocumentSet.emptySet(Comparator<Document> comparator) {
@@ -33,6 +30,9 @@ class DocumentSet extends Iterable<Document> {
       ImmutableSortedSet<Document>(<Document>[], adjustedComparator),
     );
   }
+
+  final ImmutableSortedMap<DocumentKey, Document> _keyIndex;
+  final ImmutableSortedSet<Document> sortedSet;
 
   @override
   int get length => _keyIndex.length;

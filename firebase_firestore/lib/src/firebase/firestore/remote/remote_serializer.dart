@@ -77,11 +77,11 @@ import 'package:grpc/grpc.dart';
 
 /// Serializer that converts to and from Firestore API protos.
 class RemoteSerializer {
-  final DatabaseId databaseId;
-  final String databaseName;
-
   RemoteSerializer(this.databaseId)
       : databaseName = _encodedDatabaseId(databaseId).canonicalString;
+
+  final DatabaseId databaseId;
+  final String databaseName;
 
   // Timestamps and Versions
   proto.Timestamp encodeTimestamp(Timestamp timestamp) {

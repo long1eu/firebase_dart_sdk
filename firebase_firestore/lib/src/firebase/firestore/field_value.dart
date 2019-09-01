@@ -8,8 +8,6 @@ import 'package:firebase_common/firebase_common.dart';
 /// [update].
 @publicApi
 abstract class FieldValue {
-  final List<Object> elements;
-
   const FieldValue._(this.elements);
 
   /// Returns a sentinel for use with update() to mark a field for deletion.
@@ -46,6 +44,8 @@ abstract class FieldValue {
   factory FieldValue.arrayRemove(List<Object> elements) {
     return _ArrayRemoveFieldValue._(elements);
   }
+
+  final List<Object> elements;
 
   /// Returns the method name (e.g. 'FieldValue.delete') that was used to create
   /// this FieldValue instance, for use in error messages, etc.

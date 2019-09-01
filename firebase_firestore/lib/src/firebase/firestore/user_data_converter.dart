@@ -33,16 +33,16 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// Helper for parsing raw user input (provided via the API) into internal model
 /// classes.
 class UserDataConverter {
-  final DatabaseId databaseId;
-
   UserDataConverter(this.databaseId);
+
+  final DatabaseId databaseId;
 
   /// Parse document data from a non-merge set() call.
   UserDataParsedSetData parseSetData(Map<String, Object> input) {
     final UserDataParseAccumulator accumulator =
         UserDataParseAccumulator(UserDataSource.set);
     final FieldValue updateData = _parseData(input, accumulator.rootContext);
-    return accumulator.toSetData(updateData as ObjectValue);
+    return accumulator.toSetData(updateData);
   }
 
   /// Parse document data from a set() call with SetOptions.merge() set.

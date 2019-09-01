@@ -71,6 +71,8 @@ import 'package:meta/meta.dart';
 /// * A full collection scan is therefore only needed when no [filters] or
 /// [orderBy] constraints are specified.
 class IndexedQueryEngine implements QueryEngine {
+  const IndexedQueryEngine(this.localDocuments, this.collectionIndex);
+
   static const double highSelectivity = 1.0;
   static const double lowSelectivity = 0.5;
 
@@ -84,8 +86,6 @@ class IndexedQueryEngine implements QueryEngine {
 
   final LocalDocumentsView localDocuments;
   final SQLiteCollectionIndex collectionIndex;
-
-  const IndexedQueryEngine(this.localDocuments, this.collectionIndex);
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(

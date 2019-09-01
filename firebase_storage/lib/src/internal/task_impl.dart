@@ -10,13 +10,6 @@ import 'package:firebase_storage/src/streamed_task.dart';
 import 'package:firebase_storage/src/task.dart';
 
 class TaskImpl<TState extends StorageTaskState> extends Task<TState> {
-  final Stream<dynamic> _received;
-  final Completer<TState> _completer;
-
-  List<dynamic> _queue = <dynamic>[];
-  SendPort _port;
-  int _id = 0;
-
   TaskImpl._(this._received, this._completer) {
     _received
         .where((dynamic data) => data is SendPort)
@@ -24,6 +17,13 @@ class TaskImpl<TState extends StorageTaskState> extends Task<TState> {
         .first
         .then((SendPort data) => _port = data);
   }
+
+  final Stream<dynamic> _received;
+  final Completer<TState> _completer;
+
+  List<dynamic> _queue = <dynamic>[];
+  SendPort _port;
+  int _id = 0;
 
   static TaskImpl<TState> create<TState extends StorageTaskState>(
       Stream<dynamic> received, Completer<TState> completer) {

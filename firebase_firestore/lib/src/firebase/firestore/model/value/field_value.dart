@@ -12,6 +12,8 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// * Bool
 /// * todo finish this
 abstract class FieldValue implements Comparable<FieldValue> {
+  const FieldValue();
+
   static const int typeOrderNull = 0;
   static const int typeOrderBool = 1;
   static const int typeOrderNumber = 2;
@@ -22,8 +24,6 @@ abstract class FieldValue implements Comparable<FieldValue> {
   static const int typeOrderGeopoint = 7;
   static const int typeOrderArray = 8;
   static const int typeOrderObject = 9;
-
-  const FieldValue();
 
   int get typeOrder;
 

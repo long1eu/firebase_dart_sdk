@@ -17,6 +17,12 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// [QueryListener] takes a series of internal view snapshots and determines
 /// when to raise events.
 class QueryListener extends Stream<ViewSnapshot> {
+  QueryListener(this.query,
+      [this.options = const ListenOptions(), this.onCancel])
+      : assert(options != null) {
+    sink = StreamController<ViewSnapshot>(onCancel: () => onCancel?.call(this));
+  }
+
   final Query query;
 
   final ListenOptions options;
@@ -32,12 +38,6 @@ class QueryListener extends Stream<ViewSnapshot> {
   OnlineState onlineState = OnlineState.unknown;
 
   ViewSnapshot snapshot;
-
-  QueryListener(this.query,
-      [this.options = const ListenOptions(), this.onCancel])
-      : assert(options != null) {
-    sink = StreamController<ViewSnapshot>(onCancel: () => onCancel?.call(this));
-  }
 
   Future<void> onViewSnapshot(ViewSnapshot newSnapshot) async {
     Assert.hardAssert(

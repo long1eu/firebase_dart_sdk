@@ -8,8 +8,8 @@ import 'package:firebase_common/firebase_common.dart';
 /// running task.
 @publicApi
 class CancelException implements Exception {
-  final String message = 'The operation was canceled.';
-
   @publicApi
   CancelException();
+
+  final String message = 'The operation was canceled.';
 }

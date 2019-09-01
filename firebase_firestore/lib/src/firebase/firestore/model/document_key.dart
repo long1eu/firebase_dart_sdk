@@ -8,11 +8,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// DocumentKey represents the location of a document in the Firestore database.
 class DocumentKey implements Comparable<DocumentKey> {
-  static const String keyFieldName = '__name__';
-
-  /// The path to the document.
-  final ResourcePath path;
-
   DocumentKey._(this.path) {
     Assert.hardAssert(isDocumentKey(path), 'Not a document key path: $path');
   }
@@ -33,6 +28,11 @@ class DocumentKey implements Comparable<DocumentKey> {
   factory DocumentKey.fromPathString(String path) {
     return DocumentKey._(ResourcePath.fromString(path));
   }
+
+  static const String keyFieldName = '__name__';
+
+  /// The path to the document.
+  final ResourcePath path;
 
   static int comparator(DocumentKey a, DocumentKey b) =>
       a.path.compareTo(b.path);

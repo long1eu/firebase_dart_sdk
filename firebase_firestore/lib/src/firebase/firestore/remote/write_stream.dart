@@ -38,6 +38,21 @@ import 'package:protobuf/protobuf.dart';
 /// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L139'>firestore.proto</a>
 class WriteStream
     extends AbstractStream<WriteRequest, WriteResponse, WriteStreamCallback> {
+  WriteStream(FirestoreChannel channel, AsyncQueue workerQueue,
+      this._serializer, WriteStreamCallback listener)
+      : super(
+          channel,
+          ClientMethod<WriteRequest, WriteResponse>(
+            'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Write',
+            (GeneratedMessage req) => req.writeToBuffer(),
+            (List<int> res) => WriteResponse.fromBuffer(res),
+          ),
+          workerQueue,
+          TimerId.writeStreamConnectionBackoff,
+          TimerId.writeStreamIdle,
+          listener,
+        );
+
   /// The empty stream token.
   static final Uint8List emptyStreamToken = Uint8List.fromList(<int>[0]);
 
@@ -57,20 +72,6 @@ class WriteStream
 
   @visibleForTesting
   bool handshakeComplete = false;
-
-  WriteStream(FirestoreChannel channel, AsyncQueue workerQueue,
-      this._serializer, WriteStreamCallback listener)
-      : super(
-            channel,
-            ClientMethod<WriteRequest, WriteResponse>(
-              'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Write',
-              (GeneratedMessage req) => req.writeToBuffer(),
-              (List<int> res) => WriteResponse.fromBuffer(res),
-            ),
-            workerQueue,
-            TimerId.writeStreamConnectionBackoff,
-            TimerId.writeStreamIdle,
-            listener);
 
   @override
   Future<void> start() async {
@@ -157,16 +158,16 @@ typedef OnWriteResponse = Future<void> Function(
 /// A callback interface for the set of events that can be emitted by the
 /// [WriteStream]
 class WriteStreamCallback extends StreamCallback {
-  /// The handshake for this write stream has completed
-  final Task<void> onHandshakeComplete;
-
-  /// Response for the last write.
-  final OnWriteResponse onWriteResponse;
-
   const WriteStreamCallback({
     @required Task<void> onOpen,
     @required OnClose onClose,
     @required this.onHandshakeComplete,
     @required this.onWriteResponse,
   }) : super(onOpen: onOpen, onClose: onClose);
+
+  /// The handshake for this write stream has completed
+  final Task<void> onHandshakeComplete;
+
+  /// Response for the last write.
+  final OnWriteResponse onWriteResponse;
 }

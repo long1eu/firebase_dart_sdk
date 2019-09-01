@@ -22,10 +22,10 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 ///   - They sort after all TimestampValues. With respect to other
 ///   ServerTimestampValues, they sort by their localWriteTime.
 class ServerTimestampValue extends FieldValue {
+  const ServerTimestampValue(this.localWriteTime, this.previousValue);
+
   final Timestamp localWriteTime;
   final FieldValue previousValue;
-
-  const ServerTimestampValue(this.localWriteTime, this.previousValue);
 
   @override
   int get typeOrder => FieldValue.typeOrderTimestamp;

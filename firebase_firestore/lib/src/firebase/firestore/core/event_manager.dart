@@ -16,16 +16,15 @@ import 'package:grpc/grpc.dart';
 /// It handles 'fan-out.' (Identical queries will re-use the same watch on the
 /// backend.)
 class EventManager implements SyncEngineCallback {
+  EventManager(this._syncEngine) : _queries = <Query, QueryListenersInfo>{} {
+    _syncEngine.callback = this;
+  }
+
   final SyncEngine _syncEngine;
 
   final Map<Query, QueryListenersInfo> _queries;
 
   OnlineState _onlineState = OnlineState.unknown;
-
-  EventManager(this._syncEngine)
-      : this._queries = <Query, QueryListenersInfo>{} {
-    _syncEngine.callback = this;
-  }
 
   /// Adds a query listener that will be called with new snapshots for the
   /// query. The [EventManager] is responsible for multiplexing many listeners
@@ -114,26 +113,16 @@ class EventManager implements SyncEngineCallback {
 }
 
 class QueryListenersInfo {
+  QueryListenersInfo() : _listeners = <QueryListener>[];
+
   final List<QueryListener> _listeners;
 
   ViewSnapshot _viewSnapshot;
   int _targetId;
-
-  QueryListenersInfo() : _listeners = <QueryListener>[];
 }
 
 /// Holds (internal) options for listening
 class ListenOptions {
-  /// Raise events when only metadata of documents changes
-  final bool includeDocumentMetadataChanges;
-
-  /// Raise events when only metadata of the query changes
-  final bool includeQueryMetadataChanges;
-
-  /// Wait for a sync with the server when online, but still raise events while
-  /// offline.
-  final bool waitForSyncWhenOnline;
-
   const ListenOptions({
     this.includeDocumentMetadataChanges = false,
     this.includeQueryMetadataChanges = false,
@@ -146,6 +135,16 @@ class ListenOptions {
       : includeDocumentMetadataChanges = true,
         includeQueryMetadataChanges = true,
         waitForSyncWhenOnline = true;
+
+  /// Raise events when only metadata of documents changes
+  final bool includeDocumentMetadataChanges;
+
+  /// Raise events when only metadata of the query changes
+  final bool includeQueryMetadataChanges;
+
+  /// Wait for a sync with the server when online, but still raise events while
+  /// offline.
+  final bool waitForSyncWhenOnline;
 
   ListenOptions copyWith({
     bool includeDocumentMetadataChanges,

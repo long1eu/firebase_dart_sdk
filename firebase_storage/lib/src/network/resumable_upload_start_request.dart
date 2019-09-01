@@ -9,11 +9,6 @@ import 'package:firebase_storage/src/network/resumable_network_request.dart';
 
 /// Starts a resumable upload session with GCS.
 class ResumableUploadStartRequest extends ResumableNetworkRequest {
-  final Map<String, dynamic> _metadata;
-
-  @override
-  final String url;
-
   ResumableUploadStartRequest(
       Uri gsUri, FirebaseApp app, this._metadata, String contentType)
       : url = '${NetworkRequest.uploadUrl}${gsUri.authority}/o',
@@ -25,6 +20,11 @@ class ResumableUploadStartRequest extends ResumableNetworkRequest {
     super.setCustomHeader(ResumableNetworkRequest.kCommand, 'start');
     super.setCustomHeader(ResumableNetworkRequest.kContentType, contentType);
   }
+
+  final Map<String, dynamic> _metadata;
+
+  @override
+  final String url;
 
   @override
   String get action => 'POST';

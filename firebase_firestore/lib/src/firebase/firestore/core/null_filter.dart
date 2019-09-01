@@ -10,9 +10,9 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/null_value
 
 /// Filter that matches NULL values.
 class NullFilter extends Filter {
-  final FieldPath fieldPath;
-
   const NullFilter(this.fieldPath);
+
+  final FieldPath fieldPath;
 
   @override
   FieldPath get field => fieldPath;

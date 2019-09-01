@@ -9,14 +9,6 @@ import 'package:firebase_database_collection/src/rb_tree_sorted_map.dart';
 typedef D KeyTranslator<C, D>(C key);
 
 abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
-  /// The size threshold where we use a tree backed sorted map instead of an
-  /// array backed sorted map. This is a more or less arbitrary chosen value,
-  /// that was chosen to be large enough to fit most of object kind of Database
-  /// data, but small enough to not notice degradation in performance for
-  /// inserting and lookups. Feel free to empirically determine this constant,
-  /// but don't expect much gain in real world performance.
-  static const int arrayToRbTreeSizeThreshold = 25;
-
   const ImmutableSortedMap();
 
   factory ImmutableSortedMap.emptyMap(Comparator<K> comparator) {
@@ -31,6 +23,14 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
       return RBTreeSortedMap<K, V>.fromMap(values, comparator);
     }
   }
+
+  /// The size threshold where we use a tree backed sorted map instead of an
+  /// array backed sorted map. This is a more or less arbitrary chosen value,
+  /// that was chosen to be large enough to fit most of object kind of Database
+  /// data, but small enough to not notice degradation in performance for
+  /// inserting and lookups. Feel free to empirically determine this constant,
+  /// but don't expect much gain in real world performance.
+  static const int arrayToRbTreeSizeThreshold = 25;
 
   static ImmutableSortedMap<A, C> buildFrom<A, B, C>(
       List<A> keys,

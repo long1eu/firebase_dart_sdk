@@ -8,6 +8,18 @@ import 'package:firebase_common/src/util/to_string_helper.dart';
 /// Result object that contains a Firebase Auth ID Token. */
 @publicApi
 class GetTokenResult {
+  /// Token represents the {@link String} access token.
+  // TODO:{24/10/2018 09:48}-long1eu: make sure that claims does not contain
+  // anything that could not go through a SendPort.send.
+  @keepForSdk
+  const GetTokenResult(this.token, [this.claims = const <String, dynamic>{}]);
+
+  factory GetTokenResult.fromJson(Map<String, dynamic> json) {
+    final String token = json['token'];
+    final Map<String, dynamic> claims = json['claims'] ?? <String, dynamic>{};
+    return GetTokenResult(token, claims);
+  }
+
   static const String _expirationTimestamp = 'exp';
   static const String _authTimestamp = 'auth_time';
   static const String _issuedAtTimestamp = 'iat';
@@ -27,18 +39,6 @@ class GetTokenResult {
   /// Returns an empty map if no claims are present.
   @publicApi
   final Map<String, dynamic> claims;
-
-  /// Token represents the {@link String} access token.
-  // TODO:{24/10/2018 09:48}-long1eu: make sure that claims does not contain
-  // anything that could not go through a SendPort.send.
-  @keepForSdk
-  const GetTokenResult(this.token, [this.claims = const <String, dynamic>{}]);
-
-  factory GetTokenResult.fromJson(Map<String, dynamic> json) {
-    final String token = json['token'];
-    final Map<String, dynamic> claims = json['claims'] ?? <String, dynamic>{};
-    return GetTokenResult(token, claims);
-  }
 
   /// Returns the time at which this ID token will expire
   @publicApi

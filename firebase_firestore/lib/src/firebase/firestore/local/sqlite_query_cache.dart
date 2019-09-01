@@ -19,10 +19,12 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:firebase_firestore/src/proto/firestore/local/target.pb.dart'
-    as proto;
+as proto;
 
 /// Cached Queries backed by SQLite.
 class SQLiteQueryCache implements QueryCache {
+  SQLiteQueryCache(this._db, this._localSerializer);
+
   final SQLitePersistence _db;
   final LocalSerializer _localSerializer;
 
@@ -37,13 +39,12 @@ class SQLiteQueryCache implements QueryCache {
   @override
   int targetCount;
 
-  SQLiteQueryCache(this._db, this._localSerializer);
 
   Future<void> start() async {
     // Store exactly one row in the table. If the row exists at all, it's the
     // global metadata.
     final List<Map<String, dynamic>> result = await _db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT highest_target_id,
                  highest_listen_sequence_number,
@@ -54,18 +55,18 @@ class SQLiteQueryCache implements QueryCache {
           LIMIT 1;
         '''
         // @formatter:on
-        );
+    );
     Assert.hardAssert(result.isNotEmpty, 'Missing target_globals entry');
 
     final Map<String, dynamic> row = result.first;
 
-    highestTargetId = row['highest_target_id'] as int;
-    _lastListenSequenceNumber = row['highest_listen_sequence_number'] as int;
+    highestTargetId = row['highest_target_id'];
+    _lastListenSequenceNumber = row['highest_listen_sequence_number'];
     lastRemoteSnapshotVersion = SnapshotVersion(Timestamp(
-      row['last_remote_snapshot_version_seconds'] as int,
-      row['last_remote_snapshot_version_nanos'] as int,
+      row['last_remote_snapshot_version_seconds'],
+      row['last_remote_snapshot_version_nanos'],
     ));
-    targetCount = row['target_count'] as int;
+    targetCount = row['target_count'];
   }
 
   @override
@@ -74,13 +75,13 @@ class SQLiteQueryCache implements QueryCache {
   @override
   Future<void> forEachTarget(Consumer<QueryData> consumer) async {
     final List<Map<String, dynamic>> result = await _db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT target_proto
           FROM targets;
         '''
         // @formatter:on
-        );
+    );
 
     for (Map<String, dynamic> row in result) {
       final Uint8List targetProto = row['target_proto'];
@@ -102,10 +103,10 @@ class SQLiteQueryCache implements QueryCache {
     final Timestamp version = queryData.snapshotVersion.timestamp;
 
     final proto.Target targetProto =
-        _localSerializer.encodeQueryData(queryData);
+    _localSerializer.encodeQueryData(queryData);
 
     await _db.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           INSERT
           OR REPLACE INTO targets (target_id,
@@ -165,7 +166,7 @@ class SQLiteQueryCache implements QueryCache {
 
   Future<void> _writeMetadata() async {
     await _db.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           UPDATE target_globals
           SET highest_target_id                    = ?,
@@ -188,7 +189,7 @@ class SQLiteQueryCache implements QueryCache {
   Future<void> _removeTarget(int targetId) async {
     await _removeMatchingKeysForTargetId(targetId);
     await _db.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           DELETE
           FROM targets
@@ -218,7 +219,7 @@ class SQLiteQueryCache implements QueryCache {
     // out live targets from the result set.
 
     final List<Map<String, dynamic>> result = await _db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT target_id
           FROM targets
@@ -247,7 +248,7 @@ class SQLiteQueryCache implements QueryCache {
     final String canonicalId = query.canonicalId;
 
     final List<Map<String, dynamic>> result = await _db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT target_proto
           FROM targets
@@ -260,7 +261,7 @@ class SQLiteQueryCache implements QueryCache {
     for (Map<String, dynamic> row in result) {
       // TODO: break out early if found.
       final QueryData found =
-          _decodeQueryData(row['target_proto'] as List<int>);
+      _decodeQueryData(row['target_proto']);
 
       // After finding a potential match, check that the query is actually equal
       // to the requested query.
@@ -279,8 +280,8 @@ class SQLiteQueryCache implements QueryCache {
   // Matching key tracking
 
   @override
-  Future<void> addMatchingKeys(
-      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+  Future<void> addMatchingKeys(ImmutableSortedSet<DocumentKey> keys,
+                               int targetId) async {
     // PORTING NOTE: The reverse index (document_targets) is maintained by
     // SQLite.
     //
@@ -291,7 +292,7 @@ class SQLiteQueryCache implements QueryCache {
     // additional information in the row. If we want to track additional data
     // this will probably need to become INSERT OR REPLACE instead.
     const String statement =
-        // @formatter:off
+    // @formatter:off
         '''
           INSERT
           OR IGNORE INTO target_documents (target_id, path)
@@ -309,12 +310,12 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> removeMatchingKeys(
-      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+  Future<void> removeMatchingKeys(ImmutableSortedSet<DocumentKey> keys,
+                                  int targetId) async {
     // PORTING NOTE: The reverse index (document_targets) is maintained by
     // SQLite.
     const String statement =
-        // @formatter:off
+    // @formatter:off
         '''
           DELETE
           FROM target_documents
@@ -334,7 +335,7 @@ class SQLiteQueryCache implements QueryCache {
 
   Future<void> _removeMatchingKeysForTargetId(int targetId) async {
     await _db.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           DELETE
           FROM target_documents
@@ -350,7 +351,7 @@ class SQLiteQueryCache implements QueryCache {
     ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet;
 
     final List<Map<String, dynamic>> result = await _db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT path
           FROM target_documents
@@ -362,7 +363,7 @@ class SQLiteQueryCache implements QueryCache {
     for (Map<String, dynamic> row in result) {
       final String path = row['path'];
       final DocumentKey key =
-          DocumentKey.fromPath(EncodedPath.decodeResourcePath(path));
+      DocumentKey.fromPath(EncodedPath.decodeResourcePath(path));
       keys = keys.insert(key);
     }
 
@@ -374,7 +375,7 @@ class SQLiteQueryCache implements QueryCache {
     final String path = EncodedPath.encode(key.path);
 
     final List<Map<String, dynamic>> result = await _db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT target_id
           FROM target_documents

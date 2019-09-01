@@ -26,16 +26,30 @@ abstract class AbstractStream<
     ReqT extends GeneratedMessage,
     RespT extends GeneratedMessage,
     CallbackT extends StreamCallback> implements Stream<CallbackT> {
+  AbstractStream(
+    this._firestoreChannel,
+    this._methodDescriptor,
+    this._workerQueue,
+    TimerId connectionTimerId,
+    this._idleTimerId,
+    this.listener,
+  ) : backoff = ExponentialBackoff(
+          _workerQueue,
+          connectionTimerId,
+          _backoffInitialDelayMs,
+          _backoffFactor,
+          _backoffMaxDelayMs,
+        );
+
   /// Initial backoff time in milliseconds after an error. Set to 1s according
   /// to https://cloud.google.com/apis/design/errors.
-
-  static final int _backoffInitialDelayMs = Duration(seconds: 1).inMilliseconds;
-  static final int _backoffMaxDelayMs = Duration(minutes: 1).inMilliseconds;
+  static const int _backoffInitialDelayMs = 1000;
+  static const int _backoffMaxDelayMs = 60 * 1000;
 
   static const double _backoffFactor = 1.5;
 
   /// The time a stream stays open after it is marked idle.
-  static final int _idleTimeoutMs = Duration(minutes: 1).inMilliseconds;
+  static const int _idleTimeoutMs = 60 * 1000;
 
   DelayedTask<void> _idleTimer;
 
@@ -57,34 +71,16 @@ abstract class AbstractStream<
   final ExponentialBackoff backoff;
   final CallbackT listener;
 
-  AbstractStream(
-    this._firestoreChannel,
-    this._methodDescriptor,
-    this._workerQueue,
-    TimerId connectionTimerId,
-    this._idleTimerId,
-    this.listener,
-  ) : backoff = ExponentialBackoff(
-          _workerQueue,
-          connectionTimerId,
-          _backoffInitialDelayMs,
-          _backoffFactor,
-          _backoffMaxDelayMs,
-        );
-
-  @override
   bool get isStarted {
     return _state == StreamState.starting ||
         _state == StreamState.open ||
         _state == StreamState.backoff;
   }
 
-  @override
   bool get isOpen {
     return _state == StreamState.open;
   }
 
-  @override
   Future<void> start() async {
     Assert.hardAssert(_call == null, 'Last call still set');
     Assert.hardAssert(_idleTimer == null, 'Idle timer still set');
@@ -181,14 +177,12 @@ abstract class AbstractStream<
   /// closed. Calling super.tearDown() is not required.
   void tearDown() {}
 
-  @override
   Future<void> stop() async {
     if (isStarted) {
       await _close(StreamState.initial, GrpcError.ok());
     }
   }
 
-  @override
   void inhibitBackoff() {
     Assert.hardAssert(
         !isStarted, 'Can only inhibit backoff after in a stopped state');
@@ -260,7 +254,7 @@ abstract class AbstractStream<
     if (isOpen && _idleTimer == null) {
       _idleTimer = _workerQueue.enqueueAfterDelay(
         _idleTimerId,
-        Duration(milliseconds: _idleTimeoutMs),
+        const Duration(milliseconds: _idleTimeoutMs),
         _handleIdleCloseTimer,
         'AbstractStream markIdle',
       );
@@ -284,15 +278,15 @@ abstract class AbstractStream<
 /// only expose a run() method which asserts that we're already on the
 /// [asyncQueue].
 class CloseGuardedRunner {
-  final AsyncQueue asyncQueue;
-  final int initialCloseCount;
-  final int Function() closeCount;
-
   CloseGuardedRunner(
     this.asyncQueue,
     this.initialCloseCount,
     this.closeCount,
   );
+
+  final AsyncQueue asyncQueue;
+  final int initialCloseCount;
+  final int Function() closeCount;
 
   Future<void> run(Task<void> task, String caller) async {
     if (closeCount() == initialCloseCount) {
@@ -309,10 +303,10 @@ class StreamObserver<
     ReqT extends GeneratedMessage,
     RespT extends GeneratedMessage,
     CallbackT extends StreamCallback> implements IncomingStreamObserver<RespT> {
+  const StreamObserver(this._dispatcher, this.stream);
+
   final CloseGuardedRunner _dispatcher;
   final AbstractStream<ReqT, RespT, CallbackT> stream;
-
-  const StreamObserver(this._dispatcher, this.stream);
 
   @override
   void onHeaders(Map<String, String> headers) {

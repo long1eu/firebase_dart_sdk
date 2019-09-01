@@ -22,6 +22,13 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// a query. It gets notified of local and remote changes to docs, and applies
 /// the query filters and limits to determine the most correct possible results.
 class View {
+  View(this.query, this.syncedDocuments) {
+    syncState = ViewSnapshotSyncState.none;
+    documentSet = DocumentSet.emptySet(query.comparator);
+    limboDocuments = DocumentKey.emptyKeySet;
+    mutatedKeys = DocumentKey.emptyKeySet;
+  }
+
   final Query query;
 
   ViewSnapshotSyncState syncState;
@@ -43,13 +50,6 @@ class View {
 
   /// Documents that have local changes
   ImmutableSortedSet<DocumentKey> mutatedKeys;
-
-  View(this.query, this.syncedDocuments) {
-    syncState = ViewSnapshotSyncState.none;
-    documentSet = DocumentSet.emptySet(query.comparator);
-    limboDocuments = DocumentKey.emptyKeySet;
-    mutatedKeys = DocumentKey.emptyKeySet;
-  }
 
   /// Iterates over a set of doc changes, applies the query limit, and computes
   /// what the new results should be, what the changes were, and whether we may

@@ -58,6 +58,15 @@ import 'package:meta/meta.dart';
 /// * The [SyncEngine]’s methods should only ever be called by methods running
 /// on our own worker dispatch queue.
 class SyncEngine implements RemoteStoreCallback {
+  SyncEngine(this._localStore, this._remoteStore, this._currentUser)
+      : _queryViewsByQuery = <Query, QueryView>{},
+        _queryViewsByTarget = <int, QueryView>{},
+        _limboTargetsByKey = <DocumentKey, int>{},
+        _limboResolutionsByTarget = <int, _LimboResolution>{},
+        _limboDocumentRefs = ReferenceSet(),
+        _mutationUserCallbacks = <User, Map<int, Completer<void>>>{},
+        _targetIdGenerator = TargetIdGenerator.getSyncEngineGenerator(0);
+
   static const String _tag = 'SyncEngine';
 
   /// The local store, used to persist mutations and cached documents.
@@ -95,15 +104,6 @@ class SyncEngine implements RemoteStoreCallback {
   User _currentUser;
 
   SyncEngineCallback callback;
-
-  SyncEngine(this._localStore, this._remoteStore, this._currentUser)
-      : _queryViewsByQuery = <Query, QueryView>{},
-        _queryViewsByTarget = <int, QueryView>{},
-        _limboTargetsByKey = <DocumentKey, int>{},
-        _limboResolutionsByTarget = <int, _LimboResolution>{},
-        _limboDocumentRefs = ReferenceSet(),
-        _mutationUserCallbacks = <User, Map<int, Completer<void>>>{},
-        _targetIdGenerator = TargetIdGenerator.getSyncEngineGenerator(0);
 
   void _assertCallback(String method) {
     Assert.hardAssert(
@@ -326,12 +326,11 @@ class SyncEngine implements RemoteStoreCallback {
           /*hasCommittedMutations:*/ false,
         )
       };
-      final Set<DocumentKey> limboDocuments =
-          Set<DocumentKey>.from(<DocumentKey>[limboKey]);
+      final Set<DocumentKey> limboDocuments = <DocumentKey>{limboKey};
       final RemoteEvent event = RemoteEvent(
         SnapshotVersion.none,
         /* targetChanges: */ <int, TargetChange>{},
-        /* targetMismatches: */ Set<int>(),
+        /* targetMismatches: */ <int>{},
         documentUpdates,
         limboDocuments,
       );
@@ -564,6 +563,8 @@ class SyncEngine implements RemoteStoreCallback {
 
 /// Tracks a limbo resolution.
 class _LimboResolution {
+  _LimboResolution(this.key);
+
   final DocumentKey key;
 
   /// Set to true once we've received a document. This is used in
@@ -571,8 +572,6 @@ class _LimboResolution {
   /// [WatchChangeAggregator] to decide whether it needs to manufacture a delete
   /// event for the target once the target is CURRENT.
   bool receivedDocument = false;
-
-  _LimboResolution(this.key);
 }
 
 /// A callback used to handle events from the SyncEngine

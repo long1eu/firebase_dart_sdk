@@ -37,33 +37,6 @@ typedef IsBackground = bool Function();
 
 @publicApi
 class FirebaseApp {
-  static const String logTag = 'FirebaseApp';
-  static const String defaultAppName = '[DEFAULT]';
-
-  static const String firebaseAppPrefs = 'com.google.firebase.common.prefs';
-  @visibleForTesting
-  static const String _dataCollectionDefaultEnabledPreferenceKey =
-      'firebase_data_collection_default_enabled';
-
-  static final Map<String, FirebaseApp> instances = <String, FirebaseApp>{};
-
-  final String _name;
-  final FirebaseOptions _options;
-  final InternalTokenProvider getAuthProvider;
-  final IsNetworkConnected isNetworkConnected;
-
-  final StreamController<bool> _dataColectionChangeSink =
-      StreamController<bool>.broadcast();
-  final List<OnBackgroundStateChanged> backgroundStateChangeObservers =
-      <OnBackgroundStateChanged>[];
-  final List<OnFirebaseAppDelete> _onDeleteObservers = <OnFirebaseAppDelete>[];
-
-  IsBackground isInBackground;
-
-  bool automaticResourceManagementEnabled = true;
-  bool deleted = false;
-  bool _dataCollectionDefaultEnabled;
-
   /// Initializes the default FirebaseApp instance using string resource values
   /// populated from the map you provide. It also initializes Firebase
   /// Analytics. Returns the default FirebaseApp, if either it has been
@@ -160,6 +133,32 @@ class FirebaseApp {
     throw StateError(
         'FirebaseApp with name $name does\'t exist. $availableAppNamesMessage');
   }
+
+  static const String logTag = 'FirebaseApp';
+  static const String defaultAppName = '[DEFAULT]';
+
+  static const String firebaseAppPrefs = 'com.google.firebase.common.prefs';
+  static const String _dataCollectionDefaultEnabledPreferenceKey =
+      'firebase_data_collection_default_enabled';
+
+  static final Map<String, FirebaseApp> instances = <String, FirebaseApp>{};
+
+  final String _name;
+  final FirebaseOptions _options;
+  final InternalTokenProvider getAuthProvider;
+  final IsNetworkConnected isNetworkConnected;
+
+  final StreamController<bool> _dataColectionChangeSink =
+      StreamController<bool>.broadcast();
+  final List<OnBackgroundStateChanged> backgroundStateChangeObservers =
+      <OnBackgroundStateChanged>[];
+  final List<OnFirebaseAppDelete> _onDeleteObservers = <OnFirebaseAppDelete>[];
+
+  IsBackground isInBackground;
+
+  bool automaticResourceManagementEnabled = true;
+  bool deleted = false;
+  bool _dataCollectionDefaultEnabled;
 
   /// Returns the unique name of this app.
   @publicApi

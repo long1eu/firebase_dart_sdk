@@ -15,6 +15,14 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 /// marked [current]. The actual changes *to* documents are not part of the
 /// [TargetChange] since documents may be part of multiple targets.
 class TargetChange {
+  const TargetChange(
+    this.resumeToken,
+    this.current,
+    this.addedDocuments,
+    this.modifiedDocuments,
+    this.removedDocuments,
+  );
+
   /// Returns the opaque, server-assigned token that allows watching a query to
   /// be resumed after disconnecting without retransmitting all the data that
   /// matches the query. The resume token essentially identifies a point in time
@@ -37,14 +45,6 @@ class TargetChange {
   /// Returns the set of documents that were removed from this target as part of
   /// this remote event.
   final ImmutableSortedSet<DocumentKey> removedDocuments;
-
-  const TargetChange(
-    this.resumeToken,
-    this.current,
-    this.addedDocuments,
-    this.modifiedDocuments,
-    this.removedDocuments,
-  );
 
   @override
   bool operator ==(Object other) =>

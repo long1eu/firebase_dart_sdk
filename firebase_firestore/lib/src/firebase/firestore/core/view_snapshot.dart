@@ -19,14 +19,6 @@ enum ViewSnapshotSyncState {
 }
 
 class ViewSnapshot {
-  final Query query;
-  final DocumentSet documents;
-  final DocumentSet oldDocuments;
-  final List<DocumentViewChange> changes;
-  final bool isFromCache;
-  final ImmutableSortedSet<DocumentKey> mutatedKeys;
-  final bool didSyncStateChange;
-
   ViewSnapshot(
     this.query,
     this.documents,
@@ -36,6 +28,14 @@ class ViewSnapshot {
     this.mutatedKeys,
     this.didSyncStateChange,
   );
+
+  final Query query;
+  final DocumentSet documents;
+  final DocumentSet oldDocuments;
+  final List<DocumentViewChange> changes;
+  final bool isFromCache;
+  final ImmutableSortedSet<DocumentKey> mutatedKeys;
+  final bool didSyncStateChange;
 
   bool get hasPendingWrites => mutatedKeys.isNotEmpty;
 

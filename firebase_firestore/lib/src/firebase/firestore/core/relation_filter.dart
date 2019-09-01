@@ -12,14 +12,14 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Represents a filter to be applied to query.
 class RelationFilter extends Filter {
+  /// Creates a new filter that compares fields and values. Only intended to be
+  /// called from [Filter.create()].
+  const RelationFilter(this.field, this.operator, this.value);
+
   final FilterOperator operator;
   final FieldValue value;
   @override
   final FieldPath field;
-
-  /// Creates a new filter that compares fields and values. Only intended to be
-  /// called from [Filter.create()].
-  const RelationFilter(this.field, this.operator, this.value);
 
   @override
   bool matches(Document doc) {

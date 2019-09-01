@@ -45,14 +45,14 @@ import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 /// writes in order to avoid relying on being able to read back uncommitted
 /// writes.
 abstract class Persistence {
+  Persistence();
+
   static const String tag = 'Persistence';
 
   /// Temporary setting for enabling indexing-specific code paths while in
   /// development.
   // TODO: Remove this.
   static bool indexingSupportEnabled = false;
-
-  Persistence();
 
   /// Starts persistent storage, opening the database or similar.
   Future<void> start();

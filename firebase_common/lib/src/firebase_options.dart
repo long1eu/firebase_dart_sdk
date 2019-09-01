@@ -7,6 +7,34 @@ import 'package:firebase_common/src/util/to_string_helper.dart';
 import 'package:meta/meta.dart';
 
 class FirebaseOptions {
+  FirebaseOptions({
+    @required this.apiKey,
+    @required this.applicationId,
+    this.databaseUrl,
+    this.gaTrackingId,
+    this.gcmSenderId,
+    this.storageBucket,
+    this.projectId,
+    this.dataCollectionEnabled = true,
+  })  : assert(apiKey != null),
+        assert(applicationId != null, 'ApplicationId must be set.'),
+        assert(applicationId.trim().isNotEmpty, 'ApplicationId must be set.');
+
+  /// Creates a new [FirebaseOptions] instance that is populated from a map.
+  /// Returns the populated options or null if applicationId is missing from
+  /// the map.
+  factory FirebaseOptions.fromJson(Map<String, String> json) {
+    return FirebaseOptions(
+      applicationId: json[_appId],
+      apiKey: json[_apiKey],
+      databaseUrl: json[_databaseUrl],
+      gaTrackingId: json[_gaTrackingId],
+      gcmSenderId: json[_gcmSenderId],
+      storageBucket: json[_storageBucket],
+      projectId: json[_projectId],
+    );
+  }
+
   static const String _apiKey = 'google_api_key';
   static const String _appId = 'google_app_id';
   static const String _databaseUrl = 'firebase_database_url';
@@ -56,34 +84,6 @@ class FirebaseOptions {
   /// developer via SDK specific mechanisms.
   @publicApi
   final bool dataCollectionEnabled;
-
-  FirebaseOptions({
-    @required this.apiKey,
-    @required this.applicationId,
-    this.databaseUrl,
-    this.gaTrackingId,
-    this.gcmSenderId,
-    this.storageBucket,
-    this.projectId,
-    this.dataCollectionEnabled = true,
-  })  : assert(apiKey != null),
-        assert(applicationId != null, 'ApplicationId must be set.'),
-        assert(applicationId.trim().isNotEmpty, 'ApplicationId must be set.');
-
-  /// Creates a new [FirebaseOptions] instance that is populated from a map.
-  /// Returns the populated options or null if applicationId is missing from
-  /// the map.
-  factory FirebaseOptions.fromJson(Map<String, String> json) {
-    return FirebaseOptions(
-      applicationId: json[_appId],
-      apiKey: json[_apiKey],
-      databaseUrl: json[_databaseUrl],
-      gaTrackingId: json[_gaTrackingId],
-      gcmSenderId: json[_gcmSenderId],
-      storageBucket: json[_storageBucket],
-      projectId: json[_projectId],
-    );
-  }
 
   Map<String, String> toJson() {
     return <String, String>{

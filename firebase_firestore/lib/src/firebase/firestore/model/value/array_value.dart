@@ -7,16 +7,14 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value_options.dart';
-import 'package:meta/meta.dart';
 
 /// A wrapper for Array values in Firestore
 class ArrayValue extends FieldValue {
-  @visibleForTesting
-  final List<FieldValue> _value;
-
   const ArrayValue(this._value);
 
   factory ArrayValue.fromList(List<FieldValue> list) => ArrayValue(list);
+
+  final List<FieldValue> _value;
 
   @override
   int get typeOrder => FieldValue.typeOrderArray;

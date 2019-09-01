@@ -14,6 +14,8 @@ import 'package:meta/meta.dart';
 /// A controllable Task that has a synchronized state machine.
 @publicApi
 abstract class StorageTask<TResult extends StorageTaskState> {
+  StorageTask(this._sendPort) : _completer = Completer<void>();
+
   static const String _tag = 'StorageTask';
 
   static const int kInternalStateNotStarted = 1;
@@ -35,50 +37,51 @@ abstract class StorageTask<TResult extends StorageTaskState> {
 
   static final Map<int, Set<int>> _validUserInitiatedStateChanges =
       <int, Set<int>>{
-    kInternalStateNotStarted:
-        Set<int>.from(<int>[kInternalStatePaused, kInternalStateCanceled]),
-    kInternalStateQueued:
-        Set<int>.from(<int>[kInternalStatePausing, kInternalStateCanceling]),
-    kInternalStateInProgress:
-        Set<int>.from(<int>[kInternalStatePausing, kInternalStateCanceling]),
-    kInternalStatePaused:
-        Set<int>.from(<int>[kInternalStateQueued, kInternalStateCanceled]),
-    kInternalStateFailure:
-        Set<int>.from(<int>[kInternalStateQueued, kInternalStateCanceled]),
+    kInternalStateNotStarted: <int>{
+      kInternalStatePaused,
+      kInternalStateCanceled
+    },
+    kInternalStateQueued: <int>{kInternalStatePausing, kInternalStateCanceling},
+    kInternalStateInProgress: <int>{
+      kInternalStatePausing,
+      kInternalStateCanceling
+    },
+    kInternalStatePaused: <int>{kInternalStateQueued, kInternalStateCanceled},
+    kInternalStateFailure: <int>{kInternalStateQueued, kInternalStateCanceled},
   };
 
   static final Map<int, Set<int>> _validTaskInitiatedStateChanges =
       <int, Set<int>>{
-    kInternalStateNotStarted:
-        Set<int>.from(<int>[kInternalStateQueued, kInternalStateFailure]),
-    kInternalStateQueued: Set<int>.from(<int>[
+    kInternalStateNotStarted: <int>{
+      kInternalStateQueued,
+      kInternalStateFailure
+    },
+    kInternalStateQueued: <int>{
       kInternalStateInProgress,
       kInternalStateFailure,
       kInternalStateSuccess
-    ]),
-    kInternalStateInProgress: Set<int>.from(<int>[
+    },
+    kInternalStateInProgress: <int>{
       kInternalStateInProgress,
       kInternalStateFailure,
       kInternalStateSuccess
-    ]),
-    kInternalStatePausing: Set<int>.from(<int>[
+    },
+    kInternalStatePausing: <int>{
       kInternalStatePaused,
       kInternalStateFailure,
       kInternalStateSuccess
-    ]),
-    kInternalStateCanceling: Set<int>.from(<int>[
+    },
+    kInternalStateCanceling: <int>{
       kInternalStateCanceled,
       kInternalStateFailure,
       kInternalStateSuccess
-    ]),
+    },
   };
 
   final SendPort _sendPort;
   final Completer<void> _completer;
   int _currentState = kInternalStateNotStarted;
   TResult _finalResult;
-
-  StorageTask(this._sendPort) : _completer = Completer<void>();
 
   Future<void> get future => _completer.future;
 

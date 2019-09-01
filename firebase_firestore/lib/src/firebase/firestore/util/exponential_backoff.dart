@@ -9,16 +9,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart'
 
 /// Helper to implement exponential backoff.
 class ExponentialBackoff {
-  final AsyncQueue _queue;
-  final TimerId _timerId;
-  final int _initialDelayMs;
-  final double _backoffFactor;
-  final int _maxDelayMs;
-
-  int _currentBaseMs;
-  int _lastAttemptTime;
-  DelayedTask<void> _timerTask;
-
   /// Creates and returns a helper for running delayed tasks following an
   /// exponential backoff curve between attempts.
   ///
@@ -41,6 +31,16 @@ class ExponentialBackoff {
 
     reset();
   }
+
+  final AsyncQueue _queue;
+  final TimerId _timerId;
+  final int _initialDelayMs;
+  final double _backoffFactor;
+  final int _maxDelayMs;
+
+  int _currentBaseMs;
+  int _lastAttemptTime;
+  DelayedTask<void> _timerTask;
 
   /// Resets the backoff delay.
   ///

@@ -8,9 +8,9 @@ import 'package:firebase_common/src/annotations.dart';
 /// externally.
 @keepForSdk
 class FirebaseApiError {
-  final int errorCode;
-
   const FirebaseApiError(this.errorCode);
+
+  final int errorCode;
 
   /// Firebase auth specific error codes.
 

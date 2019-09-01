@@ -26,6 +26,10 @@ typedef OnlineStateCallback = Future<void> Function(OnlineState onlineState);
 /// client will behave as if it is offline (get() calls will return cached data,
 /// etc.).
 class OnlineStateTracker {
+  OnlineStateTracker(this._workerQueue, this._onlineStateCallback)
+      : _state = OnlineState.unknown,
+        _shouldWarnClientIsOffline = false;
+
   /// To deal with transient failures, we allow multiple stream attempts before
   /// giving up and transitioning from [OnlineState.unknown] to
   /// [OnlineState.offline].
@@ -71,10 +75,6 @@ class OnlineStateTracker {
   /// The callback to notify on OnlineState changes.
   final OnlineStateCallback _onlineStateCallback;
 
-  OnlineStateTracker(this._workerQueue, this._onlineStateCallback)
-      : _state = OnlineState.unknown,
-        _shouldWarnClientIsOffline = false;
-
   /// Called by [RemoteStore] when a watch stream is started (including on each
   /// backoff attempt).
   ///
@@ -87,22 +87,25 @@ class OnlineStateTracker {
       Assert.hardAssert(_onlineStateTimer == null,
           'onlineStateTimer shouldn\'t be started yet');
       _onlineStateTimer = _workerQueue.enqueueAfterDelay<void>(
-          TimerId.onlineStateTimeout,
-          Duration(milliseconds: _onlineStateTimeoutMs), () async {
-        _onlineStateTimer = null;
-        Assert.hardAssert(
-            _state == OnlineState.unknown,
-            'Timer should be canceled if we transitioned to a different '
-            'state.');
-        _logClientOfflineWarningIfNecessary(
-            'Backend didn\'t respond within ${_onlineStateTimeoutMs / 1000} '
-            'seconds\n');
-        await _setAndBroadcastState(OnlineState.offline);
+        TimerId.onlineStateTimeout,
+        const Duration(milliseconds: _onlineStateTimeoutMs),
+        () async {
+          _onlineStateTimer = null;
+          Assert.hardAssert(
+              _state == OnlineState.unknown,
+              'Timer should be canceled if we transitioned to a different '
+              'state.');
+          _logClientOfflineWarningIfNecessary(
+              'Backend didn\'t respond within ${_onlineStateTimeoutMs / 1000} '
+              'seconds\n');
+          await _setAndBroadcastState(OnlineState.offline);
 
-        // NOTE: [handleWatchStreamFailure] will continue to increment
-        // [watchStreamFailures] even though we are already marked
-        // [OnlineState.offline] but this is non-harmful.
-      }, 'OnlineStateTracker handleWatchStreamStart');
+          // NOTE: [handleWatchStreamFailure] will continue to increment
+          // [watchStreamFailures] even though we are already marked
+          // [OnlineState.offline] but this is non-harmful.
+        },
+        'OnlineStateTracker handleWatchStreamStart',
+      );
     }
   }
 

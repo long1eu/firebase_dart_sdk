@@ -17,14 +17,6 @@ import 'package:firebase_storage/src/util/wrapped_future.dart';
 
 /// A Task that updates metadata on a [StorageReference]
 class UpdateMetadataTask extends WrappedFuture<StorageMetadata> {
-  static const String _tag = 'UpdateMetadataTask';
-
-  final StorageReference _storageRef;
-  final Map<String, dynamic> _newMetadata;
-  final ExponentialBackoffSender _sender;
-
-  StorageMetadata _resultMetadata;
-
   UpdateMetadataTask._(this._storageRef, this._newMetadata)
       : _sender = ExponentialBackoffSender(
           _storageRef.app,
@@ -32,6 +24,14 @@ class UpdateMetadataTask extends WrappedFuture<StorageMetadata> {
         ) {
     run();
   }
+
+  static const String _tag = 'UpdateMetadataTask';
+
+  final StorageReference _storageRef;
+  final Map<String, dynamic> _newMetadata;
+  final ExponentialBackoffSender _sender;
+
+  StorageMetadata _resultMetadata;
 
   static Future<StorageMetadata> execute(
       StorageReference storageRef, StorageMetadata newMetadata) {

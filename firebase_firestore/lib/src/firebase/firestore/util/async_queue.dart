@@ -15,9 +15,9 @@ import 'package:meta/meta.dart';
 /// These IDs can then be used from tests to check for the presence of tasks or
 /// to run them early.
 class TimerId implements Comparable<TimerId> {
-  final int _i;
-
   const TimerId._(this._i);
+
+  final int _i;
 
   /// ALL can be used with runDelayedTasksUntil() to run all timers.
   static const TimerId all = TimerId._(0);
@@ -71,19 +71,19 @@ class TimerId implements Comparable<TimerId> {
 typedef Task<TResult> = Future<TResult> Function();
 
 class _TaskQueueEntry<T> {
+  _TaskQueueEntry(this.function) : completer = Completer<T>();
+
   Task<T> function;
   Completer<T> completer;
-
-  _TaskQueueEntry(this.function) : completer = Completer<T>();
 }
 
 /// A helper class that allows to schedule/queue [Function]s on a single queue.
 class AsyncQueue {
-  static final AsyncQueue _instance = AsyncQueue._();
-
   factory AsyncQueue() => _instance;
 
   AsyncQueue._();
+
+  static final AsyncQueue _instance = AsyncQueue._();
 
   // Tasks scheduled to be queued in the future. Tasks are automatically removed
   // after they are run or canceled.
@@ -258,16 +258,6 @@ class AsyncQueue {
 /// * Supports cancellation (via [cancel()]) and early execution (via
 /// [skipDelay()]).
 class DelayedTask<T> implements Comparable<DelayedTask<T>> {
-  final String caller;
-  final TimerId timerId;
-  final DateTime targetTimeMs;
-  final Task<T> task;
-  final AsyncQueue queue;
-  final void Function(DelayedTask<T> task) removeDelayedTask;
-
-  // It is set to null after the task has been run or canceled.
-  Timer scheduledFuture;
-
   DelayedTask._(
     this.caller,
     this.timerId,
@@ -282,6 +272,16 @@ class DelayedTask<T> implements Comparable<DelayedTask<T>> {
     scheduledFuture =
         Timer(targetTimeMs.difference(DateTime.now()), _handleDelayElapsed);
   }
+
+  final String caller;
+  final TimerId timerId;
+  final DateTime targetTimeMs;
+  final Task<T> task;
+  final AsyncQueue queue;
+  final void Function(DelayedTask<T> task) removeDelayedTask;
+
+  // It is set to null after the task has been run or canceled.
+  Timer scheduledFuture;
 
   /// Cancels the task if it hasn't already been executed or canceled.
   ///

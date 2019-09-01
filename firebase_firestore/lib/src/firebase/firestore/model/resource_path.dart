@@ -7,8 +7,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/base_path.dart';
 /// A slash separated path for navigating resources (documents and collections)
 /// within Firestore.
 class ResourcePath extends BasePath<ResourcePath> {
-  static const ResourcePath empty = ResourcePath._();
-
   const ResourcePath._([List<String> segments = const <String>[]])
       : super(segments);
 
@@ -38,6 +36,8 @@ class ResourcePath extends BasePath<ResourcePath> {
 
     return ResourcePath._(segments.toList(growable: false));
   }
+
+  static const ResourcePath empty = ResourcePath._();
 
   @override
   ResourcePath createPathWithSegments(List<String> segments) {

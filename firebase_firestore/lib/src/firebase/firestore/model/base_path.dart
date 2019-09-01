@@ -8,9 +8,9 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// BasePath represents a path sequence in the Firestore database. It is
 /// composed of an ordered sequence of string segments.
 abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
-  final List<String> segments;
-
   const BasePath(this.segments);
+
+  final List<String> segments;
 
   String getSegment(int index) => segments[index];
 

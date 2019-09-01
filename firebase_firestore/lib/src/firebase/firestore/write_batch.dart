@@ -29,12 +29,12 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 /// code and new SDK releases may break code that does so.
 @publicApi
 class WriteBatch {
+  WriteBatch(this._firestore) : assert(_firestore != null);
+
   final FirebaseFirestore _firestore;
   final List<Mutation> _mutations = <Mutation>[];
 
   bool _committed = false;
-
-  WriteBatch(this._firestore) : assert(_firestore != null);
 
   /// Writes to the document referred to by the provided [DocumentReference]. If
   /// the document does not yet exist, it will be created. If you pass

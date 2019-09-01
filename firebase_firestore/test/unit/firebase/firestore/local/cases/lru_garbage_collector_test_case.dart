@@ -26,6 +26,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/object_val
 import '../../../../../util/test_util.dart';
 
 class LruGarbageCollectorTestCase {
+  LruGarbageCollectorTestCase(this.getPersistence);
+
   Persistence persistence;
   QueryCache queryCache;
   MutationQueue mutationQueue;
@@ -37,8 +39,6 @@ class LruGarbageCollectorTestCase {
   ObjectValue testValue;
 
   Future<Persistence> Function() getPersistence;
-
-  LruGarbageCollectorTestCase(this.getPersistence);
 
   Future<void> setUp() async {
     previousTargetId = 500;

@@ -21,6 +21,13 @@ import 'package:firebase_storage/src/streamed_task.dart';
 /// A task that downloads bytes of a GCS blob.
 @publicApi
 class StreamDownloadTask extends StorageTask<DownloadStreamTaskSnapshot> {
+  StreamDownloadTask._(this.reference, SendPort sendPort)
+      : _sender = ExponentialBackoffSender(
+          reference.app,
+          reference.storage.maxDownloadRetry,
+        ),
+        super(sendPort);
+
   static const String _tag = 'StreamDownloadTask';
   static const int kPreferredChunkSize = 256 * 1024; // 256KB
 
@@ -36,13 +43,6 @@ class StreamDownloadTask extends StorageTask<DownloadStreamTaskSnapshot> {
   List<int> _data;
   NetworkRequest _request;
   String _eTagVerification;
-
-  StreamDownloadTask._(this.reference, SendPort sendPort)
-      : _sender = ExponentialBackoffSender(
-          reference.app,
-          reference.storage.maxDownloadRetry,
-        ),
-        super(sendPort);
 
   static StreamedTask<DownloadStreamTaskSnapshot> schedule(
       StorageReference storage) {

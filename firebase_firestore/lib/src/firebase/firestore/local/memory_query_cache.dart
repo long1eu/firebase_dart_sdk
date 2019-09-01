@@ -18,6 +18,8 @@ import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 /// An implementation of the [QueryCache] protocol that merely keeps queries in
 /// memory, suitable for online only clients with persistence disabled.
 class MemoryQueryCache implements QueryCache {
+  MemoryQueryCache(this.persistence);
+
   /// Maps a query to the data about that query.
   final Map<Query, QueryData> queries = <Query, QueryData>{};
 
@@ -36,8 +38,6 @@ class MemoryQueryCache implements QueryCache {
   int highestSequenceNumber = 0;
 
   final MemoryPersistence persistence;
-
-  MemoryQueryCache(this.persistence);
 
   @override
   int get targetCount => queries.length;

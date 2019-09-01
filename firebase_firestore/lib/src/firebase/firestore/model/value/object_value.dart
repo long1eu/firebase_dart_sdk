@@ -10,12 +10,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 class ObjectValue extends FieldValue {
-  final ImmutableSortedMap<String, FieldValue> _value;
-
   const ObjectValue(this._value);
-
-  static final ObjectValue empty = ObjectValue(
-      ImmutableSortedMap<String, FieldValue>.emptyMap(comparator()));
 
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
     return ObjectValue.fromImmutableMap(
@@ -30,6 +25,11 @@ class ObjectValue extends FieldValue {
       return ObjectValue(value);
     }
   }
+
+  static final ObjectValue empty = ObjectValue(
+      ImmutableSortedMap<String, FieldValue>.emptyMap(comparator()));
+
+  final ImmutableSortedMap<String, FieldValue> _value;
 
   @override
   int get typeOrder => FieldValue.typeOrderObject;

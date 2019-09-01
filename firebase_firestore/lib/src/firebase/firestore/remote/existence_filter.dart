@@ -4,12 +4,10 @@
 
 /// Simplest form of existence filter
 class ExistenceFilter {
-  final int count;
-
   ExistenceFilter(this.count);
 
+  final int count;
+
   @override
-  String toString() {
-    return 'ExistenceFilter{count:$count}';
-  }
+  String toString() => 'ExistenceFilter{count:$count}';
 }

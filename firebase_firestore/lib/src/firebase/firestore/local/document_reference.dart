@@ -16,12 +16,12 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 ///
 /// * Not to be confused with [public.DocumentReference] in the public API.
 class DocumentReference {
+  /// Initializes the document reference with the given key and ID.
+  DocumentReference(this.key, this._targetOrBatchId);
+
   /// Returns the document key that's the target of this reference.
   final DocumentKey key;
   final int _targetOrBatchId;
-
-  /// Initializes the document reference with the given key and ID.
-  DocumentReference(this.key, this._targetOrBatchId);
 
   /// Returns the [targetId] of a referring target or the [batchId] of a
   /// referring mutation batch. (Which this is depends upon which [ReferenceSet]

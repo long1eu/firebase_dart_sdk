@@ -11,14 +11,14 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Event accumulator for integration test
 class EventAccumulator<T> {
+  EventAccumulator()
+      : _events = <T>[],
+        _maxEvents = 0;
+
   final List<T> _events;
 
   Completer<void> _completion;
   int _maxEvents;
-
-  EventAccumulator()
-      : _events = <T>[],
-        _maxEvents = 0;
 
   void onData(T data) {
     Log.i('EventAccumulator', 'Received new event: $data');

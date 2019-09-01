@@ -17,10 +17,10 @@ import 'package:test/test.dart';
 import '../../../../../util/test_util.dart';
 
 class MutationQueueTestCase {
+  MutationQueueTestCase(this.persistence);
+
   final Persistence persistence;
   MutationQueue mutationQueue;
-
-  MutationQueueTestCase(this.persistence);
 
   Future<void> setUp() async {
     persistence.referenceDelegate.inMemoryPins = ReferenceSet();

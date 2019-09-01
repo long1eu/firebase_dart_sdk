@@ -20,6 +20,14 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
 class MemoryMutationQueue implements MutationQueue {
+  MemoryMutationQueue(this.persistence)
+      : queue = <MutationBatch>[],
+        batchesByDocumentKey = ImmutableSortedSet<DocumentReference>(
+            <DocumentReference>[], DocumentReference.byKey),
+        nextBatchId = 1,
+        highestAcknowledgedBatchId = MutationBatch.unknown,
+        lastStreamToken = WriteStream.emptyStreamToken;
+
   /// A FIFO queue of all mutations to apply to the backend. Mutations are added
   /// to the end of the queue as they're written, and removed from the front of
   /// the queue as the mutations become visible or are rejected.
@@ -56,14 +64,6 @@ class MemoryMutationQueue implements MutationQueue {
 
   /// The highest acknowledged mutation in the queue.
   int highestAcknowledgedBatchId;
-
-  MemoryMutationQueue(this.persistence)
-      : queue = <MutationBatch>[],
-        batchesByDocumentKey = ImmutableSortedSet<DocumentReference>(
-            <DocumentReference>[], DocumentReference.byKey),
-        nextBatchId = 1,
-        highestAcknowledgedBatchId = MutationBatch.unknown,
-        lastStreamToken = WriteStream.emptyStreamToken;
 
   // MutationQueue implementation
 

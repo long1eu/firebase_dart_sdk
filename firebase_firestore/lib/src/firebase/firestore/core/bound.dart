@@ -23,13 +23,13 @@ import 'order_by.dart';
 /// after a bound. This is influenced by whether the position is just before or
 /// just after the provided values.
 class Bound {
+  Bound({this.position, this.before});
+
   /// Whether this bound is just before or just after the provided position
   final bool before;
 
   /// The index position of this bound
   final List<FieldValue> position;
-
-  Bound({this.position, this.before});
 
   String canonicalString() {
     // TODO: Make this collision robust.

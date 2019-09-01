@@ -15,6 +15,17 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Represents the internal structure of a Firestore Query
 class Query {
+  /// Initializes a Query with all of its components directly.
+  Query(this.path, this.filters, this.explicitSortOrder, this._limit,
+      this._startAt, this._endAt);
+
+  /// Creates and returns a new Query.
+  ///
+  /// The [path] to the collection to be queried over.
+  factory Query.atPath(ResourcePath path) {
+    return Query(path, <Filter>[], <OrderBy>[], noLimit, null, null);
+  }
+
   static const int noLimit = -1;
 
   static final OrderBy keyOrderingAsc =
@@ -45,17 +56,6 @@ class Query {
   final Bound _endAt;
 
   List<OrderBy> memoizedOrderBy;
-
-  /// Initializes a Query with all of its components directly.
-  Query(this.path, this.filters, this.explicitSortOrder, this._limit,
-      this._startAt, this._endAt);
-
-  /// Creates and returns a new Query.
-  ///
-  /// The [path] to the collection to be queried over.
-  factory Query.atPath(ResourcePath path) {
-    return Query(path, <Filter>[], <OrderBy>[], noLimit, null, null);
-  }
 
   /// Returns true if this Query is for a specific document.
   bool get isDocumentQuery {
@@ -379,8 +379,6 @@ class Query {
 }
 
 class QueryComparator {
-  final List<OrderBy> sortOrder;
-
   factory QueryComparator(List<OrderBy> order) {
     bool hasKeyOrdering = false;
     for (OrderBy orderBy in order) {
@@ -394,6 +392,8 @@ class QueryComparator {
   }
 
   const QueryComparator._(this.sortOrder);
+
+  final List<OrderBy> sortOrder;
 
   Comparator<Document> get comparator => (Document doc1, Document doc2) {
         for (OrderBy order in sortOrder) {

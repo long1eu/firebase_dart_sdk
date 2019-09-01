@@ -16,6 +16,8 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// can be marked as a tombstone if the mutation queue does not remove them
 /// immediately. When a batch is a tombstone it has no mutations.
 class MutationBatch {
+  const MutationBatch(this.batchId, this.localWriteTime, this.mutations);
+
   /// A batch ID that was searched for and not found or a batch ID value known
   /// to be before all known batches.
   ///
@@ -29,8 +31,6 @@ class MutationBatch {
   /// used to assign local times to server timestamps, etc.
   final Timestamp localWriteTime;
   final List<Mutation> mutations;
-
-  const MutationBatch(this.batchId, this.localWriteTime, this.mutations);
 
   /// Applies all the mutations in this [MutationBatch] to the specified
   /// document to create a new remote document.
@@ -101,7 +101,7 @@ class MutationBatch {
 
   /// Returns the set of unique keys referenced by all mutations in the batch.
   Set<DocumentKey> get keys {
-    final Set<DocumentKey> set = Set<DocumentKey>();
+    final Set<DocumentKey> set = <DocumentKey>{};
     for (Mutation mutation in mutations) {
       set.add(mutation.key);
     }

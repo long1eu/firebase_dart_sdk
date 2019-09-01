@@ -13,6 +13,11 @@ import 'package:rxdart/rxdart.dart';
 /// [FirebaseAuthCredentialsProvider] uses Firebase Auth via [FirebaseApp] to
 /// get an auth token.
 class FirebaseAuthCredentialsProvider extends CredentialsProvider {
+  FirebaseAuthCredentialsProvider(this._authProvider)
+      : _onUserChange = BehaviorSubject<User>.seeded(_authProvider.uid != null
+            ? User(_authProvider.uid)
+            : User.unauthenticated);
+
   /// Stream that will receive credential changes (sign-in / sign-out, token
   /// changes).
   final BehaviorSubject<User> _onUserChange;
@@ -23,11 +28,6 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   /// outstanding.
   int _tokenCounter = 0;
   bool _forceRefresh = false;
-
-  FirebaseAuthCredentialsProvider(this._authProvider)
-      : _onUserChange = BehaviorSubject<User>.seeded(_authProvider.uid != null
-            ? User(_authProvider.uid)
-            : User.unauthenticated);
 
   /// The listener registered with FirebaseApp; used to stop receiving auth
   /// changes once changeListener is removed.

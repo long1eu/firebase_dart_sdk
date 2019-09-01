@@ -13,6 +13,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 /// [Mutations], there's a corresponding entry in the array of
 /// [MutationResults].
 class MutationResult {
+  const MutationResult(this.version, this.transformResults);
+
   /// The version at which the mutation was committed.
   ///
   /// <ul>
@@ -31,6 +33,4 @@ class MutationResult {
   ///
   /// * Will be null if the mutation was not a [TransformMutation].
   final List<FieldValue> transformResults;
-
-  const MutationResult(this.version, this.transformResults);
 }

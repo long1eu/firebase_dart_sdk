@@ -20,12 +20,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 /// Provides LRU garbage collection functionality for [MemoryPersistence].
 class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
-  final MemoryPersistence persistence;
-  Map<DocumentKey, int> orphanedSequenceNumbers;
-
-  ListenSequence listenSequence;
-  int _currentSequenceNumber;
-
   MemoryLruReferenceDelegate(this.persistence)
       : orphanedSequenceNumbers = <DocumentKey, int>{},
         listenSequence =
@@ -33,6 +27,12 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
         _currentSequenceNumber = ListenSequence.invalid {
     garbageCollector = LruGarbageCollector(this);
   }
+
+  final MemoryPersistence persistence;
+  Map<DocumentKey, int> orphanedSequenceNumbers;
+
+  ListenSequence listenSequence;
+  int _currentSequenceNumber;
 
   @override
   ReferenceSet inMemoryPins;

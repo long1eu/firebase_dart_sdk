@@ -6,9 +6,9 @@ import 'package:firebase_common/firebase_common.dart';
 
 @publicApi
 class FirebaseFirestoreErrorCode {
-  final int value;
-
   const FirebaseFirestoreErrorCode._(this.value);
+
+  final int value;
 
   static const FirebaseFirestoreErrorCode ok = FirebaseFirestoreErrorCode._(0);
   static const FirebaseFirestoreErrorCode canceled =
@@ -91,9 +91,6 @@ class FirebaseFirestoreErrorCode {
 
 @publicApi
 class FirebaseFirestoreError extends FirebaseError {
-  final FirebaseFirestoreErrorCode code;
-  final dynamic cause;
-
   FirebaseFirestoreError(
     String message,
     this.code, [
@@ -103,6 +100,9 @@ class FirebaseFirestoreError extends FirebaseError {
     Preconditions.checkNotNull(message);
     Preconditions.checkNotNull(code);
   }
+
+  final FirebaseFirestoreErrorCode code;
+  final dynamic cause;
 
   @override
   String toString() => '$runtimeType:$code $message $cause $stackTrace';

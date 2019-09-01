@@ -13,9 +13,9 @@ import 'package:meta/meta.dart';
 // ignore_for_file: prefer_constructors_over_static_methods
 
 class TaskEventType {
-  final int _i;
-
   const TaskEventType._(this._i);
+
+  final int _i;
 
   static const TaskEventType progress = TaskEventType._(0);
   static const TaskEventType paused = TaskEventType._(1);
@@ -53,9 +53,6 @@ class TaskEventType {
 }
 
 class TaskEvent<TResult extends StorageTaskState> {
-  final TaskEventType type;
-  final TResult data;
-
   TaskEvent(this.type, {this.data});
 
   factory TaskEvent.progressed(TResult progress) =>
@@ -70,6 +67,9 @@ class TaskEvent<TResult extends StorageTaskState> {
 
   factory TaskEvent.error(TResult data) =>
       TaskEvent<TResult>(TaskEventType.error, data: data);
+
+  final TaskEventType type;
+  final TResult data;
 
   static TaskEvent<TResult> deserialized<TResult extends StorageTaskState>(
       List<dynamic> values) {
@@ -121,10 +121,6 @@ abstract class StorageStreamedTaskState implements StorageTaskState {
 /// Base class for state.
 class SnapshotBase<TResult extends StorageTaskState>
     implements StorageTaskState {
-  @override
-  final dynamic error;
-  final String referenceUrl;
-
   factory SnapshotBase(
       String referenceUrl,
       int currentState,
@@ -136,6 +132,10 @@ class SnapshotBase<TResult extends StorageTaskState>
   }
 
   SnapshotBase._(this.error, this.referenceUrl);
+
+  @override
+  final dynamic error;
+  final String referenceUrl;
 
   static SnapshotBase<TResult> deserialized<TResult extends StorageTaskState>(
       List<dynamic> values) {
@@ -181,14 +181,6 @@ class SnapshotBase<TResult extends StorageTaskState>
 /// Encapsulates state about the running [FileDownloadTask]
 @publicApi
 class DownloadTaskSnapshot extends SnapshotBase<DownloadTaskSnapshot> {
-  /// Return the total bytes downloaded so far.
-  @publicApi
-  final int bytesTransferred;
-
-  /// Returns the total bytes to upload.
-  @publicApi
-  final int totalByteCount;
-
   factory DownloadTaskSnapshot(
       String referenceUrl,
       int currentState,
@@ -207,6 +199,14 @@ class DownloadTaskSnapshot extends SnapshotBase<DownloadTaskSnapshot> {
   DownloadTaskSnapshot._(dynamic error, String referenceUrl,
       this.bytesTransferred, this.totalByteCount)
       : super._(error, referenceUrl);
+
+  /// Return the total bytes downloaded so far.
+  @publicApi
+  final int bytesTransferred;
+
+  /// Returns the total bytes to upload.
+  @publicApi
+  final int totalByteCount;
 
   static DownloadTaskSnapshot deserialized(List<dynamic> values) {
     final dynamic error = values[0];
@@ -236,16 +236,6 @@ class DownloadTaskSnapshot extends SnapshotBase<DownloadTaskSnapshot> {
 class DownloadStreamTaskSnapshot
     extends SnapshotBase<DownloadStreamTaskSnapshot>
     implements StorageStreamedTaskState {
-  @publicApi
-  final int bytesTransferred;
-
-  /// Returns the total bytes to upload.
-  @publicApi
-  final int totalByteCount;
-
-  @override
-  final List<int> data;
-
   factory DownloadStreamTaskSnapshot(
       String referenceUrl,
       int currentState,
@@ -268,6 +258,16 @@ class DownloadStreamTaskSnapshot
       this.bytesTransferred, this.totalByteCount, this.data)
       : super._(error, referenceUrl);
 
+  @publicApi
+  final int bytesTransferred;
+
+  /// Returns the total bytes to upload.
+  @publicApi
+  final int totalByteCount;
+
+  @override
+  final List<int> data;
+
   static DownloadStreamTaskSnapshot deserialized(List<dynamic> values) {
     final dynamic error = values[0];
     final String referenceUrl = values[1];
@@ -285,15 +285,15 @@ class DownloadStreamTaskSnapshot
 }
 
 class TaskPayload extends DelegatingList<dynamic> {
-  final int type;
-  final String eventType;
-  final List<dynamic> data;
-
   TaskPayload({
     @required this.type,
     @required this.eventType,
     @required this.data,
   }) : super(<dynamic>[type, eventType, data]);
+
+  final int type;
+  final String eventType;
+  final List<dynamic> data;
 
   @override
   String toString() {

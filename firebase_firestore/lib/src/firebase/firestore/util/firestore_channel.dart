@@ -17,24 +17,6 @@ import 'package:grpc/grpc.dart';
 /// Wrapper class around io.grpc.Channel that adds headers, exception handling
 /// and simplifies invoking RPCs.
 class FirestoreChannel {
-  static const String _xGoogApiClientHeader = 'x-goog-api-client';
-
-  static const String _resourcePrefixHeader = 'google-cloud-resource-prefix';
-
-  static const String _xGoogApiClientValue =
-      'gl-dart/ fire/${Version.sdkVersion} grpc/${Version.grpcVersion}';
-
-  /// The async worker queue that is used to dispatch events.
-  final AsyncQueue asyncQueue;
-
-  final CredentialsProvider _credentialsProvider;
-
-  /// The underlying gRPC channel.
-  final ClientChannel _channel;
-
-  /// Call options to be used when invoking RPCs.
-  final CallOptions _callOptions;
-
   factory FirestoreChannel(
       AsyncQueue asyncQueue,
       CredentialsProvider credentialsProvider,
@@ -68,6 +50,24 @@ class FirestoreChannel {
     this._callOptions,
   );
 
+  static const String _xGoogApiClientHeader = 'x-goog-api-client';
+
+  static const String _resourcePrefixHeader = 'google-cloud-resource-prefix';
+
+  static const String _xGoogApiClientValue =
+      'gl-dart/ fire/${Version.sdkVersion} grpc/${Version.grpcVersion}';
+
+  /// The async worker queue that is used to dispatch events.
+  final AsyncQueue asyncQueue;
+
+  final CredentialsProvider _credentialsProvider;
+
+  /// The underlying gRPC channel.
+  final ClientChannel _channel;
+
+  /// Call options to be used when invoking RPCs.
+  final CallOptions _callOptions;
+
   /// Creates and starts a new bi-directional streaming RPC.
   BidiChannel<ReqT, RespT> runBidiStreamingRpc<ReqT, RespT>(
       ClientMethod<ReqT, RespT> method,
@@ -86,7 +86,7 @@ class FirestoreChannel {
         (RespT data) => _catchError(() => observer.onNext(data)),
         onDone: () => _catchError(() => observer.onClose(GrpcError.ok())),
         onError: (dynamic e, StackTrace s) {
-          return _catchError(() => observer.onClose(e as GrpcError));
+          return _catchError(() => observer.onClose(e));
         },
       );
 
@@ -120,7 +120,7 @@ class FirestoreChannel {
       onError: (dynamic status) {
         hadError = true;
         controller.close();
-        completer.completeError(exceptionFromStatus(status as GrpcError));
+        completer.completeError(exceptionFromStatus(status));
       },
     );
 
@@ -152,7 +152,7 @@ class FirestoreChannel {
       },
       onError: (dynamic status) {
         controller.close();
-        completer.completeError(exceptionFromStatus(status as GrpcError));
+        completer.completeError(exceptionFromStatus(status));
       },
     );
 
@@ -172,10 +172,10 @@ class FirestoreChannel {
 }
 
 class BidiChannel<ReqT, RespT> {
+  const BidiChannel(this._sink, this._call);
+
   final Sink<ReqT> _sink;
   final ClientCall<ReqT, RespT> _call;
-
-  const BidiChannel(this._sink, this._call);
 
   void add(ReqT data) => _sink.add(data);
 

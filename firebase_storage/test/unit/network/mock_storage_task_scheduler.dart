@@ -7,11 +7,11 @@ import 'dart:async';
 import 'package:firebase_storage/src/storage_task_scheduler.dart';
 
 class MockStorageTaskScheduler implements StorageTaskScheduler {
-  static final MockStorageTaskScheduler instance = MockStorageTaskScheduler._();
-
   factory MockStorageTaskScheduler() => instance;
 
   MockStorageTaskScheduler._();
+
+  static final MockStorageTaskScheduler instance = MockStorageTaskScheduler._();
 
   @override
   Future<R> scheduleCallback<R, P>(

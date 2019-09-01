@@ -19,6 +19,6 @@ class FirestoreProvider {
         'Add the \'google-services.json\' file at this path \'${Directory.current.path}/res/google-services.json\'');
 
     final Map<String, dynamic> json = jsonDecode(config.readAsStringSync());
-    return json['project_info']['project_id'] as String;
+    return json['project_info']['project_id'];
   }
 }

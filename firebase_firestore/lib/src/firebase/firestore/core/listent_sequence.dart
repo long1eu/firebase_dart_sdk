@@ -4,11 +4,11 @@
 
 /// Implements a monotonic sequence starting after an initial value.
 class ListenSequence {
+  ListenSequence(this.previousSequenceNumber);
+
   static const int invalid = -1;
 
   int previousSequenceNumber;
-
-  ListenSequence(this.previousSequenceNumber);
 
   int next() => ++previousSequenceNumber;
 }

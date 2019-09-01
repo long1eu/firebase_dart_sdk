@@ -8,6 +8,10 @@ import 'package:firebase_database_collection/src/llrb_node.dart';
 import 'package:firebase_database_collection/src/llrb_red_value_node.dart';
 
 abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
+  LLRBValueNode(this.key, this.value, LLRBNode<K, V> left, LLRBNode<K, V> right)
+      : _left = left ?? LLRBEmptyNode<K, V>(),
+        right = right ?? LLRBEmptyNode<K, V>();
+
   @override
   final K key;
   @override
@@ -17,10 +21,6 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   final LLRBNode<K, V> right;
 
   LLRBNode<K, V> _left;
-
-  LLRBValueNode(this.key, this.value, LLRBNode<K, V> left, LLRBNode<K, V> right)
-      : _left = left ?? LLRBEmptyNode<K, V>(),
-        right = right ?? LLRBEmptyNode<K, V>();
 
   static LLRBNodeColor _oppositeColor<K, V>(LLRBNode<K, V> node) {
     return node.isRed ? LLRBNodeColor.black : LLRBNodeColor.red;
@@ -78,9 +78,7 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
         n = n._rotateRight();
       }
 
-      if (!n.right.isEmpty &&
-          !n.right.isRed &&
-          !(n.right as LLRBValueNode<K, V>).left.isRed) {
+      if (!n.right.isEmpty && !n.right.isRed && !n.right.left.isRed) {
         n = n._moveRedRight();
       }
 
@@ -149,8 +147,10 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   }
 
   @override
+  // ignore: unnecessary_getters_setters
   LLRBNode<K, V> get left => _left;
 
+  // ignore: unnecessary_getters_setters
   set left(LLRBNode<K, V> left) {
     _left = left;
   }

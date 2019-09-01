@@ -27,19 +27,23 @@ abstract class WatchChange {
 /// required to verify the current client state against expected state sent from
 /// the server.
 class WatchChangeExistenceFilterWatchChange extends WatchChange {
-  final int targetId;
-
-  final ExistenceFilter existenceFilter;
-
   const WatchChangeExistenceFilterWatchChange(
       this.targetId, this.existenceFilter)
       : super._();
+
+  final int targetId;
+
+  final ExistenceFilter existenceFilter;
 }
 
 /// A document change represents a change document and a list of target ids to
 /// which this change applies. If the document has been deleted, the deleted
 /// document will be provided.
 class WatchChangeDocumentChange extends WatchChange {
+  const WatchChangeDocumentChange(this.updatedTargetIds, this.removedTargetIds,
+      this.documentKey, this.newDocument)
+      : super._();
+
   // TODO: figure out if we can actually use arrays here for efficiency
   /// The target IDs for which this document should be updated/added. The new
   /// document applies to all of these targets.
@@ -55,10 +59,6 @@ class WatchChangeDocumentChange extends WatchChange {
   /// The new document or DeletedDocument if it was deleted. Is null if the
   /// document went out of view without the server sending a new document.
   final MaybeDocument newDocument;
-
-  const WatchChangeDocumentChange(this.updatedTargetIds, this.removedTargetIds,
-      this.documentKey, this.newDocument)
-      : super._();
 
   @override
   bool operator ==(Object other) =>
@@ -91,6 +91,22 @@ class WatchChangeDocumentChange extends WatchChange {
 /// The state of a target has changed. This can mean removal, addition, current
 /// or reset.
 class WatchChangeWatchTargetChange extends WatchChange {
+  WatchChangeWatchTargetChange(
+    this.changeType,
+    this.targetIds, [
+    Uint8List resumeToken,
+    GrpcError cause,
+  ])  : resumeToken = resumeToken ?? WatchStream.emptyResumeToken,
+        // We can get a cause that is considered ok, but everywhere we assume
+        // that any non-null cause is an error.
+        cause = cause != null && cause.code != StatusCode.ok ? cause : null,
+        super._() {
+    // cause != null implies removal
+    Assert.hardAssert(
+        cause == null || changeType == WatchTargetChangeType.removed,
+        'Got cause for a target change that was not a removal');
+  }
+
   /// What kind of change occurred to the watch target.
   final WatchTargetChangeType changeType;
 
@@ -105,23 +121,6 @@ class WatchChangeWatchTargetChange extends WatchChange {
 
   /// The cause, only valid if changeType == Removal
   final GrpcError cause;
-
-  WatchChangeWatchTargetChange(
-    this.changeType,
-    this.targetIds, [
-    Uint8List resumeToken,
-    GrpcError cause,
-  ])  : resumeToken = resumeToken ?? WatchStream.emptyResumeToken,
-        // We can get a cause that is considered ok, but everywhere we assume
-        // that any non-null cause is an error.
-        this.cause =
-            cause != null && cause.code != StatusCode.ok ? cause : null,
-        super._() {
-    // cause != null implies removal
-    Assert.hardAssert(
-        cause == null || changeType == WatchTargetChangeType.removed,
-        'Got cause for a target change that was not a removal');
-  }
 
   @override
   bool operator ==(Object other) =>

@@ -9,11 +9,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.d
 
 /// The result of a write to the local store.
 class LocalWriteResult {
+  const LocalWriteResult(this.batchId, this.changes);
+
   final int batchId;
 
   final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
-
-  const LocalWriteResult(this.batchId, this.changes);
 
   @override
   String toString() {

@@ -44,13 +44,13 @@ enum Direction { ascending, descending }
 /// code and new SDK releases may break code that does so.
 @publicApi
 class Query {
-  final core.Query query;
-
-  final FirebaseFirestore firestore;
-
   const Query(this.query, this.firestore)
       : assert(query != null),
         assert(firestore != null);
+
+  final core.Query query;
+
+  final FirebaseFirestore firestore;
 
   void _validateOrderByFieldMatchesInequality(
       core.FieldPath orderBy, core.FieldPath inequality) {
@@ -75,9 +75,9 @@ class Query {
         if (existingInequality != null && existingInequality != newInequality) {
           throw ArgumentError(
             'All where filters other than whereEqualTo() must be on the same '
-                'field. But you have filters on '
-                '\'${existingInequality.canonicalString}\' and '
-                '\'${newInequality.canonicalString}\'',
+            'field. But you have filters on '
+            '\'${existingInequality.canonicalString}\' and '
+            '\'${newInequality.canonicalString}\'',
           );
         }
         final core.FieldPath firstOrderByField = query.getFirstOrderByField();

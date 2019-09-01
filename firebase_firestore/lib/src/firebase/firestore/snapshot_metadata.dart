@@ -12,6 +12,8 @@ import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 /// code and new SDK releases may break code that does so.
 @publicApi
 class SnapshotMetadata {
+  const SnapshotMetadata(this.hasPendingWrites, this.isFromCache);
+
   /// Returns true if the snapshot contains the result of local writes
   /// (e.g. set() or update() calls) that have not yet been committed to the
   /// backend. If your listener has opted into metadata updates
@@ -26,8 +28,6 @@ class SnapshotMetadata {
   /// snapshot with [isFomCache] equal to false once the client has received
   /// up-to-date data from the backend.
   final bool isFromCache;
-
-  const SnapshotMetadata(this.hasPendingWrites, this.isFromCache);
 
   @override
   bool operator ==(Object other) =>

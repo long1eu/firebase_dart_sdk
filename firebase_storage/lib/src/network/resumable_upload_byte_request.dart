@@ -9,15 +9,6 @@ import 'package:firebase_storage/src/network/resumable_network_request.dart';
 
 /// A request to upload a single chunk of a large blob.
 class ResumableUploadByteRequest extends ResumableNetworkRequest {
-  @override
-  final String url;
-
-  @override
-  final Uint8List outputRaw;
-
-  @override
-  final int outputRawSize;
-
   ResumableUploadByteRequest(Uri gsUri, FirebaseApp app, this.url,
       Uint8List chunk, int offset, int bytesToWrite, bool isFinal)
       : outputRaw = bytesToWrite <= 0 ? null : chunk,
@@ -45,6 +36,15 @@ class ResumableUploadByteRequest extends ResumableNetworkRequest {
     }
     super.setCustomHeader(ResumableNetworkRequest.kOffset, '$offset');
   }
+
+  @override
+  final String url;
+
+  @override
+  final Uint8List outputRaw;
+
+  @override
+  final int outputRawSize;
 
   @override
   String get action => 'POST';

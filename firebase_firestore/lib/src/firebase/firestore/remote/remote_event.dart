@@ -12,6 +12,14 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.d
 /// the state or the set of documents in our watched targets) and
 /// documentUpdates (changes to the actual documents).
 class RemoteEvent {
+  const RemoteEvent(
+    this.snapshotVersion,
+    this.targetChanges,
+    this.targetMismatches,
+    this.documentUpdates,
+    this.resolvedLimboDocuments,
+  );
+
   /// Returns the snapshot version this event brings us up to.
   final SnapshotVersion snapshotVersion;
 
@@ -29,14 +37,6 @@ class RemoteEvent {
   /// Returns the set of document updates that are due only to limbo resolution
   /// targets.
   final Set<DocumentKey> resolvedLimboDocuments;
-
-  const RemoteEvent(
-    this.snapshotVersion,
-    this.targetChanges,
-    this.targetMismatches,
-    this.documentUpdates,
-    this.resolvedLimboDocuments,
-  );
 
   @override
   String toString() {

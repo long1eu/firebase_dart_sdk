@@ -17,11 +17,11 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// A mutation that creates or replaces the document at the given key with the
 /// object value contents.
 class SetMutation extends Mutation {
-  /// The object value to use when setting the document.
-  final ObjectValue value;
-
   SetMutation(DocumentKey key, this.value, Precondition precondition)
       : super(key, precondition);
+
+  /// The object value to use when setting the document.
+  final ObjectValue value;
 
   @override
   MaybeDocument applyToRemoteDocument(

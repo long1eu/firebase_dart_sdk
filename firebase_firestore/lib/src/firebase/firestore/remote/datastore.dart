@@ -38,20 +38,6 @@ import 'package:protobuf/protobuf.dart';
 /// higher-level protocol involved in actually making changes or reading data,
 /// and is otherwise stateless.
 class Datastore {
-  /// Set of lowercase, white-listed headers for logging purposes.
-  static final Set<String> whiteListedHeaders = Set<String>.from(<String>[
-    'date',
-    'x-google-backends',
-    'x-google-netmon-label',
-    'x-google-service',
-    'x-google-gfe-request-trace'
-  ]);
-
-  final DatabaseInfo databaseInfo;
-  final AsyncQueue workerQueue;
-  final RemoteSerializer serializer;
-  final FirestoreChannel channel;
-
   factory Datastore(DatabaseInfo databaseInfo, AsyncQueue workerQueue,
       CredentialsProvider credentialsProvider,
       {ClientChannel clientChannel}) {
@@ -77,6 +63,20 @@ class Datastore {
   @visibleForTesting
   Datastore.init(
       this.databaseInfo, this.workerQueue, this.serializer, this.channel);
+
+  /// Set of lowercase, white-listed headers for logging purposes.
+  static final Set<String> whiteListedHeaders = <String>{
+    'date',
+    'x-google-backends',
+    'x-google-netmon-label',
+    'x-google-service',
+    'x-google-gfe-request-trace'
+  };
+
+  final DatabaseInfo databaseInfo;
+  final AsyncQueue workerQueue;
+  final RemoteSerializer serializer;
+  final FirestoreChannel channel;
 
   /// Creates a new [WatchStream] that is still unstarted but uses a common
   /// shared channel

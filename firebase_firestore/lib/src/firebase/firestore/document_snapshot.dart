@@ -35,18 +35,6 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// code and new SDK releases may break code that does so.
 @publicApi
 class DocumentSnapshot {
-  final FirebaseFirestore _firestore;
-
-  final DocumentKey _key;
-
-  /// Is null if the document doesn't exist
-  @publicApi
-  final Document document;
-
-  /// The metadata for this document snapshot.
-  @publicApi
-  final SnapshotMetadata metadata;
-
   DocumentSnapshot(
     this._firestore,
     this._key,
@@ -72,6 +60,18 @@ class DocumentSnapshot {
     bool hasPendingWrites,
   ) =>
       DocumentSnapshot(firestore, key, null, fromCache, hasPendingWrites);
+
+  final FirebaseFirestore _firestore;
+
+  final DocumentKey _key;
+
+  /// Is null if the document doesn't exist
+  @publicApi
+  final Document document;
+
+  /// The metadata for this document snapshot.
+  @publicApi
+  final SnapshotMetadata metadata;
 
   /// @return The id of the document.
   @publicApi
@@ -307,10 +307,10 @@ class DocumentSnapshot {
         Log.w(
             'DocumentSnapshot',
             'Document ${key.path} contains a document reference within a '
-            'different database '
-            '(${refDatabase.projectId}/${refDatabase.databaseId}) which is not '
-            'supported. It will be treated as a reference in the current '
-            'database (${database.projectId}/${database.databaseId}) instead.');
+                'different database '
+                '(${refDatabase.projectId}/${refDatabase.databaseId}) which is not '
+                'supported. It will be treated as a reference in the current '
+                'database (${database.projectId}/${database.databaseId}) instead.');
       }
       return DocumentReference(key, _firestore);
     } else {

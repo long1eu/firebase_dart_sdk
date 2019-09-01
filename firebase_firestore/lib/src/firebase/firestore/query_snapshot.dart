@@ -24,6 +24,13 @@ import 'package:firebase_firestore/src/firebase/firestore/snapshot_metadata.dart
 /// code and new SDK releases may break code that does so.
 @publicApi
 class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
+  QuerySnapshot(this.query, this.snapshot, this._firestore)
+      : assert(query != null),
+        assert(snapshot != null),
+        assert(_firestore != null),
+        metadata =
+            SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
+
   @publicApi
   final Query query;
 
@@ -36,13 +43,6 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
 
   List<DocumentChange> _cachedChanges;
   MetadataChanges _cachedChangesMetadataState;
-
-  QuerySnapshot(this.query, this.snapshot, this._firestore)
-      : assert(query != null),
-        assert(snapshot != null),
-        assert(_firestore != null),
-        this.metadata =
-            SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
 
   /// Returns the list of documents that changed since the last snapshot. If
   /// it's the first snapshot all documents will be in the list as added

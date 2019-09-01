@@ -32,6 +32,10 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 ///           map is ignored.
 ///     </ul>
 class PatchMutation extends Mutation {
+  const PatchMutation(
+      DocumentKey key, this.value, this.mask, Precondition precondition)
+      : super(key, precondition);
+
   /// Returns the fields and associated values to use when patching the
   /// document.
   final ObjectValue value;
@@ -39,10 +43,6 @@ class PatchMutation extends Mutation {
   /// Returns the mask to apply to [value], where only fields that are in both
   /// the fieldMask and the value will be updated.
   final FieldMask mask;
-
-  const PatchMutation(
-      DocumentKey key, this.value, this.mask, Precondition precondition)
-      : super(key, precondition);
 
   @override
   MaybeDocument applyToRemoteDocument(

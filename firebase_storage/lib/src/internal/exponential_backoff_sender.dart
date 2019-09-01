@@ -15,6 +15,8 @@ import 'package:firebase_storage/src/network/network_request.dart';
 /// instead uses simple polling. In both cases, the retry time is capped by a
 /// setting which if exceeded will result in the task failing.
 class ExponentialBackoffSender {
+  ExponentialBackoffSender(this._app, this._retryTime);
+
   static const String _tag = 'ExponenentialBackoff';
 
   static const int kRndMax = 250;
@@ -26,8 +28,6 @@ class ExponentialBackoffSender {
   final Duration _retryTime;
 
   bool _canceled = false;
-
-  ExponentialBackoffSender(this._app, this._retryTime);
 
   bool isRetryableError(int resultCode) {
     return (resultCode >= 500 && resultCode < 600) ||

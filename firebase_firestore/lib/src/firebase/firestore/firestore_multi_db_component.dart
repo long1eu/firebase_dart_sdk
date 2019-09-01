@@ -10,6 +10,8 @@ import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 
 /// Multi-resource container for Firestore.
 class FirestoreMultiDbComponent {
+  FirestoreMultiDbComponent(this.app, this.authProvider);
+
   /// A static map from instance key to [FirebaseFirestore] instances. Instance
   /// keys are database names.
   static final Map<String, FirebaseFirestore> instances =
@@ -18,8 +20,6 @@ class FirestoreMultiDbComponent {
   final FirebaseApp app;
 
   final InternalTokenProvider authProvider;
-
-  FirestoreMultiDbComponent(this.app, this.authProvider);
 
   /// Provides instances of Firestore for given database names. */
   Future<FirebaseFirestore> get(

@@ -18,13 +18,13 @@ import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 /// adding a new migration method, bumping the VERSION, and adding a call to the
 /// migration method from [runMigrations].
 class SQLiteSchema {
+  SQLiteSchema(this.db);
+
   /// The version of the schema. Increase this by one for each migration added
   /// to [runMigrations] below.
   static final int version = (Persistence.indexingSupportEnabled) ? 2 : 1;
 
   final Database db;
-
-  SQLiteSchema(this.db);
 
   /// Runs the migration methods defined in this class, starting at the given
   /// version.
@@ -51,7 +51,7 @@ class SQLiteSchema {
   Future<void> _createMutationQueue() async {
     // A table naming all the mutation queues in the system.
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE TABLE mutation_queues (
             uid                        TEXT PRIMARY KEY,
@@ -60,11 +60,11 @@ class SQLiteSchema {
           );
         '''
         // @formatter:on
-        );
+    );
 
     // All the mutation batches in the system, partitioned by user.
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE TABLE mutations (
             uid       TEXT,
@@ -74,13 +74,13 @@ class SQLiteSchema {
           );
         '''
         // @formatter:on
-        );
+    );
 
     // A manually maintained index of all the mutation batches that affect a
     // given document key. The rows in this table are references based on the
     // contents of mutations.mutations.
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE TABLE document_mutations (
             uid      TEXT,
@@ -90,13 +90,13 @@ class SQLiteSchema {
           );
         '''
         // @formatter:on
-        );
+    );
   }
 
   Future<void> _createQueryCache() async {
     // A cache of targets and associated metadata
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE TABLE targets (
             target_id                   INTEGER PRIMARY KEY,
@@ -109,20 +109,20 @@ class SQLiteSchema {
           );
         '''
         // @formatter:on
-        );
+    );
 
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE INDEX query_targets
             ON targets (canonical_id, target_id);
         '''
         // @formatter:on
-        );
+    );
 
     // Global state tracked across all queries, tracked separately
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE TABLE target_globals (
             highest_target_id                    INTEGER,
@@ -133,10 +133,10 @@ class SQLiteSchema {
           );
         '''
         // @formatter:on
-        );
+    );
 
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           INSERT INTO target_globals (highest_target_id,
                                       highest_listen_sequence_number,
@@ -150,7 +150,7 @@ class SQLiteSchema {
 
     // A Mapping table between targets, document paths and sequence number
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE TABLE target_documents (
             target_id       INTEGER,
@@ -160,24 +160,24 @@ class SQLiteSchema {
           );
         '''
         // @formatter:on
-        );
+    );
 
     // The document_targets reverse mapping table is just an index on
     // target_documents.
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE INDEX document_targets
             ON target_documents (path, target_id);
         '''
         // @formatter:on
-        );
+    );
   }
 
   Future<void> _createRemoteDocumentCache() async {
     // A cache of documents obtained from the server.
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE TABLE remote_documents (
             path     TEXT PRIMARY KEY,
@@ -185,7 +185,7 @@ class SQLiteSchema {
           );
         '''
         // @formatter:on
-        );
+    );
   }
 
   // field_value_type determines type of field_value fields.
@@ -195,7 +195,7 @@ class SQLiteSchema {
     // A per-user, per-collection index for cached documents indexed by a single
     // field's name and value.
     await db.query(
-        // @formatter:off
+      // @formatter:off
         '''
           CREATE TABLE collection_index (
             uid              TEXT,
@@ -209,6 +209,6 @@ class SQLiteSchema {
           );
         '''
         // @formatter:on
-        );
+    );
   }
 }

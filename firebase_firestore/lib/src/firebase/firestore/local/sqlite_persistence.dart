@@ -26,6 +26,8 @@ import 'package:meta/meta.dart';
 /// interface, also contains helper routines that make dealing with SQLite much
 /// more pleasant.
 class SQLitePersistence extends Persistence {
+  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName);
+
   static const String tag = 'SQLitePersistence';
 
   final OpenDatabase openDatabase;
@@ -45,8 +47,6 @@ class SQLitePersistence extends Persistence {
 
   @override
   SQLiteLruReferenceDelegate referenceDelegate;
-
-  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName);
 
   static Future<SQLitePersistence> create(
       String persistenceKey,

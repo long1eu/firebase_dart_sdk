@@ -17,12 +17,6 @@ import 'package:firebase_storage/src/util/wrapped_future.dart';
 
 /// A [Future] that retrieves metadata for a [StorageReference] object
 class GetMetadataTask extends WrappedFuture<StorageMetadata> {
-  static const String _tag = 'GetMetadataTask';
-  final StorageReference _reference;
-  final ExponentialBackoffSender _sender;
-
-  StorageMetadata _resultMetadata;
-
   GetMetadataTask._(this._reference)
       : assert(_reference != null),
         _sender = ExponentialBackoffSender(
@@ -31,6 +25,12 @@ class GetMetadataTask extends WrappedFuture<StorageMetadata> {
         ) {
     run();
   }
+
+  static const String _tag = 'GetMetadataTask';
+  final StorageReference _reference;
+  final ExponentialBackoffSender _sender;
+
+  StorageMetadata _resultMetadata;
 
   static Future<StorageMetadata> execute(StorageReference reference) {
     return StorageTaskScheduler.instance

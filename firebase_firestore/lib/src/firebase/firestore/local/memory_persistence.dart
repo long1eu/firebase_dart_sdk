@@ -17,6 +17,25 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 class MemoryPersistence extends Persistence {
+  /// Use factory constructors to instantiate
+  MemoryPersistence._()
+      : mutationQueues = <User, MemoryMutationQueue>{},
+        remoteDocumentCache = MemoryRemoteDocumentCache() {
+    queryCache = MemoryQueryCache(this);
+  }
+
+  factory MemoryPersistence.createEagerGcMemoryPersistence() {
+    final MemoryPersistence persistence = MemoryPersistence._();
+    persistence.referenceDelegate = MemoryEagerReferenceDelegate(persistence);
+    return persistence;
+  }
+
+  factory MemoryPersistence.createLruGcMemoryPersistence() {
+    final MemoryPersistence persistence = MemoryPersistence._();
+    persistence.referenceDelegate = MemoryLruReferenceDelegate(persistence);
+    return persistence;
+  }
+
   static const String tag = 'MemoryPersistence';
 
   // The persistence objects backing MemoryPersistence are retained here to make
@@ -37,25 +56,6 @@ class MemoryPersistence extends Persistence {
 
   @override
   bool started = false;
-
-  /// Use static helpers to instantiate
-  MemoryPersistence._()
-      : mutationQueues = <User, MemoryMutationQueue>{},
-        remoteDocumentCache = MemoryRemoteDocumentCache() {
-    queryCache = MemoryQueryCache(this);
-  }
-
-  factory MemoryPersistence.createEagerGcMemoryPersistence() {
-    final MemoryPersistence persistence = MemoryPersistence._();
-    persistence.referenceDelegate = MemoryEagerReferenceDelegate(persistence);
-    return persistence;
-  }
-
-  factory MemoryPersistence.createLruGcMemoryPersistence() {
-    final MemoryPersistence persistence = MemoryPersistence._();
-    persistence.referenceDelegate = MemoryLruReferenceDelegate(persistence);
-    return persistence;
-  }
 
   @override
   Future<void> start() async {

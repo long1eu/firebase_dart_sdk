@@ -9,10 +9,10 @@ import 'package:firebase_common/src/util/to_string_helper.dart';
 @keepForSdk
 class InternalTokenResult {
   @keepForSdk
-  final String token;
+  const InternalTokenResult(this.token);
 
   @keepForSdk
-  const InternalTokenResult(this.token);
+  final String token;
 
   @override
   bool operator ==(Object other) =>

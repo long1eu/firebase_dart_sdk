@@ -6,11 +6,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 
 /// A wrapper for null values in Firestore.
 class NullValue extends FieldValue {
-  static const NullValue _instance = NullValue._();
-
   const NullValue._();
 
   factory NullValue.nullValue() => _instance;
+
+  static const NullValue _instance = NullValue._();
 
   @override
   int get typeOrder => FieldValue.typeOrderNull;

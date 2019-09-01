@@ -8,10 +8,10 @@ import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dar
 
 /// A set of changes to a view
 class ViewChange {
+  ViewChange(this.snapshot, this.limboChanges);
+
   final ViewSnapshot snapshot;
   final List<LimboDocumentChange> limboChanges;
-
-  ViewChange(this.snapshot, this.limboChanges);
 
   @override
   String toString() {

@@ -7,9 +7,6 @@ import 'package:firebase_storage/src/network/resumable_network_request.dart';
 
 /// Queries the current status of a resumable upload session.
 class ResumableUploadQueryRequest extends ResumableNetworkRequest {
-  @override
-  final String url;
-
   ResumableUploadQueryRequest(Uri gsUri, FirebaseApp app, this.url)
       : super(gsUri, app) {
     if (url == null || url.isEmpty) {
@@ -19,6 +16,9 @@ class ResumableUploadQueryRequest extends ResumableNetworkRequest {
     super.setCustomHeader(ResumableNetworkRequest.kProtocol, 'resumable');
     super.setCustomHeader(ResumableNetworkRequest.kCommand, 'query');
   }
+
+  @override
+  final String url;
 
   @override
   String get action => 'POST';

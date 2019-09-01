@@ -8,12 +8,6 @@ import 'package:meta/meta.dart';
 
 /// Cancels an upload request in progress.
 class ResumableUploadCancelRequest extends ResumableNetworkRequest {
-  @visibleForTesting
-  static bool kCancelCalled = false;
-
-  @override
-  final String url;
-
   ResumableUploadCancelRequest(Uri gsUri, FirebaseApp app, this.url)
       : super(gsUri, app) {
     kCancelCalled = true;
@@ -24,6 +18,12 @@ class ResumableUploadCancelRequest extends ResumableNetworkRequest {
     setCustomHeader(ResumableNetworkRequest.kProtocol, 'resumable');
     setCustomHeader(ResumableNetworkRequest.kCommand, 'cancel');
   }
+
+  @visibleForTesting
+  static bool kCancelCalled = false;
+
+  @override
+  final String url;
 
   @override
   String get action => 'POST';

@@ -14,15 +14,15 @@ import 'package:firebase_storage/src/util/wrapped_future.dart';
 
 /// A task that sends network requests to delete a Google Cloud Storage blob.
 class DeleteStorageTask extends WrappedFuture<void> {
-  final StorageReference _storageRef;
-  final ExponentialBackoffSender _sender;
-
   DeleteStorageTask._(this._storageRef)
       : assert(_storageRef != null),
         _sender = ExponentialBackoffSender(
             _storageRef.app, _storageRef.storage.maxOperationRetry) {
     run();
   }
+
+  final StorageReference _storageRef;
+  final ExponentialBackoffSender _sender;
 
   static Future<void> execute(StorageReference storageRef) {
     return StorageTaskScheduler.instance

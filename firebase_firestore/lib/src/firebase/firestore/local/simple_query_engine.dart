@@ -15,9 +15,9 @@ import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.d
 /// A naive implementation of QueryEngine that just loads all the documents in
 /// the queried collection and then filters them in memory.
 class SimpleQueryEngine implements QueryEngine {
-  final LocalDocumentsView localDocumentsView;
-
   SimpleQueryEngine(this.localDocumentsView);
+
+  final LocalDocumentsView localDocumentsView;
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(

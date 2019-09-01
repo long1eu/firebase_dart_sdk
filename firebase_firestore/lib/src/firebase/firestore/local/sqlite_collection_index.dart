@@ -16,11 +16,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 ///
 /// * NOTE: There is no in-memory implementation at this time.
 class SQLiteCollectionIndex {
-  final SQLitePersistence db;
-  final String uid;
-
   SQLiteCollectionIndex(this.db, User user)
       : uid = user.isAuthenticated ? user.uid : '';
+
+  final SQLitePersistence db;
+  final String uid;
 
   /// Adds the specified entry to the index.
   void addEntry(

@@ -48,9 +48,9 @@ import 'package:fixnum/fixnum.dart';
 
 /// Serializer for values stored in the LocalStore.
 class LocalSerializer {
-  final RemoteSerializer rpcSerializer;
-
   const LocalSerializer(this.rpcSerializer);
+
+  final RemoteSerializer rpcSerializer;
 
   /// Encodes a MaybeDocument model to the equivalent protocol buffer for local
   /// storage.

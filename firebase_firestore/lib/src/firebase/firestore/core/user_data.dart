@@ -21,9 +21,9 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// for determining which error conditions apply during parsing and providing
 /// better error messages.
 class UserDataSource {
-  final int _value;
-
   const UserDataSource._(this._value);
+
+  final int _value;
 
   /// The data comes from a regular Set operation, without merge.
   static const UserDataSource set = UserDataSource._(0);
@@ -60,18 +60,6 @@ class UserDataSource {
 /// passed around while traversing user data during parsing in order to
 /// conveniently accumulate data in the [UserDataParseAccumulator].
 class UserDataParseContext {
-  final Pattern _reservedFieldRegex = RegExp('^__.*__\$');
-
-  final UserDataParseAccumulator _accumulator;
-
-  /// The current path being parsed.
-  // TODO: path should never be null, but we don't support array paths right
-  // now.
-  final FieldPath path;
-
-  /// Whether or not this context corresponds to an element of an array.
-  final bool arrayElement;
-
   /// Initializes a [UserDataParseContext] with the given source and path.
   ///
   /// [_accumulator] on which to add results. [path] within the object being
@@ -85,6 +73,18 @@ class UserDataParseContext {
   /// case certain features will not work and errors will be somewhat
   /// compromised).
   UserDataParseContext._(this._accumulator, this.path, this.arrayElement);
+
+  final Pattern _reservedFieldRegex = RegExp('^__.*__\$');
+
+  final UserDataParseAccumulator _accumulator;
+
+  /// The current path being parsed.
+  // TODO: path should never be null, but we don't support array paths right
+  // now.
+  final FieldPath path;
+
+  /// Whether or not this context corresponds to an element of an array.
+  final bool arrayElement;
 
   /// What type of API method provided the data being parsed; useful for
   /// determining which error conditions apply during parsing and providing
@@ -166,11 +166,11 @@ class UserDataParseContext {
 
 /// The result of parsing document data (e.g. for a setData call).
 class UserDataParsedSetData {
+  UserDataParsedSetData(this._data, this._fieldMask, this._fieldTransforms);
+
   final ObjectValue _data;
   final FieldMask _fieldMask;
   final List<FieldTransform> _fieldTransforms;
-
-  UserDataParsedSetData(this._data, this._fieldMask, this._fieldTransforms);
 
   List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
     final List<Mutation> mutations = <Mutation>[];
@@ -188,13 +188,13 @@ class UserDataParsedSetData {
 
 /// The result of parsing 'update' data (i.e. for an updateData call).
 class UserDataParsedUpdateData {
+  UserDataParsedUpdateData(this._data, this._fieldMask, this.fieldTransforms);
+
   final ObjectValue _data;
 
   final FieldMask _fieldMask;
 
   final List<FieldTransform> fieldTransforms;
-
-  UserDataParsedUpdateData(this._data, this._fieldMask, this.fieldTransforms);
 
   List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
     final List<Mutation> mutations = <Mutation>[]
@@ -215,6 +215,11 @@ class UserDataParsedUpdateData {
 /// from the Value.
 /// </ul>
 class UserDataParseAccumulator {
+  /// [dataSource] indicates what kind of API method this data came from.
+  UserDataParseAccumulator(this.dataSource)
+      : _fieldMask = SplayTreeSet<FieldPath>(),
+        fieldTransforms = <FieldTransform>[];
+
   /// What type of API method provided the data being parsed; useful for
   /// determining which error conditions apply during parsing and providing
   /// better error messages.
@@ -226,11 +231,6 @@ class UserDataParseAccumulator {
   /// Accumulates a list of field transforms found while parsing the data.
 
   final List<FieldTransform> fieldTransforms;
-
-  /// [dataSource] indicates what kind of API method this data came from.
-  UserDataParseAccumulator(this.dataSource)
-      : _fieldMask = SplayTreeSet<FieldPath>(),
-        fieldTransforms = <FieldTransform>[];
 
   /// Returns a new [UserDataParseContext] representing the root of a user
   /// document.

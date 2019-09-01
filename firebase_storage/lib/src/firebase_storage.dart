@@ -18,35 +18,6 @@ import 'package:meta/meta.dart';
 /// in this case will come the json configuration file downloaded from the web.
 @publicApi
 class FirebaseStorage {
-  static const String _tag = 'FirebaseStorage';
-  static final Map<String /*App name*/,
-          Map<String /*StorageBucket*/, FirebaseStorage>>
-      _storageMap = <String, Map<String, FirebaseStorage>>{};
-
-  static const String _kStorageUriParseException =
-      'The storage Uri could not be parsed.';
-
-  static const String _kStorageBucketWithPathException =
-      'The storage Uri cannot contain a path element.';
-
-  final IsNetworkConnected isNetworkConnected;
-
-  @publicApi
-  final FirebaseApp app;
-
-  @publicApi
-  final String bucketName;
-
-  /// Returns the maximum time to retry an upload if a failure occurs.
-  Duration maxUploadRetry = const Duration(minutes: 10);
-
-  /// The maximum time to retry a download if a failure occurs.
-  Duration maxDownloadRetry = const Duration(minutes: 10);
-
-  /// Returns the maximum time to retry operations other than upload and
-  /// download if a failure occurs.
-  Duration maxOperationRetry = const Duration(minutes: 2);
-
   FirebaseStorage._(this.bucketName, this.app)
       : isNetworkConnected = app.isNetworkConnected;
 
@@ -123,6 +94,35 @@ class FirebaseStorage {
   @publicApi
   static FirebaseStorage get instance => _defaultInstance ??=
       FirebaseStorage.getInstance(app: FirebaseApp.instance);
+
+  static const String _tag = 'FirebaseStorage';
+  static final Map<String /*App name*/,
+          Map<String /*StorageBucket*/, FirebaseStorage>>
+      _storageMap = <String, Map<String, FirebaseStorage>>{};
+
+  static const String _kStorageUriParseException =
+      'The storage Uri could not be parsed.';
+
+  static const String _kStorageBucketWithPathException =
+      'The storage Uri cannot contain a path element.';
+
+  final IsNetworkConnected isNetworkConnected;
+
+  @publicApi
+  final FirebaseApp app;
+
+  @publicApi
+  final String bucketName;
+
+  /// Returns the maximum time to retry an upload if a failure occurs.
+  Duration maxUploadRetry = const Duration(minutes: 10);
+
+  /// The maximum time to retry a download if a failure occurs.
+  Duration maxDownloadRetry = const Duration(minutes: 10);
+
+  /// Returns the maximum time to retry operations other than upload and
+  /// download if a failure occurs.
+  Duration maxOperationRetry = const Duration(minutes: 2);
 
   @visibleForTesting
   static void clearInstancesForTest() => _storageMap.clear();

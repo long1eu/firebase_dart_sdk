@@ -6,6 +6,9 @@ import 'package:firebase_database_collection/src/llrb_node.dart';
 import 'package:firebase_database_collection/src/lltb_value_node.dart';
 
 class LLRBBlackValueNode<K, V> extends LLRBValueNode<K, V> {
+  LLRBBlackValueNode(K key, V value, LLRBNode<K, V> left, LLRBNode<K, V> right)
+      : super(key, value, left, right);
+
   /// Only memoize size on black nodes, not on red nodes. This saves memory
   /// while guaranteeing that size will still have an amortized constant
   /// runtime. The first time [length] may have to traverse the entire tree.
@@ -15,9 +18,6 @@ class LLRBBlackValueNode<K, V> extends LLRBValueNode<K, V> {
   ///
   /// * Needs to be mutable because left node can be updated via [setLeft].
   int size = -1;
-
-  LLRBBlackValueNode(K key, V value, LLRBNode<K, V> left, LLRBNode<K, V> right)
-      : super(key, value, left, right);
 
   @override
   final LLRBNodeColor color = LLRBNodeColor.black;

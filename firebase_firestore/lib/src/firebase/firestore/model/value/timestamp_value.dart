@@ -8,11 +8,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/server_tim
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
 class TimestampValue extends FieldValue {
-  final Timestamp _value;
-
   const TimestampValue(this._value);
 
   factory TimestampValue.valueOf(Timestamp value) => TimestampValue(value);
+
+  final Timestamp _value;
 
   @override
   int get typeOrder => FieldValue.typeOrderTimestamp;

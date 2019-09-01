@@ -80,42 +80,6 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// any remote changes have been received.
 
 class LocalStore {
-  /// The maximum time to leave a resume token buffered without writing it out.
-  /// This value is arbitrary: it's long enough to avoid several writes
-  /// (possibly indefinitely if updates come more frequently than this) but
-  /// short enough that restarting after crashing will still have a pretty
-  /// recent resume token.
-  static final int _resultTokenMaxAgeSeconds = Duration(minutes: 5).inSeconds;
-
-  /// Manages our in-memory or durable persistence.
-  final Persistence _persistence;
-
-  /// The set of all mutations that have been sent but not yet been applied to
-  /// the backend.
-  MutationQueue _mutationQueue;
-
-  /// The last known state of all referenced documents according to the backend.
-  final RemoteDocumentCache _remoteDocuments;
-
-  /// The current state of all referenced documents, reflecting local changes.
-  LocalDocumentsView _localDocuments;
-
-  /// Performs queries over the [_localDocuments] (and potentially maintains
-  /// indexes).
-  QueryEngine _queryEngine;
-
-  /// The set of document references maintained by any local views.
-  final ReferenceSet _localViewReferences;
-
-  /// Maps a query to the data about that query.
-  final QueryCache _queryCache;
-
-  /// Maps a targetId to data about its query.
-  final Map<int, QueryData> _targetIds;
-
-  /// Used to generate targetIds for queries tracked locally.
-  final TargetIdGenerator _targetIdGenerator;
-
   factory LocalStore(Persistence persistence, User initialUser) {
     Assert.hardAssert(persistence.started,
         'LocalStore was passed an unstarted persistence implementation');
@@ -157,6 +121,43 @@ class LocalStore {
       this._queryEngine,
       this._localViewReferences,
       this._targetIds);
+
+  /// The maximum time to leave a resume token buffered without writing it out.
+  /// This value is arbitrary: it's long enough to avoid several writes
+  /// (possibly indefinitely if updates come more frequently than this) but
+  /// short enough that restarting after crashing will still have a pretty
+  /// recent resume token.
+  static final int _resultTokenMaxAgeSeconds =
+      const Duration(minutes: 5).inSeconds;
+
+  /// Manages our in-memory or durable persistence.
+  final Persistence _persistence;
+
+  /// The set of all mutations that have been sent but not yet been applied to
+  /// the backend.
+  MutationQueue _mutationQueue;
+
+  /// The last known state of all referenced documents according to the backend.
+  final RemoteDocumentCache _remoteDocuments;
+
+  /// The current state of all referenced documents, reflecting local changes.
+  LocalDocumentsView _localDocuments;
+
+  /// Performs queries over the [_localDocuments] (and potentially maintains
+  /// indexes).
+  QueryEngine _queryEngine;
+
+  /// The set of document references maintained by any local views.
+  final ReferenceSet _localViewReferences;
+
+  /// Maps a query to the data about that query.
+  final QueryCache _queryCache;
+
+  /// Maps a targetId to data about its query.
+  final Map<int, QueryData> _targetIds;
+
+  /// Used to generate targetIds for queries tracked locally.
+  final TargetIdGenerator _targetIdGenerator;
 
   Future<void> start() async {
     await _mutationQueue.start();
@@ -294,7 +295,7 @@ class LocalStore {
             MaybeDocument>>('Apply remote event', () async {
       final int sequenceNumber =
           _persistence.referenceDelegate.currentSequenceNumber;
-      final Set<DocumentKey> authoritativeUpdates = Set<DocumentKey>();
+      final Set<DocumentKey> authoritativeUpdates = <DocumentKey>{};
 
       final Map<int, TargetChange> targetChanges = remoteEvent.targetChanges;
       for (MapEntry<int, TargetChange> entry in targetChanges.entries) {
@@ -341,7 +342,7 @@ class LocalStore {
         }
       }
 
-      final Set<DocumentKey> changedDocKeys = Set<DocumentKey>();
+      final Set<DocumentKey> changedDocKeys = <DocumentKey>{};
       final Map<DocumentKey, MaybeDocument> documentUpdates =
           remoteEvent.documentUpdates;
       final Set<DocumentKey> limboDocuments =
@@ -367,8 +368,8 @@ class LocalStore {
           Log.d(
               'LocalStore',
               'Ignoring outdated watch update for $key. '
-              'Current version: ${existingDoc.version}  '
-              'Watch version: ${doc.version}');
+                  'Current version: ${existingDoc.version}  '
+                  'Watch version: ${doc.version}');
         }
 
         if (limboDocuments.contains(key)) {

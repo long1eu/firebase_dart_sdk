@@ -7,6 +7,17 @@ import 'package:firebase_common/firebase_common.dart';
 /// Settings used to configure a FirebaseFirestore instance.
 @publicApi
 class FirebaseFirestoreSettings {
+  /// Constructs a FirebaseFirestoreSettings object
+  FirebaseFirestoreSettings({
+    this.host = _defaultHost,
+    this.sslEnabled = true,
+    this.persistenceEnabled = true,
+  })  : assert(host != null, 'Provided host must not be null.'),
+        assert(
+            !(!sslEnabled && host == _defaultHost),
+            'You can\'t set the \'sslEnabled\' setting '
+            'unless you also set a non-default \'host\'.');
+
   static const String _defaultHost = 'firestore.googleapis.com';
 
   /// The host of the Firestore backend.
@@ -22,22 +33,10 @@ class FirebaseFirestoreSettings {
   @publicApi
   final bool persistenceEnabled;
 
-  /// Constructs a FirebaseFirestoreSettings object
-  FirebaseFirestoreSettings({
-    this.host = _defaultHost,
-    this.sslEnabled = true,
-    this.persistenceEnabled = true,
-  })  : assert(host != null, 'Provided host must not be null.'),
-        assert(
-            !(!sslEnabled && host == _defaultHost),
-            'You can\'t set the \'sslEnabled\' setting '
-            'unless you also set a non-default \'host\'.');
-
   FirebaseFirestoreSettings copyWith({
     String host,
     bool sslEnabled,
     bool persistenceEnabled,
-    bool timestampsInSnapshotsEnabled,
   }) {
     return FirebaseFirestoreSettings(
       host: host ?? this.host,

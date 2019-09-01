@@ -11,21 +11,8 @@ import 'storage_task.dart';
 /// Represents an Exception resulting from an operation on a [StorageReference].
 @publicApi
 class StorageException extends FirebaseError {
-  static const String _tag = 'StorageException';
-
-  static const int _networkUnavailable = -2;
-
-  final ErrorCode errorCode;
-
-  /// The Http result code (if one exists) from a network operation.
-  final int httpResultCode;
-
-  dynamic _cause;
-
   StorageException(
-      /*@ErrorCode*/ this.errorCode,
-      this._cause,
-      this.httpResultCode)
+      /*@ErrorCode*/ this.errorCode, this._cause, this.httpResultCode)
       : super(getErrorMessageForCode(errorCode)) {
     Log.e(
         _tag,
@@ -64,6 +51,17 @@ class StorageException extends FirebaseError {
     assert(se != null);
     return se;
   }
+
+  static const String _tag = 'StorageException';
+
+  static const int _networkUnavailable = -2;
+
+  final ErrorCode errorCode;
+
+  /// The Http result code (if one exists) from a network operation.
+  final int httpResultCode;
+
+  dynamic _cause;
 
   static ErrorCode _calculateErrorCode(Status status) {
     if (status.isCanceled) {
@@ -144,9 +142,9 @@ class StorageException extends FirebaseError {
 
 /// An [ErrorCode] indicates the source of a failed [StorageTask] or operation.
 class ErrorCode {
-  final int _i;
-
   const ErrorCode(this._i);
+
+  final int _i;
 
   static const ErrorCode errorUnknown = ErrorCode(-13000);
   static const ErrorCode errorObjectNotFound = ErrorCode(-13010);
@@ -177,9 +175,9 @@ class ErrorCode {
 }
 
 class Status {
-  final int statusCode;
-
   const Status._(this.statusCode);
+
+  final int statusCode;
 
   static const Status resultSuccess = Status._(0);
 

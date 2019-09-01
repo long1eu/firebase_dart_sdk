@@ -16,9 +16,9 @@ final Map<int, String> _sendPortsHashes = <int, String>{};
 /// A class used to schedule long running operations (upload/download) and
 /// operations that are intended to be short lived (list/get/delete)
 class StorageTaskScheduler {
-  static StorageTaskScheduler instance = StorageTaskScheduler._();
-
   StorageTaskScheduler._();
+
+  static StorageTaskScheduler instance = StorageTaskScheduler._();
 
   LoadBalancer _commands;
   LoadBalancer _uploads;
@@ -227,17 +227,17 @@ class _IsolateIsNetworkConnected extends IsolateRunnerProxy {
 }
 
 class IsolateRunnerProxy {
-  final String runnerName;
-  final String appName;
-  final SendPort sendPort;
-  final Stream<List<dynamic>> receiveStream;
-
   IsolateRunnerProxy({
     @required this.runnerName,
     @required this.appName,
     @required this.sendPort,
     @required this.receiveStream,
   });
+
+  final String runnerName;
+  final String appName;
+  final SendPort sendPort;
+  final Stream<List<dynamic>> receiveStream;
 
   IsolateRunnerProxy copyWith({
     String runnerName,
@@ -255,17 +255,17 @@ class IsolateRunnerProxy {
 }
 
 class _IsolateCallPayload<T> extends DelegatingList<dynamic> {
-  final String runnerName;
-  final String appName;
-  final String methodName;
-  final T argument;
-
   _IsolateCallPayload({
     @required this.runnerName,
     @required this.appName,
     @required this.methodName,
     this.argument,
   }) : super(<dynamic>[runnerName, appName, methodName, argument]);
+
+  final String runnerName;
+  final String appName;
+  final String methodName;
+  final T argument;
 
   @override
   String toString() {

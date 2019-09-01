@@ -7,13 +7,13 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// A version of a document in Firestore. This corresponds to the version
 /// timestamp, such as update_time or read_time.
 class SnapshotVersion implements Comparable<SnapshotVersion> {
+  /// Creates a new version representing the given timestamp.
+  const SnapshotVersion(this.timestamp);
+
   final Timestamp timestamp;
 
   /// A version that is smaller than all other versions.
   static final SnapshotVersion none = SnapshotVersion(Timestamp(0, 0));
-
-  /// Creates a new version representing the given timestamp.
-  const SnapshotVersion(this.timestamp);
 
   @override
   int compareTo(SnapshotVersion other) => timestamp.compareTo(other.timestamp);

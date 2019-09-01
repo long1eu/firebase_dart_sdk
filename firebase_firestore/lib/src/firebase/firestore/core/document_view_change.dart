@@ -9,9 +9,9 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 /// * NOTE: We sort document changes by their type, so the ordering of this enum
 /// is significant.
 class DocumentViewChangeType implements Comparable<DocumentViewChangeType> {
-  final int _i;
-
   const DocumentViewChangeType._(this._i);
+
+  final int _i;
 
   static const DocumentViewChangeType removed = DocumentViewChangeType._(0);
   static const DocumentViewChangeType added = DocumentViewChangeType._(1);
@@ -43,10 +43,10 @@ class DocumentViewChangeType implements Comparable<DocumentViewChangeType> {
 }
 
 class DocumentViewChange {
+  const DocumentViewChange(this.type, this.document);
+
   final DocumentViewChangeType type;
   final Document document;
-
-  const DocumentViewChange(this.type, this.document);
 
   @override
   bool operator ==(Object other) =>

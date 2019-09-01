@@ -15,11 +15,11 @@ import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.da
 
 /// In-memory cache of remote documents.
 class MemoryRemoteDocumentCache implements RemoteDocumentCache {
-  /// Underlying cache of documents.
-  ImmutableSortedMap<DocumentKey, MaybeDocument> documents;
-
   MemoryRemoteDocumentCache()
       : documents = DocumentCollections.emptyMaybeDocumentMap();
+
+  /// Underlying cache of documents.
+  ImmutableSortedMap<DocumentKey, MaybeDocument> documents;
 
   @override
   Future<void> add(MaybeDocument document) async {

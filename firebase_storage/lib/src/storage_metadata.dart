@@ -15,62 +15,6 @@ import 'package:meta/meta.dart';
 /// validation rules.
 @publicApi
 class StorageMetadata {
-  static const String _tag = 'StorageMetadata';
-
-  static const String _kContentLanguage = 'contentLanguage';
-  static const String _kContentEncoding = 'contentEncoding';
-  static const String _kContentDisposition = 'contentDisposition';
-  static const String _kCacheControl = 'cacheControl';
-  static const String _kCustomMetadataKey = 'metadata';
-  static const String _kContentTypeKey = 'contentType';
-  static const String _kMd5HashKey = 'md5Hash';
-  static const String _kSizeKey = 'size';
-  static const String _kTimeUpdatedKey = 'updated';
-  static const String _kTimeCreatedKey = 'timeCreated';
-  static const String _kMetaGenerationKey = 'metageneration';
-  static const String _kBucketKey = 'bucket';
-  static const String _kNameKey = 'name';
-  static const String _kGenerationKey = 'generation';
-
-  final String path;
-  final FirebaseStorage _storage;
-  final StorageReference _reference;
-
-  /// Return the owning Google Cloud Storage bucket for the [StorageReference]
-  @publicApi
-  final String bucket;
-
-  /// Returns a version String indicating what version of the [StorageReference]
-  @publicApi
-  final String generation;
-
-  /// Returns a version String indicating the version of this [StorageMetadata]
-  @publicApi
-  final String metadataGeneration;
-
-  /// Returns the time the [StorageReference] was created.
-  @publicApi
-  final int creationTimeMillis;
-
-  /// Returns the time the [StorageReference] was last updated.
-  @publicApi
-  final int updatedTimeMillis;
-
-  /// Returns the stored Size in bytes of the [StorageReference] object
-  @publicApi
-  final int sizeBytes;
-
-  /// Return the MD5Hash of the [StorageReference] object
-  @publicApi
-  final String md5Hash;
-
-  final _MetadataValue<String> _contentEncoding;
-  final _MetadataValue<String> _cacheControl;
-  final _MetadataValue<String> _contentDisposition;
-  final _MetadataValue<String> _contentLanguage;
-  final _MetadataValue<String> _contentType;
-  final _MetadataValue<Map<String, String>> _customMetadata;
-
   // TODO:{23/10/2018 15:11}-long1eu: find a way to create metadata for update
   /// Creates a [StorageMetadata] object to hold metadata for a
   /// [StorageReference]
@@ -187,6 +131,62 @@ class StorageMetadata {
           _MetadataValue<Map<String, String>>.withUserValue(customMetadata),
     );
   }
+
+  static const String _tag = 'StorageMetadata';
+
+  static const String _kContentLanguage = 'contentLanguage';
+  static const String _kContentEncoding = 'contentEncoding';
+  static const String _kContentDisposition = 'contentDisposition';
+  static const String _kCacheControl = 'cacheControl';
+  static const String _kCustomMetadataKey = 'metadata';
+  static const String _kContentTypeKey = 'contentType';
+  static const String _kMd5HashKey = 'md5Hash';
+  static const String _kSizeKey = 'size';
+  static const String _kTimeUpdatedKey = 'updated';
+  static const String _kTimeCreatedKey = 'timeCreated';
+  static const String _kMetaGenerationKey = 'metageneration';
+  static const String _kBucketKey = 'bucket';
+  static const String _kNameKey = 'name';
+  static const String _kGenerationKey = 'generation';
+
+  final String path;
+  final FirebaseStorage _storage;
+  final StorageReference _reference;
+
+  /// Return the owning Google Cloud Storage bucket for the [StorageReference]
+  @publicApi
+  final String bucket;
+
+  /// Returns a version String indicating what version of the [StorageReference]
+  @publicApi
+  final String generation;
+
+  /// Returns a version String indicating the version of this [StorageMetadata]
+  @publicApi
+  final String metadataGeneration;
+
+  /// Returns the time the [StorageReference] was created.
+  @publicApi
+  final int creationTimeMillis;
+
+  /// Returns the time the [StorageReference] was last updated.
+  @publicApi
+  final int updatedTimeMillis;
+
+  /// Returns the stored Size in bytes of the [StorageReference] object
+  @publicApi
+  final int sizeBytes;
+
+  /// Return the MD5Hash of the [StorageReference] object
+  @publicApi
+  final String md5Hash;
+
+  final _MetadataValue<String> _contentEncoding;
+  final _MetadataValue<String> _cacheControl;
+  final _MetadataValue<String> _contentDisposition;
+  final _MetadataValue<String> _contentLanguage;
+  final _MetadataValue<String> _contentType;
+  final _MetadataValue<Map<String, String>> _customMetadata;
 
   StorageMetadata copyWith(
       {String path,
@@ -340,9 +340,6 @@ class MetadataUpdate {}
 /// Stores metadata values and indicates whether these are defaults or
 /// user-provided.
 class _MetadataValue<T> {
-  final bool userProvided;
-  final T value;
-
   _MetadataValue({@required this.value, @required this.userProvided});
 
   /// Creates an optional that doesn't have a user provided value and returns
@@ -356,4 +353,7 @@ class _MetadataValue<T> {
   factory _MetadataValue.withUserValue(T value) {
     return _MetadataValue<T>(value: value, userProvided: true);
   }
+
+  final bool userProvided;
+  final T value;
 }

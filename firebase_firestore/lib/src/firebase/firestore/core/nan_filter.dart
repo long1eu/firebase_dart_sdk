@@ -10,9 +10,9 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 
 /// Filter that matches NaN (not-a-number) fields.
 class NaNFilter extends Filter {
-  final FieldPath fieldPath;
-
   const NaNFilter(this.fieldPath);
+
+  final FieldPath fieldPath;
 
   @override
   FieldPath get field => fieldPath;

@@ -14,11 +14,6 @@ import 'package:firebase_storage/src/util/wrapped_future.dart';
 
 /// A Task that retrieves the download URL for a [StorageReference] object
 class GetDownloadUrlTask extends WrappedFuture<Uri> {
-  static const String _kDownloadTokensKey = 'downloadTokens';
-
-  final StorageReference _reference;
-  final ExponentialBackoffSender _sender;
-
   GetDownloadUrlTask._(this._reference)
       : assert(_reference != null),
         _sender = ExponentialBackoffSender(
@@ -27,6 +22,11 @@ class GetDownloadUrlTask extends WrappedFuture<Uri> {
         ) {
     run();
   }
+
+  static const String _kDownloadTokensKey = 'downloadTokens';
+
+  final StorageReference _reference;
+  final ExponentialBackoffSender _sender;
 
   static Future<Uri> execute(StorageReference reference) {
     return StorageTaskScheduler.instance

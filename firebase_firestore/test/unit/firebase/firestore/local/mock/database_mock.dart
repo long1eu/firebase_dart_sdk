@@ -9,12 +9,12 @@ import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:dart_sqlite/dart_sqlite.dart' as sql;
 
 class DatabaseMock extends Database {
+  DatabaseMock._(this.database, this.path);
+
   sql.Database database;
   File path;
 
   bool renamePath = true;
-
-  DatabaseMock._(this.database, this.path);
 
   static Future<DatabaseMock> create(String name,
       {int version,

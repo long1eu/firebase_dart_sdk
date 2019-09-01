@@ -20,13 +20,13 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// Internal transaction object responsible for accumulating the mutations to
 /// perform and the base versions for any documents read.
 class Transaction {
+  Transaction(this.datastore);
+
   final Datastore datastore;
   final Map<DocumentKey, SnapshotVersion> readVersions =
       <DocumentKey, SnapshotVersion>{};
   final List<Mutation> mutations = <Mutation>[];
   bool committed = false;
-
-  Transaction(this.datastore);
 
   void _recordVersion(MaybeDocument doc) {
     SnapshotVersion docVersion;

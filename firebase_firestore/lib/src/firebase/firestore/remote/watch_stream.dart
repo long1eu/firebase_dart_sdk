@@ -29,24 +29,25 @@ import 'package:protobuf/protobuf.dart';
 /// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L147'>firestore.proto</a>
 class WatchStream
     extends AbstractStream<ListenRequest, ListenResponse, WatchStreamCallback> {
+  WatchStream(FirestoreChannel channel, AsyncQueue workerQueue, this.serializer,
+      WatchStreamCallback listener)
+      : super(
+          channel,
+          ClientMethod<ListenRequest, ListenResponse>(
+            'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Listen',
+            (GeneratedMessage req) => req.writeToBuffer(),
+            (List<int> res) => ListenResponse.fromBuffer(res),
+          ),
+          workerQueue,
+          TimerId.listenStreamConnectionBackoff,
+          TimerId.listenStreamIdle,
+          listener,
+        );
+
   /// The empty stream token.
   static final Uint8List emptyResumeToken = Uint8List.fromList(<int>[]);
 
   final RemoteSerializer serializer;
-
-  WatchStream(FirestoreChannel channel, AsyncQueue workerQueue, this.serializer,
-      WatchStreamCallback listener)
-      : super(
-            channel,
-            ClientMethod<ListenRequest, ListenResponse>(
-              'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Listen',
-              (GeneratedMessage req) => req.writeToBuffer(),
-              (List<int> res) => ListenResponse.fromBuffer(res),
-            ),
-            workerQueue,
-            TimerId.listenStreamConnectionBackoff,
-            TimerId.listenStreamIdle,
-            listener);
 
   /// Registers interest in the results of the given query. If the query
   /// includes a [resumeToken] it will be included in the request. Results that
@@ -103,13 +104,13 @@ typedef OnWatchChange = Future<void> Function(
 /// A callback interface for the set of events that can be emitted by the
 /// [WatchStream]
 class WatchStreamCallback extends StreamCallback {
-  /// A new change from the watch stream. Snapshot version will ne non-null if
-  /// it was set
-  final OnWatchChange onWatchChange;
-
   const WatchStreamCallback({
     @required Task<void> onOpen,
     @required OnClose onClose,
     @required this.onWatchChange,
   }) : super(onOpen: onOpen, onClose: onClose);
+
+  /// A new change from the watch stream. Snapshot version will ne non-null if
+  /// it was set
+  final OnWatchChange onWatchChange;
 }
