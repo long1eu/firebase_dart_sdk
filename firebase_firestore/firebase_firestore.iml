@@ -9,6 +9,9 @@
       <excludeFolder url="file://$MODULE_DIR$/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/build" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/vm_example/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/vm_example/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/vm_example/build" />
       <excludeFolder url="file://$MODULE_DIR$/test/vm/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/test/vm/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/test/vm/build" />
