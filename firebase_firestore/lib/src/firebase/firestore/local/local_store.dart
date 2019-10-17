@@ -160,7 +160,12 @@ class LocalStore {
   final TargetIdGenerator _targetIdGenerator;
 
   Future<void> start() async {
-    await _mutationQueue.start();
+    return startMutationQueue();
+  }
+
+  Future<void> startMutationQueue() {
+    return _persistence.runTransaction(
+        "Start MutationQueue", _mutationQueue.start);
   }
 
   // PORTING NOTE: no shutdown for [LocalStore] or persistence components on
@@ -174,7 +179,7 @@ class LocalStore {
         await _mutationQueue.getAllMutationBatches();
 
     _mutationQueue = _persistence.getMutationQueue(user);
-    await _mutationQueue.start();
+    await startMutationQueue();
 
     final List<MutationBatch> newBatches =
         await _mutationQueue.getAllMutationBatches();
