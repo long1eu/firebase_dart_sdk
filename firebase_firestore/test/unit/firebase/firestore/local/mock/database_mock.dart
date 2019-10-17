@@ -5,8 +5,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:dart_sqlite/dart_sqlite.dart' as sql;
+import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 
 class DatabaseMock extends Database {
   DatabaseMock._(this.database, this.path);
@@ -15,6 +15,10 @@ class DatabaseMock extends Database {
   File path;
 
   bool renamePath = true;
+
+  static File pathForName(String name) {
+    return File('${Directory.current.path}/build/test/$name');
+  }
 
   static Future<DatabaseMock> create(String name,
       {int version,
@@ -25,7 +29,7 @@ class DatabaseMock extends Database {
       OnOpen onOpen}) async {
     version ??= 1;
 
-    final File path = File('${Directory.current.path}/build/test/$name');
+    final File path = pathForName(name);
     final bool callOnCreate = !path.existsSync();
     path.createSync(recursive: true);
 

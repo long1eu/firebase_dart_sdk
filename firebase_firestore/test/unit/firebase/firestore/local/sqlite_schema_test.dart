@@ -3,6 +3,7 @@
 // on 28/09/2018
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_schema.dart';
@@ -17,10 +18,14 @@ void main() {
   SQLiteSchema schema;
 
   setUp(() async {
-    db = await DatabaseMock.create(
-        'firebase/firestore/local/sqlite_schema_test.db');
+    final String name = 'firebase/firestore/local/sqlite_schema_test.db';
+    final File file = DatabaseMock.pathForName(name);
+    if (file.existsSync()) {
+      file.deleteSync();
+    }
+
+    db = await DatabaseMock.create(name);
     schema = SQLiteSchema(db);
-    await schema.runMigrations();
   });
 
   tearDown(() => db.close());
@@ -33,6 +38,7 @@ void main() {
   }
 
   test('createsMutationsTable', () async {
+    await schema.runMigrations();
     await _assertNoResultsForQuery('SELECT uid, batch_id FROM mutations');
     await db.execute("INSERT INTO mutations (uid, batch_id) VALUES ('foo', 1)");
 
@@ -46,6 +52,7 @@ void main() {
   });
 
   test('testDatabaseName', () async {
+    await schema.runMigrations();
     expect(
         SQLitePersistence.sDatabaseName(
             '[DEFAULT]', DatabaseId.forProject('my-project')),
@@ -54,5 +61,54 @@ void main() {
         SQLitePersistence.sDatabaseName(
             '[DEFAULT]', DatabaseId.forDatabase('my-project', 'my-database')),
         'firestore.%5BDEFAULT%5D.my-project.my-database');
+  });
+
+  test('addsSentinelRows', () async {
+    await schema.runMigrations(0, 1);
+
+    final int oldSequenceNumber = 1;
+    // Set the highest sequence number to this value so that untagged documents
+    // will pick up this value.
+    final int newSequenceNumber = 2;
+    await db.execute(
+      '''UPDATE target_globals
+         SET highest_listen_sequence_number = ?''',
+      <int>[newSequenceNumber],
+    );
+
+    // Set up some documents (we only need the keys)
+    // For the odd ones, add sentinel rows.
+    for (int i = 0; i < 10; i++) {
+      final String path = 'docs/doc_$i';
+      await db.execute(
+          'INSERT INTO remote_documents (path) VALUES (?)', <String>[path]);
+      if (i % 2 == 1) {
+        await db.execute(
+          '''INSERT INTO target_documents (target_id, path, sequence_number)
+             VALUES (0, ?, ?)''',
+          <dynamic>[path, oldSequenceNumber],
+        );
+      }
+    }
+
+    await schema.runMigrations(1, 2);
+
+    final List<Map<String, dynamic>> result =
+        await db.query('''SELECT path, sequence_number
+           FROM target_documents
+           WHERE target_id = 0;''');
+
+    for (Map<String, dynamic> row in result) {
+      final String path = row['path'];
+      final int sequenceNumber = row['sequence_number'];
+
+      final int docNum = int.parse(path.split("_")[1]);
+      // The even documents were missing sequence numbers, they should now be
+      // filled in to have the new sequence number. The odd documents should
+      // have their sequence number unchanged, and so be the old value.
+      final int expected =
+          docNum % 2 == 1 ? oldSequenceNumber : newSequenceNumber;
+      expect(sequenceNumber, expected);
+    }
   });
 }

@@ -48,6 +48,7 @@ linter:
     - implementation_imports
     - library_names
     - library_prefixes
+    - lines_longer_than_80_chars
     - non_constant_identifier_names
     - overridden_fields
     - package_api_docs
