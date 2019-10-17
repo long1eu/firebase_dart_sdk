@@ -534,7 +534,7 @@ class RemoteStore implements TargetMetadataProvider {
     if (status.code == StatusCode.ok) {
       // Graceful stop (due to stop() or idle timeout). Make sure that's
       // desirable.
-      Assert.hardAssert(!_shouldStartWatchStream(),
+      Assert.hardAssert(!_shouldStartWriteStream(),
           'Write stream was stopped gracefully while still needed.');
     }
 
