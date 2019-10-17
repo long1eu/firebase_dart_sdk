@@ -127,13 +127,14 @@ class View {
             changeSet.addChange(
                 DocumentViewChange(DocumentViewChangeType.modified, newDoc));
             changeApplied = true;
-          }
-          if (lastDocInLimit != null &&
-              query.comparator(newDoc, lastDocInLimit) > 0) {
-            // This doc moved from inside the limit to after the limit. That
-            // means there may be some doc in the local cache that's actually
-            // less than this one.
-            needsRefill = true;
+
+            if (lastDocInLimit != null &&
+                query.comparator(newDoc, lastDocInLimit) > 0) {
+              // This doc moved from inside the limit to after the limit. That
+              // means there may be some doc in the local cache that's actually
+              // less than this one.
+              needsRefill = true;
+            }
           }
         } else if (oldDocHadPendingMutations != newDocHasPendingMutations) {
           changeSet.addChange(
