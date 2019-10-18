@@ -238,7 +238,6 @@ class FirestoreClient implements RemoteStoreCallback {
   @override
   Future<void> handleOnlineStateChange(OnlineState onlineState) async {
     await syncEngine.handleOnlineStateChange(onlineState);
-    eventManager.handleOnlineStateChange(onlineState);
   }
 
   @override

@@ -86,7 +86,7 @@ class LocalStore {
 
     final QueryCache queryCache = persistence.queryCache;
     final TargetIdGenerator targetIdGenerator =
-        TargetIdGenerator.getLocalStoreIdGenerator(queryCache.highestTargetId);
+        TargetIdGenerator.forQueryCache(queryCache.highestTargetId);
     final MutationQueue mutationQueue =
         persistence.getMutationQueue(initialUser);
     final RemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
@@ -112,15 +112,16 @@ class LocalStore {
   }
 
   LocalStore._(
-      this._persistence,
-      this._queryCache,
-      this._targetIdGenerator,
-      this._mutationQueue,
-      this._remoteDocuments,
-      this._localDocuments,
-      this._queryEngine,
-      this._localViewReferences,
-      this._targetIds);
+    this._persistence,
+    this._queryCache,
+    this._targetIdGenerator,
+    this._mutationQueue,
+    this._remoteDocuments,
+    this._localDocuments,
+    this._queryEngine,
+    this._localViewReferences,
+    this._targetIds,
+  );
 
   /// The maximum time to leave a resume token buffered without writing it out.
   /// This value is arbitrary: it's long enough to avoid several writes
@@ -490,7 +491,7 @@ class LocalStore {
       targetId = cached.targetId;
     } else {
       await _persistence.runTransaction('Allocate query', () async {
-        targetId = _targetIdGenerator.nextId();
+        targetId = _targetIdGenerator.nextId;
         cached = QueryData.init(
           query,
           targetId,

@@ -2,59 +2,58 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-/// Generates monotonically increasing integer IDs. There are separate
-/// generators for different scopes. While these generators will operate
-/// independently of each other, they are scoped, such that no two generators
-/// will ever produce the same ID. This is useful, because sometimes the backend
-/// may group IDs from separate parts of the client into the same ID space.
-
+/// Generates monotonically increasing target IDs for sending targets to the
+/// watch stream.
+///
+/// The client constructs two generators, one for the query cache
+/// [forQueryCache], and one for limbo documents [forSyncEngine]. These two
+/// generators produce non-overlapping IDs (by using even and odd IDs
+/// respectively).
+///
+/// By separating the target ID space, the query cache can generate target IDs
+/// that persist across client restarts, while sync engine can independently
+/// generate in-memory target IDs that are transient and can be reused after a
+/// restart.
+// TODO(mrschmidt): Explore removing this class in favor of generating these IDs
+//  directly in SyncEngine and LocalStore.
 class TargetIdGenerator {
-  TargetIdGenerator(int generatorId, int after) {
-    final int afterWithoutGenerator = after >> _reservedBits << _reservedBits;
-    final int afterGenerator = after - afterWithoutGenerator;
-    if (afterGenerator >= generatorId) {
-      // For example, if:
-      //   self.generatorID = 0b0000
-      //   after = 0b1011
-      //   afterGenerator = 0b0001
-      // Then:
-      //   previous = 0b1010
-      //   next = 0b1100
-      _previousId = afterWithoutGenerator | generatorId;
-    } else {
-      // For example, if:
-      //   self.generatorID = 0b0001
-      //   after = 0b1010
-      //   afterGenerator = 0b0000
-      // Then:
-      //   previous = 0b1001
-      //   next = 0b1011
-      _previousId =
-          (afterWithoutGenerator | generatorId) - (1 << _reservedBits);
-    }
-  }
+  /// Instantiates a new TargetIdGenerator, using the seed as the first target
+  /// ID to return.
+  TargetIdGenerator(int generatorId, int seed)
+      : assert(
+            (generatorId & _reservedBits) == generatorId,
+            'Generator ID $generatorId contains more than $_reservedBits '
+            'reserved bits.'),
+        assert((seed & _reservedBits) == generatorId,
+            'Cannot supply target ID from different generator ID'),
+        _nextId = seed;
 
   /// Creates and returns the [TargetIdGenerator] for the local store.
-  /// [after] is an ID to start at. Every call to nextID will return an
-  /// id > after.
-  factory TargetIdGenerator.getLocalStoreIdGenerator(int after) {
-    return TargetIdGenerator(_localStateId, after);
+  factory TargetIdGenerator.forQueryCache(int after) {
+    final TargetIdGenerator generator = TargetIdGenerator(_queryCacheId, after);
+    // Make sure that the next call to `nextId()` returns the first value after
+    // 'after'.
+    generator.nextId;
+    return generator;
   }
 
-  /// Creates and returns the [TargetIdGenerator] for the sync engine. [after]
-  /// is an ID to start at. Every call to nextID will return an id > after.
-  factory TargetIdGenerator.getSyncEngineGenerator(int after) {
-    return TargetIdGenerator(_syncEngineId, after);
+  /// Creates and returns the [TargetIdGenerator] for the sync engine.
+  factory TargetIdGenerator.forSyncEngine() {
+    // Sync engine assigns target IDs for limbo document detection.
+    return TargetIdGenerator(_syncEngineId, 1);
   }
 
-  static const int _localStateId = 0;
+  static const int _queryCacheId = 0;
   static const int _syncEngineId = 1;
+
   static const int _reservedBits = 1;
 
-  int _previousId;
+  int _nextId;
 
   /// Returns the next id in the sequence
-  int nextId() {
-    return _previousId += 1 << _reservedBits;
+  int get nextId {
+    final int _nextId = this._nextId;
+    this._nextId += 1 << _reservedBits;
+    return _nextId;
   }
 }

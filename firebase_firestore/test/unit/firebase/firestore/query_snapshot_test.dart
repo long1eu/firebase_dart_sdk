@@ -72,15 +72,15 @@ void main() {
 
     final core.Query fooQuery = util.query('foo');
     final ViewSnapshot viewSnapshot = ViewSnapshot(
-        fooQuery,
-        newDocuments,
-        oldDocuments,
-        documentChanges,
-        /*isFromCache:*/
-        false,
-        util.keySet(),
-        /*didSyncStateChange:*/
-        true);
+      fooQuery,
+      newDocuments,
+      oldDocuments,
+      documentChanges,
+      false /*isFromCache*/,
+      util.keySet(),
+      true /*didSyncStateChange*/,
+      false /*excludesMetadataChanges*/,
+    );
 
     final QuerySnapshot snapshot =
         QuerySnapshot(Query(fooQuery, firestore), viewSnapshot, firestore);
@@ -88,40 +88,40 @@ void main() {
     final QueryDocumentSnapshot doc1Snap = QueryDocumentSnapshot.fromDocument(
       firestore,
       doc1New,
-      /*fromCache:*/ false,
-      /*keySet:*/ false,
+      false /*fromCache*/,
+      false /*keySet*/,
     );
     final QueryDocumentSnapshot doc2Snap = QueryDocumentSnapshot.fromDocument(
       firestore,
       doc2New,
-      /*fromCache:*/ false,
-      /*keySet:*/ false,
+      false /*fromCache*/,
+      false /*keySet*/,
     );
 
     expect(snapshot.documentChanges.length, 1);
     final List<DocumentChange> changesWithoutMetadata = <DocumentChange>[
       DocumentChange(
-          doc2Snap,
-          DocumentChangeType.modified,
-          /*oldIndex:*/
-          1,
-          /*newIndex:*/ 1)
+        doc2Snap,
+        DocumentChangeType.modified,
+        1 /*oldIndex*/,
+        1 /*newIndex*/,
+      )
     ];
     expect(snapshot.documentChanges, changesWithoutMetadata);
 
     final List<DocumentChange> changesWithMetadata = <DocumentChange>[
       DocumentChange(
-          doc1Snap,
-          DocumentChangeType.modified,
-          /*oldIndex:*/
-          0,
-          /*newIndex:*/ 0),
+        doc1Snap,
+        DocumentChangeType.modified,
+        0 /*oldIndex*/,
+        0 /*newIndex*/,
+      ),
       DocumentChange(
-          doc2Snap,
-          DocumentChangeType.modified,
-          /*oldIndex:*/
-          1,
-          /*newIndex:*/ 1)
+        doc2Snap,
+        DocumentChangeType.modified,
+        1 /*oldIndex*/,
+        1 /*newIndex*/,
+      )
     ];
     expect(snapshot.getDocumentChanges(MetadataChanges.include),
         changesWithMetadata);

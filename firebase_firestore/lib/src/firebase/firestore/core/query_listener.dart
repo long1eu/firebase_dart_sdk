@@ -10,8 +10,6 @@ import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// [QueryListener] takes a series of internal view snapshots and determines
@@ -52,7 +50,10 @@ class QueryListener extends Stream<ViewSnapshot> {
           documentChanges.add(change);
         }
       }
-      newSnapshot = newSnapshot.copyWith(changes: documentChanges);
+      newSnapshot = newSnapshot.copyWith(
+        changes: documentChanges,
+        excludesMetadataChanges: true,
+      );
     }
 
     if (!raisedInitialEvent) {
@@ -133,23 +134,16 @@ class QueryListener extends Stream<ViewSnapshot> {
     Assert.hardAssert(
         !raisedInitialEvent, 'Trying to raise initial event for second time');
 
-    snapshot = snapshot.copyWith(
-      oldDocuments: DocumentSet.emptySet(snapshot.query.comparator),
-      changes: QueryListener._getInitialViewChanges(snapshot),
-      didSyncStateChange: true,
+    snapshot = ViewSnapshot.fromInitialDocuments(
+      snapshot.query,
+      snapshot.documents,
+      snapshot.mutatedKeys,
+      snapshot.isFromCache,
+      snapshot.excludesMetadataChanges,
     );
 
     raisedInitialEvent = true;
     sink.add(snapshot);
-  }
-
-  static List<DocumentViewChange> _getInitialViewChanges(
-      ViewSnapshot snapshot) {
-    final List<DocumentViewChange> res = <DocumentViewChange>[];
-    for (Document doc in snapshot.documents) {
-      res.add(DocumentViewChange(DocumentViewChangeType.added, doc));
-    }
-    return res;
   }
 
   @override

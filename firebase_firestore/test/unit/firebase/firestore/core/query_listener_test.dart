@@ -12,6 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.da
 import 'package:firebase_firestore/src/firebase/firestore/core/view.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
+import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
@@ -81,14 +82,15 @@ void main() {
     expect(accum[1].changes, <DocumentViewChange>[change3]);
 
     final ViewSnapshot snap2Prime = ViewSnapshot(
-        snap2.query,
-        snap2.documents,
-        DocumentSet.emptySet(snap2.query.comparator),
-        <DocumentViewChange>[change1, change4],
-        snap2.isFromCache,
-        snap2.mutatedKeys,
-        /*didSyncStateChange:*/
-        true);
+      snap2.query,
+      snap2.documents,
+      DocumentSet.emptySet(snap2.query.comparator),
+      <DocumentViewChange>[change1, change4],
+      snap2.isFromCache,
+      snap2.mutatedKeys,
+      true /*didSyncStateChange:*/,
+      false /*excludesMetadataChanges:*/,
+    );
     expect(otherAccum, <ViewSnapshot>[snap2Prime]);
   });
 
@@ -143,8 +145,10 @@ void main() {
     final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']));
     final Document doc2 = doc('rooms/hades', 2, map(<String>['name', 'hades']));
     const ListenOptions options1 = ListenOptions();
-    const ListenOptions options2 =
-        ListenOptions(includeQueryMetadataChanges: true);
+    const ListenOptions options2 = ListenOptions(
+      includeQueryMetadataChanges: true,
+      includeDocumentMetadataChanges: true,
+    );
     final QueryListener filteredListener =
         queryListener(query, options1, filteredAccum);
     final QueryListener fullListener =
@@ -169,7 +173,13 @@ void main() {
     fullListener.onViewSnapshot(snap3); // doc2 update
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    expect(filteredAccum, <ViewSnapshot>[snap1, snap3]);
+    expect(
+      filteredAccum,
+      <ViewSnapshot>[
+        _applyExpectedMetadata(snap1, MetadataChanges.exclude),
+        _applyExpectedMetadata(snap3, MetadataChanges.exclude),
+      ],
+    );
     expect(fullAccum, <ViewSnapshot>[snap1, snap2, snap3]);
   });
 
@@ -206,7 +216,13 @@ void main() {
     fullListener.onViewSnapshot(snap3);
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    expect(filteredAccum, <ViewSnapshot>[snap1, snap3]);
+    expect(
+      filteredAccum,
+      <ViewSnapshot>[
+        _applyExpectedMetadata(snap1, MetadataChanges.exclude),
+        _applyExpectedMetadata(snap3, MetadataChanges.exclude)
+      ],
+    );
     // Second listener should receive doc1prime as added document not modified
     expect(fullAccum, <ViewSnapshot>[snap1, snap2, snap3]);
   });
@@ -243,14 +259,24 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final ViewSnapshot expectedSnapshot4 = ViewSnapshot(
-        snap4.query,
-        snap4.documents,
-        snap3.documents,
-        <DocumentViewChange>[],
-        snap4.isFromCache,
-        snap4.mutatedKeys,
-        snap4.didSyncStateChange);
-    expect(fullAccum, <ViewSnapshot>[snap1, snap3, expectedSnapshot4]);
+      snap4.query,
+      snap4.documents,
+      snap3.documents,
+      <DocumentViewChange>[],
+      snap4.isFromCache,
+      snap4.mutatedKeys,
+      snap4.didSyncStateChange,
+      true,
+    );
+
+    expect(
+      fullAccum,
+      <ViewSnapshot>[
+        _applyExpectedMetadata(snap1, MetadataChanges.exclude),
+        _applyExpectedMetadata(snap3, MetadataChanges.exclude),
+        expectedSnapshot4,
+      ],
+    );
   });
 
   test('testMetadataOnlyDocumentChangesAreFilteredOut', () async {
@@ -277,14 +303,19 @@ void main() {
     final DocumentViewChange change3 =
         DocumentViewChange(DocumentViewChangeType.added, doc3);
     final ViewSnapshot expectedSnapshot2 = ViewSnapshot(
-        snap2.query,
-        snap2.documents,
-        snap1.documents,
-        <DocumentViewChange>[change3],
-        snap2.isFromCache,
-        snap2.mutatedKeys,
-        snap2.didSyncStateChange);
-    expect(filteredAccum, <ViewSnapshot>[snap1, expectedSnapshot2]);
+      snap2.query,
+      snap2.documents,
+      snap1.documents,
+      <DocumentViewChange>[change3],
+      snap2.isFromCache,
+      snap2.mutatedKeys,
+      snap2.didSyncStateChange,
+      true,
+    );
+    expect(filteredAccum, <ViewSnapshot>[
+      _applyExpectedMetadata(snap1, MetadataChanges.exclude),
+      expectedSnapshot2,
+    ]);
   });
 
   test('testWillWaitForSyncIfOnline', () async {
@@ -321,16 +352,15 @@ void main() {
     final DocumentViewChange change2 =
         DocumentViewChange(DocumentViewChangeType.added, doc2);
     final ViewSnapshot expectedSnapshot = ViewSnapshot(
-        snap3.query,
-        snap3.documents,
-        DocumentSet.emptySet(snap3.query.comparator),
-        <DocumentViewChange>[change1, change2],
-        /*isFromCache:*/
-        false,
-        /*hasPendingWrites:*/
-        snap3.mutatedKeys,
-        /*didSyncStateChange:*/
-        true);
+      snap3.query,
+      snap3.documents,
+      DocumentSet.emptySet(snap3.query.comparator),
+      <DocumentViewChange>[change1, change2],
+      false /*isFromCache*/,
+      snap3.mutatedKeys /*hasPendingWrites*/,
+      true /*didSyncStateChange*/,
+      true /*excludesMetadataChanges*/,
+    );
     expect(events, <ViewSnapshot>[expectedSnapshot]);
   });
 
@@ -363,28 +393,26 @@ void main() {
     final DocumentViewChange change2 =
         DocumentViewChange(DocumentViewChangeType.added, doc2);
     final ViewSnapshot expectedSnapshot1 = ViewSnapshot(
-        snap1.query,
-        snap1.documents,
-        DocumentSet.emptySet(snap1.query.comparator),
-        <DocumentViewChange>[change1],
-        /* sFromCache:*/
-        true,
-        /*hasPendingWrites:*/
-        snap1.mutatedKeys,
-        /*didSyncStateChange:*/
-        true);
+      snap1.query,
+      snap1.documents,
+      DocumentSet.emptySet(snap1.query.comparator),
+      <DocumentViewChange>[change1],
+      true /*isFromCache*/,
+      snap1.mutatedKeys /*hasPendingWrites*/,
+      true /*didSyncStateChange*/,
+      true /*excludesMetadataChanges*/,
+    );
 
     final ViewSnapshot expectedSnapshot2 = ViewSnapshot(
-        snap2.query,
-        snap2.documents,
-        snap1.documents,
-        <DocumentViewChange>[change2],
-        /*isFromCache:*/
-        true,
-        /*hasPendingWrites=:*/
-        snap2.mutatedKeys,
-        /*didSyncStateChange:*/
-        false);
+      snap2.query,
+      snap2.documents,
+      snap1.documents,
+      <DocumentViewChange>[change2],
+      true /*isFromCache*/,
+      snap2.mutatedKeys /*hasPendingWrites*/,
+      false /*didSyncStateChange*/,
+      true /*excludesMetadataChanges*/,
+    );
     expect(events, <ViewSnapshot>[expectedSnapshot1, expectedSnapshot2]);
   });
 
@@ -405,16 +433,15 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final ViewSnapshot expectedSnapshot = ViewSnapshot(
-        snap1.query,
-        snap1.documents,
-        DocumentSet.emptySet(snap1.query.comparator),
-        <DocumentViewChange>[],
-        /*isFromCache:*/
-        true,
-        /*hasPendingWrites:*/
-        snap1.mutatedKeys,
-        /*didSyncStateChange:*/
-        true);
+      snap1.query,
+      snap1.documents,
+      DocumentSet.emptySet(snap1.query.comparator),
+      <DocumentViewChange>[],
+      true /*isFromCache*/,
+      snap1.mutatedKeys /*hasPendingWrites*/,
+      true /*didSyncStateChange*/,
+      true /*excludesMetadataChanges*/,
+    );
     expect(events, <ViewSnapshot>[expectedSnapshot]);
   });
 
@@ -435,16 +462,29 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final ViewSnapshot expectedSnapshot = ViewSnapshot(
-        snap1.query,
-        snap1.documents,
-        DocumentSet.emptySet(snap1.query.comparator),
-        <DocumentViewChange>[],
-        /*isFromCache:*/
-        true,
-        /*hasPendingWrites:*/
-        snap1.mutatedKeys,
-        /*didSyncStateChange:*/
-        true);
+      snap1.query,
+      snap1.documents,
+      DocumentSet.emptySet(snap1.query.comparator),
+      <DocumentViewChange>[],
+      true /*isFromCache*/,
+      snap1.mutatedKeys /*hasPendingWrites*/,
+      true /*didSyncStateChange*/,
+      true /*excludesMetadataChanges*/,
+    );
     expect(events, <ViewSnapshot>[expectedSnapshot]);
   });
+}
+
+ViewSnapshot _applyExpectedMetadata(
+    ViewSnapshot snap, MetadataChanges metadata) {
+  return ViewSnapshot(
+    snap.query,
+    snap.documents,
+    snap.oldDocuments,
+    snap.changes,
+    snap.isFromCache,
+    snap.mutatedKeys,
+    snap.didSyncStateChange,
+    MetadataChanges.exclude == metadata,
+  );
 }

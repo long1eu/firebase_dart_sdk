@@ -46,6 +46,8 @@ import '../remote/mock_datastore.dart';
 import 'query_event.dart';
 
 class SpecTestCase implements RemoteStoreCallback {
+  SpecTestCase(this.getPersistence, this.isExcluded);
+
   /// Set this to true when debugging test failures.
   static const bool _debug = true;
   static const bool _runBenchmarkTests = false;
@@ -66,8 +68,6 @@ class SpecTestCase implements RemoteStoreCallback {
   final bool Function(Set<String> tags) isExcluded;
 
   String currentName;
-
-  SpecTestCase(this.getPersistence, this.isExcluded);
 
   bool _garbageCollectionEnabled;
   bool _networkEnabled = true;
@@ -212,7 +212,6 @@ class SpecTestCase implements RemoteStoreCallback {
   @override
   Future<void> handleOnlineStateChange(OnlineState onlineState) async {
     await _syncEngine.handleOnlineStateChange(onlineState);
-    _eventManager.handleOnlineStateChange(onlineState);
   }
 
   List<Pair<Mutation, Future<void>>> _getCurrentOutstandingWrites() {
@@ -640,8 +639,9 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _doRestart() async {
     if (_localPersistence is SQLitePersistence) {
-      ((_localPersistence as SQLitePersistence).database as DatabaseMock)
-          .renamePath = false;
+      final SQLitePersistence persistence = _localPersistence;
+      final DatabaseMock databaseMock = persistence.database;
+      databaseMock.renamePath = false;
     }
 
     await Future.wait(<Future<void>>[
@@ -651,8 +651,9 @@ class SpecTestCase implements RemoteStoreCallback {
     ]);
 
     if (_localPersistence is SQLitePersistence) {
-      ((_localPersistence as SQLitePersistence).database as DatabaseMock)
-          .renamePath = true;
+      final SQLitePersistence persistence = _localPersistence;
+      final DatabaseMock databaseMock = persistence.database;
+      databaseMock.renamePath = true;
     }
   }
 

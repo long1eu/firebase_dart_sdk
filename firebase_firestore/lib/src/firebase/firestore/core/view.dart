@@ -250,6 +250,7 @@ class View {
         fromCache,
         docChanges.mutatedKeys,
         syncStatedChanged,
+        false /*excludesMetadataChanges*/,
       );
     }
     return ViewChange(snapshot, limboDocumentChanges);

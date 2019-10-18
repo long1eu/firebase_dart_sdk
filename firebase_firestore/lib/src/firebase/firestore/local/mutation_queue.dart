@@ -25,13 +25,6 @@ abstract class MutationQueue {
   /// Returns true if this queue contains no mutation batches.
   Future<bool> isEmpty();
 
-  /// Returns the next batch ID that will be assigned to a new mutation batch.
-  ///
-  /// * Callers generally don't care about this value except to test that the
-  /// mutation queue is properly maintaining the invariant that
-  /// [highestAcknowledgedBatchId] is less than [nextBatchId].
-  int get nextBatchId;
-
   /// Acknowledges the given [batch].
   Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken);
 

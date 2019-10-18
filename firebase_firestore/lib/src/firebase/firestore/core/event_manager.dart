@@ -17,7 +17,7 @@ import 'package:grpc/grpc.dart';
 /// backend.)
 class EventManager implements SyncEngineCallback {
   EventManager(this._syncEngine) : _queries = <Query, QueryListenersInfo>{} {
-    _syncEngine.callback = this;
+    _syncEngine.syncEngineListener = this;
   }
 
   final SyncEngine _syncEngine;
@@ -102,6 +102,7 @@ class EventManager implements SyncEngineCallback {
     _queries.remove(query);
   }
 
+  @override
   void handleOnlineStateChange(OnlineState onlineState) {
     _onlineState = onlineState;
     for (QueryListenersInfo info in _queries.values) {

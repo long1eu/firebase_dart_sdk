@@ -24,7 +24,7 @@ class MemoryMutationQueue implements MutationQueue {
       : queue = <MutationBatch>[],
         batchesByDocumentKey = ImmutableSortedSet<DocumentReference>(
             <DocumentReference>[], DocumentReference.byKey),
-        nextBatchId = 1,
+        _nextBatchId = 1,
         highestAcknowledgedBatchId = MutationBatch.unknown,
         lastStreamToken = WriteStream.emptyStreamToken;
 
@@ -51,8 +51,7 @@ class MemoryMutationQueue implements MutationQueue {
 
   /// The next value to use when assigning sequential ids to each mutation
   /// batch.
-  @override
-  int nextBatchId;
+  int _nextBatchId;
 
   /// The last received stream token from the server, used to acknowledge which
   /// responses the client has processed. Stream tokens are opaque checkpoint
@@ -76,10 +75,10 @@ class MemoryMutationQueue implements MutationQueue {
     // [highestAcknowledgedBatchId] if the queue is empty.
     final bool queueIsEmpty = await isEmpty();
     if (queueIsEmpty) {
-      nextBatchId = 1;
+      _nextBatchId = 1;
       highestAcknowledgedBatchId = MutationBatch.unknown;
     }
-    Assert.hardAssert(highestAcknowledgedBatchId < nextBatchId,
+    Assert.hardAssert(highestAcknowledgedBatchId < _nextBatchId,
         'highestAcknowledgedBatchId must be less than the nextBatchId');
   }
 
@@ -123,8 +122,8 @@ class MemoryMutationQueue implements MutationQueue {
     Assert.hardAssert(
         mutations.isNotEmpty, 'Mutation batches should not be empty');
 
-    final int batchId = nextBatchId;
-    nextBatchId += 1;
+    final int batchId = _nextBatchId;
+    _nextBatchId += 1;
 
     final int size = queue.length;
     if (size > 0) {

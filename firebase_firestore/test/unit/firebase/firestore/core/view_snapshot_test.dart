@@ -29,17 +29,27 @@ void main() {
     const bool fromCache = true;
     const bool hasPendingWrites = true;
     const bool syncStateChanges = true;
+    const bool excludesMetadataChanges = true;
 
-    final ViewSnapshot snapshot = ViewSnapshot(query, docs, oldDocs, changes,
-        fromCache, mutatedKeys, syncStateChanges);
+    final ViewSnapshot snapshot = ViewSnapshot(
+      query,
+      docs,
+      oldDocs,
+      changes,
+      fromCache,
+      mutatedKeys,
+      syncStateChanges,
+      excludesMetadataChanges,
+    );
 
-    expect(query, snapshot.query);
-    expect(docs, snapshot.documents);
-    expect(oldDocs, snapshot.oldDocuments);
-    expect(changes, snapshot.changes);
-    expect(fromCache, snapshot.isFromCache);
-    expect(mutatedKeys, snapshot.mutatedKeys);
-    expect(hasPendingWrites, snapshot.hasPendingWrites);
-    expect(syncStateChanges, snapshot.didSyncStateChange);
+    expect(snapshot.query, query);
+    expect(snapshot.documents, docs);
+    expect(snapshot.oldDocuments, oldDocs);
+    expect(snapshot.changes, changes);
+    expect(snapshot.isFromCache, fromCache);
+    expect(snapshot.mutatedKeys, mutatedKeys);
+    expect(snapshot.hasPendingWrites, hasPendingWrites);
+    expect(snapshot.didSyncStateChange, syncStateChanges);
+    expect(snapshot.excludesMetadataChanges, excludesMetadataChanges);
   });
 }

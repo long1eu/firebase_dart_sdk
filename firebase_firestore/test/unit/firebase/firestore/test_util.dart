@@ -105,6 +105,7 @@ QuerySnapshot querySnapshot(
     isFromCache,
     mutatedKeys,
     true,
+    false /*excludesMetadataChanges*/,
   );
 
   return QuerySnapshot(query(path), viewSnapshot, firestore);
@@ -128,10 +129,6 @@ TestTargetMetadataProvider get testTargetMetadataProvider {
 /// access to the [TargetMetadataProvider] callbacks. Any target accessed via
 /// these callbacks must be registered beforehand via [setSyncedKeys].
 class TestTargetMetadataProvider extends TargetMetadataProvider {
-  final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys;
-
-  final Map<int, QueryData> queryDataMap;
-
   TestTargetMetadataProvider(
       this.syncedKeys,
       this.queryDataMap,
@@ -141,8 +138,13 @@ class TestTargetMetadataProvider extends TargetMetadataProvider {
       @required
           QueryData Function(int targetId) getQueryDataForTarget})
       : super(
-            getRemoteKeysForTarget: getRemoteKeysForTarget,
-            getQueryDataForTarget: getQueryDataForTarget);
+          getRemoteKeysForTarget: getRemoteKeysForTarget,
+          getQueryDataForTarget: getQueryDataForTarget,
+        );
+
+  final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys;
+
+  final Map<int, QueryData> queryDataMap;
 
   /// Sets or replaces the local state for the provided query data.
   void setSyncedKeys(

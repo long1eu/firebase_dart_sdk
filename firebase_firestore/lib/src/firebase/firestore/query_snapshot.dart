@@ -64,6 +64,13 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
 
   @publicApi
   List<DocumentChange> getDocumentChanges(MetadataChanges metadataChanges) {
+    if (metadataChanges == MetadataChanges.include &&
+        snapshot.excludesMetadataChanges) {
+      throw ArgumentError('To include metadata changes with your document '
+          'changes, you must also pass MetadataChanges.include to '
+          'getSnapshots().');
+    }
+
     if (_cachedChanges == null ||
         _cachedChangesMetadataState != metadataChanges) {
       _cachedChanges = DocumentChange.changesFromSnapshot(
