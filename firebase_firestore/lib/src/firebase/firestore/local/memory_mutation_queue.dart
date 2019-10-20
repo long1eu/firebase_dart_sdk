@@ -21,11 +21,11 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
 class MemoryMutationQueue implements MutationQueue {
   MemoryMutationQueue(this.persistence)
-      : queue = <MutationBatch>[],
-        batchesByDocumentKey =
+      : _queue = <MutationBatch>[],
+        _batchesByDocumentKey =
             ImmutableSortedSet<DocumentReference>(<DocumentReference>[], DocumentReference.byKey),
         _nextBatchId = 1,
-        highestAcknowledgedBatchId = MutationBatch.unknown,
+        _highestAcknowledgedBatchId = MutationBatch.unknown,
         lastStreamToken = WriteStream.emptyStreamToken;
 
   /// A FIFO queue of all mutations to apply to the backend. Mutations are added to the end of the
@@ -43,10 +43,10 @@ class MemoryMutationQueue implements MutationQueue {
   ///
   /// Once the held write acknowledgements become visible they are removed from the head of the
   /// queue along with any tombstones that follow.
-  final List<MutationBatch> queue;
+  final List<MutationBatch> _queue;
 
   /// An ordered mapping between documents and the mutation batch ids.
-  ImmutableSortedSet<DocumentReference> batchesByDocumentKey;
+  ImmutableSortedSet<DocumentReference> _batchesByDocumentKey;
 
   /// The next value to use when assigning sequential ids to each mutation batch.
   int _nextBatchId;
@@ -60,7 +60,7 @@ class MemoryMutationQueue implements MutationQueue {
   final MemoryPersistence persistence;
 
   /// The highest acknowledged mutation in the queue.
-  int highestAcknowledgedBatchId;
+  int _highestAcknowledgedBatchId;
 
   // MutationQueue implementation
 
@@ -73,9 +73,9 @@ class MemoryMutationQueue implements MutationQueue {
     final bool queueIsEmpty = await isEmpty();
     if (queueIsEmpty) {
       _nextBatchId = 1;
-      highestAcknowledgedBatchId = MutationBatch.unknown;
+      _highestAcknowledgedBatchId = MutationBatch.unknown;
     }
-    hardAssert(highestAcknowledgedBatchId < _nextBatchId,
+    hardAssert(_highestAcknowledgedBatchId < _nextBatchId,
         'highestAcknowledgedBatchId must be less than the nextBatchId');
   }
 
@@ -83,26 +83,24 @@ class MemoryMutationQueue implements MutationQueue {
   Future<bool> isEmpty() async {
     // If the queue has any entries at all, the first entry must not be a tombstone (otherwise it
     // would have been removed already).
-    return queue.isEmpty;
+    return _queue.isEmpty;
   }
 
   @override
   Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken) async {
     final int batchId = batch.batchId;
     hardAssert(
-        batchId > highestAcknowledgedBatchId, 'Mutation batchIds must be acknowledged in order');
+        batchId > _highestAcknowledgedBatchId, 'Mutation batchIds must be acknowledged in order');
 
-    final int batchIndex = indexOfExistingBatchId(batchId, 'acknowledged');
+    final int batchIndex = _indexOfExistingBatchId(batchId, 'acknowledged');
+    hardAssert(batchIndex == 0, 'Can only acknowledge the first batch in the mutation queue');
 
     // Verify that the batch in the queue is the one to be acknowledged.
-    final MutationBatch check = queue[batchIndex];
-    hardAssert(
-        batchId == check.batchId,
-        'Queue ordering failure: expected batch $batchId, '
-        'got batch ${check.batchId}');
-    hardAssert(!check.isTombstone, 'Can\'t acknowledge a previously removed batch');
+    final MutationBatch check = _queue[batchIndex];
+    hardAssert(batchId == check.batchId,
+        'Queue ordering failure: expected batch $batchId, got batch ${check.batchId}');
 
-    highestAcknowledgedBatchId = batchId;
+    _highestAcknowledgedBatchId = batchId;
     lastStreamToken = checkNotNull(streamToken);
   }
 
@@ -118,19 +116,20 @@ class MemoryMutationQueue implements MutationQueue {
     final int batchId = _nextBatchId;
     _nextBatchId += 1;
 
-    final int size = queue.length;
+    final int size = _queue.length;
     if (size > 0) {
-      final MutationBatch prior = queue[size - 1];
+      final MutationBatch prior = _queue[size - 1];
       hardAssert(
           prior.batchId < batchId, 'Mutation batchIds must be monotonically increasing order');
     }
 
     final MutationBatch batch = MutationBatch(batchId, localWriteTime, mutations);
-    queue.add(batch);
+    _queue.add(batch);
 
     // Track references by document key.
     for (Mutation mutation in mutations) {
-      batchesByDocumentKey = batchesByDocumentKey.insert(DocumentReference(mutation.key, batchId));
+      _batchesByDocumentKey =
+          _batchesByDocumentKey.insert(DocumentReference(mutation.key, batchId));
     }
 
     return batch;
@@ -138,43 +137,32 @@ class MemoryMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch> lookupMutationBatch(int batchId) async {
-    final int index = indexOfBatchId(batchId);
-    if (index < 0 || index >= queue.length) {
+    final int index = _indexOfBatchId(batchId);
+    if (index < 0 || index >= _queue.length) {
       return null;
     }
 
-    final MutationBatch batch = queue[index];
+    final MutationBatch batch = _queue[index];
     hardAssert(batch.batchId == batchId, 'If found batch must match');
-    return batch.isTombstone ? null : batch;
+    return batch;
   }
 
   @override
   Future<MutationBatch> getNextMutationBatchAfterBatchId(int batchId) async {
-    final int size = queue.length;
-
     // All batches with [batchId] <= [highestAcknowledgedBatchId] have been acknowledged so the
     // first unacknowledged batch after batchId will have a [batchId] larger than both of these
     // values.
-    final int nextBatchId = max(batchId, highestAcknowledgedBatchId) + 1;
+    final int nextBatchId = max(batchId, _highestAcknowledgedBatchId) + 1;
 
     // The requested batchId may still be out of range so normalize it to the start of the queue.
-    final int rawIndex = indexOfBatchId(nextBatchId);
-    int index = rawIndex < 0 ? 0 : rawIndex;
-
-    // Finally return the first non-tombstone batch.
-    for (; index < size; index++) {
-      final MutationBatch batch = queue[index];
-      if (!batch.isTombstone) {
-        return batch;
-      }
-    }
-
-    return null;
+    final int rawIndex = _indexOfBatchId(nextBatchId);
+    final int index = rawIndex < 0 ? 0 : rawIndex;
+    return _queue.length > index ? _queue[index] : null;
   }
 
   @override
   Future<List<MutationBatch>> getAllMutationBatches() async {
-    return getAllLiveMutationBatchesBeforeIndex(queue.length);
+    return List<MutationBatch>.unmodifiable(_queue);
   }
 
   @override
@@ -183,7 +171,7 @@ class MemoryMutationQueue implements MutationQueue {
     final DocumentReference start = DocumentReference(documentKey, 0);
 
     final List<MutationBatch> result = <MutationBatch>[];
-    final Iterator<DocumentReference> iterator = batchesByDocumentKey.iteratorFrom(start);
+    final Iterator<DocumentReference> iterator = _batchesByDocumentKey.iteratorFrom(start);
     while (iterator.moveNext()) {
       final DocumentReference reference = iterator.current;
       if (documentKey != reference.key) {
@@ -206,7 +194,7 @@ class MemoryMutationQueue implements MutationQueue {
 
     for (DocumentKey key in documentKeys) {
       final DocumentReference start = DocumentReference(key, 0);
-      final Iterator<DocumentReference> batchesIterator = batchesByDocumentKey.iteratorFrom(start);
+      final Iterator<DocumentReference> batchesIterator = _batchesByDocumentKey.iteratorFrom(start);
       while (batchesIterator.moveNext()) {
         final DocumentReference reference = batchesIterator.current;
         if (key != reference.key) {
@@ -216,7 +204,7 @@ class MemoryMutationQueue implements MutationQueue {
       }
     }
 
-    return lookupMutationBatches(uniqueBatchIDs);
+    return _lookupMutationBatches(uniqueBatchIDs);
   }
 
   @override
@@ -239,7 +227,7 @@ class MemoryMutationQueue implements MutationQueue {
     ImmutableSortedSet<int> uniqueBatchIDs =
         ImmutableSortedSet<int>(<int>[], standardComparator<num>());
 
-    final Iterator<DocumentReference> iterator = batchesByDocumentKey.iteratorFrom(start);
+    final Iterator<DocumentReference> iterator = _batchesByDocumentKey.iteratorFrom(start);
     while (iterator.moveNext()) {
       final DocumentReference reference = iterator.current;
       final ResourcePath rowKeyPath = reference.key.path;
@@ -255,10 +243,10 @@ class MemoryMutationQueue implements MutationQueue {
       }
     }
 
-    return lookupMutationBatches(uniqueBatchIDs);
+    return _lookupMutationBatches(uniqueBatchIDs);
   }
 
-  Future<List<MutationBatch>> lookupMutationBatches(ImmutableSortedSet<int> batchIds) async {
+  Future<List<MutationBatch>> _lookupMutationBatches(ImmutableSortedSet<int> batchIds) async {
     // Construct an array of matching batches, sorted by batchId to ensure that multiple mutations
     // affecting the same document key are applied in order.
     final List<MutationBatch> result = <MutationBatch>[];
@@ -276,30 +264,13 @@ class MemoryMutationQueue implements MutationQueue {
   Future<void> removeMutationBatch(MutationBatch batch) async {
     // Find the position of the first batch for removal. This need not be the first entry in the
     // queue.
-    final int batchIndex = indexOfExistingBatchId(batch.batchId, 'removed');
-    hardAssert(
-        queue[batchIndex].batchId == batch.batchId, 'Removed batches must exist in the queue');
+    final int batchIndex = _indexOfExistingBatchId(batch.batchId, 'removed');
+    hardAssert(batchIndex == 0, "Can only remove the first entry of the mutation queue");
 
-    // Only actually remove batches if removing at the front of the queue. Previously rejected
-    // batches may have left tombstones in the queue, so expand the removal range to include any
-    // tombstones.
-    if (batchIndex == 0) {
-      int endIndex = 1;
-      for (; endIndex < queue.length; endIndex++) {
-        final MutationBatch currentBatch = queue[endIndex];
-        if (!currentBatch.isTombstone) {
-          break;
-        }
-      }
-
-      queue.removeRange(batchIndex, endIndex);
-    } else {
-      // Mark tombstones
-      queue[batchIndex] = queue[batchIndex].toTombstone();
-    }
+    _queue.removeAt(0);
 
     // Remove entries from the index too.
-    ImmutableSortedSet<DocumentReference> references = batchesByDocumentKey;
+    ImmutableSortedSet<DocumentReference> references = _batchesByDocumentKey;
     for (Mutation mutation in batch.mutations) {
       final DocumentKey key = mutation.key;
       await persistence.referenceDelegate.removeMutationReference(key);
@@ -308,13 +279,13 @@ class MemoryMutationQueue implements MutationQueue {
       references = references.remove(reference);
     }
 
-    batchesByDocumentKey = references;
+    _batchesByDocumentKey = references;
   }
 
   @override
   Future<void> performConsistencyCheck() async {
-    if (queue.isEmpty) {
-      hardAssert(batchesByDocumentKey.isEmpty,
+    if (_queue.isEmpty) {
+      hardAssert(_batchesByDocumentKey.isEmpty,
           'Document leak -- detected dangling mutation references when queue is empty.');
     }
   }
@@ -324,7 +295,7 @@ class MemoryMutationQueue implements MutationQueue {
     // this key.
     final DocumentReference reference = DocumentReference(key, 0);
 
-    final Iterator<DocumentReference> iterator = batchesByDocumentKey.iteratorFrom(reference);
+    final Iterator<DocumentReference> iterator = _batchesByDocumentKey.iteratorFrom(reference);
     if (!iterator.moveNext()) {
       return false;
     }
@@ -335,29 +306,14 @@ class MemoryMutationQueue implements MutationQueue {
 
   // Helpers
 
-  /// A private helper that collects all the mutation batches in the queue up to but not including
-  /// the given [endIndex]. All tombstones in the queue are excluded.
-  List<MutationBatch> getAllLiveMutationBatchesBeforeIndex(int endIndex) {
-    final List<MutationBatch> result = <MutationBatch>[];
-
-    for (int i = 0; i < endIndex; i++) {
-      final MutationBatch batch = queue[i];
-
-      if (!batch.isTombstone) {
-        result.add(batch);
-      }
-    }
-    return result.toList(growable: false);
-  }
-
   /// Finds the index of the given batchId in the mutation queue. This operation is O(1).
   ///
   /// Returns the computed index of the batch with the given [batchId], based on the state of the
   /// queue. Note this index can be negative if the requested [batchId] has already been removed
   /// from the queue or past the end of the queue if the [batchId] is larger than the last added
   /// batch.
-  int indexOfBatchId(int batchId) {
-    if (queue.isEmpty) {
+  int _indexOfBatchId(int batchId) {
+    if (_queue.isEmpty) {
       // As an index this is past the end of the queue
       return 0;
     }
@@ -365,7 +321,7 @@ class MemoryMutationQueue implements MutationQueue {
     // Examine the front of the queue to figure out the difference between the [batchId] and indexes
     // in the array. Note that since the queue is ordered by [batchId], if the first batch has a
     // larger [batchId] then the requested [batchId] doesn't exist in the queue.
-    final MutationBatch firstBatch = queue[0];
+    final MutationBatch firstBatch = _queue[0];
     final int firstBatchId = firstBatch.batchId;
     return batchId - firstBatchId;
   }
@@ -374,9 +330,9 @@ class MemoryMutationQueue implements MutationQueue {
   /// index is within the bounds of the queue. The [batchId] to search for [action] is description
   /// of what the caller is doing, phrased in passive form (e.g. 'acknowledged' in a routine that
   /// acknowledges batches).
-  int indexOfExistingBatchId(int batchId, String action) {
-    final int index = indexOfBatchId(batchId);
-    hardAssert(index >= 0 && index < queue.length, 'Batches must exist to be $action');
+  int _indexOfExistingBatchId(int batchId, String action) {
+    final int index = _indexOfBatchId(batchId);
+    hardAssert(index >= 0 && index < _queue.length, 'Batches must exist to be $action');
     return index;
   }
 }

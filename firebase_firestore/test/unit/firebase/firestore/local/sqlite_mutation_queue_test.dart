@@ -49,11 +49,12 @@ void main() {
     final MutationBatch batch2 = await testCase.addMutationBatch();
     await testCase.expectCount(count: 2, isEmpty: false);
 
-    await testCase.removeMutationBatches(<MutationBatch>[batch2]);
+    await testCase.removeMutationBatches(<MutationBatch>[batch1]);
     await testCase.expectCount(count: 1, isEmpty: false);
 
-    await testCase.removeMutationBatches(<MutationBatch>[batch1]);
+    await testCase.removeMutationBatches(<MutationBatch>[batch2]);
     await testCase.expectCount(count: 0, isEmpty: true);
+    expect(await mutationQueue.isEmpty(), isTrue);
   });
 
   test('testAcknowledgeThenRemove', () async {
@@ -73,7 +74,7 @@ void main() {
     expect(notFound, isNull);
 
     final List<MutationBatch> batches = await testCase.createBatches(10);
-    final List<MutationBatch> removed = await testCase.makeHoles(<int>[2, 6, 7], batches);
+    final List<MutationBatch> removed = await testCase.removeFirstBatches(3, batches);
 
     // After removing, a batch should not be found
     for (MutationBatch batch in removed) {
@@ -95,10 +96,7 @@ void main() {
 
   test('testNextMutationBatchAfterBatchId', () async {
     final List<MutationBatch> batches = await testCase.createBatches(10);
-
-    // This is an array of successors assuming the removals below will happen:
-    final List<MutationBatch> afters = <MutationBatch>[batches[3], batches[8], batches[8]];
-    final List<MutationBatch> removed = await testCase.makeHoles(<int>[2, 6, 7], batches);
+    final List<MutationBatch> removed = await testCase.removeFirstBatches(3, batches);
 
     for (int i = 0; i < batches.length - 1; i++) {
       final MutationBatch current = batches[i];
@@ -111,7 +109,7 @@ void main() {
 
     for (int i = 0; i < removed.length; i++) {
       final MutationBatch current = removed[i];
-      final MutationBatch next = afters[i];
+      final MutationBatch next = batches[i];
       final MutationBatch found =
           await mutationQueue.getNextMutationBatchAfterBatchId(current.batchId);
       expect(found, isNotNull);
@@ -201,14 +199,12 @@ void main() {
     expect(matches, expected);
   });
 
-  // PORTING NOTE: this test only applies to Android, because it's the only p
-  // latform where the implementation of
-  // getAllMutationBatchesAffectingDocumentKeys might split the input into
-  // several queries.
+  // PORTING NOTE: this test only applies to Android, because it's the only platform where the
+  // implementation of getAllMutationBatchesAffectingDocumentKeys might split the input into several
+  // queries.
   test('testAllMutationBatchesAffectingDocumentLotsOfDocumentKeys', () async {
     final List<Mutation> mutations = <Mutation>[];
-    // Make sure to force SQLite implementation to split the large query into
-    // several smaller ones.
+    // Make sure to force SQLite implementation to split the large query into several smaller ones.
     const int lotsOfMutations = 10000;
     for (int i = 0; i < lotsOfMutations; i++) {
       mutations.add(setMutation('foo/$i', map(<dynamic>['a', 1])));
@@ -220,9 +216,9 @@ void main() {
       }
     });
 
-    // To make it easier validating the large resulting set, use a simple
-    // criteria to evaluate -- query all keys with an even number in them and
-    // make sure the corresponding batches make it into the results.
+    // To make it easier validating the large resulting set, use a simple criteria to evaluate --
+    // query all keys with an even number in them and make sure the corresponding batches make it
+    // into the results.
     ImmutableSortedSet<DocumentKey> evenKeys = DocumentKey.emptyKeySet;
     final List<MutationBatch> expected = <MutationBatch>[];
     for (int i = 2; i < lotsOfMutations; i += 2) {
@@ -306,17 +302,17 @@ void main() {
     expect(found, batches);
     expect(found.length, 6);
 
-    await testCase.removeMutationBatches(<MutationBatch>[batches.removeAt(batches.length - 1)]);
+    await testCase.removeMutationBatches(<MutationBatch>[batches.removeAt(0)]);
     expect(await testCase.batchCount(), 5);
 
     found = await mutationQueue.getAllMutationBatches();
     expect(found, batches);
     expect(found.length, 5);
 
-    await testCase.removeMutationBatches(<MutationBatch>[batches.removeAt(3)]);
+    await testCase.removeMutationBatches(<MutationBatch>[batches.removeAt(0)]);
     expect(await testCase.batchCount(), 4);
 
-    await testCase.removeMutationBatches(<MutationBatch>[batches.removeAt(1)]);
+    await testCase.removeMutationBatches(<MutationBatch>[batches.removeAt(0)]);
     expect(await testCase.batchCount(), 3);
 
     found = await mutationQueue.getAllMutationBatches();

@@ -16,7 +16,9 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// tombstone if the mutation queue does not remove them immediately. When a batch is a tombstone it
 /// has no mutations.
 class MutationBatch {
-  const MutationBatch(this.batchId, this.localWriteTime, this.mutations);
+  const MutationBatch(this.batchId, this.localWriteTime, this.mutations)
+      // ignore: prefer_is_empty
+      : assert(mutations.length != 0, 'Cannot create an empty mutation batch');
 
   /// A batch ID that was searched for and not found or a batch ID value known to be before all
   /// known batches.
@@ -75,18 +77,6 @@ class MutationBatch {
       }
     }
     return maybeDoc;
-  }
-
-  /// Returns true if this mutation batch has already been removed from the mutation queue.
-  ///
-  /// Note that not all implementations of the [MutationQueue] necessarily use tombstones as a part
-  /// of their implementation and generally speaking no code outside the mutation queues should
-  /// really care about this.
-  bool get isTombstone => mutations.isEmpty;
-
-  /// Converts this batch to a tombstone.
-  MutationBatch toTombstone() {
-    return MutationBatch(batchId, localWriteTime, <Mutation>[]);
   }
 
   /// Returns the set of unique keys referenced by all mutations in the batch.
