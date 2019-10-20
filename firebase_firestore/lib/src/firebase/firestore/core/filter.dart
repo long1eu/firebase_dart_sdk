@@ -17,21 +17,20 @@ abstract class Filter {
 
   /// Gets a Filter instance for the provided path, operator, and value.
   ///
-  /// * Note that if the relation operator is [FilterOperator.equal] and the
-  /// value is null or NaN, this will return the appropriate [NullFilter] or
-  /// [NaNFilter] class instead of a [RelationFilter].
-  factory Filter.create(
-      FieldPath path, FilterOperator operator, FieldValue value) {
+  /// Note that if the relation operator is [FilterOperator.equal] and the value is null or NaN,
+  /// this will return the appropriate [NullFilter] or [NaNFilter] class instead of a
+  /// [RelationFilter].
+  factory Filter.create(FieldPath path, FilterOperator operator, FieldValue value) {
     if (value == NullValue.nullValue()) {
       if (operator != FilterOperator.equal) {
-        throw ArgumentError('Invalid Query. You can only perform equality '
-            'comparisons on null (via whereEqualTo()).');
+        throw ArgumentError('Invalid Query. You can only perform equality comparisons on null (via '
+            'whereEqualTo()).');
       }
       return NullFilter(path);
     } else if (value == DoubleValue.nan) {
       if (operator != FilterOperator.equal) {
-        throw ArgumentError('Invalid Query. You can only perform equality '
-            'comparisons on NaN (via whereEqualTo()).');
+        throw ArgumentError('Invalid Query. You can only perform equality comparisons on NaN (via'
+            ' whereEqualTo()).');
       }
       return NaNFilter(path);
     } else {
@@ -59,8 +58,7 @@ class FilterOperator {
   static const FilterOperator equal = FilterOperator._('==');
   static const FilterOperator graterThan = FilterOperator._('>');
   static const FilterOperator graterThanOrEqual = FilterOperator._('>=');
-  static const FilterOperator arrayContains =
-      FilterOperator._('array_contains');
+  static const FilterOperator arrayContains = FilterOperator._('array_contains');
 
   @override
   String toString() => _value;

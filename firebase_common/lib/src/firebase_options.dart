@@ -80,7 +80,7 @@ class FirebaseOptions {
 
   /// Determine whether automatic data collection is enabled or disabled in all
   /// SDKs.
-  /// * Note: this value is respected by all SDKs unless overridden by the
+  /// Note: this value is respected by all SDKs unless overridden by the
   /// developer via SDK specific mechanisms.
   @publicApi
   final bool dataCollectionEnabled;

@@ -44,16 +44,15 @@ class OrderBy {
     } else {
       final FieldValue v1 = d1.getField(field);
       final FieldValue v2 = d2.getField(field);
-      Assert.hardAssert(v1 != null && v2 != null,
-          'Trying to compare documents on fields that don\'t exist.');
+      hardAssert(
+          v1 != null && v2 != null, 'Trying to compare documents on fields that don\'t exist.');
       return direction._comparisonModifier * v1.compareTo(v2);
     }
   }
 
   @override
   String toString() {
-    return (direction == OrderByDirection.ascending ? '' : '-') +
-        field.canonicalString;
+    return (direction == OrderByDirection.ascending ? '' : '-') + field.canonicalString;
   }
 
   @override

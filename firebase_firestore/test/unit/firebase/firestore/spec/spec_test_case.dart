@@ -35,7 +35,7 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.da
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart' as asserts;
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
 import 'package:test/test.dart';
@@ -63,8 +63,7 @@ class SpecTestCase implements RemoteStoreCallback {
       ? <String>{'no-android', 'multi-client'}
       : <String>{'no-android', 'benchmark', 'multi-client'};
 
-  final Future<Persistence> Function(bool garbageCollectionEnabled, String name)
-      getPersistence;
+  final Future<Persistence> Function(bool garbageCollectionEnabled, String name) getPersistence;
   final bool Function(Set<String> tags) isExcluded;
 
   String currentName;
@@ -100,15 +99,15 @@ class SpecTestCase implements RemoteStoreCallback {
   /// [SyncEngine.writeMutations] but not yet acknowledged by calling
   /// receiveWriteAck/Error. They are tracked per-user.
   ///
-  /// * It is mostly an implementation detail used internally to validate that
+  /// It is mostly an implementation detail used internally to validate that
   /// the writes sent to the mock backend by the [SyncEngine] match the user
   /// mutations that initiated them.
   ///
-  /// * It is exposed specifically for use [_doRestart] to test persistence
+  /// It is exposed specifically for use [_doRestart] to test persistence
   /// scenarios where the [SyncEngine] is restarted while the [Persistence]
   /// implementation still has outstanding persisted mutations.
   ///
-  /// * Note: The size of the list for the current user will generally be the
+  /// Note: The size of the list for the current user will generally be the
   /// same as [_writesSent], but not necessarily, since the [RemoteStore] limits
   /// the number of outstanding writes to the backend at a given time.
   Map<User, List<Pair<Mutation, Future<void>>>> _outstandingWrites;
@@ -161,8 +160,7 @@ class SpecTestCase implements RemoteStoreCallback {
     _currentUser = User.unauthenticated;
 
     if ((config['numClients'] ?? 1) != 1) {
-      throw Assert.fail(
-          'The Android client does not support multi-client tests');
+      throw asserts.fail('The Android client does not support multi-client tests');
     }
 
     if (config.isNotEmpty) {
@@ -192,8 +190,7 @@ class SpecTestCase implements RemoteStoreCallback {
   Future<void> _initClient([bool isRestart = false]) async {
     log('    Set up a new client.');
 
-    _localPersistence =
-        await getPersistence(_garbageCollectionEnabled, currentName ?? 'init');
+    _localPersistence = await getPersistence(_garbageCollectionEnabled, currentName ?? 'init');
 
     final LocalStore localStore = LocalStore(_localPersistence, _currentUser);
 
@@ -215,8 +212,7 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   List<Pair<Mutation, Future<void>>> _getCurrentOutstandingWrites() {
-    List<Pair<Mutation, Future<void>>> writes =
-        _outstandingWrites[_currentUser];
+    List<Pair<Mutation, Future<void>>> writes = _outstandingWrites[_currentUser];
     if (writes == null) {
       writes = <Pair<Mutation, Future<void>>>[];
       _outstandingWrites[_currentUser] = writes;
@@ -248,11 +244,11 @@ class SpecTestCase implements RemoteStoreCallback {
   /// https://github.com/firebase/firebase-js-sdk/blob/master/packages/firestore/test/unit/specs/spec_test_runner.ts#L1115
   Query _parseQuery(Object querySpec) {
     if (querySpec is String) {
-      return Query.atPath(ResourcePath.fromString(querySpec));
+      return Query(ResourcePath.fromString(querySpec));
     } else if (querySpec is Map<String, dynamic>) {
       final Map<String, dynamic> queryDict = querySpec;
       final String path = queryDict['path'];
-      Query query = Query.atPath(ResourcePath.fromString(path));
+      Query query = Query(ResourcePath.fromString(path));
       if (queryDict.containsKey('limit')) {
         query = query.limit(queryDict['limit']);
       }
@@ -277,12 +273,11 @@ class SpecTestCase implements RemoteStoreCallback {
       }
       return query;
     } else {
-      throw Assert.fail('Invalid query: $querySpec');
+      throw asserts.fail('Invalid query: $querySpec');
     }
   }
 
-  DocumentViewChange _parseChange(
-      Map<String, dynamic> jsonDoc, DocumentViewChangeType type) {
+  DocumentViewChange _parseChange(Map<String, dynamic> jsonDoc, DocumentViewChangeType type) {
     final int version = jsonDoc['version'];
     final Map<String, dynamic> options = jsonDoc['options'];
     final DocumentState documentState = options['hasLocalMutations'] ?? false
@@ -292,8 +287,7 @@ class SpecTestCase implements RemoteStoreCallback {
             : DocumentState.synced);
 
     final Map<String, Object> values = _parseMap(jsonDoc['value']);
-    final Document document =
-        doc(jsonDoc['key'], version, values, documentState);
+    final Document document = doc(jsonDoc['key'], version, values, documentState);
     return DocumentViewChange(type, document);
   }
 
@@ -356,10 +350,8 @@ class SpecTestCase implements RemoteStoreCallback {
           _events.add(QueryEvent(query: query, view: value));
         },
         onError: (dynamic error) {
-          Assert.hardAssert(
-              error is FirebaseFirestoreError,
-              'The recived error is not a FirebaseFirestoreError it is '
-              '${error.runtimeType}.');
+          asserts.hardAssert(error is FirebaseFirestoreError,
+              'The recived error is not a FirebaseFirestoreError it is ${error.runtimeType}.');
           _events.add(QueryEvent(query: query, error: error));
         },
       );
@@ -385,8 +377,7 @@ class SpecTestCase implements RemoteStoreCallback {
         .then((_) => _acknowledgedDocs.add(documentKey))
         .catchError((dynamic e) => _rejectedDocs.add(documentKey));
 
-    _getCurrentOutstandingWrites()
-        .add(Pair<Mutation, Future<void>>(mutation, writeProcessed));
+    _getCurrentOutstandingWrites().add(Pair<Mutation, Future<void>>(mutation, writeProcessed));
     log('      Sending this write: $mutation');
 
     await _syncEngine.writeMutations(<Mutation>[mutation], callback);
@@ -406,24 +397,22 @@ class SpecTestCase implements RemoteStoreCallback {
 
   // Helper for calling datastore.writeWatchChange() on the AsyncQueue.
 
-  Future<void> _writeWatchChange(
-      WatchChange change, SnapshotVersion version) async {
+  Future<void> _writeWatchChange(WatchChange change, SnapshotVersion version) async {
     await _datastore.writeWatchChange(change, version);
     await Future<void>.delayed(const Duration(milliseconds: 32));
   }
 
   Future<void> _doWatchAck(List<dynamic> ackedTargets) async {
-    final WatchChangeWatchTargetChange change = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.added, _parseIntList(ackedTargets));
+    final WatchChangeWatchTargetChange change =
+        WatchChangeWatchTargetChange(WatchTargetChangeType.added, _parseIntList(ackedTargets));
     await _writeWatchChange(change, SnapshotVersion.none);
   }
 
   Future<void> _doWatchCurrent(List<dynamic> currentSpec) async {
     final List<int> currentTargets = _parseIntList(currentSpec[0]);
-    final Uint8List resumeToken =
-        Uint8List.fromList(utf8.encode(currentSpec[1]));
-    final WatchChangeWatchTargetChange change = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.current, currentTargets, resumeToken);
+    final Uint8List resumeToken = Uint8List.fromList(utf8.encode(currentSpec[1]));
+    final WatchChangeWatchTargetChange change =
+        WatchChangeWatchTargetChange(WatchTargetChangeType.current, currentTargets, resumeToken);
     await _writeWatchChange(change, SnapshotVersion.none);
   }
 
@@ -437,13 +426,9 @@ class SpecTestCase implements RemoteStoreCallback {
       }
     }
 
-    final List<int> targetIds =
-        _parseIntList(watchRemoveSpec['targetIds'].cast<int>());
+    final List<int> targetIds = _parseIntList(watchRemoveSpec['targetIds'].cast<int>());
     final WatchChangeWatchTargetChange change = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.removed,
-        targetIds,
-        WatchStream.emptyResumeToken,
-        error);
+        WatchTargetChangeType.removed, targetIds, WatchStream.emptyResumeToken, error);
 
     await _writeWatchChange(change, SnapshotVersion.none);
     // Unlike web, the MockDatastore detects a watch removal with cause and will
@@ -454,8 +439,8 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _doWatchEntity(Map<String, dynamic> watchEntity) async {
     if (watchEntity.containsKey('docs')) {
-      Assert.hardAssert(!watchEntity.containsKey('doc'),
-          'Exactly one of |doc| or |docs| needs to be set.');
+      asserts.hardAssert(
+          !watchEntity.containsKey('doc'), 'Exactly one of |doc| or |docs| needs to be set.');
       final List<dynamic> docs = watchEntity['docs'];
       for (int i = 0; i < docs.length; ++i) {
         final Map<String, dynamic> doc = docs[i];
@@ -480,8 +465,7 @@ class SpecTestCase implements RemoteStoreCallback {
       final MaybeDocument document =
           value != null ? doc(key, version, value) : deletedDoc(key, version);
 
-      final List<int> updated =
-          _parseIntList(watchEntity['targets'] ?? <int>[].cast<int>());
+      final List<int> updated = _parseIntList(watchEntity['targets'] ?? <int>[].cast<int>());
       final List<int> removed =
           _parseIntList((watchEntity['removedTargets'] ?? <int>[]).cast<int>());
       final WatchChange change =
@@ -490,20 +474,18 @@ class SpecTestCase implements RemoteStoreCallback {
       await _writeWatchChange(change, SnapshotVersion.none);
     } else if (watchEntity.containsKey('key')) {
       final String _key = watchEntity['key'];
-      final List<int> removed =
-          _parseIntList(watchEntity['removedTargets'].cast<int>());
-      final WatchChange change =
-          WatchChangeDocumentChange(<int>[], removed, key(_key), null);
+      final List<int> removed = _parseIntList(watchEntity['removedTargets'].cast<int>());
+      final WatchChange change = WatchChangeDocumentChange(<int>[], removed, key(_key), null);
       await _writeWatchChange(change, SnapshotVersion.none);
     } else {
-      throw Assert.fail('Either key, doc or docs must be set.');
+      throw asserts.fail('Either key, doc or docs must be set.');
     }
   }
 
   Future<void> _doWatchFilter(List<dynamic> watchFilter) async {
     final List<int> targets = _parseIntList(watchFilter[0].cast<int>());
-    Assert.hardAssert(targets.length == 1,
-        'ExistenceFilters currently support exactly one target only.');
+    asserts.hardAssert(
+        targets.length == 1, 'ExistenceFilters currently support exactly one target only.');
 
     final int keyCount = watchFilter.isEmpty ? 0 : watchFilter.length - 1;
 
@@ -517,22 +499,18 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _doWatchReset(List<dynamic> targetIds) async {
     final List<int> targets = _parseIntList(targetIds);
-    final WatchChange change =
-        WatchChangeWatchTargetChange(WatchTargetChangeType.reset, targets);
+    final WatchChange change = WatchChangeWatchTargetChange(WatchTargetChangeType.reset, targets);
     await _writeWatchChange(change, SnapshotVersion.none);
   }
 
   Future<void> _doWatchSnapshot(Map<String, dynamic> watchSnapshot) async {
     // The client will only respond to watchSnapshots if they are on a target
     // change with an empty set of target IDs.
-    final List<int> targets =
-        _parseIntList(watchSnapshot['targetIds']?.cast<int>());
+    final List<int> targets = _parseIntList(watchSnapshot['targetIds']?.cast<int>());
     final String resumeToken = watchSnapshot['resumeToken'] ?? '';
 
     final WatchChange change = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.noChange,
-        targets,
-        Uint8List.fromList(utf8.encode(resumeToken)));
+        WatchTargetChangeType.noChange, targets, Uint8List.fromList(utf8.encode(resumeToken)));
 
     await _writeWatchChange(change, version(watchSnapshot['version']));
   }
@@ -560,14 +538,12 @@ class SpecTestCase implements RemoteStoreCallback {
         !keepInQueue,
         '"keepInQueue=true" is not supported on Android and should only be set'
         ' in multi-client tests');
-    final Pair<Mutation, Future<void>> write =
-        _getCurrentOutstandingWrites().removeAt(0);
+    final Pair<Mutation, Future<void>> write = _getCurrentOutstandingWrites().removeAt(0);
     _validateNextWriteSent(write.first);
 
     final MutationResult mutationResult =
         MutationResult(version(_version), /*transformResults:*/ null);
-    await _datastore
-        .ackWrite(version(_version), <MutationResult>[mutationResult]);
+    await _datastore.ackWrite(version(_version), <MutationResult>[mutationResult]);
   }
 
   Future<void> _doFailWrite(Map<String, dynamic> writeFailureSpec) async {
@@ -577,8 +553,7 @@ class SpecTestCase implements RemoteStoreCallback {
     final int code = errorSpec['code'];
     final GrpcError error = GrpcError.custom(code, '');
 
-    final Pair<Mutation, Future<void>> write =
-        _getCurrentOutstandingWrites()[0];
+    final Pair<Mutation, Future<void>> write = _getCurrentOutstandingWrites()[0];
     _validateNextWriteSent(write.first);
 
     // If this is a permanent error, the write is not expected to be sent again.
@@ -612,7 +587,7 @@ class SpecTestCase implements RemoteStoreCallback {
         timerId = TimerId.onlineStateTimeout;
         break;
       default:
-        throw Assert.fail('runTimer spec step specified unknown timer: $timer');
+        throw asserts.fail('runTimer spec step specified unknown timer: $timer');
     }
 
     await _queue.runDelayedTasksUntil(timerId);
@@ -659,8 +634,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _doStep(Map<String, dynamic> step) async {
     if (step['clientIndex'] != null) {
-      throw Assert.fail(
-          'The Android client does not support switching clients');
+      throw asserts.fail('The Android client does not support switching clients');
     }
 
     if (step.containsKey('userListen')) {
@@ -694,7 +668,7 @@ class SpecTestCase implements RemoteStoreCallback {
     } else if (step.containsKey('watchProto')) {
       // watchProto isn't yet used, and it's unclear how to create arbitrary
       // protos from JSON.
-      throw Assert.fail('watchProto is not yet supported.');
+      throw asserts.fail('watchProto is not yet supported.');
     } else if (step.containsKey('writeAck')) {
       await _doWriteAck(step['writeAck']);
     } else if (step.containsKey('failWrite')) {
@@ -718,11 +692,10 @@ class SpecTestCase implements RemoteStoreCallback {
     } else if (step.containsKey('restart')) {
       await _doRestart();
     } else if (step.containsKey('applyClientState')) {
-      throw Assert.fail(
-          '"applyClientState"is not supported on Android and should only be '
+      throw asserts.fail('"applyClientState"is not supported on Android and should only be '
           'used in multi-client tests');
     } else {
-      throw Assert.fail('Unknown step: $step');
+      throw asserts.fail('Unknown step: $step');
     }
   }
 
@@ -733,41 +706,34 @@ class SpecTestCase implements RemoteStoreCallback {
   void _assertEventMatches(Map<String, dynamic> expected, QueryEvent actual) {
     final Query expectedQuery = _parseQuery(expected['query']);
     expect(actual.query, expectedQuery);
-    if (expected.containsKey('errorCode') &&
-        expected['errorCode'] != StatusCode.ok) {
+    if (expected.containsKey('errorCode') && expected['errorCode'] != StatusCode.ok) {
       expect(actual.error, isNotNull);
       expect(actual.error.code.value, expected['errorCode']);
     } else {
       final List<DocumentViewChange> expectedChanges = <DocumentViewChange>[];
       final List<dynamic> removed = expected['removed'];
       for (int i = 0; removed != null && i < removed.length; ++i) {
-        expectedChanges
-            .add(_parseChange(removed[i], DocumentViewChangeType.removed));
+        expectedChanges.add(_parseChange(removed[i], DocumentViewChangeType.removed));
       }
 
       final List<dynamic> added = expected['added'];
       for (int i = 0; added != null && i < added.length; ++i) {
-        expectedChanges
-            .add(_parseChange(added[i], DocumentViewChangeType.added));
+        expectedChanges.add(_parseChange(added[i], DocumentViewChangeType.added));
       }
       final List<dynamic> modified = expected['modified'];
       for (int i = 0; modified != null && i < modified.length; ++i) {
-        expectedChanges
-            .add(_parseChange(modified[i], DocumentViewChangeType.modified));
+        expectedChanges.add(_parseChange(modified[i], DocumentViewChangeType.modified));
       }
 
       final List<dynamic> metadata = expected['metadata'];
       for (int i = 0; metadata != null && i < metadata.length; ++i) {
-        expectedChanges
-            .add(_parseChange(metadata[i], DocumentViewChangeType.metadata));
+        expectedChanges.add(_parseChange(metadata[i], DocumentViewChangeType.metadata));
       }
       expect(actual.view.changes, expectedChanges);
 
-      final bool expectedHasPendingWrites =
-          expected['hasPendingWrites'] ?? false;
+      final bool expectedHasPendingWrites = expected['hasPendingWrites'] ?? false;
       final bool expectedFromCache = expected['fromCache'] ?? false;
-      expect(actual.view.hasPendingWrites, expectedHasPendingWrites,
-          reason: 'hasPendingWrites');
+      expect(actual.view.hasPendingWrites, expectedHasPendingWrites, reason: 'hasPendingWrites');
       expect(actual.view.isFromCache, expectedFromCache, reason: 'fromCache');
     }
   }
@@ -781,15 +747,14 @@ class SpecTestCase implements RemoteStoreCallback {
     }
 
     // Sort both the expected and actual events by the query's canonical ID.
-    _events.sort((QueryEvent q1, QueryEvent q2) =>
-        q1.query.canonicalId.compareTo(q2.query.canonicalId));
+    _events.sort(
+        (QueryEvent q1, QueryEvent q2) => q1.query.canonicalId.compareTo(q2.query.canonicalId));
 
     final List<Map<String, dynamic>> expectedEvents = <Map<String, dynamic>>[];
     for (int i = 0; i < stepExpectations.length; ++i) {
       expectedEvents.add(stepExpectations[i]);
     }
-    expectedEvents
-        .sort((Map<String, dynamic> left, Map<String, dynamic> right) {
+    expectedEvents.sort((Map<String, dynamic> left, Map<String, dynamic> right) {
       final Query leftQuery = _parseQuery(left['query']);
       final Query rightQuery = _parseQuery(right['query']);
       return leftQuery.canonicalId.compareTo(rightQuery.canonicalId);
@@ -816,13 +781,11 @@ class SpecTestCase implements RemoteStoreCallback {
       }
 
       if (expected.containsKey('writeStreamRequestCount')) {
-        expect(_datastore.writeStreamRequestCount,
-            expected['writeStreamRequestCount']);
+        expect(_datastore.writeStreamRequestCount, expected['writeStreamRequestCount']);
       }
 
       if (expected.containsKey('watchStreamRequestCount')) {
-        expect(_datastore.watchStreamRequestCount,
-            expected['watchStreamRequestCount']);
+        expect(_datastore.watchStreamRequestCount, expected['watchStreamRequestCount']);
       }
 
       if (expected.containsKey('limboDocs')) {
@@ -840,8 +803,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
         for (String targetIdString in keys) {
           final int targetId = int.tryParse(targetIdString);
-          final Map<String, dynamic> queryDataJson =
-              activeTargets[targetIdString];
+          final Map<String, dynamic> queryDataJson = activeTargets[targetIdString];
           final Query query = _parseQuery(queryDataJson['query']);
           final String resumeToken = queryDataJson['resumeToken'];
 
@@ -873,8 +835,7 @@ class SpecTestCase implements RemoteStoreCallback {
     if (expected != null && expected.containsKey('userCallbacks')) {
       final Map<String, dynamic> userCallbacks = expected['userCallbacks'];
 
-      final List<dynamic> expectedAcknowledgedDocs =
-          userCallbacks['acknowledgedDocs'];
+      final List<dynamic> expectedAcknowledgedDocs = userCallbacks['acknowledgedDocs'];
       for (int i = 0; i < expectedAcknowledgedDocs.length; i++) {
         final String documentKey = expectedAcknowledgedDocs[i];
         expect(_acknowledgedDocs.contains(key(documentKey)), isTrue,
@@ -931,16 +892,14 @@ class SpecTestCase implements RemoteStoreCallback {
       expect(actualTarget.query, expectedTarget.query);
       expect(actualTarget.targetId, expectedTarget.targetId);
       expect(actualTarget.snapshotVersion, expectedTarget.snapshotVersion);
-      expect(utf8.decode(actualTarget.resumeToken),
-          utf8.decode(expectedTarget.resumeToken));
+      expect(utf8.decode(actualTarget.resumeToken), utf8.decode(expectedTarget.resumeToken));
       actualTargets.remove(expected.key);
     }
 
     expect(actualTargets, isEmpty);
   }
 
-  Future<void> runSteps(
-      List<dynamic> steps, Map<String, dynamic> config) async {
+  Future<void> runSteps(List<dynamic> steps, Map<String, dynamic> config) async {
     await specSetUp(config);
     for (int i = 0; i < steps.length; ++i) {
       final Map<String, dynamic> step = steps[i];
@@ -1009,8 +968,7 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   @override
-  Future<void> handleSuccessfulWrite(
-      MutationBatchResult mutationBatchResult) async {
+  Future<void> handleSuccessfulWrite(MutationBatchResult mutationBatchResult) async {
     await _syncEngine.handleSuccessfulWrite(mutationBatchResult);
   }
 

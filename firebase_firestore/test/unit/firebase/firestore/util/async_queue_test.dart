@@ -26,8 +26,7 @@ void main() {
   /// resolves the Future if the completedSteps match the expectedSteps.
   Future<int> Function() runnableForStep(int n) {
     return () async {
-      if (expectedSteps != null &&
-          completedSteps.length >= expectedSteps.length) {
+      if (expectedSteps != null && completedSteps.length >= expectedSteps.length) {
         expect(completedSteps, containsAllInOrder(expectedSteps));
       }
 
@@ -41,11 +40,9 @@ void main() {
     expectedSteps = <int>[1, 2, 3, 4];
 
     queue.enqueueAndForget(runnableForStep(1));
-    queue.enqueueAfterDelay(
-        timerId1, const Duration(milliseconds: 5), runnableForStep(4));
+    queue.enqueueAfterDelay(timerId1, const Duration(milliseconds: 5), runnableForStep(4));
     queue.enqueueAndForget(runnableForStep(2));
-    queue.enqueueAfterDelay(
-        timerId2, const Duration(milliseconds: 1), runnableForStep(3));
+    queue.enqueueAfterDelay(timerId2, const Duration(milliseconds: 1), runnableForStep(3));
 
     await Future<void>.delayed(const Duration(seconds: 5));
   });
@@ -60,8 +57,7 @@ void main() {
       final DelayedTask<void> step2Timer = queue.enqueueAfterDelay<void>(
           timerId1, const Duration(milliseconds: 1), runnableForStep(2));
 
-      queue.enqueueAfterDelay(
-          timerId3, const Duration(milliseconds: 3), runnableForStep(3));
+      queue.enqueueAfterDelay(timerId3, const Duration(milliseconds: 3), runnableForStep(3));
 
       expect(queue.containsDelayedTask(timerId1), isTrue);
       step2Timer.cancel();
@@ -73,10 +69,8 @@ void main() {
 
   test('canManuallyDrainAllDelayedTasksForTesting', () async {
     queue.enqueueAndForget(runnableForStep(1));
-    queue.enqueueAfterDelay(
-        timerId1, const Duration(milliseconds: 20), runnableForStep(4));
-    queue.enqueueAfterDelay(
-        timerId2, const Duration(milliseconds: 10), runnableForStep(3));
+    queue.enqueueAfterDelay(timerId1, const Duration(milliseconds: 20), runnableForStep(4));
+    queue.enqueueAfterDelay(timerId2, const Duration(milliseconds: 10), runnableForStep(3));
     queue.enqueueAndForget(runnableForStep(2));
 
     await queue.runDelayedTasksUntil(TimerId.all);
@@ -85,12 +79,9 @@ void main() {
 
   test('canManuallyDrainSpecificDelayedTasksForTesting', () async {
     queue.enqueueAndForget(runnableForStep(1));
-    queue.enqueueAfterDelay(
-        timerId1, const Duration(milliseconds: 20), runnableForStep(5));
-    queue.enqueueAfterDelay(
-        timerId2, const Duration(milliseconds: 10), runnableForStep(3));
-    queue.enqueueAfterDelay(
-        timerId3, const Duration(milliseconds: 15), runnableForStep(4));
+    queue.enqueueAfterDelay(timerId1, const Duration(milliseconds: 20), runnableForStep(5));
+    queue.enqueueAfterDelay(timerId2, const Duration(milliseconds: 10), runnableForStep(3));
+    queue.enqueueAfterDelay(timerId3, const Duration(milliseconds: 15), runnableForStep(4));
     queue.enqueueAndForget(runnableForStep(2));
 
     await queue.runDelayedTasksUntil(timerId3);

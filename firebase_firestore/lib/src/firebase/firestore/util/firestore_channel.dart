@@ -14,26 +14,24 @@ import 'package:firebase_firestore/src/firebase/firestore/util/incoming_stream_o
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 
-/// Wrapper class around io.grpc.Channel that adds headers, exception handling
-/// and simplifies invoking RPCs.
+/// Wrapper class around io.grpc.Channel that adds headers, exception handling and simplifies
+/// invoking RPCs.
 class FirestoreChannel {
-  factory FirestoreChannel(
-      AsyncQueue asyncQueue,
-      CredentialsProvider credentialsProvider,
-      ClientChannel channel,
-      DatabaseId databaseId) {
-    final CallOptions options = CallOptions(providers: <MetadataProvider>[
-      FirestoreCallCredentials(credentialsProvider).getRequestMetadata,
-      (Map<String, String> map, String url) {
-        map.addAll(<String, String>{
-          _xGoogApiClientHeader: _xGoogApiClientValue,
-          // This header is used to improve routing and project isolation by the
-          // backend.
-          _resourcePrefixHeader:
-              'projects/${databaseId.projectId}/databases/${databaseId.databaseId}',
-        });
-      }
-    ]);
+  factory FirestoreChannel(AsyncQueue asyncQueue, CredentialsProvider credentialsProvider,
+      ClientChannel channel, DatabaseId databaseId) {
+    final CallOptions options = CallOptions(
+      providers: <MetadataProvider>[
+        FirestoreCallCredentials(credentialsProvider).getRequestMetadata,
+        (Map<String, String> map, String url) {
+          map.addAll(<String, String>{
+            _xGoogApiClientHeader: _xGoogApiClientValue,
+            // This header is used to improve routing and project isolation by the backend.
+            _resourcePrefixHeader:
+                'projects/${databaseId.projectId}/databases/${databaseId.databaseId}',
+          });
+        }
+      ],
+    );
 
     return FirestoreChannel._(
       asyncQueue,
@@ -70,8 +68,7 @@ class FirestoreChannel {
 
   /// Creates and starts a new bi-directional streaming RPC.
   BidiChannel<ReqT, RespT> runBidiStreamingRpc<ReqT, RespT>(
-      ClientMethod<ReqT, RespT> method,
-      IncomingStreamObserver<RespT> observer) {
+      ClientMethod<ReqT, RespT> method, IncomingStreamObserver<RespT> observer) {
     // ignore: close_sinks
     final StreamController<ReqT> controller = StreamController<ReqT>();
 
@@ -110,8 +107,7 @@ class FirestoreChannel {
         results.add(message);
       },
       onDone: () {
-        assert((hadError && completer.isCompleted) ||
-            !hadError && !completer.isCompleted);
+        assert((hadError && completer.isCompleted) || !hadError && !completer.isCompleted);
         if (!completer.isCompleted) {
           completer.complete(results);
         }
@@ -131,8 +127,7 @@ class FirestoreChannel {
   }
 
   /// Creates and starts a single response RPC.
-  Future<RespT> runRpc<ReqT, RespT>(
-      ClientMethod<ReqT, RespT> method, ReqT request) async {
+  Future<RespT> runRpc<ReqT, RespT>(ClientMethod<ReqT, RespT> method, ReqT request) async {
     final Completer<RespT> completer = Completer<RespT>();
     final StreamController<ReqT> controller = StreamController<ReqT>();
     final ClientCall<ReqT, RespT> call =

@@ -17,9 +17,7 @@ class LocalWriteResult {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('batchId', batchId)
-          ..add('changes', changes))
+    return (ToStringHelper(runtimeType)..add('batchId', batchId)..add('changes', changes))
         .toString();
   }
 }

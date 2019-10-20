@@ -24,7 +24,7 @@ void main() {
   }
 
   test('testMultipleListenersPerQuery', () async {
-    final Query query = Query.atPath(path('foo/bar'));
+    final Query query = Query(path('foo/bar'));
 
     final QueryListener listener1 = queryListener(query);
     final QueryListener listener2 = queryListener(query);
@@ -43,7 +43,7 @@ void main() {
   });
 
   test('testUnlistensOnUnknownListeners', () async {
-    final Query query = Query.atPath(path('foo/bar'));
+    final Query query = Query(path('foo/bar'));
     final SyncEngine syncSpy = SyncEngineMock();
 
     final EventManager manager = EventManager(syncSpy);
@@ -52,8 +52,8 @@ void main() {
   });
 
   test('testListenCalledInOrder', () async {
-    final Query query1 = Query.atPath(path('foo/bar'));
-    final Query query2 = Query.atPath(path('bar/baz'));
+    final Query query1 = Query(path('foo/bar'));
+    final Query query2 = Query(path('bar/baz'));
 
     final SyncEngine syncSpy = SyncEngineMock();
     final EventManager eventManager = EventManager(syncSpy);
@@ -87,7 +87,7 @@ void main() {
   });
 
   test('testWillForwardOnOnlineStateChangedCalls', () {
-    final Query query1 = Query.atPath(path('foo/bar'));
+    final Query query1 = Query(path('foo/bar'));
 
     final SyncEngine syncSpy = SyncEngineMock();
     final EventManager eventManager = EventManager(syncSpy);
@@ -97,8 +97,8 @@ void main() {
     final QueryListener spy = QueryListenerMock();
     when(spy.query).thenReturn(query1);
 
-    when(spy.onOnlineStateChanged(any)).thenAnswer((Invocation invocation) =>
-        events.add(invocation.positionalArguments[0]));
+    when(spy.onOnlineStateChanged(any))
+        .thenAnswer((Invocation invocation) => events.add(invocation.positionalArguments[0]));
 
     eventManager.addQueryListener(spy);
     expect(events, <OnlineState>[OnlineState.unknown]);

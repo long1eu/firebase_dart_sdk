@@ -11,11 +11,10 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// A set of changes to documents with respect to a view. This set is mutable.
 class DocumentViewChangeSet {
-  DocumentViewChangeSet();
+  DocumentViewChangeSet() : changes = SplayTreeMap<DocumentKey, DocumentViewChange>();
 
   // This map is sorted to make the unit tests simpler.
-  final SplayTreeMap<DocumentKey, DocumentViewChange> changes =
-      SplayTreeMap<DocumentKey, DocumentViewChange>();
+  final SplayTreeMap<DocumentKey, DocumentViewChange> changes;
 
   void addChange(DocumentViewChange change) {
     final DocumentKey key = change.document.key;
@@ -27,13 +26,11 @@ class DocumentViewChangeSet {
 
     final DocumentViewChangeType oldType = old.type;
     final DocumentViewChangeType newType = change.type;
-    if (newType != DocumentViewChangeType.added &&
-        oldType == DocumentViewChangeType.metadata) {
+    if (newType != DocumentViewChangeType.added && oldType == DocumentViewChangeType.metadata) {
       changes[key] = change;
     } else if (newType == DocumentViewChangeType.metadata &&
         oldType != DocumentViewChangeType.removed) {
-      final DocumentViewChange newChange =
-          DocumentViewChange(oldType, change.document);
+      final DocumentViewChange newChange = DocumentViewChange(oldType, change.document);
       changes[key] = newChange;
     } else if (newType == DocumentViewChangeType.modified &&
         oldType == DocumentViewChangeType.modified) {
@@ -67,8 +64,7 @@ class DocumentViewChangeSet {
       // Removed -> Modified
       // Metadata -> Added
       // Removed -> Metadata
-      throw Assert.fail(
-          'Unsupported combination of changes $newType after $oldType');
+      throw fail('Unsupported combination of changes $newType after $oldType');
     }
   }
 

@@ -29,16 +29,14 @@ void main() {
     final DocumentReference documentReference = collectionReference.document();
 
     final AwaitHelper<void> events = AwaitHelper<void>(4);
-    final StreamSubscription<QuerySnapshot> one =
-        collectionReference.snapshots.listen(
+    final StreamSubscription<QuerySnapshot> one = collectionReference.snapshots.listen(
       (QuerySnapshot value) => events.completeNext(),
       onError: (dynamic error) {
         assert(false, 'This should not happen.');
       },
     );
 
-    final StreamSubscription<DocumentSnapshot> two =
-        documentReference.snapshots.listen(
+    final StreamSubscription<DocumentSnapshot> two = documentReference.snapshots.listen(
       (DocumentSnapshot value) => events.completeNext(),
       onError: (dynamic error) {
         assert(false, 'This should not happen.');
@@ -66,10 +64,8 @@ void main() {
 
   test('canBeRemovedTwice', () async {
     final CollectionReference reference = await testCollection();
-    final StreamSubscription<QuerySnapshot> one =
-        reference.snapshots.listen((QuerySnapshot value) {});
-    final StreamSubscription<DocumentSnapshot> two =
-        reference.document().snapshots.listen((DocumentSnapshot value) {});
+    final StreamSubscription<QuerySnapshot> one = reference.snapshots.listen((QuerySnapshot value) {});
+    final StreamSubscription<DocumentSnapshot> two = reference.document().snapshots.listen((DocumentSnapshot value) {});
 
     one.cancel();
     one.cancel();
@@ -84,16 +80,14 @@ void main() {
     final AwaitHelper<void> eventsOne = AwaitHelper<void>(2);
     final AwaitHelper<void> eventsTwo = AwaitHelper<void>(3);
 
-    final StreamSubscription<QuerySnapshot> one =
-        collectionReference.snapshots.listen(
+    final StreamSubscription<QuerySnapshot> one = collectionReference.snapshots.listen(
       (QuerySnapshot value) => eventsOne.completeNext(),
       onError: (dynamic error) {
         assert(false, 'This should not happen.');
       },
     );
 
-    final StreamSubscription<QuerySnapshot> two =
-        collectionReference.snapshots.listen(
+    final StreamSubscription<QuerySnapshot> two = collectionReference.snapshots.listen(
       (QuerySnapshot value) => eventsTwo.completeNext(),
       onError: (dynamic error) {
         assert(false, 'This should not happen.');

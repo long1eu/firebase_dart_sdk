@@ -51,8 +51,7 @@ void main() {
   test('updateWithNoCachedBaseDoc', () async {
     // Write an initial document in an isolated Firestore instance so it's not
     // stored in our cache.
-    await (await testFirestore(newTestSettings(),
-            'integration/array_transforms_updateWithNoCachedBaseDoc.db'))
+    await (await testFirestore(newTestSettings(), 'integration/array_transforms_updateWithNoCachedBaseDoc.db'))
         .document(docRef.path)
         .set(map(<dynamic>[
           'array',
@@ -75,8 +74,7 @@ void main() {
   test('mergeSetWithNoCachedBaseDoc', () async {
     // Write an initial document in an isolated Firestore instance so it's not
     // stored in our cache.
-    await (await testFirestore(newTestSettings(),
-            'integration/array_transforms_mergeSetWithNoCachedBaseDoc.db'))
+    await (await testFirestore(newTestSettings(), 'integration/array_transforms_mergeSetWithNoCachedBaseDoc.db'))
         .document(docRef.path)
         .set(map(<dynamic>[
           'array',

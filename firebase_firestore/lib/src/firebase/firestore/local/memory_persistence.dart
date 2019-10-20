@@ -38,11 +38,10 @@ class MemoryPersistence extends Persistence {
 
   static const String tag = 'MemoryPersistence';
 
-  // The persistence objects backing MemoryPersistence are retained here to make
-  // it easier to write tests affecting both the in-memory and SQLite-backed
-  // persistence layers. Tests can create a new LocalStore wrapping this
-  // Persistence instance and this will make the in-memory persistence layer
-  // behave as if it were actually persisting values.
+  // The persistence objects backing MemoryPersistence are retained here to make it easier to write
+  // tests affecting both the in-memory and SQLite-backed persistence layers. Tests can create a new
+  // LocalStore wrapping this Persistence instance and this will make the in-memory persistence
+  // layer behave as if it were actually persisting values.
   Map<User, MemoryMutationQueue> mutationQueues;
 
   @override
@@ -59,15 +58,15 @@ class MemoryPersistence extends Persistence {
 
   @override
   Future<void> start() async {
-    Assert.hardAssert(!started, 'MemoryPersistence double-started!');
+    hardAssert(!started, 'MemoryPersistence double-started!');
     started = true;
   }
 
   @override
   Future<void> shutdown() async {
-    // TODO: This assertion seems problematic, since we may attempt shutdown in
-    // the finally block after failing to initialize.
-    Assert.hardAssert(started, 'MemoryPersistence shutdown without start');
+    // TODO: This assertion seems problematic, since we may attempt shutdown in the finally block
+    //  after failing to initialize.
+    hardAssert(started, 'MemoryPersistence shutdown without start');
     started = false;
   }
 
@@ -84,8 +83,7 @@ class MemoryPersistence extends Persistence {
   Iterable<MemoryMutationQueue> getMutationQueues() => mutationQueues.values;
 
   @override
-  Future<void> runTransaction(
-      String action, Transaction<void> operation) async {
+  Future<void> runTransaction(String action, Transaction<void> operation) async {
     Log.d(tag, 'Starting transaction: $action');
 
     referenceDelegate.onTransactionStarted();
@@ -94,8 +92,7 @@ class MemoryPersistence extends Persistence {
   }
 
   @override
-  Future<T> runTransactionAndReturn<T>(
-      String action, Transaction<T> operation) async {
+  Future<T> runTransactionAndReturn<T>(String action, Transaction<T> operation) async {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
     final T result = await operation();

@@ -12,15 +12,13 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
 /// Represents a locally-applied Server Timestamp.
 ///
-/// * Notes:
-///   - ServerTimestampValue instances are created as the result of
-///   applying a TransformMutation (see [TransformMutation.applyTo]). They can
-///   only exist in the local view of a document. Therefore they do not need to
-///   be parsed or serialized.
-///   - When evaluated locally (e.g. via [DocumentSnapshot.ata]), they evaluate
-///   to null.
-///   - They sort after all TimestampValues. With respect to other
-///   ServerTimestampValues, they sort by their localWriteTime.
+/// Notes:
+///   - ServerTimestampValue instances are created as the result of applying a [TransformMutation]
+///   (see TransformMutation.applyTo methods). They can only exist in the local view of a document.
+///   Therefore they do not need to be parsed or serialized.
+///   - When evaluated locally (e.g. via [DocumentSnapshot.ata]), they evaluate to null.
+///   - They sort after all [TimestampValue]s. With respect to other [ServerTimestampValue]s, they
+///   sort by their [localWriteTime].
 class ServerTimestampValue extends FieldValue {
   const ServerTimestampValue(this.localWriteTime, this.previousValue);
 
@@ -44,7 +42,7 @@ class ServerTimestampValue extends FieldValue {
         return null;
 
       default:
-        throw Assert.fail('Unexpected case for ServerTimestampBehavior: '
+        throw fail('Unexpected case for ServerTimestampBehavior: '
             '${options.serverTimestampBehavior}');
     }
   }

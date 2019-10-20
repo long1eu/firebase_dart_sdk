@@ -43,8 +43,8 @@ class FirebaseApp {
   /// initialized previously, or Firebase API keys are present in string
   /// resources. Returns null otherwise.
   ///
-  /// * This method should be called at app startup.
-  /// * The [FirebaseOptions] values used by the default app instance are read
+  /// This method should be called at app startup.
+  /// The [FirebaseOptions] values used by the default app instance are read
   /// from string resources.
   @publicApi
   factory FirebaseApp(
@@ -218,7 +218,7 @@ class FirebaseApp {
   /// default in all SDKs. Returns true if automatic data collection is enabled
   /// by default and false otherwise
   ///
-  /// * Note: this value is respected by all SDKs unless overridden by the
+  /// Note: this value is respected by all SDKs unless overridden by the
   /// developer via SDK specific mechanisms.
   @keepForSdk
   bool get dataCollectionDefaultEnabled {
@@ -228,7 +228,7 @@ class FirebaseApp {
 
   /// Enable or disable automatic data collection across all SDKs.
   ///
-  /// * Note: this value is respected by all SDKs unless overridden by the
+  /// Note: this value is respected by all SDKs unless overridden by the
   /// developer via SDK specific mechanisms.
   @keepForSdk
   void setDataCollectionDefaultEnabled({bool enabled = false}) {
@@ -273,7 +273,7 @@ class FirebaseApp {
   /// [removeBackgroundStateChangeObserver] as appropriate to avoid memory
   /// leaks.
   ///
-  /// * If automatic resource management is enabled and the app is in the
+  /// If automatic resource management is enabled and the app is in the
   /// background a callback is triggered immediately.
   /// see [OnBackgroundStateChanged]
   @keepForSdk

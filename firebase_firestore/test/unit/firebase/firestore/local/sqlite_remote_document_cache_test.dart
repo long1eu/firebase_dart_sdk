@@ -34,8 +34,8 @@ void main() {
     print('setUpDone');
   });
 
-  tearDown(() => Future<void>.delayed(
-      const Duration(milliseconds: 250), () => testCase.tearDown()));
+  tearDown(
+      () => Future<void>.delayed(const Duration(milliseconds: 250), () => testCase.tearDown()));
 
   test('testReadDocumentNotInCache', () async {
     expect(await testCase.get('a/b'), isNull);
@@ -93,13 +93,10 @@ void main() {
     await testCase.addTestDocumentAtPath('b/2');
     await testCase.addTestDocumentAtPath('c/1');
 
-    final Query query = Query.atPath(path('b'));
+    final Query query = Query(path('b'));
     final ImmutableSortedMap<DocumentKey, Document> results =
         await remoteDocumentCache.getAllDocumentsMatchingQuery(query);
-    final List<Document> expected = <Document>[
-      doc('b/1', 42, docData),
-      doc('b/2', 42, docData)
-    ];
+    final List<Document> expected = <Document>[doc('b/1', 42, docData), doc('b/2', 42, docData)];
 
     expect(values(results), expected);
   });

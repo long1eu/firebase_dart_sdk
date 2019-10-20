@@ -15,8 +15,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.da
 
 /// In-memory cache of remote documents.
 class MemoryRemoteDocumentCache implements RemoteDocumentCache {
-  MemoryRemoteDocumentCache()
-      : documents = DocumentCollections.emptyMaybeDocumentMap();
+  MemoryRemoteDocumentCache() : documents = DocumentCollections.emptyMaybeDocumentMap();
 
   /// Underlying cache of documents.
   ImmutableSortedMap<DocumentKey, MaybeDocument> documents;
@@ -35,18 +34,15 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   Future<MaybeDocument> get(DocumentKey key) async => documents[key];
 
   @override
-  Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query) async {
-    ImmutableSortedMap<DocumentKey, Document> result =
-        DocumentCollections.emptyDocumentMap();
+  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(
+      Query query) async {
+    ImmutableSortedMap<DocumentKey, Document> result = DocumentCollections.emptyDocumentMap();
 
-    // Documents are ordered by key, so we can use a prefix scan to narrow down
-    // the documents we need to match the query against.
+    // Documents are ordered by key, so we can use a prefix scan to narrow down the documents we
+    // need to match the query against.
     final ResourcePath queryPath = query.path;
-    final DocumentKey prefix =
-        DocumentKey.fromPath(queryPath.appendSegment(''));
-    final Iterator<MapEntry<DocumentKey, MaybeDocument>> iterator =
-        documents.iteratorFrom(prefix);
+    final DocumentKey prefix = DocumentKey.fromPath(queryPath.appendSegment(''));
+    final Iterator<MapEntry<DocumentKey, MaybeDocument>> iterator = documents.iteratorFrom(prefix);
     while (iterator.moveNext()) {
       final MapEntry<DocumentKey, MaybeDocument> entry = iterator.current;
       final DocumentKey key = entry.key;

@@ -21,14 +21,13 @@ import 'package:protobuf/protobuf.dart';
 
 /// A Stream that implements the [StreamingWatch] RPC.
 ///
-/// * Once the [WatchStream] has started, any number of [watchQuery] and
-/// [unwatchTargetId] calls can be sent to control what changes will be sent
-/// from the server for [WatchChanges].
+/// Once the [WatchStream] has started, any number of [watchQuery] and [unwatchTargetId] calls can
+/// be sent to control what changes will be sent from the server for [WatchChanges].
 ///
 /// @see <a
 /// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L147'>firestore.proto</a>
-class WatchStream extends AbstractStream<proto.ListenRequest,
-    proto.ListenResponse, WatchStreamCallback> {
+class WatchStream
+    extends AbstractStream<proto.ListenRequest, proto.ListenResponse, WatchStreamCallback> {
   WatchStream(FirestoreChannel channel, AsyncQueue workerQueue, this.serializer,
       WatchStreamCallback listener)
       : super(
@@ -49,18 +48,16 @@ class WatchStream extends AbstractStream<proto.ListenRequest,
 
   final RemoteSerializer serializer;
 
-  /// Registers interest in the results of the given query. If the query
-  /// includes a [resumeToken] it will be included in the request. Results that
-  /// affect the query will be streamed back as [WatchChange] messages that
-  /// reference the [targetId] included in query.
+  /// Registers interest in the results of the given query. If the query includes a [resumeToken] it
+  /// will be included in the request. Results that affect the query will be streamed back as
+  /// [WatchChange] messages that reference the [targetId] included in query.
   void watchQuery(QueryData queryData) {
-    Assert.hardAssert(isOpen, 'Watching queries requires an open stream');
+    hardAssert(isOpen, 'Watching queries requires an open stream');
     final proto.ListenRequest request = proto.ListenRequest.create()
       ..database = serializer.databaseName
       ..addTarget = serializer.encodeTarget(queryData);
 
-    final MapEntry<String, String> labels =
-        serializer.encodeListenRequestLabels(queryData);
+    final MapEntry<String, String> labels = serializer.encodeListenRequestLabels(queryData);
     if (labels != null) {
       request.labels[labels.key] = labels.value;
     }
@@ -68,10 +65,9 @@ class WatchStream extends AbstractStream<proto.ListenRequest,
     writeRequest(request..freeze());
   }
 
-  /// Unregisters interest in the results of the query associated with the given
-  /// target id.
+  /// Unregisters interest in the results of the query associated with the given target id.
   void unwatchTarget(int targetId) {
-    Assert.hardAssert(isOpen, 'Unwatching targets requires an open stream');
+    hardAssert(isOpen, 'Unwatching targets requires an open stream');
 
     final proto.ListenRequest request = proto.ListenRequest.create()
       ..database = serializer.databaseName
@@ -87,8 +83,7 @@ class WatchStream extends AbstractStream<proto.ListenRequest,
     backoff.reset();
 
     final WatchChange watchChange = serializer.decodeWatchChange(change);
-    final SnapshotVersion snapshotVersion =
-        serializer.decodeVersionFromListenResponse(change);
+    final SnapshotVersion snapshotVersion = serializer.decodeVersionFromListenResponse(change);
 
     await listener.onWatchChange(snapshotVersion, watchChange);
   }
@@ -97,8 +92,7 @@ class WatchStream extends AbstractStream<proto.ListenRequest,
 typedef OnWatchChange = Future<void> Function(
     SnapshotVersion snapshotVersion, WatchChange watchChange);
 
-/// A callback interface for the set of events that can be emitted by the
-/// [WatchStream]
+/// A callback interface for the set of events that can be emitted by the [WatchStream]
 class WatchStreamCallback extends StreamCallback {
   const WatchStreamCallback({
     @required Task<void> onOpen,
@@ -106,7 +100,6 @@ class WatchStreamCallback extends StreamCallback {
     @required this.onWatchChange,
   }) : super(onOpen: onOpen, onClose: onClose);
 
-  /// A new change from the watch stream. Snapshot version will ne non-null if
-  /// it was set
+  /// A new change from the watch stream. Snapshot version will ne non-null if it was set
   final OnWatchChange onWatchChange;
 }

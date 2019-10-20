@@ -4,15 +4,16 @@
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
+import 'package:meta/meta.dart';
 
 /// Contains info about host, project id and database
 class DatabaseInfo {
-  DatabaseInfo(
+  const DatabaseInfo(
     this.databaseId,
     this.persistenceKey,
-    this.host,
-    this.sslEnabled,
-  );
+    this.host, {
+    @required this.sslEnabled,
+  });
 
   final DatabaseId databaseId;
   final String persistenceKey;

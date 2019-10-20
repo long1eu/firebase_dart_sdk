@@ -70,8 +70,7 @@ void main() {
       await testCase.addNextQuery();
     }
 
-    expect(await garbageCollector.nthSequenceNumber(10),
-        testCase.initialSequenceNumber + 10);
+    expect(await garbageCollector.nthSequenceNumber(10), testCase.initialSequenceNumber + 10);
   });
 
   test('testSequenceNumberForMultipleQueriesInATransaction', () async {
@@ -85,8 +84,7 @@ void main() {
     for (int i = 9; i < 50; i++) {
       await testCase.addNextQuery();
     }
-    expect(await garbageCollector.nthSequenceNumber(10),
-        2 + testCase.initialSequenceNumber);
+    expect(await garbageCollector.nthSequenceNumber(10), 2 + testCase.initialSequenceNumber);
   });
 
   test('testAllCollectedQueriesInSingleTransaction', () async {
@@ -106,8 +104,7 @@ void main() {
       await testCase.addNextQuery();
     }
 
-    expect(await garbageCollector.nthSequenceNumber(10),
-        1 + testCase.initialSequenceNumber);
+    expect(await garbageCollector.nthSequenceNumber(10), 1 + testCase.initialSequenceNumber);
   });
 
   test('testSequenceNumbersWithMutationAndSequentialQueries', () async {
@@ -118,8 +115,7 @@ void main() {
       await testCase.addNextQuery();
     }
 
-    expect(await garbageCollector.nthSequenceNumber(10),
-        10 + testCase.initialSequenceNumber);
+    expect(await garbageCollector.nthSequenceNumber(10), 10 + testCase.initialSequenceNumber);
   });
 
   test('testSequenceNumbersWithMutationsInQueries', () async {
@@ -138,16 +134,14 @@ void main() {
     for (int i = 0; i < 49; i++) {
       await testCase.addNextQuery();
     }
-    await testCase.persistence.runTransaction('query with a mutation',
-        () async {
+    await testCase.persistence.runTransaction('query with a mutation', () async {
       final QueryData queryData = await testCase.addNextQueryInTransaction();
       await testCase.addDocumentToTarget(docInQuery, queryData.targetId);
     });
 
     // This should catch the remaining 8 documents, plus the first two queries
     // we added.
-    expect(await garbageCollector.nthSequenceNumber(10),
-        3 + testCase.initialSequenceNumber);
+    expect(await garbageCollector.nthSequenceNumber(10), 3 + testCase.initialSequenceNumber);
   });
 
   test('testRemoveQueriesUpThroughSequenceNumber', () async {
@@ -164,13 +158,11 @@ void main() {
     // GC up through 20th query, which is 20%.
     // Expect to have GC'd 10 targets, since every other target is live
     final int upperBound = 20 + testCase.initialSequenceNumber;
-    final int removed =
-        await testCase.removeTargets(upperBound, activeTargetIds.keys.toSet());
+    final int removed = await testCase.removeTargets(upperBound, activeTargetIds.keys.toSet());
     expect(removed, 10);
 
     // Make sure we removed the even targets with targetID <= 20.
-    await testCase.persistence
-        .runTransaction('verify remaining targets are > 20 or odd', () async {
+    await testCase.persistence.runTransaction('verify remaining targets are > 20 or odd', () async {
       return testCase.queryCache.forEachTarget((QueryData queryData) {
         final bool isOdd = queryData.targetId.remainder(2) == 1;
         final bool isOver20 = queryData.targetId > 20;
@@ -187,8 +179,7 @@ void main() {
     // we add two mutations later, for now track them in an array.
     final List<Mutation> mutations = <Mutation>[];
 
-    await testCase.persistence
-        .runTransaction('add a target and add two documents to it', () async {
+    await testCase.persistence.runTransaction('add a target and add two documents to it', () async {
       // Add two documents to first target, queue a mutation on the second
       // document
       final QueryData queryData = await testCase.addNextQueryInTransaction();
@@ -220,8 +211,7 @@ void main() {
     // Insert the mutations. These operations don't have a sequence number, they
     // just serve to keep the mutated documents from being GC'd while the
     // mutations are outstanding.
-    await testCase.persistence.runTransaction('actually register the mutations',
-        () async {
+    await testCase.persistence.runTransaction('actually register the mutations', () async {
       final Timestamp writeTime = Timestamp.now();
       await testCase.mutationQueue.addMutationBatch(writeTime, mutations);
     });
@@ -230,8 +220,8 @@ void main() {
     // mutated then ack'd. Since they were ack'd, they are no longer in a
     // mutation queue, and there is nothing keeping them alive.
     final Set<DocumentKey> toBeRemoved = <DocumentKey>{};
-    await testCase.persistence.runTransaction(
-        'add orphaned docs (previously mutated, then ack\'d)', () async {
+    await testCase.persistence.runTransaction('add orphaned docs (previously mutated, then ack\'d)',
+        () async {
       for (int i = 0; i < 5; i++) {
         final Document doc = await testCase.cacheADocumentInTransaction();
         toBeRemoved.add(doc.key);
@@ -284,8 +274,8 @@ void main() {
     // Add oldest target, 5 documents, and add those documents to the target.
     // This target will not be removed, so all documents that are part of it
     // will be retained.
-    final QueryData oldestTarget = await testCase.persistence
-        .runTransactionAndReturn('Add oldest target and docs', () async {
+    final QueryData oldestTarget =
+        await testCase.persistence.runTransactionAndReturn('Add oldest target and docs', () async {
       final QueryData queryData = await testCase.addNextQueryInTransaction();
       for (int i = 0; i < 5; i++) {
         final Document doc = await testCase.cacheADocumentInTransaction();
@@ -300,8 +290,8 @@ void main() {
     final Set<DocumentKey> middleDocsToRemove = <DocumentKey>{};
     // This will be the document in this target that gets an update later.
     DocumentKey middleDocToUpdateHolder;
-    final QueryData middleTarget = await testCase.persistence
-        .runTransactionAndReturn('Add middle target and docs', () async {
+    final QueryData middleTarget =
+        await testCase.persistence.runTransactionAndReturn('Add middle target and docs', () async {
       final QueryData queryData = await testCase.addNextQueryInTransaction();
       // these docs will be removed from this target later, triggering a bump
       // to their sequence numbers. Since they will not be a part of the target,
@@ -336,8 +326,7 @@ void main() {
     // documents to be retained. The remaining documents are expected to be
     // removed, since this target will be removed.
     final Set<DocumentKey> newestDocsToAddToOldest = <DocumentKey>{};
-    await testCase.persistence.runTransaction('Add newest target and docs',
-        () async {
+    await testCase.persistence.runTransaction('Add newest target and docs', () async {
       final QueryData queryData = await testCase.addNextQueryInTransaction();
       // These documents are only in this target. They are expected to be
       // removed because this target will also be removed.
@@ -358,8 +347,8 @@ void main() {
     });
 
     // 2 doc writes, add one of them to the oldest target.
-    await testCase.persistence.runTransaction(
-        '2 doc writes, add one of them to the oldest target', () async {
+    await testCase.persistence.runTransaction('2 doc writes, add one of them to the oldest target',
+        () async {
       // write two docs and have them ack'd by the server. can skip mutation
       // queue and set them in document cache. Add potentially orphaned first,
       // also add one doc to a target.
@@ -377,8 +366,8 @@ void main() {
     });
 
     // Remove some documents from the middle target.
-    await testCase.persistence.runTransaction(
-        'Remove some documents from the middle target', () async {
+    await testCase.persistence.runTransaction('Remove some documents from the middle target',
+        () async {
       await testCase.updateTargetInTransaction(middleTarget);
       for (DocumentKey key in middleDocsToRemove) {
         await testCase.removeDocumentFromTarget(key, middleTarget.targetId);
@@ -398,24 +387,21 @@ void main() {
     });
 
     // Update a doc in the middle target
-    await testCase.persistence
-        .runTransaction('Update a doc in the middle target', () async {
+    await testCase.persistence.runTransaction('Update a doc in the middle target', () async {
       final SnapshotVersion newVersion = version(3);
-      final Document doc = Document(middleDocToUpdate, newVersion,
-          testCase.testValue, DocumentState.synced);
+      final Document doc =
+          Document(middleDocToUpdate, newVersion, testCase.testValue, DocumentState.synced);
       await testCase.documentCache.add(doc);
       await testCase.updateTargetInTransaction(middleTarget);
     });
 
     // Remove the middle target
-    await testCase.persistence.runTransaction(
-        'remove middle target',
-        () =>
-            testCase.persistence.referenceDelegate.removeTarget(middleTarget));
+    await testCase.persistence.runTransaction('remove middle target',
+        () => testCase.persistence.referenceDelegate.removeTarget(middleTarget));
 
     // Write a doc and get an ack, not part of a target
-    await testCase.persistence.runTransaction(
-        'Write a doc and get an ack, not part of a target', () async {
+    await testCase.persistence.runTransaction('Write a doc and get an ack, not part of a target',
+        () async {
       final Document doc = await testCase.cacheADocumentInTransaction();
       // Mark it as eligible for GC, but this is after our upper bound for what
       // we will collect.
@@ -431,8 +417,7 @@ void main() {
         await testCase.garbageCollector.removeTargets(upperBound, liveQueries);
     // Expect to remove newest target
     expect(queriesRemoved, 1);
-    final int docsRemoved =
-        await testCase.garbageCollector.removeOrphanedDocuments(upperBound);
+    final int docsRemoved = await testCase.garbageCollector.removeOrphanedDocuments(upperBound);
     expect(docsRemoved, expectedRemoved.length);
     await testCase.persistence.runTransaction('verify results', () async {
       for (DocumentKey key in expectedRemoved) {

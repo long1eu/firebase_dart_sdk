@@ -6,8 +6,7 @@ import 'package:firebase_firestore/src/firebase/firestore/server_timestamp_behav
 
 /// Holds settings that define field value deserialization options.
 class FieldValueOptions {
-  const FieldValueOptions(this.serverTimestampBehavior,
-      [this.timestampsInSnapshotsEnabled = true]);
+  const FieldValueOptions(this.serverTimestampBehavior, {this.timestampsInSnapshotsEnabled = true});
 
   final ServerTimestampBehavior serverTimestampBehavior;
   final bool timestampsInSnapshotsEnabled;

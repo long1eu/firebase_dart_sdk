@@ -15,34 +15,26 @@ import '../../../../util/test_util.dart';
 
 void main() {
   test('testMatchesBasedDocumentKey', () {
-    final ResourcePath queryPath =
-        ResourcePath.fromString('rooms/eros/messages/1');
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
-    final Document doc3 =
-        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
+    final ResourcePath queryPath = ResourcePath.fromString('rooms/eros/messages/1');
+    final Document doc1 = doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
+    final Document doc2 = doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
+    final Document doc3 = doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
 
-    final Query query = Query.atPath(queryPath);
+    final Query query = Query(queryPath);
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isFalse);
     expect(query.matches(doc3), isFalse);
   });
 
   test('testMatchesShallowAncestorQuery', () {
-    final ResourcePath queryPath =
-        ResourcePath.fromString('rooms/eros/messages');
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
-    final Document doc1meta = doc('rooms/eros/messages/1/meta/1', 0,
-        map(<dynamic>['meta', 'meta-value']));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
-    final Document doc3 =
-        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
+    final ResourcePath queryPath = ResourcePath.fromString('rooms/eros/messages');
+    final Document doc1 = doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
+    final Document doc1meta =
+        doc('rooms/eros/messages/1/meta/1', 0, map(<dynamic>['meta', 'meta-value']));
+    final Document doc2 = doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
+    final Document doc3 = doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
 
-    final Query query = Query.atPath(queryPath);
+    final Query query = Query(queryPath);
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc1meta), isFalse);
     expect(query.matches(doc2), isTrue);
@@ -50,30 +42,26 @@ void main() {
   });
 
   test('testEmptyFieldsAreAllowedForQueries', () {
-    final ResourcePath queryPath =
-        ResourcePath.fromString('rooms/eros/messages');
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
+    final ResourcePath queryPath = ResourcePath.fromString('rooms/eros/messages');
+    final Document doc1 = doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
     final Document doc2 = doc('rooms/eros/messages/2', 0, map(<String>[]));
 
-    final Query query =
-        Query.atPath(queryPath).filter(filter('text', '==', 'msg1'));
+    final Query query = Query(queryPath).filter(filter('text', '==', 'msg1'));
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isFalse);
   });
 
   test('testPrimitiveValueFilter', () {
-    final Query query1 = Query.atPath(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '>=', 2));
-    final Query query2 = Query.atPath(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '<=', 2));
+    final Query query1 =
+        Query(ResourcePath.fromString('collection')).filter(filter('sort', '>=', 2));
+    final Query query2 =
+        Query(ResourcePath.fromString('collection')).filter(filter('sort', '<=', 2));
 
     final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 1]));
     final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', 2]));
     final Document doc3 = doc('collection/3', 0, map(<dynamic>['sort', 3]));
     final Document doc4 = doc('collection/4', 0, map(<dynamic>['sort', false]));
-    final Document doc5 =
-        doc('collection/5', 0, map(<dynamic>['sort', 'string']));
+    final Document doc5 = doc('collection/5', 0, map(<dynamic>['sort', 'string']));
 
     expect(query1.matches(doc1), isFalse);
     expect(query1.matches(doc2), isTrue);
@@ -89,8 +77,8 @@ void main() {
   });
 
   test('testArrayContainsFilters', () {
-    final Query query = Query.atPath(ResourcePath.fromString('collection'))
-        .filter(filter('array', 'array-contains', 42));
+    final Query query =
+        Query(ResourcePath.fromString('collection')).filter(filter('array', 'array-contains', 42));
 
     // not an array
     Document document = doc('collection/1', 0, map(<dynamic>['array', 1]));
@@ -140,14 +128,13 @@ void main() {
 
   test('testArrayContainsFiltersWithObjectValues', () {
     // Search for arrays containing the object { a: [42] }
-    final Query query =
-        Query.atPath(ResourcePath.fromString('collection')).filter(filter(
-            'array',
-            'array-contains',
-            map<dynamic>(<dynamic>[
-              'a',
-              <int>[42]
-            ])));
+    final Query query = Query(ResourcePath.fromString('collection')).filter(filter(
+        'array',
+        'array-contains',
+        map<dynamic>(<dynamic>[
+          'a',
+          <int>[42]
+        ])));
 
     // array without element
     Document document = doc(
@@ -196,15 +183,13 @@ void main() {
   });
 
   test('testNaNFilter', () {
-    final Query query = Query.atPath(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '==', double.nan));
-    final Document doc1 =
-        doc('collection/1', 0, map(<dynamic>['sort', double.nan]));
+    final Query query =
+        Query(ResourcePath.fromString('collection')).filter(filter('sort', '==', double.nan));
+    final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', double.nan]));
     final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', 2]));
     final Document doc3 = doc('collection/3', 0, map(<dynamic>['sort', 3.1]));
     final Document doc4 = doc('collection/4', 0, map(<dynamic>['sort', false]));
-    final Document doc5 =
-        doc('collection/5', 0, map(<dynamic>['sort', 'string']));
+    final Document doc5 = doc('collection/5', 0, map(<dynamic>['sort', 'string']));
 
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isFalse);
@@ -214,14 +199,13 @@ void main() {
   });
 
   test('testNullFilter', () {
-    final Query query = Query.atPath(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '==', null));
+    final Query query =
+        Query(ResourcePath.fromString('collection')).filter(filter('sort', '==', null));
     final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', null]));
     final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', 2]));
     final Document doc3 = doc('collection/3', 0, map(<dynamic>['sort', 3.1]));
     final Document doc4 = doc('collection/4', 0, map(<dynamic>['sort', false]));
-    final Document doc5 =
-        doc('collection/5', 0, map(<dynamic>['sort', 'string']));
+    final Document doc5 = doc('collection/5', 0, map(<dynamic>['sort', 'string']));
 
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isFalse);
@@ -232,21 +216,20 @@ void main() {
 
   test('testOnlySupportsEqualsForNull', () {
     final List<String> invalidOps = <String>['<', '<=', '>', '>='];
-    final Query query = Query.atPath(ResourcePath.fromString('collection'));
+    final Query query = Query(ResourcePath.fromString('collection'));
     for (String op in invalidOps) {
       expect(() => query.filter(filter('sort', op, null)), throwsArgumentError);
     }
   });
 
   test('testComplexObjectFilters', () {
-    final Query query1 = Query.atPath(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '<=', 2));
-    final Query query2 = Query.atPath(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '>=', 2));
+    final Query query1 =
+        Query(ResourcePath.fromString('collection')).filter(filter('sort', '<=', 2));
+    final Query query2 =
+        Query(ResourcePath.fromString('collection')).filter(filter('sort', '>=', 2));
 
     final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 2]));
-    final Document doc2 =
-        doc('collection/2', 0, map(<dynamic>['sort', <int>[]]));
+    final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', <int>[]]));
     final Document doc3 = doc(
         'collection/3',
         0,
@@ -268,8 +251,7 @@ void main() {
           'sort',
           map<String>(<String>['foo', 'bar'])
         ]));
-    final Document doc6 =
-        doc('collection/6', 0, map(<dynamic>['sort', map<int>(<int>[])]));
+    final Document doc6 = doc('collection/6', 0, map(<dynamic>['sort', map<int>(<int>[])]));
     final Document doc7 = doc(
         'collection/7',
         0,
@@ -296,12 +278,10 @@ void main() {
   });
 
   test('testDoesNotRemoveComplexObjectsWithOrderBy', () {
-    final Query query = Query.atPath(ResourcePath.fromString('collection'))
-        .orderBy(orderBy('sort'));
+    final Query query = Query(ResourcePath.fromString('collection')).orderBy(orderBy('sort'));
 
     final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 2]));
-    final Document doc2 =
-        doc('collection/2', 0, map(<dynamic>['sort', <int>[]]));
+    final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', <int>[]]));
     final Document doc3 = doc(
         'collection/3',
         0,
@@ -332,7 +312,7 @@ void main() {
   });
 
   test('testFiltersArrays', () {
-    final Query baseQuery = Query.atPath(ResourcePath.fromString('collection'));
+    final Query baseQuery = Query(ResourcePath.fromString('collection'));
     final Document doc1 = doc(
         'collection/doc',
         0,
@@ -360,34 +340,26 @@ void main() {
   });
 
   test('testFiltersObjects', () {
-    final Query baseQuery = Query.atPath(ResourcePath.fromString('collection'));
+    final Query baseQuery = Query(ResourcePath.fromString('collection'));
     final Document doc1 = doc(
         'collection/doc',
         0,
         map(<dynamic>[
           'tags',
-          map<dynamic>(
-              <dynamic>['foo', 'foo', 'a', 0, 'b', true, 'c', double.nan])
+          map<dynamic>(<dynamic>['foo', 'foo', 'a', 0, 'b', true, 'c', double.nan])
         ]));
 
     final List<Filter> matchingFilters = <Filter>[
       filter(
-          'tags',
-          '==',
-          map<dynamic>(
-              <dynamic>['foo', 'foo', 'a', 0, 'b', true, 'c', double.nan])),
+          'tags', '==', map<dynamic>(<dynamic>['foo', 'foo', 'a', 0, 'b', true, 'c', double.nan])),
       filter(
-          'tags',
-          '==',
-          map<dynamic>(
-              <dynamic>['b', true, 'a', 0, 'foo', 'foo', 'c', double.nan])),
+          'tags', '==', map<dynamic>(<dynamic>['b', true, 'a', 0, 'foo', 'foo', 'c', double.nan])),
       filter('tags.foo', '==', 'foo')
     ];
 
     final List<Filter> nonMatchingFilters = <Filter>[
       filter('tags', '==', 'foo'),
-      filter('tags', '==',
-          map<dynamic>(<dynamic>['foo', 'foo', 'a', 0, 'b', true]))
+      filter('tags', '==', map<dynamic>(<dynamic>['foo', 'foo', 'a', 0, 'b', true]))
     ];
 
     for (Filter filter in matchingFilters) {
@@ -400,8 +372,7 @@ void main() {
   });
 
   test('testSortsDocuments', () {
-    final Query query = Query.atPath(ResourcePath.fromString('collection'))
-        .orderBy(orderBy('sort'));
+    final Query query = Query(ResourcePath.fromString('collection')).orderBy(orderBy('sort'));
     ComparatorTester<Document>(query.comparator)
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', null])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', false])))
@@ -416,92 +387,79 @@ void main() {
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', 'a'])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', 'ab'])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', 'b'])))
-        .addItem(doc(
-            'collection/1', 0, map(<dynamic>['sort', ref('collection/id1')])))
+        .addItem(doc('collection/1', 0, map(<dynamic>['sort', ref('collection/id1')])))
         .testCompare();
   });
 
   test('testSortsWithMultipleFields', () {
-    final Query query = Query.atPath(ResourcePath.fromString('collection'))
+    final Query query = Query(ResourcePath.fromString('collection'))
         .orderBy(orderBy('sort1'))
         .orderBy(orderBy('sort2'));
 
     ComparatorTester<Document>(query.comparator)
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 1])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 2])))
-        .addItem(doc('collection/2', 0,
-            map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
-        .addItem(doc('collection/3', 0,
-            map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
+        .addItem(doc('collection/2', 0, map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
+        .addItem(doc('collection/3', 0, map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 3])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 1])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 2])))
-        .addItem(doc('collection/2', 0,
-            map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
-        .addItem(doc('collection/3', 0,
-            map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
+        .addItem(doc('collection/2', 0, map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
+        .addItem(doc('collection/3', 0, map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 3])))
         .testCompare();
   });
 
   test('testSortsDescending', () {
-    final Query query = Query.atPath(ResourcePath.fromString('collection'))
+    final Query query = Query(ResourcePath.fromString('collection'))
         .orderBy(orderBy('sort1', 'desc'))
         .orderBy(orderBy('sort2', 'desc'));
 
     ComparatorTester<Document>(query.comparator)
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 3])))
         .addItem(doc('collection/3', 0, map(<dynamic>['sort1', 2, 'sort2', 2])))
-        .addItem(doc('collection/2', 0,
-            map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
-        .addItem(doc('collection/1', 0,
-            map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
+        .addItem(doc('collection/2', 0, map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
+        .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 1])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 3])))
         .addItem(doc('collection/3', 0, map(<dynamic>['sort1', 1, 'sort2', 2])))
-        .addItem(doc('collection/2', 0,
-            map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
-        .addItem(doc('collection/1', 0,
-            map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
+        .addItem(doc('collection/2', 0, map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
+        .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 1])))
         .testCompare();
   });
 
   test('testHashCode', () {
-    final Query q1a = Query.atPath(ResourcePath.fromString('foo'))
+    final Query q1a = Query(ResourcePath.fromString('foo'))
         .filter(filter('i1', '<', 2))
         .filter(filter('i2', '==', 3));
 
     // TODO uncomment this when hashcode does not depend on filter order.
     /*
     Query q1b =
-        Query.atPath(ResourcePath.fromString('foo'))
+        Query(ResourcePath.fromString('foo'))
             .filter(filter('i2', '==', 3))
             .filter(filter('i1', '<', 2));
     */
 
-    final Query q2a = Query.atPath(ResourcePath.fromString('foo'));
-    final Query q2b = Query.atPath(ResourcePath.fromString('foo'));
+    final Query q2a = Query(ResourcePath.fromString('foo'));
+    final Query q2b = Query(ResourcePath.fromString('foo'));
 
-    final Query q3a = Query.atPath(ResourcePath.fromString('foo/bar'));
-    final Query q3b = Query.atPath(ResourcePath.fromString('foo/bar'));
+    final Query q3a = Query(ResourcePath.fromString('foo/bar'));
+    final Query q3b = Query(ResourcePath.fromString('foo/bar'));
 
-    final Query q4a = Query.atPath(ResourcePath.fromString('foo'))
-        .orderBy(orderBy('foo'))
-        .orderBy(orderBy('bar'));
-    final Query q4b = Query.atPath(ResourcePath.fromString('foo'))
-        .orderBy(orderBy('foo'))
-        .orderBy(orderBy('bar'));
+    final Query q4a =
+        Query(ResourcePath.fromString('foo')).orderBy(orderBy('foo')).orderBy(orderBy('bar'));
+    final Query q4b =
+        Query(ResourcePath.fromString('foo')).orderBy(orderBy('foo')).orderBy(orderBy('bar'));
 
-    final Query q5a = Query.atPath(ResourcePath.fromString('foo'))
-        .orderBy(orderBy('bar'))
-        .orderBy(orderBy('foo'));
+    final Query q5a =
+        Query(ResourcePath.fromString('foo')).orderBy(orderBy('bar')).orderBy(orderBy('foo'));
 
-    final Query q6a = Query.atPath(ResourcePath.fromString('foo'))
-        .filter(filter('bar', '>', 2))
-        .orderBy(orderBy('bar'));
+    final Query q6a =
+        Query(ResourcePath.fromString('foo')).filter(filter('bar', '>', 2)).orderBy(orderBy('bar'));
 
-    final Query q7a = Query.atPath(ResourcePath.fromString('foo')).limit(10);
+    final Query q7a = Query(ResourcePath.fromString('foo')).limit(10);
 
     // TODO: Add test cases with{Lower,Upper}Bound once cursors are implemented.
     testEquality(<List<int>>[
@@ -516,59 +474,44 @@ void main() {
   });
 
   test('testImplicitOrderBy', () {
-    final Query baseQuery = Query.atPath(path('foo'));
+    final Query baseQuery = Query(path('foo'));
     // Default is ascending
-    expect(baseQuery.getOrderBy(),
-        <OrderBy>[orderBy(DocumentKey.keyFieldName, 'asc')]);
+    expect(baseQuery.orderByConstraints, <OrderBy>[orderBy(DocumentKey.keyFieldName, 'asc')]);
 
     // Explicit key ordering is respected
-    expect(
-        baseQuery
-            .orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
-            .getOrderBy(),
+    expect(baseQuery.orderBy(orderBy(DocumentKey.keyFieldName, 'asc')).orderByConstraints,
         <OrderBy>[orderBy(DocumentKey.keyFieldName, 'asc')]);
-    expect(
-        baseQuery
-            .orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
-            .getOrderBy(),
+    expect(baseQuery.orderBy(orderBy(DocumentKey.keyFieldName, 'desc')).orderByConstraints,
         <OrderBy>[orderBy(DocumentKey.keyFieldName, 'desc')]);
     expect(
         baseQuery
             .orderBy(orderBy('foo'))
             .orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
-            .getOrderBy(),
+            .orderByConstraints,
         <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'asc')]);
     expect(
         baseQuery
             .orderBy(orderBy('foo'))
             .orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
-            .getOrderBy(),
+            .orderByConstraints,
         <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'desc')]);
 
     // Inequality filters add order bys
-    expect(baseQuery.filter(filter('foo', '<', 5)).getOrderBy(),
+    expect(baseQuery.filter(filter('foo', '<', 5)).orderByConstraints,
         <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'asc')]);
 
     // Descending order by applies to implicit key ordering
-    expect(baseQuery.orderBy(orderBy('foo', 'desc')).getOrderBy(), <OrderBy>[
-      orderBy('foo', 'desc'),
-      orderBy(DocumentKey.keyFieldName, 'desc')
-    ]);
+    expect(baseQuery.orderBy(orderBy('foo', 'desc')).orderByConstraints,
+        <OrderBy>[orderBy('foo', 'desc'), orderBy(DocumentKey.keyFieldName, 'desc')]);
     expect(
-        baseQuery
-            .orderBy(orderBy('foo', 'asc'))
-            .orderBy(orderBy('bar', 'desc'))
-            .getOrderBy(),
+        baseQuery.orderBy(orderBy('foo', 'asc')).orderBy(orderBy('bar', 'desc')).orderByConstraints,
         <OrderBy>[
           orderBy('foo', 'asc'),
           orderBy('bar', 'desc'),
           orderBy(DocumentKey.keyFieldName, 'desc')
         ]);
     expect(
-        baseQuery
-            .orderBy(orderBy('foo', 'desc'))
-            .orderBy(orderBy('bar', 'asc'))
-            .getOrderBy(),
+        baseQuery.orderBy(orderBy('foo', 'desc')).orderBy(orderBy('bar', 'asc')).orderByConstraints,
         <OrderBy>[
           orderBy('foo', 'desc'),
           orderBy('bar', 'asc'),

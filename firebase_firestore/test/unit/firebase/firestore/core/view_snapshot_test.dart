@@ -16,16 +16,15 @@ import '../../../../util/test_util.dart';
 
 void main() {
   test('testConstructor', () {
-    final Query query = Query.atPath(ResourcePath.fromString('a'));
-    final DocumentSet docs = DocumentSet.emptySet(Document.keyComparator)
-        .add(doc('c/foo', 1, map()));
+    final Query query = Query(ResourcePath.fromString('a'));
+    final DocumentSet docs =
+        DocumentSet.emptySet(Document.keyComparator).add(doc('c/foo', 1, map()));
     final DocumentSet oldDocs = DocumentSet.emptySet(Document.keyComparator);
     final List<DocumentViewChange> changes = <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.added, doc('c/foo', 1, map()))
     ];
 
-    final ImmutableSortedSet<DocumentKey> mutatedKeys =
-        keySet(<DocumentKey>[key('c/foo')]);
+    final ImmutableSortedSet<DocumentKey> mutatedKeys = keySet(<DocumentKey>[key('c/foo')]);
     const bool fromCache = true;
     const bool hasPendingWrites = true;
     const bool syncStateChanges = true;
@@ -36,10 +35,10 @@ void main() {
       docs,
       oldDocs,
       changes,
-      fromCache,
       mutatedKeys,
-      syncStateChanges,
-      excludesMetadataChanges,
+      isFromCache: fromCache,
+      didSyncStateChange: syncStateChanges,
+      excludesMetadataChanges: excludesMetadataChanges,
     );
 
     expect(snapshot.query, query);

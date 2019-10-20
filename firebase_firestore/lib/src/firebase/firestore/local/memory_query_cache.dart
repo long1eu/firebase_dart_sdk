@@ -15,16 +15,15 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
-/// An implementation of the [QueryCache] protocol that merely keeps queries in
-/// memory, suitable for online only clients with persistence disabled.
+/// An implementation of the [QueryCache] protocol that merely keeps queries in memory, suitable for
+/// online only clients with persistence disabled.
 class MemoryQueryCache implements QueryCache {
   MemoryQueryCache(this.persistence);
 
   /// Maps a query to the data about that query.
   final Map<Query, QueryData> queries = <Query, QueryData>{};
 
-  /// A ordered bidirectional mapping between documents and the remote target
-  /// ids.
+  /// A ordered bidirectional mapping between documents and the remote target ids.
   final ReferenceSet references = ReferenceSet();
 
   /// The highest numbered target id encountered.
@@ -51,8 +50,7 @@ class MemoryQueryCache implements QueryCache {
   int get highestListenSequenceNumber => highestSequenceNumber;
 
   @override
-  Future<void> setLastRemoteSnapshotVersion(
-      SnapshotVersion snapshotVersion) async {
+  Future<void> setLastRemoteSnapshotVersion(SnapshotVersion snapshotVersion) async {
     lastRemoteSnapshotVersion = snapshotVersion;
   }
 
@@ -72,8 +70,7 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<void> updateQueryData(QueryData queryData) async {
-    // Memory persistence doesn't need to do anything different between add and
-    // remove.
+    // Memory persistence doesn't need to do anything different between add and remove.
     return addQueryData(queryData);
   }
 
@@ -83,9 +80,8 @@ class MemoryQueryCache implements QueryCache {
     references.removeReferencesForId(queryData.targetId);
   }
 
-  /// Drops any targets with sequence number less than or equal to the upper
-  /// bound, excepting those present in [activeTargetIds]. Document associations
-  /// for the removed targets are also removed.
+  /// Drops any targets with sequence number less than or equal to the upper bound, excepting those
+  /// present in [activeTargetIds]. Document associations for the removed targets are also removed.
   int removeQueries(int upperBound, Set<int> activeTargetIds) {
     int removed = 0;
     queries.removeWhere((Query query, QueryData queryData) {
@@ -109,8 +105,7 @@ class MemoryQueryCache implements QueryCache {
   // Reference tracking
 
   @override
-  Future<void> addMatchingKeys(
-      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+  Future<void> addMatchingKeys(ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     references.addReferences(keys, targetId);
     final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
 
@@ -120,8 +115,7 @@ class MemoryQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> removeMatchingKeys(
-      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+  Future<void> removeMatchingKeys(ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     references.removeReferences(keys, targetId);
     final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
 
@@ -135,12 +129,10 @@ class MemoryQueryCache implements QueryCache {
   }
 
   @override
-  Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
-      int targetId) async {
+  Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(int targetId) async {
     return references.referencesForId(targetId);
   }
 
   @override
-  Future<bool> containsKey(DocumentKey key) async =>
-      references.containsKey(key);
+  Future<bool> containsKey(DocumentKey key) async => references.containsKey(key);
 }

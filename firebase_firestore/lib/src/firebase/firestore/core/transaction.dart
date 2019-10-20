@@ -17,36 +17,35 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
-/// Internal transaction object responsible for accumulating the mutations to
-/// perform and the base versions for any documents read.
+/// Internal transaction object responsible for accumulating the mutations to perform and the base
+/// versions for any documents read.
 class Transaction {
-  Transaction(this.datastore);
+  Transaction(this.datastore)
+      : readVersions = <DocumentKey, SnapshotVersion>{},
+        mutations = <Mutation>[],
+        committed = false;
 
   final Datastore datastore;
-  final Map<DocumentKey, SnapshotVersion> readVersions =
-      <DocumentKey, SnapshotVersion>{};
-  final List<Mutation> mutations = <Mutation>[];
-  bool committed = false;
+  final Map<DocumentKey, SnapshotVersion> readVersions;
+  final List<Mutation> mutations;
+  bool committed;
 
   void _recordVersion(MaybeDocument doc) {
     SnapshotVersion docVersion;
     if (doc is Document) {
       docVersion = doc.version;
     } else if (doc is NoDocument) {
-      // For nonexistent docs, we must use precondition with version 0 when we
-      // overwrite them.
+      // For nonexistent docs, we must use precondition with version 0 when we overwrite them.
       docVersion = SnapshotVersion.none;
     } else {
-      throw Assert.fail(
-          'Unexpected document type in transaction: ${doc.runtimeType}');
+      throw fail('Unexpected document type in transaction: ${doc.runtimeType}');
     }
 
     if (readVersions.containsKey(doc.key)) {
       final SnapshotVersion existingVersion = readVersions[doc.key];
       if (existingVersion != doc.version) {
         // This transaction will fail no matter what.
-        throw FirebaseFirestoreError(
-            'Document version changed between two reads.',
+        throw FirebaseFirestoreError('Document version changed between two reads.',
             FirebaseFirestoreErrorCode.failedPrecondition);
       }
     } else {
@@ -54,13 +53,12 @@ class Transaction {
     }
   }
 
-  /// Takes a set of keys and asynchronously attempts to fetch all the documents
-  /// from the backend, ignoring any local changes.
+  /// Takes a set of keys and asynchronously attempts to fetch all the documents from the backend,
+  /// ignoring any local changes.
   Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
     if (committed) {
       return Future<List<MaybeDocument>>.error(FirebaseFirestoreError(
-          'Transaction has already completed.',
-          FirebaseFirestoreErrorCode.failedPrecondition));
+          'Transaction has already completed.', FirebaseFirestoreErrorCode.failedPrecondition));
     }
     if (mutations.isNotEmpty) {
       return Future<List<MaybeDocument>>.error(FirebaseFirestoreError(
@@ -80,8 +78,8 @@ class Transaction {
     this.mutations.addAll(mutations);
   }
 
-  /// Returns version of this doc when it was read in this transaction as a
-  /// precondition, or no precondition if it was not read.
+  /// Returns version of this doc when it was read in this transaction as a precondition, or no
+  /// precondition if it was not read.
   Precondition _precondition(DocumentKey key) {
     final SnapshotVersion version = readVersions[key];
     if (version != null) {
@@ -91,8 +89,8 @@ class Transaction {
     }
   }
 
-  /// Returns the precondition for a document if the operation is an update,
-  /// based on the provided [UpdateOptions].
+  /// Returns the precondition for a document if the operation is an update, based on the provided
+  /// [UpdateOptions].
   Precondition _preconditionForUpdate(DocumentKey key) {
     final SnapshotVersion version = readVersions[key];
     if (version != null && version == SnapshotVersion.none) {
@@ -102,36 +100,33 @@ class Transaction {
       // Document exists, base precondition on document update time.
       return Precondition(updateTime: version);
     } else {
-      // Document was not read, so we just use the preconditions for a blind
-      // write.
+      // Document was not read, so we just use the preconditions for a blind write.
       return Precondition(exists: true);
     }
   }
 
-  /// Stores a set mutation for the given key and value, to be committed when
-  /// [commit] is called.
+  /// Stores a set mutation for the given key and value, to be committed when [commit] is called.
   void set(DocumentKey key, UserDataParsedSetData data) {
     _write(data.toMutationList(key, _precondition(key)));
   }
 
-  /// Stores an update mutation for the given key and values, to be committed
-  /// when [commit] is called.
+  /// Stores an update mutation for the given key and values, to be committed when [commit] is
+  /// called.
   void update(DocumentKey key, UserDataParsedUpdateData data) {
     _write(data.toMutationList(key, _preconditionForUpdate(key)));
   }
 
   void delete(DocumentKey key) {
     _write(<DeleteMutation>[DeleteMutation(key, _precondition(key))]);
-    // Since the delete will be applied before all following writes, we need to
-    // ensure that the precondition for the next write will be exists: false.
+    // Since the delete will be applied before all following writes, we need to ensure that the
+    // precondition for the next write will be exists: false.
     readVersions[key] = SnapshotVersion.none;
   }
 
   Future<void> commit() {
     if (committed) {
       return Future<void>.error(FirebaseFirestoreError(
-          'Transaction has already completed.',
-          FirebaseFirestoreErrorCode.failedPrecondition));
+          'Transaction has already completed.', FirebaseFirestoreErrorCode.failedPrecondition));
     }
     final Set<DocumentKey> unwritten = Set<DocumentKey>.from(readVersions.keys);
     // For each mutation, note that the doc was written.

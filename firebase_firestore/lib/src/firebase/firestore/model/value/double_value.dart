@@ -11,9 +11,8 @@ class DoubleValue extends NumberValue {
 
   factory DoubleValue.valueOf(double value) => DoubleValue(value);
 
-  /// A constant holding the smallest positive normal value of type
-  /// [double], 2<sup>-1022</sup>.  It is equal to the
-  /// hexadecimal floating-point literal ```0x1.0p-1022```.
+  /// A constant holding the smallest positive normal value of type [double], 2<sup>-1022</sup>.
+  /// It is equal to the hexadecimal floating-point literal ```0x1.0p-1022```.
   static const double minNormal = 2.2250738585072014E-308;
 
   static const DoubleValue nan = DoubleValue(double.nan);
@@ -48,8 +47,8 @@ class DoubleValue extends NumberValue {
   @override
   int get hashCode => _value.hashCode;
 
-  /// Comparing NaN's should return 0, if [this] is NaN it should return -1 and
-  /// if [other] is NaN it should return 1
+  /// Comparing NaN's should return 0, if [this] is NaN it should return -1 and if [other] is NaN it
+  /// should return 1
   @override
   int compareTo(FieldValue other) {
     if (other is! NumberValue) {

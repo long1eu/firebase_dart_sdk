@@ -19,8 +19,7 @@ class FieldPath extends BasePath<FieldPath> {
     final List<String> res = <String>[];
     StringBuffer buffer = StringBuffer();
     // TODO: We should make this more strict.
-    // Right now, it allows non-identifier path components, even if they aren't
-    // escaped.
+    //  Right now, it allows non-identifier path components, even if they aren't escaped.
     int i = 0;
 
     // If we're inside '`' backticks, then we should ignore '.' dots.
@@ -41,8 +40,7 @@ class FieldPath extends BasePath<FieldPath> {
         if (!inBackticks) {
           final String elem = buffer.toString();
           if (elem.isEmpty) {
-            throw ArgumentError(
-                'Invalid field path ($path). Paths must not be empty, begin '
+            throw ArgumentError('Invalid field path ($path). Paths must not be empty, begin '
                 'with \'.\', end with \'.\', or contain \'..\'');
           }
           buffer = StringBuffer();
@@ -62,9 +60,8 @@ class FieldPath extends BasePath<FieldPath> {
     }
     final String lastElem = buffer.toString();
     if (lastElem.isEmpty) {
-      throw ArgumentError(
-          'Invalid field path ($path). Paths must not be empty, begin with '
-          '\'.\', end with \'.\', or contain \'..\'');
+      throw ArgumentError('Invalid field path ($path). Paths must not be empty, begin with \'.\', '
+          'end with \'.\', or contain \'..\'');
     }
     res.add(lastElem);
     return FieldPath._(res);
@@ -75,8 +72,7 @@ class FieldPath extends BasePath<FieldPath> {
     return segments.isEmpty ? FieldPath.emptyPath : FieldPath._(segments);
   }
 
-  static final FieldPath keyPath =
-      FieldPath.fromSingleSegment(DocumentKey.keyFieldName);
+  static final FieldPath keyPath = FieldPath.fromSingleSegment(DocumentKey.keyFieldName);
 
   static const FieldPath emptyPath = FieldPath._(<String>[]);
 
@@ -85,8 +81,8 @@ class FieldPath extends BasePath<FieldPath> {
     return FieldPath._(segments);
   }
 
-  /// Return true if the string could be used as a segment in a field path
-  /// without escaping. Valid identifies follow the regex [a-zA-Z_][a-zA-Z0-9_]
+  /// Return true if the string could be used as a segment in a field path without escaping. Valid
+  /// identifies follow the regex [a-zA-Z_][a-zA-Z0-9_]
   static bool _isValidIdentifier(String identifier) {
     if (identifier.isEmpty) {
       return false;

@@ -4,7 +4,7 @@
 
 /// Simplest form of existence filter
 class ExistenceFilter {
-  ExistenceFilter(this.count);
+  const ExistenceFilter(this.count);
 
   final int count;
 

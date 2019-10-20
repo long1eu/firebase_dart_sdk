@@ -10,22 +10,18 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 
 /// Provides static helpers around document collections.
 class DocumentCollections {
-  /// Returns an empty, immutable document map */
+  /// Returns an empty, immutable document map
   static ImmutableSortedMap<DocumentKey, Document> emptyDocumentMap() {
-    return ImmutableSortedMap<DocumentKey, Document>.emptyMap(
-        DocumentKey.comparator);
+    return ImmutableSortedMap<DocumentKey, Document>.emptyMap(DocumentKey.comparator);
   }
 
-  /// Returns an empty, immutable 'maybe' document map */
-  static ImmutableSortedMap<DocumentKey, MaybeDocument>
-      emptyMaybeDocumentMap() {
-    return ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(
-        DocumentKey.comparator);
+  /// Returns an empty, immutable 'maybe' document map
+  static ImmutableSortedMap<DocumentKey, MaybeDocument> emptyMaybeDocumentMap() {
+    return ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(DocumentKey.comparator);
   }
 
-  /// Returns an empty, immutable versions map */
+  /// Returns an empty, immutable versions map
   static ImmutableSortedMap<DocumentKey, SnapshotVersion> emptyVersionMap() {
-    return ImmutableSortedMap<DocumentKey, SnapshotVersion>.emptyMap(
-        DocumentKey.comparator);
+    return ImmutableSortedMap<DocumentKey, SnapshotVersion>.emptyMap(DocumentKey.comparator);
   }
 }

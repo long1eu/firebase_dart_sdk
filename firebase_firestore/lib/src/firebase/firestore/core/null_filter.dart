@@ -32,9 +32,7 @@ class NullFilter extends Filter {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is NullFilter &&
-          runtimeType == other.runtimeType &&
-          fieldPath == other.fieldPath;
+      other is NullFilter && runtimeType == other.runtimeType && fieldPath == other.fieldPath;
 
   @override
   int get hashCode => fieldPath.hashCode;

@@ -8,7 +8,7 @@ import 'relationship_tester.dart';
 
 /// Tester for [==] and [hashCode] methods of a class.
 ///
-/// * To use, create a new [EqualsTester] and add equality groups where each
+/// To use, create a new [EqualsTester] and add equality groups where each
 /// group contains objects that are supposed to be equal to each other, and
 /// objects of different groups are expected to be unequal.
 ///
@@ -33,7 +33,7 @@ class EqualsTester {
   /// each other and not equal to any other equality groups added to this
   /// tester.
   EqualsTester addEqualityGroup(List<Object> equalityGroup) {
-    Assert.checkNotNull(equalityGroup);
+    checkNotNull(equalityGroup);
     _equalityGroups.add(equalityGroup.toList());
     return this;
   }
@@ -41,15 +41,15 @@ class EqualsTester {
   /// Adds [item] with an object that is supposed to be not equal to any other
   /// equality groups added to this tester.
   EqualsTester addItem(Object item) {
-    Assert.checkNotNull(item);
+    checkNotNull(item);
     _equalityGroups.add(<Object>[item]);
     return this;
   }
 
   /// Run tests on equals method, throwing a failure on an invalid test
   EqualsTester testEquals() {
-    final RelationshipTester<Object> delegate = RelationshipTester<Object>(
-        RelationshipAssertion<Object>((Object item, Object related) {
+    final RelationshipTester<Object> delegate =
+        RelationshipTester<Object>(RelationshipAssertion<Object>((Object item, Object related) {
       assert(
           related == item || identical(related, item),
           '${RelationshipTester.itemPlaceholder} must be equal to '
@@ -82,8 +82,7 @@ class EqualsTester {
       assert(item != _NotAnInstance.equalToNothing,
           '$item must be unequal to an arbitrary object of another class');
       assert(item == item, '$item must be equal to itself');
-      assert(item.hashCode == item.hashCode,
-          'the hash of $item must be consistent');
+      assert(item.hashCode == item.hashCode, 'the hash of $item must be consistent');
     }
   }
 }

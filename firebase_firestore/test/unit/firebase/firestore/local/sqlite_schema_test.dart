@@ -30,8 +30,7 @@ void main() {
 
   tearDown(() => db.close());
 
-  Future<void> _assertNoResultsForQuery(String query,
-      [List<String> args]) async {
+  Future<void> _assertNoResultsForQuery(String query, [List<String> args]) async {
     final List<Map<String, dynamic>> result = await db.query(query, args);
 
     expect(result, isEmpty);
@@ -42,8 +41,7 @@ void main() {
     await _assertNoResultsForQuery('SELECT uid, batch_id FROM mutations');
     await db.execute("INSERT INTO mutations (uid, batch_id) VALUES ('foo', 1)");
 
-    final List<Map<String, dynamic>> result =
-        await db.query('SELECT uid, batch_id FROM mutations');
+    final List<Map<String, dynamic>> result = await db.query('SELECT uid, batch_id FROM mutations');
 
     expect(result, isNotEmpty);
     expect(result.first['uid'], 'foo');
@@ -53,9 +51,7 @@ void main() {
 
   test('testDatabaseName', () async {
     await schema.runMigrations();
-    expect(
-        SQLitePersistence.sDatabaseName(
-            '[DEFAULT]', DatabaseId.forProject('my-project')),
+    expect(SQLitePersistence.sDatabaseName('[DEFAULT]', DatabaseId.forProject('my-project')),
         'firestore.%5BDEFAULT%5D.my-project.%28default%29');
     expect(
         SQLitePersistence.sDatabaseName(
@@ -80,8 +76,7 @@ void main() {
     // For the odd ones, add sentinel rows.
     for (int i = 0; i < 10; i++) {
       final String path = 'docs/doc_$i';
-      await db.execute(
-          'INSERT INTO remote_documents (path) VALUES (?)', <String>[path]);
+      await db.execute('INSERT INTO remote_documents (path) VALUES (?)', <String>[path]);
       if (i % 2 == 1) {
         await db.execute(
           '''INSERT INTO target_documents (target_id, path, sequence_number)
@@ -93,8 +88,7 @@ void main() {
 
     await schema.runMigrations(1, 2);
 
-    final List<Map<String, dynamic>> result =
-        await db.query('''SELECT path, sequence_number
+    final List<Map<String, dynamic>> result = await db.query('''SELECT path, sequence_number
            FROM target_documents
            WHERE target_id = 0;''');
 
@@ -106,8 +100,7 @@ void main() {
       // The even documents were missing sequence numbers, they should now be
       // filled in to have the new sequence number. The odd documents should
       // have their sequence number unchanged, and so be the old value.
-      final int expected =
-          docNum % 2 == 1 ? oldSequenceNumber : newSequenceNumber;
+      final int expected = docNum % 2 == 1 ? oldSequenceNumber : newSequenceNumber;
       expect(sequenceNumber, expected);
     }
   });

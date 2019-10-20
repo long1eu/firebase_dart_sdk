@@ -17,8 +17,7 @@ class ObjectValue extends FieldValue {
         ImmutableSortedMap<String, FieldValue>.fromMap(value, comparator()));
   }
 
-  factory ObjectValue.fromImmutableMap(
-      ImmutableSortedMap<String, FieldValue> value) {
+  factory ObjectValue.fromImmutableMap(ImmutableSortedMap<String, FieldValue> value) {
     if (value.isEmpty) {
       return empty;
     } else {
@@ -26,8 +25,8 @@ class ObjectValue extends FieldValue {
     }
   }
 
-  static final ObjectValue empty = ObjectValue(
-      ImmutableSortedMap<String, FieldValue>.emptyMap(comparator()));
+  static final ObjectValue empty =
+      ObjectValue(ImmutableSortedMap<String, FieldValue>.emptyMap(comparator()));
 
   final ImmutableSortedMap<String, FieldValue> _value;
 
@@ -81,8 +80,7 @@ class ObjectValue extends FieldValue {
 
   /// Returns a new ObjectValue with the field at the named path set to value.
   ObjectValue set(FieldPath path, FieldValue value) {
-    Assert.hardAssert(
-        path.isNotEmpty, 'Cannot set field for empty path on ObjectValue');
+    hardAssert(path.isNotEmpty, 'Cannot set field for empty path on ObjectValue');
 
     final String childName = path.first;
     if (path.length == 1) {
@@ -101,11 +99,10 @@ class ObjectValue extends FieldValue {
     }
   }
 
-  /// Returns an ObjectValue with the field path deleted. If there is no field
-  /// at the specified path nothing is changed.
+  /// Returns an ObjectValue with the field path deleted. If there is no field at the specified path
+  /// nothing is changed.
   ObjectValue delete(FieldPath path) {
-    Assert.hardAssert(
-        path.isNotEmpty, 'Cannot delete field for empty path on ObjectValue');
+    hardAssert(path.isNotEmpty, 'Cannot delete field for empty path on ObjectValue');
 
     final String childName = path.first;
     if (path.length == 1) {
@@ -128,7 +125,8 @@ class ObjectValue extends FieldValue {
 
     for (int i = 0; i < fieldPath.length; i++) {
       if (current is ObjectValue) {
-        current = (current as ObjectValue)._value[fieldPath[i]];
+        final ObjectValue object = current;
+        current = object._value[fieldPath[i]];
       } else {
         return null;
       }
@@ -147,9 +145,7 @@ class ObjectValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ObjectValue &&
-          runtimeType == other.runtimeType &&
-          _value == other._value;
+      other is ObjectValue && runtimeType == other.runtimeType && _value == other._value;
 
   @override
   int get hashCode => _value.hashCode;

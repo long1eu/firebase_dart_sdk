@@ -11,8 +11,7 @@ import 'package:grpc/grpc.dart';
 
 const int _autoIdLength = 20;
 
-const String _autoIdAlphabet =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const String _autoIdAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 final Random rand = Random();
 
@@ -28,6 +27,7 @@ String toDebugString(List<int> bytes) {
   return result.toString();
 }
 
+// ignore: avoid_positional_boolean_parameters
 int compareBools(bool b1, bool b2) {
   if (b1 == b2) {
     return 0;
@@ -75,26 +75,23 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
   }
 }
 
-/// Converts varargs from an update call to a list of objects, ensuring that
-/// the arguments alternate between String/FieldPath and Objects.
+/// Converts varargs from an update call to a list of objects, ensuring that the arguments alternate
+/// between String/FieldPath and Objects.
 ///
-/// [fieldPathOffset] is the offset of the first field path in the original
-/// update API (used as the index in error messages)
-List<Object> collectUpdateArguments(
-    int fieldPathOffset, List<Object> fieldsAndValues) {
+/// [fieldPathOffset] is the offset of the first field path in the original update API (used as the
+/// index in error messages)
+List<Object> collectUpdateArguments(int fieldPathOffset, List<Object> fieldsAndValues) {
   if (fieldsAndValues.length % 2 == 1) {
-    throw ArgumentError(
-        'Missing value in call to update().  There must be an even number of '
+    throw ArgumentError('Missing value in call to update().  There must be an even number of '
         'arguments that alternate between field names and values');
   }
   final List<Object> argumentList = fieldsAndValues.toList(growable: false);
   for (int i = 0; i < argumentList.length; i += 2) {
     final Object fieldPath = argumentList[i];
     if (fieldPath is! String && fieldPath is! FieldPath) {
-      throw ArgumentError('Excepted field name at argument position '
-          '${i + fieldPathOffset + 1} but got $fieldPath in call to update. '
-          'The arguments to update should alternate between field names and '
-          'values');
+      throw ArgumentError('Excepted field name at argument position ${i + fieldPathOffset + 1} but '
+          'got $fieldPath in call to update. The arguments to update should alternate between '
+          'field names and values');
     }
   }
 

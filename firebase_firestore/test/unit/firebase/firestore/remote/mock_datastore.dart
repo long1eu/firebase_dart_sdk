@@ -36,7 +36,7 @@ class MockDatastore extends Datastore {
       DatabaseId.forDatabase('project', 'database'),
       'persistenceKey',
       'host',
-      false,
+      sslEnabled: false,
     );
 
     final ClientChannel clientChannel = ClientChannel(databaseInfo.host,
@@ -55,8 +55,8 @@ class MockDatastore extends Datastore {
     return MockDatastore._(databaseInfo, workerQueue, serializer, channel);
   }
 
-  MockDatastore._(DatabaseInfo databaseInfo, AsyncQueue workerQueue,
-      RemoteSerializer serializer, FirestoreChannel channel)
+  MockDatastore._(DatabaseInfo databaseInfo, AsyncQueue workerQueue, RemoteSerializer serializer,
+      FirestoreChannel channel)
       : super.init(databaseInfo, workerQueue, serializer, channel);
 
   _MockWatchStream _watchStream;
@@ -90,8 +90,7 @@ class MockDatastore extends Datastore {
 
   /// Injects a write ack as though it had come from the backend in response to
   /// a write.
-  Future<void> ackWrite(
-      SnapshotVersion commitVersion, List<MutationResult> results) async {
+  Future<void> ackWrite(SnapshotVersion commitVersion, List<MutationResult> results) async {
     await _writeStream.ackWrite(commitVersion, results);
   }
 
@@ -101,8 +100,7 @@ class MockDatastore extends Datastore {
   }
 
   /// Injects a watch change as though it had come from the backend.
-  Future<void> writeWatchChange(
-      WatchChange change, SnapshotVersion snapshotVersion) async {
+  Future<void> writeWatchChange(WatchChange change, SnapshotVersion snapshotVersion) async {
     await _watchStream.writeWatchChange(change, snapshotVersion);
   }
 
@@ -123,8 +121,7 @@ class MockDatastore extends Datastore {
 }
 
 class _MockWatchStream extends WatchStream {
-  _MockWatchStream(
-      this._datastore, AsyncQueue workerQueue, WatchStreamCallback listener)
+  _MockWatchStream(this._datastore, AsyncQueue workerQueue, WatchStreamCallback listener)
       : super(/*channel:*/ null, workerQueue, _datastore.serializer, listener);
 
   final MockDatastore _datastore;
@@ -136,7 +133,7 @@ class _MockWatchStream extends WatchStream {
 
   @override
   Future<void> start() async {
-    Assert.hardAssert(!_open, 'Trying to start already started watch stream');
+    hardAssert(!_open, 'Trying to start already started watch stream');
     _open = true;
     await listener.onOpen();
   }
@@ -161,8 +158,7 @@ class _MockWatchStream extends WatchStream {
   @override
   void watchQuery(QueryData queryData) {
     final String resumeToken = toDebugString(queryData.resumeToken);
-    SpecTestCase.log(
-        '      watchQuery(${queryData.query}, ${queryData.targetId}, '
+    SpecTestCase.log('      watchQuery(${queryData.query}, ${queryData.targetId}, '
         '$resumeToken)');
     // Snapshot version is ignored on the wire
     final QueryData sentQueryData = queryData.copyWith(
@@ -186,8 +182,7 @@ class _MockWatchStream extends WatchStream {
   }
 
   /// Injects a watch change as though it had come from the backend.
-  Future<void> writeWatchChange(
-      WatchChange change, SnapshotVersion snapshotVersion) async {
+  Future<void> writeWatchChange(WatchChange change, SnapshotVersion snapshotVersion) async {
     if (change is WatchChangeWatchTargetChange) {
       if (change.cause != null && change.cause.code != StatusCode.ok) {
         for (int targetId in change.targetIds) {
@@ -214,8 +209,7 @@ class _MockWatchStream extends WatchStream {
 }
 
 class _MockWriteStream extends WriteStream {
-  _MockWriteStream(
-      this._datastore, AsyncQueue workerQueue, WriteStreamCallback listener)
+  _MockWriteStream(this._datastore, AsyncQueue workerQueue, WriteStreamCallback listener)
       : sentWrites = <List<Mutation>>[],
         super(/*channel=*/ null, workerQueue, _datastore.serializer, listener);
 
@@ -228,7 +222,7 @@ class _MockWriteStream extends WriteStream {
 
   @override
   Future<void> start() async {
-    Assert.hardAssert(!_open, 'Trying to start already started write stream');
+    hardAssert(!_open, 'Trying to start already started write stream');
     handshakeComplete = false;
     _open = true;
     sentWrites.clear();
@@ -255,7 +249,7 @@ class _MockWriteStream extends WriteStream {
 
   @override
   Future<void> writeHandshake() async {
-    Assert.hardAssert(!handshakeComplete, 'Handshake already completed');
+    hardAssert(!handshakeComplete, 'Handshake already completed');
     _datastore._writeStreamRequestCount += 1;
     handshakeComplete = true;
 
@@ -270,8 +264,7 @@ class _MockWriteStream extends WriteStream {
 
   /// Injects a write ack as though it had come from the backend in response to
   /// a write.
-  Future<void> ackWrite(
-      SnapshotVersion commitVersion, List<MutationResult> results) async {
+  Future<void> ackWrite(SnapshotVersion commitVersion, List<MutationResult> results) async {
     await listener.onWriteResponse(commitVersion, results);
   }
 
@@ -284,8 +277,7 @@ class _MockWriteStream extends WriteStream {
 
   /// Returns a previous write that had been 'sent to the backend'.
   List<Mutation> waitForWriteSend() {
-    Assert.hardAssert(sentWrites.isNotEmpty,
-        'Writes need to happen before you can wait on them.');
+    hardAssert(sentWrites.isNotEmpty, 'Writes need to happen before you can wait on them.');
     return sentWrites.removeAt(0);
   }
 

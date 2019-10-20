@@ -9,7 +9,7 @@ enum LimboDocumentChangeType { added, removed }
 
 /// Change to a particular document wrt to whether it is in 'limbo'.
 class LimboDocumentChange {
-  LimboDocumentChange(this.type, this.key);
+  const LimboDocumentChange(this.type, this.key);
 
   final LimboDocumentChangeType type;
   final DocumentKey key;

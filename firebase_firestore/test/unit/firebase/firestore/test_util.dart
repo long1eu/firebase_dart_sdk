@@ -33,14 +33,21 @@ DocumentReference documentReference(String path) {
   return DocumentReference(util.key(path), firestore);
 }
 
-DocumentSnapshot documentSnapshot(
-    String path, Map<String, Object> data, bool isFromCache) {
+DocumentSnapshot documentSnapshot(String path, Map<String, Object> data, bool isFromCache) {
   if (data == null) {
     return DocumentSnapshot.fromNoDocument(
-        firestore, util.key(path), isFromCache, false);
+      firestore,
+      util.key(path),
+      isFromCache: isFromCache,
+      hasPendingWrites: false,
+    );
   } else {
     return DocumentSnapshot.fromDocument(
-        firestore, util.doc(path, 1, data), isFromCache, false);
+      firestore,
+      util.doc(path, 1, data),
+      isFromCache: isFromCache,
+      hasPendingWrites: false,
+    );
   }
 }
 
@@ -59,23 +66,14 @@ Query query(String path) {
 /// value being the document contents.
 /// [isFromCache] whether the query snapshot is cache result.
 /// Returns a query snapshot that consists of both sets of documents.
-QuerySnapshot querySnapshot(
-    String path,
-    Map<String, ObjectValue> oldDocs,
-    Map<String, ObjectValue> docsToAdd,
-    bool hasPendingWrites,
-    bool isFromCache) {
+QuerySnapshot querySnapshot(String path, Map<String, ObjectValue> oldDocs,
+    Map<String, ObjectValue> docsToAdd, bool hasPendingWrites, bool isFromCache) {
   DocumentSet oldDocuments = util.docSet(Document.keyComparator);
   ImmutableSortedSet<DocumentKey> mutatedKeys = DocumentKey.emptyKeySet;
   for (MapEntry<String, ObjectValue> pair in oldDocs.entries) {
     final String docKey = '$path/${pair.key}';
-    oldDocuments = oldDocuments.add(util.docForValue(
-        docKey,
-        1,
-        pair.value,
-        hasPendingWrites
-            ? DocumentState.synced
-            : DocumentState.localMutations));
+    oldDocuments = oldDocuments.add(util.docForValue(docKey, 1, pair.value,
+        hasPendingWrites ? DocumentState.synced : DocumentState.localMutations));
 
     if (hasPendingWrites) {
       mutatedKeys = mutatedKeys.insert(util.key(docKey));
@@ -89,8 +87,7 @@ QuerySnapshot querySnapshot(
     final Document docToAdd = util.docForValue(docKey, 1, pair.value,
         hasPendingWrites ? DocumentState.synced : DocumentState.localMutations);
     newDocuments = newDocuments.add(docToAdd);
-    documentChanges
-        .add(DocumentViewChange(DocumentViewChangeType.added, docToAdd));
+    documentChanges.add(DocumentViewChange(DocumentViewChangeType.added, docToAdd));
 
     if (hasPendingWrites) {
       mutatedKeys = mutatedKeys.insert(util.key(docKey));
@@ -102,10 +99,10 @@ QuerySnapshot querySnapshot(
     newDocuments,
     oldDocuments,
     documentChanges,
-    isFromCache,
     mutatedKeys,
-    true,
-    false /*excludesMetadataChanges*/,
+    isFromCache: isFromCache,
+    didSyncStateChange: true,
+    excludesMetadataChanges: false,
   );
 
   return QuerySnapshot(query(path), viewSnapshot, firestore);
@@ -113,15 +110,14 @@ QuerySnapshot querySnapshot(
 
 TestTargetMetadataProvider get testTargetMetadataProvider {
   final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys =
-      <int, ImmutableSortedSet<DocumentKey>>{};
+  <int, ImmutableSortedSet<DocumentKey>>{};
   final Map<int, QueryData> queryDataMap = <int, QueryData>{};
 
   return TestTargetMetadataProvider(
     syncedKeys,
     queryDataMap,
     getQueryDataForTarget: (int targetId) => queryDataMap[targetId],
-    getRemoteKeysForTarget: (int targetId) =>
-        syncedKeys[targetId] ?? DocumentKey.emptyKeySet,
+    getRemoteKeysForTarget: (int targetId) => syncedKeys[targetId] ?? DocumentKey.emptyKeySet,
   );
 }
 
@@ -129,26 +125,20 @@ TestTargetMetadataProvider get testTargetMetadataProvider {
 /// access to the [TargetMetadataProvider] callbacks. Any target accessed via
 /// these callbacks must be registered beforehand via [setSyncedKeys].
 class TestTargetMetadataProvider extends TargetMetadataProvider {
-  TestTargetMetadataProvider(
-      this.syncedKeys,
-      this.queryDataMap,
-      {@required
-          ImmutableSortedSet<DocumentKey> Function(int targetId)
-              getRemoteKeysForTarget,
-      @required
-          QueryData Function(int targetId) getQueryDataForTarget})
+  TestTargetMetadataProvider(this.syncedKeys, this.queryDataMap,
+      {@required ImmutableSortedSet<DocumentKey> Function(int targetId) getRemoteKeysForTarget,
+        @required QueryData Function(int targetId) getQueryDataForTarget})
       : super(
-          getRemoteKeysForTarget: getRemoteKeysForTarget,
-          getQueryDataForTarget: getQueryDataForTarget,
-        );
+    getRemoteKeysForTarget: getRemoteKeysForTarget,
+    getQueryDataForTarget: getQueryDataForTarget,
+  );
 
   final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys;
 
   final Map<int, QueryData> queryDataMap;
 
   /// Sets or replaces the local state for the provided query data.
-  void setSyncedKeys(
-      QueryData queryData, ImmutableSortedSet<DocumentKey> keys) {
+  void setSyncedKeys(QueryData queryData, ImmutableSortedSet<DocumentKey> keys) {
     queryDataMap[queryData.targetId] = queryData;
     syncedKeys[queryData.targetId] = keys;
   }

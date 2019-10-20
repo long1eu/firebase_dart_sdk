@@ -35,10 +35,8 @@ class MutationQueueTestCase {
   Future<MutationBatch> addMutationBatch([String key = 'foo/bar']) {
     final SetMutation mutation = setMutation(key, map(<dynamic>['a', 1]));
 
-    return persistence.runTransactionAndReturn(
-        'New mutation batch',
-        () => mutationQueue
-            .addMutationBatch(Timestamp.now(), <SetMutation>[mutation]));
+    return persistence.runTransactionAndReturn('New mutation batch',
+        () => mutationQueue.addMutationBatch(Timestamp.now(), <SetMutation>[mutation]));
   }
 
   /// Creates a list of batches containing [number] dummy [MutationBatches].
@@ -53,9 +51,7 @@ class MutationQueueTestCase {
 
   Future<void> acknowledgeBatch(MutationBatch batch) async {
     await persistence.runTransaction(
-        'Ack batchId',
-        () => mutationQueue.acknowledgeBatch(
-            batch, WriteStream.emptyStreamToken));
+        'Ack batchId', () => mutationQueue.acknowledgeBatch(batch, WriteStream.emptyStreamToken));
   }
 
   /// Calls [removeMutationBatches] on the mutation queue in a new transaction
@@ -70,8 +66,8 @@ class MutationQueueTestCase {
 
   /// Returns the number of mutation batches in the mutation queue.
   Future<int> batchCount() {
-    return persistence.runTransactionAndReturn('batchCount',
-        () async => (await mutationQueue.getAllMutationBatches()).length);
+    return persistence.runTransactionAndReturn(
+        'batchCount', () async => (await mutationQueue.getAllMutationBatches()).length);
   }
 
   /// Removes entries from the given [batches] and returns them.
@@ -83,8 +79,7 @@ class MutationQueueTestCase {
   ///
   /// Returns a new list containing all the entries that were removed from
   /// [batches].
-  Future<List<MutationBatch>> makeHoles(
-      List<int> holes, List<MutationBatch> batches) async {
+  Future<List<MutationBatch>> makeHoles(List<int> holes, List<MutationBatch> batches) async {
     final List<MutationBatch> removed = <MutationBatch>[];
     for (int i = 0; i < holes.length; i++) {
       final int index = holes[i] - i;

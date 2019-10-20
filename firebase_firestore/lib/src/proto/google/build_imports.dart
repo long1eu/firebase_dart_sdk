@@ -6,10 +6,8 @@ import 'dart:io';
 import 'package:path/path.dart';
 
 void main() {
-  final Directory directory =
-      Directory('${Directory.current.path}/lib/src/proto/google');
-  final List<Directory> dirs =
-      directory.listSync(recursive: true).whereType<Directory>().toList();
+  final Directory directory = Directory('${Directory.current.path}/lib/src/proto/google');
+  final List<Directory> dirs = directory.listSync(recursive: true).whereType<Directory>().toList();
 
   final StringBuffer _buffer = StringBuffer();
   for (Directory dir in dirs) {
@@ -27,12 +25,9 @@ void main() {
       buffer.writeln('export \'$name\';');
     }
 
-    File('${dir.absolute.path}/index.dart')
-        .writeAsStringSync(buffer.toString());
+    File('${dir.absolute.path}/index.dart').writeAsStringSync(buffer.toString());
 
-    _buffer.writeln(
-        'export \'${dir.absolute.path.split('/lib/src/proto/google/')[1]}/index.dart\';');
+    _buffer.writeln('export \'${dir.absolute.path.split('/lib/src/proto/google/')[1]}/index.dart\';');
   }
-  File('${directory.path}/index.dart')
-      .writeAsStringSync(_buffer.toString());
+  File('${directory.path}/index.dart').writeAsStringSync(_buffer.toString());
 }

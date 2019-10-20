@@ -73,11 +73,9 @@ class LruGarbageCollectorTestCase {
 
   QueryData nextQueryData() {
     final int targetId = ++previousTargetId;
-    final int sequenceNumber =
-        persistence.referenceDelegate.currentSequenceNumber;
+    final int sequenceNumber = persistence.referenceDelegate.currentSequenceNumber;
     final Query _query = query('path$targetId');
-    return QueryData.init(
-        _query, targetId, sequenceNumber, QueryPurpose.listen);
+    return QueryData.init(_query, targetId, sequenceNumber, QueryPurpose.listen);
   }
 
   Future<void> updateTargetInTransaction(QueryData queryData) async {
@@ -98,8 +96,7 @@ class LruGarbageCollectorTestCase {
   }
 
   Future<QueryData> addNextQuery() {
-    return persistence.runTransactionAndReturn(
-        'Add query', addNextQueryInTransaction);
+    return persistence.runTransactionAndReturn('Add query', addNextQueryInTransaction);
   }
 
   DocumentKey nextTestDocumentKey() {
@@ -128,8 +125,8 @@ class LruGarbageCollectorTestCase {
   }
 
   Future<void> markDocumentEligibleForGc(DocumentKey key) async {
-    await persistence.runTransaction('Removing mutation reference',
-        () => markDocumentEligibleForGcInTransaction(key));
+    await persistence.runTransaction(
+        'Removing mutation reference', () => markDocumentEligibleForGcInTransaction(key));
   }
 
   Future<void> markADocumentEligibleForGc() async {
@@ -151,8 +148,8 @@ class LruGarbageCollectorTestCase {
   }
 
   Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) {
-    return persistence.runTransactionAndReturn('Remove queries',
-        () => garbageCollector.removeTargets(upperBound, activeTargetIds));
+    return persistence.runTransactionAndReturn(
+        'Remove queries', () => garbageCollector.removeTargets(upperBound, activeTargetIds));
   }
 
   SetMutation mutation(DocumentKey key) {

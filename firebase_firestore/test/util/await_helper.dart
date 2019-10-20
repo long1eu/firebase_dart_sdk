@@ -47,8 +47,7 @@ class AwaitHelper<T> {
     assert(count != 0);
     assert(_values.length >= count);
 
-    return Future.wait<T>(
-        _values.take(count).map((Completer<T> it) => it.future));
+    return Future.wait<T>(_values.take(count).map((Completer<T> it) => it.future));
   }
 
   bool get isCompleted => _values.every((Completer<T> it) => it.isCompleted);

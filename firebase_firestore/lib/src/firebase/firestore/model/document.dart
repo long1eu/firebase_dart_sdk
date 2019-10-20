@@ -12,12 +12,10 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/object_val
 
 /// Describes the hasPendingWrites state of a document.
 enum DocumentState {
-  /// Local mutations applied via the mutation queue. Document is potentially
-  /// inconsistent.
+  /// Local mutations applied via the mutation queue. Document is potentially inconsistent.
   localMutations,
 
-  /// Mutations applied based on a write acknowledgment. Document is potentially
-  /// inconsistent.
+  /// Mutations applied based on a write acknowledgment. Document is potentially inconsistent.
   committedMutations,
 
   /// No mutations applied. Document was sent to us by Watch.
@@ -25,15 +23,13 @@ enum DocumentState {
 }
 
 class Document extends MaybeDocument implements Comparable<Document> {
-  const Document(
-      DocumentKey key, SnapshotVersion version, this.data, this.documentState)
+  const Document(DocumentKey key, SnapshotVersion version, this.data, this.documentState)
       : super(key, version);
 
   final ObjectValue data;
   final DocumentState documentState;
 
-  static int keyComparator(Document left, Document right) =>
-      left.key.compareTo(right.key);
+  static int keyComparator(Document left, Document right) => left.key.compareTo(right.key);
 
   FieldValue getField(FieldPath path) => data.get(path);
 
@@ -67,8 +63,7 @@ class Document extends MaybeDocument implements Comparable<Document> {
           data == other.data;
 
   @override
-  int get hashCode =>
-      key.hashCode ^ data.hashCode ^ version.hashCode ^ documentState.hashCode;
+  int get hashCode => key.hashCode ^ data.hashCode ^ version.hashCode ^ documentState.hashCode;
 
   @override
   String toString() {

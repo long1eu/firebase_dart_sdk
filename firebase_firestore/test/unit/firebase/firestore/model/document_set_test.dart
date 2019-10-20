@@ -22,8 +22,7 @@ void main() {
 
   test('testCount', () {
     expect(docSet(testComparator).length, 0);
-    expect(
-        docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]).length, 3);
+    expect(docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]).length, 3);
   });
 
   test('testHasKey', () {
@@ -48,21 +47,18 @@ void main() {
     expect(emptySet.first, isNull);
     expect(emptySet.last, isNull);
 
-    final DocumentSet set =
-        docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
+    final DocumentSet set = docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
     expect(set.first, _kDoc3);
     expect(set.last, _kDoc2);
   });
 
   test('testKeepsDocumentsInTheRightOrder', () {
-    final DocumentSet set =
-        docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
+    final DocumentSet set = docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
     expect(set.toList(), <Document>[_kDoc3, _kDoc1, _kDoc2]);
   });
 
   test('testPredecessorDocumentForKey', () {
-    final DocumentSet set =
-        docSet(testComparator, <Document>[_kDoc3, _kDoc1, _kDoc2]);
+    final DocumentSet set = docSet(testComparator, <Document>[_kDoc3, _kDoc1, _kDoc2]);
 
     expect(set.getPredecessor(_kDoc3.key), isNull);
     expect(set.getPredecessor(_kDoc1.key), _kDoc3);
@@ -70,8 +66,7 @@ void main() {
   });
 
   test('testDeletes', () {
-    final DocumentSet set =
-        docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
+    final DocumentSet set = docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
 
     final DocumentSet withoutDoc1 = set.remove(_kDoc1.key);
     expect(withoutDoc1.toList(), <Document>[_kDoc3, _kDoc2]);
@@ -86,8 +81,7 @@ void main() {
   });
 
   test('testUpdates', () {
-    DocumentSet set =
-        docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
+    DocumentSet set = docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
     final Document doc2Prime = doc('docs/2', 0, map(<dynamic>['sort', 9]));
 
     set = set.add(doc2Prime);
@@ -104,25 +98,20 @@ void main() {
   });
 
   test('testIsEqual', () {
-    final DocumentSet set1 =
-        docSet(Document.keyComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
-    final DocumentSet set2 =
-        docSet(Document.keyComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
+    final DocumentSet set1 = docSet(Document.keyComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
+    final DocumentSet set2 = docSet(Document.keyComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
 
     expect(set1, set1);
     expect(set2, set1);
     expect(set1 == null, isFalse);
 
-    final DocumentSet sortedSet1 =
-        docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
-    final DocumentSet sortedSet2 =
-        docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
+    final DocumentSet sortedSet1 = docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
+    final DocumentSet sortedSet2 = docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
     expect(sortedSet1, sortedSet1);
     expect(sortedSet2, sortedSet1);
     expect(sortedSet1 == null, isFalse);
 
-    final DocumentSet shortSet =
-        docSet(Document.keyComparator, <Document>[_kDoc1, _kDoc2]);
+    final DocumentSet shortSet = docSet(Document.keyComparator, <Document>[_kDoc1, _kDoc2]);
     expect(shortSet, isNot(set1));
     expect(sortedSet1, isNot(set1));
   });

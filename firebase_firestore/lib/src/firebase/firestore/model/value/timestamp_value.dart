@@ -44,9 +44,7 @@ class TimestampValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is TimestampValue &&
-          runtimeType == other.runtimeType &&
-          _value == other._value;
+      other is TimestampValue && runtimeType == other.runtimeType && _value == other._value;
 
   @override
   int get hashCode => _value.hashCode;

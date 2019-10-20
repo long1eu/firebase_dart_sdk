@@ -5,8 +5,8 @@
 import 'package:collection/collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
-/// BasePath represents a path sequence in the Firestore database. It is
-/// composed of an ordered sequence of string segments.
+/// BasePath represents a path sequence in the Firestore database. It is composed of an ordered
+/// sequence of string segments.
 abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   const BasePath(this.segments);
 
@@ -16,8 +16,7 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
 
   String operator [](int index) => segments[index];
 
-  /// Returns a new path whose segments are the current path plus the passed in
-  /// path
+  /// Returns a new path whose segments are the current path plus the passed in path
   ///
   /// Returns a new path with this path's segment plus the new one.
   B appendSegment(String segment) {
@@ -29,18 +28,15 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   ///
   /// Returns a new path with this segments path plus the new one
   B appendField(B path) {
-    final List<String> newPath = List<String>.from(segments)
-      ..addAll(path.segments);
+    final List<String> newPath = List<String>.from(segments)..addAll(path.segments);
     return createPathWithSegments(newPath);
   }
 
-  /// If count is null it returns a new path with the current path's first
-  /// segment removed. Otherwise will return a new path with the current path's
-  /// first [count] segments removed.
+  /// If count is null it returns a new path with the current path's first segment removed.
+  /// Otherwise will return a new path with the current path's first [count] segments removed.
   B popFirst([int count = 1]) {
     final int length = this.length;
-    Assert.hardAssert(length >= count,
-        'Can\'t call popFirst with count > length() ($count > $length)');
+    hardAssert(length >= count, 'Can\'t call popFirst with count > length() ($count > $length)');
     return createPathWithSegments(segments.sublist(count, length));
   }
 
@@ -49,8 +45,7 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
     return createPathWithSegments(segments.sublist(0, length - 1));
   }
 
-  /// Returns a new path made up of the first count segments of the current
-  /// path.
+  /// Returns a new path made up of the first count segments of the current path.
   B keepFirst(int count) {
     return createPathWithSegments(segments.sublist(0, count));
   }
@@ -114,7 +109,7 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
 
   /// Returns true if the given argument is a direct child of this path.
   ///
-  /// * Empty path is a parent of any path that consists of a single segment.
+  /// Empty path is a parent of any path that consists of a single segment.
   bool isImmediateParentOf(B potentialChild) {
     if (length + 1 != potentialChild.length) {
       return false;

@@ -46,8 +46,7 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef =
-        await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
 
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -80,16 +79,13 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef =
-        await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
 
     // Since we're offline, the returned promises won't complete
-    colRef
-        .document('doc2')
-        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
+    colRef.document('doc2').set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
     colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
     colRef.document('doc4').set(map(<String>['key4', 'value4']));
 
@@ -134,8 +130,7 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef =
-        await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
 
@@ -169,16 +164,13 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef =
-        await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
 
     // Since we're offline, the returned promises won't complete
-    colRef
-        .document('doc2')
-        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
+    colRef.document('doc2').set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
     colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
     colRef.document('doc4').set(map(<String>['key4', 'value4']));
 
@@ -221,8 +213,7 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
 
-    final CollectionReference colRef =
-        await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
 
     final QuerySnapshot qrySnap = await colRef.get(Source.server);
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -250,8 +241,7 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef =
-        await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
@@ -304,16 +294,13 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef =
-        await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
 
     // since we're offline, the returned promises won't complete
-    colRef
-        .document('doc2')
-        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
+    colRef.document('doc2').set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
     colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
     colRef.document('doc4').set(map(<String>['key4', 'value4']));
 

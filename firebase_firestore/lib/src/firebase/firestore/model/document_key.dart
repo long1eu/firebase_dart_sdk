@@ -9,7 +9,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// DocumentKey represents the location of a document in the Firestore database.
 class DocumentKey implements Comparable<DocumentKey> {
   DocumentKey._(this.path) {
-    Assert.hardAssert(isDocumentKey(path), 'Not a document key path: $path');
+    hardAssert(isDocumentKey(path), 'Not a document key path: $path');
   }
 
   /// Returns a document key for the empty path.
@@ -23,8 +23,7 @@ class DocumentKey implements Comparable<DocumentKey> {
     return DocumentKey._(ResourcePath.fromSegments(segments));
   }
 
-  /// Creates and returns a new document key using '/' to split the string into
-  /// segments.
+  /// Creates and returns a new document key using '/' to split the string into segments.
   factory DocumentKey.fromPathString(String path) {
     return DocumentKey._(ResourcePath.fromString(path));
   }
@@ -34,11 +33,9 @@ class DocumentKey implements Comparable<DocumentKey> {
   /// The path to the document.
   final ResourcePath path;
 
-  static int comparator(DocumentKey a, DocumentKey b) =>
-      a.path.compareTo(b.path);
+  static int comparator(DocumentKey a, DocumentKey b) => a.path.compareTo(b.path);
 
-  static final ImmutableSortedSet<DocumentKey> emptyKeySet =
-      ImmutableSortedSet<DocumentKey>();
+  static final ImmutableSortedSet<DocumentKey> emptyKeySet = ImmutableSortedSet<DocumentKey>();
 
   /// Returns true iff the given path is a path to a document.
   static bool isDocumentKey(ResourcePath path) => path.length.remainder(2) == 0;
@@ -55,9 +52,7 @@ class DocumentKey implements Comparable<DocumentKey> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is DocumentKey &&
-          runtimeType == other.runtimeType &&
-          path == other.path;
+      other is DocumentKey && runtimeType == other.runtimeType && path == other.path;
 
   @override
   int get hashCode => path.hashCode;

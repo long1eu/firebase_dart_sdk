@@ -15,8 +15,7 @@ class LruGarbageCollector {
 
   final LruDelegate delegate;
 
-  /// Given a percentile of target to collect, returns the number of targets to
-  /// collect.
+  /// Given a percentile of target to collect, returns the number of targets to collect.
   int calculateQueryCount(int percentile) {
     return (percentile / 100.0 * delegate.targetCount).toInt();
   }
@@ -26,33 +25,29 @@ class LruGarbageCollector {
     if (count == 0) {
       return ListenSequence.invalid;
     }
-    final _RollingSequenceNumberBuffer buffer =
-        _RollingSequenceNumberBuffer(count);
-    await delegate.forEachTarget(
-        (QueryData queryData) => buffer.addElement(queryData.sequenceNumber));
+    final _RollingSequenceNumberBuffer buffer = _RollingSequenceNumberBuffer(count);
+    await delegate.forEachTarget((QueryData queryData) => buffer.addElement(queryData.sequenceNumber));
     await delegate.forEachOrphanedDocumentSequenceNumber(buffer.addElement);
     return buffer.maxValue;
   }
 
-  /// Removes targets with a sequence number equal to or less than the given
-  /// upper bound, and removes document associations with those targets.
+  /// Removes targets with a sequence number equal to or less than the given upper bound, and
+  /// removes document associations with those targets.
   Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) {
     return delegate.removeTargets(upperBound, activeTargetIds);
   }
 
-  /// Removes documents that have a sequence number equal to or less than the
-  /// upper bound and are not otherwise pinned.
+  /// Removes documents that have a sequence number equal to or less than the upper bound and are
+  /// not otherwise pinned.
   Future<int> removeOrphanedDocuments(int upperBound) {
     return delegate.removeOrphanedDocuments(upperBound);
   }
 }
 
-/// Used to calculate the nth sequence number. Keeps a rolling buffer of the
-/// lowest n values passed to [addElement], and finally reports the largest of
-/// them in [maxValue].
+/// Used to calculate the nth sequence number. Keeps a rolling buffer of the lowest n values passed
+/// to [addElement], and finally reports the largest of them in [maxValue].
 class _RollingSequenceNumberBuffer {
-  _RollingSequenceNumberBuffer(this.maxElements)
-      : queue = PriorityQueue<int>(comparator);
+  _RollingSequenceNumberBuffer(this.maxElements) : queue = PriorityQueue<int>(comparator);
 
   final PriorityQueue<int> queue;
   final int maxElements;

@@ -78,16 +78,13 @@ class ComparatorTester<T> {
   }
 
   void _doTestEquivalanceGroupOrdering() {
-    for (int referenceIndex = 0;
-        referenceIndex < _equalityGroups.length;
-        referenceIndex++) {
+    for (int referenceIndex = 0; referenceIndex < _equalityGroups.length; referenceIndex++) {
       for (T reference in _equalityGroups[referenceIndex]) {
-        for (int otherIndex = 0;
-            otherIndex < _equalityGroups.length;
-            otherIndex++) {
+        for (int otherIndex = 0; otherIndex < _equalityGroups.length; otherIndex++) {
           for (T other in _equalityGroups[otherIndex]) {
-            assert(_compare(reference, other).sign ==
-                referenceIndex.compareTo(otherIndex).sign);
+            assert(_compare(reference, other).sign == referenceIndex
+                .compareTo(otherIndex)
+                .sign);
           }
         }
       }
@@ -100,8 +97,8 @@ class ComparatorTester<T> {
         for (List<Object> otherGroup in _equalityGroups) {
           for (T other in otherGroup) {
             assert(
-                reference == other && _compare(reference, other) == 0,
-                'Testing equals() for compatibility with '
+            reference == other && _compare(reference, other) == 0,
+            'Testing equals() for compatibility with '
                 'compare()/compareTo(), add a call to '
                 'doNotRequireEqualsCompatibility() if this is not required');
           }

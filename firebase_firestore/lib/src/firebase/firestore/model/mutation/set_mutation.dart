@@ -14,26 +14,23 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/object_val
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
-/// A mutation that creates or replaces the document at the given key with the
-/// object value contents.
+/// A mutation that creates or replaces the document at the given key with the object value
+/// contents.
 class SetMutation extends Mutation {
-  SetMutation(DocumentKey key, this.value, Precondition precondition)
-      : super(key, precondition);
+  SetMutation(DocumentKey key, this.value, Precondition precondition) : super(key, precondition);
 
   /// The object value to use when setting the document.
   final ObjectValue value;
 
   @override
-  MaybeDocument applyToRemoteDocument(
-      MaybeDocument maybeDoc, MutationResult mutationResult) {
+  MaybeDocument applyToRemoteDocument(MaybeDocument maybeDoc, MutationResult mutationResult) {
     verifyKeyMatches(maybeDoc);
 
-    Assert.hardAssert(mutationResult.transformResults == null,
-        'Transform results received by SetMutation.');
+    hardAssert(
+        mutationResult.transformResults == null, 'Transform results received by SetMutation.');
 
-    // Unlike applyToLocalView, if we're applying a mutation to a remote
-    // document the server has accepted the mutation so the precondition must
-    // have held.
+    // Unlike applyToLocalView, if we're applying a mutation to a remote document the server has
+    // accepted the mutation so the precondition must have held.
     final SnapshotVersion version = mutationResult.version;
     return Document(key, version, value, DocumentState.committedMutations);
   }

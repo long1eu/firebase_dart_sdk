@@ -95,7 +95,7 @@ ResourcePath path(String key) {
 }
 
 Query query(String thePath) {
-  return Query.atPath(path(thePath));
+  return Query(path(thePath));
 }
 
 FieldPath field(String path) {
@@ -118,10 +118,7 @@ SnapshotVersion version(int versionMicros) {
   return SnapshotVersion(Timestamp(seconds, nanos));
 }
 
-Document docForValue(
-    /*String|DocumentKey*/ dynamic theKey,
-    int theVersion,
-    ObjectValue data,
+Document docForValue(/*String|DocumentKey*/ dynamic theKey, int theVersion, ObjectValue data,
     [DocumentState documentState = DocumentState.synced]) {
   assert(theKey is String || theKey is DocumentKey);
 
@@ -145,8 +142,7 @@ Document docForValue(
   }
 }
 
-Document doc(/*String|DocumentKey*/ dynamic theKey, int theVersion,
-    Map<String, Object> data,
+Document doc(/*String|DocumentKey*/ dynamic theKey, int theVersion, Map<String, Object> data,
     [DocumentState documentState = DocumentState.synced]) {
   assert(theKey is String || theKey is DocumentKey);
 
@@ -170,9 +166,8 @@ Document doc(/*String|DocumentKey*/ dynamic theKey, int theVersion,
   }
 }
 
-NoDocument deletedDoc(String theKey, int theVersion,
-    [bool hasCommittedMutations = false]) {
-  return NoDocument(key(theKey), version(theVersion), hasCommittedMutations);
+NoDocument deletedDoc(String theKey, int theVersion, [bool hasCommittedMutations = false]) {
+  return NoDocument(key(theKey), version(theVersion), hasCommittedMutations: hasCommittedMutations);
 }
 
 UnknownDocument unknownDoc(String theKey, int theVersion) {
@@ -188,8 +183,7 @@ DocumentSet docSet(Comparator<Document> comparator,
   return set;
 }
 
-ImmutableSortedSet<DocumentKey> keySet(
-    [List<DocumentKey> keys = const <DocumentKey>[]]) {
+ImmutableSortedSet<DocumentKey> keySet([List<DocumentKey> keys = const <DocumentKey>[]]) {
   ImmutableSortedSet<DocumentKey> keySet = DocumentKey.emptyKeySet;
   for (DocumentKey key in keys) {
     keySet = keySet.insert(key);
@@ -249,8 +243,7 @@ void testEquality(List<List<int>> equalityGroups) {
 }
 
 QueryData queryData(int targetId, QueryPurpose queryPurpose, String path) {
-  return QueryData.init(
-      query(path), targetId, arbitrarySequenceNumber, queryPurpose);
+  return QueryData.init(query(path), targetId, arbitrarySequenceNumber, queryPurpose);
 }
 
 ImmutableSortedMap<DocumentKey, T> docUpdates<T extends MaybeDocument>(
@@ -270,8 +263,7 @@ TargetChange targetChange<T extends MaybeDocument>(
     Iterable<Document> modifiedDocuments,
     Iterable<T> removedDocuments) {
   ImmutableSortedSet<DocumentKey> addedDocumentKeys = DocumentKey.emptyKeySet;
-  ImmutableSortedSet<DocumentKey> modifiedDocumentKeys =
-      DocumentKey.emptyKeySet;
+  ImmutableSortedSet<DocumentKey> modifiedDocumentKeys = DocumentKey.emptyKeySet;
   ImmutableSortedSet<DocumentKey> removedDocumentKeys = DocumentKey.emptyKeySet;
 
   if (addedDocuments != null) {
@@ -292,21 +284,25 @@ TargetChange targetChange<T extends MaybeDocument>(
     }
   }
 
-  return TargetChange(resumeToken, current, addedDocumentKeys,
-      modifiedDocumentKeys, removedDocumentKeys);
+  return TargetChange(
+    resumeToken,
+    addedDocumentKeys,
+    modifiedDocumentKeys,
+    removedDocumentKeys,
+    current: current,
+  );
 }
 
 TargetChange ackTarget([List<Document> docs]) {
-  return targetChange(Uint8List.fromList(<int>[]), true,
-      docs ?? const <Document>[], null, null);
+  return targetChange(Uint8List.fromList(<int>[]), true, docs ?? const <Document>[], null, null);
 }
 
 Map<int, QueryData> activeQueries([List<int> targets = const <int>[]]) {
   final Query theQuery = query('foo');
   final Map<int, QueryData> listenMap = <int, QueryData>{};
   for (int targetId in targets) {
-    final QueryData queryData = QueryData.init(
-        theQuery, targetId, arbitrarySequenceNumber, QueryPurpose.listen);
+    final QueryData queryData =
+        QueryData.init(theQuery, targetId, arbitrarySequenceNumber, QueryPurpose.listen);
     listenMap[targetId] = queryData;
   }
   return listenMap;
@@ -316,46 +312,43 @@ Map<int, QueryData> activeLimboQueries(String docKey, Iterable<int> targets) {
   final Query theQuery = query(docKey);
   final Map<int, QueryData> listenMap = <int, QueryData>{};
   for (int targetId in targets) {
-    final QueryData queryData = QueryData.init(theQuery, targetId,
-        arbitrarySequenceNumber, QueryPurpose.limboResolution);
+    final QueryData queryData =
+        QueryData.init(theQuery, targetId, arbitrarySequenceNumber, QueryPurpose.limboResolution);
     listenMap[targetId] = queryData;
   }
   return listenMap;
 }
 
-RemoteEvent addedRemoteEvent(MaybeDocument doc, List<int> updatedInTargets,
-    List<int> removedFromTargets) {
-  final WatchChangeDocumentChange change = WatchChangeDocumentChange(
-      updatedInTargets, removedFromTargets, doc.key, doc);
-  final WatchChangeAggregator aggregator =
-      WatchChangeAggregator(TargetMetadataProvider(
+RemoteEvent addedRemoteEvent(
+    MaybeDocument doc, List<int> updatedInTargets, List<int> removedFromTargets) {
+  final WatchChangeDocumentChange change =
+      WatchChangeDocumentChange(updatedInTargets, removedFromTargets, doc.key, doc);
+  final WatchChangeAggregator aggregator = WatchChangeAggregator(TargetMetadataProvider(
     getRemoteKeysForTarget: (int targetId) => DocumentKey.emptyKeySet,
     getQueryDataForTarget: (int targetId) =>
         queryData(targetId, QueryPurpose.listen, doc.key.toString()),
   ))
-        ..handleDocumentChange(change);
+    ..handleDocumentChange(change);
   return aggregator.createRemoteEvent(doc.version);
 }
 
 RemoteEvent updateRemoteEvent(
     MaybeDocument doc, List<int> updatedInTargets, List<int> removedFromTargets,
     [List<int> limboTargets = const <int>[]]) {
-  final WatchChangeDocumentChange change = WatchChangeDocumentChange(
-      updatedInTargets, removedFromTargets, doc.key, doc);
-  final WatchChangeAggregator aggregator =
-      WatchChangeAggregator(TargetMetadataProvider(
+  final WatchChangeDocumentChange change =
+      WatchChangeDocumentChange(updatedInTargets, removedFromTargets, doc.key, doc);
+  final WatchChangeAggregator aggregator = WatchChangeAggregator(TargetMetadataProvider(
     getRemoteKeysForTarget: (int targetId) {
       return DocumentKey.emptyKeySet.insert(doc.key);
     },
     getQueryDataForTarget: (int targetId) {
-      final bool isLimbo = !(updatedInTargets.contains(targetId) ||
-          removedFromTargets.contains(targetId));
-      final QueryPurpose purpose =
-          isLimbo ? QueryPurpose.limboResolution : QueryPurpose.listen;
+      final bool isLimbo =
+          !(updatedInTargets.contains(targetId) || removedFromTargets.contains(targetId));
+      final QueryPurpose purpose = isLimbo ? QueryPurpose.limboResolution : QueryPurpose.listen;
       return queryData(targetId, purpose, doc.key.toString());
     },
   ))
-        ..handleDocumentChange(change);
+    ..handleDocumentChange(change);
   return aggregator.createRemoteEvent(doc.version);
 }
 
@@ -363,8 +356,7 @@ SetMutation setMutation(String path, Map<String, Object> values) {
   return SetMutation(key(path), wrapMap(values), Precondition.none);
 }
 
-PatchMutation patchMutation(String path, Map<String, Object> values,
-    [List<FieldPath> updateMask]) {
+PatchMutation patchMutation(String path, Map<String, Object> values, [List<FieldPath> updateMask]) {
   ObjectValue objectValue = ObjectValue.empty;
   final List<FieldPath> objectMask = <FieldPath>[];
   for (MapEntry<String, Object> entry in values.entries) {
@@ -381,10 +373,7 @@ PatchMutation patchMutation(String path, Map<String, Object> values,
   // We sort the fieldMaskPaths to make the order deterministic in tests.
   objectMask.sort();
 
-  return PatchMutation(
-      key(path),
-      objectValue,
-      FieldMask(merge ? updateMask : objectMask),
+  return PatchMutation(key(path), objectValue, FieldMask(merge ? updateMask : objectMask),
       merge ? Precondition.none : Precondition(exists: true));
 }
 
@@ -397,17 +386,15 @@ DeleteMutation deleteMutation(String path) {
 /// fields (i.e. { 'foo.bar': FieldValue.foo() } and must not contain any
 /// non-sentinel data.
 TransformMutation transformMutation(String path, Map<String, Object> data) {
-  final UserDataConverter dataConverter =
-      UserDataConverter(DatabaseId.forProject('project'));
+  final UserDataConverter dataConverter = UserDataConverter(DatabaseId.forProject('project'));
   final UserDataParsedUpdateData result = dataConverter.parseUpdateData(data);
 
   // The order of the transforms doesn't matter, but we sort them so tests can
   // assume a particular order.
-  final List<FieldTransform> fieldTransforms =
-      List<FieldTransform>.from(result.fieldTransforms)
-        ..sort((FieldTransform ft1, FieldTransform ft2) {
-          return ft1.fieldPath.compareTo(ft2.fieldPath);
-        });
+  final List<FieldTransform> fieldTransforms = List<FieldTransform>.from(result.fieldTransforms)
+    ..sort((FieldTransform ft1, FieldTransform ft2) {
+      return ft1.fieldPath.compareTo(ft2.fieldPath);
+    });
 
   return TransformMutation(key(path), fieldTransforms);
 }
@@ -416,8 +403,7 @@ MutationResult mutationResult(int theVersion) {
   return MutationResult(version(theVersion), null);
 }
 
-LocalViewChanges viewChanges(
-    int targetId, List<String> addedKeys, List<String> removedKeys) {
+LocalViewChanges viewChanges(int targetId, List<String> addedKeys, List<String> removedKeys) {
   ImmutableSortedSet<DocumentKey> added = DocumentKey.emptyKeySet;
   for (String keyPath in addedKeys) {
     added = added.insert(key(keyPath));
@@ -450,8 +436,7 @@ Uint8List resumeToken(
   } else if (snapshotVersion is String) {
     return Uint8List.fromList(utf8.encode(snapshotVersion));
   } else {
-    throw StateError(
-        'snapshotVersion should be int|SnapshotVersion|String but it\'s'
+    throw StateError('snapshotVersion should be int|SnapshotVersion|String but it\'s'
         ' ${snapshotVersion.runtimeType}');
   }
 }
@@ -478,8 +463,7 @@ List<T> values<T>(ImmutableSortedMap<dynamic, T> map) {
 /// Expects runnable to throw an exception with a specific error message. An
 /// optional context (e.g. 'for bad_data') can be provided which will be
 /// displayed in any resulting failure message.
-Future<void> expectError(
-    FutureOr<dynamic> Function() runnable, String exceptionMessage,
+Future<void> expectError(FutureOr<dynamic> Function() runnable, String exceptionMessage,
     [String context]) async {
   bool exceptionThrown = false;
   try {

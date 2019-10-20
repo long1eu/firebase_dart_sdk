@@ -32,15 +32,14 @@ class QueryCacheTestCase {
   /// synthesizing a resume token from the snapshot version.
   QueryData newQueryData(Query query, int targetId, int theVersion) {
     final int sequenceNumber = ++previousSequenceNumber;
-    return QueryData(query, targetId, sequenceNumber, QueryPurpose.listen,
-        version(theVersion), resumeToken(theVersion));
+    return QueryData(query, targetId, sequenceNumber, QueryPurpose.listen, version(theVersion),
+        resumeToken(theVersion));
   }
 
   /// Adds the given query data to the [queryCache] under test, committing
   /// immediately.
   Future<QueryData> addQueryData(QueryData queryData) async {
-    await persistence.runTransaction(
-        'addQueryData', () => queryCache.addQueryData(queryData));
+    await persistence.runTransaction('addQueryData', () => queryCache.addQueryData(queryData));
     return queryData;
   }
 
@@ -52,19 +51,17 @@ class QueryCacheTestCase {
   }
 
   Future<void> addMatchingKey(DocumentKey key, int targetId) async {
-    final ImmutableSortedSet<DocumentKey> keys =
-        DocumentKey.emptyKeySet.insert(key);
+    final ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet.insert(key);
 
     await persistence.runTransaction(
         'addMatchingKeys', () => queryCache.addMatchingKeys(keys, targetId));
   }
 
   Future<void> removeMatchingKey(DocumentKey key, int targetId) async {
-    final ImmutableSortedSet<DocumentKey> keys =
-        DocumentKey.emptyKeySet.insert(key);
+    final ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet.insert(key);
 
-    await persistence.runTransaction('removeMatchingKeys',
-        () => queryCache.removeMatchingKeys(keys, targetId));
+    await persistence.runTransaction(
+        'removeMatchingKeys', () => queryCache.removeMatchingKeys(keys, targetId));
   }
 
   Future<void> removeMatchingKeysForTargetId(int targetId) async {

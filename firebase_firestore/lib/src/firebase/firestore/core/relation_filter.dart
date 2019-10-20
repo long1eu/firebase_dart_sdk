@@ -12,8 +12,8 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Represents a filter to be applied to query.
 class RelationFilter extends Filter {
-  /// Creates a new filter that compares fields and values. Only intended to be
-  /// called from [Filter.create()].
+  /// Creates a new filter that compares fields and values. Only intended to be called from
+  /// [Filter.create].
   const RelationFilter(this.field, this.operator, this.value);
 
   final FilterOperator operator;
@@ -25,9 +25,8 @@ class RelationFilter extends Filter {
   bool matches(Document doc) {
     if (field.isKeyField) {
       final DocumentKey refValue = value.value;
-      Assert.hardAssert(refValue is DocumentKey,
-          'Comparing on key, but filter value not a DocumentKey');
-      Assert.hardAssert(operator != FilterOperator.arrayContains,
+      hardAssert(refValue is DocumentKey, 'Comparing on key, but filter value not a DocumentKey');
+      hardAssert(operator != FilterOperator.arrayContains,
           'ARRAY_CONTAINS queries don\'t make sense on document keys.');
       final int comparison = doc.key.compareTo(refValue);
       return _matchesComparison(comparison);
@@ -43,8 +42,7 @@ class RelationFilter extends Filter {
     } else {
       // Only compare types with matching backend order (such as double and
       // int).
-      return value.typeOrder == other.typeOrder &&
-          _matchesComparison(other.compareTo(value));
+      return value.typeOrder == other.typeOrder && _matchesComparison(other.compareTo(value));
     }
   }
 
@@ -61,13 +59,12 @@ class RelationFilter extends Filter {
       case FilterOperator.graterThanOrEqual:
         return comp >= 0;
       default:
-        throw Assert.fail('Unknown operator: $operator');
+        throw fail('Unknown operator: $operator');
     }
   }
 
   bool get isInequality =>
-      operator != FilterOperator.equal &&
-      operator != FilterOperator.arrayContains;
+      operator != FilterOperator.equal && operator != FilterOperator.arrayContains;
 
   // TODO: Technically, this won't be unique if two values have the same
   // description, such as the int 3 and the string '3'. So we should add the

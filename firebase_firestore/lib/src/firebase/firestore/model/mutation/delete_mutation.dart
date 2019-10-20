@@ -15,24 +15,21 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
 /// Represents a Delete operation
 class DeleteMutation extends Mutation {
-  const DeleteMutation(DocumentKey key, Precondition precondition)
-      : super(key, precondition);
+  const DeleteMutation(DocumentKey key, Precondition precondition) : super(key, precondition);
 
   @override
-  MaybeDocument applyToRemoteDocument(
-      MaybeDocument maybeDoc, MutationResult mutationResult) {
+  MaybeDocument applyToRemoteDocument(MaybeDocument maybeDoc, MutationResult mutationResult) {
     verifyKeyMatches(maybeDoc);
 
-    Assert.hardAssert(mutationResult.transformResults == null,
-        'Transform results received by DeleteMutation.');
+    hardAssert(
+        mutationResult.transformResults == null, 'Transform results received by DeleteMutation.');
 
-    // Unlike applyToLocalView, if we're applying a mutation to a remote
-    // document the server has accepted the mutation so the precondition must
-    // have held.
+    // Unlike applyToLocalView, if we're applying a mutation to a remote document the server has
+    // accepted the mutation so the precondition must have held.
     return NoDocument(
       key,
       mutationResult.version,
-      /*hasCommittedMutations:*/ true,
+      hasCommittedMutations: true,
     );
   }
 
@@ -48,7 +45,7 @@ class DeleteMutation extends Mutation {
     return NoDocument(
       key,
       SnapshotVersion.none,
-      /*hasCommittedMutations:*/ false,
+      hasCommittedMutations: false,
     );
   }
 
@@ -64,9 +61,7 @@ class DeleteMutation extends Mutation {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('key', key)
-          ..add('precondition', precondition))
+    return (ToStringHelper(runtimeType)..add('key', key)..add('precondition', precondition))
         .toString();
   }
 }

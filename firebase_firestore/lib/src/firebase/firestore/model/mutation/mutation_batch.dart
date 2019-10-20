@@ -12,47 +12,42 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
-/// A batch of mutations that will be sent as one unit to the backend. Batches
-/// can be marked as a tombstone if the mutation queue does not remove them
-/// immediately. When a batch is a tombstone it has no mutations.
+/// A batch of mutations that will be sent as one unit to the backend. Batches can be marked as a
+/// tombstone if the mutation queue does not remove them immediately. When a batch is a tombstone it
+/// has no mutations.
 class MutationBatch {
   const MutationBatch(this.batchId, this.localWriteTime, this.mutations);
 
-  /// A batch ID that was searched for and not found or a batch ID value known
-  /// to be before all known batches.
+  /// A batch ID that was searched for and not found or a batch ID value known to be before all
+  /// known batches.
   ///
-  /// * Batch ID values from the local store are non-negative so this value is
-  /// before all batches.
+  /// Batch ID values from the local store are non-negative so this value is before all batches.
   static const int unknown = -1;
 
   final int batchId;
 
-  /// Returns the local time at which the mutation batch was created / written;
-  /// used to assign local times to server timestamps, etc.
+  /// Returns the local time at which the mutation batch was created / written; used to assign local
+  /// times to server timestamps, etc.
   final Timestamp localWriteTime;
   final List<Mutation> mutations;
 
-  /// Applies all the mutations in this [MutationBatch] to the specified
-  /// document to create a new remote document.
+  /// Applies all the mutations in this [MutationBatch] to the specified document to create a new
+  /// remote document.
   ///
-  /// [documentKey] is the key of the document to apply mutations to, [maybeDoc]
-  /// is the document to apply mutations to and [batchResult] is the result of
-  /// applying the [MutationBatch] to the backend.
-  MaybeDocument applyToRemoteDocument(DocumentKey documentKey,
-      MaybeDocument maybeDoc, MutationBatchResult batchResult) {
+  /// [documentKey] is the key of the document to apply mutations to, [maybeDoc] is the document to
+  /// apply mutations to and [batchResult] is the result of applying the [MutationBatch] to the
+  /// backend.
+  MaybeDocument applyToRemoteDocument(
+      DocumentKey documentKey, MaybeDocument maybeDoc, MutationBatchResult batchResult) {
     if (maybeDoc != null) {
-      Assert.hardAssert(
-          maybeDoc.key == documentKey,
-          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key '
-          '${maybeDoc.key}');
+      hardAssert(maybeDoc.key == documentKey,
+          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
     }
 
     final int size = mutations.length;
     final List<MutationResult> mutationResults = batchResult.mutationResults;
-    Assert.hardAssert(
-        mutationResults.length == size,
-        'Mismatch between mutations length ($size) and results length '
-        '(${mutationResults.length})');
+    hardAssert(mutationResults.length == size,
+        'Mismatch between mutations length ($size) and results length (${mutationResults.length})');
 
     for (int i = 0; i < size; i++) {
       final Mutation mutation = mutations[i];
@@ -64,15 +59,11 @@ class MutationBatch {
     return maybeDoc;
   }
 
-  /// Computes the local view of a document given all the mutations in this
-  /// batch.
-  MaybeDocument applyToLocalView(
-      DocumentKey documentKey, MaybeDocument maybeDoc) {
+  /// Computes the local view of a document given all the mutations in this batch.
+  MaybeDocument applyToLocalView(DocumentKey documentKey, MaybeDocument maybeDoc) {
     if (maybeDoc != null) {
-      Assert.hardAssert(
-          maybeDoc.key == documentKey,
-          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key '
-          '${maybeDoc.key}');
+      hardAssert(maybeDoc.key == documentKey,
+          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
     }
 
     final MaybeDocument baseDoc = maybeDoc;
@@ -86,12 +77,11 @@ class MutationBatch {
     return maybeDoc;
   }
 
-  /// Returns true if this mutation batch has already been removed from the
-  /// mutation queue.
+  /// Returns true if this mutation batch has already been removed from the mutation queue.
   ///
-  /// * Note that not all implementations of the [MutationQueue] necessarily use
-  /// tombstones as a part of their implementation and generally speaking no
-  /// code outside the mutation queues should really care about this.
+  /// Note that not all implementations of the [MutationQueue] necessarily use tombstones as a part
+  /// of their implementation and generally speaking no code outside the mutation queues should
+  /// really care about this.
   bool get isTombstone => mutations.isEmpty;
 
   /// Converts this batch to a tombstone.
@@ -119,9 +109,7 @@ class MutationBatch {
 
   @override
   int get hashCode =>
-      batchId.hashCode ^
-      localWriteTime.hashCode ^
-      const DeepCollectionEquality().hash(mutations);
+      batchId.hashCode ^ localWriteTime.hashCode ^ const DeepCollectionEquality().hash(mutations);
 
   @override
   String toString() {

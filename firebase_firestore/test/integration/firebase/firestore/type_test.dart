@@ -24,8 +24,7 @@ void main() {
     await IntegrationTestUtil.tearDown();
   });
 
-  Future<void> verifySuccessfulWriteReadCycle(
-      Map<String, Object> data, DocumentReference documentReference) async {
+  Future<void> verifySuccessfulWriteReadCycle(Map<String, Object> data, DocumentReference documentReference) async {
     await documentReference.set(data);
     final DocumentSnapshot doc = await documentReference.get();
     expect(doc.data, data);
@@ -36,8 +35,7 @@ void main() {
   }
 
   test('testCanReadAndWriteNullFields', () async {
-    await verifySuccessfulWriteReadCycle(
-        map(<dynamic>['a', 1.0, 'b', null]), await testDoc());
+    await verifySuccessfulWriteReadCycle(map(<dynamic>['a', 1.0, 'b', null]), await testDoc());
   });
 
   test('testCanReadAndWriteListFields', () async {
@@ -75,15 +73,13 @@ void main() {
 
   test('testCanReadAndWriteTimestamps', () async {
     final Timestamp timestamp = Timestamp(100, 123000000);
-    await verifySuccessfulWriteReadCycle(
-        map(<dynamic>['timestamp', timestamp]), await testDoc());
+    await verifySuccessfulWriteReadCycle(map(<dynamic>['timestamp', timestamp]), await testDoc());
   });
 
   test('testCanReadAndWriteDates', () async {
     final DateTime date = DateTime.fromMillisecondsSinceEpoch(1491847082123);
     // Tests are set up to read back Timestamps, not Dates.
-    await verifySuccessfulWriteReadCycle(
-        map(<dynamic>['date', Timestamp.fromDate(date)]), await testDoc());
+    await verifySuccessfulWriteReadCycle(map(<dynamic>['date', Timestamp.fromDate(date)]), await testDoc());
   });
 
   test('testCanUseTypedAccessors', () async {
@@ -115,18 +111,15 @@ void main() {
     await doc.set(data);
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot['null'], data['null']);
-    expect(snapshot.getField(FieldPath.fromDotSeparatedPath('null')),
-        data['null']);
+    expect(snapshot.getField(FieldPath.fromDotSeparatedPath('null')), data['null']);
     expect(snapshot.getBool('boolean'), data['boolean']);
     expect(snapshot.getString('string'), data['string']);
     expect(snapshot.getDouble('double'), data['double']);
     expect(snapshot.getDouble('int'), 1.0);
     expect(snapshot.getGeoPoint('geoPoint'), data['geoPoint']);
     expect(snapshot.getBlob('blob'), data['blob']);
-    expect(snapshot.getDate('date').millisecondsSinceEpoch,
-        (data['date'] as DateTime).millisecondsSinceEpoch);
-    expect(snapshot.getTimestamp('date'),
-        Timestamp.fromDate(data['date'] as DateTime));
+    expect(snapshot.getDate('date').millisecondsSinceEpoch, (data['date'] as DateTime).millisecondsSinceEpoch);
+    expect(snapshot.getTimestamp('date'), Timestamp.fromDate(data['date'] as DateTime));
     expect(snapshot.getTimestamp('timestamp'), data['timestamp']);
     final Timestamp timestamp = data['timestamp'];
     expect(snapshot.getDate('timestamp'), timestamp.toDate());

@@ -22,24 +22,21 @@ import 'package:protobuf/protobuf.dart';
 
 /// A Stream that implements the StreamingWrite RPC.
 ///
-/// * The StreamingWrite RPC requires the caller to maintain special
-/// streamToken state in between calls, to help the server understand which
-/// responses the client has processed by the time the next request is made.
-/// Every response may contain a streamToken; this value must be passed to the
+/// The StreamingWrite RPC requires the caller to maintain special streamToken state in between
+/// calls, to help the server understand which responses the client has processed by the time the
+/// next request is made. Every response may contain a streamToken; this value must be passed to the
 /// next request.
 ///
-/// * After calling [start] on this stream, the next request must be a
-/// handshake, containing whatever streamToken is on hand. Once a response to
-/// this request is received, all pending mutations may be submitted. When
-/// submitting multiple batches of mutations at the same time, it's okay to use
+/// After calling [start] on this stream, the next request must be a handshake, containing whatever
+/// streamToken is on hand. Once a response to this request is received, all pending mutations may
+/// be submitted. When submitting multiple batches of mutations at the same time, it's okay to use
 /// the same streamToken for the calls to [writeMutations].
 ///
 /// @see <a
 /// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L139'>firestore.proto</a>
-class WriteStream
-    extends AbstractStream<WriteRequest, WriteResponse, WriteStreamCallback> {
-  WriteStream(FirestoreChannel channel, AsyncQueue workerQueue,
-      this._serializer, WriteStreamCallback listener)
+class WriteStream extends AbstractStream<WriteRequest, WriteResponse, WriteStreamCallback> {
+  WriteStream(FirestoreChannel channel, AsyncQueue workerQueue, this._serializer,
+      WriteStreamCallback listener)
       : super(
           channel,
           ClientMethod<WriteRequest, WriteResponse>(
@@ -58,16 +55,13 @@ class WriteStream
 
   final RemoteSerializer _serializer;
 
-  /// Contains last received stream token from the server, used to acknowledge
-  /// which responses the client has processed. Stream tokens are opaque
-  /// checkpoint markers whose only real value is their inclusion in the next
-  /// request.
+  /// Contains last received stream token from the server, used to acknowledge which responses the
+  /// client has processed. Stream tokens are opaque checkpoint markers whose only real value is
+  /// their inclusion in the next request.
   ///
-  /// * WriteStream implementations manage propagating this value from responses
-  /// to the next request.
+  /// WriteStream implementations manage propagating this value from responses to the next request.
   ///
-  /// NOTE: A null streamToken is not allowed: use the empty array for the
-  /// unset value.
+  /// NOTE: A null streamToken is not allowed: use the empty array for the unset value.
   Uint8List lastStreamToken = emptyStreamToken;
 
   @visibleForTesting
@@ -82,38 +76,34 @@ class WriteStream
   @override
   void tearDown() {
     if (handshakeComplete) {
-      // Send an empty write request to the backend to indicate imminent stream
-      // closure. This allows the backend to clean up resources.
+      // Send an empty write request to the backend to indicate imminent stream closure. This allows
+      // the backend to clean up resources.
       writeMutations(<Mutation>[]);
     }
   }
 
-  /// Tracks whether or not a handshake has been successfully exchanged and the
-  /// stream is ready to accept mutations.
+  /// Tracks whether or not a handshake has been successfully exchanged and the stream is ready to
+  /// accept mutations.
   bool get isHandshakeComplete => handshakeComplete;
 
-  /// Sends an initial streamToken to the server, performing the handshake
-  /// required to make the StreamingWrite RPC work. Subsequent
-  /// [writeMutations] calls should wait until a response has been delivered to
-  /// [WriteStreamCallback.onHandshakeComplete].
+  /// Sends an initial streamToken to the server, performing the handshake required to make the
+  /// StreamingWrite RPC work. Subsequent [writeMutations] calls should wait until a response has
+  /// been delivered to [WriteStreamCallback.onHandshakeComplete].
   Future<void> writeHandshake() async {
-    Assert.hardAssert(isOpen, 'Writing handshake requires an opened stream');
-    Assert.hardAssert(!handshakeComplete, 'Handshake already completed');
-    // TODO: Support stream resumption. We intentionally do not set the stream
-    // token on the handshake, ignoring any stream token we might have.
-    final WriteRequest request = WriteRequest.create()
-      ..database = _serializer.databaseName;
+    hardAssert(isOpen, 'Writing handshake requires an opened stream');
+    hardAssert(!handshakeComplete, 'Handshake already completed');
+    // TODO: Support stream resumption. We intentionally do not set the stream  token on the
+    //  handshake, ignoring any stream token we might have.
+    final WriteRequest request = WriteRequest.create()..database = _serializer.databaseName;
 
     writeRequest(request..freeze());
   }
 
   /// Sends a list of mutations to the Firestore backend to apply
   void writeMutations(List<Mutation> mutations) {
-    Assert.hardAssert(isOpen, 'Writing mutations requires an opened stream');
-    Assert.hardAssert(handshakeComplete,
-        'Handshake must be complete before writing mutations');
-    final WriteRequest request = WriteRequest.create()
-      ..streamToken = lastStreamToken;
+    hardAssert(isOpen, 'Writing mutations requires an opened stream');
+    hardAssert(handshakeComplete, 'Handshake must be complete before writing mutations');
+    final WriteRequest request = WriteRequest.create()..streamToken = lastStreamToken;
 
     for (Mutation mutation in mutations) {
       request.writes.add(_serializer.encodeMutation(mutation));
@@ -132,13 +122,13 @@ class WriteStream
 
       await listener.onHandshakeComplete();
     } else {
-      // A successful first write response means the stream is healthy,
-      // Note, that we could consider a successful handshake healthy, however,
-      // the write itself might be causing an error we want to back off from.
+      // A successful first write response means the stream is healthy.
+      //
+      // Note, that we could consider a successful handshake healthy, however, the write itself
+      // might be causing an error we want to back off from.
       backoff.reset();
 
-      final SnapshotVersion commitVersion =
-          _serializer.decodeVersion(change.commitTime);
+      final SnapshotVersion commitVersion = _serializer.decodeVersion(change.commitTime);
 
       final int count = change.writeResults.length;
       final List<MutationResult> results = List<MutationResult>(count);
@@ -155,8 +145,7 @@ class WriteStream
 typedef OnWriteResponse = Future<void> Function(
     SnapshotVersion commitVersion, List<MutationResult> mutationResults);
 
-/// A callback interface for the set of events that can be emitted by the
-/// [WriteStream]
+/// A callback interface for the set of events that can be emitted by the [WriteStream]
 class WriteStreamCallback extends StreamCallback {
   const WriteStreamCallback({
     @required Task<void> onOpen,

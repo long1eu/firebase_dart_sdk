@@ -8,28 +8,26 @@ import 'package:firebase_firestore/src/firebase/firestore/document_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart'
-    as core;
+import 'package:firebase_firestore/src/firebase/firestore/model/document.dart' as core;
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query.dart' as core;
 import 'package:firebase_firestore/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/snapshot_metadata.dart';
 
-/// A [QuerySnapshot] contains the results of a query. It can contain zero or
-/// more [DocumentSnapshot] objects.
+/// A [QuerySnapshot] contains the results of a query. It can contain zero or more
+/// [DocumentSnapshot] objects.
 ///
-/// * <b>Subclassing Note</b>: Firestore classes are not meant to be subclassed
-/// except for use in test mocks. Subclassing is not supported in production
-/// code and new SDK releases may break code that does so.
+/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
+/// mocks. Subclassing is not supported in production code and new SDK releases may break code that
+/// does so.
 @publicApi
 class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   QuerySnapshot(this.query, this.snapshot, this._firestore)
       : assert(query != null),
         assert(snapshot != null),
         assert(_firestore != null),
-        metadata =
-            SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
+        metadata = SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
 
   @publicApi
   final Query query;
@@ -44,51 +42,44 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   List<DocumentChange> _cachedChanges;
   MetadataChanges _cachedChangesMetadataState;
 
-  /// Returns the list of documents that changed since the last snapshot. If
-  /// it's the first snapshot all documents will be in the list as added
-  /// changes.
+  /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot
+  /// all documents will be in the list as added changes.
   ///
-  /// * Documents with changes only to their metadata will not be included.
+  /// Documents with changes only to their metadata will not be included.
   ///
   /// Returns the list of document changes since the last snapshot.
-  List<DocumentChange> get documentChanges =>
-      getDocumentChanges(MetadataChanges.exclude);
+  List<DocumentChange> get documentChanges => getDocumentChanges(MetadataChanges.exclude);
 
-  /// Returns the list of documents that changed since the last snapshot. If
-  /// it's the first snapshot all documents will be in the list as added
-  /// changes.
+  /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot
+  /// all documents will be in the list as added changes.
   ///
   /// [metadataChanges] Indicates whether metadata-only changes (i.e. only
   /// [Query.metadata] changed) should be included.
+  ///
   /// Returns the list of document changes since the last snapshot.
 
   @publicApi
   List<DocumentChange> getDocumentChanges(MetadataChanges metadataChanges) {
-    if (metadataChanges == MetadataChanges.include &&
-        snapshot.excludesMetadataChanges) {
-      throw ArgumentError('To include metadata changes with your document '
-          'changes, you must also pass MetadataChanges.include to '
-          'getSnapshots().');
+    if (metadataChanges == MetadataChanges.include && snapshot.excludesMetadataChanges) {
+      throw ArgumentError(
+          'To include metadata changes with your document changes, you must also pass '
+          'MetadataChanges.include to getSnapshots().');
     }
 
-    if (_cachedChanges == null ||
-        _cachedChangesMetadataState != metadataChanges) {
-      _cachedChanges = DocumentChange.changesFromSnapshot(
-              _firestore, metadataChanges, snapshot)
+    if (_cachedChanges == null || _cachedChangesMetadataState != metadataChanges) {
+      _cachedChanges = DocumentChange.changesFromSnapshot(_firestore, metadataChanges, snapshot)
           .toList(growable: false);
       _cachedChangesMetadataState = metadataChanges;
     }
     return _cachedChanges;
   }
 
-  /// Returns the documents in this [QuerySnapshot] as a List in order of the
-  /// query.
+  /// Returns the documents in this [QuerySnapshot] as a List in order of the query.
   ///
   /// Returns the list of documents.
   @publicApi
   List<DocumentSnapshot> get documents {
-    final List<DocumentSnapshot> res =
-        List<DocumentSnapshot>(snapshot.documents.length);
+    final List<DocumentSnapshot> res = List<DocumentSnapshot>(snapshot.documents.length);
     int i = 0;
     for (core.Document doc in snapshot.documents) {
       res[i] = _convertDocument(doc);
@@ -123,8 +114,8 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
     return QueryDocumentSnapshot.fromDocument(
       _firestore,
       document,
-      snapshot.isFromCache,
-      snapshot.mutatedKeys.contains(document.key),
+      fromCache: snapshot.isFromCache,
+      hasPendingWrites: snapshot.mutatedKeys.contains(document.key),
     );
   }
 
@@ -134,16 +125,12 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
       other is QuerySnapshot &&
           runtimeType == other.runtimeType &&
           query == other.query &&
+          metadata == other.metadata &&
           snapshot == other.snapshot &&
-          _firestore == other._firestore &&
-          metadata == other.metadata;
+          _firestore == other._firestore;
 
   @override
-  int get hashCode =>
-      query.hashCode * 31 +
-      snapshot.hashCode * 31 +
-      _firestore.hashCode * 31 +
-      metadata.hashCode * 31;
+  int get hashCode => query.hashCode ^ metadata.hashCode ^ snapshot.hashCode ^ _firestore.hashCode;
 
   @override
   String toString() {

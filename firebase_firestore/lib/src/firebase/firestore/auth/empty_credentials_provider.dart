@@ -12,8 +12,7 @@ import 'user.dart';
 /// A Credentials Provider that always returns an empty token
 class EmptyCredentialsProvider extends CredentialsProvider {
   // ignore: close_sinks
-  final BehaviorSubject<User> _onChange =
-      BehaviorSubject<User>.seeded(User.unauthenticated);
+  final BehaviorSubject<User> _onChange = BehaviorSubject<User>.seeded(User.unauthenticated);
 
   @override
   Future<String> get token => Future<String>.value(null);

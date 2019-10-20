@@ -22,8 +22,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/model/unknown_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
 import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/index.dart' as proto_beta;
+import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
 import 'package:fixnum/fixnum.dart';
 import 'package:test/test.dart';
 
@@ -40,8 +40,7 @@ void main() {
   });
 
   test('testEncodesMutationBatch', () {
-    final Mutation set =
-        setMutation('foo/bar', map(<dynamic>['a', 'b', 'num', 1]));
+    final Mutation set = setMutation('foo/bar', map(<dynamic>['a', 'b', 'num', 1]));
     final Mutation patch = PatchMutation(
         key('bar/baz'),
         wrapMap(map(<dynamic>['a', 'b', 'num', 1])),
@@ -50,8 +49,7 @@ void main() {
 
     final Mutation del = deleteMutation('baz/quux');
     final Timestamp writeTime = Timestamp.now();
-    final MutationBatch model =
-        MutationBatch(42, writeTime, <Mutation>[set, patch, del]);
+    final MutationBatch model = MutationBatch(42, writeTime, <Mutation>[set, patch, del]);
 
     final proto.Write setProto = (proto.Write.create()
           ..update = (proto.Document.create()
@@ -69,9 +67,8 @@ void main() {
           ..currentDocument = (proto.Precondition.create()..exists = true))
         .freeze();
 
-    final proto.Write delProto = (proto.Write.create()
-          ..delete = 'projects/p/databases/d/documents/baz/quux')
-        .freeze();
+    final proto.Write delProto =
+        (proto.Write.create()..delete = 'projects/p/databases/d/documents/baz/quux').freeze();
 
     final proto.Timestamp writeTimeProto = (proto.Timestamp.create()
           ..seconds = Int64(writeTime.seconds)
@@ -160,8 +157,7 @@ void main() {
     );
 
     // Let the RPC serializer test various permutations of query serialization.
-    final proto.Target_QueryTarget queryTarget =
-        remoteSerializer.encodeQueryTarget(_query);
+    final proto.Target_QueryTarget queryTarget = remoteSerializer.encodeQueryTarget(_query);
 
     final proto.Target expected = (proto.Target.create()
           ..targetId = targetId

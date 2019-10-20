@@ -12,21 +12,19 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Tracks the internal state of a [Watch] target.
 class TargetState {
-  /// The number of outstanding responses (adds or removes) that we are waiting
-  /// on. We only consider targets active that have no outstanding responses.
+  /// The number of outstanding responses (adds or removes) that we are waiting on. We only consider
+  /// targets active that have no outstanding responses.
   int _outstandingResponses = 0;
 
   /// Keeps track of the document changes since the last raised snapshot.
   ///
-  /// * These changes are continuously updated as we receive document updates
-  /// and always reflect the current set of changes against the last issued
-  /// snapshot.
+  /// These changes are continuously updated as we receive document updates and always reflect the
+  /// current set of changes against the last issued snapshot.
   final Map<DocumentKey, DocumentViewChangeType> _documentChanges =
       <DocumentKey, DocumentViewChangeType>{};
 
-  /// Whether this target state should be included in the next snapshot. We
-  /// initialize to true so that newly-added targets are included in the next
-  /// [RemoteEvent].
+  /// Whether this target state should be included in the next snapshot. We initialize to true so
+  /// that newly-added targets are included in the next [RemoteEvent].
   bool _hasChanges = true;
 
   /// The last resume token sent to us for this target.
@@ -36,10 +34,9 @@ class TargetState {
 
   /// Whether this target has been marked [_current].
   ///
-  /// * [_current] has special meaning in the RPC protocol: It implies that the
-  /// [Watch] backend has sent us all changes up to the point at which the
-  /// target was added and that the target is consistent with the rest of the
-  /// watch stream.
+  /// [_current] has special meaning in the RPC protocol: It implies that the [Watch] backend has
+  /// sent us all changes up to the point at which the target was added and that the target is
+  /// consistent with the rest of the watch stream.
   bool get isCurrent => _current;
 
   /// Whether this target has pending target adds or target removes.
@@ -50,8 +47,8 @@ class TargetState {
   /// Whether we have modified any state that should trigger a snapshot.
   bool get hasChanges => _hasChanges;
 
-  /// Applies the resume token to the [TargetChange], but only when it has a new
-  /// value. Empty [resumeTokens] are discarded.
+  /// Applies the resume token to the [TargetChange], but only when it has a new value. Empty
+  /// [resumeTokens] are discarded.
   void updateResumeToken(Uint8List resumeToken) {
     if (resumeToken.isNotEmpty) {
       _hasChanges = true;
@@ -61,15 +58,13 @@ class TargetState {
 
   /// Creates a target change from the current set of changes.
   ///
-  /// * To reset the document changes after raising this snapshot, call
-  /// [clearChanges].
+  /// To reset the document changes after raising this snapshot, call [clearChanges].
   TargetChange toTargetChange() {
     ImmutableSortedSet<DocumentKey> addedDocuments = DocumentKey.emptyKeySet;
     ImmutableSortedSet<DocumentKey> modifiedDocuments = DocumentKey.emptyKeySet;
     ImmutableSortedSet<DocumentKey> removedDocuments = DocumentKey.emptyKeySet;
 
-    for (MapEntry<DocumentKey, DocumentViewChangeType> entry
-        in _documentChanges.entries) {
+    for (MapEntry<DocumentKey, DocumentViewChangeType> entry in _documentChanges.entries) {
       final DocumentKey key = entry.key;
       final DocumentViewChangeType changeType = entry.value;
 
@@ -80,16 +75,16 @@ class TargetState {
       } else if (changeType == DocumentViewChangeType.removed) {
         removedDocuments = removedDocuments.insert(key);
       } else {
-        throw Assert.fail('Encountered invalid change type: $changeType');
+        throw fail('Encountered invalid change type: $changeType');
       }
     }
 
     return TargetChange(
       _resumeToken,
-      _current,
       addedDocuments,
       modifiedDocuments,
       removedDocuments,
+      current: _current,
     );
   }
 

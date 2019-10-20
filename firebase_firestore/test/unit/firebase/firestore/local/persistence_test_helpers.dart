@@ -18,8 +18,7 @@ int _databaseNameCounter = 0;
 
 Future<SQLitePersistence> openSQLitePersistence(String name) async {
   final DatabaseId databaseId = DatabaseId.forProject('projectId');
-  final LocalSerializer serializer =
-      LocalSerializer(RemoteSerializer(databaseId));
+  final LocalSerializer serializer = LocalSerializer(RemoteSerializer(databaseId));
 
   final SQLitePersistence persistence = await SQLitePersistence.create(
     name,
@@ -55,15 +54,13 @@ Future<SQLitePersistence> createSQLitePersistence() {
 
 /// Creates and starts a new [MemoryPersistence] instance for testing.
 Future<MemoryPersistence> createEagerGCMemoryPersistence() async {
-  final MemoryPersistence persistence =
-      MemoryPersistence.createEagerGcMemoryPersistence();
+  final MemoryPersistence persistence = MemoryPersistence.createEagerGcMemoryPersistence();
   await persistence.start();
   return persistence;
 }
 
 Future<MemoryPersistence> createLRUMemoryPersistence() async {
-  final MemoryPersistence persistence =
-      MemoryPersistence.createLruGcMemoryPersistence();
+  final MemoryPersistence persistence = MemoryPersistence.createLruGcMemoryPersistence();
   await persistence.start();
   return persistence;
 }

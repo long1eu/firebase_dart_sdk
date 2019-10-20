@@ -18,45 +18,34 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/object_val
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
-/// A mutation that modifies fields of the document at the given key with the
-/// given values. The values are applied through a field mask:
-///
-///     <ul>
-///       <li>When a field is in both the mask and the values, the corresponding
-///           field is updated.
-///       <li>When a field is in neither the mask nor the values, the
-///           corresponding field is unmodified.
-///       <li>When a field is in the mask but not in the values, the
-///           corresponding field is deleted.
-///       <li>When a field is not in the mask but is in the values, the values
-///           map is ignored.
-///     </ul>
+/// A mutation that modifies fields of the document at the given key with the given values. The
+/// values are applied through a field mask:
+///   * When a field is in both the mask and the values, the corresponding field is updated.
+///   * When a field is in neither the mask nor the values, the corresponding field is unmodified.
+///   * When a field is in the mask but not in the values, the corresponding field is deleted.
+///   * When a field is not in the mask but is in the values, the values map is ignored.
 class PatchMutation extends Mutation {
-  const PatchMutation(
-      DocumentKey key, this.value, this.mask, Precondition precondition)
+  const PatchMutation(DocumentKey key, this.value, this.mask, Precondition precondition)
       : super(key, precondition);
 
-  /// Returns the fields and associated values to use when patching the
-  /// document.
+  /// Returns the fields and associated values to use when patching the document.
   final ObjectValue value;
 
-  /// Returns the mask to apply to [value], where only fields that are in both
-  /// the fieldMask and the value will be updated.
+  /// Returns the mask to apply to [value], where only fields that are in both the fieldMask and the
+  /// value will be updated.
   final FieldMask mask;
 
   @override
-  MaybeDocument applyToRemoteDocument(
-      MaybeDocument maybeDoc, MutationResult mutationResult) {
+  MaybeDocument applyToRemoteDocument(MaybeDocument maybeDoc, MutationResult mutationResult) {
     verifyKeyMatches(maybeDoc);
 
-    Assert.hardAssert(mutationResult.transformResults == null,
-        'Transform results received by PatchMutation.');
+    hardAssert(
+        mutationResult.transformResults == null, 'Transform results received by PatchMutation.');
 
     if (!precondition.isValidFor(maybeDoc)) {
-      // Since the mutation was not rejected, we know that the precondition
-      // matched on the backend. We therefore must not have the expected version
-      // of the document in our cache and return an [UnknownDocument] with the
-      // known [updateTime].
+      // Since the mutation was not rejected, we know that the precondition matched on the backend.
+      // We therefore must not have the expected version of the document in our cache and return an
+      // [UnknownDocument] with the known [updateTime].
       return UnknownDocument(key, mutationResult.version);
     }
 
@@ -79,9 +68,8 @@ class PatchMutation extends Mutation {
     return Document(key, version, newData, DocumentState.localMutations);
   }
 
-  /// Patches the data of document if available or creates a new document. Note
-  /// that this does not check whether or not the precondition of this patch
-  /// holds.
+  /// Patches the data of document if available or creates a new document. Note that this does not
+  /// check whether or not the precondition of this patch holds.
   ObjectValue patchDocument(MaybeDocument maybeDoc) {
     ObjectValue data;
     if (maybeDoc is Document) {
@@ -116,8 +104,7 @@ class PatchMutation extends Mutation {
           mask == other.mask;
 
   @override
-  int get hashCode =>
-      value.hashCode ^ mask.hashCode ^ keyAndPreconditionHashCode();
+  int get hashCode => value.hashCode ^ mask.hashCode ^ keyAndPreconditionHashCode();
 
   @override
   String toString() {

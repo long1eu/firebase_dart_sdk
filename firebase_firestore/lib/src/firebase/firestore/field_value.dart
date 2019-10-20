@@ -4,8 +4,7 @@
 
 import 'package:firebase_common/firebase_common.dart';
 
-/// Sentinel values that can be used when writing document fields with [set] or
-/// [update].
+/// Sentinel values that can be used when writing document fields with [set] or [update].
 @publicApi
 abstract class FieldValue {
   const FieldValue._(this.elements);
@@ -14,32 +13,29 @@ abstract class FieldValue {
   @publicApi
   factory FieldValue.delete() => _deleteInstance;
 
-  /// Returns a sentinel for use with set() or update() to include a
-  /// server-generated timestamp in the written data.
+  /// Returns a sentinel for use with set() or update() to include a server-generated timestamp in
+  /// the written data.
   @publicApi
   factory FieldValue.serverTimestamp() => _serverTimestampInstance;
 
-  /// Returns a special value that can be used with set() or update() that tells
-  /// the server to union the given elements with any array value that already
-  /// exists on the server. Each specified element that doesn't already exist in
-  /// the array will be added to the end. If the field being modified is not
-  /// already an array it will be overwritten with an array containing exactly
-  /// the specified elements.
-  /// The [elements] to union into the array. Returns the [FieldValue] sentinel
+  /// Returns a special value that can be used with set() or update() that tells the server to union
+  /// the given elements with any array value that already exists on the server. Each specified
+  /// element that doesn't already exist in the array will be added to the end. If the field being
+  /// modified is not already an array it will be overwritten with an array containing exactly the
+  /// specified elements. The [elements] to union into the array. Returns the [FieldValue] sentinel
   /// for use in a call to set() or update().
   @publicApi
   factory FieldValue.arrayUnion(List<Object> elements) {
     return _ArrayUnionFieldValue._(elements);
   }
 
-  /// Returns a special value that can be used with set() or update() that tells
-  /// the server to remove the given elements from any array value that already
-  /// exists on the server. All instances of each element specified will be
-  /// removed from the array. If the field being modified is not already an
-  /// array it will be overwritten with an empty array.
+  /// Returns a special value that can be used with set() or update() that tells the server to
+  /// remove the given elements from any array value that already exists on the server. All
+  /// instances of each element specified will be removed from the array. If the field being
+  /// modified is not already an array it will be overwritten with an empty array.
   ///
-  /// The [elements] to remove from the array. Returns the [FieldValue] sentinel
-  /// for use in a call to set() or update().
+  /// The [elements] to remove from the array. Returns the [FieldValue] sentinel for use in a call
+  /// to set() or update().
   @publicApi
   factory FieldValue.arrayRemove(List<Object> elements) {
     return _ArrayRemoveFieldValue._(elements);
@@ -47,8 +43,8 @@ abstract class FieldValue {
 
   final List<Object> elements;
 
-  /// Returns the method name (e.g. 'FieldValue.delete') that was used to create
-  /// this FieldValue instance, for use in error messages, etc.
+  /// Returns the method name (e.g. 'FieldValue.delete') that was used to create this FieldValue
+  /// instance, for use in error messages, etc.
   String get methodName;
 
   bool get isDelete => this is _DeleteFieldValue;
@@ -61,8 +57,7 @@ abstract class FieldValue {
 
   static const _DeleteFieldValue _deleteInstance = _DeleteFieldValue._();
 
-  static const _ServerTimestampFieldValue _serverTimestampInstance =
-      _ServerTimestampFieldValue._();
+  static const _ServerTimestampFieldValue _serverTimestampInstance = _ServerTimestampFieldValue._();
 }
 
 /// FieldValue class for field deletes.

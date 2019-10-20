@@ -9,16 +9,14 @@ import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 
 /// Migrates schemas from version 0 (empty) to whatever the current version is.
 ///
-/// * Migrations are numbered for the version of the database they apply to. The
-/// [version] constant in this class should be one more than the highest
-/// numbered migration.
+/// Migrations are numbered for the version of the database they apply to. The [version] constant in
+/// this class should be one more than the highest numbered migration.
 ///
-/// * NOTE: Once we ship code with a migration in it the code for that migration
-/// should never be changed again. Further changes can be made to the schema by
-/// adding a new migration method, bumping the VERSION, and adding a call to the
-/// migration method from [runMigrations].
+/// NOTE: Once we ship code with a migration in it the code for that migration should never be
+/// changed again. Further changes can be made to the schema by adding a new migration method,
+/// bumping the [version], and adding a call to the migration method from [runMigrations].
 class SQLiteSchema {
-  SQLiteSchema(this.db);
+  const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added
   /// to [runMigrations] below.
@@ -48,8 +46,7 @@ class SQLiteSchema {
       await _ensureSequenceNumbers();
     }
 
-    if (fromVersion < indexingSupportVersion &&
-        toVersion >= indexingSupportVersion) {
+    if (fromVersion < indexingSupportVersion && toVersion >= indexingSupportVersion) {
       if (Persistence.indexingSupportEnabled) {
         await _createLocalDocumentsCollectionIndex();
       }
@@ -84,9 +81,8 @@ class SQLiteSchema {
         // @formatter:on
         );
 
-    // A manually maintained index of all the mutation batches that affect a
-    // given document key. The rows in this table are references based on the
-    // contents of mutations.mutations.
+    // A manually maintained index of all the mutation batches that affect a given document key. The
+    // rows in this table are references based on the contents of mutations.mutations.
     await db.query(
         // @formatter:off
         '''
@@ -170,8 +166,7 @@ class SQLiteSchema {
         // @formatter:on
         );
 
-    // The document_targets reverse mapping table is just an index on
-    // target_documents.
+    // The document_targets reverse mapping table is just an index on target_documents.
     await db.query(
         // @formatter:off
         '''
@@ -200,8 +195,8 @@ class SQLiteSchema {
   // field_value_2 is first component
   // field_value_2 is the second component; required for timestamps, GeoPoints
   Future<void> _createLocalDocumentsCollectionIndex() async {
-    // A per-user, per-collection index for cached documents indexed by a single
-    // field's name and value.
+    // A per-user, per-collection index for cached documents indexed by a single field's name and
+    // value.
     await db.query(
         // @formatter:off
         '''
@@ -220,10 +215,9 @@ class SQLiteSchema {
         );
   }
 
-  /// Ensures that each entry in the remote document cache has a corresponding
-  /// sentinel row. Any entries that lack a sentinel row are given one with the
-  /// sequence number set to the highest recorded sequence number from the
-  /// target metadata.
+  /// Ensures that each entry in the remote document cache has a corresponding sentinel row. Any
+  /// entries that lack a sentinel row are given one with the sequence number set to the highest
+  /// recorded sequence number from the target metadata.
   Future<void> _ensureSequenceNumbers() async {
     // Get the current highest sequence number
     final List<Map<String, dynamic>> sequenceNumberQuery = await db.query(
@@ -235,8 +229,7 @@ class SQLiteSchema {
         '''
         // @formatter:on
         );
-    final int sequenceNumber =
-        sequenceNumberQuery.first['highest_listen_sequence_number'];
+    final int sequenceNumber = sequenceNumberQuery.first['highest_listen_sequence_number'];
     assert(sequenceNumber != null, 'Missing highest sequence number');
 
     final List<Map<String, dynamic>> untaggedDocumentsQuery = await db.query(

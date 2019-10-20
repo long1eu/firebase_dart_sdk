@@ -8,9 +8,17 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// A field value represents a data type as stored by Firestore.
 ///
 /// Supported types are:
-/// * Null
-/// * Bool
-/// * todo finish this
+///   * Null
+///   * Boolean
+///   * Double
+///   * Timestamp
+///   * ServerTimestamp (a sentinel used in uncommitted writes)
+///   * String
+///   * Binary
+///   * (Document) References
+///   * GeoPoint
+///   * Array
+///   * Object
 abstract class FieldValue implements Comparable<FieldValue> {
   const FieldValue();
 
@@ -27,12 +35,12 @@ abstract class FieldValue implements Comparable<FieldValue> {
 
   int get typeOrder;
 
-  /// Converts a FieldValue into the value that users will see in document
-  /// snapshots using the default deserialization options.
+  /// Converts a [FieldValue] into the value that users will see in document snapshots using the
+  /// default deserialization options.
   Object get value;
 
-  /// Converts a FieldValue into the value that users will see in document
-  /// snapshots using the provided deserialization options.
+  /// Converts a [FieldValue] into the value that users will see in document snapshots using the
+  /// provided deserialization options.
   Object valueWith(FieldValueOptions options) => value;
 
   @override
@@ -52,8 +60,7 @@ abstract class FieldValue implements Comparable<FieldValue> {
 
   int defaultCompareTo(FieldValue other) {
     final int cmp = typeOrder.compareTo(other.typeOrder);
-    Assert.hardAssert(cmp != 0,
-        'Default compareTo should not be used for values of same type.');
+    hardAssert(cmp != 0, 'Default compareTo should not be used for values of same type.');
     return cmp;
   }
 }

@@ -22,8 +22,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   MemoryLruReferenceDelegate(this.persistence)
       : orphanedSequenceNumbers = <DocumentKey, int>{},
-        listenSequence =
-            ListenSequence(persistence.queryCache.highestListenSequenceNumber),
+        listenSequence = ListenSequence(persistence.queryCache.highestListenSequenceNumber),
         _currentSequenceNumber = ListenSequence.invalid {
     garbageCollector = LruGarbageCollector(this);
   }
@@ -45,21 +44,21 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
-    Assert.hardAssert(_currentSequenceNumber == ListenSequence.invalid,
+    hardAssert(_currentSequenceNumber == ListenSequence.invalid,
         'Starting a transaction without committing the previous one');
-    _currentSequenceNumber = listenSequence.next();
+    _currentSequenceNumber = listenSequence.next;
   }
 
   @override
   Future<void> onTransactionCommitted() async {
-    Assert.hardAssert(_currentSequenceNumber != ListenSequence.invalid,
+    hardAssert(_currentSequenceNumber != ListenSequence.invalid,
         'Committing a transaction without having started one');
     _currentSequenceNumber = ListenSequence.invalid;
   }
 
   @override
   int get currentSequenceNumber {
-    Assert.hardAssert(_currentSequenceNumber != ListenSequence.invalid,
+    hardAssert(_currentSequenceNumber != ListenSequence.invalid,
         'Attempting to get a sequence number outside of a transaction');
     return _currentSequenceNumber;
   }
@@ -70,8 +69,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<void> forEachOrphanedDocumentSequenceNumber(
-      Consumer<int> consumer) async {
+  Future<void> forEachOrphanedDocumentSequenceNumber(Consumer<int> consumer) async {
     orphanedSequenceNumbers.values.forEach(consumer);
   }
 
@@ -134,9 +132,8 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
     return false;
   }
 
-  /// Returns [true] if there is anything that would keep the given document
-  /// alive or if the document's sequence number is greater than the provided
-  /// upper bound.
+  /// Returns [true] if there is anything that would keep the given document alive or if the
+  /// document's sequence number is greater than the provided upper bound.
   Future<bool> _isPinned(DocumentKey key, int upperBound) async {
     if (_mutationQueuesContainsKey(key)) {
       return true;

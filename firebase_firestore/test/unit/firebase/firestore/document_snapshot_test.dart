@@ -9,13 +9,11 @@ import 'test_util.dart';
 
 void main() {
   test('testEquals', () {
-    final DocumentSnapshot base =
-        documentSnapshot('rooms/foo', util.map(<dynamic>['a', 1]), false);
+    final DocumentSnapshot base = documentSnapshot('rooms/foo', util.map(<dynamic>['a', 1]), false);
     final DocumentSnapshot baseDup =
         documentSnapshot('rooms/foo', util.map(<dynamic>['a', 1]), false);
     final DocumentSnapshot noData = documentSnapshot('rooms/foo', null, false);
-    final DocumentSnapshot noDataDup =
-        documentSnapshot('rooms/foo', null, false);
+    final DocumentSnapshot noDataDup = documentSnapshot('rooms/foo', null, false);
     final DocumentSnapshot differentPath =
         documentSnapshot('rooms/bar', util.map(<dynamic>['a', 1]), false);
     final DocumentSnapshot differentData =

@@ -16,7 +16,7 @@ class LLRBBlackValueNode<K, V> extends LLRBValueNode<K, V> {
   /// two black children. So future invocations of the [length] function will
   /// have to go at most 2 levels deep if the child is a red node.
   ///
-  /// * Needs to be mutable because left node can be updated via [setLeft].
+  /// Needs to be mutable because left node can be updated via [setLeft].
   int size = -1;
 
   @override

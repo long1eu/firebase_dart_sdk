@@ -38,8 +38,7 @@ void main() {
     // Enumerate the .json files containing the spec tests.
     final List<Pair<String, Map<String, dynamic>>> parsedSpecFiles =
         <Pair<String, Map<String, dynamic>>>[];
-    final Directory jsonDir =
-        Directory('${Directory.current.path}/test/res/json');
+    final Directory jsonDir = Directory('${Directory.current.path}/test/res/json');
     final List<File> jsonFiles = jsonDir //
         .listSync()
         .where((FileSystemEntity it) => it is File && it.path.endsWith('.json'))
@@ -51,10 +50,9 @@ void main() {
     for (File f in jsonFiles) {
       final String json = f.readAsStringSync();
       final Map<String, dynamic> fileJSON = jsonDecode(json);
-      exclusiveMode =
-          exclusiveMode || SpecTestCase.anyTestsAreMarkedExclusive(fileJSON);
-      parsedSpecFiles.add(Pair<String, Map<String, dynamic>>(
-          basenameWithoutExtension(f.path), fileJSON));
+      exclusiveMode = exclusiveMode || SpecTestCase.anyTestsAreMarkedExclusive(fileJSON);
+      parsedSpecFiles
+          .add(Pair<String, Map<String, dynamic>>(basenameWithoutExtension(f.path), fileJSON));
     }
 
     for (Pair<String, Map<String, dynamic>> parsedSpecFile in parsedSpecFiles) {

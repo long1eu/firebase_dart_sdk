@@ -24,14 +24,11 @@ class MutationBatchResult {
   );
 
   /// Creates a new [MutationBatchResult] for the given [batch] and [results].
-  /// There must be one result for each mutation in the batch. This factory
-  /// caches a document=>version mapping (as [docVersions]).
-  factory MutationBatchResult.create(
-      MutationBatch batch,
-      SnapshotVersion commitVersion,
-      List<MutationResult> mutationResults,
-      Uint8List streamToken) {
-    Assert.hardAssert(
+  /// There must be one result for each mutation in the batch. This factory caches a
+  /// document=>version mapping (as [docVersions]).
+  factory MutationBatchResult.create(MutationBatch batch, SnapshotVersion commitVersion,
+      List<MutationResult> mutationResults, Uint8List streamToken) {
+    hardAssert(
         batch.mutations.length == mutationResults.length,
         'Mutations sent ${batch.mutations.length} must equal results received '
         '${mutationResults.length}');
@@ -41,8 +38,7 @@ class MutationBatchResult {
 
     final List<Mutation> mutations = batch.mutations;
     for (int i = 0; i < mutations.length; i++) {
-      docVersions =
-          docVersions.insert(mutations[i].key, mutationResults[i].version);
+      docVersions = docVersions.insert(mutations[i].key, mutationResults[i].version);
     }
     return MutationBatchResult(
       batch,

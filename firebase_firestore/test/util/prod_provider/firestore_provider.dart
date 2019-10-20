@@ -12,11 +12,11 @@ class FirestoreProvider {
   String get firestoreHost => 'firestore.googleapis.com';
 
   String get projectId {
-    final File config =
-        File('${Directory.current.path}/res/google-services.json');
+    final File config = File('${Directory.current.path}/res/google-services.json');
 
-    Assert.hardAssert(config.existsSync(),
-        'Add the \'google-services.json\' file at this path \'${Directory.current.path}/res/google-services.json\'');
+    hardAssert(config.existsSync(),
+        'Add the \'google-services.json\' file at this path \'${Directory.current
+            .path}/res/google-services.json\'');
 
     final Map<String, dynamic> json = jsonDecode(config.readAsStringSync());
     return json['project_info']['project_id'];

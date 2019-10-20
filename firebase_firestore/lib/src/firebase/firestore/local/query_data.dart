@@ -12,29 +12,24 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
 import 'package:meta/meta.dart';
 
-/// An immutable set of metadata that the store will need to keep track of for
-/// each query.
+/// An immutable set of metadata that the store will need to keep track of for each query.
 class QueryData {
   /// Creates a new QueryData with the given values.
   ///
-  /// The [query] being listened to. [targetId] to which the query corresponds,
-  /// assigned by the [LocalStore] for user queries or the [SyncEngine] for
-  /// limbo queries. [purpose] of the query. The latest [snapshotVersion] seen
-  /// for this target. [resumeToken] is an opaque, server-assigned token that
-  /// allows watching a query to be resumed after disconnecting without
-  /// retransmitting all the data that matches the query. The resume token
-  /// essentially identifies a point in time from which the server should resume
-  /// sending results.
-  QueryData(this.query, this.targetId, this.sequenceNumber, this.purpose,
-      this.snapshotVersion, this.resumeToken)
+  /// The [query] being listened to. [targetId] to which the query corresponds, assigned by the
+  /// [LocalStore] for user queries or the [SyncEngine] for limbo queries. [snapshotVersion] is the
+  /// latest seen for this target and [resumeToken] is an opaque, server-assigned token that allows
+  /// watching a query to be resumed after disconnecting without retransmitting all the data that
+  /// matches the query. The resume token essentially identifies a point in time from which the
+  /// server should resume sending results.
+  QueryData(this.query, this.targetId, this.sequenceNumber, this.purpose, this.snapshotVersion,
+      this.resumeToken)
       : assert(query != null),
         assert(snapshotVersion != null),
         assert(resumeToken != null);
 
-  /// Convenience constructor for use when creating a [QueryData] for the first
-  /// time.
-  factory QueryData.init(
-      Query query, int targetId, int sequenceNumber, QueryPurpose purpose) {
+  /// Convenience constructor for use when creating a [QueryData] for the first time.
+  factory QueryData.init(Query query, int targetId, int sequenceNumber, QueryPurpose purpose) {
     return QueryData(
       query,
       targetId,
@@ -52,8 +47,7 @@ class QueryData {
   final SnapshotVersion snapshotVersion;
   final Uint8List resumeToken;
 
-  /// Creates a new query data instance with an updated snapshot version and
-  /// resume token.
+  /// Creates a new query data instance with an updated snapshot version and resume token.
   QueryData copyWith(
       {@required SnapshotVersion snapshotVersion,
       @required Uint8List resumeToken,

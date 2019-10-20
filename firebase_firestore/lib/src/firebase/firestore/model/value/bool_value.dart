@@ -8,6 +8,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/field_valu
 class BoolValue extends FieldValue {
   const BoolValue._(this._value);
 
+  // ignore: avoid_positional_boolean_parameters
   factory BoolValue.valueOf(bool value) => value ? trueValue : falseValue;
 
   static const BoolValue trueValue = BoolValue._(true);

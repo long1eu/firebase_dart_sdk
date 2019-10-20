@@ -22,9 +22,8 @@ import 'package:meta/meta.dart';
 
 /// A SQLite-backed instance of Persistence.
 ///
-/// * In addition to implementations of the methods in the Persistence
-/// interface, also contains helper routines that make dealing with SQLite much
-/// more pleasant.
+/// In addition to implementations of the methods in the Persistence interface, also contains helper
+/// routines that make dealing with SQLite much more pleasant.
 class SQLitePersistence extends Persistence {
   SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName);
 
@@ -48,22 +47,17 @@ class SQLitePersistence extends Persistence {
   @override
   SQLiteLruReferenceDelegate referenceDelegate;
 
-  static Future<SQLitePersistence> create(
-      String persistenceKey,
-      DatabaseId databaseId,
-      LocalSerializer serializer,
-      OpenDatabase openDatabase) async {
+  static Future<SQLitePersistence> create(String persistenceKey, DatabaseId databaseId,
+      LocalSerializer serializer, OpenDatabase openDatabase) async {
     final String databaseName = sDatabaseName(persistenceKey, databaseId);
 
     final SQLitePersistence persistence =
         SQLitePersistence._(serializer, openDatabase, databaseName);
 
-    final SQLiteQueryCache queryCache =
-        SQLiteQueryCache(persistence, serializer);
+    final SQLiteQueryCache queryCache = SQLiteQueryCache(persistence, serializer);
     final SQLiteRemoteDocumentCache remoteDocumentCache =
         SQLiteRemoteDocumentCache(persistence, serializer);
-    final SQLiteLruReferenceDelegate referenceDelegate =
-        SQLiteLruReferenceDelegate(persistence);
+    final SQLiteLruReferenceDelegate referenceDelegate = SQLiteLruReferenceDelegate(persistence);
 
     return persistence
       ..queryCache = queryCache
@@ -76,7 +70,7 @@ class SQLitePersistence extends Persistence {
   /// releases. The database is uniquely identified by a persistence key -
   /// usually the Firebase app name - and a DatabaseId (project and database).
   ///
-  /// * Format is [firestore.{persistence-key}.{project-id}.{database-id}].
+  /// Format is [firestore.{persistence-key}.{project-id}.{database-id}].
   @visibleForTesting
   static String sDatabaseName(String persistenceKey, DatabaseId databaseId) {
     return 'firestore.'
@@ -88,7 +82,7 @@ class SQLitePersistence extends Persistence {
   @override
   Future<void> start() async {
     Log.d(tag, 'Starting SQLite persistance');
-    Assert.hardAssert(!started, 'SQLitePersistence double-started!');
+    hardAssert(!started, 'SQLitePersistence double-started!');
     _db = await _openDb(databaseName, openDatabase);
     await queryCache.start();
     started = true;
@@ -98,7 +92,7 @@ class SQLitePersistence extends Persistence {
   @override
   Future<void> shutdown() async {
     Log.d(tag, 'Shutingdown SQLite persistance');
-    Assert.hardAssert(started, 'SQLitePersistence shutdown without start!');
+    hardAssert(started, 'SQLitePersistence shutdown without start!');
 
     started = false;
     _db.close();
@@ -114,8 +108,7 @@ class SQLitePersistence extends Persistence {
   }
 
   @override
-  Future<void> runTransaction(
-      String action, Transaction<void> operation) async {
+  Future<void> runTransaction(String action, Transaction<void> operation) async {
     Log.d(tag, 'Starting transaction: $action');
     try {
       referenceDelegate.onTransactionStarted();
@@ -130,8 +123,7 @@ class SQLitePersistence extends Persistence {
   }
 
   @override
-  Future<T> runTransactionAndReturn<T>(
-      String action, Transaction<T> operation) async {
+  Future<T> runTransactionAndReturn<T>(String action, Transaction<T> operation) async {
     Log.d(tag, 'Starting transaction: $action');
 
     try {
@@ -152,8 +144,7 @@ class SQLitePersistence extends Persistence {
     return _db.execute(statement, args);
   }
 
-  Future<List<Map<String, dynamic>>> query(String statement,
-      [List<dynamic> args]) {
+  Future<List<Map<String, dynamic>>> query(String statement, [List<dynamic> args]) {
     return _db.query(statement, args);
   }
 
@@ -161,27 +152,21 @@ class SQLitePersistence extends Persistence {
     return _db.delete(statement, args);
   }
 
-  /// Configures database connections just the way we like them, delegating to
-  /// SQLiteSchema to actually do the work of migration.
+  /// Configures database connections just the way we like them, delegating to SQLiteSchema to
+  /// actually do the work of migration.
   ///
-  /// * The order of events when opening a new connection is as follows:
+  /// The order of events when opening a new connection is as follows:
+  ///   * New connection
+  ///   * onConfigure
+  ///   * onCreate / onUpgrade (optional; if version already matches these aren't called)
+  ///   * onOpen
   ///
-  /// <ol>
-  /// <li>New connection
-  /// <li>onConfigure
-  /// <li>onCreate / onUpgrade (optional; if version already matches these aren't
-  /// called)
-  /// <li>onOpen
-  /// </ol>
-  ///
-  /// * This attempts to obtain exclusive access to the database and attempts to
-  /// do so as early as possible.
-  static Future<Database> _openDb(
-      String databaseName, OpenDatabase openDatabase) async {
+  /// This attempts to obtain exclusive access to the database and attempts to do so as early as
+  /// possible.
+  static Future<Database> _openDb(String databaseName, OpenDatabase openDatabase) async {
     bool configured;
 
-    /// Ensures that onConfigure has been called. This should be called first
-    /// from all methods.
+    /// Ensures that onConfigure has been called. This should be called first from all methods.
     void ensureConfigured(Database db) async {
       if (!configured) {
         configured = true;
@@ -209,17 +194,15 @@ class SQLitePersistence extends Persistence {
 
         // For now, we can safely do nothing.
         //
-        // The only case that's possible at this point would be to downgrade
-        // from version 1 (present in our first released version) to 0
-        // (uninstalled). Nobody would want us to just wipe the data so instead
-        // we just keep it around in the hope that they'll upgrade again :-).
+        // The only case that's possible at this point would be to downgrade from version 1 (present
+        // in our first released version) to 0 (uninstalled). Nobody would want us to just wipe the
+        // data so instead we just keep it around in the hope that they'll upgrade again :-).
         //
-        // Note that if you uninstall a Firestore-based app, the database goes
-        // away completely. The downgrade-then-upgrade case can only happen in
-        // very limited circumstances.
+        // Note that if you uninstall a Firestore-based app, the database goes away completely. The
+        // downgrade-then-upgrade case can only happen in very limited circumstances.
         //
-        // We'll have to revisit this once we ship a migration past version 1,
-        // but this will definitely be good enough for our initial launch.
+        // We'll have to revisit this once we ship a migration past version 1, but this will
+        // definitely be good enough for our initial launch.
       },
       onOpen: (Database db) async => ensureConfigured(db),
     );

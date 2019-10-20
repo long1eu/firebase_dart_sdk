@@ -27,12 +27,11 @@ class EventAccumulator<T> {
   }
 
   void onError(dynamic error, [StackTrace stackTrace]) {
-    Assert.hardAssert(false, 'Unexpected error: $error');
+    hardAssert(false, 'Unexpected error: $error');
   }
 
   Future<List<T>> waitFor([int numEvents = 1]) async {
-    Assert.hardAssert(
-        _completion == null, 'calling await while another await is running');
+    hardAssert(_completion == null, 'calling await while another await is running');
     _completion = Completer<void>();
     _maxEvents = _maxEvents + numEvents;
     _checkFulfilled();
@@ -69,8 +68,7 @@ class EventAccumulator<T> {
     if (event is DocumentSnapshot) {
       return event.metadata.hasPendingWrites;
     } else {
-      Assert.hardAssert(event is QuerySnapshot,
-          'hasPendingWrites called on unknown event: $event');
+      hardAssert(event is QuerySnapshot, 'hasPendingWrites called on unknown event: $event');
       return (event as QuerySnapshot).metadata.hasPendingWrites;
     }
   }

@@ -23,8 +23,7 @@ void main() {
 
   setUp(() async {
     print('setUp');
-    final MemoryPersistence persistence =
-        await createEagerGCMemoryPersistence();
+    final MemoryPersistence persistence = await createEagerGCMemoryPersistence();
 
     testCase = QueryCacheTestCase(persistence)..setUp();
 
@@ -32,8 +31,8 @@ void main() {
     print('setUpDone');
   });
 
-  tearDown(() => Future<void>.delayed(
-      const Duration(milliseconds: 250), () => testCase.tearDown()));
+  tearDown(
+      () => Future<void>.delayed(const Duration(milliseconds: 250), () => testCase.tearDown()));
 
   test('testReadQueryNotInCache', () async {
     expect(await queryCache.getQueryData(query('rooms')), isNull);
@@ -187,15 +186,12 @@ void main() {
     await testCase.addMatchingKey(key2, 1);
     await testCase.addMatchingKey(key3, 2);
 
-    expect(await queryCache.getMatchingKeysForTargetId(1),
-        <DocumentKey>[key1, key2]);
+    expect(await queryCache.getMatchingKeysForTargetId(1), <DocumentKey>[key1, key2]);
     expect(await queryCache.getMatchingKeysForTargetId(2), <DocumentKey>[key3]);
 
     await testCase.addMatchingKey(key1, 2);
-    expect(await queryCache.getMatchingKeysForTargetId(1),
-        <DocumentKey>[key1, key2]);
-    expect(await queryCache.getMatchingKeysForTargetId(2),
-        <DocumentKey>[key1, key3]);
+    expect(await queryCache.getMatchingKeysForTargetId(1), <DocumentKey>[key1, key2]);
+    expect(await queryCache.getMatchingKeysForTargetId(2), <DocumentKey>[key1, key3]);
   });
 
   test('testHighestSequenceNumber', () async {
@@ -213,8 +209,7 @@ void main() {
     await testCase.removeQueryData(query2);
     expect(queryCache.highestListenSequenceNumber, 20);
 
-    final QueryData query3 =
-        QueryData.init(garages, 42, 100, QueryPurpose.listen);
+    final QueryData query3 = QueryData.init(garages, 42, 100, QueryPurpose.listen);
     await testCase.addQueryData(query3);
     expect(queryCache.highestListenSequenceNumber, 100);
 
@@ -227,8 +222,7 @@ void main() {
   test('testHighestTargetId', () async {
     expect(queryCache.highestTargetId, 0);
 
-    final QueryData query1 =
-        QueryData.init(query('rooms'), 1, 10, QueryPurpose.listen);
+    final QueryData query1 = QueryData.init(query('rooms'), 1, 10, QueryPurpose.listen);
     await testCase.addQueryData(query1);
 
     final DocumentKey key1 = key('rooms/bar');
@@ -236,8 +230,7 @@ void main() {
     await testCase.addMatchingKey(key1, 1);
     await testCase.addMatchingKey(key2, 1);
 
-    final QueryData query2 =
-        QueryData.init(query('halls'), 2, 20, QueryPurpose.listen);
+    final QueryData query2 = QueryData.init(query('halls'), 2, 20, QueryPurpose.listen);
     await testCase.addQueryData(query2);
     final DocumentKey key3 = key('halls/foo');
     await testCase.addMatchingKey(key3, 2);
@@ -248,8 +241,7 @@ void main() {
     expect(queryCache.highestTargetId, 2);
 
     // A query with an empty result set still counts.
-    final QueryData query3 =
-        QueryData.init(query('garages'), 42, 100, QueryPurpose.listen);
+    final QueryData query3 = QueryData.init(query('garages'), 42, 100, QueryPurpose.listen);
     await testCase.addQueryData(query3);
     expect(queryCache.highestTargetId, 42);
 

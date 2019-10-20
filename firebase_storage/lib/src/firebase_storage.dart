@@ -12,7 +12,7 @@ import 'package:meta/meta.dart';
 /// [FirebaseStorage.getInstance] which will initialize it with a storage
 /// location (bucket) specified via [FirebaseOptions.storageBucket].
 ///
-/// * Otherwise, if you call [FirebaseStorage.getReference] without a
+/// Otherwise, if you call [FirebaseStorage.getReference] without a
 /// FirebaseApp, the FirebaseStorage instance will initialize with the default
 /// [FirebaseApp] obtainable from [FirebaseApp.instance]. The storage location
 /// in this case will come the json configuration file downloaded from the web.

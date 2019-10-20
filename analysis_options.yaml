@@ -39,6 +39,7 @@ linter:
     - avoid_as
     - avoid_init_to_null
     - avoid_null_checks_in_equality_operators
+    - avoid_positional_boolean_parameters
     - avoid_return_types_on_setters
     - await_only_futures
     - camel_case_types
@@ -48,7 +49,6 @@ linter:
     - implementation_imports
     - library_names
     - library_prefixes
-    - lines_longer_than_80_chars
     - non_constant_identifier_names
     - overridden_fields
     - package_api_docs

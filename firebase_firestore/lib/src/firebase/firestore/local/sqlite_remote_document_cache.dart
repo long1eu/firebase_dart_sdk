@@ -10,15 +10,14 @@ import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart'
-as sq;
+import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart' as sq;
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/proto/google/firebase/firestore/proto/maybe_document.pb.dart'
-as proto;
+    as proto;
 import 'package:protobuf/protobuf.dart';
 
 class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
@@ -28,15 +27,13 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   final LocalSerializer serializer;
 
-
   @override
   Future<void> add(MaybeDocument maybeDocument) async {
     final String path = _pathForKey(maybeDocument.key);
-    final GeneratedMessage message =
-    serializer.encodeMaybeDocument(maybeDocument);
+    final GeneratedMessage message = serializer.encodeMaybeDocument(maybeDocument);
 
     await db.execute(
-      // @formatter:off
+        // @formatter:off
         '''
           INSERT
           OR REPLACE INTO remote_documents (path, contents)
@@ -51,7 +48,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final String path = _pathForKey(documentKey);
 
     await db.execute(
-      // @formatter:off
+        // @formatter:off
         '''
           DELETE
           FROM remote_documents
@@ -66,7 +63,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final String path = _pathForKey(documentKey);
 
     final List<Map<String, dynamic>> result = await db.query(
-      // @formatter:off
+        // @formatter:off
         '''
           SELECT contents
           FROM remote_documents
@@ -84,10 +81,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<ImmutableSortedMap<DocumentKey, Document>>
-  getAllDocumentsMatchingQuery(Query query) async {
-    // Use the query path as a prefix for testing if a document matches the
-    // query.
+  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(
+      Query query) async {
+    // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
     final int immediateChildrenPathLength = prefix.length + 1;
 
@@ -97,7 +93,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final Map<DocumentKey, Document> results = <DocumentKey, Document>{};
 
     final List<Map<String, dynamic>> result = await db.query(
-      // @formatter:off
+        // @formatter:off
         '''
           SELECT path, contents
           FROM remote_documents
@@ -109,12 +105,10 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     for (Map<String, dynamic> row in result) {
       // TODO: Actually implement a single-collection query
-      //
-      // The query is actually returning any path that starts with the query
-      // path prefix which may include documents in subcollections. For example,
-      // a query on 'rooms' will return rooms/abc/messages/xyx but we shouldn't
-      // match it. Fix this by discarding rows with document keys more than one
-      // segment longer than the query path.
+      //  The query is actually returning any path that starts with the query path prefix which may
+      //  include documents in subcollections. For example, a query on 'rooms' will return
+      //  rooms/abc/messages/xyx but we shouldn't match it. Fix this by discarding rows with
+      //  document keys more than one segment longer than the query path.
 
       final String _path = row['path'];
       final ResourcePath path = EncodedPath.decodeResourcePath(_path);
@@ -137,8 +131,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       results[doc.key] = doc;
     }
 
-    return ImmutableSortedMap<DocumentKey, Document>.fromMap(
-        results, DocumentKey.comparator);
+    return ImmutableSortedMap<DocumentKey, Document>.fromMap(results, DocumentKey.comparator);
   }
 
   String _pathForKey(DocumentKey key) {
@@ -147,10 +140,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   MaybeDocument decodeMaybeDocument(Uint8List bytes) {
     try {
-      return serializer
-          .decodeMaybeDocument(proto.MaybeDocument.fromBuffer(bytes));
+      return serializer.decodeMaybeDocument(proto.MaybeDocument.fromBuffer(bytes));
     } on InvalidProtocolBufferException catch (e) {
-      throw Assert.fail('MaybeDocument failed to parse: $e');
+      throw fail('MaybeDocument failed to parse: $e');
     }
   }
 }

@@ -6,11 +6,11 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:meta/meta.dart';
 
 /// Represents that no documents exists for the key at the given version.
 class NoDocument extends MaybeDocument {
-  const NoDocument(
-      DocumentKey key, SnapshotVersion version, this.hasCommittedMutations)
+  const NoDocument(DocumentKey key, SnapshotVersion version, {@required this.hasCommittedMutations})
       : super(key, version);
 
   final bool hasCommittedMutations;
@@ -28,8 +28,7 @@ class NoDocument extends MaybeDocument {
           hasCommittedMutations == other.hasCommittedMutations;
 
   @override
-  int get hashCode =>
-      key.hashCode ^ version.hashCode ^ (hasCommittedMutations ? 1 : 0);
+  int get hashCode => key.hashCode ^ version.hashCode ^ (hasCommittedMutations ? 1 : 0);
 
   @override
   String toString() {

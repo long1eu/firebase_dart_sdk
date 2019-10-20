@@ -30,8 +30,7 @@ class RemoteDocumentCacheTestCase {
   }
 
   Future<void> add(MaybeDocument doc) async {
-    await persistence.runTransaction(
-        'add entry', () => remoteDocumentCache.add(doc));
+    await persistence.runTransaction('add entry', () => remoteDocumentCache.add(doc));
   }
 
   Future<MaybeDocument> get(String path) {
@@ -39,7 +38,6 @@ class RemoteDocumentCacheTestCase {
   }
 
   Future<void> remove(String path) async {
-    await persistence.runTransaction(
-        'remove entry', () => remoteDocumentCache.remove(key(path)));
+    await persistence.runTransaction('remove entry', () => remoteDocumentCache.remove(key(path)));
   }
 }

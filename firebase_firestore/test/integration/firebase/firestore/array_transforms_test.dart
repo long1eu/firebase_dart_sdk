@@ -35,9 +35,8 @@ void main() {
   setUp(() async {
     docRef = await testDocument();
     accumulator = EventAccumulator<DocumentSnapshot>();
-    listenerRegistration = docRef
-        .getSnapshots(MetadataChanges.include)
-        .listen(accumulator.onData, onError: accumulator.onError);
+    listenerRegistration =
+        docRef.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
 
     // Wait for initial null snapshot to avoid potential races.
     final DocumentSnapshot initialSnapshot = await accumulator.wait();
@@ -50,8 +49,7 @@ void main() {
     await IntegrationTestUtil.tearDown();
   });
 
-  Future<void> expectLocalAndRemoteEvent(
-      Map<String, Object> expectedData) async {
+  Future<void> expectLocalAndRemoteEvent(Map<String, Object> expectedData) async {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
     expect(snap.data, expectedData);
     snap = await accumulator.awaitRemoteEvent();

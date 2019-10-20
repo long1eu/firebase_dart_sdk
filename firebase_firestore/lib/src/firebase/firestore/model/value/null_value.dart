@@ -29,8 +29,7 @@ class NullValue extends FieldValue {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is NullValue && runtimeType == other.runtimeType;
+      identical(this, other) || other is NullValue && runtimeType == other.runtimeType;
 
   @override
   int get hashCode => -1;

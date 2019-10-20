@@ -8,8 +8,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dar
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:meta/meta.dart';
 
-/// Object that contains exactly one of either a view snapshot or an error for
-/// the given query.
+/// Object that contains exactly one of either a view snapshot or an error for the given query.
 class QueryEvent {
   QueryEvent({@required this.query, this.view, this.error});
 

@@ -33,9 +33,7 @@ class StringValue extends FieldValue {
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is StringValue &&
-            runtimeType == other.runtimeType &&
-            _value == other._value;
+        other is StringValue && runtimeType == other.runtimeType && _value == other._value;
   }
 
   @override

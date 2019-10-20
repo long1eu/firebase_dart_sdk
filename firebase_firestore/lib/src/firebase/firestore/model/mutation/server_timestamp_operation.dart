@@ -13,18 +13,15 @@ class ServerTimestampOperation implements TransformOperation {
 
   const ServerTimestampOperation._();
 
-  static const ServerTimestampOperation sharedInstance =
-      ServerTimestampOperation._();
+  static const ServerTimestampOperation sharedInstance = ServerTimestampOperation._();
 
   @override
-  FieldValue applyToLocalView(
-      FieldValue previousValue, Timestamp localWriteTime) {
+  FieldValue applyToLocalView(FieldValue previousValue, Timestamp localWriteTime) {
     return ServerTimestampValue(localWriteTime, previousValue);
   }
 
   @override
-  FieldValue applyToRemoteDocument(
-      FieldValue previousValue, FieldValue transformResult) {
+  FieldValue applyToRemoteDocument(FieldValue previousValue, FieldValue transformResult) {
     return transformResult;
   }
 

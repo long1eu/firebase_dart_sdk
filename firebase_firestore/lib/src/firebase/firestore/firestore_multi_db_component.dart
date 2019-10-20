@@ -12,19 +12,17 @@ import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 class FirestoreMultiDbComponent {
   FirestoreMultiDbComponent(this.app, this.authProvider);
 
-  /// A static map from instance key to [FirebaseFirestore] instances. Instance
-  /// keys are database names.
-  static final Map<String, FirebaseFirestore> instances =
-      <String, FirebaseFirestore>{};
+  /// A static map from instance key to [FirebaseFirestore] instances. Instance keys are database
+  /// names.
+  static final Map<String, FirebaseFirestore> instances = <String, FirebaseFirestore>{};
 
   final FirebaseApp app;
 
   final InternalTokenProvider authProvider;
 
   /// Provides instances of Firestore for given database names. */
-  Future<FirebaseFirestore> get(
-      String databaseName, OpenDatabase openDatabase) async {
-    return instances[databaseName] ??= await FirebaseFirestore.newInstance(
-        app, databaseName, authProvider, openDatabase);
+  Future<FirebaseFirestore> get(String databaseName, OpenDatabase openDatabase) async {
+    return instances[databaseName] ??=
+        await FirebaseFirestore.newInstance(app, databaseName, authProvider, openDatabase);
   }
 }

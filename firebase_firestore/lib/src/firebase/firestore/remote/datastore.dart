@@ -23,23 +23,17 @@ import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
 
-/// Datastore represents a proxy for the remote server, hiding details of the
-/// RPC layer. It:
+/// Datastore represents a proxy for the remote server, hiding details of the RPC layer. It:
+///   * Manages connections to the server
+///   * Authenticates to the server
+///   * Manages threading and keeps higher-level code running on the worker queue
+///   * Serializes internal model objects to and from protocol buffers
 ///
-/// <ul>
-///   <li>Manages connections to the server
-///   <li>Authenticates to the server
-///   <li>Manages threading and keeps higher-level code running on the worker
-///       queue
-///   <li>Serializes internal model objects to and from protocol buffers
-/// </ul>
-///
-/// <p>The Datastore is generally not responsible for understanding the
-/// higher-level protocol involved in actually making changes or reading data,
-/// and is otherwise stateless.
+/// The Datastore is generally not responsible for understanding the higher-level protocol involved
+/// in actually making changes or reading data, and is otherwise stateless.
 class Datastore {
-  factory Datastore(DatabaseInfo databaseInfo, AsyncQueue workerQueue,
-      CredentialsProvider credentialsProvider,
+  factory Datastore(
+      DatabaseInfo databaseInfo, AsyncQueue workerQueue, CredentialsProvider credentialsProvider,
       {ClientChannel clientChannel}) {
     clientChannel ??= ClientChannel(databaseInfo.host,
         options: ChannelOptions(
@@ -54,15 +48,13 @@ class Datastore {
       databaseInfo.databaseId,
     );
 
-    final RemoteSerializer serializer =
-        RemoteSerializer(databaseInfo.databaseId);
+    final RemoteSerializer serializer = RemoteSerializer(databaseInfo.databaseId);
 
     return Datastore.init(databaseInfo, workerQueue, serializer, channel);
   }
 
   @visibleForTesting
-  Datastore.init(
-      this.databaseInfo, this.workerQueue, this.serializer, this.channel);
+  Datastore.init(this.databaseInfo, this.workerQueue, this.serializer, this.channel);
 
   /// Set of lowercase, white-listed headers for logging purposes.
   static final Set<String> whiteListedHeaders = <String>{
@@ -78,21 +70,18 @@ class Datastore {
   final RemoteSerializer serializer;
   final FirestoreChannel channel;
 
-  /// Creates a new [WatchStream] that is still unstarted but uses a common
-  /// shared channel
+  /// Creates a new [WatchStream] that is still unstarted but uses a common shared channel
   WatchStream createWatchStream(WatchStreamCallback listener) {
     return WatchStream(channel, workerQueue, serializer, listener);
   }
 
-  /// Creates a new [WriteStream] that is still unstarted but uses a common
-  /// shared channel
+  /// Creates a new [WriteStream] that is still unstarted but uses a common shared channel
   WriteStream createWriteStream(WriteStreamCallback listener) {
     return WriteStream(channel, workerQueue, serializer, listener);
   }
 
   Future<List<MutationResult>> commit(List<Mutation> mutations) async {
-    final CommitRequest builder = CommitRequest.create()
-      ..database = serializer.databaseName;
+    final CommitRequest builder = CommitRequest.create()..database = serializer.databaseName;
 
     for (Mutation mutation in mutations) {
       builder.writes.add(serializer.encodeMutation(mutation));
@@ -108,8 +97,7 @@ class Datastore {
         builder.freeze(),
       );
 
-      final SnapshotVersion commitVersion =
-          serializer.decodeVersion(response.commitTime);
+      final SnapshotVersion commitVersion = serializer.decodeVersion(response.commitTime);
 
       final int count = response.writeResults.length;
       final List<MutationResult> results = List<MutationResult>(count);
@@ -119,8 +107,7 @@ class Datastore {
       }
       return results;
     } catch (e) {
-      if (e is FirebaseFirestoreError &&
-          e.code == FirebaseFirestoreErrorCode.unauthenticated) {
+      if (e is FirebaseFirestoreError && e.code == FirebaseFirestoreErrorCode.unauthenticated) {
         channel.invalidateToken();
       }
 
@@ -136,18 +123,15 @@ class Datastore {
     }
 
     try {
-      final List<BatchGetDocumentsResponse> responses =
-          await channel.runStreamingResponseRpc(
-              ClientMethod<BatchGetDocumentsResponse,
-                  BatchGetDocumentsResponse>(
-                'firestore.googleapis.com/google.firestore.v1beta1.Firestore/BatchGetDocuments',
-                (GeneratedMessage req) => req.writeToBuffer(),
-                (List<int> res) => BatchGetDocumentsResponse.fromBuffer(res),
-              ),
-              builder.freeze());
+      final List<BatchGetDocumentsResponse> responses = await channel.runStreamingResponseRpc(
+          ClientMethod<BatchGetDocumentsResponse, BatchGetDocumentsResponse>(
+            'firestore.googleapis.com/google.firestore.v1beta1.Firestore/BatchGetDocuments',
+            (GeneratedMessage req) => req.writeToBuffer(),
+            (List<int> res) => BatchGetDocumentsResponse.fromBuffer(res),
+          ),
+          builder.freeze());
 
-      final Map<DocumentKey, MaybeDocument> resultMap =
-          <DocumentKey, MaybeDocument>{};
+      final Map<DocumentKey, MaybeDocument> resultMap = <DocumentKey, MaybeDocument>{};
       for (BatchGetDocumentsResponse response in responses) {
         final MaybeDocument doc = serializer.decodeMaybeDocument(response);
         resultMap[doc.key] = doc;
@@ -158,8 +142,7 @@ class Datastore {
       }
       return results;
     } catch (e) {
-      if (e is FirebaseFirestoreError &&
-          e.code == FirebaseFirestoreErrorCode.unauthenticated) {
+      if (e is FirebaseFirestoreError && e.code == FirebaseFirestoreErrorCode.unauthenticated) {
         channel.invalidateToken();
       }
       rethrow;
@@ -178,8 +161,8 @@ class Datastore {
       case StatusCode.internal:
       case StatusCode.unavailable:
       case StatusCode.unauthenticated:
-        // Unauthenticated means something went wrong with our token and we need
-        // to retry with new credentials which will happen automatically.
+        // Unauthenticated means something went wrong with our token and we need to retry with new
+        // credentials which will happen automatically.
         return false;
       case StatusCode.invalidArgument:
       case StatusCode.notFound:
@@ -187,9 +170,8 @@ class Datastore {
       case StatusCode.permissionDenied:
       case StatusCode.failedPrecondition:
       case StatusCode.aborted:
-      // Aborted might be retried in some scenarios, but that is dependant on
-      // the context and should handled individually by the calling code.
-      // See https://cloud.google.com/apis/design/errors.
+      // Aborted might be retried in some scenarios, but that is dependant on the context and should
+      // handled individually by the calling code. See https://cloud.google.com/apis/design/errors.
       case StatusCode.outOfRange:
       case StatusCode.unimplemented:
       case StatusCode.dataLoss:

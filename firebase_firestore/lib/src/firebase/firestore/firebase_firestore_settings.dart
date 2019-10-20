@@ -15,8 +15,8 @@ class FirebaseFirestoreSettings {
   })  : assert(host != null, 'Provided host must not be null.'),
         assert(
             !(!sslEnabled && host == _defaultHost),
-            'You can\'t set the \'sslEnabled\' setting '
-            'unless you also set a non-default \'host\'.');
+            'You can\'t set the \'sslEnabled\' setting unless you also set a non-default '
+            '\'host\'.');
 
   static const String _defaultHost = 'firestore.googleapis.com';
 
@@ -28,8 +28,7 @@ class FirebaseFirestoreSettings {
   @publicApi
   final bool sslEnabled;
 
-  /// Enables or disables local persistent storage. The default is to use local
-  /// persistent storage.
+  /// Enables or disables local persistent storage. The default is to use local persistent storage.
   @publicApi
   final bool persistenceEnabled;
 

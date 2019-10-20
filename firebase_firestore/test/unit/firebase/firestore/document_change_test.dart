@@ -5,8 +5,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
-    as core;
+import 'package:firebase_firestore/src/firebase/firestore/core/query.dart' as core;
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
@@ -24,18 +23,12 @@ import 'package:test/test.dart';
 import '../../../util/test_util.dart';
 
 void main() {
-  void validatePositions(
-      core.Query query,
-      List<Document> initialDocsList,
-      List<Document> addedList,
-      List<Document> modifiedList,
-      List<NoDocument> removedList) {
-    final ImmutableSortedMap<DocumentKey, MaybeDocument> initialDocs =
-        docUpdates(initialDocsList);
+  void validatePositions(core.Query query, List<Document> initialDocsList, List<Document> addedList,
+      List<Document> modifiedList, List<NoDocument> removedList) {
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> initialDocs = docUpdates(initialDocsList);
 
     ImmutableSortedMap<DocumentKey, MaybeDocument> updates =
-        ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(
-            DocumentKey.comparator);
+        ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(DocumentKey.comparator);
     for (Document doc in addedList) {
       updates = updates.insert(doc.key, doc);
     }
@@ -47,19 +40,14 @@ void main() {
     }
 
     final View view = View(query, DocumentKey.emptyKeySet);
-    final ViewDocumentChanges initialChanges =
-        view.computeDocChanges(initialDocs);
+    final ViewDocumentChanges initialChanges = view.computeDocChanges(initialDocs);
     final TargetChange initialTargetChange = ackTarget(initialDocsList);
     final ViewSnapshot initialSnapshot =
         view.applyChanges(initialChanges, initialTargetChange).snapshot;
 
     final ViewDocumentChanges updateChanges = view.computeDocChanges(updates);
-    final TargetChange updateTargetChange = targetChange(
-        Uint8List.fromList(<int>[]),
-        true,
-        addedList,
-        modifiedList,
-        removedList);
+    final TargetChange updateTargetChange =
+        targetChange(Uint8List.fromList(<int>[]), true, addedList, modifiedList, removedList);
     final ViewSnapshot updatedSnapshot =
         view.applyChanges(updateChanges, updateTargetChange).snapshot;
 
@@ -72,8 +60,8 @@ void main() {
     final List<Document> actual = initialSnapshot.documents.toList();
 
     final FirebaseFirestore firestore = FirebaseFirestoreMock();
-    final List<DocumentChange> changes = DocumentChange.changesFromSnapshot(
-        firestore, MetadataChanges.exclude, updatedSnapshot);
+    final List<DocumentChange> changes =
+        DocumentChange.changesFromSnapshot(firestore, MetadataChanges.exclude, updatedSnapshot);
 
     for (DocumentChange change in changes) {
       if (change.type != DocumentChangeType.added) {
@@ -89,36 +77,30 @@ void main() {
   }
 
   test('testAdditions', () {
-    final Query query = Query.atPath(path('c'));
+    final Query query = Query(path('c'));
     final List<Document> initialDocs = <Document>[
       doc('c/a', 1, map()),
       doc('c/c', 1, map()),
       doc('c/e', 1, map())
     ];
-    final List<Document> adds = <Document>[
-      doc('c/d', 2, map()),
-      doc('c/b', 2, map())
-    ];
+    final List<Document> adds = <Document>[doc('c/d', 2, map()), doc('c/b', 2, map())];
 
     validatePositions(query, initialDocs, adds, <Document>[], <NoDocument>[]);
   });
 
   test('testDeletions', () {
-    final Query query = Query.atPath(path('c'));
+    final Query query = Query(path('c'));
     final List<Document> initialDocs = <Document>[
       doc('c/a', 1, map()),
       doc('c/b', 1, map()),
       doc('c/c', 1, map())
     ];
-    final List<NoDocument> deletes = <NoDocument>[
-      deletedDoc('c/a', 2),
-      deletedDoc('c/c', 2)
-    ];
+    final List<NoDocument> deletes = <NoDocument>[deletedDoc('c/a', 2), deletedDoc('c/c', 2)];
     validatePositions(query, initialDocs, <Document>[], <Document>[], deletes);
   });
 
   test('testModifications', () {
-    final Query query = Query.atPath(path('c'));
+    final Query query = Query(path('c'));
     final List<Document> initialDocs = <Document>[
       doc('c/a', 1, map(<String>['value', 'a-1'])),
       doc('c/b', 1, map(<String>['value', 'b-1'])),
@@ -128,12 +110,11 @@ void main() {
       doc('c/a', 2, map(<String>['value', 'a-2'])),
       doc('c/c', 2, map(<String>['value', 'c-2']))
     ];
-    validatePositions(
-        query, initialDocs, <Document>[], updates, <NoDocument>[]);
+    validatePositions(query, initialDocs, <Document>[], updates, <NoDocument>[]);
   });
 
   test('testChangesWithSortOrderChange', () {
-    final Query query = Query.atPath(path('c')).orderBy(orderBy('sort'));
+    final Query query = Query(path('c')).orderBy(orderBy('sort'));
     final List<Document> initialDocs = <Document>[
       doc('c/a', 1, map(<dynamic>['sort', 10])),
       doc('c/b', 1, map(<dynamic>['sort', 20])),
@@ -155,7 +136,7 @@ void main() {
 
   test('randomTests', () {
     for (int run = 0; run < 100; run++) {
-      final Query query = Query.atPath(path('c')).orderBy(orderBy('sort'));
+      final Query query = Query(path('c')).orderBy(orderBy('sort'));
       final Map<DocumentKey, Document> initialDocs = <DocumentKey, Document>{};
       final List<Document> adds = <Document>[];
       final List<Document> updates = <Document>[];
@@ -166,8 +147,7 @@ void main() {
         final String docKey = 'c/test-doc-$i';
         // Skip 20% of the docs
         if (random.nextDouble() > 0.8) {
-          initialDocs[key(docKey)] =
-              doc(docKey, 1, map(<dynamic>['sort', random.nextDouble()]));
+          initialDocs[key(docKey)] = doc(docKey, 1, map(<dynamic>['sort', random.nextDouble()]));
         }
       }
       for (int i = 0; i < numDocs; i++) {
@@ -179,18 +159,15 @@ void main() {
             deletes.add(deletedDoc(docKey, 2));
           } else {
             if (initialDocs.containsKey(key(docKey))) {
-              updates.add(
-                  doc(docKey, 2, map(<dynamic>['sort', random.nextDouble()])));
+              updates.add(doc(docKey, 2, map(<dynamic>['sort', random.nextDouble()])));
             } else {
-              adds.add(
-                  doc(docKey, 2, map(<dynamic>['sort', random.nextDouble()])));
+              adds.add(doc(docKey, 2, map(<dynamic>['sort', random.nextDouble()])));
             }
           }
         }
       }
 
-      validatePositions(
-          query, initialDocs.values.toList(), adds, updates, deletes);
+      validatePositions(query, initialDocs.values.toList(), adds, updates, deletes);
     }
   });
 }

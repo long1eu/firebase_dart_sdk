@@ -15,26 +15,22 @@ abstract class ArrayTransformOperation implements TransformOperation {
   final List<FieldValue> elements;
 
   @override
-  FieldValue applyToLocalView(
-      FieldValue previousValue, Timestamp localWriteTime) {
+  FieldValue applyToLocalView(FieldValue previousValue, Timestamp localWriteTime) {
     return apply(previousValue);
   }
 
   @override
-  FieldValue applyToRemoteDocument(
-      FieldValue previousValue, FieldValue transformResult) {
-    // The server just sends null as the transform result for array operations,
-    // so we have to calculate a result the same as we do for local
-    // applications.
+  FieldValue applyToRemoteDocument(FieldValue previousValue, FieldValue transformResult) {
+    // The server just sends null as the transform result for array operations, so we have to
+    // calculate a result the same as we do for local applications.
     return apply(previousValue);
   }
 
   /// Applies this ArrayTransformOperation against the specified previousValue.
   ArrayValue apply(FieldValue previousValue);
 
-  /// Inspects the provided value, returning an [List] copy of the internal
-  /// array if it's an ArrayValue and an empty [List] if it's null or any other
-  /// type of FSTFieldValue.
+  /// Inspects the provided value, returning an [List] copy of the internal array if it's an
+  /// ArrayValue and an empty [List] if it's null or any other type of FSTFieldValue.
   static List<FieldValue> coercedFieldValuesArray(FieldValue value) {
     if (value is ArrayValue) {
       return value.internalValue.toList();
@@ -66,8 +62,7 @@ class ArrayTransformOperationUnion extends ArrayTransformOperation {
 
   @override
   ArrayValue apply(FieldValue previousValue) {
-    final List<FieldValue> result =
-        ArrayTransformOperation.coercedFieldValuesArray(previousValue);
+    final List<FieldValue> result = ArrayTransformOperation.coercedFieldValuesArray(previousValue);
     for (FieldValue element in elements) {
       if (!result.contains(element)) {
         result.add(element);
@@ -83,8 +78,7 @@ class ArrayTransformOperationRemove extends ArrayTransformOperation {
 
   @override
   ArrayValue apply(FieldValue previousValue) {
-    final List<FieldValue> result =
-        ArrayTransformOperation.coercedFieldValuesArray(previousValue);
+    final List<FieldValue> result = ArrayTransformOperation.coercedFieldValuesArray(previousValue);
     result.removeWhere((FieldValue it) => elements.contains(it));
     return ArrayValue.fromList(result);
   }

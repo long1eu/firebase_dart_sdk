@@ -6,8 +6,8 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 
 /// The types of changes that can happen to a document with respect to a view.
-/// * NOTE: We sort document changes by their type, so the ordering of this enum
-/// is significant.
+///
+/// NOTE: We sort document changes by their type, so the ordering of this 'enum' is significant.
 class DocumentViewChangeType implements Comparable<DocumentViewChangeType> {
   const DocumentViewChangeType._(this._i);
 
@@ -21,11 +21,18 @@ class DocumentViewChangeType implements Comparable<DocumentViewChangeType> {
   @override
   int compareTo(DocumentViewChangeType other) => _i.compareTo(other._i);
 
+  static const List<DocumentViewChangeType> values = <DocumentViewChangeType>[
+    removed,
+    added,
+    modified,
+    metadata,
+  ];
+
   static const List<String> _values = <String>[
     'removed',
     'added',
     'modified',
-    'metadata'
+    'metadata',
   ];
 
   @override
@@ -34,9 +41,7 @@ class DocumentViewChangeType implements Comparable<DocumentViewChangeType> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is DocumentViewChangeType &&
-          runtimeType == other.runtimeType &&
-          _i == other._i;
+      other is DocumentViewChangeType && runtimeType == other.runtimeType && _i == other._i;
 
   @override
   int get hashCode => _i.hashCode;
@@ -57,11 +62,11 @@ class DocumentViewChange {
           document == other.document;
 
   @override
-  int get hashCode => type.hashCode * 31 + document.hashCode * 31;
+  int get hashCode => type.hashCode ^ document.hashCode;
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
+    return (ToStringHelper(runtimeType) //
           ..add('type', type)
           ..add('document', document))
         .toString();

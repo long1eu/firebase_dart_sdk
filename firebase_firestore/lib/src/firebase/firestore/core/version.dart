@@ -5,5 +5,5 @@
 /// Holds static version string of the SDK.
 class Version {
   static const String sdkVersion = '0.0.1-dev';
-  static const String grpcVersion = '0.6.5';
+  static const String grpcVersion = '2.1.1';
 }

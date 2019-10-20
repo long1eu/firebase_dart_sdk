@@ -28,9 +28,7 @@ class ArrayValue extends FieldValue {
 
   @override
   Object valueWith(FieldValueOptions options) {
-    return _value
-        .map((FieldValue it) => it.valueWith(options))
-        .toList(growable: false);
+    return _value.map((FieldValue it) => it.valueWith(options)).toList(growable: false);
   }
 
   @override

@@ -35,8 +35,7 @@ class IntegrationTestUtil {
   static const String badProjectId = 'test-project-2';
 
   /// Online status of all active Firestore clients.
-  static final Map<FirebaseFirestore, bool> firestoreStatus =
-      <FirebaseFirestore, bool>{};
+  static final Map<FirebaseFirestore, bool> firestoreStatus = <FirebaseFirestore, bool>{};
 
   static final FirestoreProvider provider = FirestoreProvider();
 
@@ -46,10 +45,11 @@ class IntegrationTestUtil {
 
   static DatabaseInfo testEnvDatabaseInfo() {
     return DatabaseInfo(
-        DatabaseId.forProject(provider.projectId),
-        'test-persistenceKey',
-        provider.firestoreHost,
-        /*sslEnabled:*/ true);
+      DatabaseId.forProject(provider.projectId),
+      'test-persistenceKey',
+      provider.firestoreHost,
+      sslEnabled: true,
+    );
   }
 
   static FirebaseFirestoreSettings newTestSettings() {
@@ -108,12 +108,12 @@ class IntegrationTestUtil {
         databaseId,
         persistenceKey,
         settings.host,
-        settings.sslEnabled,
+        sslEnabled: settings.sslEnabled,
       ),
-      settings.persistenceEnabled,
       provider,
       queue,
       openDatabase,
+      usePersistence: settings.persistenceEnabled,
     );
 
     return FirebaseFirestore(databaseId, queue, null, client);
@@ -122,11 +122,8 @@ class IntegrationTestUtil {
   /// Initializes a new Firestore instance that can be used in testing. It is
   /// guaranteed to not share state with other instances returned from this
   /// call.
-  static Future<FirebaseFirestore> testFirestoreInstance(
-      String projectId,
-      LogLevel logLevel,
-      FirebaseFirestoreSettings settings,
-      String dbPath) async {
+  static Future<FirebaseFirestore> testFirestoreInstance(String projectId, LogLevel logLevel,
+      FirebaseFirestoreSettings settings, String dbPath) async {
     // This unfortunately is a global setting that affects existing Firestore
     // clients.
     Log.level = logLevel;
@@ -134,13 +131,11 @@ class IntegrationTestUtil {
     // TODO: Remove this once this is ready to ship.
     Persistence.indexingSupportEnabled = true;
 
-    final DatabaseId databaseId =
-        DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
+    final DatabaseId databaseId = DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
     final String persistenceKey = 'db${firestoreStatus.length}';
 
     print('index: $dbIndex');
-    final String dbFullPath =
-        '${Directory.current.path}/build/test/$dbPath\_${dbIndex++}.db';
+    final String dbFullPath = '${Directory.current.path}/build/test/$dbPath\_${dbIndex++}.db';
 
     clearPersistence(dbFullPath);
 
@@ -186,30 +181,27 @@ class IntegrationTestUtil {
     return (await testCollection('test-collection')).document();
   }
 
-  static Future<DocumentReference> testDocumentWithData(
-      Map<String, Object> data) async {
+  static Future<DocumentReference> testDocumentWithData(Map<String, Object> data) async {
     final DocumentReference docRef = await testDocument();
     await docRef.set(data);
     return docRef;
   }
 
   static Future<CollectionReference> testCollection([String name]) async {
-    return (await testFirestore())
-        .collection(name == null ? autoId() : '$name${autoId()}');
+    return (await testFirestore()).collection(name == null ? autoId() : '$name${autoId()}');
   }
 
   static Future<CollectionReference> testCollectionWithDocs(
       Map<String, Map<String, Object>> docs) async {
     final CollectionReference collection = await testCollection();
-    final CollectionReference writer =
-        (await testFirestore()).collection(collection.id);
+    final CollectionReference writer = (await testFirestore()).collection(collection.id);
 
     await writeAllDocs(writer, docs);
     return collection;
   }
 
-  static Future<void> writeAllDocs(CollectionReference collection,
-      Map<String, Map<String, Object>> docs) async {
+  static Future<void> writeAllDocs(
+      CollectionReference collection, Map<String, Map<String, Object>> docs) async {
     for (MapEntry<String, Map<String, Object>> doc in docs.entries) {
       await collection.document(doc.key).set(doc.value);
     }
@@ -222,8 +214,7 @@ class IntegrationTestUtil {
         .first;
   }
 
-  static List<Map<String, Object>> querySnapshotToValues(
-      QuerySnapshot querySnapshot) {
+  static List<Map<String, Object>> querySnapshotToValues(QuerySnapshot querySnapshot) {
     final List<Map<String, Object>> res = <Map<String, Object>>[];
     for (DocumentSnapshot doc in querySnapshot) {
       res.add(doc.data);

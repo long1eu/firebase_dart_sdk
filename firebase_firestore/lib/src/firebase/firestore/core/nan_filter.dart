@@ -32,9 +32,7 @@ class NaNFilter extends Filter {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is NaNFilter &&
-          runtimeType == other.runtimeType &&
-          fieldPath == other.fieldPath;
+      other is NaNFilter && runtimeType == other.runtimeType && fieldPath == other.fieldPath;
 
   @override
   int get hashCode => fieldPath.hashCode;

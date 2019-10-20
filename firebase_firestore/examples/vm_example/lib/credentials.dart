@@ -20,7 +20,7 @@ class ServiceCredential extends InternalTokenProvider {
     'auth_uri': '',
     'token_uri': '',
     'auth_provider_x509_cert_url': '',
-    'client_x509_cert_url': ''
+    'client_x509_cert_url': '',
   });
   final List<String> _scopes = <String>[
     'https://www.googleapis.com/auth/cloud-platform',
@@ -72,8 +72,10 @@ class ServiceCredential extends InternalTokenProvider {
   /// [expiry] token expiry date
   Future<void> _flush(String token, DateTime expiry) async {
     final File file = File(tokenPath);
-    final String json = jsonEncode(
-        <String, dynamic>{'token': token, 'expiry': expiry.toString()});
+    final String json = jsonEncode(<String, dynamic>{
+      'token': token,
+      'expiry': expiry.toString(),
+    });
     file.writeAsStringSync(json);
   }
 

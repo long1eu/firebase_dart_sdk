@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dart_sqlite/dart_sqlite.dart' as sql;
-import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
+import 'package:firebase_firestore/firebase_firestore.dart';
 
 class DatabaseMock extends Database {
   DatabaseMock._(this.database, this.path);

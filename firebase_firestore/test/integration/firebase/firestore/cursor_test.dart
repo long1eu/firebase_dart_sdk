@@ -28,8 +28,7 @@ void main() {
   });
 
   test('canPageThroughItems', () async {
-    final CollectionReference testCollection =
-        await testCollectionWithDocs(map(<dynamic>[
+    final CollectionReference testCollection = await testCollectionWithDocs(map(<dynamic>[
       'a',
       map<String>(<String>['v', 'a']),
       'b',
@@ -71,8 +70,7 @@ void main() {
   });
 
   test('canBeCreatedFromDocuments', () async {
-    final CollectionReference testCollection =
-        await testCollectionWithDocs(map(<dynamic>[
+    final CollectionReference testCollection = await testCollectionWithDocs(map(<dynamic>[
       'a', map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
       'b', map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
       'c', map<dynamic>(<dynamic>['k', 'c', 'sort', 2.0]),
@@ -103,8 +101,7 @@ void main() {
   });
 
   test('canBeCreatedFromValues', () async {
-    final CollectionReference testCollection =
-        await testCollectionWithDocs(map(<dynamic>[
+    final CollectionReference testCollection = await testCollectionWithDocs(map(<dynamic>[
       'a', map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
       'b', map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
       'c', map<dynamic>(<dynamic>['k', 'c', 'sort', 2.0]),
@@ -144,19 +141,17 @@ void main() {
       map<String>(<String>['k', 'e'])
     ]);
 
-    final CollectionReference writer = (await testFirestore(newTestSettings(),
-            'integration/cursor_canBeCreatedUsingDocumentId.db'))
-        .collection('parent-collection')
-        .document()
-        .collection('sub-collection');
+    final CollectionReference writer =
+        (await testFirestore(newTestSettings(), 'integration/cursor_canBeCreatedUsingDocumentId.db'))
+            .collection('parent-collection')
+            .document()
+            .collection('sub-collection');
     await writeAllDocs(writer, testDocs);
 
-    final CollectionReference reader =
-        (await testFirestore()).collection(writer.path);
+    final CollectionReference reader = (await testFirestore()).collection(writer.path);
 
-    final QuerySnapshot snapshot = await reader
-        .orderByField(FieldPath.documentId())
-        .startAt(<String>['b']).endBefore(<String>['d']).get();
+    final QuerySnapshot snapshot =
+        await reader.orderByField(FieldPath.documentId()).startAt(<String>['b']).endBefore(<String>['d']).get();
 
     expect(querySnapshotToValues(snapshot), <dynamic>[
       map<dynamic>(<dynamic>['k', 'b']),
@@ -168,30 +163,22 @@ void main() {
     final FirebaseFirestore firestore = await testFirestore();
     final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
       'a',
-      map<dynamic>(
-          <dynamic>['k', '1a', 'ref', firestore.collection('1').document('a')]),
+      map<dynamic>(<dynamic>['k', '1a', 'ref', firestore.collection('1').document('a')]),
       'b',
-      map<dynamic>(
-          <dynamic>['k', '1b', 'ref', firestore.collection('1').document('b')]),
+      map<dynamic>(<dynamic>['k', '1b', 'ref', firestore.collection('1').document('b')]),
       'c',
-      map<dynamic>(
-          <dynamic>['k', '2a', 'ref', firestore.collection('2').document('a')]),
+      map<dynamic>(<dynamic>['k', '2a', 'ref', firestore.collection('2').document('a')]),
       'd',
-      map<dynamic>(
-          <dynamic>['k', '2b', 'ref', firestore.collection('2').document('b')]),
+      map<dynamic>(<dynamic>['k', '2b', 'ref', firestore.collection('2').document('b')]),
       'e',
-      map<dynamic>(
-          <dynamic>['k', '3a', 'ref', firestore.collection('3').document('a')])
+      map<dynamic>(<dynamic>['k', '3a', 'ref', firestore.collection('3').document('a')])
     ]);
 
-    final CollectionReference testCollection =
-        await testCollectionWithDocs(testDocs);
+    final CollectionReference testCollection = await testCollectionWithDocs(testDocs);
 
     final QuerySnapshot snapshot = await testCollection
         .orderBy('ref')
-        .startAfter(<DocumentReference>[
-      firestore.collection('1').document('a')
-    ]).endAt(
+        .startAfter(<DocumentReference>[firestore.collection('1').document('a')]).endAt(
             <DocumentReference>[firestore.collection('2').document('b')]).get();
 
     final List<String> results = <String>[];
@@ -202,8 +189,7 @@ void main() {
   });
 
   test('canBeUsedInDescendingQueries', () async {
-    final CollectionReference testCollection =
-        await testCollectionWithDocs(map(<dynamic>[
+    final CollectionReference testCollection = await testCollectionWithDocs(map(<dynamic>[
       'a', map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
       'b', map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
       'c', map<dynamic>(<dynamic>['k', 'c', 'sort', 2.0]),
@@ -213,9 +199,8 @@ void main() {
       map<dynamic>(<dynamic>['k', 'f', 'nosort', 1.0]) // should not show up
     ]));
 
-    final Query query = testCollection
-        .orderBy('sort', Direction.descending)
-        .orderByField(FieldPath.documentId(), Direction.descending);
+    final Query query =
+        testCollection.orderBy('sort', Direction.descending).orderByField(FieldPath.documentId(), Direction.descending);
 
     QuerySnapshot snapshot = await query.startAt(<double>[2.0]).get();
 
@@ -239,8 +224,7 @@ void main() {
   }
 
   test('timestampsCanBePassedToQueriesAsLimits', () async {
-    final CollectionReference testCollection =
-        await testCollectionWithDocs(map(<dynamic>[
+    final CollectionReference testCollection = await testCollectionWithDocs(map(<dynamic>[
       'a', map<Timestamp>(<dynamic>['timestamp', timestamp(100, 2)]),
       'b', map<Timestamp>(<dynamic>['timestamp', timestamp(100, 5)]),
       'c', map<Timestamp>(<dynamic>['timestamp', timestamp(100, 3)]),
@@ -251,15 +235,13 @@ void main() {
     ]));
 
     final Query query = testCollection.orderBy('timestamp');
-    final QuerySnapshot snapshot = await query
-        .startAfter(<Timestamp>[timestamp(100, 2)]).endAt(
-            <Timestamp>[timestamp(100, 5)]).get();
+    final QuerySnapshot snapshot =
+        await query.startAfter(<Timestamp>[timestamp(100, 2)]).endAt(<Timestamp>[timestamp(100, 5)]).get();
     expect(querySnapshotToIds(snapshot), <String>['c', 'f', 'b', 'e']);
   });
 
   test('timestampsCanBePassedToQueriesInWhereClause', () async {
-    final CollectionReference testCollection =
-        await testCollectionWithDocs(map(<dynamic>[
+    final CollectionReference testCollection = await testCollectionWithDocs(map(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['timestamp', timestamp(100, 7)]),
       'b',
@@ -283,14 +265,12 @@ void main() {
     final Timestamp nanos = Timestamp(0, 123456789);
     final Timestamp micros = Timestamp(0, 123456000);
     final Timestamp millis = Timestamp(0, 123000000);
-    final CollectionReference testCollection =
-        await testCollectionWithDocs(map(<dynamic>[
+    final CollectionReference testCollection = await testCollectionWithDocs(map(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['timestamp', nanos])
     ]));
 
-    QuerySnapshot snapshot =
-        await testCollection.whereEqualTo('timestamp', nanos).get();
+    QuerySnapshot snapshot = await testCollection.whereEqualTo('timestamp', nanos).get();
     expect(querySnapshotToValues(snapshot), hasLength(1));
     // Because Timestamp should have been truncated to microseconds, the
     // microsecond timestamp should be considered equal to the nanosecond one.

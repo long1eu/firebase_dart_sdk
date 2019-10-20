@@ -69,13 +69,9 @@ class LocalStoreTestCase {
   Future<void> acknowledgeMutation(int documentVersion) async {
     final MutationBatch batch = _batches.removeAt(0);
     final SnapshotVersion _version = version(documentVersion);
-    final MutationResult mutationResult =
-        MutationResult(_version, /*transformResults:*/ null);
+    final MutationResult mutationResult = MutationResult(_version, /*transformResults:*/ null);
     final MutationBatchResult result = MutationBatchResult.create(
-        batch,
-        _version,
-        <MutationResult>[mutationResult],
-        WriteStream.emptyStreamToken);
+        batch, _version, <MutationResult>[mutationResult], WriteStream.emptyStreamToken);
     _lastChanges = await localStore.acknowledgeBatch(result);
   }
 
@@ -103,9 +99,8 @@ class LocalStoreTestCase {
   void assertChanged([List<MaybeDocument> expected = const <MaybeDocument>[]]) {
     expect(_lastChanges, isNotNull);
 
-    final List<MaybeDocument> actualList = _lastChanges
-        .map((MapEntry<DocumentKey, MaybeDocument> entry) => entry.value)
-        .toList();
+    final List<MaybeDocument> actualList =
+        _lastChanges.map((MapEntry<DocumentKey, MaybeDocument> entry) => entry.value).toList();
 
     expect(actualList, expected);
     _lastChanges = null;

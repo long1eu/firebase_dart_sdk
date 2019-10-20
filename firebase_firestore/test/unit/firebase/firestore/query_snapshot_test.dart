@@ -3,8 +3,7 @@
 // on 28/09/2018
 
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart'
-    as core;
+import 'package:firebase_firestore/src/firebase/firestore/core/query.dart' as core;
 import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
@@ -24,18 +23,18 @@ void main() {
     final ObjectValue firstValue = util.wrapList(<dynamic>['a', 1]);
     final ObjectValue secondValue = util.wrapList(<dynamic>['b', 1]);
 
-    final QuerySnapshot foo = querySnapshot(
-        'foo', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
-    final QuerySnapshot fooDup = querySnapshot(
-        'foo', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
-    final QuerySnapshot differentPath = querySnapshot(
-        'bar', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
-    final QuerySnapshot differentDoc = querySnapshot(
-        'foo', util.map(), util.map(<dynamic>['a', secondValue]), true, false);
-    final QuerySnapshot noPendingWrites = querySnapshot(
-        'foo', util.map(), util.map(<dynamic>['a', firstValue]), false, false);
-    final QuerySnapshot fromCache = querySnapshot(
-        'foo', util.map(), util.map(<dynamic>['a', firstValue]), true, true);
+    final QuerySnapshot foo =
+    querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
+    final QuerySnapshot fooDup =
+    querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
+    final QuerySnapshot differentPath =
+    querySnapshot('bar', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
+    final QuerySnapshot differentDoc =
+    querySnapshot('foo', util.map(), util.map(<dynamic>['a', secondValue]), true, false);
+    final QuerySnapshot noPendingWrites =
+    querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), false, false);
+    final QuerySnapshot fromCache =
+    querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), true, true);
 
     expect(fooDup, foo);
     expect(differentPath, isNot(foo));
@@ -51,19 +50,19 @@ void main() {
   });
 
   test('testIncludeMetadataChanges', () {
-    final Document doc1Old = util.docForValue('foo/bar', 1,
-        util.wrapList(<String>['a', 'b']), DocumentState.localMutations);
-    final Document doc1New = util.docForValue(
-        'foo/bar', 1, util.wrapList(<String>['a', 'b']), DocumentState.synced);
-    final Document doc2Old = util.docForValue(
-        'foo/baz', 1, util.wrapList(<String>['a', 'b']), DocumentState.synced);
-    final Document doc2New = util.docForValue(
-        'foo/baz', 1, util.wrapList(<String>['a', 'c']), DocumentState.synced);
+    final Document doc1Old = util.docForValue(
+        'foo/bar', 1, util.wrapList(<String>['a', 'b']), DocumentState.localMutations);
+    final Document doc1New =
+    util.docForValue('foo/bar', 1, util.wrapList(<String>['a', 'b']), DocumentState.synced);
+    final Document doc2Old =
+    util.docForValue('foo/baz', 1, util.wrapList(<String>['a', 'b']), DocumentState.synced);
+    final Document doc2New =
+    util.docForValue('foo/baz', 1, util.wrapList(<String>['a', 'c']), DocumentState.synced);
 
     final DocumentSet oldDocuments =
-        util.docSet(Document.keyComparator, <Document>[doc1Old, doc2Old]);
+    util.docSet(Document.keyComparator, <Document>[doc1Old, doc2Old]);
     final DocumentSet newDocuments =
-        util.docSet(Document.keyComparator, <Document>[doc1New, doc2New]);
+    util.docSet(Document.keyComparator, <Document>[doc1New, doc2New]);
 
     final List<DocumentViewChange> documentChanges = <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.metadata, doc1New),
@@ -76,26 +75,26 @@ void main() {
       newDocuments,
       oldDocuments,
       documentChanges,
-      false /*isFromCache*/,
       util.keySet(),
-      true /*didSyncStateChange*/,
-      false /*excludesMetadataChanges*/,
+      isFromCache: false,
+      didSyncStateChange: true,
+      excludesMetadataChanges: false,
     );
 
     final QuerySnapshot snapshot =
-        QuerySnapshot(Query(fooQuery, firestore), viewSnapshot, firestore);
+    QuerySnapshot(Query(fooQuery, firestore), viewSnapshot, firestore);
 
     final QueryDocumentSnapshot doc1Snap = QueryDocumentSnapshot.fromDocument(
       firestore,
       doc1New,
-      false /*fromCache*/,
-      false /*keySet*/,
+      fromCache: false,
+      hasPendingWrites: false,
     );
     final QueryDocumentSnapshot doc2Snap = QueryDocumentSnapshot.fromDocument(
       firestore,
       doc2New,
-      false /*fromCache*/,
-      false /*keySet*/,
+      fromCache: false,
+      hasPendingWrites: false,
     );
 
     expect(snapshot.documentChanges.length, 1);
@@ -123,7 +122,6 @@ void main() {
         1 /*newIndex*/,
       )
     ];
-    expect(snapshot.getDocumentChanges(MetadataChanges.include),
-        changesWithMetadata);
+    expect(snapshot.getDocumentChanges(MetadataChanges.include), changesWithMetadata);
   });
 }

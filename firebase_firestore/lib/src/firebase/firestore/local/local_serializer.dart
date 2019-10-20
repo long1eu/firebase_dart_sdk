@@ -29,8 +29,7 @@ class LocalSerializer {
 
   final RemoteSerializer rpcSerializer;
 
-  /// Encodes a MaybeDocument model to the equivalent protocol buffer for local
-  /// storage.
+  /// Encodes a MaybeDocument model to the equivalent protocol buffer for local storage.
   proto.MaybeDocument encodeMaybeDocument(MaybeDocument document) {
     final proto.MaybeDocument builder = proto.MaybeDocument.create();
     if (document is NoDocument) {
@@ -46,7 +45,7 @@ class LocalSerializer {
         ..unknownDocument = _encodeUnknownDocument(document)
         ..hasCommittedMutations = true;
     } else {
-      throw Assert.fail('Unknown document type ${document.runtimeType}');
+      throw fail('Unknown document type ${document.runtimeType}');
     }
 
     return builder..freeze();
@@ -61,13 +60,13 @@ class LocalSerializer {
     } else if (data.hasUnknownDocument()) {
       return _decodeUnknownDocument(data.unknownDocument);
     } else {
-      throw Assert.fail('Unknown MaybeDocument $data');
+      throw fail('Unknown MaybeDocument $data');
     }
   }
 
-  /// Encodes a Document for local storage. This differs from the v1beta1 RPC
-  /// serializer for Documents in that it preserves the updateTime, which is
-  /// considered an output only value by the server.
+  /// Encodes a Document for local storage. This differs from the v1beta1 RPC serializer for
+  /// Documents in that it preserves the updateTime, which is considered an output only value by the
+  /// server.
   proto.Document _encodeDocument(Document document) {
     final proto.Document builder = proto.Document.create();
     builder.name = rpcSerializer.encodeKey(document.key);
@@ -83,20 +82,15 @@ class LocalSerializer {
   }
 
   /// Decodes a Document proto to the equivalent model.
-  Document _decodeDocument(
-      proto.Document document, bool hasCommittedMutations) {
+  Document _decodeDocument(proto.Document document, bool hasCommittedMutations) {
     final DocumentKey key = rpcSerializer.decodeKey(document.name);
-    final ObjectValue value =
-        rpcSerializer.decodeDocumentFields(document.fields);
-    final SnapshotVersion version =
-        rpcSerializer.decodeVersion(document.updateTime);
+    final ObjectValue value = rpcSerializer.decodeDocumentFields(document.fields);
+    final SnapshotVersion version = rpcSerializer.decodeVersion(document.updateTime);
     return Document(
       key,
       version,
       value,
-      hasCommittedMutations
-          ? DocumentState.committedMutations
-          : DocumentState.synced,
+      hasCommittedMutations ? DocumentState.committedMutations : DocumentState.synced,
     );
   }
 
@@ -109,11 +103,10 @@ class LocalSerializer {
   }
 
   /// Decodes a NoDocument proto to the equivalent model.
-  NoDocument _decodeNoDocument(
-      proto.NoDocument proto, bool hasCommittedMutations) {
+  NoDocument _decodeNoDocument(proto.NoDocument proto, bool hasCommittedMutations) {
     final DocumentKey key = rpcSerializer.decodeKey(proto.name);
     final SnapshotVersion version = rpcSerializer.decodeVersion(proto.readTime);
-    return NoDocument(key, version, hasCommittedMutations);
+    return NoDocument(key, version, hasCommittedMutations: hasCommittedMutations);
   }
 
   /// Encodes a [UnknownDocument] value to the equivalent proto.
@@ -146,8 +139,7 @@ class LocalSerializer {
   /// Decodes a [WriteBatch] proto into a MutationBatch model. */
   MutationBatch decodeMutationBatch(proto.WriteBatch batch) {
     final int batchId = batch.batchId;
-    final Timestamp localWriteTime =
-        rpcSerializer.decodeTimestamp(batch.localWriteTime);
+    final Timestamp localWriteTime = rpcSerializer.decodeTimestamp(batch.localWriteTime);
 
     final int count = batch.writes.length;
     final List<Mutation> mutations = List<Mutation>(count);
@@ -159,7 +151,7 @@ class LocalSerializer {
   }
 
   proto.Target encodeQueryData(QueryData queryData) {
-    Assert.hardAssert(
+    hardAssert(
         queryData.purpose == QueryPurpose.listen,
         'Only queries with purpose ${QueryPurpose.listen} '
         'may be stored, got ${queryData.purpose}');
@@ -183,8 +175,7 @@ class LocalSerializer {
   QueryData decodeQueryData(proto.Target target) {
     final int targetId = target.targetId;
 
-    final SnapshotVersion version =
-        rpcSerializer.decodeVersion(target.snapshotVersion);
+    final SnapshotVersion version = rpcSerializer.decodeVersion(target.snapshotVersion);
     final Uint8List resumeToken = Uint8List.fromList(target.resumeToken);
     final int sequenceNumber = target.lastListenSequenceNumber.toInt();
 
@@ -195,7 +186,7 @@ class LocalSerializer {
     } else if (target.hasQuery()) {
       query = rpcSerializer.decodeQueryTarget(target.query);
     } else {
-      throw Assert.fail('Unknown targetType $target}');
+      throw fail('Unknown targetType $target}');
     }
 
     return QueryData(

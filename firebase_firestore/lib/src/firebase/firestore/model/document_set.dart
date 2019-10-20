@@ -8,14 +8,14 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 
 import 'document.dart';
 
-/// An immutable set of documents (unique by key) ordered by the given
-/// comparator or ordered by key by default if no document is present.
+/// An immutable set of documents (unique by key) ordered by the given comparator or ordered by key
+/// by default if no document is present.
 class DocumentSet extends Iterable<Document> {
   const DocumentSet._(this._keyIndex, this.sortedSet);
 
   factory DocumentSet.emptySet(Comparator<Document> comparator) {
-    // We have to add the document key comparator to the passed in comparator,
-    // as it's the only guaranteed unique property of a document.
+    // We have to add the document key comparator to the passed in comparator, as it's the only
+    // guaranteed unique property of a document.
     int adjustedComparator(Document left, Document right) {
       final int comparison = comparator(left, right);
       if (comparison == 0) {
@@ -49,23 +49,22 @@ class DocumentSet extends Iterable<Document> {
     return key is DocumentKey && _keyIndex.containsKey(key);
   }
 
-  /// Returns the document from this set with the given key if it exists or
-  /// null if it doesn't.
+  /// Returns the document from this set with the given key if it exists or null if it doesn't.
   Document getDocument(DocumentKey key) => _keyIndex[key];
 
-  /// Returns the first document in the set according to the set's ordering, or
-  /// null if the set is empty.
+  /// Returns the first document in the set according to the set's ordering, or null if the set is
+  /// empty.
   @override
   Document get first => sortedSet.minEntry;
 
-  /// Returns the last document in the set according to the set's ordering, or
-  /// null if the set is empty.
+  /// Returns the last document in the set according to the set's ordering, or null if the set is
+  /// empty.
   @override
   Document get last => sortedSet.maxEntry;
 
-  /// Returns the document previous to the document associated with the given
-  /// key in the set according to the set's ordering. Returns null if the
-  /// document associated with the given key is the first document.
+  /// Returns the document previous to the document associated with the given key in the set
+  /// according to the set's ordering. Returns null if the document associated with the given key is
+  /// the first document.
   ///
   /// Throws ArgumentError if the set does not contain the key
   Document getPredecessor(DocumentKey key) {
@@ -76,8 +75,8 @@ class DocumentSet extends Iterable<Document> {
     return sortedSet.getPredecessorEntry(document);
   }
 
-  /// Returns the index of the provided key in the document set, or -1 if the
-  /// document key is not present in the set;
+  /// Returns the index of the provided key in the document set, or -1 if the document key is not
+  /// present in the set;
   int indexOf(DocumentKey key) {
     final Document document = _keyIndex[key];
     if (document == null) {
@@ -87,17 +86,15 @@ class DocumentSet extends Iterable<Document> {
     return sortedSet.indexOf(document);
   }
 
-  /// Returns a new DocumentSet that contains the given document, replacing any
-  /// old document with the same key.
+  /// Returns a new DocumentSet that contains the given document, replacing any old document with
+  /// the same key.
   DocumentSet add(Document document) {
-    // Remove any prior mapping of the document's key before adding, preventing
-    // sortedSet from accumulating values that aren't in the index.
+    // Remove any prior mapping of the document's key before adding, preventing sortedSet from
+    // accumulating values that aren't in the index.
     final DocumentSet removed = remove(document.key);
 
-    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
-        removed._keyIndex.insert(document.key, document);
-    final ImmutableSortedSet<Document> newSortedSet =
-        removed.sortedSet.insert(document);
+    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex = removed._keyIndex.insert(document.key, document);
+    final ImmutableSortedSet<Document> newSortedSet = removed.sortedSet.insert(document);
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
@@ -111,15 +108,12 @@ class DocumentSet extends Iterable<Document> {
     _keyIndex.remove(key);
     sortedSet.remove(document);
 
-    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
-        _keyIndex.remove(key);
-    final ImmutableSortedSet<Document> newSortedSet =
-        sortedSet.remove(document);
+    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex = _keyIndex.remove(key);
+    final ImmutableSortedSet<Document> newSortedSet = sortedSet.remove(document);
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
-  /// Returns a copy of the documents in this set as array. This is O(n) in the
-  /// size of the set.
+  /// Returns a copy of the documents in this set as array. This is O(n) in the size of the set.
   // TODO:Consider making this backed by the set instead to achieve O(1)?
   @override
   List<Document> toList({bool growable = true}) {
@@ -140,8 +134,7 @@ class DocumentSet extends Iterable<Document> {
 
     if (other is DocumentSet) {
       final Iterator<Document> thisList = toList(growable: false).iterator;
-      final Iterator<Document> otherList =
-          other.toList(growable: false).iterator;
+      final Iterator<Document> otherList = other.toList(growable: false).iterator;
 
       while (thisList.moveNext()) {
         final Document thisDoc = thisList.current;

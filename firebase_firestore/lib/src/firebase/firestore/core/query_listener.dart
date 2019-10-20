@@ -12,11 +12,9 @@ import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dar
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
-/// [QueryListener] takes a series of internal view snapshots and determines
-/// when to raise events.
+/// [QueryListener] takes a series of internal view snapshots and determines when to raise events.
 class QueryListener extends Stream<ViewSnapshot> {
-  QueryListener(this.query,
-      [this.options = const ListenOptions(), this.onCancel])
+  QueryListener(this.query, [this.options = const ListenOptions(), this.onCancel])
       : assert(options != null) {
     sink = StreamController<ViewSnapshot>(onCancel: () => onCancel?.call(this));
   }
@@ -29,8 +27,8 @@ class QueryListener extends Stream<ViewSnapshot> {
 
   StreamController<ViewSnapshot> sink;
 
-  /// Initial snapshots (e.g. from cache) may not be propagated to the wrapped
-  /// observer. This flag is set to true once we've actually raised an event.
+  /// Initial snapshots (e.g. from cache) may not be propagated to the wrapped observer. This flag
+  /// is set to true once we've actually raised an event.
   bool raisedInitialEvent = false;
 
   OnlineState onlineState = OnlineState.unknown;
@@ -38,8 +36,7 @@ class QueryListener extends Stream<ViewSnapshot> {
   ViewSnapshot snapshot;
 
   Future<void> onViewSnapshot(ViewSnapshot newSnapshot) async {
-    Assert.hardAssert(
-        newSnapshot.changes.isNotEmpty || newSnapshot.didSyncStateChange,
+    hardAssert(newSnapshot.changes.isNotEmpty || newSnapshot.didSyncStateChange,
         'We got a new snapshot with no changes?');
 
     if (!options.includeDocumentMetadataChanges) {
@@ -57,8 +54,7 @@ class QueryListener extends Stream<ViewSnapshot> {
     }
 
     if (!raisedInitialEvent) {
-      final bool shouldRaiseInitialEvent =
-          _shouldRaiseInitialEvent(newSnapshot, onlineState);
+      final bool shouldRaiseInitialEvent = _shouldRaiseInitialEvent(newSnapshot, onlineState);
 
       if (shouldRaiseInitialEvent) {
         _raiseInitialEvent(newSnapshot);
@@ -83,9 +79,8 @@ class QueryListener extends Stream<ViewSnapshot> {
     }
   }
 
-  bool _shouldRaiseInitialEvent(
-      ViewSnapshot snapshot, OnlineState onlineState) {
-    Assert.hardAssert(
+  bool _shouldRaiseInitialEvent(ViewSnapshot snapshot, OnlineState onlineState) {
+    hardAssert(
       !raisedInitialEvent,
       'Determining whether to raise first event but already had first event.',
     );
@@ -95,14 +90,13 @@ class QueryListener extends Stream<ViewSnapshot> {
       return true;
     }
 
-    // NOTE: We consider OnlineState.unknown as [online] (it should become
-    // [offline] or [online] if we wait long enough).
+    // NOTE: We consider OnlineState.unknown as [online] (it should become [offline] or [online] if
+    // we wait long enough).
     final bool maybeOnline = onlineState != OnlineState.offline;
-    // Don't raise the event if we're online, aren't synced yet (checked
-    // above) and are waiting for a sync.
+    // Don't raise the event if we're online, aren't synced yet (checked above) and are waiting for
+    // a sync.
     if (options.waitForSyncWhenOnline && maybeOnline) {
-      Assert.hardAssert(snapshot.isFromCache,
-          'Waiting for sync, but snapshot is not from cache');
+      hardAssert(snapshot.isFromCache, 'Waiting for sync, but snapshot is not from cache');
       return false;
     }
 
@@ -111,35 +105,33 @@ class QueryListener extends Stream<ViewSnapshot> {
   }
 
   bool _shouldRaiseEvent(ViewSnapshot snapshot) {
-    // We don't need to handle includeDocumentMetadataChanges here because the
-    // Metadata only changes have already been stripped out if needed. At this
-    // point the only changes we will see are the ones we should propagate.
+    // We don't need to handle includeDocumentMetadataChanges here because the Metadata only changes
+    // have already been stripped out if needed. At this point the only changes we will see are the
+    // ones we should propagate.
     if (snapshot.changes.isNotEmpty) {
       return true;
     }
 
-    final bool hasPendingWritesChanged = this.snapshot != null &&
-        this.snapshot.hasPendingWrites != snapshot.hasPendingWrites;
+    final bool hasPendingWritesChanged =
+        this.snapshot != null && this.snapshot.hasPendingWrites != snapshot.hasPendingWrites;
     if (snapshot.didSyncStateChange || hasPendingWritesChanged) {
       return options.includeQueryMetadataChanges;
     }
 
-    // Generally we should have hit one of the cases above, but it's possible
-    // to get here if there were only metadata docChanges and they got
-    // stripped out.
+    // Generally we should have hit one of the cases above, but it's possible to get here if there
+    // were only metadata docChanges and they got stripped out.
     return false;
   }
 
   void _raiseInitialEvent(ViewSnapshot snapshot) {
-    Assert.hardAssert(
-        !raisedInitialEvent, 'Trying to raise initial event for second time');
+    hardAssert(!raisedInitialEvent, 'Trying to raise initial event for second time');
 
     snapshot = ViewSnapshot.fromInitialDocuments(
       snapshot.query,
       snapshot.documents,
       snapshot.mutatedKeys,
-      snapshot.isFromCache,
-      snapshot.excludesMetadataChanges,
+      isFromCache: snapshot.isFromCache,
+      excludesMetadataChanges: snapshot.excludesMetadataChanges,
     );
 
     raisedInitialEvent = true;
@@ -147,11 +139,7 @@ class QueryListener extends Stream<ViewSnapshot> {
   }
 
   @override
-  StreamSubscription<ViewSnapshot> listen(
-          void Function(ViewSnapshot event) onData,
-          {Function onError,
-          void Function() onDone,
-          bool cancelOnError}) =>
-      sink.stream.listen(onData,
-          onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+  StreamSubscription<ViewSnapshot> listen(void Function(ViewSnapshot event) onData,
+          {Function onError, void Function() onDone, bool cancelOnError}) =>
+      sink.stream.listen(onData, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
 }

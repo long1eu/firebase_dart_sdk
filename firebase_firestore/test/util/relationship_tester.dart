@@ -29,9 +29,7 @@ class RelationshipTester<T> {
       final List<T> group = _groups[groupNumber];
       for (int itemNumber = 0; itemNumber < group.length; itemNumber++) {
         // check related items in same group
-        for (int relatedItemNumber = 0;
-            relatedItemNumber < group.length;
-            relatedItemNumber++) {
+        for (int relatedItemNumber = 0; relatedItemNumber < group.length; relatedItemNumber++) {
           if (itemNumber != relatedItemNumber) {
             _assertRelated(groupNumber, itemNumber, relatedItemNumber);
           }
@@ -45,8 +43,7 @@ class RelationshipTester<T> {
             for (int unrelatedItemNumber = 0;
                 unrelatedItemNumber < unrelatedGroup.length;
                 unrelatedItemNumber++) {
-              _assertUnrelated(groupNumber, itemNumber, unrelatedGroupNumber,
-                  unrelatedItemNumber);
+              _assertUnrelated(groupNumber, itemNumber, unrelatedGroupNumber, unrelatedItemNumber);
             }
           }
         }
@@ -62,29 +59,24 @@ class RelationshipTester<T> {
       _assertion.assertRelated(item, related);
     } on AssertionError catch (e) {
       final String message = (e.message as String)
-          .replaceAll(
-              itemPlaceholder, _itemString(item, groupNumber, itemNumber))
-          .replaceAll(relatedPlaceholder,
-              _itemString(related, groupNumber, relatedItemNumber));
+          .replaceAll(itemPlaceholder, _itemString(item, groupNumber, itemNumber))
+          .replaceAll(relatedPlaceholder, _itemString(related, groupNumber, relatedItemNumber));
 
       throw StateError(message);
     }
   }
 
-  void _assertUnrelated(int groupNumber, int itemNumber,
-      int unrelatedGroupNumber, int unrelatedItemNumber) {
+  void _assertUnrelated(
+      int groupNumber, int itemNumber, int unrelatedGroupNumber, int unrelatedItemNumber) {
     final T item = _groups[groupNumber][itemNumber];
     final T unrelated = _groups[unrelatedGroupNumber][unrelatedItemNumber];
     try {
       _assertion.assertUnrelated(item, unrelated);
     } on AssertionError catch (e) {
       final String message = (e.message as String)
-          .replaceAll(
-              itemPlaceholder, _itemString(item, groupNumber, itemNumber))
-          .replaceAll(
-              unrelatedPlaceholder,
-              _itemString(
-                  unrelated, unrelatedGroupNumber, unrelatedItemNumber));
+          .replaceAll(itemPlaceholder, _itemString(item, groupNumber, itemNumber))
+          .replaceAll(unrelatedPlaceholder,
+              _itemString(unrelated, unrelatedGroupNumber, unrelatedItemNumber));
       throw StateError(message);
     }
   }
@@ -105,7 +97,7 @@ class RelationshipTester<T> {
 /// expected to throw [AssertionError] whenever the relationship is
 /// violated.
 ///
-/// * As a convenience, any occurrence of [RelationshipTester.itemPlaceholder],
+/// As a convenience, any occurrence of [RelationshipTester.itemPlaceholder],
 /// [RelationshipTester.relatedPlaceholder] or
 /// [RelationshipTester.unrelatedPlaceholder] in the error message will be
 /// replaced with a string that combines the [Object.toString], item number and

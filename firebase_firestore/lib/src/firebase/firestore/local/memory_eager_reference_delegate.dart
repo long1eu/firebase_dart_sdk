@@ -46,8 +46,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   @override
   Future<void> removeTarget(QueryData queryData) async {
     final MemoryQueryCache queryCache = persistence.queryCache;
-    (await queryCache.getMatchingKeysForTargetId(queryData.targetId))
-        .forEach(orphanedDocuments.add);
+    (await queryCache.getMatchingKeysForTargetId(queryData.targetId)).forEach(orphanedDocuments.add);
 
     await queryCache.removeQueryData(queryData);
   }
@@ -60,8 +59,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   /// In eager garbage collection, collection is run on transaction commit.
   @override
   Future<void> onTransactionCommitted() async {
-    final MemoryRemoteDocumentCache remoteDocuments =
-        persistence.remoteDocumentCache;
+    final MemoryRemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
 
     for (DocumentKey key in orphanedDocuments) {
       final bool isReferenced = await _isReferenced(key);
