@@ -25,6 +25,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart'
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/reference_value.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/value/server_timestamp_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/source.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
@@ -459,7 +460,8 @@ class Query {
   /// Note that the [Bound] will always include the key of the document and so only the provided
   /// document will compare equal to the returned position.
   ///
-  /// Will throw if the document does not contain all fields of the order by of the query.
+  /// Will throw if the document does not contain all fields of the order by of the query or if any
+  /// of the fields in the order by are an uncommitted server timestamp.
   Bound _boundFromDocumentSnapshot(String methodName, DocumentSnapshot snapshot, bool before) {
     checkNotNull<DocumentSnapshot>(snapshot, 'Provided snapshot must not be null.');
     if (!snapshot.exists) {
@@ -479,7 +481,12 @@ class Query {
         components.add(ReferenceValue.valueOf(firestore.databaseId, document.key));
       } else {
         final FieldValue value = document.getField(orderBy.field);
-        if (value != null) {
+        if (value is ServerTimestampValue) {
+          throw ArgumentError(
+              'Invalid query. You are trying to start or end a query using a document for which '
+              'the field "${orderBy.field}" is an uncommitted server timestamp. (Since the value '
+              'of this field is unknown, you cannot start/end a query with it.)');
+        } else if (value != null) {
           components.add(value);
         } else {
           throw ArgumentError('Invalid query. You are trying to start or end a query using a '

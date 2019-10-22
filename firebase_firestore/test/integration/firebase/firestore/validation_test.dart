@@ -14,6 +14,7 @@ import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dar
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_settings.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query.dart';
+import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/transaction.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart' hide Transaction;
 import 'package:firebase_firestore/src/firebase/firestore/write_batch.dart';
@@ -93,7 +94,8 @@ void main() {
   }
 
   test('firestoreSettingsNullHostFails', () async {
-    await expectError(() => FirebaseFirestoreSettings(host: null), 'Provided host must not be null.');
+    await expectError(
+        () => FirebaseFirestoreSettings(host: null), 'Provided host must not be null.');
   });
 
   test('disableSslWithoutSettingHostFails', () async {
@@ -104,7 +106,8 @@ void main() {
   });
 
   test('firestoreGetInstanceWithNullAppFails', () async {
-    await expectError(() => FirebaseFirestore.getInstance(null), 'Provided FirebaseApp must not be null.');
+    await expectError(
+        () => FirebaseFirestore.getInstance(null), 'Provided FirebaseApp must not be null.');
   });
 
   void withApp(String name, Consumer<FirebaseApp> toRun) {
@@ -127,8 +130,10 @@ void main() {
   }
 
   test('firestoreGetInstanceWithNonNullAppReturnsNonNullInstance', () async {
-    withApp('firestoreTestApp',
-        (FirebaseApp app) => expect(FirebaseFirestore.getInstance(app, openDatabase: DatabaseMock.create), isNotNull));
+    withApp(
+        'firestoreTestApp',
+        (FirebaseApp app) => expect(
+            FirebaseFirestore.getInstance(app, openDatabase: DatabaseMock.create), isNotNull));
   });
 
   test('collectionPathsMustBeOddLength', () async {
@@ -335,7 +340,14 @@ void main() {
   });
 
   test('fieldPathsMustNotHaveInvalidSegments', () async {
-    final List<String> badFieldPaths = <String>['foo~bar', 'foo*bar', 'foo/bar', 'foo[1', 'foo]1', 'foo[1]'];
+    final List<String> badFieldPaths = <String>[
+      'foo~bar',
+      'foo*bar',
+      'foo/bar',
+      'foo[1',
+      'foo]1',
+      'foo[1]'
+    ];
     for (String fieldPath in badFieldPaths) {
       final String reason =
           'Invalid field path ($fieldPath). Paths must not contain \'~\', \'*\', \'/\', \'[\', or \']\'';
@@ -427,9 +439,10 @@ void main() {
 
   test('queriesWithNonPositiveLimitFail', () async {
     final CollectionReference collection = await testCollection();
-    await expectError(() => collection.limit(0), 'Invalid Query. Query limit (0) is invalid. Limit must be positive.');
-    await expectError(
-        () => collection.limit(-1), 'Invalid Query. Query limit (-1) is invalid. Limit must be positive.');
+    await expectError(() => collection.limit(0),
+        'Invalid Query. Query limit (0) is invalid. Limit must be positive.');
+    await expectError(() => collection.limit(-1),
+        'Invalid Query. Query limit (-1) is invalid. Limit must be positive.');
   });
 
   test('queriesWithNullOrNaNFiltersOtherThanEqualityFail', () async {
@@ -472,6 +485,49 @@ void main() {
     await expectError(() => query.startAfterDocument(snapshot), reason);
     await expectError(() => query.endBeforeDocument(snapshot), reason);
     await expectError(() => query.endAtDocument(snapshot), reason);
+  });
+
+  test('queriesCannotBeSortedByAnUncommittedServerTimestamp', () async {
+    final CollectionReference collection = await testCollection();
+
+    // Ensure the server timestamp stays uncommitted for the first half of the test
+    await collection.firestore.client.disableNetwork();
+
+    final Completer<void> offlineCallbackDone = Completer<void>();
+    final Completer<void> onlineCallbackDone = Completer<void>();
+
+    collection.snapshots.listen(
+      (QuerySnapshot snapshot) {
+        expect(snapshot, isNotNull);
+
+        // Skip the initial empty snapshot.
+        if (snapshot.isEmpty) return;
+
+        expect(snapshot.documents.length, 1);
+        final DocumentSnapshot docSnap = snapshot.documents[0];
+
+        if (snapshot.metadata.hasPendingWrites) {
+          // Offline snapshot. Since the server timestamp is uncommitted, we shouldn't be able to
+          // query by it.
+          expect(
+              () => collection.orderBy("timestamp").endAtDocument(docSnap).snapshots.listen(null),
+              throwsArgumentError);
+          offlineCallbackDone.complete(null);
+        } else {
+          // Online snapshot. Since the server timestamp is committed, we should be able to query
+          // by it.
+          collection.orderBy("timestamp").endAtDocument(docSnap).snapshots.listen(null);
+          onlineCallbackDone.complete(null);
+        }
+      },
+    );
+
+    final DocumentReference document = collection.document();
+    await document.set(map(<dynamic>['timestamp', FieldValue.serverTimestamp()]));
+    await offlineCallbackDone.future;
+
+    await collection.firestore.client.enableNetwork();
+    await onlineCallbackDone.future;
   });
 
   test('queriesMustNotHaveMoreComponentsThanOrderBy', () async {
@@ -517,7 +573,8 @@ void main() {
 
   test('queriesWithMultipleArrayContainsFiltersFail', () async {
     await expectError(
-        () async => (await testCollection()).whereArrayContains('foo', 1).whereArrayContains('foo', 2),
+        () async =>
+            (await testCollection()).whereArrayContains('foo', 1).whereArrayContains('foo', 2),
         'Invalid Query. Queries only support having a single array-contains'
         ' filter.');
   });
@@ -539,16 +596,20 @@ void main() {
     final CollectionReference collection = await testCollection();
     String reason = 'Invalid query. When querying with FieldPath.documentId() you must '
         'provide a valid document ID, but it was an empty string.';
-    await expectError(() => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), ''), reason);
+    await expectError(
+        () => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), ''), reason);
 
     reason = 'Invalid query. When querying with FieldPath.documentId() you must '
         'provide a valid document ID, but \'foo/bar/baz\' contains a \'/\' '
         'character.';
-    await expectError(() => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), 'foo/bar/baz'), reason);
+    await expectError(
+        () => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), 'foo/bar/baz'),
+        reason);
 
     reason = 'Invalid query. When querying with FieldPath.documentId() you must '
         'provide a valid String or DocumentReference, but it was of type: int';
-    await expectError(() => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), 1), reason);
+    await expectError(
+        () => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), 1), reason);
 
     reason = 'Invalid query. You can\'t perform array-contains queries on '
         'FieldPath.documentId() since document IDs are not arrays.';

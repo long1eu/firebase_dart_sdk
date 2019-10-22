@@ -347,7 +347,7 @@ class SQLiteMutationQueue implements MutationQueue {
         'SELECT DISTINCT dm.batch_id, m.mutations FROM document_mutations dm, mutations m WHERE dm.uid = ? AND dm.path IN (',
         <String>[uid],
         args,
-        ') AND dm.uid = m.uid " + "AND dm.batch_id = m.batch_id " + "ORDER BY dm.batch_id');
+        ') AND dm.uid = m.uid AND dm.batch_id = m.batch_id ORDER BY dm.batch_id');
 
     final List<MutationBatch> result = <MutationBatch>[];
     final Set<int> uniqueBatchIds = <int>{};

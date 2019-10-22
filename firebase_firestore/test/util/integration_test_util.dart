@@ -80,8 +80,7 @@ class IntegrationTestUtil {
     );
   }
 
-  /*p*/
-  static void clearPersistence(String path) {
+  static void _clearPersistence(String path) {
     final String sqlLitePath = path;
     final String journalPath = '$sqlLitePath-journal';
 
@@ -137,7 +136,7 @@ class IntegrationTestUtil {
     print('index: $dbIndex');
     final String dbFullPath = '${Directory.current.path}/build/test/$dbPath\_${dbIndex++}.db';
 
-    clearPersistence(dbFullPath);
+    _clearPersistence(dbFullPath);
 
     final AsyncQueue asyncQueue = AsyncQueue();
 
