@@ -70,6 +70,8 @@ class Datastore {
   final RemoteSerializer serializer;
   final FirestoreChannel channel;
 
+  Future<void> shutdown() => channel.shutdown();
+
   /// Creates a new [WatchStream] that is still unstarted but uses a common shared channel
   WatchStream createWatchStream(WatchStreamCallback listener) {
     return WatchStream(channel, workerQueue, serializer, listener);

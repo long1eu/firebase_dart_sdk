@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
@@ -65,6 +66,32 @@ class FirestoreChannel {
 
   /// Call options to be used when invoking RPCs.
   final CallOptions _callOptions;
+
+  /// Shuts down the grpc channel. This is not reversible and renders the FirestoreChannel
+  /// unusable.
+  Future<void> shutdown() async {
+    try {
+      await _channel.shutdown().timeout(const Duration(seconds: 1));
+    } on TimeoutException catch (e) {
+      Log.d(
+          'FirestoreChannel',
+          'Unable to gracefully shutdown the gRPC ManagedChannel. Will attempt an immediate '
+              'shutdown.');
+      try {
+        await _channel.terminate().timeout(const Duration(minutes: 1));
+      } on TimeoutException catch (e) {
+        // Something bad has happened. We could assert, but this is just resource cleanup for a
+        // resource that is likely only released at the end of the execution. So instead, we'll
+        // just log the error.
+        Log.w('FirestoreChannel', 'Unable to forcefully shutdown the gRPC ManagedChannel.');
+      }
+    } catch (e) {
+      // (Re-)Cancel if current thread also interrupted
+      await _channel.terminate();
+      // Similar to above, something bad happened, but it's not worth asserting. Just log it.
+      Log.w('FirestoreChannel', 'Interrupted while shutting down the gRPC Managed Channel');
+    }
+  }
 
   /// Creates and starts a new bi-directional streaming RPC.
   BidiChannel<ReqT, RespT> runBidiStreamingRpc<ReqT, RespT>(

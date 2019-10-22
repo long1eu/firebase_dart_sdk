@@ -164,10 +164,9 @@ class RemoteStore implements TargetMetadataProvider {
   /// reversible and renders the Remote Store unusable.
   Future<void> shutdown() async {
     Log.d(_tag, 'Shutting down');
-    // For now, all shutdown logic is handled by disableNetworkInternal(). We might expand on this
-    // in the future.
     _networkEnabled = false;
     await _disableNetworkInternal();
+    await _datastore.shutdown();
     // Set the OnlineState to UNKNOWN (rather than OFFLINE) to avoid potentially triggering spurious
     // listener events with cached data, etc.
     await _onlineStateTracker.updateState(OnlineState.unknown);
