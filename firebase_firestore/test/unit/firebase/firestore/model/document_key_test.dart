@@ -39,6 +39,6 @@ void main() {
   });
 
   test('testUnevenNumberOfSegmentsAreRejected', () {
-    expect(() => DocumentKey.fromSegments(<String>['a']), throwsStateError);
+    expect(() => DocumentKey.fromSegments(<String>['a']), throwsArgumentError);
   });
 }

@@ -103,5 +103,5 @@ void main() {
     }
 
     expect(ranAtLeastOneTest, isTrue);
-  }, timeout: const Timeout(Duration(minutes: 10)));
+  }, timeout: const Timeout(Duration(minutes: 2)));
 }

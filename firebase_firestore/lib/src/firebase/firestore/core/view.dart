@@ -44,7 +44,8 @@ class View {
   /// view.
   ImmutableSortedSet<DocumentKey> _syncedDocuments;
 
-  List<DocumentKey> get syncedDocuments => _syncedDocuments.toList();
+  ImmutableSortedSet<DocumentKey> get syncedDocuments =>
+      ImmutableSortedSet<DocumentKey>(_syncedDocuments.toList());
 
   /// Documents in the view but not in the remote target
   ImmutableSortedSet<DocumentKey> _limboDocuments;
