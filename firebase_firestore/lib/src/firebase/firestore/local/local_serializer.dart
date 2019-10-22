@@ -38,7 +38,7 @@ class LocalSerializer {
         ..hasCommittedMutations = document.hasCommittedMutations;
     } else if (document is Document) {
       builder
-        ..document = _encodeDocument(document)
+        ..document = document.proto ?? _encodeDocument(document)
         ..hasCommittedMutations = document.hasCommittedMutations;
     } else if (document is UnknownDocument) {
       builder

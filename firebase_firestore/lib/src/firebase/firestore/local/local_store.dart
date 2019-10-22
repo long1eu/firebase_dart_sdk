@@ -310,14 +310,18 @@ class LocalStore {
         }
       }
 
-      final Set<DocumentKey> changedDocKeys = <DocumentKey>{};
+      final Map<DocumentKey, MaybeDocument> changedDocs = <DocumentKey, MaybeDocument>{};
       final Map<DocumentKey, MaybeDocument> documentUpdates = remoteEvent.documentUpdates;
       final Set<DocumentKey> limboDocuments = remoteEvent.resolvedLimboDocuments;
+      // Each loop iteration only affects its "own" doc, so it's safe to get all the remote
+      // documents in advance in a single call.
+      final Map<DocumentKey, MaybeDocument> existingDocs =
+          await _remoteDocuments.getAll(documentUpdates.keys);
       for (MapEntry<DocumentKey, MaybeDocument> entry in documentUpdates.entries) {
         final DocumentKey key = entry.key;
         final MaybeDocument doc = entry.value;
-        changedDocKeys.add(key);
-        final MaybeDocument existingDoc = await _remoteDocuments.get(key);
+        final MaybeDocument existingDoc = existingDocs[key];
+
         // If a document update isn't authoritative, make sure we don't apply an old document
         // version to the remote cache. We make an exception for SnapshotVersion.MIN which can
         // happen for manufactured events (e.g. in the case of a limbo document resolution failing).
@@ -326,6 +330,7 @@ class LocalStore {
             (authoritativeUpdates.contains(doc.key) && !existingDoc.hasPendingWrites) ||
             doc.version.compareTo(existingDoc.version) >= 0) {
           await _remoteDocuments.add(doc);
+          changedDocs[key] = doc;
         } else {
           Log.d(
               'LocalStore',
@@ -352,7 +357,7 @@ class LocalStore {
         await _queryCache.setLastRemoteSnapshotVersion(remoteVersion);
       }
 
-      return _localDocuments.getDocuments(changedDocKeys);
+      return _localDocuments.getLocalViewOfDocuments(changedDocs);
     });
   }
 

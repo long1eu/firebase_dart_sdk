@@ -12,6 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dar
 import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart' as sq;
+import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
@@ -336,46 +337,27 @@ class SQLiteMutationQueue implements MutationQueue {
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
       Iterable<DocumentKey> documentKeys) async {
-    final List<MutationBatch> result = <MutationBatch>[];
-    if (documentKeys.isEmpty) {
-      return result;
+    final List<Object> args = <Object>[];
+    for (DocumentKey key in documentKeys) {
+      args.add(EncodedPath.encode(key.path));
     }
 
-    // SQLite limits maximum number of host parameters to 999 (see
-    // https://www.sqlite.org/limits.html). To work around this, split the given keys into several
-    // smaller sets and issue a separate query for each.
-    const int chunkSize = 900;
-    final int len = documentKeys.length;
+    final LongQuery longQuery = LongQuery(
+        db,
+        'SELECT DISTINCT dm.batch_id, m.mutations FROM document_mutations dm, mutations m WHERE dm.uid = ? AND dm.path IN (',
+        <String>[uid],
+        args,
+        ') AND dm.uid = m.uid " + "AND dm.batch_id = m.batch_id " + "ORDER BY dm.batch_id');
+
+    final List<MutationBatch> result = <MutationBatch>[];
     final Set<int> uniqueBatchIds = <int>{};
-    for (int i = 0; i < len; i += chunkSize) {
-      final List<String> args = <String>[];
-      args.add(uid);
-
-      final String placeholders = documentKeys.skip(i).take(chunkSize).map((DocumentKey key) {
-        args.add(EncodedPath.encode(key.path));
-        return '?';
-      }).join(', ');
-
-      final List<Map<String, dynamic>> rows = await db.query(
-          // @formatter:off
-          '''
-            SELECT DISTINCT dm.batch_id, m.mutations
-            FROM document_mutations dm,
-                 mutations m
-            WHERE dm.uid = ?
-              AND dm.path IN ($placeholders)
-              AND dm.uid = m.uid
-              AND dm.batch_id = m.batch_id
-            ORDER BY dm.batch_id;
-          ''',
-          // @formatter:on
-          args);
-
+    while (longQuery.hasMoreSubqueries) {
+      final List<Map<String, dynamic>> rows = await longQuery.performNextSubquery();
       for (Map<String, dynamic> row in rows) {
         final int batchId = row['batch_id'];
         if (!uniqueBatchIds.contains(batchId)) {
           uniqueBatchIds.add(batchId);
-          result.add(decodeMutationBatch(Uint8List.fromList(row['mutations'])));
+          result.add(decodeMutationBatch(row['mutations']));
         }
       }
     }
@@ -383,7 +365,7 @@ class SQLiteMutationQueue implements MutationQueue {
     // If more than one query was issued, batches might be in an unsorted order (batches are ordered
     // within one query's results, but not across queries). It's likely to be rare, so don't impose
     // performance penalty on the normal case.
-    if (documentKeys.length > 1) {
+    if (longQuery.subqueriesPerformed > 1) {
       result.sort((MutationBatch lhs, MutationBatch rhs) => lhs.batchId.compareTo(rhs.batchId));
     }
     return result;

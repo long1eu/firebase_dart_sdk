@@ -11,6 +11,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dar
 import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart' as sq;
+import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
@@ -78,6 +79,34 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final Map<String, dynamic> row = result.first;
     final Uint8List contents = row['contents'];
     return decodeMaybeDocument(contents);
+  }
+
+  @override
+  Future<Map<DocumentKey, MaybeDocument>> getAll(Iterable<DocumentKey> documentKeys) async {
+    final List<Object> args = <Object>[];
+    for (DocumentKey key in documentKeys) {
+      args.add(EncodedPath.encode(key.path));
+    }
+
+    final Map<DocumentKey, MaybeDocument> results = <DocumentKey, MaybeDocument>{};
+    for (DocumentKey key in documentKeys) {
+      // Make sure each key has a corresponding entry, which is null in case the document is not
+      // found.
+      results[key] = null;
+    }
+
+    final LongQuery longQuery = LongQuery(
+        db, 'SELECT contents FROM remote_documents WHERE path IN (', null, args, ') ORDER BY path');
+
+    while (longQuery.hasMoreSubqueries) {
+      final List<Map<String, dynamic>> rows = await longQuery.performNextSubquery();
+      for (Map<String, dynamic> row in rows) {
+        final MaybeDocument decoded = decodeMaybeDocument(row['contents']);
+        results[decoded.key] = decoded;
+      }
+    }
+
+    return results;
   }
 
   @override

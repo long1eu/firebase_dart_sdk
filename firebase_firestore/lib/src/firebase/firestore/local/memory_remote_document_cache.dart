@@ -34,6 +34,14 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   Future<MaybeDocument> get(DocumentKey key) async => documents[key];
 
   @override
+  Future<Map<DocumentKey, MaybeDocument>> getAll(Iterable<DocumentKey> documentKeys) async {
+    final List<MapEntry<DocumentKey, MaybeDocument>> entries = await Future.wait(documentKeys
+        .map((DocumentKey key) async => MapEntry<DocumentKey, MaybeDocument>(key, await get(key))));
+
+    return Map<DocumentKey, MaybeDocument>.fromEntries(entries);
+  }
+
+  @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(
       Query query) async {
     ImmutableSortedMap<DocumentKey, Document> result = DocumentCollections.emptyDocumentMap();

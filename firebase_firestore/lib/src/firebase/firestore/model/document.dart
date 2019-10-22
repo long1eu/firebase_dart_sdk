@@ -9,6 +9,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.d
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
+import 'package:firebase_firestore/src/proto/google/index.dart' as pb;
 
 /// Describes the hasPendingWrites state of a document.
 enum DocumentState {
@@ -23,11 +24,13 @@ enum DocumentState {
 }
 
 class Document extends MaybeDocument implements Comparable<Document> {
-  const Document(DocumentKey key, SnapshotVersion version, this.data, this.documentState)
+  const Document(DocumentKey key, SnapshotVersion version, this.data, this.documentState,
+      [this.proto])
       : super(key, version);
 
   final ObjectValue data;
   final DocumentState documentState;
+  final pb.Document proto;
 
   static int keyComparator(Document left, Document right) => left.key.compareTo(right.key);
 

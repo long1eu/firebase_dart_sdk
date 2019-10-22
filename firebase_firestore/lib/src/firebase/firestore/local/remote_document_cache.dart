@@ -31,6 +31,12 @@ abstract class RemoteDocumentCache {
   /// entry, or null if we have nothing cached.
   Future<MaybeDocument> get(DocumentKey documentKey);
 
+  /// Looks up a set of entries in the cache.
+  ///
+  /// Returns the cached Document or NoDocument entries indexed by key. If an entry is not cached,
+  /// the corresponding key will be mapped to a null value.
+  Future<Map<DocumentKey, MaybeDocument>> getAll(Iterable<DocumentKey> documentKeys);
+
   /// Executes a query against the cached Document entries
   ///
   /// Implementations may return extra documents if convenient. The results should be re-filtered by

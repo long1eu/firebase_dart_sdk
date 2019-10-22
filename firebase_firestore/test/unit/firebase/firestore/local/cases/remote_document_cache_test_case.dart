@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
+import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 
 import '../../../../../util/test_util.dart';
@@ -35,6 +36,16 @@ class RemoteDocumentCacheTestCase {
 
   Future<MaybeDocument> get(String path) {
     return remoteDocumentCache.get(key(path));
+  }
+
+  Future<Map<DocumentKey, MaybeDocument>> getAll(Iterable<String> paths) {
+    final List<DocumentKey> keys = <DocumentKey>[];
+
+    for (String path in paths) {
+      keys.add(key(path));
+    }
+
+    return remoteDocumentCache.getAll(keys);
   }
 
   Future<void> remove(String path) async {

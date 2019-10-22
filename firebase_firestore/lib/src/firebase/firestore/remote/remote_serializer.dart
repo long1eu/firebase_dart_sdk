@@ -335,7 +335,7 @@ class RemoteSerializer {
     final ObjectValue value = decodeDocumentFields(response.found.fields);
     final SnapshotVersion version = decodeVersion(response.found.updateTime);
     hardAssert(version != SnapshotVersion.none, 'Got a document response with no snapshot version');
-    return Document(key, version, value, DocumentState.synced);
+    return Document(key, version, value, DocumentState.synced, response.found);
   }
 
   NoDocument _decodeMissingDocument(proto.BatchGetDocumentsResponse response) {
@@ -949,8 +949,10 @@ class RemoteSerializer {
       final SnapshotVersion version = decodeVersion(docChange.document.updateTime);
       hardAssert(version != SnapshotVersion.none, 'Got a document change without an update time');
       final ObjectValue data = decodeDocumentFields(docChange.document.fields);
+      // The document may soon be re-serialized back to protos in order to store it in local
+      // persistence. Memoize the encoded form to avoid encoding it again.
       final Document document =
-          Document(key, version, data, /*hasLocalMutations:*/ DocumentState.synced);
+          Document(key, version, data, DocumentState.synced, docChange.document);
       watchChange = WatchChangeDocumentChange(added, removed, document.key, document);
     } else if (protoChange.hasDocumentDelete()) {
       final proto.DocumentDelete docDelete = protoChange.documentDelete;

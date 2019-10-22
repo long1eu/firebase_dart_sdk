@@ -50,6 +50,49 @@ void main() {
     }
   });
 
+  test('testSetAndReadSeveralDocuments', () async {
+    final List<String> paths = <String>['a/b', 'a/b/c/d/e/f'];
+
+    final Map<DocumentKey, MaybeDocument> written = <DocumentKey, MaybeDocument>{};
+    for (String path in paths) {
+      written[DocumentKey.fromPathString(path)] = await testCase.addTestDocumentAtPath(path);
+    }
+
+    final Map<DocumentKey, MaybeDocument> read = await testCase.getAll(paths);
+    expect(read, written);
+  });
+
+  test('testReadSeveralDocumentsIncludingMissingDocument', () async {
+    final List<String> paths = <String>['foo/1', 'foo/2'];
+    final Map<DocumentKey, MaybeDocument> written = <DocumentKey, MaybeDocument>{};
+    for (String path in paths) {
+      written[DocumentKey.fromPathString(path)] = await testCase.addTestDocumentAtPath(path);
+    }
+    written[DocumentKey.fromPathString("foo/nonexistent")] = null;
+
+    final List<String> keys = paths.toList();
+    keys.add("foo/nonexistent");
+    final Map<DocumentKey, MaybeDocument> read = await testCase.getAll(keys);
+    expect(read, written);
+  });
+
+  // PORTING NOTE: this test only applies to Android, because it's the only platform where the
+  // implementation of getAll might split the input into several queries.
+  test('testSetAndReadLotsOfDocuments', () async {
+    // Make sure to force SQLite implementation to split the large query into several smaller ones.
+    const int lotsOfDocuments = 2000;
+    final List<String> paths = <String>[];
+    final Map<DocumentKey, MaybeDocument> expected = <DocumentKey, MaybeDocument>{};
+    for (int i = 0; i < lotsOfDocuments; i++) {
+      final String path = 'foo/$i';
+      paths.add(path);
+      expected[DocumentKey.fromPathString(path)] = await testCase.addTestDocumentAtPath(path);
+    }
+
+    final Map<DocumentKey, MaybeDocument> read = await testCase.getAll(paths);
+    expect(read, expected);
+  });
+
   test('testSetAndReadDeletedDocument', () async {
     const String path = 'a/b';
     final NoDocument deletedDocument = deletedDoc(path, 42);

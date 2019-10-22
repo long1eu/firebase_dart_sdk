@@ -301,7 +301,9 @@ class StreamObserver<ReqT extends GeneratedMessage, RespT extends GeneratedMessa
   @override
   Future<void> onNext(RespT response) async {
     await _dispatcher.run(() async {
-      Log.d('AbstractStream', '($hashCode) Stream received: ${response.writeToJsonMap()}');
+      if (Log.isDebugEnabled) {
+        Log.d('AbstractStream', '($hashCode) Stream received: ${response.writeToJsonMap()}');
+      }
       await stream.onNext(response);
     }, 'onNext');
   }
