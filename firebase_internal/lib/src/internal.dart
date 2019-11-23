@@ -5,6 +5,8 @@
 import 'package:firebase_common/firebase_common.dart';
 import 'package:meta/meta.dart';
 
+import 'auth.dart';
+
 /// Provides a way for [FirebaseApp] to get an access token if there exists
 /// a logged in user.
 @keepForSdk
