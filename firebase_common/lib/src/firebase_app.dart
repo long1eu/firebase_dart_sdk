@@ -7,11 +7,11 @@ import 'dart:io';
 
 import 'package:firebase_common/src/annotations.dart';
 import 'package:firebase_common/src/firebase_options.dart';
-import 'package:firebase_common/src/internal/internal_token_provider.dart';
 import 'package:firebase_common/src/util/base64_utils.dart';
 import 'package:firebase_common/src/util/log.dart';
 import 'package:firebase_common/src/util/preconditions.dart';
 import 'package:firebase_common/src/util/to_string_helper.dart';
+import 'package:firebase_internal/firebase_internal.dart';
 import 'package:meta/meta.dart';
 import 'package:user_preferences/user_preferences.dart';
 

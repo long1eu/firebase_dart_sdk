@@ -9,6 +9,8 @@ environment:
 
 dependencies:
   user_preferences: ^0.1.1+4
+  firebase_internal:
+    path: ../firebase_internal
 
 dev_dependencies:
   test: ^1.6.8
