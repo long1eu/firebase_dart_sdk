@@ -42,7 +42,7 @@ class FirebaseOptions {
   static const String _gcmSenderId = 'gcm_defaultSenderId';
   static const String _storageBucket = 'google_storage_bucket';
   static const String _projectId = 'project_id';
-  static const String _dataColectionEnabled = 'data_colection_enabled';
+  static const String _dataCollectionEnabled = 'data_collection_enabled';
 
   /// API key used for authenticating requests from your app, e.g.
   /// AIzaSyDdVgKwhZl0sTTTLZ7iTmt1r3N2cJLnaDk, used to identify your app to

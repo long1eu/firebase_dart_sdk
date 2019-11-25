@@ -8,7 +8,7 @@ Created from templates made available by Stagehand under a BSD-style
 A simple usage example:
 
 ```dart
-import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_internal.dart';
 
 main() {
   var awesome = new Awesome();

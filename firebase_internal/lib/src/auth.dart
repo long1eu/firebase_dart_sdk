@@ -33,8 +33,7 @@ class GetTokenResult {
   final Map<String, dynamic> claims;
 
   /// Returns the time at which this ID token will expire
-  DateTime get expirationTimestamp =>
-      _getTimeFromClaimsSafely(_expirationTimestamp);
+  DateTime get expirationTimestamp => _getTimeFromClaimsSafely(_expirationTimestamp);
 
   /// Returns the authentication timestamp. This is the time the user
   /// authenticated (signed in) and not the time the token was refreshed.
@@ -42,8 +41,7 @@ class GetTokenResult {
 
   /// Returns the issued at timestamp. This is the time the ID token was last
   /// refreshed and not the authentication timestamp.
-  DateTime get issuedAtTimestamp =>
-      _getTimeFromClaimsSafely(_issuedAtTimestamp);
+  DateTime get issuedAtTimestamp => _getTimeFromClaimsSafely(_issuedAtTimestamp);
 
   /// Returns the sign-in provider through which the ID token was obtained
   /// (anonymous, custom, phone, password, etc). Note, this does not map to
@@ -68,10 +66,7 @@ class GetTokenResult {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is GetTokenResult &&
-          runtimeType == other.runtimeType &&
-          token == other.token &&
-          claims == other.claims;
+      other is GetTokenResult && runtimeType == other.runtimeType && token == other.token && claims == other.claims;
 
   @override
   int get hashCode => token.hashCode * 31 ^ claims.hashCode * 31;
@@ -85,18 +80,17 @@ class GetTokenResult {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('token', token)
-          ..add('claims', claims))
-        .toString();
+    return (ToStringHelper(runtimeType)..add('token', token)..add('claims', claims)).toString();
   }
 }
 
 class FirebaseAuthError extends FirebaseError {
-  FirebaseAuthError(this.errorCode, String message)
-      : assert(errorCode.isNotEmpty),
+  FirebaseAuthError(this.code, String message)
+      : assert(code != null),
         super(message);
 
-  final String errorCode;
+  final int code;
 }
 
+/// A interface responsible for presenting URL to the user in Authentication context
+abstract class AuthUrlPresenter {}
