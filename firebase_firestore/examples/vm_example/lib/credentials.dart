@@ -82,7 +82,7 @@ class ServiceCredential extends InternalTokenProvider {
   ///Fetch token from file
   Future<Map<String, dynamic>> _fetch() async {
     if (_tokenExpiry != null && _tokenData != null) {
-      return <String, dynamic>{'token': _tokenExpiry, 'expiry': _tokenExpiry};
+      return <String, dynamic>{'token': _tokenData, 'expiry': _tokenExpiry};
     }
     final File file = File(tokenPath);
     if (file.existsSync()) {
