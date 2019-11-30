@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
+import 'package:firebase_internal/firebase_internal.dart';
 
 /// Multi-resource container for Firestore.
 class FirestoreMultiDbComponent {

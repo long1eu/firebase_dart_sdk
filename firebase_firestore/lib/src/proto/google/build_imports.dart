@@ -15,7 +15,7 @@ void main() {
         .listSync()
         .whereType<File>()
         .map((File it) => it.absolute.path)
-        .where((String it) => !it.endsWith('index.dart'))
+        .where((String it) => !it.endsWith('user.dart'))
         .map(basename)
         .toList()
           ..sort();
@@ -25,9 +25,9 @@ void main() {
       buffer.writeln('export \'$name\';');
     }
 
-    File('${dir.absolute.path}/index.dart').writeAsStringSync(buffer.toString());
+    File('${dir.absolute.path}/user.dart').writeAsStringSync(buffer.toString());
 
-    _buffer.writeln('export \'${dir.absolute.path.split('/lib/src/proto/google/')[1]}/index.dart\';');
+    _buffer.writeln('export \'${dir.absolute.path.split('/lib/src/proto/google/')[1]}/user.dart\';');
   }
-  File('${directory.path}/index.dart').writeAsStringSync(_buffer.toString());
+  File('${directory.path}/user.dart').writeAsStringSync(_buffer.toString());
 }

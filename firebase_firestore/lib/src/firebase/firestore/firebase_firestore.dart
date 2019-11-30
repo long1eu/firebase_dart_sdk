@@ -23,6 +23,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:firebase_firestore/src/firebase/firestore/write_batch.dart';
+import 'package:firebase_internal/firebase_internal.dart';
 import 'package:meta/meta.dart';
 
 /// Represents a Firestore Database and is the entry point for all Firestore operations
@@ -60,7 +61,7 @@ class FirebaseFirestore {
     checkNotNull(app, 'Provided FirebaseApp must not be null.');
     checkNotNull(openDatabase, 'Provided openDatabase must not be null.');
 
-    final FirestoreMultiDbComponent component = FirestoreMultiDbComponent(app, app.getAuthProvider);
+    final FirestoreMultiDbComponent component = FirestoreMultiDbComponent(app, app.platformDependencies.authProvider);
     checkNotNull(component, 'Firestore component is not present.');
 
     final FirebaseFirestore firestore = await component.get(database, openDatabase);
