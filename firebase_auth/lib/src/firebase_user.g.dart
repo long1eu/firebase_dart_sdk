@@ -44,8 +44,6 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       serializers.serialize(object._secureTokenApi._accessTokenExpirationDate, specifiedType: const FullType(DateTime)),
       'refreshToken',
       serializers.serialize(object._secureTokenApi._refreshToken, specifiedType: const FullType(String)),
-      'appName',
-      serializers.serialize(object._auth._app.name, specifiedType: const FullType(String)),
     ];
   }
 
@@ -66,7 +64,7 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
     String accessToken;
     DateTime accessTokenExpirationDate;
     String refreshToken;
-    String appName;
+    FirebaseAuth auth;
 
     final Iterator<Object> iterator = serialized.iterator;
     while (iterator.moveNext()) {
@@ -121,8 +119,8 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
         case 'refreshToken':
           refreshToken = serializers.deserialize(value, specifiedType: const FullType(String));
           break;
-        case 'appName':
-          appName = serializers.deserialize(value, specifiedType: const FullType(String));
+        case 'auth':
+          auth = value;
           break;
       }
     }
@@ -136,9 +134,7 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       refreshToken: refreshToken,
     );
 
-    final FirebaseApp firebaseApp = FirebaseApp.getInstance(appName);
-    final FirebaseAuth firebaseAuth = FirebaseAuth.getInstance(firebaseApp);
-    final FirebaseUser user = FirebaseUser(secureTokenApi: secureTokenApi, auth: firebaseAuth);
+    final FirebaseUser user = FirebaseUser(secureTokenApi: secureTokenApi, auth: auth);
 
     return user
       .._isAnonymous = isAnonymous
@@ -154,4 +150,29 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       .._metadata = metadata
       .._providerData = providerUserInfo;
   }
+}
+
+mixin UserInfoMixin implements UserInfo {
+  UserInfo _userInfo;
+
+  @override
+  String get uid => _userInfo.uid;
+
+  @override
+  ProviderType get providerId => _userInfo.providerId;
+
+  @override
+  String get displayName => _userInfo.displayName;
+
+  @override
+  String get photoUrl => _userInfo.photoUrl;
+
+  @override
+  String get email => _userInfo.email;
+
+  @override
+  String get phoneNumber => _userInfo.phoneNumber;
+
+  @override
+  bool get isEmailVerified => _userInfo.isEmailVerified;
 }

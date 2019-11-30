@@ -44,7 +44,7 @@ class FirebaseUser with UserInfoMixin {
   bool _isAnonymous;
   String _refreshToken;
   List<UserInfo> _providerData;
-  UserMetadata _metadata;
+  UserMetadataImpl _metadata;
 
   bool __hasEmailPasswordCredential;
 
@@ -68,7 +68,7 @@ class FirebaseUser with UserInfoMixin {
   ///
   /// This method is specifically for providing the access token to internal clients during deserialization and sign-
   /// in events, and should not be used to retrieve the access token by anyone else.
-  String get _rawAccessToken => null;
+  String get _rawAccessToken => _secureTokenApi._accessToken;
 
   /// Whether or not the user can be authenticated by using Firebase email and password.
   bool get _hasEmailPasswordCredential => __hasEmailPasswordCredential;
@@ -118,14 +118,17 @@ class FirebaseUser with UserInfoMixin {
     _providerData = user.providerUserInfo.map((ProviderUserInfo info) => info.userInfo).toList();
   }
 
-  static Serializer<FirebaseUser> get serializer => _$firebaseUserSerializer;
-
   void _signOutIfTokenIsInvalid(FirebaseAuthError e) {
-    if (e is UserNotFound || e is UserDisabled || e is InvalidIdToken || e is TokenExpired) {
+    if (e == FirebaseAuthError.userNotFound ||
+        e == FirebaseAuthError.userDisabled ||
+        e == FirebaseAuthError.invalidUserToken ||
+        e == FirebaseAuthError.userTokenExpired) {
       print('Invalid user token detectedm user is automatically signed out.');
       _auth._signOutByForce(uid);
     }
   }
+
+  static Serializer<FirebaseUser> get serializer => _$firebaseUserSerializer;
 
   @override
   String toString() {
@@ -142,29 +145,4 @@ class FirebaseUser with UserInfoMixin {
           ..add('metadata', _metadata))
         .toString();
   }
-}
-
-mixin UserInfoMixin implements UserInfo {
-  UserInfo _userInfo;
-
-  @override
-  String get uid => _userInfo.uid;
-
-  @override
-  ProviderType get providerId => _userInfo.providerId;
-
-  @override
-  String get displayName => _userInfo.displayName;
-
-  @override
-  String get photoUrl => _userInfo.photoUrl;
-
-  @override
-  String get email => _userInfo.email;
-
-  @override
-  String get phoneNumber => _userInfo.phoneNumber;
-
-  @override
-  bool get isEmailVerified => _userInfo.isEmailVerified;
 }

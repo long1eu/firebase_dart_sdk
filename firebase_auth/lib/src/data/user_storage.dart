@@ -15,14 +15,25 @@ class UserStorage {
   final String _appName;
 
   void save(FirebaseUser user) {
-    final Map<String, dynamic> data = serializers.serializeWith(FirebaseUser.serializer, user);
-    _userBox.put(_getKey('user'), jsonEncode(data));
+    if (user == null) {
+      final Map<String, dynamic> data = serializers.serializeWith(FirebaseUser.serializer, user);
+      _userBox.put(_userKey, jsonEncode(data));
+    } else {
+      _userBox.delete(_userKey);
+    }
   }
 
-  FirebaseUser get() {
-    final String json = _userBox.get(_getKey('user'));
-    return serializers.deserializeWith(FirebaseUser.serializer, jsonDecode(json));
+  FirebaseUser get(FirebaseAuth auth) {
+    final String json = _userBox.get(_userKey);
+    if (json == null) {
+      return null;
+    }
+
+    final Map<String, dynamic> data = <String, dynamic>{...jsonDecode(json), 'auth': auth};
+    return serializers.deserializeWith(FirebaseUser.serializer, data);
   }
+
+  String get _userKey => _getKey('user');
 
   String _getKey(String field) => 'UserStorage___${_appName}__$field';
 }

@@ -13,69 +13,56 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:meta/meta.dart';
 
 part 'credentials/auth_credential.dart';
-
 part 'credentials/auth_providers.dart';
-
 part 'credentials/impl.dart';
-
 part 'index.g.dart';
-
 part 'requests/auth_request_configuration.dart';
-
 part 'requests/base_auth.dart';
-
 part 'requests/create_auth_uri.dart';
-
 part 'requests/exchange_token.dart';
-
 part 'requests/oauth.dart';
-
 part 'requests/oob_code.dart';
-
 part 'requests/reset_password.dart';
-
 part 'requests/update.dart';
-
 part 'requests/user_data_response.dart';
-
 part 'user/impl.dart';
-
 part 'user/user.dart';
 
 @SerializersFor(<Type>[
-  EmailPasswordAuthCredentialImpl,
-  FacebookAuthCredentialImpl,
-  GithubAuthCredentialImpl,
-  GoogleAuthCredentialImpl,
-  TwitterAuthCredentialImpl,
+  AdditionalUserInfoImpl,
+  AuthRequestConfiguration,
   BaseAuthRequest,
   BaseAuthResponse,
   CreateAuthUriRequest,
   CreateAuthUriResponse,
-  ExchangeRefreshTokenRequest,
-  ExchangeRefreshTokenResponse,
+  EmailPasswordAuthCredentialImpl,
   ExchangeCustomTokenRequest,
   ExchangeCustomTokenResponse,
+  ExchangeRefreshTokenRequest,
+  ExchangeRefreshTokenResponse,
+  FacebookAuthCredentialImpl,
+  GithubAuthCredentialImpl,
+  GoogleAuthCredentialImpl,
   OAuthRequest,
   OAuthResponse,
   OobCodeRequest,
   OobCodeResponse,
+  ProviderUserInfo,
   ResetPasswordRequest,
   ResetPasswordResponse,
+  TwitterAuthCredentialImpl,
   UpdateRequest,
   UpdateResponse,
-  ProviderUserInfo,
   UserDataResponse,
-  AdditionalUserInfoImpl,
   UserInfoImpl,
   UserMetadataImpl,
 ])
 Serializers serializers = (_$serializers.toBuilder() //
       ..add(IntSerializer())
+      ..add(FirebaseUser.serializer)
       ..add(OobCodeType.serializer)
       ..add(ProfileAttribute.serializer)
       ..add(ProviderType.serializer)
-      ..add(FirebaseUser.serializer)
       ..addBuilderFactory(
         const FullType(BuiltList, <FullType>[FullType(UserInfoImpl)]),
         () => ListBuilder<UserInfoImpl>(),

@@ -28,7 +28,7 @@ class HttpService {
       {Map<String, String> headers = const <String, String>{}}) async {
     final Response response = await _client.post(
       _host.replace(
-        pathSegments: <String>[..._host.pathSegments, path],
+        pathSegments: <String>[..._host.pathSegments, ...path.split('/')],
         queryParameters: <String, dynamic>{'key': _configuration.apiKey},
       ),
       headers: <String, String>{
@@ -50,9 +50,11 @@ class HttpService {
       final int code = error['code'];
       final String message = error['message'];
       // ERROR_CODE( : $MESSAGE)?.
-      final String errorName = message.split(':')[0].trim();
+      final String parts = message.split(' : ')[0];
+      final String errorName = parts.trim();
+      final String errorMessage = parts.length == 2 ? parts[1] : '';
 
-      throw getErrorFor(errorName, code, message);
+      throw FirebaseAuthError(errorName, errorMessage);
     } else {
       return jsonDecode(response.body);
     }

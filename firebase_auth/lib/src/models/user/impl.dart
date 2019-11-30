@@ -6,7 +6,28 @@ part of models;
 
 abstract class AdditionalUserInfoImpl
     implements Built<AdditionalUserInfoImpl, AdditionalUserInfoImplBuilder>, AdditionalUserInfo {
-  factory AdditionalUserInfoImpl() = _$AdditionalUserInfoImpl;
+  factory AdditionalUserInfoImpl({
+    ProviderType providerId,
+    Map<String, dynamic> profile,
+    String username,
+    bool isNewUser,
+  }) {
+    MapBuilder<String, JsonObject> data;
+    if (profile != null) {
+      data = MapBuilder<String, JsonObject>();
+      for (String key in profile.keys) {
+        data[key] = JsonObject(profile[key]);
+      }
+    }
+
+    return _$AdditionalUserInfoImpl((AdditionalUserInfoImplBuilder b) {
+      b
+        ..providerId = providerId
+        ..profile = data
+        ..username = username
+        ..isNewUser = isNewUser;
+    });
+  }
 
   factory AdditionalUserInfoImpl.newAnonymous() {
     return _$AdditionalUserInfoImpl((AdditionalUserInfoImplBuilder b) => b.isNewUser = true);

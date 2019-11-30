@@ -8,6 +8,7 @@ part of models;
 
 Serializers _$serializers = (new Serializers().toBuilder()
       ..add(AdditionalUserInfoImpl.serializer)
+      ..add(AuthRequestConfiguration.serializer)
       ..add(BaseAuthRequest.serializer)
       ..add(BaseAuthResponse.serializer)
       ..add(CreateAuthUriRequest.serializer)
