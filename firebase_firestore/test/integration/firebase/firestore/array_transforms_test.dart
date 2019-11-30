@@ -149,10 +149,13 @@ void main() {
       <int>[1, 3, 1, 3]
     ]));
 
-    await docRef.update(map(<dynamic>[
-      'array',
-      FieldValue.arrayRemove(<int>[1, 4])
-    ]));
+    await docRef.set(
+      map(<dynamic>[
+        'array',
+        FieldValue.arrayRemove(<int>[1, 4])
+      ]),
+      SetOptions.mergeAllFields,
+    );
 
     await expectLocalAndRemoteEvent(map(<dynamic>[
       'array',
