@@ -15,11 +15,14 @@ import 'package:firebase_firestore/src/firebase/firestore/util/incoming_stream_o
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 
-/// Wrapper class around io.grpc.Channel that adds headers, exception handling and simplifies
-/// invoking RPCs.
+/// Wrapper class around io.grpc.Channel that adds headers, exception handling and simplifies invoking RPCs.
 class FirestoreChannel {
-  factory FirestoreChannel(AsyncQueue asyncQueue, CredentialsProvider credentialsProvider,
-      ClientChannel channel, DatabaseId databaseId) {
+  factory FirestoreChannel(
+    AsyncQueue asyncQueue,
+    CredentialsProvider credentialsProvider,
+    ClientChannel channel,
+    DatabaseId databaseId,
+  ) {
     final CallOptions options = CallOptions(
       providers: <MetadataProvider>[
         FirestoreCallCredentials(credentialsProvider).getRequestMetadata,
@@ -27,34 +30,22 @@ class FirestoreChannel {
           map.addAll(<String, String>{
             _xGoogApiClientHeader: _xGoogApiClientValue,
             // This header is used to improve routing and project isolation by the backend.
-            _resourcePrefixHeader:
-                'projects/${databaseId.projectId}/databases/${databaseId.databaseId}',
+            _resourcePrefixHeader: 'projects/${databaseId.projectId}/databases/${databaseId.databaseId}',
           });
         }
       ],
     );
 
-    return FirestoreChannel._(
-      asyncQueue,
-      credentialsProvider,
-      channel,
-      options,
-    );
+    return FirestoreChannel._(asyncQueue, credentialsProvider, channel, options);
   }
 
-  FirestoreChannel._(
-    this.asyncQueue,
-    this._credentialsProvider,
-    this._channel,
-    this._callOptions,
-  );
+  FirestoreChannel._(this.asyncQueue, this._credentialsProvider, this._channel, this._callOptions);
 
   static const String _xGoogApiClientHeader = 'x-goog-api-client';
 
   static const String _resourcePrefixHeader = 'google-cloud-resource-prefix';
 
-  static const String _xGoogApiClientValue =
-      'gl-dart/ fire/${Version.sdkVersion} grpc/${Version.grpcVersion}';
+  static const String _xGoogApiClientValue = 'gl-dart/ fire/${Version.sdkVersion} grpc/${Version.grpcVersion}';
 
   /// The async worker queue that is used to dispatch events.
   final AsyncQueue asyncQueue;
@@ -67,22 +58,18 @@ class FirestoreChannel {
   /// Call options to be used when invoking RPCs.
   final CallOptions _callOptions;
 
-  /// Shuts down the grpc channel. This is not reversible and renders the FirestoreChannel
-  /// unusable.
+  /// Shuts down the grpc channel. This is not reversible and renders the FirestoreChannel unusable.
   Future<void> shutdown() async {
     try {
       await _channel.shutdown().timeout(const Duration(seconds: 1));
-    } on TimeoutException catch (e) {
-      Log.d(
-          'FirestoreChannel',
-          'Unable to gracefully shutdown the gRPC ManagedChannel. Will attempt an immediate '
-              'shutdown.');
+    } on TimeoutException catch (_) {
+      Log.d('FirestoreChannel',
+          'Unable to gracefully shutdown the gRPC ManagedChannel. Will attempt an immediate shutdown.');
       try {
         await _channel.terminate().timeout(const Duration(minutes: 1));
-      } on TimeoutException catch (e) {
-        // Something bad has happened. We could assert, but this is just resource cleanup for a
-        // resource that is likely only released at the end of the execution. So instead, we'll
-        // just log the error.
+      } on TimeoutException catch (_) {
+        // Something bad has happened. We could assert, but this is just resource cleanup for a resource that is likely
+        // only released at the end of the execution. So instead, we'll just log the error.
         Log.w('FirestoreChannel', 'Unable to forcefully shutdown the gRPC ManagedChannel.');
       }
     } catch (e) {
@@ -99,10 +86,7 @@ class FirestoreChannel {
     // ignore: close_sinks
     final StreamController<ReqT> controller = StreamController<ReqT>();
 
-    final ClientCall<ReqT, RespT> call =
-        _channel.createCall(method, controller.stream, _callOptions);
-
-    call
+    final ClientCall<ReqT, RespT> call = _channel.createCall(method, controller.stream, _callOptions)
       ..headers.then((Map<String, String> headers) {
         _catchError(() => observer.onHeaders(headers));
       })
@@ -120,19 +104,15 @@ class FirestoreChannel {
   }
 
   /// Creates and starts a streaming response RPC.
-  Future<List<RespT>> runStreamingResponseRpc<ReqT, RespT>(
-      ClientMethod<ReqT, RespT> method, ReqT request) async {
+  Future<List<RespT>> runStreamingResponseRpc<ReqT, RespT>(ClientMethod<ReqT, RespT> method, ReqT request) async {
     final Completer<List<RespT>> completer = Completer<List<RespT>>();
     final StreamController<ReqT> controller = StreamController<ReqT>();
-    final ClientCall<ReqT, RespT> call =
-        _channel.createCall(method, controller.stream, _callOptions);
+    final ClientCall<ReqT, RespT> call = _channel.createCall(method, controller.stream, _callOptions);
 
     bool hadError = false;
     final List<RespT> results = <RespT>[];
     call.response.listen(
-      (RespT message) {
-        results.add(message);
-      },
+      results.add,
       onDone: () {
         assert((hadError && completer.isCompleted) || !hadError && !completer.isCompleted);
         if (!completer.isCompleted) {
@@ -157,8 +137,7 @@ class FirestoreChannel {
   Future<RespT> runRpc<ReqT, RespT>(ClientMethod<ReqT, RespT> method, ReqT request) async {
     final Completer<RespT> completer = Completer<RespT>();
     final StreamController<ReqT> controller = StreamController<ReqT>();
-    final ClientCall<ReqT, RespT> call =
-        _channel.createCall(method, controller.stream, _callOptions);
+    final ClientCall<ReqT, RespT> call = _channel.createCall(method, controller.stream, _callOptions);
 
     call.response.listen(
       (RespT message) {
@@ -168,8 +147,7 @@ class FirestoreChannel {
       onDone: () {
         if (!completer.isCompleted) {
           completer.completeError(FirebaseFirestoreError(
-              'Received onClose with status OK, but no message.',
-              FirebaseFirestoreErrorCode.internal));
+              'Received onClose with status OK, but no message.', FirebaseFirestoreErrorCode.internal));
         }
       },
       onError: (dynamic status) {
@@ -201,18 +179,8 @@ class BidiChannel<ReqT, RespT> {
 
   void add(ReqT data) => _sink.add(data);
 
-  void listen(
-    void onData(RespT event), {
-    Function onError,
-    void onDone(),
-    bool cancelOnError,
-  }) {
-    _call.response.listen(
-      onData,
-      onError: onError,
-      onDone: onDone,
-      cancelOnError: cancelOnError,
-    );
+  void listen(void Function(RespT event) onData, {Function onError, void Function() onDone, bool cancelOnError}) {
+    _call.response.listen(onData, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }
 
   void cancel() => _sink.close();
