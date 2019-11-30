@@ -38,8 +38,7 @@ void main() {
     final Document doc2 = doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
     final Document doc3 = doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
 
-    final ImmutableSortedMap<DocumentKey, Document> updates =
-        docUpdates(<Document>[doc1, doc2, doc3]);
+    final ImmutableSortedMap<DocumentKey, Document> updates = docUpdates(<Document>[doc1, doc2, doc3]);
     final ViewDocumentChanges docViewChanges = view.computeDocChanges(updates);
     final TargetChange targetChange = ackTarget(<Document>[doc1, doc2, doc3]);
     final ViewSnapshot snapshot = view.applyChanges(docViewChanges, targetChange).snapshot;
@@ -67,9 +66,7 @@ void main() {
 
     // delete doc2, add doc3
     final ViewSnapshot snapshot = view
-        .applyChanges(
-            view.computeDocChanges(
-                docUpdates(<MaybeDocument>[deletedDoc('rooms/eros/messages/2', 0), doc3])),
+        .applyChanges(view.computeDocChanges(docUpdates(<MaybeDocument>[deletedDoc('rooms/eros/messages/2', 0), doc3])),
             ackTarget(<Document>[doc1, doc3]))
         .snapshot;
 
@@ -115,8 +112,7 @@ void main() {
     final Document doc4 = doc('rooms/eros/messages/4', 0, map()); // no sort, no match
     final Document doc5 = doc('rooms/eros/messages/5', 0, map(<dynamic>['sort', 1]));
 
-    final ViewSnapshot snapshot =
-        applyChanges(view, <Document>[doc1, doc2, doc3, doc4, doc5]).snapshot;
+    final ViewSnapshot snapshot = applyChanges(view, <Document>[doc1, doc2, doc3, doc4, doc5]).snapshot;
 
     expect(snapshot.query, query);
     expect(snapshot.documents.toList(), <Document>[doc1, doc5, doc2]);
@@ -173,8 +169,7 @@ void main() {
     applyChanges(view, <Document>[doc1, doc3]);
 
     final ViewSnapshot snapshot = view
-        .applyChanges(view.computeDocChanges(docUpdates(<Document>[doc2])),
-            ackTarget(<Document>[doc1, doc2, doc3]))
+        .applyChanges(view.computeDocChanges(docUpdates(<Document>[doc2])), ackTarget(<Document>[doc1, doc2, doc3]))
         .snapshot;
     expect(snapshot.query, query);
     expect(snapshot.documents.toList(), <Document>[doc1, doc2]);
@@ -203,12 +198,10 @@ void main() {
     // doc3 will be added
     // doc4 will be added + removed = nothing
     doc2 = doc('rooms/eros/messages/2', 1, map(<dynamic>['num', 5]));
-    ViewDocumentChanges viewDocChanges =
-        view.computeDocChanges(docUpdates(<Document>[doc2, doc3, doc4]));
+    ViewDocumentChanges viewDocChanges = view.computeDocChanges(docUpdates(<Document>[doc2, doc3, doc4]));
     expect(viewDocChanges.needsRefill, isTrue);
     // Verify that all the docs still match.
-    viewDocChanges =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3, doc4]), viewDocChanges);
+    viewDocChanges = view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3, doc4]), viewDocChanges);
     final ViewSnapshot snapshot =
         view.applyChanges(viewDocChanges, ackTarget(<Document>[doc1, doc2, doc3, doc4])).snapshot;
 
@@ -235,27 +228,23 @@ void main() {
 
     ViewDocumentChanges viewDocChanges = view.computeDocChanges(docUpdates());
     change = view.applyChanges(viewDocChanges, ackTarget());
-    expect(change.limboChanges,
-        <LimboDocumentChange>[LimboDocumentChange(LimboDocumentChangeType.added, doc1.key)]);
+    expect(change.limboChanges, <LimboDocumentChange>[LimboDocumentChange(LimboDocumentChangeType.added, doc1.key)]);
 
     viewDocChanges = view.computeDocChanges(docUpdates());
-    change = view.applyChanges(viewDocChanges,
-        targetChange(Uint8List.fromList(<int>[]), true, <Document>[doc1], null, null));
-    expect(change.limboChanges,
-        <LimboDocumentChange>[LimboDocumentChange(LimboDocumentChangeType.removed, doc1.key)]);
+    change = view.applyChanges(
+        viewDocChanges, targetChange(Uint8List.fromList(<int>[]), <Document>[doc1], null, null, current: true));
+    expect(change.limboChanges, <LimboDocumentChange>[LimboDocumentChange(LimboDocumentChangeType.removed, doc1.key)]);
 
     viewDocChanges = view.computeDocChanges(docUpdates(<Document>[doc2]));
-    change = view.applyChanges(viewDocChanges,
-        targetChange(Uint8List.fromList(<int>[]), true, <Document>[doc2], null, null));
+    change = view.applyChanges(
+        viewDocChanges, targetChange(Uint8List.fromList(<int>[]), <Document>[doc2], null, null, current: true));
     expect(change.limboChanges, isEmpty);
 
     change = applyChanges(view, <Document>[doc3]);
-    expect(change.limboChanges,
-        <LimboDocumentChange>[LimboDocumentChange(LimboDocumentChangeType.added, doc3.key)]);
+    expect(change.limboChanges, <LimboDocumentChange>[LimboDocumentChange(LimboDocumentChangeType.added, doc3.key)]);
 
     change = applyChanges(view, <NoDocument>[deletedDoc('rooms/eros/messages/2', 1)]);
-    expect(change.limboChanges,
-        <LimboDocumentChange>[LimboDocumentChange(LimboDocumentChangeType.removed, doc3.key)]);
+    expect(change.limboChanges, <LimboDocumentChange>[LimboDocumentChange(LimboDocumentChangeType.removed, doc3.key)]);
   });
 
   test('testResumingQueryCreatesNoLimbos', () {
@@ -263,9 +252,8 @@ void main() {
     final Document doc1 = doc('rooms/eros/messages/0', 0, map());
     final Document doc2 = doc('rooms/eros/messages/1', 0, map());
 
-    // Unlike other cases, here the view is initialized with a set of previously
-    // synced documents which happens when listening to a previously listened-to
-    // query.
+    // Unlike other cases, here the view is initialized with a set of previously synced documents which happens when
+    // listening to a previously listened-to query.
     final View view = View(query, keySet(<DocumentKey>[doc1.key, doc2.key]));
 
     final TargetChange markCurrent = ackTarget();
@@ -288,8 +276,7 @@ void main() {
     view.applyChanges(changes);
 
     // Remove one of the docs.
-    changes =
-        view.computeDocChanges(docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/0', 0)]));
+    changes = view.computeDocChanges(docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/0', 0)]));
     expect(changes.documentSet.length, 1);
     expect(changes.needsRefill, isTrue);
     expect(changes.changeSet.changes.length, 1);
@@ -339,8 +326,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]));
+    ViewDocumentChanges changes = view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]));
     expect(changes.documentSet.length, 3);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 3);
@@ -365,8 +351,7 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]));
+    ViewDocumentChanges changes = view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]));
     expect(changes.documentSet.length, 3);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 3);
@@ -395,8 +380,7 @@ void main() {
     view.applyChanges(changes);
 
     // Add a doc that is past the limit.
-    changes =
-        view.computeDocChanges(docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/2', 0)]));
+    changes = view.computeDocChanges(docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/2', 0)]));
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes, isEmpty);
@@ -416,8 +400,7 @@ void main() {
     view.applyChanges(changes);
 
     // Remove one of the docs.
-    changes =
-        view.computeDocChanges(docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/1', 0)]));
+    changes = view.computeDocChanges(docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/1', 0)]));
     expect(changes.documentSet.length, 1);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 1);
@@ -438,8 +421,7 @@ void main() {
     view.applyChanges(changes);
 
     // Remove a doc that isn't even in the results.
-    changes =
-        view.computeDocChanges(docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/2', 0)]));
+    changes = view.computeDocChanges(docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/2', 0)]));
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 0);
@@ -540,19 +522,15 @@ void main() {
     // and instead wait for Watch to catch up.
     final Query query = messageQuery();
 
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 1, map(<dynamic>['time', 1]), DocumentState.localMutations);
-    final Document doc1Committed = doc(
-        'rooms/eros/messages/1', 2, map(<dynamic>['time', 2]), DocumentState.committedMutations);
-    final Document doc1Acknowledged =
-        doc('rooms/eros/messages/1', 2, map(<dynamic>['time', 2]), DocumentState.synced);
+    final Document doc1 = doc('rooms/eros/messages/1', 1, map(<dynamic>['time', 1]), DocumentState.localMutations);
+    final Document doc1Committed =
+        doc('rooms/eros/messages/1', 2, map(<dynamic>['time', 2]), DocumentState.committedMutations);
+    final Document doc1Acknowledged = doc('rooms/eros/messages/1', 2, map(<dynamic>['time', 2]), DocumentState.synced);
 
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 1, map(<dynamic>['time', 1]), DocumentState.localMutations);
+    final Document doc2 = doc('rooms/eros/messages/2', 1, map(<dynamic>['time', 1]), DocumentState.localMutations);
     final Document doc2Modified =
         doc('rooms/eros/messages/2', 2, map(<dynamic>['time', 3]), DocumentState.localMutations);
-    final Document doc2Acknowledged =
-        doc('rooms/eros/messages/2', 2, map(<dynamic>['time', 3]), DocumentState.synced);
+    final Document doc2Acknowledged = doc('rooms/eros/messages/2', 2, map(<dynamic>['time', 3]), DocumentState.synced);
 
     final View view = View(query, DocumentKey.emptyKeySet);
 
@@ -568,8 +546,8 @@ void main() {
     snap = view.applyChanges(changes);
 
     // The 'doc1Committed' update is suppressed
-    expect(snap.snapshot.changes,
-        <DocumentViewChange>[DocumentViewChange(DocumentViewChangeType.modified, doc2Modified)]);
+    expect(
+        snap.snapshot.changes, <DocumentViewChange>[DocumentViewChange(DocumentViewChangeType.modified, doc2Modified)]);
 
     changes = view.computeDocChanges(docUpdates(<Document>[doc1Acknowledged, doc2Acknowledged]));
     snap = view.applyChanges(changes);

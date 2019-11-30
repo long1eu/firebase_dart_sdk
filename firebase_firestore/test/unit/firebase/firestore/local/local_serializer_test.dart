@@ -10,9 +10,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart'
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/patch_mutation.dart';
@@ -41,11 +39,8 @@ void main() {
 
   test('testEncodesMutationBatch', () {
     final Mutation set = setMutation('foo/bar', map(<dynamic>['a', 'b', 'num', 1]));
-    final Mutation patch = PatchMutation(
-        key('bar/baz'),
-        wrapMap(map(<dynamic>['a', 'b', 'num', 1])),
-        FieldMask(<FieldPath>[field('a')]),
-        Precondition(exists: true));
+    final Mutation patch = PatchMutation(key('bar/baz'), wrapMap(map(<dynamic>['a', 'b', 'num', 1])),
+        fieldMask(<String>['a']), Precondition(exists: true));
 
     final Mutation del = deleteMutation('baz/quux');
     final Timestamp writeTime = Timestamp.now();
@@ -67,8 +62,7 @@ void main() {
           ..currentDocument = (proto.Precondition.create()..exists = true))
         .freeze();
 
-    final proto.Write delProto =
-        (proto.Write.create()..delete = 'projects/p/databases/d/documents/baz/quux').freeze();
+    final proto.Write delProto = (proto.Write.create()..delete = 'projects/p/databases/d/documents/baz/quux').freeze();
 
     final proto.Timestamp writeTimeProto = (proto.Timestamp.create()
           ..seconds = Int64(writeTime.seconds)

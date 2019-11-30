@@ -126,23 +126,23 @@ void main() {
     expect(event.targetChanges.length, 6);
 
     final TargetChange mapping1 =
-        util.targetChange(resumeToken, false, <Document>[newDoc], <Document>[existingDoc], null);
+        util.targetChange(resumeToken, <Document>[newDoc], <Document>[existingDoc], null, current: false);
     expect(event.targetChanges[1], mapping1);
 
-    final TargetChange mapping2 = util.targetChange(resumeToken, false, null, <Document>[existingDoc], null);
+    final TargetChange mapping2 = util.targetChange(resumeToken, null, <Document>[existingDoc], null, current: false);
     expect(event.targetChanges[2], mapping2);
 
-    final TargetChange mapping3 = util.targetChange(resumeToken, false, null, <Document>[existingDoc], null);
+    final TargetChange mapping3 = util.targetChange(resumeToken, null, <Document>[existingDoc], null, current: false);
     expect(event.targetChanges[3], mapping3);
 
     final TargetChange mapping4 =
-        util.targetChange(resumeToken, false, <Document>[newDoc], null, <Document>[existingDoc]);
+        util.targetChange(resumeToken, <Document>[newDoc], null, <Document>[existingDoc], current: false);
     expect(event.targetChanges[4], mapping4);
 
-    final TargetChange mapping5 = util.targetChange(resumeToken, false, null, null, <Document>[existingDoc]);
+    final TargetChange mapping5 = util.targetChange(resumeToken, null, null, <Document>[existingDoc], current: false);
     expect(event.targetChanges[5], mapping5);
 
-    final TargetChange mapping6 = util.targetChange(resumeToken, false, null, null, <Document>[existingDoc]);
+    final TargetChange mapping6 = util.targetChange(resumeToken, null, null, <Document>[existingDoc], current: false);
     expect(event.targetChanges[6], mapping6);
   });
 
@@ -251,7 +251,8 @@ void main() {
     expect(event.targetChanges.length, 1);
 
     // Only doc3 is part of the new mapping.
-    final TargetChange expected = util.targetChange(resumeToken, false, <Document>[doc3], null, <Document>[doc1]);
+    final TargetChange expected =
+        util.targetChange(resumeToken, <Document>[doc3], null, <Document>[doc1], current: false);
     expect(event.targetChanges[1], expected);
   });
 
@@ -272,7 +273,7 @@ void main() {
     expect(event.targetChanges.length, 1);
 
     // Reset mapping is empty.
-    final TargetChange expected = util.targetChange(Uint8List.fromList(<int>[]), false, null, null, null);
+    final TargetChange expected = util.targetChange(Uint8List.fromList(<int>[]), null, null, null, current: false);
     expect(event.targetChanges[1], expected);
   });
 
@@ -293,10 +294,10 @@ void main() {
 
     expect(event.targetChanges.length, 2);
 
-    final TargetChange mapping1 = util.targetChange(resumeToken, false, null, null, <Document>[doc1b]);
+    final TargetChange mapping1 = util.targetChange(resumeToken, null, null, <Document>[doc1b], current: false);
     expect(event.targetChanges[1], mapping1);
 
-    final TargetChange mapping2 = util.targetChange(resumeToken, false, null, <Document>[doc1b], null);
+    final TargetChange mapping2 = util.targetChange(resumeToken, null, <Document>[doc1b], null, current: false);
     expect(event.targetChanges[2], mapping2);
   });
 
@@ -311,7 +312,7 @@ void main() {
     expect(event.documentUpdates.length, 0);
     expect(event.targetChanges.length, 1);
 
-    final TargetChange mapping = util.targetChange(resumeToken, true, null, null, null);
+    final TargetChange mapping = util.targetChange(resumeToken, null, null, null, current: true);
     expect(event.targetChanges[1], mapping);
   });
 
@@ -339,18 +340,18 @@ void main() {
     expect(event.documentUpdates[doc1.key], doc1);
     expect(event.documentUpdates[doc2.key], doc2);
 
-    // target 1 and 3 are affected (1 because of re-add), target 2 is not
-    // because of remove.
+    // target 1 and 3 are affected (1 because of re-add), target 2 is not because of remove.
     expect(event.targetChanges.length, 2);
 
     // doc1 was before the remove, so it does not show up in the mapping.
     // Current was before the remove.
-    final TargetChange mapping1 = util.targetChange(resumeToken, false, null, <Document>[doc2], null);
+    final TargetChange mapping1 = util.targetChange(resumeToken, null, <Document>[doc2], null, current: false);
     expect(event.targetChanges[1], mapping1);
 
     // Doc1 was before the remove.
     // Current was after the remove
-    final TargetChange mapping3 = util.targetChange(resumeToken, true, <Document>[doc1], null, <Document>[doc2]);
+    final TargetChange mapping3 =
+        util.targetChange(resumeToken, <Document>[doc1], null, <Document>[doc2], current: true);
     expect(event.targetChanges[3], mapping3);
   });
 
@@ -368,7 +369,7 @@ void main() {
     expect(event.documentUpdates.length, 0);
     expect(event.targetChanges.length, 1);
 
-    final TargetChange expected = util.targetChange(resumeToken, false, null, null, null);
+    final TargetChange expected = util.targetChange(resumeToken, null, null, null, current: false);
     expect(event.targetChanges[1], expected);
   });
 
@@ -394,20 +395,20 @@ void main() {
 
     expect(event.targetChanges.length, 2);
 
-    final TargetChange mapping1 = util.targetChange(resumeToken, true, null, <Document>[doc1, doc2], null);
+    final TargetChange mapping1 = util.targetChange(resumeToken, null, <Document>[doc1, doc2], null, current: true);
     expect(event.targetChanges[1], mapping1);
 
-    final TargetChange mapping2 = util.targetChange(resumeToken, false, null, null, null);
+    final TargetChange mapping2 = util.targetChange(resumeToken, null, null, null, current: false);
     expect(event.targetChanges[2], mapping2);
 
-    final WatchChangeExistenceFilterWatchChange watchChange =
+    const WatchChangeExistenceFilterWatchChange watchChange =
         WatchChangeExistenceFilterWatchChange(1, ExistenceFilter(1));
     aggregator.handleExistenceFilter(watchChange);
 
     event = aggregator.createRemoteEvent(util.version(3));
 
     final TargetChange mapping3 =
-        util.targetChange(Uint8List.fromList(<int>[]), false, null, null, <Document>[doc1, doc2]);
+        util.targetChange(Uint8List.fromList(<int>[]), null, null, <Document>[doc1, doc2], current: false);
     expect(event.targetChanges.length, 1);
     expect(event.targetChanges[1], mapping3);
     expect(event.targetMismatches.length, 1);
@@ -427,9 +428,8 @@ void main() {
     final WatchChangeDocumentChange addDoc = WatchChangeDocumentChange(<int>[1], <int>[], doc1.key, doc1);
     aggregator.handleDocumentChange(addDoc);
 
-    // The existence filter mismatch will remove the document from target 1, but
-    // not synthesize a document delete.
-    final WatchChangeExistenceFilterWatchChange existenceFilter =
+    // The existence filter mismatch will remove the document from target 1, but not synthesize a document delete.
+    const WatchChangeExistenceFilterWatchChange existenceFilter =
         WatchChangeExistenceFilterWatchChange(1, ExistenceFilter(0));
     aggregator.handleExistenceFilter(existenceFilter);
 
@@ -442,7 +442,7 @@ void main() {
 
     expect(event.targetChanges.length, 1);
 
-    final TargetChange mapping1 = util.targetChange(Uint8List.fromList(<int>[]), false, null, null, null);
+    final TargetChange mapping1 = util.targetChange(Uint8List.fromList(<int>[]), null, null, null, current: false);
     expect(event.targetChanges[1], mapping1);
   });
 
@@ -493,8 +493,9 @@ void main() {
     // Target is unchanged
     expect(event.targetChanges.length, 1);
 
-    final TargetChange mapping1 =
-        util.targetChange(resumeToken, false, <Document>[doc3], <Document>[updatedDoc2], <NoDocument>[deletedDoc1]);
+    final TargetChange mapping1 = util.targetChange(
+        resumeToken, <Document>[doc3], <Document>[updatedDoc2], <NoDocument>[deletedDoc1],
+        current: false);
     expect(event.targetChanges[1], mapping1);
   });
 
@@ -516,10 +517,10 @@ void main() {
 
     expect(event.targetChanges.length, 2);
 
-    final TargetChange mapping1 = util.targetChange(resumeToken, true, null, null, null);
+    final TargetChange mapping1 = util.targetChange(resumeToken, null, null, null, current: true);
     expect(event.targetChanges[1], mapping1);
 
-    final TargetChange mapping2 = util.targetChange(resumeToken2, true, null, null, null);
+    final TargetChange mapping2 = util.targetChange(resumeToken2, null, null, null, current: true);
     expect(event.targetChanges[2], mapping2);
   });
 
@@ -546,10 +547,10 @@ void main() {
 
     expect(event.targetChanges.length, 2);
 
-    final TargetChange mapping1 = util.targetChange(resumeToken2, true, null, null, null);
+    final TargetChange mapping1 = util.targetChange(resumeToken2, null, null, null, current: true);
     expect(event.targetChanges[1], mapping1);
 
-    final TargetChange mapping2 = util.targetChange(resumeToken3, true, null, null, null);
+    final TargetChange mapping2 = util.targetChange(resumeToken3, null, null, null, current: true);
     expect(event.targetChanges[2], mapping2);
   });
 
@@ -624,8 +625,9 @@ void main() {
       ],
     );
 
-    final TargetChange mapping =
-        util.targetChange(resumeToken, false, <Document>[newDoc], <Document>[existingDoc], <NoDocument>[deletedDoc]);
+    final TargetChange mapping = util.targetChange(
+        resumeToken, <Document>[newDoc], <Document>[existingDoc], <NoDocument>[deletedDoc],
+        current: false);
     expect(event.targetChanges[1], mapping);
   });
 
@@ -659,8 +661,7 @@ void main() {
       ],
     );
     final Set<DocumentKey> limboDocuments = event.resolvedLimboDocuments;
-    // Doc1 is in both limbo and non-limbo targets, therefore not tracked as
-    // limbo
+    // Doc1 is in both limbo and non-limbo targets, therefore not tracked as limbo
     expect(limboDocuments.contains(doc1.key), isFalse);
     // Doc2 is only in the limbo target, so is tracked as a limbo document
     expect(limboDocuments.contains(doc2.key), isTrue);
