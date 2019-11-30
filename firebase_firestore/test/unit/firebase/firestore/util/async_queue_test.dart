@@ -39,10 +39,11 @@ void main() {
   test('canScheduleTasksInTheFuture', () async {
     expectedSteps = <int>[1, 2, 3, 4];
 
-    queue.enqueueAndForget(runnableForStep(1));
-    queue.enqueueAfterDelay(timerId1, const Duration(milliseconds: 5), runnableForStep(4));
-    queue.enqueueAndForget(runnableForStep(2));
-    queue.enqueueAfterDelay(timerId2, const Duration(milliseconds: 1), runnableForStep(3));
+    queue
+      ..enqueueAndForget(runnableForStep(1))
+      ..enqueueAfterDelay(timerId1, const Duration(milliseconds: 5), runnableForStep(4))
+      ..enqueueAndForget(runnableForStep(2))
+      ..enqueueAfterDelay(timerId2, const Duration(milliseconds: 1), runnableForStep(3));
 
     await Future<void>.delayed(const Duration(seconds: 5));
   });
@@ -54,8 +55,8 @@ void main() {
     queue.enqueueAndForget(() async {
       queue.enqueueAndForget(runnableForStep(1));
 
-      final DelayedTask<void> step2Timer = queue.enqueueAfterDelay<void>(
-          timerId1, const Duration(milliseconds: 1), runnableForStep(2));
+      final DelayedTask<void> step2Timer =
+          queue.enqueueAfterDelay<void>(timerId1, const Duration(milliseconds: 1), runnableForStep(2));
 
       queue.enqueueAfterDelay(timerId3, const Duration(milliseconds: 3), runnableForStep(3));
 
@@ -67,22 +68,26 @@ void main() {
     await Future<void>.delayed(const Duration(seconds: 5));
   });
 
+  // todo(long1eu): passes when alone, but fails in group test
   test('canManuallyDrainAllDelayedTasksForTesting', () async {
-    queue.enqueueAndForget(runnableForStep(1));
-    queue.enqueueAfterDelay(timerId1, const Duration(milliseconds: 20), runnableForStep(4));
-    queue.enqueueAfterDelay(timerId2, const Duration(milliseconds: 10), runnableForStep(3));
-    queue.enqueueAndForget(runnableForStep(2));
+    queue
+      ..enqueueAndForget(runnableForStep(1))
+      ..enqueueAfterDelay(timerId1, const Duration(milliseconds: 20), runnableForStep(4))
+      ..enqueueAfterDelay(timerId2, const Duration(milliseconds: 10), runnableForStep(3))
+      ..enqueueAndForget(runnableForStep(2));
 
     await queue.runDelayedTasksUntil(TimerId.all);
     expect(completedSteps, <int>[1, 2, 3, 4]);
   });
 
+  // todo(long1eu): passes when alone, but fails in group test
   test('canManuallyDrainSpecificDelayedTasksForTesting', () async {
-    queue.enqueueAndForget(runnableForStep(1));
-    queue.enqueueAfterDelay(timerId1, const Duration(milliseconds: 20), runnableForStep(5));
-    queue.enqueueAfterDelay(timerId2, const Duration(milliseconds: 10), runnableForStep(3));
-    queue.enqueueAfterDelay(timerId3, const Duration(milliseconds: 15), runnableForStep(4));
-    queue.enqueueAndForget(runnableForStep(2));
+    queue
+      ..enqueueAndForget(runnableForStep(1))
+      ..enqueueAfterDelay(timerId1, const Duration(milliseconds: 20), runnableForStep(5))
+      ..enqueueAfterDelay(timerId2, const Duration(milliseconds: 10), runnableForStep(3))
+      ..enqueueAfterDelay(timerId3, const Duration(milliseconds: 15), runnableForStep(4))
+      ..enqueueAndForget(runnableForStep(2));
 
     await queue.runDelayedTasksUntil(timerId3);
     expect(completedSteps, <int>[1, 2, 3, 4]);

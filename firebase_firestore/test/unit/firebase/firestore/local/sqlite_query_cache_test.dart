@@ -12,6 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persisten
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:test/test.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../util/test_util.dart';
 import 'cases/query_cache_test_case.dart';
@@ -24,8 +25,8 @@ void main() {
 
   setUp(() async {
     print('setUp');
-    final SQLitePersistence persistence = await openSQLitePersistence(
-        'firebase/firestore/local/sqlite_query_cache_${nextSQLiteDatabaseName()}.db');
+    final SQLitePersistence persistence =
+        await openSQLitePersistence('firebase/firestore/local/sqlite_query_cache_test-${Uuid().v4()}.db');
 
     testCase = QueryCacheTestCase(persistence)..setUp();
 
@@ -33,8 +34,7 @@ void main() {
     print('setUpDone');
   });
 
-  tearDown(
-      () => Future<void>.delayed(const Duration(milliseconds: 250), () => testCase.tearDown()));
+  tearDown(() => Future<void>.delayed(const Duration(milliseconds: 250), () => testCase.tearDown()));
 
   test('testReadQueryNotInCache', () async {
     expect(await queryCache.getQueryData(query('rooms')), isNull);
@@ -52,8 +52,8 @@ void main() {
   });
 
   test('testCanonicalIdCollision', () async {
-    // Type information is currently lost in our canonicalID implementations so
-    // this currently an easy way to force colliding canonicalIDs
+    // Type information is currently lost in our canonicalID implementations so this currently an easy way to force
+    // colliding canonicalIDs
     final Query q1 = query('a').filter(filter('foo', '==', 1));
     final Query q2 = query('a').filter(filter('foo', '==', '1'));
     expect(q2.canonicalId, q1.canonicalId);
@@ -61,8 +61,7 @@ void main() {
     final QueryData data1 = testCase.newQueryData(q1, 1, 1);
     await testCase.addQueryData(data1);
 
-    // Using the other query should not return the query cache entry despite
-    // equal canonicalIDs.
+    // Using the other query should not return the query cache entry despite equal canonicalIDs.
     expect(await queryCache.getQueryData(q2), isNull);
     expect(await queryCache.getQueryData(q1), data1);
 
@@ -257,6 +256,7 @@ void main() {
     final SQLitePersistence sqLitePersistence = testCase.persistence;
     final DatabaseMock databaseMock = sqLitePersistence.database;
 
+    // ignore: cascade_invocations
     databaseMock.renamePath = false;
     await testCase.persistence.shutdown();
     databaseMock.renamePath = true;
@@ -278,6 +278,7 @@ void main() {
     final SQLitePersistence sqLitePersistence = testCase.persistence;
     final DatabaseMock databaseMock = sqLitePersistence.database;
 
+    // ignore: cascade_invocations
     databaseMock.renamePath = false;
     await testCase.persistence.shutdown();
     databaseMock.renamePath = true;

@@ -23,6 +23,7 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change_ag
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../util/test_util.dart';
 import '../test_util.dart' as t;
@@ -35,7 +36,7 @@ void main() {
   setUp(() async {
     print('setUp');
     final SQLitePersistence persistence =
-        await openSQLitePersistence('firebase/firestore/local/local_store_${nextSQLiteDatabaseName()}.db');
+        await openSQLitePersistence('firebase/firestore/local/local_store_test-${Uuid().v4()}.db');
 
     testCase = LocalStoreTestCase(persistence, false);
     await testCase.setUp();
@@ -67,8 +68,7 @@ void main() {
     ]);
 
     if (testCase.garbageCollectorIsEager) {
-      // Nothing is pinning this anymore, as it has been acknowledged and there
-      // are no targets active.
+      // Nothing is pinning this anymore, as it has been acknowledged and there are no targets active.
       await testCase.assertNotContains('foo/bar');
     } else {
       await testCase.assertContains(doc('foo/bar', 0, map(<String>['foo', 'bar']), DocumentState.committedMutations));
@@ -113,8 +113,7 @@ void main() {
 
     await testCase.releaseQuery(query);
 
-    // It has been acknowledged, and should no longer be retained as there is no
-    // target and mutation
+    // It has been acknowledged, and should no longer be retained as there is no target and mutation
     if (testCase.garbageCollectorIsEager) {
       await testCase.assertNotContains('foo/bar');
     } else {
@@ -136,8 +135,7 @@ void main() {
     // The last seen version is zero, so this ack must be held.
     await testCase.acknowledgeMutation(1);
     if (testCase.garbageCollectorIsEager) {
-      // Nothing is pinning this anymore, as it has been acknowledged and there
-      // are no targets active.
+      // Nothing is pinning this anymore, as it has been acknowledged and there are no targets active.
       await testCase.assertNotContains('foo/bar');
     } else {
       await testCase.assertContains(doc('foo/bar', 1, map(<String>['foo', 'bar']), DocumentState.committedMutations));
@@ -167,8 +165,7 @@ void main() {
     final int targetId = await testCase.allocateQuery(_query);
     await testCase.applyRemoteEvent(updateRemoteEvent(deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
     testCase.assertRemoved(<String>['foo/bar']);
-    // Under eager GC, there is no longer a reference for the document, and it
-    // should be deleted.
+    // Under eager GC, there is no longer a reference for the document, and it should be deleted.
     if (testCase.garbageCollectorIsEager) {
       await testCase.assertNotContains('foo/bar');
     } else {
@@ -186,8 +183,7 @@ void main() {
     testCase.assertChanged(<Document>[
       doc('foo/bar', 3, map(<String>['foo', 'bar']), DocumentState.committedMutations)
     ]);
-    // It has been acknowledged, and should no longer be retained as there is no
-    // target and mutation
+    // It has been acknowledged, and should no longer be retained as there is no target and mutation
     if (testCase.garbageCollectorIsEager) {
       await testCase.assertNotContains('foo/bar');
     }
@@ -248,8 +244,7 @@ void main() {
     testCase.assertChanged(<MaybeDocument>[unknownDoc('foo/bar', 1)]);
 
     if (testCase.garbageCollectorIsEager) {
-      // Nothing is pinning this anymore, as it has been acknowledged and there
-      // are no targets active.
+      // Nothing is pinning this anymore, as it has been acknowledged and there are no targets active.
       await testCase.assertNotContains('foo/bar');
     } else {
       await testCase.assertContains(unknownDoc('foo/bar', 1));
@@ -344,8 +339,7 @@ void main() {
     await testCase.releaseQuery(query);
     await testCase.acknowledgeMutation(2);
     if (testCase.garbageCollectorIsEager) {
-      // Neither the target nor the mutation pin the document, it should be
-      // gone.
+      // Neither the target nor the mutation pin the document, it should be gone.
       await testCase.assertNotContains('foo/bar');
     } else {
       await testCase.assertContains(deletedDoc('foo/bar', 2, hasCommittedMutations: true));
@@ -368,8 +362,7 @@ void main() {
     await testCase.acknowledgeMutation(2);
     testCase.assertRemoved(<String>['foo/bar']);
     if (testCase.garbageCollectorIsEager) {
-      // The doc is not pinned in a target and we've acknowledged the mutation.
-      // It shouldn't exist anymore.
+      // The doc is not pinned in a target and we've acknowledged the mutation. It shouldn't exist anymore.
       await testCase.assertNotContains('foo/bar');
     } else {
       await testCase.assertContains(deletedDoc('foo/bar', 2, hasCommittedMutations: true));
@@ -589,8 +582,7 @@ void main() {
     await testCase
         .applyRemoteEvent(updateRemoteEvent(doc('foo/bar', 0, map(<String>['foo', 'old'])), <int>[targetId], <int>[]));
     await testCase.writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
-    // Release the query so that our target count goes back to 0 and we are
-    // considered up-to-date.
+    // Release the query so that our target count goes back to 0 and we are considered up-to-date.
     await testCase.releaseQuery(query);
     await testCase.writeMutation(setMutation('foo/bah', map(<String>['foo', 'bah'])));
     await testCase.writeMutation(deleteMutation('foo/baz'));
@@ -757,8 +749,7 @@ void main() {
     final RemoteEvent remoteEvent1 = aggregator1.createRemoteEvent(version(1000));
     await testCase.applyRemoteEvent(remoteEvent1);
 
-    // New message with empty resume token should not replace the old resume
-    // token
+    // New message with empty resume token should not replace the old resume token
     final WatchChangeAggregator aggregator2 = WatchChangeAggregator(testTargetMetadataProvider);
     final WatchChangeWatchTargetChange watchChange2 =
         WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[targetId], WatchStream.emptyResumeToken);

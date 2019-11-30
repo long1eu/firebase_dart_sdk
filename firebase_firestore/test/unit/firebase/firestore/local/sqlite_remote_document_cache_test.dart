@@ -13,6 +13,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:test/test.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../util/test_util.dart';
 import 'cases/remote_document_cache_test_case.dart';
@@ -25,8 +26,8 @@ void main() {
   setUp(() async {
     print('setUp');
 
-    final SQLitePersistence persistence = await openSQLitePersistence(
-        'firebase/firestore/local/sqlite_remote_document_cache_${nextSQLiteDatabaseName()}.db');
+    final SQLitePersistence persistence =
+        await openSQLitePersistence('firebase/firestore/local/sqlite_remote_document_cache_test-${Uuid().v4()}.db');
 
     testCase = RemoteDocumentCacheTestCase(persistence)..setUp();
     remoteDocumentCache = testCase.remoteDocumentCache;
@@ -34,8 +35,7 @@ void main() {
     print('setUpDone');
   });
 
-  tearDown(
-      () => Future<void>.delayed(const Duration(milliseconds: 250), () => testCase.tearDown()));
+  tearDown(() => Future<void>.delayed(const Duration(milliseconds: 250), () => testCase.tearDown()));
 
   test('testReadDocumentNotInCache', () async {
     expect(await testCase.get('a/b'), isNull);
@@ -68,16 +68,14 @@ void main() {
     for (String path in paths) {
       written[DocumentKey.fromPathString(path)] = await testCase.addTestDocumentAtPath(path);
     }
-    written[DocumentKey.fromPathString("foo/nonexistent")] = null;
+    written[DocumentKey.fromPathString('foo/nonexistent')] = null;
 
-    final List<String> keys = paths.toList();
-    keys.add("foo/nonexistent");
+    final List<String> keys = <String>[...paths, 'foo/nonexistent'];
+
     final Map<DocumentKey, MaybeDocument> read = await testCase.getAll(keys);
     expect(read, written);
   });
 
-  // PORTING NOTE: this test only applies to Android, because it's the only platform where the
-  // implementation of getAll might split the input into several queries.
   test('testSetAndReadLotsOfDocuments', () async {
     // Make sure to force SQLite implementation to split the large query into several smaller ones.
     const int lotsOfDocuments = 2000;
@@ -128,8 +126,8 @@ void main() {
   });
 
   test('testDocumentsMatchingQuery', () async {
-    // TODO: This just verifies that we do a prefix scan against the
-    // query path. We'll need more tests once we add index support.
+    // TODO(long1eu): This just verifies that we do a prefix scan against the query path. We'll need more tests once we
+    //  add index support.
     final Map<String, Object> docData = map(<dynamic>['data', 2]);
     await testCase.addTestDocumentAtPath('a/1');
     await testCase.addTestDocumentAtPath('b/1');

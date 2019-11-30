@@ -10,11 +10,9 @@ import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persisten
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
+import 'package:uuid/uuid.dart';
 
 import 'mock/database_mock.dart';
-
-/// A counter for generating unique database names.
-int _databaseNameCounter = 0;
 
 Future<SQLitePersistence> openSQLitePersistence(String name) async {
   final DatabaseId databaseId = DatabaseId.forProject('projectId');
@@ -43,13 +41,11 @@ Future<SQLitePersistence> openSQLitePersistence(String name) async {
   return persistence;
 }
 
-String nextSQLiteDatabaseName() => 'test-${_databaseNameCounter++}';
-
 /// Creates and starts a new [SQLitePersistence] instance for testing.
-/// Returns a new [SQLitePersistence] with an empty database and an up-to-date
-/// schema.
+///
+/// Returns a new [SQLitePersistence] with an empty database and an up-to-date schema.
 Future<SQLitePersistence> createSQLitePersistence() {
-  return openSQLitePersistence(nextSQLiteDatabaseName());
+  return openSQLitePersistence('test-${Uuid().v4()}');
 }
 
 /// Creates and starts a new [MemoryPersistence] instance for testing.

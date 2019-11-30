@@ -43,11 +43,7 @@ class LruGarbageCollectorTestCase {
   Future<void> setUp() async {
     previousTargetId = 500;
     previousDocNum = 10;
-    final Map<String, Object> dataMap = <String, Object>{
-      'test': 'data',
-      'foo': true,
-      'bar': 3,
-    };
+    final Map<String, Object> dataMap = <String, Object>{'test': 'data', 'foo': true, 'bar': 3};
 
     testValue = wrapMap(dataMap);
     await newTestResources();
@@ -125,8 +121,7 @@ class LruGarbageCollectorTestCase {
   }
 
   Future<void> markDocumentEligibleForGc(DocumentKey key) async {
-    await persistence.runTransaction(
-        'Removing mutation reference', () => markDocumentEligibleForGcInTransaction(key));
+    await persistence.runTransaction('Removing mutation reference', () => markDocumentEligibleForGcInTransaction(key));
   }
 
   Future<void> markADocumentEligibleForGc() async {

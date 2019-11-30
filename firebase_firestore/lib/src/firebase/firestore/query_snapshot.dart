@@ -15,12 +15,10 @@ import 'package:firebase_firestore/src/firebase/firestore/query.dart' as core;
 import 'package:firebase_firestore/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:firebase_firestore/src/firebase/firestore/snapshot_metadata.dart';
 
-/// A [QuerySnapshot] contains the results of a query. It can contain zero or more
-/// [DocumentSnapshot] objects.
+/// A [QuerySnapshot] contains the results of a query. It can contain zero or more [DocumentSnapshot] objects.
 ///
-/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
-/// mocks. Subclassing is not supported in production code and new SDK releases may break code that
-/// does so.
+/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
+/// not supported in production code and new SDK releases may break code that does so.
 @publicApi
 class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   QuerySnapshot(this.query, this.snapshot, this._firestore)
@@ -42,33 +40,30 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   List<DocumentChange> _cachedChanges;
   MetadataChanges _cachedChangesMetadataState;
 
-  /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot
-  /// all documents will be in the list as added changes.
+  /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
+  /// be in the list as added changes.
   ///
   /// Documents with changes only to their metadata will not be included.
   ///
   /// Returns the list of document changes since the last snapshot.
   List<DocumentChange> get documentChanges => getDocumentChanges(MetadataChanges.exclude);
 
-  /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot
-  /// all documents will be in the list as added changes.
+  /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
+  /// be in the list as added changes.
   ///
-  /// [metadataChanges] Indicates whether metadata-only changes (i.e. only
-  /// [Query.metadata] changed) should be included.
+  /// [metadataChanges] Indicates whether metadata-only changes (i.e. only [Query.metadata] changed) should be included.
   ///
   /// Returns the list of document changes since the last snapshot.
-
   @publicApi
   List<DocumentChange> getDocumentChanges(MetadataChanges metadataChanges) {
     if (metadataChanges == MetadataChanges.include && snapshot.excludesMetadataChanges) {
-      throw ArgumentError(
-          'To include metadata changes with your document changes, you must also pass '
+      throw ArgumentError('To include metadata changes with your document changes, you must also pass '
           'MetadataChanges.include to getSnapshots().');
     }
 
     if (_cachedChanges == null || _cachedChangesMetadataState != metadataChanges) {
-      _cachedChanges = DocumentChange.changesFromSnapshot(_firestore, metadataChanges, snapshot)
-          .toList(growable: false);
+      _cachedChanges =
+          DocumentChange.changesFromSnapshot(_firestore, metadataChanges, snapshot).toList(growable: false);
       _cachedChangesMetadataState = metadataChanges;
     }
     return _cachedChanges;
@@ -130,11 +125,16 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
           _firestore == other._firestore;
 
   @override
-  int get hashCode => query.hashCode ^ metadata.hashCode ^ snapshot.hashCode ^ _firestore.hashCode;
+  int get hashCode {
+    return query.hashCode ^ //
+        metadata.hashCode ^
+        snapshot.hashCode ^
+        _firestore.hashCode;
+  }
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
+    return (ToStringHelper(QuerySnapshot)
           ..add('query', query)
           ..add('metadata', metadata)
           ..add('snapshot', snapshot)

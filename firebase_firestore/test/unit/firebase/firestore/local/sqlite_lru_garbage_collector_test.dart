@@ -13,6 +13,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../util/test_util.dart';
 import 'cases/lru_garbage_collector_test_case.dart';
@@ -20,15 +21,14 @@ import 'persistence_test_helpers.dart';
 
 void main() {
   LruGarbageCollectorTestCase testCase;
-  LruGarbageCollector garbageCollector;
 
   setUp(() async {
     print('setUp');
-    testCase = LruGarbageCollectorTestCase(() => openSQLitePersistence(
-        'firebase/firestore/local/sqlite_lru_garbage_collector_${nextSQLiteDatabaseName()}.db'));
+
+    testCase = LruGarbageCollectorTestCase(
+        () => openSQLitePersistence('firebase/firestore/local/sqlite_lru_garbage_collector_test-${Uuid().v4()}.db'));
     await testCase.setUp();
 
-    garbageCollector = testCase.garbageCollector;
     print('setUpDone');
   });
 
@@ -36,7 +36,6 @@ void main() {
     return Future<void>.delayed(const Duration(milliseconds: 250), () async {
       await testCase.tearDown();
       testCase = null;
-      garbageCollector = null;
     });
   });
 
@@ -48,7 +47,7 @@ void main() {
       final int numQueries = queryCounts[i];
       final int expectedTenthPercentile = expectedCounts[i];
       await testCase.newTestResources();
-      garbageCollector = testCase.garbageCollector;
+      final LruGarbageCollector garbageCollector = testCase.garbageCollector;
       for (int j = 0; j < numQueries; j++) {
         await testCase.addNextQuery();
       }
@@ -59,13 +58,14 @@ void main() {
   });
 
   test('testSequenceNumberNoQueries', () async {
+    final LruGarbageCollector garbageCollector = testCase.garbageCollector;
     expect(await garbageCollector.nthSequenceNumber(0), ListenSequence.invalid);
   });
 
   test('testSequenceNumberForFiftyQueries', () async {
-    // Add 50 queries sequentially, aim to collect 10 of them.
-    // The sequence number to collect should be 10 past the initial sequence
-    // number.
+    final LruGarbageCollector garbageCollector = testCase.garbageCollector;
+    // Add 50 queries sequentially, aim to collect 10 of them. The sequence number to collect should be 10 past the
+    // initial sequence number.
     for (int i = 0; i < 50; i++) {
       await testCase.addNextQuery();
     }
@@ -74,8 +74,8 @@ void main() {
   });
 
   test('testSequenceNumberForMultipleQueriesInATransaction', () async {
-    // 50 queries, 9 with one transaction, incrementing from there. Should get
-    // second sequence number.
+    final LruGarbageCollector garbageCollector = testCase.garbageCollector;
+    // 50 queries, 9 with one transaction, incrementing from there. Should get second sequence number.
     await testCase.persistence.runTransaction('9 queries in a batch', () async {
       for (int i = 0; i < 9; i++) {
         await testCase.addNextQueryInTransaction();
@@ -88,12 +88,11 @@ void main() {
   });
 
   test('testAllCollectedQueriesInSingleTransaction', () async {
-    // Ensure that even if all of the queries are added in a single transaction,
-    // we still pick a sequence number and GC. In this case, the initial
-    // transaction contains all of the targets that will get GC'd, since they
-    // account for more than the first 10 targets. 50 queries, 11 with one
-    // transaction, incrementing from there. Should get first sequence
-    // number.
+    final LruGarbageCollector garbageCollector = testCase.garbageCollector;
+    // Ensure that even if all of the queries are added in a single transaction, we still pick a sequence number and GC.
+    // In this case, the initial transaction contains all of the targets that will get GC'd, since they account for more
+    // than the first 10 targets. 50 queries, 11 with one transaction, incrementing from there. Should get first
+    // sequence number.
     await testCase.persistence.runTransaction('9 queries in a batch', () async {
       for (int i = 0; i < 11; i++) {
         await testCase.addNextQueryInTransaction();
@@ -108,8 +107,9 @@ void main() {
   });
 
   test('testSequenceNumbersWithMutationAndSequentialQueries', () async {
-    // Remove a mutated doc reference, marking it as eligible for GC.
-    // Then add 50 queries. Should get 10 past initial (9 queries).
+    final LruGarbageCollector garbageCollector = testCase.garbageCollector;
+    // Remove a mutated doc reference, marking it as eligible for GC. Then add 50 queries. Should get 10 past initial
+    // (9 queries).
     await testCase.markADocumentEligibleForGc();
     for (int i = 0; i < 50; i++) {
       await testCase.addNextQuery();
@@ -119,13 +119,12 @@ void main() {
   });
 
   test('testSequenceNumbersWithMutationsInQueries', () async {
-    // Add mutated docs, then add one of them to a query target so it doesn't
-    // get GC'd. Expect 3 past the initial value: the mutations not part of a
-    // query, and two queries
+    final LruGarbageCollector garbageCollector = testCase.garbageCollector;
+    // Add mutated docs, then add one of them to a query target so it doesn't get GC'd. Expect 3 past the initial value:
+    // the mutations not part of a query, and two queries
     final DocumentKey docInQuery = testCase.nextTestDocumentKey();
     await testCase.persistence.runTransaction('mark mutations', () async {
-      // Adding 9 doc keys in a transaction. If we remove one of them, we'll
-      // have room for two actual queries.
+      // Adding 9 doc keys in a transaction. If we remove one of them, we'll have room for two actual queries.
       await testCase.markDocumentEligibleForGcInTransaction(docInQuery);
       for (int i = 0; i < 8; i++) {
         await testCase.markADocumentEligibleForGcInTransaction();
@@ -139,8 +138,7 @@ void main() {
       await testCase.addDocumentToTarget(docInQuery, queryData.targetId);
     });
 
-    // This should catch the remaining 8 documents, plus the first two queries
-    // we added.
+    // This should catch the remaining 8 documents, plus the first two queries we added.
     expect(await garbageCollector.nthSequenceNumber(10), 3 + testCase.initialSequenceNumber);
   });
 
@@ -172,16 +170,15 @@ void main() {
   });
 
   test('testRemoveOrphanedDocuments', () async {
-    // Track documents we expect to be retained so we can verify post-GC. This
-    // will contain documents associated with targets that survive GC, as well
-    // as any documents with pending mutations.
+    final LruGarbageCollector garbageCollector = testCase.garbageCollector;
+    // Track documents we expect to be retained so we can verify post-GC. This will contain documents associated with
+    // targets that survive GC, as well as any documents with pending mutations.
     final Set<DocumentKey> expectedRetained = <DocumentKey>{};
     // we add two mutations later, for now track them in an array.
     final List<Mutation> mutations = <Mutation>[];
 
     await testCase.persistence.runTransaction('add a target and add two documents to it', () async {
-      // Add two documents to first target, queue a mutation on the second
-      // document
+      // Add two documents to first target, queue a mutation on the second document
       final QueryData queryData = await testCase.addNextQueryInTransaction();
       final Document doc1 = await testCase.cacheADocumentInTransaction();
       await testCase.addDocumentToTarget(doc1.key, queryData.targetId);
@@ -208,20 +205,17 @@ void main() {
       expectedRetained.add(doc4.key);
     });
 
-    // Insert the mutations. These operations don't have a sequence number, they
-    // just serve to keep the mutated documents from being GC'd while the
-    // mutations are outstanding.
+    // Insert the mutations. These operations don't have a sequence number, they just serve to keep the mutated
+    // documents from being GC'd while the mutations are outstanding.
     await testCase.persistence.runTransaction('actually register the mutations', () async {
       final Timestamp writeTime = Timestamp.now();
       await testCase.mutationQueue.addMutationBatch(writeTime, mutations);
     });
 
-    // Mark 5 documents eligible for GC. This simulates documents that were
-    // mutated then ack'd. Since they were ack'd, they are no longer in a
-    // mutation queue, and there is nothing keeping them alive.
+    // Mark 5 documents eligible for GC. This simulates documents that were mutated then ack'd. Since they were ack'd,
+    // they are no longer in a mutation queue, and there is nothing keeping them alive.
     final Set<DocumentKey> toBeRemoved = <DocumentKey>{};
-    await testCase.persistence.runTransaction('add orphaned docs (previously mutated, then ack\'d)',
-        () async {
+    await testCase.persistence.runTransaction('add orphaned docs (previously mutated, then ack\'d)', () async {
       for (int i = 0; i < 5; i++) {
         final Document doc = await testCase.cacheADocumentInTransaction();
         toBeRemoved.add(doc.key);
@@ -229,9 +223,8 @@ void main() {
       }
     });
 
-    // We expect only the orphaned documents, those not in a mutation or a
-    // target, to be removed. Use a large sequence number to remove as much as
-    // possible
+    // We expect only the orphaned documents, those not in a mutation or a target, to be removed. Use a large sequence
+    // number to remove as much as possible
     final int removed = await garbageCollector.removeOrphanedDocuments(1000);
     expect(removed, toBeRemoved.length);
     await testCase.persistence.runTransaction('verify', () async {
@@ -266,14 +259,12 @@ void main() {
     // * Documents from newest target are gone, except those added to the old
     //   target as well
 
-    // Through the various steps, track which documents we expect to be removed
-    // vs documents we expect to be retained.
+    // Through the various steps, track which documents we expect to be removed vs documents we expect to be retained.
     final Set<DocumentKey> expectedRetained = <DocumentKey>{};
     final Set<DocumentKey> expectedRemoved = <DocumentKey>{};
 
-    // Add oldest target, 5 documents, and add those documents to the target.
-    // This target will not be removed, so all documents that are part of it
-    // will be retained.
+    // Add oldest target, 5 documents, and add those documents to the target. This target will not be removed, so all
+    // documents that are part of it will be retained.
     final QueryData oldestTarget =
         await testCase.persistence.runTransactionAndReturn('Add oldest target and docs', () async {
       final QueryData queryData = await testCase.addNextQueryInTransaction();
@@ -285,26 +276,23 @@ void main() {
       return queryData;
     });
 
-    // Add middle target and docs. Some docs will be removed from this target
-    // later, which we track here.
+    // Add middle target and docs. Some docs will be removed from this target later, which we track here.
     final Set<DocumentKey> middleDocsToRemove = <DocumentKey>{};
     // This will be the document in this target that gets an update later.
     DocumentKey middleDocToUpdateHolder;
     final QueryData middleTarget =
         await testCase.persistence.runTransactionAndReturn('Add middle target and docs', () async {
       final QueryData queryData = await testCase.addNextQueryInTransaction();
-      // these docs will be removed from this target later, triggering a bump
-      // to their sequence numbers. Since they will not be a part of the target,
-      // we expect them to be removed.
+      // these docs will be removed from this target later, triggering a bump to their sequence numbers. Since they will
+      // not be a part of the target, we expect them to be removed.
       for (int i = 0; i < 2; i++) {
         final Document doc = await testCase.cacheADocumentInTransaction();
         await testCase.addDocumentToTarget(doc.key, queryData.targetId);
         expectedRemoved.add(doc.key);
         middleDocsToRemove.add(doc.key);
       }
-      // these docs stay in this target and only this target. There presence in
-      // this target prevents them from being GC'd, so they are also expected to
-      // be retained.
+      // these docs stay in this target and only this target. There presence in this target prevents them from being
+      // GC'd, so they are also expected to be retained.
       for (int i = 2; i < 4; i++) {
         final Document doc = await testCase.cacheADocumentInTransaction();
         expectedRetained.add(doc.key);
@@ -321,23 +309,21 @@ void main() {
     });
     final DocumentKey middleDocToUpdate = middleDocToUpdateHolder;
 
-    // Add the newest target and add 5 documents to it. Some of those documents
-    // will additionally be added to the oldest target, which will cause those
-    // documents to be retained. The remaining documents are expected to be
-    // removed, since this target will be removed.
+    // Add the newest target and add 5 documents to it. Some of those documents will additionally be added to the oldest
+    // target, which will cause those documents to be retained. The remaining documents are expected to be removed,
+    // since this target will be removed.
     final Set<DocumentKey> newestDocsToAddToOldest = <DocumentKey>{};
     await testCase.persistence.runTransaction('Add newest target and docs', () async {
       final QueryData queryData = await testCase.addNextQueryInTransaction();
-      // These documents are only in this target. They are expected to be
-      // removed because this target will also be removed.
+      // These documents are only in this target. They are expected to be removed because this target will also be
+      // removed.
       for (int i = 0; i < 3; i++) {
         final Document doc = await testCase.cacheADocumentInTransaction();
         expectedRemoved.add(doc.key);
         await testCase.addDocumentToTarget(doc.key, queryData.targetId);
       }
 
-      // docs to add to the oldest target in addition to this target. They will
-      // be retained
+      // docs to add to the oldest target in addition to this target. They will be retained
       for (int i = 3; i < 5; i++) {
         final Document doc = await testCase.cacheADocumentInTransaction();
         expectedRetained.add(doc.key);
@@ -347,11 +333,9 @@ void main() {
     });
 
     // 2 doc writes, add one of them to the oldest target.
-    await testCase.persistence.runTransaction('2 doc writes, add one of them to the oldest target',
-        () async {
-      // write two docs and have them ack'd by the server. can skip mutation
-      // queue and set them in document cache. Add potentially orphaned first,
-      // also add one doc to a target.
+    await testCase.persistence.runTransaction('2 doc writes, add one of them to the oldest target', () async {
+      // write two docs and have them ack'd by the server. can skip mutation queue and set them in document cache. Add
+      // potentially orphaned first, also add one doc to a target.
       final Document doc1 = await testCase.cacheADocumentInTransaction();
       await testCase.markDocumentEligibleForGcInTransaction(doc1.key);
       await testCase.updateTargetInTransaction(oldestTarget);
@@ -366,19 +350,17 @@ void main() {
     });
 
     // Remove some documents from the middle target.
-    await testCase.persistence.runTransaction('Remove some documents from the middle target',
-        () async {
+    await testCase.persistence.runTransaction('Remove some documents from the middle target', () async {
       await testCase.updateTargetInTransaction(middleTarget);
       for (DocumentKey key in middleDocsToRemove) {
         await testCase.removeDocumentFromTarget(key, middleTarget.targetId);
       }
     });
 
-    // Add a couple docs from the newest target to the oldest (preserves them
-    // past the point where newest was removed) upperBound is the sequence
-    // number right before middleTarget is updated, then removed.
-    final int upperBound = await testCase.persistence.runTransactionAndReturn(
-        'Add a couple docs from the newest target to the oldest', () async {
+    // Add a couple docs from the newest target to the oldest (preserves them past the point where newest was removed)
+    // upperBound is the sequence number right before middleTarget is updated, then removed.
+    final int upperBound = await testCase.persistence
+        .runTransactionAndReturn('Add a couple docs from the newest target to the oldest', () async {
       await testCase.updateTargetInTransaction(oldestTarget);
       for (DocumentKey key in newestDocsToAddToOldest) {
         await testCase.addDocumentToTarget(key, oldestTarget.targetId);
@@ -389,32 +371,27 @@ void main() {
     // Update a doc in the middle target
     await testCase.persistence.runTransaction('Update a doc in the middle target', () async {
       final SnapshotVersion newVersion = version(3);
-      final Document doc =
-          Document(middleDocToUpdate, newVersion, testCase.testValue, DocumentState.synced);
+      final Document doc = Document(middleDocToUpdate, newVersion, testCase.testValue, DocumentState.synced);
       await testCase.documentCache.add(doc);
       await testCase.updateTargetInTransaction(middleTarget);
     });
 
     // Remove the middle target
-    await testCase.persistence.runTransaction('remove middle target',
-        () => testCase.persistence.referenceDelegate.removeTarget(middleTarget));
+    await testCase.persistence.runTransaction(
+        'remove middle target', () => testCase.persistence.referenceDelegate.removeTarget(middleTarget));
 
     // Write a doc and get an ack, not part of a target
-    await testCase.persistence.runTransaction('Write a doc and get an ack, not part of a target',
-        () async {
+    await testCase.persistence.runTransaction('Write a doc and get an ack, not part of a target', () async {
       final Document doc = await testCase.cacheADocumentInTransaction();
-      // Mark it as eligible for GC, but this is after our upper bound for what
-      // we will collect.
+      // Mark it as eligible for GC, but this is after our upper bound for what we will collect.
       await testCase.markDocumentEligibleForGcInTransaction(doc.key);
       // This should be retained, it's too new to get removed.
       expectedRetained.add(doc.key);
     });
 
-    // Finally, do the garbage collection, up to but not including the removal
-    // of middleTarget
+    // Finally, do the garbage collection, up to but not including the removal of middleTarget
     final Set<int> liveQueries = <int>{oldestTarget.targetId};
-    final int queriesRemoved =
-        await testCase.garbageCollector.removeTargets(upperBound, liveQueries);
+    final int queriesRemoved = await testCase.garbageCollector.removeTargets(upperBound, liveQueries);
     // Expect to remove newest target
     expect(queriesRemoved, 1);
     final int docsRemoved = await testCase.garbageCollector.removeOrphanedDocuments(upperBound);
