@@ -174,7 +174,7 @@ class FirebaseApp {
     if (automaticResourceManagementEnabled != enabled) {
       automaticResourceManagementEnabled = enabled;
 
-      final bool inBackground = platformDependencies.isInBackground;
+      final bool inBackground = platformDependencies.isBackground;
       if (enabled && inBackground) {
         // Automatic resource management has been enabled while the app is in
         // the background, notify the listeners of the app being in the
@@ -251,7 +251,7 @@ class FirebaseApp {
   @keepForSdk
   void addBackgroundStateChangeObserver(OnBackgroundStateChanged observer) {
     _checkNotDeleted();
-    if (automaticResourceManagementEnabled && platformDependencies.isInBackground) {
+    if (automaticResourceManagementEnabled && platformDependencies.isBackground) {
       observer(isInBackground: true);
     }
     backgroundStateChangeObservers.add(observer);

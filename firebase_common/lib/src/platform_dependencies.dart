@@ -11,7 +11,7 @@ abstract class PlatformDependencies {
 
   AuthUrlPresenter get authUrlPresenter;
 
-  bool get isInBackground;
+  Stream<bool> get isBackgroundChanged;
 
   Box<dynamic> get box;
 
