@@ -129,7 +129,7 @@ void main() {
       ..orderBy.add(defaultKeyOrder());
 
     final proto_beta.Target_QueryTarget queryBuilder = proto.Target_QueryTarget.create()
-      ..parent = 'projects/p/databases/d'
+      ..parent = 'projects/p/databases/d/documents'
       ..structuredQuery = structuredQueryBuilder;
 
     final proto_beta.Target expected = proto_beta.Target.create()
@@ -509,7 +509,7 @@ void main() {
       ..orderBy.add(defaultKeyOrder());
 
     final proto_beta.Target_QueryTarget queryBuilder = proto.Target_QueryTarget.create()
-      ..parent = 'projects/p/databases/d'
+      ..parent = 'projects/p/databases/d/documents'
       ..structuredQuery = structuredQueryBuilder;
 
     final proto_beta.Target expected = proto_beta.Target.create()
@@ -562,7 +562,7 @@ void main() {
       ..orderBy.add(defaultKeyOrder());
 
     final proto_beta.Target_QueryTarget queryBuilder = proto.Target_QueryTarget.create()
-      ..parent = 'projects/p/databases/d'
+      ..parent = 'projects/p/databases/d/documents'
       ..structuredQuery = structuredQueryBuilder;
 
     final proto_beta.Target expected = proto_beta.Target.create()
@@ -648,7 +648,7 @@ void main() {
       ..orderBy.add(defaultKeyOrder());
 
     final proto_beta.Target_QueryTarget queryBuilder = proto.Target_QueryTarget.create()
-      ..parent = 'projects/p/databases/d'
+      ..parent = 'projects/p/databases/d/documents'
       ..structuredQuery = structuredQueryBuilder;
 
     final proto_beta.Target expected = proto_beta.Target.create()
@@ -700,7 +700,7 @@ void main() {
       ..limit = (proto.Int32Value.create()..value = 26);
 
     final proto_beta.Target_QueryTarget queryBuilder = proto.Target_QueryTarget.create()
-      ..parent = 'projects/p/databases/d'
+      ..parent = 'projects/p/databases/d/documents'
       ..structuredQuery = structuredQueryBuilder;
 
     final proto_beta.Target expected = proto_beta.Target.create()
@@ -735,7 +735,7 @@ void main() {
         ..values.add(valueBuilder()..referenceValue = 'projects/p/databases/d/documents/foo/baz'));
 
     final proto_beta.Target_QueryTarget queryBuilder = proto.Target_QueryTarget.create()
-      ..parent = 'projects/p/databases/d'
+      ..parent = 'projects/p/databases/d/documents'
       ..structuredQuery = structuredQueryBuilder;
 
     final proto_beta.Target expected = proto_beta.Target.create()
@@ -758,7 +758,7 @@ void main() {
       ..orderBy.add(defaultKeyOrder());
 
     final proto_beta.Target_QueryTarget queryBuilder = proto.Target_QueryTarget.create()
-      ..parent = 'projects/p/databases/d'
+      ..parent = 'projects/p/databases/d/documents'
       ..structuredQuery = structuredQueryBuilder;
 
     final proto_beta.Target expected = proto_beta.Target.create()
