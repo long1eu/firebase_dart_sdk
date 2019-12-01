@@ -26,25 +26,21 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:rxdart/rxdart.dart';
 
-/// A [DocumentReference] refers to a document location in a Firestore database and can be used to
-/// write, read, or listen to the location. There may or may not exist a document at the referenced
-/// location. A [DocumentReference] can also be used to create a [CollectionReference] to a
-/// subcollection.
+/// A [DocumentReference] refers to a document location in a Firestore database and can be used to write, read, or
+/// listen to the location. There may or may not exist a document at the referenced location. A [DocumentReference] can
+/// also be used to create a [CollectionReference] to a subcollection.
 ///
-/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
-/// mocks. Subclassing is not supported in production code and new SDK releases may break code that
-/// does so.
+/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing
+/// is not supported in production code and new SDK releases may break code that does so.
 @publicApi
 class DocumentReference {
-  // TODO: We should checkNotNull(firestore), but tests are currently cheating and setting it to
-  //  null.
+  // TODO(long1eu): We should checkNotNull(firestore), but tests are currently cheating and setting it to null.
   DocumentReference(this.key, this.firestore) : assert(key != null);
 
   factory DocumentReference.forPath(ResourcePath path, FirebaseFirestore firestore) {
     if (path.length.remainder(2) != 0) {
-      throw ArgumentError(
-          'Invalid document reference. Document references must have an even number of segments, '
-          'but ${path.canonicalString} has ${path.length}');
+      throw ArgumentError('Invalid document reference. Document references must have an even number of segments, but '
+          '${path.canonicalString} has ${path.length}');
     }
 
     return DocumentReference(DocumentKey.fromPath(path), firestore);
@@ -66,15 +62,14 @@ class DocumentReference {
     return CollectionReference(key.path.popLast(), firestore);
   }
 
-  /// Gets the path of this document (relative to the root of the database) as a slash-separated
-  /// string.
+  /// Gets the path of this document (relative to the root of the database) as a slash-separated  string.
   ///
   /// Returns the path of this document.
   @publicApi
   String get path => key.path.canonicalString;
 
-  /// Gets a [CollectionReference] instance that refers to the subcollection at the specified path
-  /// relative to this document.
+  /// Gets a [CollectionReference] instance that refers to the subcollection at the specified path relative to this
+  /// document.
   ///
   /// [collectionPath] a slash-separated relative path to a subcollection.
   ///
@@ -82,13 +77,11 @@ class DocumentReference {
   @publicApi
   CollectionReference collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
-    return CollectionReference(
-        key.path.appendField(ResourcePath.fromString(collectionPath)), firestore);
+    return CollectionReference(key.path.appendField(ResourcePath.fromString(collectionPath)), firestore);
   }
 
-  /// Writes to the document referred to by this DocumentReference. If the document does not yet
-  /// exist, it will be created. If you pass [SetOptions], the provided data can be merged into an
-  /// existing document.
+  /// Writes to the document referred to by this DocumentReference. If the document does not yet exist, it will be
+  /// created. If you pass [SetOptions], the provided data can be merged into an existing document.
   ///
   /// [data] a map of the fields and values for the document.
   /// [options] an object to configure the set behavior.
@@ -103,17 +96,16 @@ class DocumentReference {
         ? firestore.dataConverter.parseMergeData(data, options.fieldMask)
         : firestore.dataConverter.parseSetData(data);
 
-    await voidErrorTransformer(
-        () => firestore.client.write(parsed.toMutationList(key, Precondition.none)));
+    await voidErrorTransformer(() => firestore.client.write(parsed.toMutationList(key, Precondition.none)));
   }
 
-  /// Updates fields in the document referred to by this DocumentReference. If no document exists
-  /// yet, the update will fail.
+  /// Updates fields in the document referred to by this DocumentReference. If no document exists yet, the update will
+  /// fail.
   ///
   /// [data] is a List of field/value pairs to be updated.
   ///
-  /// The first item should be the field to update followed by the value. Repeat this pattern for
-  /// any additional field/value pairs.
+  /// The first item should be the field to update followed by the value. Repeat this pattern for any additional
+  /// field/value pairs.
   ///
   /// Returns a Future that will be resolved when the write finishes.
   @publicApi
@@ -124,11 +116,11 @@ class DocumentReference {
         () => firestore.client.write(parsedData.toMutationList(key, Precondition(exists: true))));
   }
 
-  /// Updates fields in the document referred to by this [DocumentReference]. If no document exists
-  /// yet, the update will fail.
+  /// Updates fields in the document referred to by this [DocumentReference]. If no document exists yet, the update will
+  /// fail.
   ///
-  /// [data] a map of field/value pairs to update. Fields can contain dots to reference nested
-  /// fields within the document.
+  /// [data] a map of field/value pairs to update. Fields can contain dots to reference nested fields within the
+  /// document.
   ///
   /// Returns a Future that will be resolved when the write finishes.
   @publicApi
@@ -143,20 +135,18 @@ class DocumentReference {
   /// Returns a Future that will be resolved when the delete completes.
   @publicApi
   Future<void> delete() {
-    return voidErrorTransformer(
-        () => firestore.client.write(<DeleteMutation>[DeleteMutation(key, Precondition.none)]));
+    return voidErrorTransformer(() => firestore.client.write(<DeleteMutation>[DeleteMutation(key, Precondition.none)]));
   }
 
   /// Reads the document referenced by this [DocumentReference].
   ///
-  /// By default, [get] attempts to provide up-to-date data when possible by waiting for data from
-  /// the server, but it may return cached data or fail if you are offline and the server cannot be
-  /// reached. This behavior can be altered via the [Source] parameter.
+  /// By default, [get] attempts to provide up-to-date data when possible by waiting for data from the server, but it
+  /// may return cached data or fail if you are offline and the server cannot be reached. This behavior can be altered
+  /// via the [Source] parameter.
   ///
   /// [source] a value to configure the get behavior.
   ///
-  /// Returns a Future that will be resolved with the contents of the [Document] at this
-  /// [DocumentReference].
+  /// Returns a Future that will be resolved with the contents of the [Document] at this [DocumentReference].
   @publicApi
   Future<DocumentSnapshot> get([Source source]) async {
     source ??= Source.defaultSource;
@@ -180,21 +170,17 @@ class DocumentReference {
   Future<DocumentSnapshot> _getViaSnapshotListener(Source source) {
     return _getSnapshotsInternal(const ListenOptions.all()).map((DocumentSnapshot snapshot) {
       if (!snapshot.exists && snapshot.metadata.isFromCache) {
-        // TODO: Reconsider how to raise missing documents when offline.
-        //  If we're online and the document doesn't exist then we set the result of the Future with
-        //  a document with document.exists set to false. If we're offline however, we set the Error
-        //  on the Task. Two options:
-        //    1. Cache the negative response from the server so we can deliver that even when you're
-        //    offline.
-        //    2. Actually set the Error of the Task if the document doesn't exist when you are
-        //    offline.
-        throw FirebaseFirestoreError('Failed to get document because the client is offline.',
-            FirebaseFirestoreErrorCode.unavailable);
+        // TODO(long1eu): Reconsider how to raise missing documents when offline.
+        //  If we're online and the document doesn't exist then we set the result of the Future with a document with
+        //  document.exists set to false. If we're offline however, we set the Error on the Task. Two options:
+        //    1. Cache the negative response from the server so we can deliver that even when you're offline.
+        //    2. Actually set the Error of the Task if the document doesn't exist when you are offline.
+        throw FirebaseFirestoreError(
+            'Failed to get document because the client is offline.', FirebaseFirestoreErrorCode.unavailable);
       } else if (snapshot.exists && snapshot.metadata.isFromCache && source == Source.server) {
         throw FirebaseFirestoreError(
-            'Failed to get document from server. (However, this document does exist in the local '
-            'cache. Run again without setting source to Source.SERVER to retrieve the cached '
-            'document.)',
+            'Failed to get document from server. (However, this document does exist in the local cache. Run again '
+            'without setting source to Source.SERVER to retrieve the cached document.)',
             FirebaseFirestoreErrorCode.unavailable);
       } else {
         return snapshot;

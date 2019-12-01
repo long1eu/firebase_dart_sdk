@@ -35,12 +35,11 @@ import 'package:rxdart/rxdart.dart';
 /// An enum for the direction of a sort.
 enum Direction { ascending, descending }
 
-/// A [Query] which you can read or listen to. You can also construct refined [Query] objects by
-/// adding filters and ordering.
+/// A [Query] which you can read or listen to. You can also construct refined [Query] objects by adding filters and
+/// ordering.
 ///
-/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
-/// mocks. Subclassing is not supported in production code and new SDK releases may break code that
-/// does so.
+/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
+/// not supported in production code and new SDK releases may break code that does so.
 @publicApi
 class Query {
   const Query(this.query, this.firestore)
@@ -54,10 +53,10 @@ class Query {
   void _validateOrderByFieldMatchesInequality(core.FieldPath orderBy, core.FieldPath inequality) {
     if (orderBy != inequality) {
       final String inequalityString = inequality.canonicalString;
-      throw ArgumentError('Invalid query. You have an inequality where filter (whereLessThan(), '
-          'whereGreaterThan(), etc.) on field \'$inequalityString\' and so you must also have'
-          ' \'$inequalityString\' as your first orderBy() field, but your first orderBy() is '
-          'currently on field \'${orderBy.canonicalString}\' instead.');
+      throw ArgumentError(
+          'Invalid query. You have an inequality where filter (whereLessThan(), whereGreaterThan(), etc.) on field '
+          '"$inequalityString" and so you must also have "$inequalityString" as your first orderBy() field, but '
+          'your first orderBy() is currently on field "${orderBy.canonicalString}" instead.');
     }
   }
 
@@ -70,9 +69,8 @@ class Query {
 
         if (existingInequality != null && existingInequality != newInequality) {
           throw ArgumentError(
-            'All where filters other than whereEqualTo() must be on the same field. But you have'
-            ' filters on \'${existingInequality.canonicalString}\' and '
-            '\'${newInequality.canonicalString}\'',
+            'All where filters other than whereEqualTo() must be on the same field. But you have filters on '
+            '"${existingInequality.canonicalString}" and "${newInequality.canonicalString}"',
           );
         }
         final core.FieldPath firstOrderByField = query.firstOrderByField;
@@ -81,15 +79,14 @@ class Query {
         }
       } else if (relationFilter.operator == FilterOperator.arrayContains) {
         if (query.hasArrayContainsFilter) {
-          throw ArgumentError(
-              'Invalid Query. Queries only support having a single array-contains filter.');
+          throw ArgumentError('Invalid Query. Queries only support having a single array-contains filter.');
         }
       }
     }
   }
 
-  /// Creates and returns a new Query with the additional filter that documents must contain the
-  /// specified field and the value should be equal to the specified value.
+  /// Creates and returns a new Query with the additional filter that documents must contain the specified field and the
+  /// value should be equal to the specified value.
   ///
   /// [field] The name of the field to compare
   /// [value] The value for comparison
@@ -100,8 +97,8 @@ class Query {
     return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.equal, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should be equal to the specified value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should be equal to the specified value.
   ///
   /// [fieldPath] The path of the field to compare
   /// [value] The value for comparison
@@ -112,8 +109,8 @@ class Query {
     return _whereHelper(fieldPath, FilterOperator.equal, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should be less than the specified value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should be less than the specified value.
   ///
   /// [field] The name of the field to compare
   /// [value] The value for comparison
@@ -124,8 +121,8 @@ class Query {
     return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.lessThan, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should be less than the specified value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should be less than the specified value.
   ///
   /// [fieldPath] The path of the field to compare
   /// [value] The value for comparison
@@ -136,8 +133,8 @@ class Query {
     return _whereHelper(fieldPath, FilterOperator.lessThan, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should be less than or equal to the specified value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should be less than or equal to the specified value.
   ///
   /// [field] The name of the field to compare
   /// [value] The value for comparison
@@ -145,12 +142,11 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query whereLessThanOrEqualTo(String field, Object value) {
-    return _whereHelper(
-        FieldPath.fromDotSeparatedPath(field), FilterOperator.lessThanOrEqual, value);
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.lessThanOrEqual, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should be less than or equal to the specified value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should be less than or equal to the specified value.
   ///
   /// [fieldPath] The path of the field to compare
   /// [value] The value for comparison
@@ -161,8 +157,8 @@ class Query {
     return _whereHelper(fieldPath, FilterOperator.lessThanOrEqual, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should be greater than the specified value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should be greater than the specified value.
   ///
   /// [field] The name of the field to compare
   /// [value] The value for comparison
@@ -173,8 +169,8 @@ class Query {
     return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.graterThan, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should be greater than the specified value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should be greater than the specified value.
   ///
   /// [fieldPath] The path of the field to compare
   /// [value] The value for comparison
@@ -185,8 +181,8 @@ class Query {
     return _whereHelper(fieldPath, FilterOperator.graterThan, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should be greater than or equal to the specified value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should be greater than or equal to the specified value.
   ///
   /// [field] The name of the field to compare
   /// [value] The value for comparison
@@ -194,12 +190,11 @@ class Query {
   /// Returns the created [Query].
   @publicApi
   Query whereGreaterThanOrEqualTo(String field, Object value) {
-    return _whereHelper(
-        FieldPath.fromDotSeparatedPath(field), FilterOperator.graterThanOrEqual, value);
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.graterThanOrEqual, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should be greater than or equal to the specified value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should be greater than or equal to the specified value.
   ///
   /// [fieldPath] The path of the field to compare
   /// [value] The value for comparison
@@ -210,8 +205,8 @@ class Query {
     return _whereHelper(fieldPath, FilterOperator.graterThanOrEqual, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field, the value must be an array, and that the array must contain the provided value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field, the
+  /// value must be an array, and that the array must contain the provided value.
   ///
   /// A Query can have only one [whereArrayContains] filter.
   ///
@@ -224,8 +219,8 @@ class Query {
     return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.arrayContains, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field, the value must be an array, and that the array must contain the provided value.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field, the
+  /// value must be an array, and that the array must contain the provided value.
   ///
   /// A Query can have only one [whereArrayContains] filter.
   ///
@@ -238,8 +233,8 @@ class Query {
     return _whereHelper(fieldPath, FilterOperator.arrayContains, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the
-  /// specified field and the value should satisfy the relation constraint provided.
+  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
+  /// the value should satisfy the relation constraint provided.
   ///
   /// [fieldPath] The field to compare
   /// [op] The operator
@@ -253,19 +248,21 @@ class Query {
     final core.FieldPath internalPath = fieldPath.internalPath;
     if (internalPath.isKeyField) {
       if (op == FilterOperator.arrayContains) {
-        throw ArgumentError('Invalid query. You can\'t perform array-contains queries on '
-            'FieldPath.documentId() since document IDs are not arrays.');
+        throw ArgumentError(
+            'Invalid query. You can\'t perform array-contains queries on FieldPath.documentId() since document IDs are '
+            'not arrays.');
       }
       if (value is String) {
         final String documentKey = value;
         if (documentKey.contains('/')) {
-          // TODO: Allow slashes once ancestor queries are supported
-          throw ArgumentError('Invalid query. When querying with FieldPath.documentId() you must '
-              'provide a valid document ID, but \'$documentKey\' contains a \'/\' character.');
+          // TODO(long1eu): Allow slashes once ancestor queries are supported
+          throw ArgumentError(
+              'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but '
+              '"$documentKey" contains a "/" character.');
         } else if (documentKey.isEmpty) {
           throw ArgumentError(
-              'Invalid query. When querying with FieldPath.documentId() you must provide a valid '
-              'document ID, but it was an empty string.');
+              'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it '
+              'was an empty string.');
         }
         final ResourcePath path = query.path.appendSegment(documentKey);
         hardAssert(path.length.remainder(2) == 0, 'Path should be a document key');
@@ -275,8 +272,8 @@ class Query {
         fieldValue = ReferenceValue.valueOf(firestore.databaseId, ref.key);
       } else {
         throw ArgumentError(
-            'Invalid query. When querying with FieldPath.documentId() you must provide a valid '
-            'String or DocumentReference, but it was of type: ${typeName(value)}');
+            'Invalid query. When querying with FieldPath.documentId() you must provide a valid String or '
+            'DocumentReference, but it was of type: ${typeName(value)}');
       }
     } else {
       fieldValue = firestore.dataConverter.parseQueryValue(value);
@@ -305,8 +302,8 @@ class Query {
     return orderByField(FieldPath.fromDotSeparatedPath(field), direction);
   }
 
-  /// Creates and returns a new [Query] that's additionally sorted by the specified field,
-  /// optionally in descending order instead of ascending.
+  /// Creates and returns a new [Query] that's additionally sorted by the specified field, optionally in descending
+  /// order instead of ascending.
   ///
   /// [fieldPath] the field to sort by.
   /// [direction] the direction to sort.
@@ -322,13 +319,11 @@ class Query {
     checkNotNull(direction, 'Provided direction must not be null.');
     if (query.getStartAt() != null) {
       throw AssertionError(
-          'Invalid query. You must not call Query.startAt() or Query.startAfter() before calling'
-          ' Query.orderBy().');
+          'Invalid query. You must not call Query.startAt() or Query.startAfter() before calling Query.orderBy().');
     }
     if (query.getEndAt() != null) {
       throw ArgumentError(
-          'Invalid query. You must not call Query.endAt() or Query.endAfter() before calling '
-          'Query.orderBy().');
+          'Invalid query. You must not call Query.endAt() or Query.endAfter() before calling Query.orderBy().');
     }
     _validateOrderByField(fieldPath);
     final OrderByDirection dir =
@@ -336,8 +331,8 @@ class Query {
     return Query(query.orderBy(OrderBy.getInstance(dir, fieldPath)), firestore);
   }
 
-  /// Creates and returns a new [Query] that's additionally limited to only return up to the
-  /// specified number of documents.
+  /// Creates and returns a new [Query] that's additionally limited to only return up to the specified number of
+  /// documents.
   ///
   /// [limit] the maximum number of items to return.
   ///
@@ -345,15 +340,14 @@ class Query {
   @publicApi
   Query limit(int limit) {
     if (limit <= 0) {
-      throw ArgumentError(
-          'Invalid Query. Query limit ($limit) is invalid. Limit must be positive.');
+      throw ArgumentError('Invalid Query. Query limit ($limit) is invalid. Limit must be positive.');
     }
     return Query(query.limit(limit), firestore);
   }
 
-  /// Creates and returns a new [Query] that starts at the provided document (inclusive). The
-  /// starting position is relative to the order of the query. The document must contain all of the
-  /// fields provided in the orderBy of this query.
+  /// Creates and returns a new [Query] that starts at the provided document (inclusive). The starting position is
+  /// relative to the order of the query. The document must contain all of the fields provided in the orderBy of this
+  /// query.
   ///
   /// [snapshot] the snapshot of the document to start at.
   ///
@@ -364,9 +358,8 @@ class Query {
     return Query(query.startAt(bound), firestore);
   }
 
-  /// Creates and returns a new [Query] that starts at the provided fields relative to the order of
-  /// the query. The order of the field values must match the order of the order by clauses of the
-  /// query.
+  /// Creates and returns a new [Query] that starts at the provided fields relative to the order of the query. The order
+  /// of the field values must match the order of the order by clauses of the query.
   ///
   /// [fieldValues] the field values to start this query at, in order of the query's order by.
   ///
@@ -377,9 +370,9 @@ class Query {
     return Query(query.startAt(bound), firestore);
   }
 
-  /// Creates and returns a new [Query] that starts after the provided document (exclusive). The
-  /// starting position is relative to the order of the query. The document must contain all of the
-  /// fields provided in the [orderBy] of this query.
+  /// Creates and returns a new [Query] that starts after the provided document (exclusive). The starting position is
+  /// relative to the order of the query. The document must contain all of the fields provided in the [orderBy] of this
+  /// query.
   ///
   /// [snapshot] the snapshot of the document to start after.
   ///
@@ -390,9 +383,8 @@ class Query {
     return Query(query.startAt(bound), firestore);
   }
 
-  /// Creates and returns a new [Query] that starts after the provided fields relative to the order
-  /// of the query. The order of the field values must match the order of the order by clauses of
-  /// the query.
+  /// Creates and returns a new [Query] that starts after the provided fields relative to the order of the query. The
+  /// order of the field values must match the order of the order by clauses of the query.
   ///
   /// [fieldValues] the field values to start this query after, in order of the query's order by.
   ///
@@ -403,9 +395,8 @@ class Query {
     return Query(query.startAt(bound), firestore);
   }
 
-  /// Creates and returns a new [Query] that ends before the provided document (exclusive). The end
-  /// position is relative to the order of the query. The document must contain all of the fields
-  /// provided in the orderBy of this query.
+  /// Creates and returns a new [Query] that ends before the provided document (exclusive). The end position is relative
+  /// to the order of the query. The document must contain all of the fields provided in the orderBy of this query.
   ///
   /// [snapshot] the snapshot of the document to end before.
   ///
@@ -416,9 +407,8 @@ class Query {
     return Query(query.endAt(bound), firestore);
   }
 
-  /// Creates and returns a new [Query] that ends before the provided fields relative to the order
-  /// of the query. The order of the field values must match the order of the order by clauses of
-  /// the query.
+  /// Creates and returns a new [Query] that ends before the provided fields relative to the order of the query. The
+  /// order of the field values must match the order of the order by clauses of the query.
   ///
   /// [fieldValues] the field values to end this query before, in order of the query's order by.
   ///
@@ -429,9 +419,8 @@ class Query {
     return Query(query.endAt(bound), firestore);
   }
 
-  /// Creates and returns a new [Query] that ends at the provided document (inclusive). The end
-  /// position is relative to the order of the query. The document must contain all of the fields
-  /// provided in the [orderBy] of this query.
+  /// Creates and returns a new [Query] that ends at the provided document (inclusive). The end position is relative to
+  /// the order of the query. The document must contain all of the fields provided in the [orderBy] of this query.
   ///
   /// [snapshot] the snapshot of the document to end at.
   ///
@@ -442,9 +431,8 @@ class Query {
     return Query(query.endAt(bound), firestore);
   }
 
-  /// Creates and returns a new [Query] that ends at the provided fields relative to the order of
-  /// the query. The order of the field values must match the order of the order by clauses of the
-  /// query.
+  /// Creates and returns a new [Query] that ends at the provided fields relative to the order of the query. The order
+  /// of the field values must match the order of the order by clauses of the query.
   ///
   /// [fieldValues] the field values to end this query at, in order of the query's order by.
   ///
@@ -457,25 +445,23 @@ class Query {
 
   /// Create a [Bound] from a query given the document.
   ///
-  /// Note that the [Bound] will always include the key of the document and so only the provided
-  /// document will compare equal to the returned position.
+  /// Note that the [Bound] will always include the key of the document and so only the provided document will compare
+  /// equal to the returned position.
   ///
-  /// Will throw if the document does not contain all fields of the order by of the query or if any
-  /// of the fields in the order by are an uncommitted server timestamp.
+  /// Will throw if the document does not contain all fields of the order by of the query or if any of the fields in the
+  /// order by are an uncommitted server timestamp.
   Bound _boundFromDocumentSnapshot(String methodName, DocumentSnapshot snapshot, bool before) {
     checkNotNull<DocumentSnapshot>(snapshot, 'Provided snapshot must not be null.');
     if (!snapshot.exists) {
-      throw ArgumentError('Can\'t use a DocumentSnapshot for a document that doesn\'t exist '
-          'for $methodName().');
+      throw ArgumentError('Can\'t use a DocumentSnapshot for a document that doesn\'t exist for $methodName().');
     }
     final Document document = snapshot.document;
     final List<FieldValue> components = <FieldValue>[];
 
-    // Because people expect to continue/end a query at the exact document provided, we need to use
-    // the implicit sort order rather than the explicit sort order, because it's guaranteed to
-    // contain the document key. That way the position becomes unambiguous and the query
-    // continues/ends exactly at the provided document. Without the key (by using the explicit sort
-    // orders), multiple documents could match the position, yielding duplicate results.
+    // Because people expect to continue/end a query at the exact document provided, we need to use the implicit sort
+    // order rather than the explicit sort order, because it's guaranteed to contain the document key. That way the
+    // position becomes unambiguous and the query continues/ends exactly at the provided document. Without the key (by
+    // using the explicit sort orders), multiple documents could match the position, yielding duplicate results.
     for (OrderBy orderBy in query.orderByConstraints) {
       if (orderBy.field == core.FieldPath.keyPath) {
         components.add(ReferenceValue.valueOf(firestore.databaseId, document.key));
@@ -483,15 +469,15 @@ class Query {
         final FieldValue value = document.getField(orderBy.field);
         if (value is ServerTimestampValue) {
           throw ArgumentError(
-              'Invalid query. You are trying to start or end a query using a document for which '
-              'the field "${orderBy.field}" is an uncommitted server timestamp. (Since the value '
-              'of this field is unknown, you cannot start/end a query with it.)');
+              'Invalid query. You are trying to start or end a query using a document for which the field '
+              '"${orderBy.field}" is an uncommitted server timestamp. (Since the value of this field is unknown, you '
+              'cannot start/end a query with it.)');
         } else if (value != null) {
           components.add(value);
         } else {
-          throw ArgumentError('Invalid query. You are trying to start or end a query using a '
-              'document for which the field \'${orderBy.field}\' (used as the orderBy) does not '
-              'exist.');
+          throw ArgumentError(
+              'Invalid query. You are trying to start or end a query using a document for which the field '
+              '"${orderBy.field}" (used as the orderBy) does not exist.');
         }
       }
     }
@@ -503,8 +489,9 @@ class Query {
     // Use explicit order by's because it has to match the query the user made
     final List<OrderBy> explicitOrderBy = query.explicitSortOrder;
     if (values.length > explicitOrderBy.length) {
-      throw ArgumentError('Too many arguments provided to $methodName(). The number of arguments '
-          'must be less than or equal to the number of orderBy() clauses.');
+      throw ArgumentError(
+          'Too many arguments provided to $methodName(). The number of arguments must be less than or equal to the '
+          'number of orderBy() clauses.');
     }
 
     final List<FieldValue> components = <FieldValue>[];
@@ -513,14 +500,11 @@ class Query {
       final OrderBy orderBy = explicitOrderBy[i];
       if (orderBy.field == core.FieldPath.keyPath) {
         if (rawValue is! String) {
-          throw ArgumentError(
-              'Invalid query. Expected a string for document ID in $methodName(), but got '
-              '$rawValue.');
+          throw ArgumentError('Invalid query. Expected a string for document ID in $methodName(), but got $rawValue.');
         }
         final String documentId = rawValue;
         if (documentId.contains('/')) {
-          throw ArgumentError(
-              'Invalid query. Document ID \'$documentId\' contains a slash in $methodName().');
+          throw ArgumentError('Invalid query. Document ID \'$documentId\' contains a slash in $methodName().');
         }
         final DocumentKey key = DocumentKey.fromPath(query.path.appendSegment(documentId));
         components.add(ReferenceValue.valueOf(firestore.databaseId, key));
@@ -535,9 +519,9 @@ class Query {
 
   /// Executes the query and returns the results as a [QuerySnapshot].
   ///
-  /// By default, get() attempts to provide up-to-date data when possible by waiting for data from
-  /// the server, but it may return cached data or fail if you are offline and the server cannot be
-  /// reached. This behavior can be altered via the [Source] parameter.
+  /// By default, get() attempts to provide up-to-date data when possible by waiting for data from the server, but it
+  /// may return cached data or fail if you are offline and the server cannot be reached. This behavior can be altered
+  /// via the [Source] parameter.
   ///
   /// [source] a value to configure the get behavior.
   ///
@@ -559,9 +543,8 @@ class Query {
     return _getSnapshotsInternal(options).map((QuerySnapshot snapshot) {
       if (snapshot.metadata.isFromCache && source == Source.server) {
         throw FirebaseFirestoreError(
-            'Failed to get documents from server. (However, these documents may exist in the local '
-            'cache. Run again without setting source to Source.server to retrieve the cached '
-            'documents.)',
+            'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
+            'without setting source to Source.server to retrieve the cached documents.)',
             FirebaseFirestoreErrorCode.unavailable);
       } else {
         return snapshot;
@@ -598,17 +581,13 @@ class Query {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Query &&
-          runtimeType == other.runtimeType &&
-          query == other.query &&
-          firestore == other.firestore;
+      other is Query && runtimeType == other.runtimeType && query == other.query && firestore == other.firestore;
 
   @override
   int get hashCode => query.hashCode ^ firestore.hashCode;
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)..add('query', query)..add('firestore', firestore))
-        .toString();
+    return (ToStringHelper(runtimeType)..add('query', query)..add('firestore', firestore)).toString();
   }
 }

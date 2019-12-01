@@ -18,8 +18,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/google/firebase/firestore/proto/target.pb.dart'
-    as proto;
+import 'package:firebase_firestore/src/proto/google/firebase/firestore/proto/target.pb.dart' as proto;
 
 /// Cached Queries backed by SQLite.
 class SQLiteQueryCache implements QueryCache {
@@ -40,8 +39,7 @@ class SQLiteQueryCache implements QueryCache {
   int targetCount;
 
   Future<void> start() async {
-    // Store exactly one row in the table. If the row exists at all, it's the
-    // global metadata.
+    // Store exactly one row in the table. If the row exists at all, it's the global metadata.
     final List<Map<String, dynamic>> result = await _db.query(
         // @formatter:off
         '''
@@ -204,14 +202,14 @@ class SQLiteQueryCache implements QueryCache {
     await _writeMetadata();
   }
 
-  /// Drops any targets with sequence number less than or equal to the upper bound, excepting those
-  /// present in [activeTargetIds]. Document associations for the removed targets are also removed.
-  /// Returns the number of targets removed.
+  /// Drops any targets with sequence number less than or equal to the upper bound, excepting those present in
+  /// [activeTargetIds]. Document associations for the removed targets are also removed. Returns the number of targets
+  /// removed.
   Future<int> removeQueries(int upperBound, Set<int> activeTargetIds) async {
     int count = 0;
-    // SQLite has a max sql statement size, so there is technically a possibility that including a
-    // an IN clause in this query to filter [activeTargetIds] could overflow. Rather than deal with
-    // that, we filter out live targets from the result set.
+    // SQLite has a max sql statement size, so there is technically a possibility that including a an IN clause in this
+    // query to filter [activeTargetIds] could overflow. Rather than deal with that, we filter out live targets from the
+    // result set.
 
     final List<Map<String, dynamic>> result = await _db.query(
         // @formatter:off
@@ -237,9 +235,8 @@ class SQLiteQueryCache implements QueryCache {
 
   @override
   Future<QueryData> getQueryData(Query query) async {
-    // Querying the targets table by canonical_id may yield more than one result because
-    // canonical_id values are not required to be unique per target. This query depends on the
-    // query_targets index to be efficient.
+    // Querying the targets table by canonical_id may yield more than one result because canonical_id values are not
+    // required to be unique per target. This query depends on the query_targets index to be efficient.
     final String canonicalId = query.canonicalId;
 
     final List<Map<String, dynamic>> result = await _db.query(
@@ -254,11 +251,10 @@ class SQLiteQueryCache implements QueryCache {
 
     QueryData data;
     for (Map<String, dynamic> row in result) {
-      // TODO: break out early if found.
+      // TODO(long1eu): break out early if found.
       final QueryData found = _decodeQueryData(row['target_proto']);
 
-      // After finding a potential match, check that the query is actually equal to the requested
-      // query.
+      // After finding a potential match, check that the query is actually equal to the requested query.
       if (query == found.query) {
         data = found;
       }
@@ -277,11 +273,10 @@ class SQLiteQueryCache implements QueryCache {
   Future<void> addMatchingKeys(ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     // PORTING NOTE: The reverse index (document_targets) is maintained by SQLite.
     //
-    // When updates come in we treat those as added keys, which means these inserts won't
-    // necessarily be unique between invocations. This INSERT statement uses the IGNORE conflict
-    // resolution strategy to avoid failing on any attempts to add duplicate entries. This works
-    // because there's no additional information in the row. If we want to track additional data
-    // this will probably need to become INSERT OR REPLACE instead.
+    // When updates come in we treat those as added keys, which means these inserts won't necessarily be unique between
+    // invocations. This INSERT statement uses the IGNORE conflict resolution strategy to avoid failing on any attempts
+    // to add duplicate entries. This works because there's no additional information in the row. If we want to track
+    // additional data this will probably need to become INSERT OR REPLACE instead.
     const String statement =
         // @formatter:off
         '''

@@ -267,7 +267,7 @@ void main() {
     } on FirebaseFirestoreError catch (e) {
       hadError = true;
       expect(e, isNotNull);
-      // TODO: This should be a NOT_FOUND, but right now we retry transactions
+      // TODO(long1eu): This should be a NOT_FOUND, but right now we retry transactions
       // on any error and so this turns into ABORTED instead.
       expect(e.code, FirebaseFirestoreErrorCode.aborted);
     } catch (e) {

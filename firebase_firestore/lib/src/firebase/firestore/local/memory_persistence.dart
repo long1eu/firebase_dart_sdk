@@ -5,6 +5,8 @@ import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_eager_reference_delegate.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_lru_reference_delegate.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_mutation_queue.dart';
@@ -30,18 +32,17 @@ class MemoryPersistence extends Persistence {
     return persistence;
   }
 
-  factory MemoryPersistence.createLruGcMemoryPersistence() {
+  factory MemoryPersistence.createLruGcMemoryPersistence(LruGarbageCollectorParams params, LocalSerializer serializer) {
     final MemoryPersistence persistence = MemoryPersistence._();
-    persistence.referenceDelegate = MemoryLruReferenceDelegate(persistence);
+    persistence.referenceDelegate = MemoryLruReferenceDelegate(persistence, params, serializer);
     return persistence;
   }
 
   static const String tag = 'MemoryPersistence';
 
-  // The persistence objects backing MemoryPersistence are retained here to make it easier to write
-  // tests affecting both the in-memory and SQLite-backed persistence layers. Tests can create a new
-  // LocalStore wrapping this Persistence instance and this will make the in-memory persistence
-  // layer behave as if it were actually persisting values.
+  // The persistence objects backing MemoryPersistence are retained here to make it easier to write tests affecting both
+  // the in-memory and SQLite-backed persistence layers. Tests can create a new LocalStore wrapping this Persistence
+  // instance and this will make the in-memory persistence layer behave as if it were actually persisting values.
   Map<User, MemoryMutationQueue> mutationQueues;
 
   @override
@@ -64,8 +65,8 @@ class MemoryPersistence extends Persistence {
 
   @override
   Future<void> shutdown() async {
-    // TODO: This assertion seems problematic, since we may attempt shutdown in the finally block
-    //  after failing to initialize.
+    // TODO(long1eu): This assertion seems problematic, since we may attempt shutdown in the finally block after failing
+    //  to initialize.
     hardAssert(started, 'MemoryPersistence shutdown without start');
     started = false;
   }

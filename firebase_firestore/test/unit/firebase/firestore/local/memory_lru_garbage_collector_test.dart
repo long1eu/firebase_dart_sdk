@@ -38,4 +38,8 @@ void main() {
   test('testRemoveQueriesUpThroughSequenceNumber', () => testCase.testRemoveQueriesUpThroughSequenceNumber());
   test('testRemoveOrphanedDocuments', () => testCase.testRemoveOrphanedDocuments());
   test('testRemoveTargetsThenGC', () => testCase.testRemoveTargetsThenGC());
+  test('testGetsSize', () => testCase.testGetsSize());
+  test('testDisabled', () => testCase.testDisabled());
+  test('testCacheTooSmall', () => testCase.testCacheTooSmall());
+  test('testGCRan', () => testCase.testGCRan());
 }

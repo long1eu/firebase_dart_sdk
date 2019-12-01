@@ -29,7 +29,7 @@ import 'package:test/test.dart';
 
 import '../../../../../util/test_util.dart';
 
-typedef PersistenceBuilder = Future<Persistence> Function();
+typedef PersistenceBuilder = Future<Persistence> Function(LruGarbageCollectorParams params);
 
 class LruGarbageCollectorTestCase {
   LruGarbageCollectorTestCase(this._getPersistence);
@@ -41,6 +41,7 @@ class LruGarbageCollectorTestCase {
   MutationQueue _mutationQueue;
   RemoteDocumentCache _documentCache;
   LruGarbageCollector _garbageCollector;
+  LruGarbageCollectorParams _lruParams;
   int _previousTargetId;
   int _previousDocNum;
   int _initialSequenceNumber;
@@ -71,14 +72,14 @@ class LruGarbageCollectorTestCase {
         await _addNextQuery();
       }
 
-      final int tenth = _garbageCollector.calculateQueryCount(10);
+      final int tenth = await _garbageCollector.calculateQueryCount(10);
       expect(tenth, expectedTenthPercentile);
     }
   }
 
   @testMethod
   Future<void> testSequenceNumberNoQueries() async {
-    expect(await _garbageCollector.nthSequenceNumber(0), ListenSequence.invalid);
+    expect(await _garbageCollector.getNthSequenceNumber(0), ListenSequence.invalid);
   }
 
   @testMethod
@@ -89,7 +90,7 @@ class LruGarbageCollectorTestCase {
       await _addNextQuery();
     }
 
-    expect(await _garbageCollector.nthSequenceNumber(10), _initialSequenceNumber + 10);
+    expect(await _garbageCollector.getNthSequenceNumber(10), _initialSequenceNumber + 10);
   }
 
   @testMethod
@@ -103,7 +104,7 @@ class LruGarbageCollectorTestCase {
     for (int i = 9; i < 50; i++) {
       await _addNextQuery();
     }
-    expect(await _garbageCollector.nthSequenceNumber(10), 2 + _initialSequenceNumber);
+    expect(await _garbageCollector.getNthSequenceNumber(10), 2 + _initialSequenceNumber);
   }
 
   @testMethod
@@ -122,7 +123,7 @@ class LruGarbageCollectorTestCase {
       await _addNextQuery();
     }
 
-    expect(await _garbageCollector.nthSequenceNumber(10), 1 + _initialSequenceNumber);
+    expect(await _garbageCollector.getNthSequenceNumber(10), 1 + _initialSequenceNumber);
   }
 
   @testMethod
@@ -134,7 +135,7 @@ class LruGarbageCollectorTestCase {
       await _addNextQuery();
     }
 
-    expect(await _garbageCollector.nthSequenceNumber(10), 10 + _initialSequenceNumber);
+    expect(await _garbageCollector.getNthSequenceNumber(10), 10 + _initialSequenceNumber);
   }
 
   @testMethod
@@ -158,7 +159,7 @@ class LruGarbageCollectorTestCase {
     });
 
     // This should catch the remaining 8 documents, plus the first two queries we added.
-    expect(await _garbageCollector.nthSequenceNumber(10), 3 + _initialSequenceNumber);
+    expect(await _garbageCollector.getNthSequenceNumber(10), 3 + _initialSequenceNumber);
   }
 
   @testMethod
@@ -424,8 +425,97 @@ class LruGarbageCollectorTestCase {
     });
   }
 
-  Future<void> _newTestResources() async {
-    _persistence = await _getPersistence();
+  Future<void> testGetsSize() async {
+    final LruGarbageCollector garbageCollector = _garbageCollector;
+    final int initialSize = garbageCollector.byteSize;
+
+    await _persistence.runTransaction('fill cache', () async {
+      // Simulate a bunch of ack'd mutations
+      for (int i = 0; i < 50; i++) {
+        final Document doc = await _cacheADocumentInTransaction();
+        await _markDocumentEligibleForGcInTransaction(doc.key);
+      }
+    });
+
+    final int finalSize = garbageCollector.byteSize;
+    expect(finalSize, greaterThan(initialSize));
+  }
+
+  Future<void> testDisabled() async {
+    final LruGarbageCollectorParams params = LruGarbageCollectorParams.disabled();
+
+    // Switch out the test resources for ones with a disabled GC.
+    await _persistence.shutdown();
+    await _newTestResources(params);
+
+    await _persistence.runTransaction('Fill cache', () async {
+      // Simulate a bunch of ack'd mutations
+      for (int i = 0; i < 500; i++) {
+        final Document doc = await _cacheADocumentInTransaction();
+        await _markDocumentEligibleForGcInTransaction(doc.key);
+      }
+    });
+
+    final LruGarbageCollectorResults results =
+        await _persistence.runTransactionAndReturn('GC', () => _garbageCollector.collect(<int>{}));
+
+    expect(results.hasRun, isFalse);
+  }
+
+  Future<void> testCacheTooSmall() async {
+    // Default LRU Params are ok for this test.
+
+    await _persistence.runTransaction('Fill cache', () async {
+      // Simulate a bunch of ack'd mutations
+      for (int i = 0; i < 50; i++) {
+        final Document doc = await _cacheADocumentInTransaction();
+        await _markDocumentEligibleForGcInTransaction(doc.key);
+      }
+    });
+
+    // Make sure we're under the target size
+    final int cacheSize = _garbageCollector.byteSize;
+    expect(cacheSize, lessThan(_lruParams.minBytesThreshold));
+
+    final LruGarbageCollectorResults results =
+        await _persistence.runTransactionAndReturn('GC', () => _garbageCollector.collect(<int>{}));
+
+    expect(results.hasRun, isFalse);
+  }
+
+  Future<void> testGCRan() async {
+    // Set a low byte threshold so we can guarantee that GC will run.
+    final LruGarbageCollectorParams params = LruGarbageCollectorParams.withCacheSizeBytes(100);
+
+    // Switch to persistence using our new params.
+    await _persistence.shutdown();
+    await _newTestResources(params);
+
+    // Add 100 targets and 10 documents to each
+    for (int i = 0; i < 100; i++) {
+      // Use separate transactions so that each target and associated documents get their own sequence number.
+      await _persistence.runTransaction('Add a target and some documents', () async {
+        final QueryData queryData = await _addNextQueryInTransaction();
+        for (int j = 0; j < 10; j++) {
+          final Document doc = await _cacheADocumentInTransaction();
+          await _addDocumentToTarget(doc.key, queryData.targetId);
+        }
+      });
+    }
+
+    // Mark nothing as live, so everything is eligible.
+    final LruGarbageCollectorResults results =
+        await _persistence.runTransactionAndReturn('GC', () => _garbageCollector.collect(<int>{}));
+
+    // By default, we collect 10% of the sequence numbers. Since we added 100 targets, that should be 10 targets with
+    // 10 documents each, for a total of 100 documents.
+    expect(results.hasRun, isTrue);
+    expect(results.targetsRemoved, 10);
+    expect(results.documentsRemoved, 100);
+  }
+
+  Future<void> _newTestResources([LruGarbageCollectorParams params = const LruGarbageCollectorParams()]) async {
+    _persistence = await _getPersistence(params);
 
     _persistence.referenceDelegate.inMemoryPins = ReferenceSet();
     _queryCache = _persistence.queryCache;
@@ -438,6 +528,7 @@ class LruGarbageCollectorTestCase {
     // ignore: avoid_as
     final LruDelegate delegate = _persistence.referenceDelegate as LruDelegate;
     _garbageCollector = delegate.garbageCollector;
+    _lruParams = params;
   }
 
   Future<QueryData> _nextQueryData() async {

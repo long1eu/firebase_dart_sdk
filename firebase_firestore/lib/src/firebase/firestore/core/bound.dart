@@ -14,12 +14,11 @@ import 'order_by.dart';
 
 /// Represents a bound of a query.
 ///
-/// The bound is specified with the given components representing a position and whether it's just
-/// before or just after the position (relative to whatever the query order is).
-/// The position represents a logical index position for a query. It's a prefix of values for the
-/// (potentially implicit) order by clauses of a query.
-/// Bound provides a function to determine whether a document comes before or after a bound. This
-/// is influenced by whether the position is just before or just after the provided values.
+/// The bound is specified with the given components representing a position and whether it's just before or just after
+/// the position (relative to whatever the query order is). The position represents a logical index position for a
+/// query. It's a prefix of values for the (potentially implicit) order by clauses of a query. Bound provides a function
+/// to determine whether a document comes before or after a bound. This is influenced by whether the position is just
+/// before or just after the provided values.
 class Bound {
   const Bound({this.position, this.before});
 
@@ -30,7 +29,7 @@ class Bound {
   final List<FieldValue> position;
 
   String canonicalString() {
-    // TODO: Make this collision robust.
+    // TODO(long1eu): Make this collision robust.
     final StringBuffer builder = StringBuffer();
     if (before) {
       builder.write('b:');
@@ -43,25 +42,20 @@ class Bound {
 
   /// Returns true if a document sorts before a bound using the provided sort order.
   bool sortsBeforeDocument(List<OrderBy> orderBy, Document document) {
-    hardAssert(
-      position.length <= orderBy.length,
-      'Bound has more components than query\'s orderBy',
-    );
+    hardAssert(position.length <= orderBy.length, 'Bound has more components than query\'s orderBy');
     int comparison = 0;
     for (int i = 0; i < position.length; i++) {
       final OrderBy orderByComponent = orderBy[i];
       final FieldValue component = position[i];
       if (orderByComponent.field == FieldPath.keyPath) {
         final Object refValue = component.value;
-        hardAssert(refValue is DocumentKey,
-            'Bound has a non-key value where the key path is being used $component');
+        hardAssert(refValue is DocumentKey, 'Bound has a non-key value where the key path is being used $component');
 
         final DocumentKey documentKey = refValue;
         comparison = documentKey.compareTo(document.key);
       } else {
         final FieldValue docValue = document.getField(orderByComponent.field);
-        hardAssert(
-            docValue != null, 'Field should exist since document matched the orderBy already.');
+        hardAssert(docValue != null, 'Field should exist since document matched the orderBy already.');
         comparison = component.compareTo(docValue);
       }
 

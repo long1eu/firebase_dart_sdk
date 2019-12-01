@@ -39,22 +39,19 @@ class SQLiteMutationQueue implements MutationQueue {
 
   /// Next value to use when assigning sequential IDs to each mutation batch.
   ///
-  /// NOTE: There can only be one [SQLiteMutationQueue] for a given db at a time, hence it is safe
-  /// to track [_nextBatchId] as an instance-level property. Should we ever relax this constraint
-  /// we'll need to revisit this.
+  /// NOTE: There can only be one [SQLiteMutationQueue] for a given db at a time, hence it is safe to track
+  /// [_nextBatchId] as an instance-level property. Should we ever relax this constraint we'll need to revisit this.
   int _nextBatchId;
 
-  /// An identifier for the highest numbered batch that has been acknowledged by the server. All
-  /// [MutationBatch]es in this queue with batch_ids less than or equal to this value are considered
-  /// to have been acknowledged by the server.
+  /// An identifier for the highest numbered batch that has been acknowledged by the server. All [MutationBatch]es in
+  /// this queue with batch_ids less than or equal to this value are considered to have been acknowledged by the server.
   int _lastAcknowledgedBatchId;
 
   /// A stream token that was previously sent by the server.
   ///
   /// See [StreamingWriteRequest] in datastore.proto for more details about usage.
   ///
-  /// After sending this token, earlier tokens may not be used anymore so only a single stream token
-  /// is retained.
+  /// After sending this token, earlier tokens may not be used anymore so only a single stream token is retained.
   Uint8List _lastStreamToken;
 
   // MutationQueue implementation
@@ -63,9 +60,9 @@ class SQLiteMutationQueue implements MutationQueue {
   Future<void> start() async {
     await _loadNextBatchIdAcrossAllUsers();
 
-    // On restart, _nextBatchId may end up lower than lastAcknowledgedBatchId since it's computed
-    // from the queue contents, and there may be no mutations in the queue. In this case, we need to
-    // reset [lastAcknowledgedBatchId] (which is safe since the queue must be empty).
+    // On restart, _nextBatchId may end up lower than lastAcknowledgedBatchId since it's computed from the queue
+    // contents, and there may be no mutations in the queue. In this case, we need to reset [lastAcknowledgedBatchId]
+    // (which is safe since the queue must be empty).
     _lastAcknowledgedBatchId = MutationBatch.unknown;
 
     final List<Map<String, dynamic>> result = await db.query(
@@ -88,8 +85,8 @@ class SQLiteMutationQueue implements MutationQueue {
     }
 
     if (result.isEmpty) {
-      // Ensure we write a default entry in mutation_queues since [loadNextBatchIdAcrossAllUsers]
-      // depends upon every queue having an entry.
+      // Ensure we write a default entry in mutation_queues since [loadNextBatchIdAcrossAllUsers] depends upon every
+      // queue having an entry.
       await _writeMutationQueueMetadata();
     } else if (_lastAcknowledgedBatchId >= _nextBatchId) {
       hardAssert(await isEmpty(), 'Reset _nextBatchId is only possible when the queue is empty');
@@ -98,11 +95,11 @@ class SQLiteMutationQueue implements MutationQueue {
     }
   }
 
-  /// Returns one larger than the largest batch ID that has been stored. If there are no mutations
-  /// returns 0. Note that batch IDs are global.
+  /// Returns one larger than the largest batch ID that has been stored. If there are no mutations returns 0. Note that
+  /// batch IDs are global.
   Future<void> _loadNextBatchIdAcrossAllUsers() async {
-    // The dependent query below turned out to be ~500x faster than any other technique, given just
-    // the primary key index on (uid, batch_id).
+    // The dependent query below turned out to be ~500x faster than any other technique, given just the primary key
+    // index on (uid, batch_id).
     //
     // naive: SELECT MAX(batch_id) FROM mutations
     // group: SELECT uid, MAX(batch_id) FROM mutations GROUP BY uid
@@ -214,8 +211,8 @@ class SQLiteMutationQueue implements MutationQueue {
         // @formatter:on
         <dynamic>[uid, batchId, proto.writeToBuffer()]);
 
-    // PORTING NOTE: Unlike LevelDB, these entries must be unique. Since [user] and [batchId] are
-    // fixed within this function body, it's enough to track unique keys added in this batch.
+    // PORTING NOTE: Unlike LevelDB, these entries must be unique. Since [user] and [batchId] are fixed within this
+    // function body, it's enough to track unique keys added in this batch.
     final Set<DocumentKey> inserted = <DocumentKey>{};
 
     const String statement =
@@ -261,8 +258,8 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch> getNextMutationBatchAfterBatchId(int batchId) async {
-    // All batches with [batchId] <= [lastAcknowledgedBatchId] have been acknowledged so the first
-    // unacknowledged batch after [batchId] will have a [batchID] larger than both of these values.
+    // All batches with [batchId] <= [lastAcknowledgedBatchId] have been acknowledged so the first unacknowledged batch
+    // after [batchId] will have a [batchID] larger than both of these values.
     final int _nextBatchId = max(batchId, _lastAcknowledgedBatchId) + 1;
 
     final List<Map<String, dynamic>> result = await db.query(
@@ -362,9 +359,8 @@ class SQLiteMutationQueue implements MutationQueue {
       }
     }
 
-    // If more than one query was issued, batches might be in an unsorted order (batches are ordered
-    // within one query's results, but not across queries). It's likely to be rare, so don't impose
-    // performance penalty on the normal case.
+    // If more than one query was issued, batches might be in an unsorted order (batches are ordered within one query's
+    // results, but not across queries). It's likely to be rare, so don't impose performance penalty on the normal case.
     if (longQuery.subqueriesPerformed > 1) {
       result.sort((MutationBatch lhs, MutationBatch rhs) => lhs.batchId.compareTo(rhs.batchId));
     }
@@ -377,20 +373,18 @@ class SQLiteMutationQueue implements MutationQueue {
     final ResourcePath prefix = query.path;
     final int immediateChildrenPathLength = prefix.length + 1;
 
-    // Scan the document_mutations table looking for documents whose path has a prefix that matches
-    // the query path.
+    // Scan the document_mutations table looking for documents whose path has a prefix that matches the query path.
     //
-    // The most obvious way to do this would be with a LIKE query with a trailing wildcard
-    // (e.g. path LIKE 'foo/%'). Unfortunately SQLite does not convert a trailing wildcard like that
-    // into the equivalent range scan so a LIKE query ends up being a table scan. The query below is
-    // equivalent but hits the index on both uid and path, so it's much faster.
+    // The most obvious way to do this would be with a LIKE query with a trailing wildcard (e.g. path LIKE 'foo/%').
+    // Unfortunately SQLite does not convert a trailing wildcard like that into the equivalent range scan so a LIKE
+    // query ends up being a table scan. The query below is equivalent but hits the index on both uid and path, so it's
+    // much faster.
 
-    // TODO: Actually implement a single-collection query
+    // TODO(long1eu): Actually implement a single-collection query
     //
-    // This is actually executing an ancestor query, traversing the whole subtree below the
-    // collection which can be horrifically inefficient for some structures. The right way to solve
-    // this is to implement the full value index, but that's not in the cards in the near future so
-    // this is the best we can do for the moment.
+    // This is actually executing an ancestor query, traversing the whole subtree below the collection which can be
+    // horrifically inefficient for some structures. The right way to solve this is to implement the full value index,
+    // but that's not in the cards in the near future so this is the best we can do for the moment.
     final String prefixPath = EncodedPath.encode(prefix);
     final String prefixSuccessorPath = EncodedPath.prefixSuccessor(prefixPath);
 
@@ -412,18 +406,17 @@ class SQLiteMutationQueue implements MutationQueue {
         <dynamic>[uid, prefixPath, prefixSuccessorPath]);
 
     for (Map<String, dynamic> row in rows) {
-      // Ensure unique batches only. This works because the batches come out in order so we only
-      // need to ensure that the batchId of this row is different from the preceding one.
+      // Ensure unique batches only. This works because the batches come out in order so we only need to ensure that the
+      // batchId of this row is different from the preceding one.
       final int batchId = row['batch_id'];
       final int size = result.length;
       if (size > 0 && batchId == result[size - 1].batchId) {
         continue;
       }
 
-      // The query is actually returning any path that starts with the query path prefix which may
-      // include documents in subcollections. For example, a query on 'rooms' will return
-      // rooms/abc/messages/xyx but we shouldn't match it. Fix this by discarding rows with document
-      // keys more than one segment longer than the query path.
+      // The query is actually returning any path that starts with the query path prefix which may include documents in
+      // subcollections. For example, a query on 'rooms' will return rooms/abc/messages/xyx but we shouldn't match it.
+      // Fix this by discarding rows with document keys more than one segment longer than the query path.
       final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
       if (path.length != immediateChildrenPathLength) {
         continue;

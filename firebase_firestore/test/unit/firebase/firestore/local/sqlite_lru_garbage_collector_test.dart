@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -16,8 +17,8 @@ void main() {
   setUp(() async {
     print('setUp');
 
-    testCase = LruGarbageCollectorTestCase(
-        () => openSQLitePersistence('firebase/firestore/local/sqlite_lru_garbage_collector_test-${Uuid().v4()}.db'));
+    testCase = LruGarbageCollectorTestCase((LruGarbageCollectorParams param) =>
+        openSQLitePersistence('firebase/firestore/local/sqlite_lru_garbage_collector_test-${Uuid().v4()}.db', param));
     await testCase.setUp();
 
     print('setUpDone');
@@ -42,4 +43,8 @@ void main() {
   test('testRemoveQueriesUpThroughSequenceNumber', () => testCase.testRemoveQueriesUpThroughSequenceNumber());
   test('testRemoveOrphanedDocuments', () => testCase.testRemoveOrphanedDocuments());
   test('testRemoveTargetsThenGC', () => testCase.testRemoveTargetsThenGC());
+  test('testGetsSize', () => testCase.testGetsSize());
+  test('testDisabled', () => testCase.testDisabled());
+  test('testCacheTooSmall', () => testCase.testCacheTooSmall());
+  test('testGCRan', () => testCase.testGCRan());
 }

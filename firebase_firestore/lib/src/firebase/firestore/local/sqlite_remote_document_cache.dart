@@ -90,8 +90,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     final Map<DocumentKey, MaybeDocument> results = <DocumentKey, MaybeDocument>{};
     for (DocumentKey key in documentKeys) {
-      // Make sure each key has a corresponding entry, which is null in case the document is not
-      // found.
+      // Make sure each key has a corresponding entry, which is null in case the document is not found.
       results[key] = null;
     }
 
@@ -133,11 +132,10 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         <String>[prefixPath, prefixSuccessorPath]);
 
     for (Map<String, dynamic> row in result) {
-      // TODO: Actually implement a single-collection query
-      //  The query is actually returning any path that starts with the query path prefix which may
-      //  include documents in subcollections. For example, a query on 'rooms' will return
-      //  rooms/abc/messages/xyx but we shouldn't match it. Fix this by discarding rows with
-      //  document keys more than one segment longer than the query path.
+      // TODO(long1eu): Actually implement a single-collection query
+      //  The query is actually returning any path that starts with the query path prefix which may include documents in
+      //  subcollections. For example, a query on 'rooms' will return rooms/abc/messages/xyx but we shouldn't match it.
+      //  Fix this by discarding rows with document keys more than one segment longer than the query path.
 
       final String _path = row['path'];
       final ResourcePath path = EncodedPath.decodeResourcePath(_path);

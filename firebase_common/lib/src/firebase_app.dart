@@ -299,7 +299,7 @@ class FirebaseApp {
 
   @visibleForTesting
   static void clearInstancesForTest() {
-    // TODO: also delete, once functionality is implemented.
+    // TODO(long1eu): also delete, once functionality is implemented.
     instances.clear();
   }
 

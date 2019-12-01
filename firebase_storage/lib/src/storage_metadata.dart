@@ -15,7 +15,7 @@ import 'package:meta/meta.dart';
 /// validation rules.
 @publicApi
 class StorageMetadata {
-  // TODO:{23/10/2018 15:11}-long1eu: find a way to create metadata for update
+  // TODO(long1eu):{23/10/2018 15:11}-long1eu: find a way to create metadata for update
   /// Creates a [StorageMetadata] object to hold metadata for a
   /// [StorageReference]
   StorageMetadata._({

@@ -87,4 +87,7 @@ class DatabaseMock extends Database {
       path.renameSync('${path.path}_');
     }
   }
+
+  @override
+  File get file => path;
 }

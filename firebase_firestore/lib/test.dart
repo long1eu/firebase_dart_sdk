@@ -43,18 +43,10 @@ Future<void> main() async {
   final String persistenceKey = app.name;
 
   final FirebaseFirestoreSettings settings = FirebaseFirestoreSettings();
-  final FirestoreClient client = await FirestoreClient.initialize(
-    DatabaseInfo(
-      databaseId,
-      persistenceKey,
-      settings.host,
-      sslEnabled: settings.sslEnabled,
-    ),
-    provider,
-    queue,
-    _DatabaseMock.create,
-    usePersistence: settings.persistenceEnabled,
-  );
+  final DatabaseInfo databaseInfo =
+      DatabaseInfo(databaseId, persistenceKey, settings.host, sslEnabled: settings.sslEnabled);
+  final FirestoreClient client =
+      await FirestoreClient.initialize(databaseInfo, settings, provider, queue, _DatabaseMock.create);
 
   final FirebaseFirestore firestore = FirebaseFirestore(databaseId, queue, app, client);
 
@@ -165,4 +157,7 @@ class _DatabaseMock extends Database {
       path.renameSync('${path.path}_');
     }
   }
+
+  @override
+  File get file => path;
 }

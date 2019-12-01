@@ -461,7 +461,7 @@ void main() {
 
     final Query q7a = Query(ResourcePath.fromString('foo')).limit(10);
 
-    // TODO: Add test cases with{Lower,Upper}Bound once cursors are implemented.
+    // TODO(long1eu): Add test cases with{Lower,Upper}Bound once cursors are implemented.
     testEquality(<List<int>>[
       <int>[q1a.hashCode],
       <int>[q2a.hashCode, q2b.hashCode],

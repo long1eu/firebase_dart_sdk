@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_collections.dart';
@@ -35,19 +36,18 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<Map<DocumentKey, MaybeDocument>> getAll(Iterable<DocumentKey> documentKeys) async {
-    final List<MapEntry<DocumentKey, MaybeDocument>> entries = await Future.wait(documentKeys
-        .map((DocumentKey key) async => MapEntry<DocumentKey, MaybeDocument>(key, await get(key))));
+    final List<MapEntry<DocumentKey, MaybeDocument>> entries = await Future.wait(
+        documentKeys.map((DocumentKey key) async => MapEntry<DocumentKey, MaybeDocument>(key, await get(key))));
 
     return Map<DocumentKey, MaybeDocument>.fromEntries(entries);
   }
 
   @override
-  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(
-      Query query) async {
+  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(Query query) async {
     ImmutableSortedMap<DocumentKey, Document> result = DocumentCollections.emptyDocumentMap();
 
-    // Documents are ordered by key, so we can use a prefix scan to narrow down the documents we
-    // need to match the query against.
+    // Documents are ordered by key, so we can use a prefix scan to narrow down the documents we need to match the query
+    // against.
     final ResourcePath queryPath = query.path;
     final DocumentKey prefix = DocumentKey.fromPath(queryPath.appendSegment(''));
     final Iterator<MapEntry<DocumentKey, MaybeDocument>> iterator = documents.iteratorFrom(prefix);
@@ -70,5 +70,26 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
     }
 
     return result;
+  }
+
+  /// Returns an estimate of the number of bytes used to store the given document key in memory. This is only an
+  /// estimate and includes the size of the segments of the path, but not any object overhead or path separators.
+  static int _getKeySize(DocumentKey key) {
+    final ResourcePath path = key.path;
+    int count = 0;
+    for (int i = 0; i < path.length; i++) {
+      // Strings in dart are utf-16, each character is two bytes in memory
+      count += path.segments[i].length * 2;
+    }
+    return count;
+  }
+
+  int getByteSize(LocalSerializer serializer) {
+    int count = 0;
+    for (MapEntry<DocumentKey, MaybeDocument> entry in documents) {
+      count += _getKeySize(entry.key);
+      count += serializer.encodeMaybeDocument(entry.value).writeToBuffer().length;
+    }
+    return count;
   }
 }
