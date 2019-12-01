@@ -100,18 +100,16 @@ class RemoteSerializer {
 
   // Names and Keys
 
-  /// Encodes the given document [key] as a fully qualified name. This includes the [databaseId]
-  /// from the constructor and the key path.
+  /// Encodes the given document [key] as a fully qualified name. This includes the [databaseId] from the constructor
+  /// and the key path.
   String encodeKey(DocumentKey key) {
     return _encodeResourceName(databaseId, key.path);
   }
 
   DocumentKey decodeKey(String name) {
     final ResourcePath resource = _decodeResourceName(name);
-    hardAssert(
-        resource[1] == databaseId.projectId, 'Tried to deserialize key from different project.');
-    hardAssert(
-        resource[3] == databaseId.databaseId, 'Tried to deserialize key from different database.');
+    hardAssert(resource[1] == databaseId.projectId, 'Tried to deserialize key from different project.');
+    hardAssert(resource[3] == databaseId.databaseId, 'Tried to deserialize key from different database.');
     return DocumentKey.fromPath(_extractLocalPathFromResourceName(resource));
   }
 
@@ -136,15 +134,11 @@ class RemoteSerializer {
   /// Encodes a [databaseId] and resource path into the following form:
   /// '/projects/$projectId/database/$databaseId/documents/$path'
   String _encodeResourceName(DatabaseId databaseId, ResourcePath path) {
-    return _encodedDatabaseId(databaseId)
-        .appendSegment('documents')
-        .appendField(path)
-        .canonicalString;
+    return _encodedDatabaseId(databaseId).appendSegment('documents').appendField(path).canonicalString;
   }
 
-  /// Decodes a fully qualified resource name into a resource path and validates that there is a
-  /// project and database encoded in the path. There are no guarantees that a local path is also
-  /// encoded in this resource name.
+  /// Decodes a fully qualified resource name into a resource path and validates that there is a project and database
+  /// encoded in the path. There are no guarantees that a local path is also encoded in this resource name.
   ResourcePath _decodeResourceName(String encoded) {
     final ResourcePath resource = ResourcePath.fromString(encoded);
     hardAssert(_isValidResourceName(resource), 'Tried to deserialize invalid key $resource');
@@ -153,15 +147,14 @@ class RemoteSerializer {
 
   /// Creates the prefix for a fully qualified resource path, without a local path on the end.
   static ResourcePath _encodedDatabaseId(DatabaseId databaseId) {
-    return ResourcePath.fromSegments(
-        <String>['projects', databaseId.projectId, 'databases', databaseId.databaseId]);
+    return ResourcePath.fromSegments(<String>['projects', databaseId.projectId, 'databases', databaseId.databaseId]);
   }
 
-  /// Decodes a fully qualified resource name into a resource path and validates that there is a
-  /// project and database encoded in the path along with a local path.
+  /// Decodes a fully qualified resource name into a resource path and validates that there is a project and database
+  /// encoded in the path along with a local path.
   static ResourcePath _extractLocalPathFromResourceName(ResourcePath resourceName) {
-    hardAssert(resourceName.length > 4 && resourceName[4] == 'documents',
-        'Tried to deserialize invalid key $resourceName');
+    hardAssert(
+        resourceName.length > 4 && resourceName[4] == 'documents', 'Tried to deserialize invalid key $resourceName');
     return resourceName.popFirst(5);
   }
 
@@ -226,8 +219,7 @@ class RemoteSerializer {
       case proto_beta.Value_ValueType.referenceValue:
         final ResourcePath resourceName = _decodeResourceName(proto.referenceValue);
         final DatabaseId id = DatabaseId.forDatabase(resourceName[1], resourceName[3]);
-        final DocumentKey key =
-            DocumentKey.fromPath(_extractLocalPathFromResourceName(resourceName));
+        final DocumentKey key = DocumentKey.fromPath(_extractLocalPathFromResourceName(resourceName));
         return ReferenceValue.valueOf(id, key);
       case proto_beta.Value_ValueType.mapValue:
         return _decodeMapValue(proto.mapValue);
@@ -309,8 +301,7 @@ class RemoteSerializer {
   // Documents
 
   proto.Document encodeDocument(DocumentKey key, ObjectValue value) {
-    final proto.Document builder = proto.Document.create();
-    builder.name = encodeKey(key);
+    final proto.Document builder = proto.Document.create()..name = encodeKey(key);
 
     for (MapEntry<String, FieldValue> entry in value.internalValue) {
       builder.fields[entry.key] = encodeValue(entry.value);
@@ -329,8 +320,7 @@ class RemoteSerializer {
   }
 
   Document _decodeFoundDocument(proto.BatchGetDocumentsResponse response) {
-    hardAssert(
-        response.hasFound(), 'Tried to deserialize a found document from a missing document.');
+    hardAssert(response.hasFound(), 'Tried to deserialize a found document from a missing document.');
     final DocumentKey key = decodeKey(response.found.name);
     final ObjectValue value = decodeDocumentFields(response.found.fields);
     final SnapshotVersion version = decodeVersion(response.found.updateTime);
@@ -339,12 +329,10 @@ class RemoteSerializer {
   }
 
   NoDocument _decodeMissingDocument(proto.BatchGetDocumentsResponse response) {
-    hardAssert(
-        response.hasMissing(), 'Tried to deserialize a missing document from a found document.');
+    hardAssert(response.hasMissing(), 'Tried to deserialize a missing document from a found document.');
     final DocumentKey key = decodeKey(response.missing);
     final SnapshotVersion version = decodeVersion(response.readTime);
-    hardAssert(
-        version != SnapshotVersion.none, 'Got a no document response with no snapshot version');
+    hardAssert(version != SnapshotVersion.none, 'Got a no document response with no snapshot version');
     return NoDocument(key, version, hasCommittedMutations: false);
   }
 
@@ -356,11 +344,12 @@ class RemoteSerializer {
     if (mutation is SetMutation) {
       builder.update = encodeDocument(mutation.key, mutation.value);
     } else if (mutation is PatchMutation) {
-      builder.update = encodeDocument(mutation.key, mutation.value);
-      builder.updateMask = _encodeDocumentMask(mutation.mask);
+      builder
+        ..update = encodeDocument(mutation.key, mutation.value)
+        ..updateMask = _encodeDocumentMask(mutation.mask);
     } else if (mutation is TransformMutation) {
-      final proto.DocumentTransform transformBuilder = proto.DocumentTransform.create();
-      transformBuilder.document = encodeKey(mutation.key);
+      final proto.DocumentTransform transformBuilder = proto.DocumentTransform.create()
+        ..document = encodeKey(mutation.key);
 
       for (FieldTransform fieldTransform in mutation.fieldTransforms) {
         transformBuilder.fieldTransforms.add(_encodeFieldTransform(fieldTransform));
@@ -380,32 +369,25 @@ class RemoteSerializer {
   }
 
   Mutation decodeMutation(proto.Write mutation) {
-    final Precondition precondition = mutation.hasCurrentDocument()
-        ? _decodePrecondition(mutation.currentDocument)
-        : Precondition.none;
+    final Precondition precondition =
+        mutation.hasCurrentDocument() ? _decodePrecondition(mutation.currentDocument) : Precondition.none;
 
     if (mutation.hasUpdate()) {
       if (mutation.hasUpdateMask()) {
-        return PatchMutation(
-            decodeKey(mutation.update.name),
-            decodeDocumentFields(mutation.update.fields),
-            _decodeDocumentMask(mutation.updateMask),
-            precondition);
+        return PatchMutation(decodeKey(mutation.update.name), decodeDocumentFields(mutation.update.fields),
+            _decodeDocumentMask(mutation.updateMask), precondition);
       } else {
-        return SetMutation(decodeKey(mutation.update.name),
-            decodeDocumentFields(mutation.update.fields), precondition);
+        return SetMutation(decodeKey(mutation.update.name), decodeDocumentFields(mutation.update.fields), precondition);
       }
     } else if (mutation.hasDelete()) {
       return DeleteMutation(decodeKey(mutation.delete), precondition);
     } else if (mutation.hasTransform()) {
       final List<FieldTransform> fieldTransforms = <FieldTransform>[];
-      for (proto.DocumentTransform_FieldTransform fieldTransform
-          in mutation.transform.fieldTransforms) {
+      for (proto.DocumentTransform_FieldTransform fieldTransform in mutation.transform.fieldTransforms) {
         fieldTransforms.add(_decodeFieldTransform(fieldTransform));
       }
       final bool exists = precondition.exists;
-      hardAssert(
-          exists != null && exists, 'Transforms only support precondition \'exists == true\'');
+      hardAssert(exists != null && exists, 'Transforms only support precondition \'exists == true\'');
       return TransformMutation(decodeKey(mutation.transform.document), fieldTransforms);
     } else {
       throw fail('Unknown mutation operation: $mutation');
@@ -447,11 +429,7 @@ class RemoteSerializer {
   }
 
   FieldMask _decodeDocumentMask(proto.DocumentMask mask) {
-    final int count = mask.fieldPaths.length;
-    final List<FieldPath> paths = List<FieldPath>(count);
-    for (int i = 0; i < count; i++) {
-      paths[i] = FieldPath.fromServerFormat(mask.fieldPaths[i]);
-    }
+    final Set<FieldPath> paths = mask.fieldPaths.map((String path) => FieldPath.fromServerFormat(path)).toSet();
     return FieldMask(paths);
   }
 
@@ -487,23 +465,16 @@ class RemoteSerializer {
 
   FieldTransform _decodeFieldTransform(proto.DocumentTransform_FieldTransform fieldTransform) {
     if (fieldTransform.hasSetToServerValue()) {
-      hardAssert(
-          fieldTransform.setToServerValue ==
-              proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME,
-          'Unknown transform setToServerValue:'
-          ' ${fieldTransform.setToServerValue}');
-      return FieldTransform(FieldPath.fromServerFormat(fieldTransform.fieldPath),
-          ServerTimestampOperation.sharedInstance);
+      hardAssert(fieldTransform.setToServerValue == proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME,
+          'Unknown transform setToServerValue: ${fieldTransform.setToServerValue}');
+      return FieldTransform(
+          FieldPath.fromServerFormat(fieldTransform.fieldPath), ServerTimestampOperation.sharedInstance);
     } else if (fieldTransform.hasAppendMissingElements()) {
-      return FieldTransform(
-          FieldPath.fromServerFormat(fieldTransform.fieldPath),
-          ArrayTransformOperationUnion(
-              _decodeArrayTransformElements(fieldTransform.appendMissingElements)));
+      return FieldTransform(FieldPath.fromServerFormat(fieldTransform.fieldPath),
+          ArrayTransformOperationUnion(_decodeArrayTransformElements(fieldTransform.appendMissingElements)));
     } else if (fieldTransform.hasRemoveAllFromArray()) {
-      return FieldTransform(
-          FieldPath.fromServerFormat(fieldTransform.fieldPath),
-          ArrayTransformOperationRemove(
-              _decodeArrayTransformElements(fieldTransform.removeAllFromArray)));
+      return FieldTransform(FieldPath.fromServerFormat(fieldTransform.fieldPath),
+          ArrayTransformOperationRemove(_decodeArrayTransformElements(fieldTransform.removeAllFromArray)));
     } else {
       throw fail(
         'Unknown FieldTransform proto: $fieldTransform',
@@ -521,10 +492,10 @@ class RemoteSerializer {
   }
 
   MutationResult decodeMutationResult(proto.WriteResult proto, SnapshotVersion commitVersion) {
-    // NOTE: Deletes don't have an [updateTime] but the commit timestamp from the containing
-    // [CommitResponse] or [WriteResponse] indicates essentially that the delete happened no later
-    // than that. For our purposes we don't care exactly when the delete happened so long as we can
-    // tell when an update on the watch stream is at or later than that change.
+    // NOTE: Deletes don't have an [updateTime] but the commit timestamp from the containing [CommitResponse] or
+    // [WriteResponse] indicates essentially that the delete happened no later than that. For our purposes we don't care
+    // exactly when the delete happened so long as we can tell when an update on the watch stream is at or later than
+    // that change.
     SnapshotVersion version = decodeVersion(proto.updateTime);
     if (version == SnapshotVersion.none) {
       version = commitVersion;
@@ -552,7 +523,6 @@ class RemoteSerializer {
     return MapEntry<String, String>('goog-listen-tags', value);
   }
 
-  /*private*/
   String _encodeLabel(QueryPurpose purpose) {
     switch (purpose) {
       case QueryPurpose.listen:
@@ -576,10 +546,10 @@ class RemoteSerializer {
       builder.query = encodeQueryTarget(query);
     }
 
-    builder.targetId = queryData.targetId;
-    builder.resumeToken = queryData.resumeToken;
-
-    return builder..freeze();
+    return builder
+      ..targetId = queryData.targetId
+      ..resumeToken = queryData.resumeToken
+      ..freeze();
   }
 
   proto.Target_DocumentsTarget encodeDocumentsTarget(Query query) {
@@ -590,10 +560,7 @@ class RemoteSerializer {
 
   Query decodeDocumentsTarget(proto.Target_DocumentsTarget target) {
     final int count = target.documents.length;
-    hardAssert(
-      count == 1,
-      'DocumentsTarget contained other than 1 document $count',
-    );
+    hardAssert(count == 1, 'DocumentsTarget contained other than 1 document $count');
 
     final String name = target.documents[0];
     return Query(_decodeQueryPath(name));
@@ -610,9 +577,8 @@ class RemoteSerializer {
       hardAssert(path.length.remainder(2) != 0, 'Document queries with filters are not supported.');
       builder.parent = _encodeQueryPath(path.popLast());
 
-      final proto.StructuredQuery_CollectionSelector from =
-          proto.StructuredQuery_CollectionSelector.create();
-      from.collectionId = path.last;
+      final proto.StructuredQuery_CollectionSelector from = proto.StructuredQuery_CollectionSelector.create()
+        ..collectionId = path.last;
       structuredQueryBuilder.from.add(from);
     }
 
@@ -650,8 +616,7 @@ class RemoteSerializer {
     final proto.StructuredQuery query = target.structuredQuery;
     final int fromCount = query.from.length;
     if (fromCount > 0) {
-      hardAssert(
-          fromCount == 1, 'StructuredQuery.from with more than one collection is not supported.');
+      hardAssert(fromCount == 1, 'StructuredQuery.from with more than one collection is not supported.');
 
       final proto.StructuredQuery_CollectionSelector from = query.from[0];
       path = path.appendSegment(from.collectionId);
@@ -703,8 +668,7 @@ class RemoteSerializer {
   // Filters
 
   proto.StructuredQuery_Filter _encodeFilters(List<Filter> filters) {
-    final List<proto.StructuredQuery_Filter> protos =
-        List<proto.StructuredQuery_Filter>(filters.length);
+    final List<proto.StructuredQuery_Filter> protos = List<proto.StructuredQuery_Filter>(filters.length);
     int i = 0;
     for (Filter filter in filters) {
       if (filter is RelationFilter) {
@@ -717,10 +681,9 @@ class RemoteSerializer {
     if (filters.length == 1) {
       return protos[0];
     } else {
-      final proto.StructuredQuery_CompositeFilter composite =
-          proto.StructuredQuery_CompositeFilter.create()
-            ..op = proto.StructuredQuery_CompositeFilter_Operator.AND
-            ..filters.addAll(protos);
+      final proto.StructuredQuery_CompositeFilter composite = proto.StructuredQuery_CompositeFilter.create()
+        ..op = proto.StructuredQuery_CompositeFilter_Operator.AND
+        ..filters.addAll(protos);
 
       return proto.StructuredQuery_Filter.create()
         ..compositeFilter = composite
@@ -757,10 +720,10 @@ class RemoteSerializer {
   }
 
   proto.StructuredQuery_Filter _encodeRelationFilter(RelationFilter filter) {
-    final proto.StructuredQuery_FieldFilter builder = proto.StructuredQuery_FieldFilter.create();
-    builder.field_1 = _encodeFieldPath(filter.field);
-    builder.op = _encodeRelationFilterOperator(filter.operator);
-    builder.value = encodeValue(filter.value);
+    final proto.StructuredQuery_FieldFilter builder = proto.StructuredQuery_FieldFilter.create()
+      ..field_1 = _encodeFieldPath(filter.field)
+      ..op = _encodeRelationFilterOperator(filter.operator)
+      ..value = encodeValue(filter.value);
 
     return proto.StructuredQuery_Filter.create()
       ..fieldFilter = builder
@@ -776,9 +739,8 @@ class RemoteSerializer {
   }
 
   proto.StructuredQuery_Filter _encodeUnaryFilter(Filter filter) {
-    final proto.StructuredQuery_UnaryFilter builder = proto.StructuredQuery_UnaryFilter.create();
-
-    builder.field_2 = _encodeFieldPath(filter.field);
+    final proto.StructuredQuery_UnaryFilter builder = proto.StructuredQuery_UnaryFilter.create()
+      ..field_2 = _encodeFieldPath(filter.field);
 
     if (filter is NaNFilter) {
       builder.op = proto.StructuredQuery_UnaryFilter_Operator.IS_NAN;
@@ -812,8 +774,7 @@ class RemoteSerializer {
       ..freeze();
   }
 
-  proto.StructuredQuery_FieldFilter_Operator _encodeRelationFilterOperator(
-      FilterOperator operator) {
+  proto.StructuredQuery_FieldFilter_Operator _encodeRelationFilterOperator(FilterOperator operator) {
     switch (operator) {
       case FilterOperator.lessThan:
         return proto.StructuredQuery_FieldFilter_Operator.LESS_THAN;
@@ -832,8 +793,7 @@ class RemoteSerializer {
     }
   }
 
-  FilterOperator _decodeRelationFilterOperator(
-      proto.StructuredQuery_FieldFilter_Operator operator) {
+  FilterOperator _decodeRelationFilterOperator(proto.StructuredQuery_FieldFilter_Operator operator) {
     switch (operator) {
       case proto.StructuredQuery_FieldFilter_Operator.LESS_THAN:
         return FilterOperator.lessThan;
@@ -887,8 +847,7 @@ class RemoteSerializer {
   // Bounds
 
   proto.Cursor _encodeBound(Bound bound) {
-    final proto.Cursor builder = proto.Cursor.create();
-    builder.before = bound.before;
+    final proto.Cursor builder = proto.Cursor.create()..before = bound.before;
     for (FieldValue component in bound.position) {
       builder.values.add(encodeValue(component));
     }
@@ -949,10 +908,9 @@ class RemoteSerializer {
       final SnapshotVersion version = decodeVersion(docChange.document.updateTime);
       hardAssert(version != SnapshotVersion.none, 'Got a document change without an update time');
       final ObjectValue data = decodeDocumentFields(docChange.document.fields);
-      // The document may soon be re-serialized back to protos in order to store it in local
-      // persistence. Memoize the encoded form to avoid encoding it again.
-      final Document document =
-          Document(key, version, data, DocumentState.synced, docChange.document);
+      // The document may soon be re-serialized back to protos in order to store it in local persistence. Memoize the
+      // encoded form to avoid encoding it again.
+      final Document document = Document(key, version, data, DocumentState.synced, docChange.document);
       watchChange = WatchChangeDocumentChange(added, removed, document.key, document);
     } else if (protoChange.hasDocumentDelete()) {
       final proto.DocumentDelete docDelete = protoChange.documentDelete;
@@ -969,7 +927,7 @@ class RemoteSerializer {
       watchChange = WatchChangeDocumentChange(<int>[], removed, key, null);
     } else if (protoChange.hasFilter()) {
       final proto.ExistenceFilter protoFilter = protoChange.filter;
-      // TODO: implement existence filter parsing (see b/33076578)
+      // TODO(long1eu): implement existence filter parsing (see b/33076578)
       final ExistenceFilter filter = ExistenceFilter(protoFilter.count);
       final int targetId = protoFilter.targetId;
       watchChange = WatchChangeExistenceFilterWatchChange(targetId, filter);
@@ -981,9 +939,8 @@ class RemoteSerializer {
   }
 
   SnapshotVersion decodeVersionFromListenResponse(proto.ListenResponse watchChange) {
-    // We have only reached a consistent snapshot for the entire stream if there is a [read_time]
-    // set and it applies to all targets (i.e. the list of targets is empty). The backend is
-    // guaranteed to send such responses.
+    // We have only reached a consistent snapshot for the entire stream if there is a [read_time] set and it applies to
+    // all targets (i.e. the list of targets is empty). The backend is guaranteed to send such responses.
 
     if (!watchChange.hasTargetChange()) {
       return SnapshotVersion.none;
@@ -996,7 +953,7 @@ class RemoteSerializer {
   }
 
   GrpcError _fromStatus(proto.Status status) {
-    // TODO: Use details?
+    // TODO(long1eu): Use details?
     return GrpcError.custom(status.code, status.hasMessage() ? status.message : null);
   }
 }

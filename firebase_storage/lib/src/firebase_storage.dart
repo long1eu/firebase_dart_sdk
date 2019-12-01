@@ -130,7 +130,7 @@ class FirebaseStorage {
   /// Creates a new [StorageReference] initialized at the root Firebase Storage
   /// location.
   @publicApi
-  // TODO:{22/10/2018 11:38}-long1eu: cache this, there is no need to recalculate it
+  // TODO(long1eu):{22/10/2018 11:38}-long1eu: cache this, there is no need to recalculate it
   StorageReference get reference {
     if (bucketName == null || bucketName.isEmpty) {
       throw StateError('FirebaseApp was not initialized with a bucket name.');

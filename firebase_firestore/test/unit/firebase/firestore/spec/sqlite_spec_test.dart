@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:path/path.dart';
 import 'package:test/test.dart';
 
@@ -20,8 +21,8 @@ void main() {
   setUp(() async {
     testCase = SpecTestCase(
       (_, String name) {
-        return openSQLitePersistence(
-            'firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}b');
+        return openSQLitePersistence('firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}b',
+            const LruGarbageCollectorParams());
       },
       (Set<String> tags) => tags.contains(eagerGc),
     );
@@ -36,8 +37,7 @@ void main() {
     bool ranAtLeastOneTest = false;
 
     // Enumerate the .json files containing the spec tests.
-    final List<Pair<String, Map<String, dynamic>>> parsedSpecFiles =
-        <Pair<String, Map<String, dynamic>>>[];
+    final List<Pair<String, Map<String, dynamic>>> parsedSpecFiles = <Pair<String, Map<String, dynamic>>>[];
     final Directory jsonDir = Directory('${Directory.current.path}/test/res/json');
     final List<File> jsonFiles = jsonDir //
         .listSync()
@@ -51,16 +51,14 @@ void main() {
       final String json = f.readAsStringSync();
       final Map<String, dynamic> fileJSON = jsonDecode(json);
       exclusiveMode = exclusiveMode || SpecTestCase.anyTestsAreMarkedExclusive(fileJSON);
-      parsedSpecFiles
-          .add(Pair<String, Map<String, dynamic>>(basenameWithoutExtension(f.path), fileJSON));
+      parsedSpecFiles.add(Pair<String, Map<String, dynamic>>(basenameWithoutExtension(f.path), fileJSON));
     }
 
     for (Pair<String, Map<String, dynamic>> parsedSpecFile in parsedSpecFiles) {
       final String fileName = parsedSpecFile.first;
       final Map<String, dynamic> fileJSON = parsedSpecFile.second;
 
-      // Print the names of the files and tests regardless of whether verbose
-      // logging is enabled.
+      // Print the names of the files and tests regardless of whether verbose logging is enabled.
       SpecTestCase.info('Spec test file: $fileName');
 
       // Iterate over the tests in the file and run them.
@@ -76,20 +74,18 @@ void main() {
         final List<dynamic> steps = testJSON['steps'];
         final Set<String> tags = SpecTestCase.getTestTags(testJSON);
 
-        final bool runTest = testCase.shouldRunTest(tags) &&
-            (!exclusiveMode || tags.contains(SpecTestCase.exclusiveTag));
+        final bool runTest =
+            testCase.shouldRunTest(tags) && (!exclusiveMode || tags.contains(SpecTestCase.exclusiveTag));
         if (runTest) {
           try {
-            SpecTestCase.info('------------------------------------------------'
-                '------------------');
+            SpecTestCase.info('------------------------------------------------------------------');
             SpecTestCase.info('  Spec test: $name');
-            SpecTestCase.info('------------------------------------------------'
-                '------------------');
+            SpecTestCase.info('------------------------------------------------------------------');
             testCase.currentName = name;
             await testCase.runSteps(steps, config);
             ranAtLeastOneTest = true;
           } on TestFailure catch (_) {
-            await testCase.specTearDown(true);
+            await testCase.specTearDown(isError: true);
 
             //throw StateError('Spec test failure: $name\n  $e');
             rethrow;

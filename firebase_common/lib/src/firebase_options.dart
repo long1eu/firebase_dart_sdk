@@ -60,7 +60,7 @@ class FirebaseOptions {
 
   /// The tracking ID for Google Analytics, e.g. UA-12345678-1, used to
   /// configure Google Analytics.
-  // TODO: unhide once an API (AppInvite) starts reading it.
+  // TODO(long1eu): unhide once an API (AppInvite) starts reading it.
   @keepForSdk
   final String gaTrackingId;
 

@@ -23,16 +23,14 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:meta/meta.dart';
 
-/// A [DocumentSnapshot] contains data read from a document in your [Firestore] database. The data
-/// can be extracted with the [data] or [get] methods.
+/// A [DocumentSnapshot] contains data read from a document in your [Firestore] database. The data can be extracted with
+/// the [data] or [get] methods.
 ///
-/// If the [DocumentSnapshot‘ points to a non-existing document, [data] and its corresponding
-/// methods will return null. You can always explicitly check for a document's existence by calling
-/// [exists].
+/// If the [DocumentSnapshot‘ points to a non-existing document, [data] and its corresponding methods will return null.
+/// You can always explicitly check for a document's existence by calling [exists].
 ///
-/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
-/// mocks. Subclassing is not supported in production code and new SDK releases may break code that
-/// does so.
+/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
+/// not supported in production code and new SDK releases may break code that does so.
 @publicApi
 class DocumentSnapshot {
   DocumentSnapshot(
@@ -47,14 +45,12 @@ class DocumentSnapshot {
 
   factory DocumentSnapshot.fromDocument(FirebaseFirestore firestore, Document doc,
       {@required bool isFromCache, @required bool hasPendingWrites}) {
-    return DocumentSnapshot(firestore, doc.key, doc,
-        isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
+    return DocumentSnapshot(firestore, doc.key, doc, isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
   }
 
   factory DocumentSnapshot.fromNoDocument(FirebaseFirestore firestore, DocumentKey key,
       {@required bool isFromCache, @required bool hasPendingWrites}) {
-    return DocumentSnapshot(firestore, key, null,
-        isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
+    return DocumentSnapshot(firestore, key, null, isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
   }
 
   final FirebaseFirestore _firestore;
@@ -77,30 +73,26 @@ class DocumentSnapshot {
   @publicApi
   bool get exists => document != null;
 
-  /// Returns the fields of the document as a Map or null if the document doesn't exist. Field
-  /// values will be converted to their native Dart representation.
+  /// Returns the fields of the document as a Map or null if the document doesn't exist. Field values will be converted
+  /// to their native Dart representation.
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
   Map<String, Object> get data => getData(ServerTimestampBehavior.none);
 
-  /// Returns the fields of the document as a Map or null if the document doesn't exist. Field
-  /// values will be converted to their native Dart representation.
+  /// Returns the fields of the document as a Map or null if the document doesn't exist. Field values will be converted
+  /// to their native Dart representation.
   ///
-  /// [serverTimestampBehavior] Configures the behavior for server timestamps that have not yet been
-  /// set to their final value.
+  /// [serverTimestampBehavior] Configures the behavior for server timestamps that have not yet been set to their final
+  /// value.
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
   @publicApi
   Map<String, Object> getData(ServerTimestampBehavior serverTimestampBehavior) {
-    checkNotNull(
-        serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
-    return document == null
-        ? null
-        : _convertObject(document.data, FieldValueOptions(serverTimestampBehavior));
+    checkNotNull(serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
+    return document == null ? null : _convertObject(document.data, FieldValueOptions(serverTimestampBehavior));
   }
 
-  /// Returns whether or not the field exists in the document. Returns false if the document does
-  /// not exist.
+  /// Returns whether or not the field exists in the document. Returns false if the document does not exist.
   ///
   /// [field] the path to the field.
   ///
@@ -110,8 +102,7 @@ class DocumentSnapshot {
     return containsPath(FieldPath.fromDotSeparatedPath(field));
   }
 
-  /// Returns whether or not the field exists in the document. Returns false if the document does
-  /// not exist.
+  /// Returns whether or not the field exists in the document. Returns false if the document does  not exist.
   ///
   /// [fieldPath] the path to the field.
   ///
@@ -127,34 +118,31 @@ class DocumentSnapshot {
   /// Returns the value at the field or null if the field doesn't exist.
   ///
   /// [field] the path to the field
-  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been
-  /// set to their final value.
+  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been set to their final
+  /// value.
   ///
   /// Returns the value at the given field or null.
   @publicApi
   Object get(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
-    return getField(FieldPath.fromDotSeparatedPath(field),
-        serverTimestampBehavior ?? ServerTimestampBehavior.none);
+    return getField(FieldPath.fromDotSeparatedPath(field), serverTimestampBehavior ?? ServerTimestampBehavior.none);
   }
 
   /// Returns the value at the field or null if the field or document doesn't exist.
   ///
   /// [fieldPath] the path to the field
-  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been
-  /// set to their final value.
+  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been set to their final
+  /// value.
   ///
   /// Returns the value at the given field or null.
   @publicApi
   Object getField(FieldPath fieldPath, [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     checkNotNull(fieldPath, 'Provided field path must not be null.');
-    checkNotNull(
-        serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
+    checkNotNull(serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
     return _getInternal(fieldPath.internalPath, FieldValueOptions(serverTimestampBehavior));
   }
 
-  /// Returns the value of the field as a bool. If the value is not a bool this will throw a state
-  /// error.
+  /// Returns the value of the field as a bool. If the value is not a bool this will throw a state error.
   ///
   /// [field] the path to the field.
   ///
@@ -198,8 +186,8 @@ class DocumentSnapshot {
   /// Returns the value of the field as a [DateTime].
   ///
   /// [field] the path to the field.
-  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been
-  /// set to their final value.
+  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been set to their final
+  /// value.
   ///
   /// Throws [StateError] if the value is not a Date.
   /// Returns the value of the field
@@ -207,8 +195,7 @@ class DocumentSnapshot {
   DateTime getDate(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     checkNotNull(field, 'Provided field path must not be null.');
-    checkNotNull(
-        serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
+    checkNotNull(serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
     final Object maybeDate = _getInternal(FieldPath.fromDotSeparatedPath(field).internalPath,
         FieldValueOptions(serverTimestampBehavior, timestampsInSnapshotsEnabled: false));
     return _castTypedValue(maybeDate, field);
@@ -217,8 +204,8 @@ class DocumentSnapshot {
   /// Returns the value of the field as a [Timestamp].
   ///
   /// [field] the path to the field.
-  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been
-  /// set to their final value.
+  /// [serverTimestampBehavior] configures the behavior for server timestamps that have not yet been set to their final
+  /// value.
   ///
   /// Throws [StateError] if the value is not a timestamp field.
   /// Returns the value of the field
@@ -226,10 +213,9 @@ class DocumentSnapshot {
   Timestamp getTimestamp(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     checkNotNull(field, 'Provided field path must not be null.');
-    checkNotNull(
-        serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
-    final Object maybeTimestamp = _getInternal(FieldPath.fromDotSeparatedPath(field).internalPath,
-        FieldValueOptions(serverTimestampBehavior));
+    checkNotNull(serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
+    final Object maybeTimestamp =
+        _getInternal(FieldPath.fromDotSeparatedPath(field).internalPath, FieldValueOptions(serverTimestampBehavior));
     return _castTypedValue(maybeTimestamp, field);
   }
 
@@ -296,13 +282,12 @@ class DocumentSnapshot {
       final DatabaseId refDatabase = value.databaseId;
       final DatabaseId database = _firestore.databaseId;
       if (refDatabase != database) {
-        // TODO: Somehow support foreign references.
+        // TODO(long1eu): Somehow support foreign references.
         Log.w(
             'DocumentSnapshot',
             'Document ${key.path} contains a document reference within a different database '
-                '(${refDatabase.projectId}/${refDatabase.databaseId}) which is not supported. It '
-                'will be treated as a reference in the current database '
-                '(${database.projectId}/${database.databaseId}) instead.');
+                '(${refDatabase.projectId}/${refDatabase.databaseId}) which is not supported. It will be treated as a '
+                'reference in the current database (${database.projectId}/${database.databaseId}) instead.');
       }
       return DocumentReference(key, _firestore);
     } else {
@@ -358,7 +343,7 @@ class DocumentSnapshot {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
+    return (ToStringHelper(runtimeType) //
           ..add('key', _key)
           ..add('metadata', metadata)
           ..add('document', document))

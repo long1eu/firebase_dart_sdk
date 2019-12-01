@@ -13,7 +13,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_internal/firebase_internal.dart';
 import 'package:hive/hive.dart';
-import 'package:dart_sqlite/dart_sqlite.dart' as sql;
+import 'package:moor_ffi/database.dart' as sql;
+
 import 'src/firebase/firestore/auth/empty_credentials_provider.dart';
 
 Future<void> main() async {
@@ -42,18 +43,10 @@ Future<void> main() async {
   final String persistenceKey = app.name;
 
   final FirebaseFirestoreSettings settings = FirebaseFirestoreSettings();
-  final FirestoreClient client = await FirestoreClient.initialize(
-    DatabaseInfo(
-      databaseId,
-      persistenceKey,
-      settings.host,
-      sslEnabled: settings.sslEnabled,
-    ),
-    provider,
-    queue,
-    DatabaseMock.create,
-    usePersistence: settings.persistenceEnabled,
-  );
+  final DatabaseInfo databaseInfo =
+      DatabaseInfo(databaseId, persistenceKey, settings.host, sslEnabled: settings.sslEnabled);
+  final FirestoreClient client =
+      await FirestoreClient.initialize(databaseInfo, settings, provider, queue, _DatabaseMock.create);
 
   final FirebaseFirestore firestore = FirebaseFirestore(databaseId, queue, app, client);
 
@@ -90,9 +83,8 @@ class Dependencies extends PlatformDependencies {
   Box<dynamic> get box => null;
 }
 
-
-class DatabaseMock extends Database {
-  DatabaseMock._(this.database, this.path);
+class _DatabaseMock extends Database {
+  _DatabaseMock._(this.database, this.path);
 
   sql.Database database;
   File path;
@@ -103,37 +95,35 @@ class DatabaseMock extends Database {
     return File('${Directory.current.path}/build/test/$name');
   }
 
-  static Future<DatabaseMock> create(String name,
+  static Future<Database> create(String name,
       {int version,
-        OnConfigure onConfigure,
-        OnCreate onCreate,
-        OnVersionChange onUpgrade,
-        OnVersionChange onDowngrade,
-        OnOpen onOpen}) async {
+      OnConfigure onConfigure,
+      OnCreate onCreate,
+      OnVersionChange onUpgrade,
+      OnVersionChange onDowngrade,
+      OnOpen onOpen}) async {
     version ??= 1;
 
     final File path = pathForName(name);
     final bool callOnCreate = !path.existsSync();
     path.createSync(recursive: true);
 
-    final sql.Database database = sql.Database(path.path);
-    final DatabaseMock mock = DatabaseMock._(database, path);
+    final sql.Database database = sql.Database.openFile(path);
+    final _DatabaseMock mock = _DatabaseMock._(database, path);
 
     await onConfigure?.call(mock);
     if (callOnCreate) {
       await onCreate?.call(mock, version);
-      await database.execute('PRAGMA user_version = $version;');
+      database.setUserVersion(version);
     } else {
-      final List<sql.Row> row = await database.query('PRAGMA user_version;').toList();
-      final int currentVersion = row.first.toMap().values.first;
-
+      final int currentVersion = database.userVersion();
       if (currentVersion < version) {
         await onUpgrade?.call(mock, currentVersion, version);
-        await database.execute('PRAGMA user_version = $version;');
+        database.setUserVersion(version);
       }
 
       if (currentVersion > version) {
-        await database.execute('PRAGMA user_version = $version;');
+        database.setUserVersion(version);
         await onDowngrade?.call(mock, currentVersion, version);
       }
     }
@@ -143,21 +133,21 @@ class DatabaseMock extends Database {
   }
 
   @override
-  Future<int> delete(String statement, [List<dynamic> arguments]) {
-    return database.execute(statement, arguments ?? <dynamic>[]);
+  Future<int> delete(String statement, [List<dynamic> arguments]) async {
+    database.prepare(statement).execute(arguments);
+    return database.getUpdatedRows();
   }
 
   @override
   Future<void> execute(String statement, [List<dynamic> arguments]) async {
-    await database.execute(statement, arguments ?? <dynamic>[]);
+    return database.prepare(statement).execute(arguments);
   }
 
   @override
   Future<List<Map<String, dynamic>>> query(String statement, [List<void> arguments]) async {
-    return database //
-        .query(statement, arguments ?? <dynamic>[])
-        .toList()
-        .then((List<sql.Row> rows) => rows.map((sql.Row row) => row.toMap()).toList());
+    final sql.Result preparedStatement = database.prepare(statement).select(arguments);
+
+    return preparedStatement.map((sql.Row row) => row).toList();
   }
 
   @override
@@ -167,4 +157,7 @@ class DatabaseMock extends Database {
       path.renameSync('${path.path}_');
     }
   }
+
+  @override
+  File get file => path;
 }

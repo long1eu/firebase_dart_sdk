@@ -26,7 +26,7 @@ class StorageTaskScheduler {
   LoadBalancer _callback;
 
   /// We should call this only after we've initialized all the FirebaseApps.
-  // TODO:{24/10/2018 09:36}-long1eu: if we decide we can add apps as we go we
+  // TODO(long1eu):{24/10/2018 09:36}-long1eu: if we decide we can add apps as we go we
   // need to provide a way to let the isolates now we have a new FirebaseApp
   static Future<void> initialize() async {
     int _iCommands = 0;

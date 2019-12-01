@@ -15,9 +15,8 @@ abstract class QueryEngine {
   /// Returns all local documents matching the specified query.
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(Query query);
 
-  /// Notifies the query engine of a document change in case it would like to update indexes and the
-  /// like.
-  // TODO: We can change this to just accept the changed fields (w/ old and new values) if it's
-  //  convenient for the caller to compute.
+  /// Notifies the query engine of a document change in case it would like to update indexes and the like.
+  // TODO(long1eu): We can change this to just accept the changed fields (w/ old and new values) if it's convenient for
+  //  the caller to compute.
   void handleDocumentChange(MaybeDocument oldDocument, MaybeDocument newDocument);
 }

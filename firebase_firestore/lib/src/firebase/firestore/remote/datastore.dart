@@ -32,14 +32,12 @@ import 'package:protobuf/protobuf.dart';
 /// The Datastore is generally not responsible for understanding the higher-level protocol involved
 /// in actually making changes or reading data, and is otherwise stateless.
 class Datastore {
-  factory Datastore(
-      DatabaseInfo databaseInfo, AsyncQueue workerQueue, CredentialsProvider credentialsProvider,
+  factory Datastore(DatabaseInfo databaseInfo, AsyncQueue workerQueue, CredentialsProvider credentialsProvider,
       {ClientChannel clientChannel}) {
     clientChannel ??= ClientChannel(databaseInfo.host,
         options: ChannelOptions(
-            credentials: databaseInfo.sslEnabled
-                ? const ChannelCredentials.secure()
-                : const ChannelCredentials.insecure()));
+            credentials:
+                databaseInfo.sslEnabled ? const ChannelCredentials.secure() : const ChannelCredentials.insecure()));
 
     final FirestoreChannel channel = FirestoreChannel(
       workerQueue,
@@ -151,7 +149,11 @@ class Datastore {
     }
   }
 
-  static bool isPermanentWriteError(GrpcError status) {
+  /// Determines whether the given status has an error code that represents a permanent error when received in response
+  /// to a non-write operation.
+  ///
+  /// See [isPermanentWriteError] for classifying write errors.
+  static bool isPermanentError(GrpcError status) {
     // See go/firestore-client-errors
     switch (status.code) {
       case StatusCode.ok:
@@ -163,8 +165,8 @@ class Datastore {
       case StatusCode.internal:
       case StatusCode.unavailable:
       case StatusCode.unauthenticated:
-        // Unauthenticated means something went wrong with our token and we need to retry with new
-        // credentials which will happen automatically.
+        // Unauthenticated means something went wrong with our token and we need to retry with new credentials which
+        // will happen automatically.
         return false;
       case StatusCode.invalidArgument:
       case StatusCode.notFound:
@@ -172,8 +174,8 @@ class Datastore {
       case StatusCode.permissionDenied:
       case StatusCode.failedPrecondition:
       case StatusCode.aborted:
-      // Aborted might be retried in some scenarios, but that is dependant on the context and should
-      // handled individually by the calling code. See https://cloud.google.com/apis/design/errors.
+      // Aborted might be retried in some scenarios, but that is dependant on the context and should handled
+      // individually by the calling code. See https://cloud.google.com/apis/design/errors.
       case StatusCode.outOfRange:
       case StatusCode.unimplemented:
       case StatusCode.dataLoss:
@@ -181,5 +183,18 @@ class Datastore {
       default:
         throw ArgumentError('Unknown gRPC status code: $status');
     }
+  }
+
+  /// Determines whether the given status has an error code that represents a permanent error when received in response
+  /// to a write operation.
+  ///
+  /// Write operations must be handled specially because as of b/119437764, ABORTED errors on the write stream should be
+  /// retried too (even though ABORTED errors are not generally retryable).
+  ///
+  /// Note that during the initial handshake on the write stream an ABORTED error signals that we should discard our
+  /// stream token (i.e. it is permanent). This means a handshake error should be classified with [isPermanentError],
+  /// above.
+  static bool isPermanentWriteError(GrpcError status) {
+    return isPermanentError(status) && status.code != StatusCode.aborted;
   }
 }

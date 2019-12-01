@@ -38,7 +38,7 @@ void main() {
       await firestore.runTransaction((Transaction transaction) => transaction.get(doc));
     } catch (e) {
       // We currently require every document read to also be written.
-      // TODO: Fix this check once we drop that requirement.
+      // TODO(long1eu): Fix this check once we drop that requirement.
       expect(e.message, 'Transaction failed all retries.');
       expect(e.cause.message, 'Every document read in a transaction must also be written.');
     }
@@ -159,8 +159,7 @@ void main() {
   test('testTransactionRejectsUpdatesForNonexistentDocuments', () async {
     // Make a transaction that will fail
     final Future<void> transactionTask = firestore.runTransaction<void>((Transaction transaction) async {
-      // Get and update a document that doesn't exist so that the transaction
-      // fails
+      // Get and update a document that doesn't exist so that the transaction fails
       final DocumentSnapshot doc = await transaction.get(firestore.collection('nonexistent').document());
       transaction.updateFromList(doc.reference, <String>['foo', 'bar']);
       return null;
@@ -170,9 +169,8 @@ void main() {
       await transactionTask;
     } catch (e) {
       // Let all of the transactions fetch the old value and stop once.
-      // TODO: should this really be raised as a FirebaseFirestoreError?
-      // Note that this test might change if transaction.get throws a
-      // FirebaseFirestoreError.
+      // TODO(long1eu): should this really be raised as a FirebaseFirestoreError?
+      // Note that this test might change if transaction.get throws a FirebaseFirestoreError.
       expect(e, const TypeMatcher<StateError>());
     }
   });
@@ -185,9 +183,10 @@ void main() {
     final Future<void> transactionTask = firestore.runTransaction<void>((Transaction transaction) async {
       final DocumentSnapshot doc = await transaction.get(docRef);
       expect(doc.exists, isTrue);
-      transaction.delete(docRef);
-      // Since we deleted the doc, the update will fail
-      transaction.updateFromList(docRef, <String>['foo', 'bar']);
+      transaction
+        ..delete(docRef)
+        // Since we deleted the doc, the update will fail
+        ..updateFromList(docRef, <String>['foo', 'bar']);
       return null;
     });
 
@@ -195,9 +194,8 @@ void main() {
       // Let all of the transactions fetch the old value and stop once.
       await transactionTask;
     } catch (e) {
-      // TODO: should this really be raised as a FirebaseFirestoreError?
-      // Note that this test might change if transaction.update throws a
-      // FirebaseFirestoreError.
+      // TODO(long1eu): should this really be raised as a FirebaseFirestoreError?
+      // Note that this test might change if transaction.update throws a FirebaseFirestoreError.
       expect(e, const TypeMatcher<StateError>());
     }
   });
@@ -210,11 +208,11 @@ void main() {
     final Future<void> transactionTask = firestore.runTransaction<void>((Transaction transaction) async {
       final DocumentSnapshot doc = await transaction.get(docRef);
       expect(doc.exists, isTrue);
-      transaction.delete(docRef);
-      // TODO: In theory this should work, but it's complex to make it work, so
-      // instead we just let the transaction fail and verify it's unsupported
-      // for now
-      transaction.set(docRef, map(<String>['foo', 'new-bar']));
+      transaction
+        ..delete(docRef)
+        // TODO(long1eu): In theory this should work, but it's complex to make it work, so instead we just let the
+        //  transaction fail and verify it's unsupported for now
+        ..set(docRef, map(<String>['foo', 'new-bar']));
       return null;
     });
 
@@ -296,14 +294,15 @@ void main() {
     await doc.set(map(<String>['a.b', 'old', 'c.d', 'old']));
 
     await firestore.runTransaction<void>((Transaction transaction) {
-      transaction.updateFromList(doc, <dynamic>[
-        FieldPath.of(<String>['a.b']),
-        'new'
-      ]);
-      transaction.updateFromList(doc, <dynamic>[
-        FieldPath.of(<String>['c.d']),
-        'new'
-      ]);
+      transaction
+        ..updateFromList(doc, <dynamic>[
+          FieldPath.of(<String>['a.b']),
+          'new'
+        ])
+        ..updateFromList(doc, <dynamic>[
+          FieldPath.of(<String>['c.d']),
+          'new'
+        ]);
       return null;
     });
 
@@ -322,8 +321,9 @@ void main() {
     ]));
 
     await firestore.runTransaction<void>((Transaction transaction) {
-      transaction.updateFromList(doc, <String>['a.b', 'new']);
-      transaction.update(doc, map<String>(<String>['c.d', 'new']));
+      transaction
+        ..updateFromList(doc, <String>['a.b', 'new'])
+        ..update(doc, map<String>(<String>['c.d', 'new']));
       return null;
     });
 
@@ -348,19 +348,17 @@ void main() {
       await firestore.runTransaction<void>((Transaction transaction) async {
         // Get the first doc.
         await transaction.get(doc1);
-        // Do a write outside of the transaction. The first time the
-        // transaction is tried, this will bump the version, which
-        // will cause the write to doc2 to fail. The second time, it
-        // will be a no-op and not bump the version.
+        // Do a write outside of the transaction. The first time the transaction is tried, this will bump the version,
+        // which will cause the write to doc2 to fail. The second time, it will be a no-op and not bump the version.
         await doc1.set(map(<dynamic>['count', 1234]));
-        // Now try to update the other doc from within the transaction.
-        // This should fail once, because we read 15 earlier.
+        // Now try to update the other doc from within the transaction. This should fail once, because we read 15
+        // earlier.
         transaction.set(doc2, map(<dynamic>['count', 16]));
         return null;
       });
     } catch (e) {
       // We currently require every document read to also be written.
-      // TODO: Add this check back once we drop that.
+      // TODO(long1eu): Add this check back once we drop that.
       // Document snapshot = await doc1.get();
       // expect(tries.getCount(), 0);
       // expect(snapshot.getDouble('count'), 1234);
@@ -383,16 +381,11 @@ void main() {
         // Do a write outside of the transaction.
         await doc.set(map(<dynamic>['count', 1234.0]));
         // Get the doc again in the transaction with the new version.
-        final DocumentSnapshot snapshot2 = await transaction.get(doc);
-        expect(snapshot2.getDouble('count').toInt(), 1234);
-        // Now try to update the doc from within the transaction.
-        // This should fail, because we read 15 earlier.
-        transaction.set(doc, map(<dynamic>['count', 16.0]));
-        return null;
+        final DocumentSnapshot _ = await transaction.get(doc);
+        // The get itself will fail, because we already read an earlier version of this document.
+        fail('Should have thrown exception');
       });
-    } catch (e) {
-      //
-    }
+    } catch (_) {}
 
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.getDouble('count').toInt(), 1234);
@@ -419,7 +412,7 @@ void main() {
       await firestore.runTransaction<void>((Transaction transaction) => transaction.get(doc));
     } catch (e) {
       // We currently require every document read to also be written.
-      // TODO: Add this check back once we drop that.
+      // TODO(long1eu): Add this check back once we drop that.
       // expect(snapshot.getString('foo'), 'bar');
       expect(e.message, 'Transaction failed all retries.');
       expect(e.cause.message, 'Every document read in a transaction must also be written.');

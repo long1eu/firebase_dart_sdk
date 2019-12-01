@@ -39,7 +39,7 @@ void main() {
   /// Performs a write using each set and/or update API and makes sure it fails
   /// with the expected reason.
   Future<void> expectWriteError(Map<String, dynamic> data, String reason,
-      [bool includeSets = true, bool includeUpdates = true]) async {
+      {bool includeSets = true, bool includeUpdates = true}) async {
     final DocumentReference ref = await testDocument();
 
     if (includeSets) {
@@ -68,7 +68,7 @@ void main() {
   /// Performs a write using each update API and makes sure it fails with the
   /// expected reason.
   void expectUpdateError(Map<String, Object> data, String reason) {
-    expectWriteError(data, reason, /*includeSets=*/ false, /*includeUpdates=*/ true);
+    expectWriteError(data, reason, includeSets: false, includeUpdates: true);
   }
 
   /// Tests a field path with all of our APIs that accept field paths and
@@ -94,8 +94,7 @@ void main() {
   }
 
   test('firestoreSettingsNullHostFails', () async {
-    await expectError(
-        () => FirebaseFirestoreSettings(host: null), 'Provided host must not be null.');
+    await expectError(() => FirebaseFirestoreSettings(host: null), 'Provided host must not be null.');
   });
 
   test('disableSslWithoutSettingHostFails', () async {
@@ -106,21 +105,12 @@ void main() {
   });
 
   test('firestoreGetInstanceWithNullAppFails', () async {
-    await expectError(
-        () => FirebaseFirestore.getInstance(null), 'Provided FirebaseApp must not be null.');
+    await expectError(() => FirebaseFirestore.getInstance(null), 'Provided FirebaseApp must not be null.');
   });
 
   void withApp(String name, Consumer<FirebaseApp> toRun) {
     final FirebaseApp app = FirebaseApp.withOptions(
-      FirebaseOptions(
-        apiKey: 'key',
-        applicationId: 'appId',
-        projectId: 'projectId',
-      ),
-      null,
-      null,
-      name,
-    );
+        FirebaseOptions(apiKey: 'key', applicationId: 'appId', projectId: 'projectId'), null, name);
 
     try {
       toRun(app);
@@ -130,10 +120,8 @@ void main() {
   }
 
   test('firestoreGetInstanceWithNonNullAppReturnsNonNullInstance', () async {
-    withApp(
-        'firestoreTestApp',
-        (FirebaseApp app) => expect(
-            FirebaseFirestore.getInstance(app, openDatabase: DatabaseMock.create), isNotNull));
+    withApp('firestoreTestApp',
+        (FirebaseApp app) => expect(FirebaseFirestore.getInstance(app, openDatabase: DatabaseMock.create), isNotNull));
   });
 
   test('collectionPathsMustBeOddLength', () async {
@@ -340,14 +328,7 @@ void main() {
   });
 
   test('fieldPathsMustNotHaveInvalidSegments', () async {
-    final List<String> badFieldPaths = <String>[
-      'foo~bar',
-      'foo*bar',
-      'foo/bar',
-      'foo[1',
-      'foo]1',
-      'foo[1]'
-    ];
+    final List<String> badFieldPaths = <String>['foo~bar', 'foo*bar', 'foo/bar', 'foo[1', 'foo]1', 'foo[1]'];
     for (String fieldPath in badFieldPaths) {
       final String reason =
           'Invalid field path ($fieldPath). Paths must not contain \'~\', \'*\', \'/\', \'[\', or \']\'';
@@ -439,10 +420,9 @@ void main() {
 
   test('queriesWithNonPositiveLimitFail', () async {
     final CollectionReference collection = await testCollection();
-    await expectError(() => collection.limit(0),
-        'Invalid Query. Query limit (0) is invalid. Limit must be positive.');
-    await expectError(() => collection.limit(-1),
-        'Invalid Query. Query limit (-1) is invalid. Limit must be positive.');
+    await expectError(() => collection.limit(0), 'Invalid Query. Query limit (0) is invalid. Limit must be positive.');
+    await expectError(
+        () => collection.limit(-1), 'Invalid Query. Query limit (-1) is invalid. Limit must be positive.');
   });
 
   test('queriesWithNullOrNaNFiltersOtherThanEqualityFail', () async {
@@ -501,7 +481,9 @@ void main() {
         expect(snapshot, isNotNull);
 
         // Skip the initial empty snapshot.
-        if (snapshot.isEmpty) return;
+        if (snapshot.isEmpty) {
+          return;
+        }
 
         expect(snapshot.documents.length, 1);
         final DocumentSnapshot docSnap = snapshot.documents[0];
@@ -510,13 +492,12 @@ void main() {
           // Offline snapshot. Since the server timestamp is uncommitted, we shouldn't be able to
           // query by it.
           expect(
-              () => collection.orderBy("timestamp").endAtDocument(docSnap).snapshots.listen(null),
-              throwsArgumentError);
+              () => collection.orderBy('timestamp').endAtDocument(docSnap).snapshots.listen(null), throwsArgumentError);
           offlineCallbackDone.complete(null);
         } else {
           // Online snapshot. Since the server timestamp is committed, we should be able to query
           // by it.
-          collection.orderBy("timestamp").endAtDocument(docSnap).snapshots.listen(null);
+          collection.orderBy('timestamp').endAtDocument(docSnap).snapshots.listen(null);
           onlineCallbackDone.complete(null);
         }
       },
@@ -573,8 +554,7 @@ void main() {
 
   test('queriesWithMultipleArrayContainsFiltersFail', () async {
     await expectError(
-        () async =>
-            (await testCollection()).whereArrayContains('foo', 1).whereArrayContains('foo', 2),
+        () async => (await testCollection()).whereArrayContains('foo', 1).whereArrayContains('foo', 2),
         'Invalid Query. Queries only support having a single array-contains'
         ' filter.');
   });
@@ -596,20 +576,16 @@ void main() {
     final CollectionReference collection = await testCollection();
     String reason = 'Invalid query. When querying with FieldPath.documentId() you must '
         'provide a valid document ID, but it was an empty string.';
-    await expectError(
-        () => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), ''), reason);
+    await expectError(() => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), ''), reason);
 
     reason = 'Invalid query. When querying with FieldPath.documentId() you must '
         'provide a valid document ID, but \'foo/bar/baz\' contains a \'/\' '
         'character.';
-    await expectError(
-        () => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), 'foo/bar/baz'),
-        reason);
+    await expectError(() => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), 'foo/bar/baz'), reason);
 
     reason = 'Invalid query. When querying with FieldPath.documentId() you must '
         'provide a valid String or DocumentReference, but it was of type: int';
-    await expectError(
-        () => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), 1), reason);
+    await expectError(() => collection.whereGreaterThanOrEqualToField(FieldPath.documentId(), 1), reason);
 
     reason = 'Invalid query. You can\'t perform array-contains queries on '
         'FieldPath.documentId() since document IDs are not arrays.';

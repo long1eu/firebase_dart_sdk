@@ -4,7 +4,7 @@ version: 0.0.1+1
 author: long1eu <home@long.1eu>
 
 environment:
-  sdk: '>=2.2.0 <3.0.0'
+  sdk: '>=2.2.2 <3.0.0'
 
 dependencies:
   firebase_common:
@@ -29,9 +29,7 @@ dependencies:
 dev_dependencies:
   test: ^1.6.8
   mockito: ^4.1.0
-  dart_sqlite:
-    git:
-      url: https://github.com/long1eu/dart_sqlite
-      path: dart
+  moor_ffi: ^0.2.0
+  uuid: ^2.0.0
 
-latest_commit: 58a4f73ac93702d9d17d8cd5299b3c8d152732ed
+latest_commit: aa19fc6355756e05f112b65d803148bac7e48b3a

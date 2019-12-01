@@ -36,53 +36,49 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.da
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
-/// Local storage in the Firestore client. Coordinates persistence components like the mutation
-/// queue and remote document cache to present a latency compensated view of stored data.
+import 'lru_garbage_collector.dart';
+
+/// Local storage in the Firestore client. Coordinates persistence components like the mutation queue and remote
+/// document cache to present a latency compensated view of stored data.
 ///
-/// The [LocalStore] is responsible for accepting mutations from the [SyncEngine]. Writes from the
-/// client are put into a queue as provisional [Mutations] until they are processed by the
-/// [RemoteStore] and confirmed as having been written to the server.
+/// The [LocalStore] is responsible for accepting mutations from the [SyncEngine]. Writes from the client are put into a
+/// queue as provisional [Mutations] until they are processed by the [RemoteStore] and confirmed as having been written
+/// to the server.
 ///
 /// The local store provides the local version of documents that have been modified locally.
 /// It maintains the constraint:
 ///   LocalDocument = RemoteDocument + Active(LocalMutations)
-///   (Active mutations are those that are enqueued and have not been previously acknowledged or
-///   rejected).
+///   (Active mutations are those that are enqueued and have not been previously acknowledged or rejected).
 ///
-/// The RemoteDocument ('ground truth') state is provided via the applyChangeBatch method. It will
-/// be some version of a server-provided document OR will be a server-provided document PLUS
-/// acknowledged mutations:
+/// The RemoteDocument ('ground truth') state is provided via the applyChangeBatch method. It will be some version of a
+/// server-provided document OR will be a server-provided document PLUS acknowledged mutations:
 ///   RemoteDocument = RemoteDocument + Acknowledged(LocalMutations)
 ///
-/// Note that this 'dirty' version of a RemoteDocument will not be identical to a server base
-/// version, since it has LocalMutations added to it pending getting an authoritative copy from the
-/// server.
+/// Note that this 'dirty' version of a RemoteDocument will not be identical to a server base version, since it has
+/// LocalMutations added to it pending getting an authoritative copy from the server.
 ///
-/// Since LocalMutations can be rejected by the server, we have to be able to revert a
-/// LocalMutation that has already been applied to the LocalDocument (typically done by replaying
-/// all remaining LocalMutations to the RemoteDocument to re-apply).
+/// Since LocalMutations can be rejected by the server, we have to be able to revert a LocalMutation that has already
+/// been applied to the LocalDocument (typically done by replaying all remaining LocalMutations to the RemoteDocument to
+/// re-apply).
 ///
-/// The [LocalStore] is responsible for the garbage collection of the documents it contains. For
-/// now, it every doc referenced by a view, the mutation queue, or the [RemoteStore].
+/// The [LocalStore] is responsible for the garbage collection of the documents it contains. For now, it every doc
+/// referenced by a view, the mutation queue, or the [RemoteStore].
 ///
-/// It also maintains the persistence of mapping queries to resume tokens and target ids. It needs
-/// to know this data about queries to properly know what docs it would be allowed to garbage
-/// collect.
+/// It also maintains the persistence of mapping queries to resume tokens and target ids. It needs to know this data
+/// about queries to properly know what docs it would be allowed to garbage collect.
 ///
-/// The [LocalStore] must be able to efficiently execute queries against its local cache of the
-/// documents, to provide the initial set of results before any remote changes have been received.
+/// The [LocalStore] must be able to efficiently execute queries against its local cache of the documents, to provide
+/// the initial set of results before any remote changes have been received.
 class LocalStore {
   factory LocalStore(Persistence persistence, User initialUser) {
-    hardAssert(
-        persistence.started, 'LocalStore was passed an unstarted persistence implementation');
+    hardAssert(persistence.started, 'LocalStore was passed an unstarted persistence implementation');
 
     final QueryCache queryCache = persistence.queryCache;
-    final TargetIdGenerator targetIdGenerator =
-        TargetIdGenerator.forQueryCache(queryCache.highestTargetId);
+    final TargetIdGenerator targetIdGenerator = TargetIdGenerator.forQueryCache(queryCache.highestTargetId);
     final MutationQueue mutationQueue = persistence.getMutationQueue(initialUser);
     final RemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
     final LocalDocumentsView localDocuments = LocalDocumentsView(remoteDocuments, mutationQueue);
-    // TODO: Use IndexedQueryEngine as appropriate.
+    // TODO(long1eu): Use IndexedQueryEngine as appropriate.
     final SimpleQueryEngine queryEngine = SimpleQueryEngine(localDocuments);
 
     final ReferenceSet localViewReferences = ReferenceSet();
@@ -115,9 +111,9 @@ class LocalStore {
 
   /// The maximum time to leave a resume token buffered without writing it out.
   ///
-  /// This value is arbitrary: it's long enough to avoid several writes (possibly indefinitely if
-  /// updates come more frequently than this) but short enough that restarting after crashing will
-  /// still have a pretty recent resume token.
+  /// This value is arbitrary: it's long enough to avoid several writes (possibly indefinitely if updates come more
+  /// frequently than this) but short enough that restarting after crashing will still have a pretty recent resume
+  /// token.
   static final int _resultTokenMaxAgeSeconds = const Duration(minutes: 5).inSeconds;
 
   /// Manages our in-memory or durable persistence.
@@ -152,12 +148,10 @@ class LocalStore {
   }
 
   Future<void> startMutationQueue() {
-    return _persistence.runTransaction("Start MutationQueue", _mutationQueue.start);
+    return _persistence.runTransaction('Start MutationQueue', _mutationQueue.start);
   }
 
-  // PORTING NOTE: no shutdown for [LocalStore] or persistence components on
-  // Android.
-
+  // PORTING NOTE: no shutdown for [LocalStore] or persistence components on Android.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> handleUserChange(User user) async {
     // Swap out the mutation queue, grabbing the pending mutation batches before and after.
     final List<MutationBatch> oldBatches = await _mutationQueue.getAllMutationBatches();
@@ -169,7 +163,7 @@ class LocalStore {
 
     // Recreate our LocalDocumentsView using the new MutationQueue.
     _localDocuments = LocalDocumentsView(_remoteDocuments, _mutationQueue);
-    // TODO: Use IndexedQueryEngine as appropriate.
+    // TODO(long1eu): Use IndexedQueryEngine as appropriate.
     _queryEngine = SimpleQueryEngine(_localDocuments);
 
     // Union the old/new changed keys.
@@ -189,15 +183,13 @@ class LocalStore {
   /// Accepts locally generated [Mutations] and commits them to storage.
   Future<LocalWriteResult> writeLocally(List<Mutation> mutations) async {
     final Timestamp localWriteTime = Timestamp.now();
-    // TODO: Call queryEngine.handleDocumentChange() appropriately.
+    // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
 
     final MutationBatch batch = await _persistence.runTransactionAndReturn(
-        'Locally write mutations',
-        () => _mutationQueue.addMutationBatch(localWriteTime, mutations));
+        'Locally write mutations', () => _mutationQueue.addMutationBatch(localWriteTime, mutations));
 
     final Set<DocumentKey> keys = batch.keys;
-    final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
-        await _localDocuments.getDocuments(keys);
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments = await _localDocuments.getDocuments(keys);
 
     return LocalWriteResult(batch.batchId, changedDocuments);
   }
@@ -207,13 +199,12 @@ class LocalStore {
   /// On the happy path when a batch is acknowledged, the local store will
   ///   * remove the batch from the mutation queue;
   ///   * apply the changes to the remote document cache;
-  ///   * recalculate the latency compensated view implied by those changes (there may be mutations
-  ///   in the queue that affect the documents but haven't been acknowledged yet); and
+  ///   * recalculate the latency compensated view implied by those changes (there may be mutations in the queue that
+  ///   affect the documents but haven't been acknowledged yet); and
   ///   * give the changed documents back the sync engine
-  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> acknowledgeBatch(
-      MutationBatchResult batchResult) {
-    return _persistence.runTransactionAndReturn<ImmutableSortedMap<DocumentKey, MaybeDocument>>(
-        'Acknowledge batch', () async {
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> acknowledgeBatch(MutationBatchResult batchResult) {
+    return _persistence.runTransactionAndReturn<ImmutableSortedMap<DocumentKey, MaybeDocument>>('Acknowledge batch',
+        () async {
       final MutationBatch batch = batchResult.batch;
       await _mutationQueue.acknowledgeBatch(batch, batchResult.streamToken);
       await _applyWriteToRemoteDocuments(batchResult);
@@ -222,12 +213,11 @@ class LocalStore {
     });
   }
 
-  /// Removes mutations from the [MutationQueue] for the specified batch. LocalDocuments will be
-  /// recalculated.
+  /// Removes mutations from the [MutationQueue] for the specified batch. LocalDocuments will be recalculated.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> rejectBatch(int batchId) {
-    // TODO: Call queryEngine.handleDocumentChange() appropriately.
-    return _persistence.runTransactionAndReturn<ImmutableSortedMap<DocumentKey, MaybeDocument>>(
-        'Reject batch', () async {
+    // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
+    return _persistence.runTransactionAndReturn<ImmutableSortedMap<DocumentKey, MaybeDocument>>('Reject batch',
+        () async {
       final MutationBatch toReject = await _mutationQueue.lookupMutationBatch(batchId);
       hardAssert(toReject != null, 'Attempt to reject nonexistent batch!');
 
@@ -240,31 +230,28 @@ class LocalStore {
   /// Returns the last recorded stream token for the current user.
   Uint8List get lastStreamToken => _mutationQueue.lastStreamToken;
 
-  /// Sets the stream token for the current user without acknowledging any mutation batch. This is
-  /// usually only useful after a stream handshake or in response to an error that requires clearing
-  /// the stream token.
+  /// Sets the stream token for the current user without acknowledging any mutation batch. This is usually only useful
+  /// after a stream handshake or in response to an error that requires clearing the stream token.
   ///
   /// Use [WriteStream.emptyStreamToken] to clear the current value.
   Future<void> setLastStreamToken(Uint8List streamToken) async {
-    await _persistence.runTransaction(
-        'Set stream token', () => _mutationQueue.setLastStreamToken(streamToken));
+    await _persistence.runTransaction('Set stream token', () => _mutationQueue.setLastStreamToken(streamToken));
   }
 
-  /// Returns the last consistent snapshot processed (used by the [RemoteStore] to determine whether
-  /// to buffer incoming snapshots from the backend).
+  /// Returns the last consistent snapshot processed (used by the [RemoteStore] to determine whether to buffer incoming
+  /// snapshots from the backend).
   SnapshotVersion getLastRemoteSnapshotVersion() {
     return _queryCache.lastRemoteSnapshotVersion;
   }
 
-  /// Updates the 'ground-state' (remote) documents. We assume that the remote event reflects any
-  /// write batches that have been acknowledged or rejected (i.e. we do not re-apply local mutations
-  /// to updates from this event).
+  /// Updates the 'ground-state' (remote) documents. We assume that the remote event reflects any write batches that
+  /// have been acknowledged or rejected (i.e. we do not re-apply local mutations to updates from this event).
   ///
   /// [LocalDocuments] are re-calculated if there are remaining mutations in the queue.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyRemoteEvent(RemoteEvent remoteEvent) {
-    // TODO: Call queryEngine.handleDocumentChange() appropriately.
-    return _persistence.runTransactionAndReturn<ImmutableSortedMap<DocumentKey, MaybeDocument>>(
-        'Apply remote event', () async {
+    // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
+    return _persistence.runTransactionAndReturn<ImmutableSortedMap<DocumentKey, MaybeDocument>>('Apply remote event',
+        () async {
       final int sequenceNumber = _persistence.referenceDelegate.currentSequenceNumber;
       final Set<DocumentKey> authoritativeUpdates = <DocumentKey>{};
 
@@ -279,14 +266,12 @@ class LocalStore {
           continue;
         }
 
-        // When a global snapshot contains updates (either add or modify) we can completely trust
-        // these updates as authoritative and blindly apply them to our cache (as a defensive
-        // measure to promote self-healing in the unfortunate case that our cache is ever somehow
-        // corrupted / out-of-sync).
+        // When a global snapshot contains updates (either add or modify) we can completely trust these updates as
+        // authoritative and blindly apply them to our cache (as a defensive measure to promote self-healing in the
+        // unfortunate case that our cache is ever somehow corrupted / out-of-sync).
         //
-        // If the document is only updated while removing it from a target then watch isn't
-        // obligated to send the absolute latest version: it can send the first version that caused
-        // the document not to match.
+        // If the document is only updated while removing it from a target then watch isn't obligated to send the
+        // absolute latest version: it can send the first version that caused the document not to match.
         change.addedDocuments.forEach(authoritativeUpdates.add);
         change.modifiedDocuments.forEach(authoritativeUpdates.add);
 
@@ -313,18 +298,17 @@ class LocalStore {
       final Map<DocumentKey, MaybeDocument> changedDocs = <DocumentKey, MaybeDocument>{};
       final Map<DocumentKey, MaybeDocument> documentUpdates = remoteEvent.documentUpdates;
       final Set<DocumentKey> limboDocuments = remoteEvent.resolvedLimboDocuments;
-      // Each loop iteration only affects its "own" doc, so it's safe to get all the remote
-      // documents in advance in a single call.
-      final Map<DocumentKey, MaybeDocument> existingDocs =
-          await _remoteDocuments.getAll(documentUpdates.keys);
+      // Each loop iteration only affects its "own" doc, so it's safe to get all the remote documents in advance in a
+      // single call.
+      final Map<DocumentKey, MaybeDocument> existingDocs = await _remoteDocuments.getAll(documentUpdates.keys);
       for (MapEntry<DocumentKey, MaybeDocument> entry in documentUpdates.entries) {
         final DocumentKey key = entry.key;
         final MaybeDocument doc = entry.value;
         final MaybeDocument existingDoc = existingDocs[key];
 
-        // If a document update isn't authoritative, make sure we don't apply an old document
-        // version to the remote cache. We make an exception for SnapshotVersion.MIN which can
-        // happen for manufactured events (e.g. in the case of a limbo document resolution failing).
+        // If a document update isn't authoritative, make sure we don't apply an old document version to the remote
+        // cache. We make an exception for SnapshotVersion.MIN which can happen for manufactured events (e.g. in the
+        // case of a limbo document resolution failing).
         if (existingDoc == null ||
             doc.version == SnapshotVersion.none ||
             (authoritativeUpdates.contains(doc.key) && !existingDoc.hasPendingWrites) ||
@@ -334,9 +318,8 @@ class LocalStore {
         } else {
           Log.d(
               'LocalStore',
-              'Ignoring outdated watch update for $key. '
-                  'Current version: ${existingDoc.version}  '
-                  'Watch version: ${doc.version}');
+              'Ignoring outdated watch update for $key. Current version: ${existingDoc.version}  Watch version: '
+                  '${doc.version}');
         }
 
         if (limboDocuments.contains(key)) {
@@ -344,16 +327,13 @@ class LocalStore {
         }
       }
 
-      // HACK: The only reason we allow snapshot version none is so that we can synthesize remote
-      // events when we get permission denied errors while trying to resolve the state of a locally
-      // cached document that is in limbo.
+      // HACK: The only reason we allow snapshot version none is so that we can synthesize remote events when we get
+      // permission denied errors while trying to resolve the state of a locally cached document that is in limbo.
       final SnapshotVersion lastRemoteVersion = _queryCache.lastRemoteSnapshotVersion;
       final SnapshotVersion remoteVersion = remoteEvent.snapshotVersion;
       if (remoteVersion != SnapshotVersion.none) {
-        hardAssert(
-            remoteVersion.compareTo(lastRemoteVersion) >= 0,
-            'Watch stream reverted to previous snapshot?? '
-            '($remoteVersion < $lastRemoteVersion)');
+        hardAssert(remoteVersion.compareTo(lastRemoteVersion) >= 0,
+            'Watch stream reverted to previous snapshot?? ($remoteVersion < $lastRemoteVersion)');
         await _queryCache.setLastRemoteSnapshotVersion(remoteVersion);
       }
 
@@ -361,16 +341,13 @@ class LocalStore {
     });
   }
 
-  /// Returns true if the [newQueryData] should be persisted during an update of an active target.
-  /// [QueryData] should always be persisted when a target is being released and should not call
-  /// this function.
+  /// Returns true if the [newQueryData] should be persisted during an update of an active target. [QueryData] should
+  /// always be persisted when a target is being released and should not call this function.
   ///
-  /// While the target is active, [QueryData] updates can be omitted when nothing about the target
-  /// has changed except metadata like the resume token or snapshot version. Occasionally it's worth
-  /// the extra write to prevent these values from getting too stale after a crash, but this doesn't
-  /// have to be too frequent.
-  static bool _shouldPersistQueryData(
-      QueryData oldQueryData, QueryData newQueryData, TargetChange change) {
+  /// While the target is active, [QueryData] updates can be omitted when nothing about the target has changed except
+  /// metadata like the resume token or snapshot version. Occasionally it's worth the extra write to prevent these
+  /// values from getting too stale after a crash, but this doesn't have to be too frequent.
+  static bool _shouldPersistQueryData(QueryData oldQueryData, QueryData newQueryData, TargetChange change) {
     // Avoid clearing any existing value
     if (newQueryData.resumeToken.isEmpty) {
       return false;
@@ -381,10 +358,9 @@ class LocalStore {
       return true;
     }
 
-    // Don't allow resume token changes to be buffered indefinitely. This allows us to be reasonably
-    // up-to-date after a crash and avoids needing to loop over all active queries on shutdown.
-    // Especially in the browser we may not get time to do anything interesting while the current
-    // tab is closing.
+    // Don't allow resume token changes to be buffered indefinitely. This allows us to be reasonably up-to-date after a
+    // crash and avoids needing to loop over all active queries on shutdown. Especially in the browser we may not get
+    // time to do anything interesting while the current tab is closing.
     final int newSeconds = newQueryData.snapshotVersion.timestamp.seconds;
     final int oldSeconds = oldQueryData.snapshotVersion.timestamp.seconds;
     final int timeDelta = newSeconds - oldSeconds;
@@ -392,13 +368,10 @@ class LocalStore {
       return true;
     }
 
-    // Otherwise if the only thing that has changed about a target is its resume token it's not
-    // worth persisting. Note that the [RemoteStore] keeps an in-memory view of the currently active
-    // targets which includes the current resume token, so stream failure or user changes will still
-    // use an up-to-date resume token regardless of what we do here.
-    final int changes = change.addedDocuments.length +
-        change.modifiedDocuments.length +
-        change.removedDocuments.length;
+    // Otherwise if the only thing that has changed about a target is its resume token it's not worth persisting. Note
+    // that the [RemoteStore] keeps an in-memory view of the currently active targets which includes the current resume
+    // token, so stream failure or user changes will still use an up-to-date resume token regardless of what we do here.
+    final int changes = change.addedDocuments.length + change.modifiedDocuments.length + change.removedDocuments.length;
     return changes > 0;
   }
 
@@ -416,8 +389,7 @@ class LocalStore {
     });
   }
 
-  /// Returns the mutation batch after the passed in [batchId] in the mutation queue or null if
-  /// empty.
+  /// Returns the mutation batch after the passed in [batchId] in the mutation queue or null if empty.
   ///
   /// [afterBatchId] The batch to search after, or -1 for the first mutation in the queue.
   ///
@@ -431,16 +403,15 @@ class LocalStore {
     return _localDocuments.getDocument(key);
   }
 
-  /// Assigns the given query an internal id so that its results can be pinned so they don't get
-  /// GC'd. A query must be allocated in the local store before the store can be used to manage its
-  /// view.
+  /// Assigns the given query an internal id so that its results can be pinned so they don't get GC'd. A query must be
+  /// allocated in the local store before the store can be used to manage its view.
   Future<QueryData> allocateQuery(Query query) async {
     int targetId;
     QueryData cached = await _queryCache.getQueryData(query);
 
     if (cached != null) {
       // This query has been listened to previously, so reuse the previous targetId.
-      // TODO: freshen last accessed date?
+      // TODO(long1eu): freshen last accessed date?
       targetId = cached.targetId;
     } else {
       await _persistence.runTransaction('Allocate query', () async {
@@ -457,8 +428,7 @@ class LocalStore {
     }
 
     // Sanity check to ensure that even when resuming a query it's not currently active.
-    hardAssert(
-        _targetIds[targetId] == null, 'Tried to allocate an already allocated query: $query');
+    hardAssert(_targetIds[targetId] == null, 'Tried to allocate an already allocated query: $query');
     _targetIds[targetId] = cached;
     return cached;
   }
@@ -472,16 +442,16 @@ class LocalStore {
       final int targetId = queryData.targetId;
       final QueryData cachedQueryData = _targetIds[targetId];
       if (cachedQueryData.snapshotVersion.compareTo(queryData.snapshotVersion) > 0) {
-        // If we've been avoiding persisting the [resumeToken] (see [shouldPersistQueryData] for
-        // conditions and rationale) we need to persist the token now because there will no longer
-        // be an in-memory version to fall back on.
+        // If we've been avoiding persisting the [resumeToken] (see [shouldPersistQueryData] for conditions and
+        // rationale) we need to persist the token now because there will no longer be an in-memory version to fall back
+        // on.
         queryData = cachedQueryData;
         await _queryCache.updateQueryData(queryData);
       }
 
-      // References for documents sent via Watch are automatically removed when we delete a query's
-      // target data from the reference delegate. Since this does not remove references for locally
-      // mutated documents, we have to remove the target associations for these documents manually.
+      // References for documents sent via Watch are automatically removed when we delete a query's target data from the
+      // reference delegate. Since this does not remove references for locally mutated documents, we have to remove the
+      // target associations for these documents manually.
       final ImmutableSortedSet<DocumentKey> removedReferences =
           _localViewReferences.removeReferencesForId(queryData.targetId);
       for (DocumentKey key in removedReferences) {
@@ -497,8 +467,7 @@ class LocalStore {
     return _queryEngine.getDocumentsMatchingQuery(query);
   }
 
-  /// Returns the keys of the documents that are associated with the given target id in the remote
-  /// table.
+  /// Returns the keys of the documents that are associated with the given target id in the remote table.
   Future<ImmutableSortedSet<DocumentKey>> getRemoteDocumentKeys(int targetId) {
     return _queryCache.getMatchingKeysForTargetId(targetId);
   }
@@ -515,10 +484,7 @@ class LocalStore {
       if (doc == null || doc.version.compareTo(ackVersion) < 0) {
         doc = batch.applyToRemoteDocument(docKey, doc, batchResult);
         if (doc == null) {
-          hardAssert(
-              remoteDoc == null,
-              'Mutation batch $batch applied to document $remoteDoc resulted '
-              'in null.');
+          hardAssert(remoteDoc == null, 'Mutation batch $batch applied to document $remoteDoc resulted in null.');
         } else {
           await _remoteDocuments.add(doc);
         }
@@ -526,5 +492,9 @@ class LocalStore {
     }
 
     await _mutationQueue.removeMutationBatch(batch);
+  }
+
+  Future<LruGarbageCollectorResults> collectGarbage(LruGarbageCollector garbageCollector) {
+    return _persistence.runTransaction('Collect garbage', () => garbageCollector.collect(_targetIds.keys.toSet()));
   }
 }

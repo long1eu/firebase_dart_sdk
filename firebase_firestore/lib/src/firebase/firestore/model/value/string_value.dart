@@ -5,7 +5,7 @@
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 
 /// A wrapper for string values in Firestore.
-// TODO: Add truncation support
+// TODO(long1eu): Add truncation support
 class StringValue extends FieldValue {
   const StringValue(this._value);
 

@@ -29,17 +29,13 @@ class Query {
 
   static const int noLimit = -1;
 
-  static final OrderBy keyOrderingAsc =
-      OrderBy.getInstance(OrderByDirection.ascending, FieldPath.keyPath);
+  static final OrderBy keyOrderingAsc = OrderBy.getInstance(OrderByDirection.ascending, FieldPath.keyPath);
 
-  static final OrderBy keyOrderingDesc =
-      OrderBy.getInstance(OrderByDirection.descending, FieldPath.keyPath);
+  static final OrderBy keyOrderingDesc = OrderBy.getInstance(OrderByDirection.descending, FieldPath.keyPath);
 
-  /// Returns the list of ordering constraints that were explicitly requested on the query by the
-  /// user.
+  /// Returns the list of ordering constraints that were explicitly requested on the query by the user.
   ///
-  /// Note that the actual query performed might add additional sort orders to match the behavior of
-  /// the backend.
+  /// Note that the actual query performed might add additional sort orders to match the behavior of the backend.
   final List<OrderBy> explicitSortOrder;
 
   /// The filters on the documents returned by the query.
@@ -61,8 +57,7 @@ class Query {
     return DocumentKey.isDocumentKey(path) && filters.isEmpty;
   }
 
-  /// The maximum number of results to return. If there is no limit on the query, then this will
-  /// cause an assertion failure.
+  /// The maximum number of results to return. If there is no limit on the query, then this will cause an assertion failure.
   int getLimit() {
     hardAssert(hasLimit, 'Called getLimit when no limit was set');
     return _limit;
@@ -72,8 +67,8 @@ class Query {
 
   /// Returns a new [Query] with the given limit on how many results can be returned.
   ///
-  /// [limit] represents the maximum number of results to return. If `limit == noLimit`, then no
-  /// limit is applied. Otherwise, if `limit <= 0`, behavior is unspecified.
+  /// [limit] represents the maximum number of results to return. If `limit == noLimit`, then no limit is applied.
+  /// Otherwise, if `limit <= 0`, behavior is unspecified.
   Query limit(int limit) => copyWith(limit: limit);
 
   /// An optional bound to start the query at.
@@ -90,8 +85,7 @@ class Query {
     return explicitSortOrder[0].field;
   }
 
-  /// Returns the field of the first filter on this Query that's an inequality,
-  /// or null if none.
+  /// Returns the field of the first filter on this Query that's an inequality, or null if none.
   FieldPath get inequalityField {
     for (Filter filter in filters) {
       if (filter is RelationFilter) {
@@ -128,20 +122,14 @@ class Query {
     }
 
     final FieldPath queryInequalityField = inequalityField;
-    hardAssert(
-        queryInequalityField == null ||
-            newInequalityField == null ||
-            queryInequalityField == newInequalityField,
+    hardAssert(queryInequalityField == null || newInequalityField == null || queryInequalityField == newInequalityField,
         'Query must only have one inequality field');
 
     hardAssert(
-        explicitSortOrder.isEmpty ||
-            newInequalityField == null ||
-            explicitSortOrder[0].field == newInequalityField,
+        explicitSortOrder.isEmpty || newInequalityField == null || explicitSortOrder[0].field == newInequalityField,
         'First orderBy must match inequality field');
 
-    final List<Filter> updatedFilter = List<Filter>.from(filters);
-    updatedFilter.add(filter);
+    final List<Filter> updatedFilter = <Filter>[...filters, filter];
     return copyWith(filters: updatedFilter);
   }
 
@@ -158,8 +146,7 @@ class Query {
         throw fail('First orderBy must match inequality field');
       }
     }
-    final List<OrderBy> updatedSortOrder = List<OrderBy>.from(explicitSortOrder);
-    updatedSortOrder.add(order);
+    final List<OrderBy> updatedSortOrder = <OrderBy>[...explicitSortOrder, order];
     return copyWith(explicitSortOrder: updatedSortOrder);
   }
 
@@ -185,10 +172,7 @@ class Query {
       if (inequalityField.isKeyField) {
         return <OrderBy>[keyOrderingAsc];
       } else {
-        return <OrderBy>[
-          OrderBy.getInstance(OrderByDirection.ascending, inequalityField),
-          keyOrderingAsc
-        ];
+        return <OrderBy>[OrderBy.getInstance(OrderByDirection.ascending, inequalityField), keyOrderingAsc];
       }
     } else {
       final List<OrderBy> res = <OrderBy>[];
@@ -262,12 +246,11 @@ class Query {
   /// Returns a canonical string representing this query. This should match the iOS and Android
   /// canonical ids for a query exactly.
   String get canonicalId {
-    // TODO: Cache the return value.
-    final StringBuffer builder = StringBuffer();
-    builder.write(path.canonicalString);
-
-    // Add filters.
-    builder.write('|f:');
+    // TODO(long1eu): Cache the return value.
+    final StringBuffer builder = StringBuffer()
+      ..write(path.canonicalString)
+      // Add filters.
+      ..write('|f:');
     for (Filter filter in filters) {
       builder.write(filter.canonicalId);
     }
@@ -275,24 +258,28 @@ class Query {
     // Add order by.
     builder.write('|ob:');
     for (OrderBy orderBy in orderByConstraints) {
-      builder.write(orderBy.field.canonicalString);
-      builder.write(orderBy.direction == OrderByDirection.ascending ? 'asc' : 'desc');
+      builder
+        ..write(orderBy.field.canonicalString)
+        ..write(orderBy.direction == OrderByDirection.ascending ? 'asc' : 'desc');
     }
 
     // Add limit.
     if (hasLimit) {
-      builder.write('|l:');
-      builder.write(limit);
+      builder //
+        ..write('|l:')
+        ..write(limit);
     }
 
     if (_startAt != null) {
-      builder.write('|lb:');
-      builder.write(_startAt.canonicalString());
+      builder //
+        ..write('|lb:')
+        ..write(_startAt.canonicalString());
     }
 
     if (_endAt != null) {
-      builder.write('|ub:');
-      builder.write(_endAt.canonicalString());
+      builder //
+        ..write('|ub:')
+        ..write(_endAt.canonicalString());
     }
 
     return builder.toString();
@@ -330,18 +317,18 @@ class Query {
 
   @override
   int get hashCode =>
-      const ListEquality<Filter>().hash(filters) * 31 +
-      path.hashCode * 31 +
-      _limit.hashCode * 31 +
-      _startAt.hashCode * 31 +
-      _endAt.hashCode * 31 +
-      const ListEquality<OrderBy>().hash(orderByConstraints) * 31;
+      const ListEquality<Filter>().hash(filters) ^
+      path.hashCode ^
+      _limit.hashCode ^
+      _startAt.hashCode ^
+      _endAt.hashCode ^
+      const ListEquality<OrderBy>().hash(orderByConstraints);
 
   @override
   String toString() {
-    final StringBuffer builder = StringBuffer();
-    builder.write('Query(');
-    builder.write(path.canonicalString);
+    final StringBuffer builder = StringBuffer() //
+      ..write('Query(')
+      ..write(path.canonicalString);
     if (filters.isNotEmpty) {
       builder.write(' where ');
       for (int i = 0; i < filters.length; i++) {
