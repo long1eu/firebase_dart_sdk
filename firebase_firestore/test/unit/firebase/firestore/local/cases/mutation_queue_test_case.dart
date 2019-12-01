@@ -124,24 +124,6 @@ class MutationQueueTestCase {
   }
 
   @testMethod
-  Future<void> testNextMutationBatchAfterBatchIdSkipsAcknowledgedBatches() async {
-    final List<MutationBatch> batches = await _createBatches(3);
-
-    MutationBatch result = await _mutationQueue.getNextMutationBatchAfterBatchId(MutationBatch.unknown);
-    expect(result, batches[0]);
-
-    await _acknowledgeBatch(batches[0]);
-    result = await _mutationQueue.getNextMutationBatchAfterBatchId(MutationBatch.unknown);
-    expect(result, batches[1]);
-
-    result = await _mutationQueue.getNextMutationBatchAfterBatchId(batches[0].batchId);
-    expect(result, batches[1]);
-
-    result = await _mutationQueue.getNextMutationBatchAfterBatchId(batches[1].batchId);
-    expect(result, batches[2]);
-  }
-
-  @testMethod
   Future<void> testAllMutationBatchesAffectingDocumentKey() async {
     final List<Mutation> mutations = <Mutation>[
       setMutation('fob/bar', map(<dynamic>['a', 1])),

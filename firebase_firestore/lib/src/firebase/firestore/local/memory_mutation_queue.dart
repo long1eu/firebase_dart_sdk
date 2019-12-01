@@ -3,7 +3,6 @@
 // on 20/09/2018
 
 import 'dart:async';
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
@@ -25,7 +24,6 @@ class MemoryMutationQueue implements MutationQueue {
       : _queue = <MutationBatch>[],
         _batchesByDocumentKey = ImmutableSortedSet<DocumentReference>(<DocumentReference>[], DocumentReference.byKey),
         _nextBatchId = 1,
-        _highestAcknowledgedBatchId = MutationBatch.unknown,
         lastStreamToken = WriteStream.emptyStreamToken;
 
   /// A FIFO queue of all mutations to apply to the backend. Mutations are added to the end of the queue as they're
@@ -56,23 +54,17 @@ class MemoryMutationQueue implements MutationQueue {
 
   final MemoryPersistence persistence;
 
-  /// The highest acknowledged mutation in the queue.
-  int _highestAcknowledgedBatchId;
-
   // MutationQueue implementation
 
   @override
   Future<void> start() async {
     // Note: The queue may be shutdown / started multiple times, since we maintain the queue for the duration of the app
     // session in case a user logs out / back in. To behave like the SQLite-backed [MutationQueue] (and accommodate
-    // tests that expect as much), we reset [nextBatchId] and [highestAcknowledgedBatchId] if the queue is empty.
+    // tests that expect as much), we reset [nextBatchId] if the queue is empty.
     final bool queueIsEmpty = await isEmpty();
     if (queueIsEmpty) {
       _nextBatchId = 1;
-      _highestAcknowledgedBatchId = MutationBatch.unknown;
     }
-    hardAssert(
-        _highestAcknowledgedBatchId < _nextBatchId, 'highestAcknowledgedBatchId must be less than the nextBatchId');
   }
 
   @override
@@ -85,8 +77,6 @@ class MemoryMutationQueue implements MutationQueue {
   @override
   Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken) async {
     final int batchId = batch.batchId;
-    hardAssert(batchId > _highestAcknowledgedBatchId, 'Mutation batchIds must be acknowledged in order');
-
     final int batchIndex = _indexOfExistingBatchId(batchId, 'acknowledged');
     hardAssert(batchIndex == 0, 'Can only acknowledge the first batch in the mutation queue');
 
@@ -94,7 +84,6 @@ class MemoryMutationQueue implements MutationQueue {
     final MutationBatch check = _queue[batchIndex];
     hardAssert(batchId == check.batchId, 'Queue ordering failure: expected batch $batchId, got batch ${check.batchId}');
 
-    _highestAcknowledgedBatchId = batchId;
     lastStreamToken = checkNotNull(streamToken);
   }
 
@@ -141,9 +130,7 @@ class MemoryMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch> getNextMutationBatchAfterBatchId(int batchId) async {
-    // All batches with [batchId] <= [highestAcknowledgedBatchId] have been acknowledged so the first unacknowledged
-    // batch after batchId will have a [batchId] larger than both of these values.
-    final int nextBatchId = max(batchId, _highestAcknowledgedBatchId) + 1;
+    final int nextBatchId = batchId + 1;
 
     // The requested batchId may still be out of range so normalize it to the start of the queue.
     final int rawIndex = _indexOfBatchId(nextBatchId);
