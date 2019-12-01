@@ -469,3 +469,9 @@ Future<void> expectError(FutureOr<dynamic> Function() runnable, String exception
     fail('Expected exception with message \'$exceptionMessage\' but no exception was thrown ${context ?? ''}.');
   }
 }
+
+const _Test testMethod = _Test();
+
+class _Test {
+  const _Test();
+}

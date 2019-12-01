@@ -52,7 +52,7 @@ Future<void> main() async {
     ),
     provider,
     queue,
-    DatabaseMock.create,
+    _DatabaseMock.create,
     usePersistence: settings.persistenceEnabled,
   );
 
@@ -91,8 +91,8 @@ class Dependencies extends PlatformDependencies {
   Box<dynamic> get box => null;
 }
 
-class DatabaseMock extends Database {
-  DatabaseMock._(this.database, this.path);
+class _DatabaseMock extends Database {
+  _DatabaseMock._(this.database, this.path);
 
   sql.Database database;
   File path;
@@ -103,7 +103,7 @@ class DatabaseMock extends Database {
     return File('${Directory.current.path}/build/test/$name');
   }
 
-  static Future<DatabaseMock> create(String name,
+  static Future<Database> create(String name,
       {int version,
       OnConfigure onConfigure,
       OnCreate onCreate,
@@ -117,7 +117,7 @@ class DatabaseMock extends Database {
     path.createSync(recursive: true);
 
     final sql.Database database = sql.Database.openFile(path);
-    final DatabaseMock mock = DatabaseMock._(database, path);
+    final _DatabaseMock mock = _DatabaseMock._(database, path);
 
     await onConfigure?.call(mock);
     if (callOnCreate) {
