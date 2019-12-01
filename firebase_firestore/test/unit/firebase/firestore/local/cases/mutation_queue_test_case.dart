@@ -339,8 +339,7 @@ class MutationQueueTestCase {
     expect(_mutationQueue.lastStreamToken, streamToken2);
   }
 
-  /// Creates a new [MutationBatch] with the given key, the next batch ID and a set of dummy
-  /// mutations.
+  /// Creates a new [MutationBatch] with the given key, the next batch ID and a set of dummy mutations.
   Future<MutationBatch> _addMutationBatch([String key = 'foo/bar']) {
     final SetMutation mutation = setMutation(key, map(<dynamic>['a', 1]));
 
@@ -348,8 +347,7 @@ class MutationQueueTestCase {
         'New mutation batch', () => _mutationQueue.addMutationBatch(Timestamp.now(), <SetMutation>[mutation]));
   }
 
-  /// Creates a list of batches containing [number] dummy [MutationBatches]. Each has a different
-  /// batchId.
+  /// Creates a list of batches containing [number] dummy [MutationBatches]. Each has a different batchId.
   Future<List<MutationBatch>> _createBatches(int number) async {
     final List<MutationBatch> batches = <MutationBatch>[];
     for (int i = 0; i < number; i++) {

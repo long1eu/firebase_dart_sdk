@@ -616,8 +616,7 @@ class LocalStoreTestCase {
     await _applyRemoteEvent(
         updateRemoteEvent(doc('foo/bar', 0, map(<String>['foo', 'old'])), <int>[targetId], <int>[]));
     await _writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
-    // Release the query so that our target count goes back to 0 and we are
-    // considered up-to-date.
+    // Release the query so that our target count goes back to 0 and we are considered up-to-date.
     await _releaseQuery(query);
     await _writeMutation(setMutation('foo/bah', map(<String>['foo', 'bah'])));
     await _writeMutation(deleteMutation('foo/baz'));

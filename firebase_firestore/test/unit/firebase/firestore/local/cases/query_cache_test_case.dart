@@ -52,8 +52,8 @@ class QueryCacheTestCase {
 
   @testMethod
   Future<void> testCanonicalIdCollision() async {
-    // Type information is currently lost in our canonicalID implementations so
-    // this currently an easy way to force colliding canonicalIDs
+    // Type information is currently lost in our canonicalID implementations so this currently an easy way to force
+    // colliding canonicalIDs
     final Query q1 = query('a').filter(filter('foo', '==', 1));
     final Query q2 = query('a').filter(filter('foo', '==', '1'));
     expect(q2.canonicalId, q1.canonicalId);
@@ -61,8 +61,7 @@ class QueryCacheTestCase {
     final QueryData data1 = _newQueryData(q1, 1, 1);
     await _addQueryData(data1);
 
-    // Using the other query should not return the query cache entry despite
-    // equal canonicalIDs.
+    // Using the other query should not return the query cache entry despite equal canonicalIDs.
     expect(await _queryCache.getQueryData(q2), isNull);
     expect(await _queryCache.getQueryData(q1), data1);
 
