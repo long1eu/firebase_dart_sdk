@@ -503,9 +503,9 @@ class RemoteStore implements TargetMetadataProvider {
 
   Future<void> _handleWriteHandshakeError(GrpcError status) async {
     hardAssert(status.code != StatusCode.ok, 'Handling write error with status OK.');
-    // Reset the token if it's a permanent error or the error code is ABORTED, signaling the write stream is no longer
-    // valid.
-    if (Datastore.isPermanentWriteError(status) || status.code == StatusCode.aborted) {
+    // Reset the token if it's a permanent error, signaling the write stream is no longer valid.
+    // Note that the handshake does not count as a write: see comments on isPermanentWriteError for details.
+    if (Datastore.isPermanentError(status)) {
       final String token = toDebugString(_writeStream.lastStreamToken);
       Log.d(_tag, 'RemoteStore error before completed handshake; resetting stream token $token: $status');
       _writeStream.lastStreamToken = WriteStream.emptyStreamToken;
@@ -515,7 +515,7 @@ class RemoteStore implements TargetMetadataProvider {
 
   Future<void> _handleWriteError(GrpcError status) async {
     hardAssert(status.code != StatusCode.ok, 'Handling write error with status OK.');
-    // Only handle permanent error, if it's transient just let the retry logic kick in.
+    // Only handle permanent errors here. If it's transient, just let the retry logic kick in.
     if (Datastore.isPermanentWriteError(status)) {
       // If this was a permanent error, the request itself was the problem so it's not going to succeed if we resend it.
       final MutationBatch batch = _writePipeline.removeFirst();
