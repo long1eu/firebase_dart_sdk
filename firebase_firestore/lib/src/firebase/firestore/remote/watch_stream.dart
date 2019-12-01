@@ -14,7 +14,7 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.da
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel.dart';
-import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
+import 'package:firebase_firestore/src/proto/index.dart' as proto;
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
@@ -25,15 +25,13 @@ import 'package:protobuf/protobuf.dart';
 /// be sent to control what changes will be sent from the server for [WatchChanges].
 ///
 /// @see <a
-/// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L147'>firestore.proto</a>
-class WatchStream
-    extends AbstractStream<proto.ListenRequest, proto.ListenResponse, WatchStreamCallback> {
-  WatchStream(FirestoreChannel channel, AsyncQueue workerQueue, this.serializer,
-      WatchStreamCallback listener)
+/// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1/firestore.proto#L147'>firestore.proto</a>
+class WatchStream extends AbstractStream<proto.ListenRequest, proto.ListenResponse, WatchStreamCallback> {
+  WatchStream(FirestoreChannel channel, AsyncQueue workerQueue, this.serializer, WatchStreamCallback listener)
       : super(
           channel,
           ClientMethod<proto.ListenRequest, proto.ListenResponse>(
-            'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Listen',
+            'firestore.googleapis.com/google.firestore.v1.Firestore/Listen',
             (GeneratedMessage req) => req.writeToBuffer(),
             (List<int> res) => proto.ListenResponse.fromBuffer(res),
           ),
@@ -89,8 +87,7 @@ class WatchStream
   }
 }
 
-typedef OnWatchChange = Future<void> Function(
-    SnapshotVersion snapshotVersion, WatchChange watchChange);
+typedef OnWatchChange = Future<void> Function(SnapshotVersion snapshotVersion, WatchChange watchChange);
 
 /// A callback interface for the set of events that can be emitted by the [WatchStream]
 class WatchStreamCallback extends StreamCallback {

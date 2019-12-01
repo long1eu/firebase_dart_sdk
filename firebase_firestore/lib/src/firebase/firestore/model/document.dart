@@ -9,7 +9,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.d
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
-import 'package:firebase_firestore/src/proto/google/index.dart' as pb;
+import 'package:firebase_firestore/src/proto/index.dart' as pb;
 
 /// Describes the hasPendingWrites state of a document.
 enum DocumentState {

@@ -17,8 +17,8 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.da
 import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel.dart';
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart';
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart';
+import 'package:firebase_firestore/src/proto/google/firestore/v1/firestore.pb.dart';
+import 'package:firebase_firestore/src/proto/google/firestore/v1/write.pb.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
@@ -90,7 +90,7 @@ class Datastore {
     try {
       final CommitResponse response = await channel.runRpc(
         ClientMethod<CommitRequest, CommitResponse>(
-          'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Commit',
+          'firestore.googleapis.com/google.firestore.v1.Firestore/Commit',
           (GeneratedMessage req) => req.writeToBuffer(),
           (List<int> req) => CommitResponse.fromBuffer(req),
         ),
@@ -116,16 +116,20 @@ class Datastore {
   }
 
   Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
-    final BatchGetDocumentsRequest builder = BatchGetDocumentsRequest.create();
-    builder.database = serializer.databaseName;
+    final BatchGetDocumentsRequest builder = BatchGetDocumentsRequest.create()..database = serializer.databaseName;
     for (DocumentKey key in keys) {
       builder.documents.add(serializer.encodeKey(key));
     }
 
     try {
+
+
+      BatchGetDocumentsRequest();
+
       final List<BatchGetDocumentsResponse> responses = await channel.runStreamingResponseRpc(
+
           ClientMethod<BatchGetDocumentsResponse, BatchGetDocumentsResponse>(
-            'firestore.googleapis.com/google.firestore.v1beta1.Firestore/BatchGetDocuments',
+            'firestore.googleapis.com/google.firestore.v1.Firestore/BatchGetDocuments',
             (GeneratedMessage req) => req.writeToBuffer(),
             (List<int> res) => BatchGetDocumentsResponse.fromBuffer(res),
           ),

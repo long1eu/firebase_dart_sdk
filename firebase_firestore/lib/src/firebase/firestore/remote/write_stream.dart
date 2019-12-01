@@ -14,8 +14,8 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel.dart';
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/firestore.pb.dart';
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/write.pb.dart';
+import 'package:firebase_firestore/src/proto/google/firestore/v1/firestore.pb.dart';
+import 'package:firebase_firestore/src/proto/google/firestore/v1/write.pb.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
@@ -31,14 +31,13 @@ import 'package:protobuf/protobuf.dart';
 /// batches of mutations at the same time, it's okay to use the same streamToken for the calls to [writeMutations].
 ///
 /// @see <a
-/// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1beta1/firestore.proto#L139'>firestore.proto</a>
+/// href='https://github.com/googleapis/googleapis/blob/master/google/firestore/v1/firestore.proto#L139'>firestore.proto</a>
 class WriteStream extends AbstractStream<WriteRequest, WriteResponse, WriteStreamCallback> {
-  WriteStream(FirestoreChannel channel, AsyncQueue workerQueue, this._serializer,
-      WriteStreamCallback listener)
+  WriteStream(FirestoreChannel channel, AsyncQueue workerQueue, this._serializer, WriteStreamCallback listener)
       : super(
           channel,
           ClientMethod<WriteRequest, WriteResponse>(
-            'firestore.googleapis.com/google.firestore.v1beta1.Firestore/Write',
+            'firestore.googleapis.com/google.firestore.v1.Firestore/Write',
             (GeneratedMessage req) => req.writeToBuffer(),
             (List<int> res) => WriteResponse.fromBuffer(res),
           ),
@@ -138,8 +137,7 @@ class WriteStream extends AbstractStream<WriteRequest, WriteResponse, WriteStrea
   }
 }
 
-typedef OnWriteResponse = Future<void> Function(
-    SnapshotVersion commitVersion, List<MutationResult> mutationResults);
+typedef OnWriteResponse = Future<void> Function(SnapshotVersion commitVersion, List<MutationResult> mutationResults);
 
 /// A callback interface for the set of events that can be emitted by the [WriteStream]
 class WriteStreamCallback extends StreamCallback {

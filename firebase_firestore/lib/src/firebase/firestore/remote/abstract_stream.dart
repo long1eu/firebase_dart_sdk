@@ -68,16 +68,19 @@ abstract class AbstractStream<ReqT extends GeneratedMessage, RespT extends Gener
   final ExponentialBackoff backoff;
   final CallbackT listener;
 
+  @override
   bool get isStarted {
     return _state == StreamState.starting ||
         _state == StreamState.open ||
         _state == StreamState.backoff;
   }
 
+  @override
   bool get isOpen {
     return _state == StreamState.open;
   }
 
+  @override
   Future<void> start() async {
     hardAssert(_call == null, 'Last call still set');
     hardAssert(_idleTimer == null, 'Idle timer still set');
