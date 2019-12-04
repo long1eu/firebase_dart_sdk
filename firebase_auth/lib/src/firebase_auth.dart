@@ -4,6 +4,14 @@
 
 part of firebase_auth;
 
+///  The maximum wait time before attempting to retry auto refreshing tokens after a failed attempt.
+///
+/// This is the upper limit of the exponential backoff used for retrying token refresh.
+const Duration _kMaxWaitTimeForBackoff = Duration(minutes: 16);
+
+/// The amount of time before the token expires that proactive refresh should be attempted.
+const Duration _kTokenRefreshHeadStart = Duration(minutes: 5);
+
 class FirebaseAuth implements InternalTokenProvider {
   FirebaseAuth._(this._app, this._firebaseAuthApi, this._configuration, this._userStorage)
       : _platformDependencies = _app.platformDependencies;
@@ -116,6 +124,24 @@ class FirebaseAuth implements InternalTokenProvider {
         AdditionalUserInfoImpl(providerId: ProviderType.password, isNewUser: true);
 
     return AuthResult._(user, additionalUserInfo);
+  }
+
+  /// Returns a list of sign-in methods that can be used to sign in a given user (identified by its main email address).
+  ///
+  /// This method is useful when you support multiple authentication mechanisms if you want to implement an email-first
+  /// authentication flow.
+  ///
+  /// An empty `List` is returned if the user could not be found.
+  ///
+  /// Errors:
+  ///   • [FirebaseAuthError.invalidEmail] - If the [email] address is malformed.
+  Future<List<String>> fetchSignInMethodsForEmail({@required String email}) async {
+    assert(email != null);
+
+    final CreateAuthUriRequest request = CreateAuthUriRequest(identifier: email, continueUri: 'http://www.google.com/');
+    final CreateAuthUriResponse response = await _firebaseAuthApi.createAuthUri(request);
+
+    return response.registered ? response.allProviders.toList() : <String>[];
   }
 
   /// Gets the cached current user, or null if there is none.

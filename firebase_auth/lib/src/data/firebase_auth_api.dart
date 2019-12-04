@@ -21,4 +21,10 @@ class FirebaseAuthApi {
   Future<List<UserDataResponse>> getAccountInfo(String firebaseAccessToken) {
     return _firebaseAuthService.lookup(firebaseAccessToken);
   }
+
+  /// Calls the createAuthURI endpoint, which is responsible for creating the URI used by the IdP to authenticate the
+  /// user.
+  Future<CreateAuthUriResponse> createAuthUri(CreateAuthUriRequest request) {
+    return _firebaseAuthService.createAuthUri(request);
+  }
 }
