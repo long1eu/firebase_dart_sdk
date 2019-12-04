@@ -166,6 +166,15 @@ class FirebaseAuth implements InternalTokenProvider {
     return _firebaseAuthApi._firebaseAuthService.sendOobCode(request);
   }
 
+  /// Sends a sign in with email link to provided email address.
+  Future<void> sendSignInWithEmailLink({@required String email, @required ActionCodeSettings settings}) async {
+    assert(email != null);
+    assert(settings != null);
+
+    final OobCodeRequest request = OobCodeRequest.emailLink(email: email, settings: settings);
+    return _firebaseAuthApi._firebaseAuthService.sendOobCode(request);
+  }
+
   /// Gets the cached current user, or null if there is none.
   FirebaseUser get currentUser => _currentUser;
 

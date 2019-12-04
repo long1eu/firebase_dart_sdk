@@ -38,18 +38,18 @@ abstract class OobCodeRequest implements Built<OobCodeRequest, OobCodeRequestBui
   }
 
   /// For email sign-in link requests, we only need an email address in addition to requestType.
-  factory OobCodeRequest.emailLink({@required String email, ActionCodeSettings settings}) {
+  factory OobCodeRequest.emailLink({@required String email, @required ActionCodeSettings settings}) {
     return _$OobCodeRequest((OobCodeRequestBuilder b) {
       b
         ..requestType = OobCodeType.emailLink
         ..email = email
-        ..continueUrl = settings?.continueUrl
-        ..iOSBundleId = settings?.iOSBundleId
-        ..androidPackageName = settings?.androidPackageName
-        ..androidInstallApp = settings?.androidInstallApp
-        ..androidMinimumVersion = settings?.androidMinimumVersion
-        ..canHandleCodeInApp = settings?.canHandleCodeInApp
-        ..dynamicLinkDomain = settings?.dynamicLinkDomain;
+        ..continueUrl = settings.continueUrl
+        ..iOSBundleId = settings.iOSBundleId
+        ..androidPackageName = settings.androidPackageName
+        ..androidInstallApp = settings.androidInstallApp
+        ..androidMinimumVersion = settings.androidMinimumVersion
+        ..canHandleCodeInApp = settings.canHandleCodeInApp
+        ..dynamicLinkDomain = settings.dynamicLinkDomain;
     });
   }
 
