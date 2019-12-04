@@ -7,84 +7,92 @@ import 'dart:math';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 
-/// Helper to implement exponential backoff.
+/// Helper for running delayed tasks following an exponential backoff curve between attempts using the [backoffFactor]
+/// to determine the extended base delay after each attempt.
+///
+/// Each delay is made up of a [initialDelay] delay which follows the exponential backoff curve, and a +/- 50%
+/// 'jitter' that is calculated and added to the base delay. This prevents clients from accidentally synchronizing
+/// their delays causing spikes of load to the backend. All tasks are randed on the [queue] using the [timerId].
+///
+/// Note that jitter be applied both for the [initialDelay] and for the [maxDelay]. This means that the value can be
+/// as little as 0.5 * [initialDelay] and as much as 1.5 * [maxDelay]. After [maxDelay] is reached no further backoff
+/// is performed.
 class ExponentialBackoff {
-  /// Creates and returns a helper for running delayed tasks following an exponential backoff curve
-  /// between attempts.
-  ///
-  /// Each delay is made up of a 'base' delay which follows the exponential backoff curve, and a
-  /// +/- 50% 'jitter' that is calculated and added to the base delay. This prevents clients from
-  /// accidentally synchronizing their delays causing spikes of load to the backend.
-  ///
-  /// The async [_queue] to run tasks on. [_timerId] to use when queuing backoff tasks in the
-  /// [AsyncQueue]. [_initialDelayMs] is the initial delay (used as the base delay on the first
-  /// retry attempt). Note that jitter will still be applied, so the actual delay could be as little
-  /// as 0.5*[_initialDelayMs]. [_backoffFactor] is the multiplier to use to determine the extended
-  /// base delay after each attempt. [_maxDelayMs] is the maximum base delay after which no further
-  /// backoff is performed. Note that jitter will still be applied, so the actual delay could be as
-  /// much as 1.5*[_maxDelayMs].
+  // Initial backoff set to 1s according to https://cloud.google.com/apis/design/errors.
   ExponentialBackoff(
-      this._queue, this._timerId, this._initialDelayMs, this._backoffFactor, this._maxDelayMs) {
-    _lastAttemptTime = DateTime.now().millisecondsSinceEpoch;
-
-    reset();
-  }
+    AsyncQueue queue,
+    TimerId timerId, {
+    Duration initialDelay = const Duration(seconds: 1),
+    double backoffFactor = 1.5,
+    Duration maxDelay = const Duration(minutes: 1),
+  })  : assert(queue != null),
+        assert(timerId != null),
+        assert(initialDelay != null),
+        assert(backoffFactor != null),
+        assert(maxDelay != null),
+        _queue = queue,
+        _timerId = timerId,
+        _initialDelay = initialDelay,
+        _backoffFactor = backoffFactor,
+        _maxDelay = maxDelay,
+        _lastAttemptTime = DateTime.now(),
+        _currentBase = Duration.zero;
 
   final AsyncQueue _queue;
   final TimerId _timerId;
-  final int _initialDelayMs;
+  final Duration _initialDelay;
   final double _backoffFactor;
-  final int _maxDelayMs;
+  final Duration _maxDelay;
 
-  int _currentBaseMs;
-  int _lastAttemptTime;
+  Duration _currentBase;
+  DateTime _lastAttemptTime;
   DelayedTask<void> _timerTask;
 
   /// Resets the backoff delay.
   ///
-  /// The very next [backoffAndRun] will have no delay. If it is called again (i.e. due to an
-  /// error), [_initialDelayMs] (plus jitter) will be used, and subsequent ones will increase
-  /// according to the [_backoffFactor].
-  void reset() => _currentBaseMs = 0;
+  /// The very next [backoffAndRun] will have no delay. If it is called again (i.e. due to an error), [_initialDelay]
+  /// (plus jitter) will be used, and subsequent ones will increase according to the [_backoffFactor].
+  void reset() => _currentBase = Duration.zero;
 
   /// Resets the backoff delay to the maximum delay (e.g. for use after a RESOURCE_EXHAUSTED error).
-  void resetToMax() => _currentBaseMs = _maxDelayMs;
+  void resetToMax() => _currentBase = _maxDelay;
 
-  /// Waits for [currentDelayMs], increases the delay and runs the specified task. If there was a
-  /// pending backoff task waiting to run already, it will be canceled.
+  /// Waits for [currentDelayMs], increases the delay and runs the specified task. If there was a pending backoff task
+  /// waiting to run already, it will be canceled.
   void backoffAndRun(Function task) {
     // Cancel any pending backoff operation.
     cancel();
 
     // First schedule using the current base (which may be 0 and should be
     // honored as such).
-    final int desiredDelayWithJitterMs = _currentBaseMs + _jitterDelayMs();
+    final Duration desiredDelayWithJitter = _currentBase + _jitterDelay();
 
     // Guard against lastAttemptTime being in the future due to a clock change.
-    final int delaySoFarMs = max(0, DateTime.now().millisecondsSinceEpoch - _lastAttemptTime);
+    final Duration difference = DateTime.now().difference(_lastAttemptTime);
+    final Duration delaySoFar = difference < Duration.zero ? Duration.zero : difference;
 
     // Guard against the backoff delay already being past.
-    final int remainingDelayMs = max(0, desiredDelayWithJitterMs - delaySoFarMs);
+    final Duration remaining = desiredDelayWithJitter - delaySoFar;
+    final Duration remainingDelay = remaining < Duration.zero ? Duration.zero : remaining;
 
-    if (_currentBaseMs > 0) {
+    if (_currentBase > Duration.zero) {
       Log.d(
           runtimeType.toString(),
-          'Backing off for $remainingDelayMs ms (base delay: $_currentBaseMs ms, delay with jitter:'
-          ' $desiredDelayWithJitterMs ms, last attempt: $delaySoFarMs ms ago)');
+          'Backing off for $remainingDelay (base delay: $_currentBase, delay with jitter: $desiredDelayWithJitter, '
+          'last attempt: $delaySoFar ago)');
     }
 
-    _timerTask = _queue.enqueueAfterDelay<void>(_timerId, Duration(milliseconds: remainingDelayMs),
-        () async {
-      _lastAttemptTime = DateTime.now().millisecondsSinceEpoch;
+    _timerTask = _queue.enqueueAfterDelay<void>(_timerId, remainingDelay, () async {
+      _lastAttemptTime = DateTime.now();
       task();
     }, 'ExponentialBackoff backoffAndRun');
 
     // Apply backoff factor to determine next delay and ensure it is within bounds.
-    _currentBaseMs = (_currentBaseMs * _backoffFactor).toInt();
-    if (_currentBaseMs < _initialDelayMs) {
-      _currentBaseMs = _initialDelayMs;
-    } else if (_currentBaseMs > _maxDelayMs) {
-      _currentBaseMs = _maxDelayMs;
+    _currentBase = _currentBase * _backoffFactor;
+    if (_currentBase < _initialDelay) {
+      _currentBase = _initialDelay;
+    } else if (_currentBase > _maxDelay) {
+      _currentBase = _maxDelay;
     }
   }
 
@@ -96,7 +104,8 @@ class ExponentialBackoff {
   }
 
   /// Returns a random value in the range [-currentBaseMs/2, currentBaseMs/2]
-  int _jitterDelayMs() {
-    return ((Random().nextDouble() - 0.5) * _currentBaseMs).toInt();
+  Duration _jitterDelay() {
+    final double value = Random().nextDouble() - 0.5;
+    return Duration(milliseconds: (value * _currentBase.inMilliseconds).toInt());
   }
 }

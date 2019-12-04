@@ -27,8 +27,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change_aggregator.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
@@ -793,7 +791,7 @@ class LocalStoreTestCase {
     // New message with empty resume token should not replace the old resume token
     final WatchChangeAggregator aggregator2 = WatchChangeAggregator(testTargetMetadataProvider);
     final WatchChangeWatchTargetChange watchChange2 =
-        WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[targetId], WatchStream.emptyResumeToken);
+        WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[targetId], Uint8List(0));
     aggregator2.handleTargetChange(watchChange2);
     final RemoteEvent remoteEvent2 = aggregator2.createRemoteEvent(version(2000));
     await _applyRemoteEvent(remoteEvent2);
@@ -846,7 +844,7 @@ class LocalStoreTestCase {
     final SnapshotVersion _version = version(documentVersion);
     final MutationResult mutationResult = MutationResult(_version, /*transformResults:*/ null);
     final MutationBatchResult result =
-        MutationBatchResult.create(batch, _version, <MutationResult>[mutationResult], WriteStream.emptyStreamToken);
+        MutationBatchResult.create(batch, _version, <MutationResult>[mutationResult], Uint8List(0));
     _lastChanges = await _localStore.acknowledgeBatch(result);
   }
 

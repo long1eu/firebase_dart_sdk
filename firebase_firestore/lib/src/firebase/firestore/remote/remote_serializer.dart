@@ -512,13 +512,13 @@ class RemoteSerializer {
 
   // Queries
 
-  MapEntry<String, String> encodeListenRequestLabels(QueryData queryData) {
+  Map<String, String> encodeListenRequestLabels(QueryData queryData) {
     final String value = _encodeLabel(queryData.purpose);
     if (value == null) {
-      return null;
+      return <String, String>{};
     }
 
-    return MapEntry<String, String>('goog-listen-tags', value);
+    return <String, String>{'goog-listen-tags': value};
   }
 
   String _encodeLabel(QueryPurpose purpose) {

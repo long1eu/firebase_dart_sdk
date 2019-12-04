@@ -9,7 +9,6 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
 import 'package:meta/meta.dart';
 
 /// An immutable set of metadata that the store will need to keep track of for each query.
@@ -22,8 +21,7 @@ class QueryData {
   /// watching a query to be resumed after disconnecting without retransmitting all the data that
   /// matches the query. The resume token essentially identifies a point in time from which the
   /// server should resume sending results.
-  QueryData(this.query, this.targetId, this.sequenceNumber, this.purpose, this.snapshotVersion,
-      this.resumeToken)
+  QueryData(this.query, this.targetId, this.sequenceNumber, this.purpose, this.snapshotVersion, this.resumeToken)
       : assert(query != null),
         assert(snapshotVersion != null),
         assert(resumeToken != null);
@@ -36,7 +34,7 @@ class QueryData {
       sequenceNumber,
       purpose,
       SnapshotVersion.none,
-      WatchStream.emptyResumeToken,
+      Uint8List(0),
     );
   }
 
@@ -49,9 +47,7 @@ class QueryData {
 
   /// Creates a new query data instance with an updated snapshot version and resume token.
   QueryData copyWith(
-      {@required SnapshotVersion snapshotVersion,
-      @required Uint8List resumeToken,
-      @required int sequenceNumber}) {
+      {@required SnapshotVersion snapshotVersion, @required Uint8List resumeToken, @required int sequenceNumber}) {
     assert(sequenceNumber != null);
     return QueryData(
       query,

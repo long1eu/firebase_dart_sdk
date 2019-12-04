@@ -17,7 +17,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:firebase_firestore/src/proto/index.dart' as proto;
@@ -28,7 +27,7 @@ class SQLiteMutationQueue implements MutationQueue {
   /// Creates a mutation queue for the given user, in the SQLite database wrapped by the persistence interface.
   SQLiteMutationQueue(this.db, this.serializer, User user)
       : uid = user.isAuthenticated ? user.uid : '',
-        _lastStreamToken = WriteStream.emptyStreamToken;
+        _lastStreamToken = Uint8List(0);
 
   final sq.SQLitePersistence db;
   final LocalSerializer serializer;

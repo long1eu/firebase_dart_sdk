@@ -14,8 +14,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// [QueryListener] takes a series of internal view snapshots and determines when to raise events.
 class QueryListener extends Stream<ViewSnapshot> {
-  QueryListener(this.query, [this.options = const ListenOptions(), this.onCancel])
-      : assert(options != null) {
+  QueryListener(this.query, [this.options = const ListenOptions(), this.onCancel]) : assert(options != null) {
     sink = StreamController<ViewSnapshot>(onCancel: () => onCancel?.call(this));
   }
 
@@ -36,8 +35,8 @@ class QueryListener extends Stream<ViewSnapshot> {
   ViewSnapshot snapshot;
 
   Future<void> onViewSnapshot(ViewSnapshot newSnapshot) async {
-    hardAssert(newSnapshot.changes.isNotEmpty || newSnapshot.didSyncStateChange,
-        'We got a new snapshot with no changes?');
+    hardAssert(
+        newSnapshot.changes.isNotEmpty || newSnapshot.didSyncStateChange, 'We got a new snapshot with no changes?');
 
     if (!options.includeDocumentMetadataChanges) {
       // Remove the metadata only changes
@@ -72,9 +71,7 @@ class QueryListener extends Stream<ViewSnapshot> {
 
   void onOnlineStateChanged(OnlineState onlineState) {
     this.onlineState = onlineState;
-    if (snapshot != null &&
-        !raisedInitialEvent &&
-        _shouldRaiseInitialEvent(snapshot, onlineState)) {
+    if (snapshot != null && !raisedInitialEvent && _shouldRaiseInitialEvent(snapshot, onlineState)) {
       _raiseInitialEvent(snapshot);
     }
   }
@@ -126,7 +123,7 @@ class QueryListener extends Stream<ViewSnapshot> {
   void _raiseInitialEvent(ViewSnapshot snapshot) {
     hardAssert(!raisedInitialEvent, 'Trying to raise initial event for second time');
 
-    snapshot = ViewSnapshot.fromInitialDocuments(
+    final ViewSnapshot _snapshot = ViewSnapshot.fromInitialDocuments(
       snapshot.query,
       snapshot.documents,
       snapshot.mutatedKeys,
@@ -135,7 +132,7 @@ class QueryListener extends Stream<ViewSnapshot> {
     );
 
     raisedInitialEvent = true;
-    sink.add(snapshot);
+    sink.add(_snapshot);
   }
 
   @override

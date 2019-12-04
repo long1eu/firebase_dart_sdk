@@ -9,7 +9,6 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/existence_filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:grpc/grpc.dart';
 
@@ -89,7 +88,7 @@ class WatchChangeWatchTargetChange extends WatchChange {
     this.targetIds, [
     Uint8List resumeToken,
     GrpcError cause,
-  ])  : resumeToken = resumeToken ?? WatchStream.emptyResumeToken,
+  ])  : resumeToken = resumeToken ?? Uint8List(0),
         // We can get a cause that is considered ok, but everywhere we assume that any non-null cause is an error.
         cause = cause != null && cause.code != StatusCode.ok ? cause : null,
         super._() {

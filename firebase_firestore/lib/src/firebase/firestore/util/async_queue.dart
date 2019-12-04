@@ -127,9 +127,9 @@ class AsyncQueue {
       _runNext();
     }
 
-    final T result = await taskEntry.completer.future;
+    return taskEntry.completer.future;
     //print('----QUEUE => done $caller');
-    return result;
+
   }
 
   /// Queue and run this Runnable task immediately after every other already queued task. Unlike [enqueue], returns void
@@ -273,7 +273,7 @@ class DelayedTask<T> implements Comparable<DelayedTask<T>> {
   Future<void> _handleDelayElapsed() async {
     if (scheduledFuture != null) {
       _markDone();
-      await queue.enqueue(task, '$caller-delayed');
+      await queue.enqueue(task, '$caller-delayed').catchError(print);
     }
 
     return;

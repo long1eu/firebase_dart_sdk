@@ -32,7 +32,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 

@@ -15,7 +15,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
@@ -24,7 +23,7 @@ class MemoryMutationQueue implements MutationQueue {
       : _queue = <MutationBatch>[],
         _batchesByDocumentKey = ImmutableSortedSet<DocumentReference>(<DocumentReference>[], DocumentReference.byKey),
         _nextBatchId = 1,
-        lastStreamToken = WriteStream.emptyStreamToken;
+        lastStreamToken = Uint8List(0);
 
   /// A FIFO queue of all mutations to apply to the backend. Mutations are added to the end of the queue as they're
   /// written, and removed from the front of the queue as the mutations become visible or are rejected.
