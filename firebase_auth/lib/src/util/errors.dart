@@ -3,139 +3,139 @@ part of firebase_auth;
 class FirebaseAuthError extends FirebaseError {
   factory FirebaseAuthError(String name, String message) {
     switch (name) {
-      case 'ERROR_INVALID_CUSTOM_TOKEN':
+      case 'INVALID_CUSTOM_TOKEN':
         return invalidCustomToken;
-      case 'ERROR_CUSTOM_TOKEN_MISMATCH':
+      case 'CUSTOM_TOKEN_MISMATCH':
         return customTokenMismatch;
-      case 'ERROR_INVALID_CREDENTIAL':
+      case 'INVALID_CREDENTIAL':
         return invalidCredential;
-      case 'ERROR_USER_DISABLED':
+      case 'USER_DISABLED':
         return userDisabled;
-      case 'ERROR_OPERATION_NOT_ALLOWED':
+      case 'OPERATION_NOT_ALLOWED':
         return operationNotAllowed;
-      case 'ERROR_EMAIL_ALREADY_IN_USE':
+      case 'EMAIL_ALREADY_IN_USE':
         return emailAlreadyInUse;
-      case 'ERROR_INVALID_EMAIL':
+      case 'INVALID_EMAIL':
         return invalidEmail;
-      case 'ERROR_WRONG_PASSWORD':
+      case 'WRONG_PASSWORD':
         return wrongPassword;
-      case 'ERROR_TOO_MANY_REQUESTS':
+      case 'TOO_MANY_REQUESTS':
         return tooManyRequests;
-      case 'ERROR_USER_NOT_FOUND':
+      case 'USER_NOT_FOUND':
         return userNotFound;
-      case 'ERROR_ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL':
+      case 'ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL':
         return accountExistsWithDifferentCredential;
-      case 'ERROR_REQUIRES_RECENT_LOGIN':
+      case 'REQUIRES_RECENT_LOGIN':
         return requiresRecentLogin;
-      case 'ERROR_PROVIDER_ALREADY_LINKED':
+      case 'PROVIDER_ALREADY_LINKED':
         return providerAlreadyLinked;
-      case 'ERROR_NO_SUCH_PROVIDER':
+      case 'NO_SUCH_PROVIDER':
         return noSuchProvider;
-      case 'ERROR_INVALID_USER_TOKEN':
+      case 'INVALID_USER_TOKEN':
         return invalidUserToken;
-      case 'ERROR_NETWORK_REQUEST_FAILED':
+      case 'NETWORK_REQUEST_FAILED':
         return networkError;
-      case 'ERROR_USER_TOKEN_EXPIRED':
+      case 'USER_TOKEN_EXPIRED':
         return userTokenExpired;
-      case 'ERROR_INVALID_API_KEY':
+      case 'INVALID_API_KEY':
         return invalidAPIKey;
-      case 'ERROR_USER_MISMATCH':
+      case 'USER_MISMATCH':
         return userMismatch;
-      case 'ERROR_CREDENTIAL_ALREADY_IN_USE':
+      case 'CREDENTIAL_ALREADY_IN_USE':
         return credentialAlreadyInUse;
-      case 'ERROR_WEAK_PASSWORD':
+      case 'WEAK_PASSWORD':
         return weakPassword;
-      case 'ERROR_APP_NOT_AUTHORIZED':
+      case 'APP_NOT_AUTHORIZED':
         return appNotAuthorized;
-      case 'ERROR_EXPIRED_ACTION_CODE':
+      case 'EXPIRED_ACTION_CODE':
         return expiredActionCode;
-      case 'ERROR_INVALID_ACTION_CODE':
+      case 'INVALID_ACTION_CODE':
         return invalidActionCode;
-      case 'ERROR_INVALID_MESSAGE_PAYLOAD':
+      case 'INVALID_MESSAGE_PAYLOAD':
         return invalidMessagePayload;
-      case 'ERROR_INVALID_SENDER':
+      case 'INVALID_SENDER':
         return invalidSender;
-      case 'ERROR_INVALID_RECIPIENT_EMAIL':
+      case 'INVALID_RECIPIENT_EMAIL':
         return invalidRecipientEmail;
-      case 'ERROR_MISSING_EMAIL':
+      case 'MISSING_EMAIL':
         return missingEmail;
-      case 'ERROR_MISSING_IOS_BUNDLE_ID':
+      case 'MISSING_IOS_BUNDLE_ID':
         return missingIosBundleID;
-      case 'ERROR_MISSING_ANDROID_PKG_NAME':
+      case 'MISSING_ANDROID_PKG_NAME':
         return missingAndroidPackageName;
-      case 'ERROR_UNAUTHORIZED_DOMAIN':
+      case 'UNAUTHORIZED_DOMAIN':
         return unauthorizedDomain;
-      case 'ERROR_INVALID_CONTINUE_URI':
+      case 'INVALID_CONTINUE_URI':
         return invalidContinueURI;
-      case 'ERROR_MISSING_CONTINUE_URI':
+      case 'MISSING_CONTINUE_URI':
         return missingContinueURI;
-      case 'ERROR_MISSING_PHONE_NUMBER':
+      case 'MISSING_PHONE_NUMBER':
         return missingPhoneNumber;
-      case 'ERROR_INVALID_PHONE_NUMBER':
+      case 'INVALID_PHONE_NUMBER':
         return invalidPhoneNumber;
-      case 'ERROR_MISSING_VERIFICATION_CODE':
+      case 'MISSING_VERIFICATION_CODE':
         return missingVerificationCode;
-      case 'ERROR_INVALID_VERIFICATION_CODE':
+      case 'INVALID_VERIFICATION_CODE':
         return invalidVerificationCode;
-      case 'ERROR_MISSING_VERIFICATION_ID':
+      case 'MISSING_VERIFICATION_ID':
         return missingVerificationID;
-      case 'ERROR_INVALID_VERIFICATION_ID':
+      case 'INVALID_VERIFICATION_ID':
         return invalidVerificationID;
       case 'MISSING_APP_CREDENTIAL':
         return missingAppCredential;
       case 'INVALID_APP_CREDENTIAL':
         return invalidAppCredential;
-      case 'ERROR_SESSION_EXPIRED':
+      case 'SESSION_EXPIRED':
         return sessionExpired;
-      case 'ERROR_QUOTA_EXCEEDED':
+      case 'QUOTA_EXCEEDED':
         return quotaExceeded;
-      case 'ERROR_MISSING_APP_TOKEN':
+      case 'MISSING_APP_TOKEN':
         return missingAppToken;
-      case 'ERROR_NOTIFICATION_NOT_FORWARDED':
+      case 'NOTIFICATION_NOT_FORWARDED':
         return notificationNotForwarded;
-      case 'ERROR_APP_NOT_VERIFIED':
+      case 'APP_NOT_VERIFIED':
         return appNotVerified;
-      case 'ERROR_CAPTCHA_CHECK_FAILED':
+      case 'CAPTCHA_CHECK_FAILED':
         return captchaCheckFailed;
-      case 'ERROR_WEB_CONTEXT_ALREADY_PRESENTED':
+      case 'WEB_CONTEXT_ALREADY_PRESENTED':
         return webContextAlreadyPresented;
-      case 'ERROR_WEB_CONTEXT_CANCELLED':
+      case 'WEB_CONTEXT_CANCELLED':
         return webContextCancelled;
-      case 'ERROR_APP_VERIFICATION_FAILED':
+      case 'APP_VERIFICATION_FAILED':
         return appVerificationUserInteractionFailure;
-      case 'ERROR_INVALID_CLIENT_ID':
+      case 'INVALID_CLIENT_ID':
         return invalidClientID;
-      case 'ERROR_WEB_NETWORK_REQUEST_FAILED':
+      case 'WEB_NETWORK_REQUEST_FAILED':
         return webNetworkRequestFailed;
-      case 'ERROR_WEB_INTERNAL_ERROR':
+      case 'WEB_INTERNAL_ERROR':
         return webInternalError;
-      case 'ERROR_WEB_USER_INTERACTION_FAILURE':
+      case 'WEB_USER_INTERACTION_FAILURE':
         return webSignInUserInteractionFailure;
-      case 'ERROR_LOCAL_PLAYER_NOT_AUTHENTICATED':
+      case 'LOCAL_PLAYER_NOT_AUTHENTICATED':
         return localPlayerNotAuthenticated;
-      case 'ERROR_NULL_USER':
+      case 'NULL_USER':
         return nullUser;
-      case 'ERROR_DYNAMIC_LINK_NOT_ACTIVATED':
+      case 'DYNAMIC_LINK_NOT_ACTIVATED':
         return dynamicLinkNotActivated;
-      case 'ERROR_INVALID_PROVIDER_ID':
+      case 'INVALID_PROVIDER_ID':
         return invalidProviderID;
-      case 'ERROR_INVALID_DYNAMIC_LINK_DOMAIN':
+      case 'INVALID_DYNAMIC_LINK_DOMAIN':
         return invalidDynamicLinkDomain;
-      case 'ERROR_REJECTED_CREDENTIAL':
+      case 'REJECTED_CREDENTIAL':
         return rejectedCredential;
-      case 'ERROR_GAME_KIT_NOT_LINKED':
+      case 'GAME_KIT_NOT_LINKED':
         return gameKitNotLinked;
-      case 'ERROR_MISSING_OR_INVALID_NONCE':
+      case 'MISSING_OR_INVALID_NONCE':
         return missingOrInvalidNonce;
       case 'EMAIL_EXISTS':
         return emailExists;
-      case 'ERROR_MISSING_CLIENT_IDENTIFIER':
+      case 'MISSING_CLIENT_IDENTIFIER':
         return missingClientIdentifier;
-      case 'ERROR_KEYCHAIN_ERROR':
+      case 'KEYCHAIN_ERROR':
         return keychainError;
-      case 'ERROR_INTERNAL_ERROR':
+      case 'INTERNAL_ERROR':
         return internalError;
-      case 'ERROR_MALFORMED_JWT':
+      case 'MALFORMED_JWT':
         return malformedJWT;
       default:
         return FirebaseAuthError._(-1, '$name${message.isEmpty ? '' : ' : $message'}');

@@ -27,6 +27,7 @@ part 'requests/update.dart';
 part 'requests/user_data_response.dart';
 part 'user/impl.dart';
 part 'user/user.dart';
+part 'requests/action_code_settings.dart';
 
 @SerializersFor(<Type>[
   AdditionalUserInfoImpl,
