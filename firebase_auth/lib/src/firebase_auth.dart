@@ -220,8 +220,60 @@ class FirebaseAuth implements InternalTokenProvider {
     _dispatchUser(_currentUser);
   }
 
+  /// Schedules a task to automatically refresh tokens on the current user.
+  ///
+  /// The token refresh is scheduled 5 minutes before the scheduled expiration time.
   void _scheduleAutoTokenRefresh() {
-    // todo
+    final DateTime preExpirationDate = _currentUser._accessTokenExpirationDate.subtract(_kTokenRefreshHeadStart);
+    Duration tokenExpirationInterval = preExpirationDate.difference(DateTime.now());
+    tokenExpirationInterval = tokenExpirationInterval < Duration.zero ? Duration.zero : tokenExpirationInterval;
+    _scheduleAutoTokenRefreshWithDelay(tokenExpirationInterval, false);
+  }
+
+  /// Schedules a task to automatically refresh tokens on the current user.
+  Future<void> _scheduleAutoTokenRefreshWithDelay(Duration delay, bool retry) async {
+    final String accessToken = _currentUser._rawAccessToken;
+    if (accessToken == null) {
+      return;
+    }
+
+    if (retry) {
+      print('Token auto-refresh re-scheduled in $delay because of error on previous refresh attempt.');
+    } else {
+      print('Token auto-refresh scheduled in $delay for the new token.');
+    }
+    _autoRefreshScheduled = true;
+
+    Timer(delay, () async {
+      if (_currentUser._rawAccessToken != accessToken) {
+        // Another auto refresh must have been scheduled so keep _autoRefreshScheduled unchanged.
+        return;
+      }
+      _autoRefreshScheduled = false;
+      if (_isAppInBackground) {
+        return;
+      }
+
+      try {
+        final String uid = _currentUser?.uid;
+        await _currentUser._getToken(forceRefresh: true);
+
+        if (_currentUser.uid != uid) {
+          return;
+        }
+      } catch (e) {
+        // Kicks off exponential back off logic to retry failed attempt. Starts with one minute delay (60 seconds) if
+        // this is the first failed attempt.
+        Duration rescheduleDelay;
+        if (retry) {
+          final Duration nextDelay = delay * 2;
+          rescheduleDelay = nextDelay < _kMaxWaitTimeForBackoff ? nextDelay : _kMaxWaitTimeForBackoff;
+        } else {
+          rescheduleDelay = const Duration(minutes: 1);
+        }
+        await _scheduleAutoTokenRefreshWithDelay(rescheduleDelay, true);
+      }
+    });
   }
 
   void _dispatchUser(FirebaseUser user) {
