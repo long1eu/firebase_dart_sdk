@@ -70,6 +70,9 @@ class FirebaseUser with UserInfoMixin {
   /// in events, and should not be used to retrieve the access token by anyone else.
   String get _rawAccessToken => _secureTokenApi._accessToken;
 
+  /// The expiration date of the cached access token.
+  DateTime get _accessTokenExpirationDate => _secureTokenApi._accessTokenExpirationDate;
+
   /// Whether or not the user can be authenticated by using Firebase email and password.
   bool get _hasEmailPasswordCredential => __hasEmailPasswordCredential;
 
