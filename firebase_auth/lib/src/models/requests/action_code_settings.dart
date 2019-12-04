@@ -15,7 +15,7 @@ abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCod
     String androidPackageName,
     bool androidInstallApp,
     String androidMinimumVersion,
-    bool canHandleCodeInApp,
+    bool canHandleCodeInApp = false,
     String dynamicLinkDomain,
   }) {
     return _$ActionCodeSettings((ActionCodeSettingsBuilder b) {
@@ -25,7 +25,7 @@ abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCod
         ..androidPackageName = androidPackageName
         ..androidInstallApp = androidInstallApp
         ..androidMinimumVersion = androidMinimumVersion
-        ..canHandleCodeInApp = canHandleCodeInApp
+        ..canHandleCodeInApp = canHandleCodeInApp ?? false
         ..dynamicLinkDomain = dynamicLinkDomain;
     });
   }
@@ -54,10 +54,15 @@ abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCod
 
   /// Indicates whether the action code link will open the app directly after being redirected from a Firebase owned web
   /// widget.
-  @nullable
+  ///
+  /// When set to true, the action code link will be sent as a universal link and will be open by the app if installed.
+  /// In the false case, the code will be sent to the web widget first and then on continue will redirect to the app if
+  /// installed.
   bool get canHandleCodeInApp;
 
   /// The Firebase Dynamic Link domain used for out of band code flow.
+  ///
+  /// Must be one of the 5 domains configured in the Firebase console.
   @nullable
   String get dynamicLinkDomain;
 }
