@@ -104,13 +104,13 @@ class FirebaseAuth implements InternalTokenProvider {
   /// the [onAuthStateChanged] stream.
   ///
   /// Errors:
-  ///   • [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
-  ///   • [FirebaseAuthError.emailAlreadyInUse] - Indicates the email used to attempt sign up already exists. Call
+  ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
+  ///   * [FirebaseAuthError.emailAlreadyInUse] - Indicates the email used to attempt sign up already exists. Call
   ///     [fetchProvidersForEmail] to check which sign-in mechanisms the user used, and prompt the user to sign in with
   ///     one of those.
-  ///   • [FirebaseAuthError.operationNotAllowed] -  Indicates that email and password accounts are not enabled. Enable
+  ///   * [FirebaseAuthError.operationNotAllowed] -  Indicates that email and password accounts are not enabled. Enable
   ///     them in the Auth section of the Firebase console.
-  ///   • [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
+  ///   * [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
   Future<AuthResult> createUserWithEmailAndPassword({@required String email, @required String password}) async {
     assert(email != null);
     assert(password != null);
@@ -134,7 +134,7 @@ class FirebaseAuth implements InternalTokenProvider {
   /// An empty `List` is returned if the user could not be found.
   ///
   /// Errors:
-  ///   • [FirebaseAuthError.invalidEmail] - If the [email] address is malformed.
+  ///   * [FirebaseAuthError.invalidEmail] - If the [email] address is malformed.
   Future<List<String>> fetchSignInMethodsForEmail({@required String email}) async {
     assert(email != null);
 
@@ -142,6 +142,28 @@ class FirebaseAuth implements InternalTokenProvider {
     final CreateAuthUriResponse response = await _firebaseAuthApi.createAuthUri(request);
 
     return response.registered ? response.allProviders.toList() : <String>[];
+  }
+
+  /// Triggers the Firebase Authentication backend to send a password-reset email to the given email address, which must
+  /// correspond to an existing user of your app.
+  ///
+  /// Errors:
+  ///  * [FirebaseAuthError.invalidRecipientEmail] - Indicates an invalid recipient email was sent in the request.
+  ///  * [FirebaseAuthError.invalidSender] - Indicates an invalid sender email is set in the console for this action.
+  ///  * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
+  ///  * [FirebaseAuthError.missingIosBundleID] - Indicates that the iOS bundle ID is missing when
+  ///    [ActionCodeSettings.handleCodeInApp] is set to true.
+  ///  * [FirebaseAuthError.missingAndroidPackageName] - Indicates that the android package name is missing when the
+  ///    [ActionCodeSettings.androidInstallApp] flag is set to true.
+  ///  * [FirebaseAuthError.unauthorizedDomain] - Indicates that the domain specified in the continue URL is not
+  ///    whitelisted in the Firebase console.
+  ///  * [FirebaseAuthError.invalidContinueURI] - Indicates that the domain specified in the continue URI is not valid.
+  ///  * [FirebaseAuthError.userNotFound] - Indicates that there is no user corresponding to the given [email] address.
+  Future<void> sendPasswordResetEmail({@required String email, ActionCodeSettings settings}) async {
+    assert(email != null);
+
+    final OobCodeRequest request = OobCodeRequest.resetPassword(email: email, settings: settings);
+    return _firebaseAuthApi._firebaseAuthService.sendOobCode(request);
   }
 
   /// Gets the cached current user, or null if there is none.

@@ -1235,10 +1235,58 @@ class _$OobCodeRequestSerializer
         ..add(serializers.serialize(object.email,
             specifiedType: const FullType(String)));
     }
+    if (object.newEmail != null) {
+      result
+        ..add('newEmail')
+        ..add(serializers.serialize(object.newEmail,
+            specifiedType: const FullType(String)));
+    }
     if (object.idToken != null) {
       result
         ..add('idToken')
         ..add(serializers.serialize(object.idToken,
+            specifiedType: const FullType(String)));
+    }
+    if (object.continueUrl != null) {
+      result
+        ..add('continueUrl')
+        ..add(serializers.serialize(object.continueUrl,
+            specifiedType: const FullType(String)));
+    }
+    if (object.iOSBundleId != null) {
+      result
+        ..add('iOSBundleId')
+        ..add(serializers.serialize(object.iOSBundleId,
+            specifiedType: const FullType(String)));
+    }
+    if (object.androidPackageName != null) {
+      result
+        ..add('androidPackageName')
+        ..add(serializers.serialize(object.androidPackageName,
+            specifiedType: const FullType(String)));
+    }
+    if (object.androidInstallApp != null) {
+      result
+        ..add('androidInstallApp')
+        ..add(serializers.serialize(object.androidInstallApp,
+            specifiedType: const FullType(bool)));
+    }
+    if (object.androidMinimumVersion != null) {
+      result
+        ..add('androidMinimumVersion')
+        ..add(serializers.serialize(object.androidMinimumVersion,
+            specifiedType: const FullType(String)));
+    }
+    if (object.canHandleCodeInApp != null) {
+      result
+        ..add('canHandleCodeInApp')
+        ..add(serializers.serialize(object.canHandleCodeInApp,
+            specifiedType: const FullType(bool)));
+    }
+    if (object.dynamicLinkDomain != null) {
+      result
+        ..add('dynamicLinkDomain')
+        ..add(serializers.serialize(object.dynamicLinkDomain,
             specifiedType: const FullType(String)));
     }
     return result;
@@ -1264,8 +1312,40 @@ class _$OobCodeRequestSerializer
           result.email = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
+        case 'newEmail':
+          result.newEmail = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
         case 'idToken':
           result.idToken = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'continueUrl':
+          result.continueUrl = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'iOSBundleId':
+          result.iOSBundleId = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'androidPackageName':
+          result.androidPackageName = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'androidInstallApp':
+          result.androidInstallApp = serializers.deserialize(value,
+              specifiedType: const FullType(bool)) as bool;
+          break;
+        case 'androidMinimumVersion':
+          result.androidMinimumVersion = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'canHandleCodeInApp':
+          result.canHandleCodeInApp = serializers.deserialize(value,
+              specifiedType: const FullType(bool)) as bool;
+          break;
+        case 'dynamicLinkDomain':
+          result.dynamicLinkDomain = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
       }
@@ -4265,12 +4345,40 @@ class _$OobCodeRequest extends OobCodeRequest {
   @override
   final String email;
   @override
+  final String newEmail;
+  @override
   final String idToken;
+  @override
+  final String continueUrl;
+  @override
+  final String iOSBundleId;
+  @override
+  final String androidPackageName;
+  @override
+  final bool androidInstallApp;
+  @override
+  final String androidMinimumVersion;
+  @override
+  final bool canHandleCodeInApp;
+  @override
+  final String dynamicLinkDomain;
 
   factory _$OobCodeRequest([void Function(OobCodeRequestBuilder) updates]) =>
       (new OobCodeRequestBuilder()..update(updates)).build();
 
-  _$OobCodeRequest._({this.requestType, this.email, this.idToken}) : super._() {
+  _$OobCodeRequest._(
+      {this.requestType,
+      this.email,
+      this.newEmail,
+      this.idToken,
+      this.continueUrl,
+      this.iOSBundleId,
+      this.androidPackageName,
+      this.androidInstallApp,
+      this.androidMinimumVersion,
+      this.canHandleCodeInApp,
+      this.dynamicLinkDomain})
+      : super._() {
     if (requestType == null) {
       throw new BuiltValueNullFieldError('OobCodeRequest', 'requestType');
     }
@@ -4290,13 +4398,39 @@ class _$OobCodeRequest extends OobCodeRequest {
     return other is OobCodeRequest &&
         requestType == other.requestType &&
         email == other.email &&
-        idToken == other.idToken;
+        newEmail == other.newEmail &&
+        idToken == other.idToken &&
+        continueUrl == other.continueUrl &&
+        iOSBundleId == other.iOSBundleId &&
+        androidPackageName == other.androidPackageName &&
+        androidInstallApp == other.androidInstallApp &&
+        androidMinimumVersion == other.androidMinimumVersion &&
+        canHandleCodeInApp == other.canHandleCodeInApp &&
+        dynamicLinkDomain == other.dynamicLinkDomain;
   }
 
   @override
   int get hashCode {
     return $jf($jc(
-        $jc($jc(0, requestType.hashCode), email.hashCode), idToken.hashCode));
+        $jc(
+            $jc(
+                $jc(
+                    $jc(
+                        $jc(
+                            $jc(
+                                $jc(
+                                    $jc(
+                                        $jc($jc(0, requestType.hashCode),
+                                            email.hashCode),
+                                        newEmail.hashCode),
+                                    idToken.hashCode),
+                                continueUrl.hashCode),
+                            iOSBundleId.hashCode),
+                        androidPackageName.hashCode),
+                    androidInstallApp.hashCode),
+                androidMinimumVersion.hashCode),
+            canHandleCodeInApp.hashCode),
+        dynamicLinkDomain.hashCode));
   }
 
   @override
@@ -4304,7 +4438,15 @@ class _$OobCodeRequest extends OobCodeRequest {
     return (newBuiltValueToStringHelper('OobCodeRequest')
           ..add('requestType', requestType)
           ..add('email', email)
-          ..add('idToken', idToken))
+          ..add('newEmail', newEmail)
+          ..add('idToken', idToken)
+          ..add('continueUrl', continueUrl)
+          ..add('iOSBundleId', iOSBundleId)
+          ..add('androidPackageName', androidPackageName)
+          ..add('androidInstallApp', androidInstallApp)
+          ..add('androidMinimumVersion', androidMinimumVersion)
+          ..add('canHandleCodeInApp', canHandleCodeInApp)
+          ..add('dynamicLinkDomain', dynamicLinkDomain))
         .toString();
   }
 }
@@ -4321,9 +4463,46 @@ class OobCodeRequestBuilder
   String get email => _$this._email;
   set email(String email) => _$this._email = email;
 
+  String _newEmail;
+  String get newEmail => _$this._newEmail;
+  set newEmail(String newEmail) => _$this._newEmail = newEmail;
+
   String _idToken;
   String get idToken => _$this._idToken;
   set idToken(String idToken) => _$this._idToken = idToken;
+
+  String _continueUrl;
+  String get continueUrl => _$this._continueUrl;
+  set continueUrl(String continueUrl) => _$this._continueUrl = continueUrl;
+
+  String _iOSBundleId;
+  String get iOSBundleId => _$this._iOSBundleId;
+  set iOSBundleId(String iOSBundleId) => _$this._iOSBundleId = iOSBundleId;
+
+  String _androidPackageName;
+  String get androidPackageName => _$this._androidPackageName;
+  set androidPackageName(String androidPackageName) =>
+      _$this._androidPackageName = androidPackageName;
+
+  bool _androidInstallApp;
+  bool get androidInstallApp => _$this._androidInstallApp;
+  set androidInstallApp(bool androidInstallApp) =>
+      _$this._androidInstallApp = androidInstallApp;
+
+  String _androidMinimumVersion;
+  String get androidMinimumVersion => _$this._androidMinimumVersion;
+  set androidMinimumVersion(String androidMinimumVersion) =>
+      _$this._androidMinimumVersion = androidMinimumVersion;
+
+  bool _canHandleCodeInApp;
+  bool get canHandleCodeInApp => _$this._canHandleCodeInApp;
+  set canHandleCodeInApp(bool canHandleCodeInApp) =>
+      _$this._canHandleCodeInApp = canHandleCodeInApp;
+
+  String _dynamicLinkDomain;
+  String get dynamicLinkDomain => _$this._dynamicLinkDomain;
+  set dynamicLinkDomain(String dynamicLinkDomain) =>
+      _$this._dynamicLinkDomain = dynamicLinkDomain;
 
   OobCodeRequestBuilder();
 
@@ -4331,7 +4510,15 @@ class OobCodeRequestBuilder
     if (_$v != null) {
       _requestType = _$v.requestType;
       _email = _$v.email;
+      _newEmail = _$v.newEmail;
       _idToken = _$v.idToken;
+      _continueUrl = _$v.continueUrl;
+      _iOSBundleId = _$v.iOSBundleId;
+      _androidPackageName = _$v.androidPackageName;
+      _androidInstallApp = _$v.androidInstallApp;
+      _androidMinimumVersion = _$v.androidMinimumVersion;
+      _canHandleCodeInApp = _$v.canHandleCodeInApp;
+      _dynamicLinkDomain = _$v.dynamicLinkDomain;
       _$v = null;
     }
     return this;
@@ -4354,7 +4541,17 @@ class OobCodeRequestBuilder
   _$OobCodeRequest build() {
     final _$result = _$v ??
         new _$OobCodeRequest._(
-            requestType: requestType, email: email, idToken: idToken);
+            requestType: requestType,
+            email: email,
+            newEmail: newEmail,
+            idToken: idToken,
+            continueUrl: continueUrl,
+            iOSBundleId: iOSBundleId,
+            androidPackageName: androidPackageName,
+            androidInstallApp: androidInstallApp,
+            androidMinimumVersion: androidMinimumVersion,
+            canHandleCodeInApp: canHandleCodeInApp,
+            dynamicLinkDomain: dynamicLinkDomain);
     replace(_$result);
     return _$result;
   }
@@ -5866,6 +6063,168 @@ class UserMetadataImplBuilder
     final _$result = _$v ??
         new _$UserMetadataImpl._(
             lastSignInDate: lastSignInDate, creationDate: creationDate);
+    replace(_$result);
+    return _$result;
+  }
+}
+
+class _$ActionCodeSettings extends ActionCodeSettings {
+  @override
+  final String continueUrl;
+  @override
+  final String iOSBundleId;
+  @override
+  final String androidPackageName;
+  @override
+  final bool androidInstallApp;
+  @override
+  final String androidMinimumVersion;
+  @override
+  final bool canHandleCodeInApp;
+  @override
+  final String dynamicLinkDomain;
+
+  factory _$ActionCodeSettings(
+          [void Function(ActionCodeSettingsBuilder) updates]) =>
+      (new ActionCodeSettingsBuilder()..update(updates)).build();
+
+  _$ActionCodeSettings._(
+      {this.continueUrl,
+      this.iOSBundleId,
+      this.androidPackageName,
+      this.androidInstallApp,
+      this.androidMinimumVersion,
+      this.canHandleCodeInApp,
+      this.dynamicLinkDomain})
+      : super._();
+
+  @override
+  ActionCodeSettings rebuild(
+          void Function(ActionCodeSettingsBuilder) updates) =>
+      (toBuilder()..update(updates)).build();
+
+  @override
+  ActionCodeSettingsBuilder toBuilder() =>
+      new ActionCodeSettingsBuilder()..replace(this);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is ActionCodeSettings &&
+        continueUrl == other.continueUrl &&
+        iOSBundleId == other.iOSBundleId &&
+        androidPackageName == other.androidPackageName &&
+        androidInstallApp == other.androidInstallApp &&
+        androidMinimumVersion == other.androidMinimumVersion &&
+        canHandleCodeInApp == other.canHandleCodeInApp &&
+        dynamicLinkDomain == other.dynamicLinkDomain;
+  }
+
+  @override
+  int get hashCode {
+    return $jf($jc(
+        $jc(
+            $jc(
+                $jc(
+                    $jc($jc($jc(0, continueUrl.hashCode), iOSBundleId.hashCode),
+                        androidPackageName.hashCode),
+                    androidInstallApp.hashCode),
+                androidMinimumVersion.hashCode),
+            canHandleCodeInApp.hashCode),
+        dynamicLinkDomain.hashCode));
+  }
+
+  @override
+  String toString() {
+    return (newBuiltValueToStringHelper('ActionCodeSettings')
+          ..add('continueUrl', continueUrl)
+          ..add('iOSBundleId', iOSBundleId)
+          ..add('androidPackageName', androidPackageName)
+          ..add('androidInstallApp', androidInstallApp)
+          ..add('androidMinimumVersion', androidMinimumVersion)
+          ..add('canHandleCodeInApp', canHandleCodeInApp)
+          ..add('dynamicLinkDomain', dynamicLinkDomain))
+        .toString();
+  }
+}
+
+class ActionCodeSettingsBuilder
+    implements Builder<ActionCodeSettings, ActionCodeSettingsBuilder> {
+  _$ActionCodeSettings _$v;
+
+  String _continueUrl;
+  String get continueUrl => _$this._continueUrl;
+  set continueUrl(String continueUrl) => _$this._continueUrl = continueUrl;
+
+  String _iOSBundleId;
+  String get iOSBundleId => _$this._iOSBundleId;
+  set iOSBundleId(String iOSBundleId) => _$this._iOSBundleId = iOSBundleId;
+
+  String _androidPackageName;
+  String get androidPackageName => _$this._androidPackageName;
+  set androidPackageName(String androidPackageName) =>
+      _$this._androidPackageName = androidPackageName;
+
+  bool _androidInstallApp;
+  bool get androidInstallApp => _$this._androidInstallApp;
+  set androidInstallApp(bool androidInstallApp) =>
+      _$this._androidInstallApp = androidInstallApp;
+
+  String _androidMinimumVersion;
+  String get androidMinimumVersion => _$this._androidMinimumVersion;
+  set androidMinimumVersion(String androidMinimumVersion) =>
+      _$this._androidMinimumVersion = androidMinimumVersion;
+
+  bool _canHandleCodeInApp;
+  bool get canHandleCodeInApp => _$this._canHandleCodeInApp;
+  set canHandleCodeInApp(bool canHandleCodeInApp) =>
+      _$this._canHandleCodeInApp = canHandleCodeInApp;
+
+  String _dynamicLinkDomain;
+  String get dynamicLinkDomain => _$this._dynamicLinkDomain;
+  set dynamicLinkDomain(String dynamicLinkDomain) =>
+      _$this._dynamicLinkDomain = dynamicLinkDomain;
+
+  ActionCodeSettingsBuilder();
+
+  ActionCodeSettingsBuilder get _$this {
+    if (_$v != null) {
+      _continueUrl = _$v.continueUrl;
+      _iOSBundleId = _$v.iOSBundleId;
+      _androidPackageName = _$v.androidPackageName;
+      _androidInstallApp = _$v.androidInstallApp;
+      _androidMinimumVersion = _$v.androidMinimumVersion;
+      _canHandleCodeInApp = _$v.canHandleCodeInApp;
+      _dynamicLinkDomain = _$v.dynamicLinkDomain;
+      _$v = null;
+    }
+    return this;
+  }
+
+  @override
+  void replace(ActionCodeSettings other) {
+    if (other == null) {
+      throw new ArgumentError.notNull('other');
+    }
+    _$v = other as _$ActionCodeSettings;
+  }
+
+  @override
+  void update(void Function(ActionCodeSettingsBuilder) updates) {
+    if (updates != null) updates(this);
+  }
+
+  @override
+  _$ActionCodeSettings build() {
+    final _$result = _$v ??
+        new _$ActionCodeSettings._(
+            continueUrl: continueUrl,
+            iOSBundleId: iOSBundleId,
+            androidPackageName: androidPackageName,
+            androidInstallApp: androidInstallApp,
+            androidMinimumVersion: androidMinimumVersion,
+            canHandleCodeInApp: canHandleCodeInApp,
+            dynamicLinkDomain: dynamicLinkDomain);
     replace(_$result);
     return _$result;
   }
