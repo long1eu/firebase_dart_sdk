@@ -46,8 +46,14 @@ abstract class EmailPasswordAuthCredential with AuthCredential {
   /// The email sign-in link.
   @nullable
   String get link;
+
+  @override
+  String get postBody {
+    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a EmailPasswordAuthCredential.');
+  }
 }
 
+/// Internal implementation of [AuthCredential] for the Facebook IdP.
 abstract class FacebookAuthCredential with AuthCredential {
   factory FacebookAuthCredential(String accessToken) {
     return _$FacebookAuthCredentialImpl((FacebookAuthCredentialImplBuilder b) {
@@ -61,6 +67,52 @@ abstract class FacebookAuthCredential with AuthCredential {
   String get accessToken;
 }
 
+/// Internal implementation of [AuthCredential] for Game Center credentials.
+abstract class GameCenterAuthCredential with AuthCredential {
+  factory GameCenterAuthCredential({
+    @required String playerId,
+    @required String publicKeyUrl,
+    @required Uint8List signature,
+    @required Uint8List salt,
+    @required DateTime timestamp,
+    @required String displayName,
+  }) {
+    return _$GameCenterAuthCredentialImpl((GameCenterAuthCredentialImplBuilder b) {
+      b
+        ..playerId = playerId
+        ..publicKeyUrl = publicKeyUrl
+        ..signature = signature
+        ..salt = salt
+        ..timestamp = timestamp
+        ..displayName = displayName;
+    });
+  }
+
+  /// The ID of the Game Center local player.
+  String get playerId;
+
+  /// The URL for the public encryption key.
+  String get publicKeyUrl;
+
+  /// The verification signature data generated.
+  Uint8List get signature;
+
+  /// A random string used to compute the hash and keep it randomized.
+  Uint8List get salt;
+
+  /// The date and time that the signature was created.
+  DateTime get timestamp;
+
+  /// The date and time that the signature was created.
+  String get displayName;
+
+  @override
+  String get postBody {
+    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a GameCenterAuthCredential.');
+  }
+}
+
+/// Internal implementation of [AuthCredential] for GitHub credentials.
 abstract class GithubAuthCredential with AuthCredential {
   factory GithubAuthCredential(String token) {
     return _$GithubAuthCredentialImpl((GithubAuthCredentialImplBuilder b) {
@@ -74,6 +126,7 @@ abstract class GithubAuthCredential with AuthCredential {
   String get token;
 }
 
+/// Internal implementation of [AuthCredential] for the Google IdP.
 abstract class GoogleAuthCredential with AuthCredential {
   factory GoogleAuthCredential({@required String idToken, @required String accessToken}) {
     return _$GoogleAuthCredentialImpl((GoogleAuthCredentialImplBuilder b) {
@@ -89,6 +142,66 @@ abstract class GoogleAuthCredential with AuthCredential {
 
   /// The Access Token obtained from Google.
   String get accessToken;
+}
+
+/// Internal implementation of [AuthCredential] for GitHub credentials.
+abstract class OAuthCredential with AuthCredential {
+  factory OAuthCredential({
+    @required String providerId,
+    String idToken,
+    String accessToken,
+    String secret,
+    String pendingToken,
+  }) {
+    return _$OAuthCredentialImpl((OAuthCredentialImplBuilder b) {
+      b
+        ..provider = providerId
+        ..idToken = idToken
+        ..accessToken = accessToken
+        ..secret = secret
+        ..pendingToken = pendingToken;
+    });
+  }
+
+  factory OAuthCredential.withSession({
+    @required String providerId,
+    @required String sessionId,
+    @required String oAuthResponseURLString,
+  }) {
+    return _$OAuthCredentialImpl((OAuthCredentialImplBuilder b) {
+      b
+        ..provider = providerId
+        ..sessionId = sessionId
+        ..oAuthResponseURLString = oAuthResponseURLString;
+    });
+  }
+
+  /// The provider ID associated with the credential being created.
+  @override
+  String get provider;
+
+  /// Used to configure the OAuth scopes.
+  @nullable
+  BuiltList<String> get scopes;
+
+  /// Used to configure the OAuth custom parameters.
+  @nullable
+  BuiltMap<String, String> get customParameters;
+
+  /// The session ID used when completing the headful-lite flow.
+  String get sessionId;
+
+  /// A string representation of the response URL corresponding to this OAuthCredential.
+  String get oAuthResponseURLString;
+
+  String get idToken;
+
+  String get accessToken;
+
+  String get secret;
+
+  /// The pending token used when completing the headful-lite flow.
+  String get pendingToken;
 }
 
 abstract class TwitterAuthCredential with AuthCredential {

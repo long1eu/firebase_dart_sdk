@@ -21,8 +21,7 @@ class FirebaseAuth implements InternalTokenProvider {
 
     // init the identity toolkit client
     final Client apiKeyClient = ApiKeyClient(app.options.apiKey, app.platformDependencies.headersBuilder);
-    final IdentitytoolkitApi gitkit = IdentitytoolkitApi(apiKeyClient);
-    final FirebaseAuthApi firebaseAuthApi = FirebaseAuthApi(gitkit: gitkit);
+    final FirebaseAuthApi firebaseAuthApi = FirebaseAuthApi(client: apiKeyClient);
 
     final UserStorage userStorage = UserStorage(userBox: app.platformDependencies.box, appName: app.name);
     final FirebaseAuth auth = FirebaseAuth._(app, firebaseAuthApi, apiKeyClient, userStorage);
@@ -110,8 +109,8 @@ class FirebaseAuth implements InternalTokenProvider {
   /// Errors:
   ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
   ///   * [FirebaseAuthError.emailAlreadyInUse] - Indicates the email used to attempt sign up already exists. Call
-  ///     [fetchProvidersForEmail] to check which sign-in mechanisms the user used, and prompt the user to sign in with
-  ///     one of those.
+  ///     [fetchSignInMethodsForEmail] to check which sign-in mechanisms the user used, and prompt the user to sign in
+  ///     with one of those.
   ///   * [FirebaseAuthError.operationNotAllowed] -  Indicates that email and password accounts are not enabled. Enable
   ///     them in the Auth section of the Firebase console.
   ///   * [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
@@ -227,6 +226,57 @@ class FirebaseAuth implements InternalTokenProvider {
     return _signInAndRetrieveData(credential, isReauthentication: false);
   }
 
+  /// Tries to sign in a user with the given email address and password.
+  ///
+  /// If successful, it also signs the user in into the app and updates the [onAuthStateChanged] stream.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.operationNotAllowed] - Indicates that email and password accounts are not enabled. Enable
+  ///     them in the Auth section of the Firebase console.
+  ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
+  ///   * [FirebaseAuthError.wrongPassword] - Indicates the user's [password] is wrong.
+  ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
+  Future<AuthResult> signInWithEmailAndPassword({@required String email, @required String password}) {
+    assert(email != null);
+    assert(password != null);
+    final AuthCredential credential = EmailAuthProvider.getCredential(email: email, password: password);
+    return _signInAndRetrieveData(credential, isReauthentication: false);
+  }
+
+  /// Asynchronously signs in to Firebase with the given 3rd-party credentials (e.g. a Facebook login Access Token, a
+  /// Google ID Token/Access Token pair, etc.) and returns additional identity provider data.
+  ///
+  /// If successful, it also signs the user in into the app and updates the [onAuthStateChanged] stream.
+  ///
+  /// If the user doesn't have an account already, one will be created automatically.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.invalidCredential] - Indicates the supplied credential is invalid. This could happen if it
+  ///     has expired or it is malformed.
+  ///   * [FirebaseAuthError.operationNotAllowed] - Indicates that email and password accounts are not enabled. Enable
+  ///     them in the Auth section of the Firebase console.
+  ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
+  ///   * [FirebaseAuthError.accountExistsWithDifferentCredential] - Indicates the email asserted by the credential
+  ///     (e.g. the email in a Facebook access token) is already in use by an existing account, that cannot be
+  ///     authenticated with this sign-in method. Call [fetchSignInMethodsForEmail] for this user’s email and then
+  ///     prompt them to sign in with any of the sign-in providers returned. This error will only be thrown if the "One
+  ///     account per email address" setting is enabled in the Firebase console, under Auth settings.
+  ///   * [FirebaseAuthError.wrongPassword] - Indicates the user's [password] is wrong.
+  ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
+  ///   * [FirebaseAuthError.missingVerificationID] - Indicates that the phone auth credential was created with an empty
+  ///     verification ID.
+  ///   * [FirebaseAuthError.missingVerificationCode] - Indicates that the phone auth credential was created with an
+  ///     empty verification code.
+  ///   * [FirebaseAuthError.invalidVerificationID] - Indicates that the phone auth credential was created with an
+  ///     invalid verification ID.
+  ///   * [FirebaseAuthError.invalidVerificationCode] - Indicates that the phone auth credential was created with an
+  ///     invalid verification code.
+  ///   * [FirebaseAuthError.sessionExpired] - Indicates that the SMS code has expired.
+  Future<AuthResult> signInWithCredential(AuthCredential credential) async {
+    assert(credential != null);
+    return _signInAndRetrieveData(credential, isReauthentication: false);
+  }
+
   /// Gets the cached current user, or null if there is none.
   FirebaseUser get currentUser => _currentUser;
 
@@ -237,8 +287,10 @@ class FirebaseAuth implements InternalTokenProvider {
       if (credential.link != null) {
         return _signInAndRetrieveDataEmailAndLink(credential.email, credential.link);
       } else {
-        //
+        return _signInAndRetrieveDataEmailAndPassword(credential.email, credential.password);
       }
+    } else if (credential is GameCenterAuthCredential) {
+      return _signInAndRetrieveDataGameCenter(credential);
     }
   }
 
@@ -263,6 +315,39 @@ class FirebaseAuth implements InternalTokenProvider {
     final AdditionalUserInfoImpl additionalUserInfo =
         AdditionalUserInfoImpl(providerId: ProviderType.password, isNewUser: response.isNewUser);
 
+    return AuthResult._(user, additionalUserInfo);
+  }
+
+  Future<AuthResult> _signInAndRetrieveDataEmailAndPassword(String email, String password) async {
+    final IdentitytoolkitRelyingpartyVerifyPasswordRequest request = IdentitytoolkitRelyingpartyVerifyPasswordRequest()
+      ..returnSecureToken = true
+      ..email = email
+      ..password = password;
+
+    final VerifyPasswordResponse response = await _firebaseAuthApi.verifyPassword(request);
+
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+    final AdditionalUserInfoImpl additionalUserInfo =
+        AdditionalUserInfoImpl(providerId: ProviderType.password, isNewUser: false);
+    return AuthResult._(user, additionalUserInfo);
+  }
+
+  Future<AuthResult> _signInAndRetrieveDataGameCenter(GameCenterAuthCredential credential) async {
+    final SignInWithGameCenterRequest request = SignInWithGameCenterRequest(
+      playerId: credential.playerId,
+      publicKeyUrl: credential.publicKeyUrl,
+      signature: credential.signature,
+      salt: credential.salt,
+      timestamp: credential.timestamp,
+      displayName: credential.displayName,
+    );
+
+    final SignInWithGameCenterResponse response = await _firebaseAuthApi.signInWithGameCenter(request);
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+    final AdditionalUserInfoImpl additionalUserInfo =
+        AdditionalUserInfoImpl(providerId: ProviderType.gameCenter, isNewUser: response.isNewUser);
     return AuthResult._(user, additionalUserInfo);
   }
 
