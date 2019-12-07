@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 23/11/2019
 
-part of models;
+part of requests;
 
 abstract class BaseAuthRequest implements Built<BaseAuthRequest, BaseAuthRequestBuilder> {
   factory BaseAuthRequest({String email, String password, bool returnSecureToken = true}) {
@@ -21,6 +21,10 @@ abstract class BaseAuthRequest implements Built<BaseAuthRequest, BaseAuthRequest
   /// Passing null for the email will create an anonymous user.
   @nullable
   String get email;
+
+  /// The name for the user to create.
+  @nullable
+  String get displayName;
 
   /// The password for the user to create.
   ///

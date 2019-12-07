@@ -159,7 +159,7 @@ mixin UserInfoMixin implements UserInfo {
   String get uid => _userInfo.uid;
 
   @override
-  ProviderType get providerId => _userInfo.providerId;
+  String get providerId => _userInfo.providerId;
 
   @override
   String get displayName => _userInfo.displayName;

@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 25/11/2019
 
-part of models;
+part of requests;
 
 abstract class AuthRequestConfiguration implements Built<AuthRequestConfiguration, AuthRequestConfigurationBuilder> {
   factory AuthRequestConfiguration({String apiKey, String languageCode}) {

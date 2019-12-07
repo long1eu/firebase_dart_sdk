@@ -7,7 +7,7 @@ part of models;
 abstract class AdditionalUserInfoImpl
     implements Built<AdditionalUserInfoImpl, AdditionalUserInfoImplBuilder>, AdditionalUserInfo {
   factory AdditionalUserInfoImpl({
-    ProviderType providerId,
+    String providerId,
     Map<String, dynamic> profile,
     String username,
     bool isNewUser,
@@ -43,7 +43,7 @@ abstract class AdditionalUserInfoImpl
 abstract class UserInfoImpl implements Built<UserInfoImpl, UserInfoImplBuilder>, UserInfo {
   factory UserInfoImpl({
     String uid,
-    ProviderType providerId,
+    String providerId,
     String displayName,
     String photoUrl,
     String email,
@@ -68,7 +68,7 @@ abstract class UserInfoImpl implements Built<UserInfoImpl, UserInfoImplBuilder>,
 
   UserInfoImpl copyWith({
     String uid,
-    ProviderType providerId,
+    String providerId,
     String displayName,
     String photoUrl,
     String email,

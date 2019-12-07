@@ -12,7 +12,7 @@ class FirebaseAuthService {
   final HttpService _service;
 
   Future<ExchangeCustomTokenResponse> signInWithCustomToken(ExchangeCustomTokenRequest request) async {
-    final dynamic data = await _service.post(':signInWithCustomToken', request.json);
+    final dynamic data = await _service.post('signInWithCustomToken', request.json);
     return ExchangeCustomTokenResponse.fromJson(data);
   }
 
@@ -22,7 +22,9 @@ class FirebaseAuthService {
   /// If the email is not provided, an anonymous user will be created. Issues an HTTP POST request to the Auth
   /// signupNewUser endpoint.
   Future<BaseAuthResponse> signUp(BaseAuthRequest request) async {
-    final dynamic data = await _service.post(':signUp', request.json);
+    final dynamic data = await _service.post('signupNewUser', request.json);
+
+    print(data);
     return BaseAuthResponse.fromJson(data);
   }
 
@@ -30,7 +32,7 @@ class FirebaseAuthService {
   ///
   /// Makes an HTTP POST request to the Auth verifyPassword endpoint.
   Future<BaseAuthResponse> signIn(BaseAuthRequest request) async {
-    final dynamic data = await _service.post(':signInWithPassword', request.json);
+    final dynamic data = await _service.post('signInWithPassword', request.json);
     return BaseAuthResponse.fromJson(data);
   }
 
@@ -38,7 +40,7 @@ class FirebaseAuthService {
   ///
   /// Issues an HTTP POST request to the Auth verifyAssertion endpoint.
   Future<OAuthResponse> signInWithIdp(OAuthRequest request) async {
-    final dynamic data = await _service.post(':signInWithIdp', request.json);
+    final dynamic data = await _service.post('signInWithIdp', request.json);
     return OAuthResponse.fromJson(data);
   }
 
@@ -46,7 +48,7 @@ class FirebaseAuthService {
   ///
   /// Issues an HTTP POST request to the Auth createAuthUri endpoint.
   Future<CreateAuthUriResponse> createAuthUri(CreateAuthUriRequest request) async {
-    final dynamic data = await _service.post(':createAuthUri', request.json);
+    final dynamic data = await _service.post('createAuthUri', request.json);
     return CreateAuthUriResponse.fromJson(data);
   }
 
@@ -56,7 +58,7 @@ class FirebaseAuthService {
   /// Issues an HTTP POST request to the Auth getOobConfirmationCode endpoint.
   Future<OobCodeResponse> sendOobCode(OobCodeRequest request) async {
     final dynamic data = await _service.post(
-      ':sendOobCode',
+      'sendOobCode',
       request.json,
       headers: <String, String>{
         if (_service.locale != null) 'X-Firebase-Locale': _service.locale,
@@ -70,7 +72,7 @@ class FirebaseAuthService {
   /// Issues an HTTP POST request to the Auth resetPassword endpoint.
   /// see [ResetPasswordRequest]
   Future<ResetPasswordResponse> resetPassword(ResetPasswordRequest request) async {
-    final dynamic data = await _service.post(':resetPassword', request.json);
+    final dynamic data = await _service.post('resetPassword', request.json);
     return ResetPasswordResponse.fromJson(data);
   }
 
@@ -85,7 +87,7 @@ class FirebaseAuthService {
   /// Issues an HTTP POST request to the Auth resetPassword endpoint.
   /// see [UpdateRequest] factory constructors
   Future<UpdateResponse> update(UpdateRequest request) async {
-    final dynamic data = await _service.post(':update', request.json);
+    final dynamic data = await _service.post('update', request.json);
     return UpdateResponse.fromJson(data);
   }
 
@@ -93,7 +95,7 @@ class FirebaseAuthService {
   ///
   /// Issues an HTTP POST request to the Auth getAccountInfo endpoint.
   Future<List<UserDataResponse>> lookup(String idToken) async {
-    final dynamic data = await _service.post(':lookup', <String, dynamic>{'idToken': idToken});
+    final dynamic data = await _service.post('lookup', <String, dynamic>{'idToken': idToken});
 
     return List<Map<String, dynamic>>.from(data['users'])
         .map((Map<String, dynamic> json) => UserDataResponse.fromJson(json))

@@ -46,6 +46,7 @@ class HttpService {
 
   dynamic _handleResponse(Response response) {
     if (response.statusCode >= 400) {
+      print(response.body);
       final Map<String, dynamic> error = Map<String, dynamic>.from(jsonDecode(response.body)['error']);
       final int code = error['code'];
       final String message = error['message'];
