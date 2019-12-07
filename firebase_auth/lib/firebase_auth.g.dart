@@ -1,58 +1,11 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of models;
+part of firebase_auth;
 
 // **************************************************************************
 // BuiltValueGenerator
 // **************************************************************************
 
-Serializers _$serializers = (new Serializers().toBuilder()
-      ..add(AdditionalUserInfoImpl.serializer)
-      ..add(AuthRequestConfiguration.serializer)
-      ..add(BaseAuthRequest.serializer)
-      ..add(BaseAuthResponse.serializer)
-      ..add(CreateAuthUriRequest.serializer)
-      ..add(CreateAuthUriResponse.serializer)
-      ..add(EmailPasswordAuthCredentialImpl.serializer)
-      ..add(ExchangeCustomTokenRequest.serializer)
-      ..add(ExchangeCustomTokenResponse.serializer)
-      ..add(ExchangeRefreshTokenRequest.serializer)
-      ..add(ExchangeRefreshTokenResponse.serializer)
-      ..add(FacebookAuthCredentialImpl.serializer)
-      ..add(GithubAuthCredentialImpl.serializer)
-      ..add(GoogleAuthCredentialImpl.serializer)
-      ..add(OAuthRequest.serializer)
-      ..add(OAuthResponse.serializer)
-      ..add(OobCodeRequest.serializer)
-      ..add(OobCodeResponse.serializer)
-      ..add(ProviderUserInfo.serializer)
-      ..add(ResetPasswordRequest.serializer)
-      ..add(ResetPasswordResponse.serializer)
-      ..add(TwitterAuthCredentialImpl.serializer)
-      ..add(UpdateRequest.serializer)
-      ..add(UpdateResponse.serializer)
-      ..add(UserDataResponse.serializer)
-      ..add(UserInfoImpl.serializer)
-      ..add(UserMetadataImpl.serializer)
-      ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(ProfileAttribute)]),
-          () => new ListBuilder<ProfileAttribute>())
-      ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(ProviderType)]),
-          () => new ListBuilder<ProviderType>())
-      ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(ProviderUserInfo)]),
-          () => new ListBuilder<ProviderUserInfo>())
-      ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(ProviderUserInfo)]),
-          () => new ListBuilder<ProviderUserInfo>())
-      ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(String)]),
-          () => new ListBuilder<String>())
-      ..addBuilderFactory(
-          const FullType(BuiltList, const [const FullType(String)]),
-          () => new ListBuilder<String>()))
-    .build();
 Serializer<EmailPasswordAuthCredentialImpl>
     _$emailPasswordAuthCredentialImplSerializer =
     new _$EmailPasswordAuthCredentialImplSerializer();
@@ -70,6 +23,10 @@ Serializer<UserInfoImpl> _$userInfoImplSerializer =
     new _$UserInfoImplSerializer();
 Serializer<UserMetadataImpl> _$userMetadataImplSerializer =
     new _$UserMetadataImplSerializer();
+Serializer<SecureTokenRequest> _$secureTokenRequestSerializer =
+    new _$SecureTokenRequestSerializer();
+Serializer<SecureTokenResponse> _$secureTokenResponseSerializer =
+    new _$SecureTokenResponseSerializer();
 
 class _$EmailPasswordAuthCredentialImplSerializer
     implements StructuredSerializer<EmailPasswordAuthCredentialImpl> {
@@ -592,6 +549,322 @@ class _$UserMetadataImplSerializer
     }
 
     return result.build();
+  }
+}
+
+class _$SecureTokenRequestSerializer
+    implements StructuredSerializer<SecureTokenRequest> {
+  @override
+  final Iterable<Type> types = const [SecureTokenRequest, _$SecureTokenRequest];
+  @override
+  final String wireName = 'SecureTokenRequest';
+
+  @override
+  Iterable<Object> serialize(Serializers serializers, SecureTokenRequest object,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = <Object>[
+      'grantType',
+      serializers.serialize(object.grantType,
+          specifiedType: const FullType(SecureTokenGrantType)),
+    ];
+    if (object.scope != null) {
+      result
+        ..add('scope')
+        ..add(serializers.serialize(object.scope,
+            specifiedType: const FullType(String)));
+    }
+    if (object.refreshToken != null) {
+      result
+        ..add('refreshToken')
+        ..add(serializers.serialize(object.refreshToken,
+            specifiedType: const FullType(String)));
+    }
+    if (object.code != null) {
+      result
+        ..add('code')
+        ..add(serializers.serialize(object.code,
+            specifiedType: const FullType(String)));
+    }
+    return result;
+  }
+
+  @override
+  SecureTokenRequest deserialize(
+      Serializers serializers, Iterable<Object> serialized,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = new SecureTokenRequestBuilder();
+
+    final iterator = serialized.iterator;
+    while (iterator.moveNext()) {
+      final key = iterator.current as String;
+      iterator.moveNext();
+      final dynamic value = iterator.current;
+      switch (key) {
+        case 'grantType':
+          result.grantType = serializers.deserialize(value,
+                  specifiedType: const FullType(SecureTokenGrantType))
+              as SecureTokenGrantType;
+          break;
+        case 'scope':
+          result.scope = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'refreshToken':
+          result.refreshToken = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'code':
+          result.code = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+      }
+    }
+
+    return result.build();
+  }
+}
+
+class _$SecureTokenResponseSerializer
+    implements StructuredSerializer<SecureTokenResponse> {
+  @override
+  final Iterable<Type> types = const [
+    SecureTokenResponse,
+    _$SecureTokenResponse
+  ];
+  @override
+  final String wireName = 'SecureTokenResponse';
+
+  @override
+  Iterable<Object> serialize(
+      Serializers serializers, SecureTokenResponse object,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = <Object>[];
+    if (object.approximateExpirationDate != null) {
+      result
+        ..add('expires_in')
+        ..add(serializers.serialize(object.approximateExpirationDate,
+            specifiedType: const FullType(DateTime)));
+    }
+    if (object.refreshToken != null) {
+      result
+        ..add('refresh_token')
+        ..add(serializers.serialize(object.refreshToken,
+            specifiedType: const FullType(String)));
+    }
+    if (object.accessToken != null) {
+      result
+        ..add('access_token')
+        ..add(serializers.serialize(object.accessToken,
+            specifiedType: const FullType(String)));
+    }
+    if (object.idToken != null) {
+      result
+        ..add('id_token')
+        ..add(serializers.serialize(object.idToken,
+            specifiedType: const FullType(String)));
+    }
+    return result;
+  }
+
+  @override
+  SecureTokenResponse deserialize(
+      Serializers serializers, Iterable<Object> serialized,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = new SecureTokenResponseBuilder();
+
+    final iterator = serialized.iterator;
+    while (iterator.moveNext()) {
+      final key = iterator.current as String;
+      iterator.moveNext();
+      final dynamic value = iterator.current;
+      switch (key) {
+        case 'expires_in':
+          result.approximateExpirationDate = serializers.deserialize(value,
+              specifiedType: const FullType(DateTime)) as DateTime;
+          break;
+        case 'refresh_token':
+          result.refreshToken = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'access_token':
+          result.accessToken = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'id_token':
+          result.idToken = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+      }
+    }
+
+    return result.build();
+  }
+}
+
+class _$ActionCodeSettings extends ActionCodeSettings {
+  @override
+  final String continueUrl;
+  @override
+  final String iOSBundleId;
+  @override
+  final String androidPackageName;
+  @override
+  final bool androidInstallIfNotAvailable;
+  @override
+  final String androidMinimumVersion;
+  @override
+  final bool handleCodeInApp;
+  @override
+  final String dynamicLinkDomain;
+
+  factory _$ActionCodeSettings(
+          [void Function(ActionCodeSettingsBuilder) updates]) =>
+      (new ActionCodeSettingsBuilder()..update(updates)).build();
+
+  _$ActionCodeSettings._(
+      {this.continueUrl,
+      this.iOSBundleId,
+      this.androidPackageName,
+      this.androidInstallIfNotAvailable,
+      this.androidMinimumVersion,
+      this.handleCodeInApp,
+      this.dynamicLinkDomain})
+      : super._() {
+    if (handleCodeInApp == null) {
+      throw new BuiltValueNullFieldError(
+          'ActionCodeSettings', 'handleCodeInApp');
+    }
+  }
+
+  @override
+  ActionCodeSettings rebuild(
+          void Function(ActionCodeSettingsBuilder) updates) =>
+      (toBuilder()..update(updates)).build();
+
+  @override
+  ActionCodeSettingsBuilder toBuilder() =>
+      new ActionCodeSettingsBuilder()..replace(this);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is ActionCodeSettings &&
+        continueUrl == other.continueUrl &&
+        iOSBundleId == other.iOSBundleId &&
+        androidPackageName == other.androidPackageName &&
+        androidInstallIfNotAvailable == other.androidInstallIfNotAvailable &&
+        androidMinimumVersion == other.androidMinimumVersion &&
+        handleCodeInApp == other.handleCodeInApp &&
+        dynamicLinkDomain == other.dynamicLinkDomain;
+  }
+
+  @override
+  int get hashCode {
+    return $jf($jc(
+        $jc(
+            $jc(
+                $jc(
+                    $jc($jc($jc(0, continueUrl.hashCode), iOSBundleId.hashCode),
+                        androidPackageName.hashCode),
+                    androidInstallIfNotAvailable.hashCode),
+                androidMinimumVersion.hashCode),
+            handleCodeInApp.hashCode),
+        dynamicLinkDomain.hashCode));
+  }
+
+  @override
+  String toString() {
+    return (newBuiltValueToStringHelper('ActionCodeSettings')
+          ..add('continueUrl', continueUrl)
+          ..add('iOSBundleId', iOSBundleId)
+          ..add('androidPackageName', androidPackageName)
+          ..add('androidInstallIfNotAvailable', androidInstallIfNotAvailable)
+          ..add('androidMinimumVersion', androidMinimumVersion)
+          ..add('handleCodeInApp', handleCodeInApp)
+          ..add('dynamicLinkDomain', dynamicLinkDomain))
+        .toString();
+  }
+}
+
+class ActionCodeSettingsBuilder
+    implements Builder<ActionCodeSettings, ActionCodeSettingsBuilder> {
+  _$ActionCodeSettings _$v;
+
+  String _continueUrl;
+  String get continueUrl => _$this._continueUrl;
+  set continueUrl(String continueUrl) => _$this._continueUrl = continueUrl;
+
+  String _iOSBundleId;
+  String get iOSBundleId => _$this._iOSBundleId;
+  set iOSBundleId(String iOSBundleId) => _$this._iOSBundleId = iOSBundleId;
+
+  String _androidPackageName;
+  String get androidPackageName => _$this._androidPackageName;
+  set androidPackageName(String androidPackageName) =>
+      _$this._androidPackageName = androidPackageName;
+
+  bool _androidInstallIfNotAvailable;
+  bool get androidInstallIfNotAvailable => _$this._androidInstallIfNotAvailable;
+  set androidInstallIfNotAvailable(bool androidInstallIfNotAvailable) =>
+      _$this._androidInstallIfNotAvailable = androidInstallIfNotAvailable;
+
+  String _androidMinimumVersion;
+  String get androidMinimumVersion => _$this._androidMinimumVersion;
+  set androidMinimumVersion(String androidMinimumVersion) =>
+      _$this._androidMinimumVersion = androidMinimumVersion;
+
+  bool _handleCodeInApp;
+  bool get handleCodeInApp => _$this._handleCodeInApp;
+  set handleCodeInApp(bool handleCodeInApp) =>
+      _$this._handleCodeInApp = handleCodeInApp;
+
+  String _dynamicLinkDomain;
+  String get dynamicLinkDomain => _$this._dynamicLinkDomain;
+  set dynamicLinkDomain(String dynamicLinkDomain) =>
+      _$this._dynamicLinkDomain = dynamicLinkDomain;
+
+  ActionCodeSettingsBuilder();
+
+  ActionCodeSettingsBuilder get _$this {
+    if (_$v != null) {
+      _continueUrl = _$v.continueUrl;
+      _iOSBundleId = _$v.iOSBundleId;
+      _androidPackageName = _$v.androidPackageName;
+      _androidInstallIfNotAvailable = _$v.androidInstallIfNotAvailable;
+      _androidMinimumVersion = _$v.androidMinimumVersion;
+      _handleCodeInApp = _$v.handleCodeInApp;
+      _dynamicLinkDomain = _$v.dynamicLinkDomain;
+      _$v = null;
+    }
+    return this;
+  }
+
+  @override
+  void replace(ActionCodeSettings other) {
+    if (other == null) {
+      throw new ArgumentError.notNull('other');
+    }
+    _$v = other as _$ActionCodeSettings;
+  }
+
+  @override
+  void update(void Function(ActionCodeSettingsBuilder) updates) {
+    if (updates != null) updates(this);
+  }
+
+  @override
+  _$ActionCodeSettings build() {
+    final _$result = _$v ??
+        new _$ActionCodeSettings._(
+            continueUrl: continueUrl,
+            iOSBundleId: iOSBundleId,
+            androidPackageName: androidPackageName,
+            androidInstallIfNotAvailable: androidInstallIfNotAvailable,
+            androidMinimumVersion: androidMinimumVersion,
+            handleCodeInApp: handleCodeInApp,
+            dynamicLinkDomain: dynamicLinkDomain);
+    replace(_$result);
+    return _$result;
   }
 }
 
@@ -1517,6 +1790,247 @@ class UserMetadataImplBuilder
     final _$result = _$v ??
         new _$UserMetadataImpl._(
             lastSignInDate: lastSignInDate, creationDate: creationDate);
+    replace(_$result);
+    return _$result;
+  }
+}
+
+class _$SecureTokenRequest extends SecureTokenRequest {
+  @override
+  final SecureTokenGrantType grantType;
+  @override
+  final String scope;
+  @override
+  final String refreshToken;
+  @override
+  final String code;
+
+  factory _$SecureTokenRequest(
+          [void Function(SecureTokenRequestBuilder) updates]) =>
+      (new SecureTokenRequestBuilder()..update(updates)).build();
+
+  _$SecureTokenRequest._(
+      {this.grantType, this.scope, this.refreshToken, this.code})
+      : super._() {
+    if (grantType == null) {
+      throw new BuiltValueNullFieldError('SecureTokenRequest', 'grantType');
+    }
+  }
+
+  @override
+  SecureTokenRequest rebuild(
+          void Function(SecureTokenRequestBuilder) updates) =>
+      (toBuilder()..update(updates)).build();
+
+  @override
+  SecureTokenRequestBuilder toBuilder() =>
+      new SecureTokenRequestBuilder()..replace(this);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is SecureTokenRequest &&
+        grantType == other.grantType &&
+        scope == other.scope &&
+        refreshToken == other.refreshToken &&
+        code == other.code;
+  }
+
+  @override
+  int get hashCode {
+    return $jf($jc(
+        $jc($jc($jc(0, grantType.hashCode), scope.hashCode),
+            refreshToken.hashCode),
+        code.hashCode));
+  }
+
+  @override
+  String toString() {
+    return (newBuiltValueToStringHelper('SecureTokenRequest')
+          ..add('grantType', grantType)
+          ..add('scope', scope)
+          ..add('refreshToken', refreshToken)
+          ..add('code', code))
+        .toString();
+  }
+}
+
+class SecureTokenRequestBuilder
+    implements Builder<SecureTokenRequest, SecureTokenRequestBuilder> {
+  _$SecureTokenRequest _$v;
+
+  SecureTokenGrantType _grantType;
+  SecureTokenGrantType get grantType => _$this._grantType;
+  set grantType(SecureTokenGrantType grantType) =>
+      _$this._grantType = grantType;
+
+  String _scope;
+  String get scope => _$this._scope;
+  set scope(String scope) => _$this._scope = scope;
+
+  String _refreshToken;
+  String get refreshToken => _$this._refreshToken;
+  set refreshToken(String refreshToken) => _$this._refreshToken = refreshToken;
+
+  String _code;
+  String get code => _$this._code;
+  set code(String code) => _$this._code = code;
+
+  SecureTokenRequestBuilder();
+
+  SecureTokenRequestBuilder get _$this {
+    if (_$v != null) {
+      _grantType = _$v.grantType;
+      _scope = _$v.scope;
+      _refreshToken = _$v.refreshToken;
+      _code = _$v.code;
+      _$v = null;
+    }
+    return this;
+  }
+
+  @override
+  void replace(SecureTokenRequest other) {
+    if (other == null) {
+      throw new ArgumentError.notNull('other');
+    }
+    _$v = other as _$SecureTokenRequest;
+  }
+
+  @override
+  void update(void Function(SecureTokenRequestBuilder) updates) {
+    if (updates != null) updates(this);
+  }
+
+  @override
+  _$SecureTokenRequest build() {
+    final _$result = _$v ??
+        new _$SecureTokenRequest._(
+            grantType: grantType,
+            scope: scope,
+            refreshToken: refreshToken,
+            code: code);
+    replace(_$result);
+    return _$result;
+  }
+}
+
+class _$SecureTokenResponse extends SecureTokenResponse {
+  @override
+  final DateTime approximateExpirationDate;
+  @override
+  final String refreshToken;
+  @override
+  final String accessToken;
+  @override
+  final String idToken;
+
+  factory _$SecureTokenResponse(
+          [void Function(SecureTokenResponseBuilder) updates]) =>
+      (new SecureTokenResponseBuilder()..update(updates)).build();
+
+  _$SecureTokenResponse._(
+      {this.approximateExpirationDate,
+      this.refreshToken,
+      this.accessToken,
+      this.idToken})
+      : super._();
+
+  @override
+  SecureTokenResponse rebuild(
+          void Function(SecureTokenResponseBuilder) updates) =>
+      (toBuilder()..update(updates)).build();
+
+  @override
+  SecureTokenResponseBuilder toBuilder() =>
+      new SecureTokenResponseBuilder()..replace(this);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is SecureTokenResponse &&
+        approximateExpirationDate == other.approximateExpirationDate &&
+        refreshToken == other.refreshToken &&
+        accessToken == other.accessToken &&
+        idToken == other.idToken;
+  }
+
+  @override
+  int get hashCode {
+    return $jf($jc(
+        $jc(
+            $jc($jc(0, approximateExpirationDate.hashCode),
+                refreshToken.hashCode),
+            accessToken.hashCode),
+        idToken.hashCode));
+  }
+
+  @override
+  String toString() {
+    return (newBuiltValueToStringHelper('SecureTokenResponse')
+          ..add('approximateExpirationDate', approximateExpirationDate)
+          ..add('refreshToken', refreshToken)
+          ..add('accessToken', accessToken)
+          ..add('idToken', idToken))
+        .toString();
+  }
+}
+
+class SecureTokenResponseBuilder
+    implements Builder<SecureTokenResponse, SecureTokenResponseBuilder> {
+  _$SecureTokenResponse _$v;
+
+  DateTime _approximateExpirationDate;
+  DateTime get approximateExpirationDate => _$this._approximateExpirationDate;
+  set approximateExpirationDate(DateTime approximateExpirationDate) =>
+      _$this._approximateExpirationDate = approximateExpirationDate;
+
+  String _refreshToken;
+  String get refreshToken => _$this._refreshToken;
+  set refreshToken(String refreshToken) => _$this._refreshToken = refreshToken;
+
+  String _accessToken;
+  String get accessToken => _$this._accessToken;
+  set accessToken(String accessToken) => _$this._accessToken = accessToken;
+
+  String _idToken;
+  String get idToken => _$this._idToken;
+  set idToken(String idToken) => _$this._idToken = idToken;
+
+  SecureTokenResponseBuilder();
+
+  SecureTokenResponseBuilder get _$this {
+    if (_$v != null) {
+      _approximateExpirationDate = _$v.approximateExpirationDate;
+      _refreshToken = _$v.refreshToken;
+      _accessToken = _$v.accessToken;
+      _idToken = _$v.idToken;
+      _$v = null;
+    }
+    return this;
+  }
+
+  @override
+  void replace(SecureTokenResponse other) {
+    if (other == null) {
+      throw new ArgumentError.notNull('other');
+    }
+    _$v = other as _$SecureTokenResponse;
+  }
+
+  @override
+  void update(void Function(SecureTokenResponseBuilder) updates) {
+    if (updates != null) updates(this);
+  }
+
+  @override
+  _$SecureTokenResponse build() {
+    final _$result = _$v ??
+        new _$SecureTokenResponse._(
+            approximateExpirationDate: approximateExpirationDate,
+            refreshToken: refreshToken,
+            accessToken: accessToken,
+            idToken: idToken);
     replace(_$result);
     return _$result;
   }

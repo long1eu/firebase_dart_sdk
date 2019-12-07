@@ -13,23 +13,19 @@ const Duration _kMaxWaitTimeForBackoff = Duration(minutes: 16);
 const Duration _kTokenRefreshHeadStart = Duration(minutes: 5);
 
 class FirebaseAuth implements InternalTokenProvider {
-  FirebaseAuth._(this._app, this._firebaseAuthApi, this._configuration, this._userStorage)
+  FirebaseAuth._(this._app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage)
       : _platformDependencies = _app.platformDependencies;
 
   factory FirebaseAuth.getInstance(FirebaseApp app) {
     _authStateChangedSubjects[FirebaseApp.instance.name] = BehaviorSubject<FirebaseUser>();
 
-    final AuthRequestConfiguration configuration =
-        AuthRequestConfiguration(apiKey: app.options.apiKey, languageCode: app.platformDependencies.locale);
-
-    final HttpService identityToolkitService =
-        HttpService(configuration: configuration, host: 'https://www.googleapis.com/identitytoolkit/v3/relyingparty');
-
-    final FirebaseAuthApi firebaseAuthApi =
-        FirebaseAuthApi(firebaseAuthService: FirebaseAuthService(service: identityToolkitService));
+    // init the identity toolkit client
+    final Client apiKeyClient = ApiKeyClient(app.options.apiKey, app.platformDependencies.headersBuilder);
+    final IdentitytoolkitApi gitkit = IdentitytoolkitApi(apiKeyClient);
+    final FirebaseAuthApi firebaseAuthApi = FirebaseAuthApi(gitkit: gitkit);
 
     final UserStorage userStorage = UserStorage(userBox: app.platformDependencies.box, appName: app.name);
-    final FirebaseAuth auth = FirebaseAuth._(app, firebaseAuthApi, configuration, userStorage);
+    final FirebaseAuth auth = FirebaseAuth._(app, firebaseAuthApi, apiKeyClient, userStorage);
     final FirebaseUser user = userStorage.get(auth);
     auth
       .._updateCurrentUser(user, saveToDisk: false)
@@ -52,8 +48,8 @@ class FirebaseAuth implements InternalTokenProvider {
   final FirebaseApp _app;
   final FirebaseAuthApi _firebaseAuthApi;
   final UserStorage _userStorage;
-  final AuthRequestConfiguration _configuration;
   final PlatformDependencies _platformDependencies;
+  final ApiKeyClient _apiKeyClient;
 
   StreamSubscription<bool> _backgroundChangedSub;
   bool _isAppInBackground;
@@ -66,6 +62,14 @@ class FirebaseAuth implements InternalTokenProvider {
   static final Map<String, FirebaseAuth> _instances = <String, FirebaseAuth>{};
   static final Map<String, BehaviorSubject<FirebaseUser>> _authStateChangedSubjects =
       <String, BehaviorSubject<FirebaseUser>>{};
+
+  /// The current user language code.
+  String get languageCode => _apiKeyClient.locale;
+
+  /// Set the current user language code.
+  ///
+  /// The string used to set this property must be a language code that follows BCP 47.
+  set languageCode(String languageCode) => _apiKeyClient.locale = languageCode;
 
   /// Receive [FirebaseUser] each time the user signIn or signOut
   Stream<FirebaseUser> get onAuthStateChanged {
@@ -88,14 +92,14 @@ class FirebaseAuth implements InternalTokenProvider {
       return _ensureUserPersistence(AuthResult._(_currentUser));
     }
 
-    final BaseAuthRequest request = BaseAuthRequest();
-    final BaseAuthResponse response = await _firebaseAuthApi.signUpNewUser(request);
+    final IdentitytoolkitRelyingpartySignupNewUserRequest request = IdentitytoolkitRelyingpartySignupNewUserRequest();
+    final SignupNewUserResponse response = await _firebaseAuthApi.signupNewUser(request);
 
     final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, response.expiresIn, response.refreshToken,
+        response.idToken, int.parse(response.expiresIn), response.refreshToken,
         anonymous: true);
 
-    return _ensureUserPersistence(AuthResult._(user, AdditionalUserInfoImpl.newAnonymous()));
+    return AuthResult._(user, AdditionalUserInfoImpl.newAnonymous());
   }
 
   /// Tries to create a new user account with the given email address and password.
@@ -115,11 +119,14 @@ class FirebaseAuth implements InternalTokenProvider {
     assert(email != null);
     assert(password != null);
 
-    final BaseAuthRequest request = BaseAuthRequest(email: email, password: password);
-    final BaseAuthResponse response = await _firebaseAuthApi.signUpNewUser(request);
+    final IdentitytoolkitRelyingpartySignupNewUserRequest request = IdentitytoolkitRelyingpartySignupNewUserRequest()
+      ..email = email
+      ..password = password;
+    final SignupNewUserResponse response = await _firebaseAuthApi.signupNewUser(request);
 
     final FirebaseUser user =
-        await _completeSignInWithAccessToken(response.idToken, response.expiresIn, response.refreshToken);
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+
     final AdditionalUserInfoImpl additionalUserInfo =
         AdditionalUserInfoImpl(providerId: ProviderType.password, isNewUser: true);
 
@@ -138,7 +145,10 @@ class FirebaseAuth implements InternalTokenProvider {
   Future<List<String>> fetchSignInMethodsForEmail({@required String email}) async {
     assert(email != null);
 
-    final CreateAuthUriRequest request = CreateAuthUriRequest(identifier: email, continueUri: 'http://www.google.com/');
+    final IdentitytoolkitRelyingpartyCreateAuthUriRequest request = IdentitytoolkitRelyingpartyCreateAuthUriRequest()
+      ..identifier = email
+      ..continueUri = 'http://www.google.com/';
+
     final CreateAuthUriResponse response = await _firebaseAuthApi.createAuthUri(request);
 
     return response.registered ? response.allProviders.toList() : <String>[];
@@ -162,8 +172,12 @@ class FirebaseAuth implements InternalTokenProvider {
   Future<void> sendPasswordResetEmail({@required String email, ActionCodeSettings settings}) async {
     assert(email != null);
 
-    final OobCodeRequest request = OobCodeRequest.resetPassword(email: email, settings: settings);
-    return _firebaseAuthApi._firebaseAuthService.sendOobCode(request);
+    final Relyingparty request = Relyingparty()
+      ..requestType = OobCodeType.passwordReset.value
+      ..email = email
+      ..updateWith(settings);
+
+    return _firebaseAuthApi.getOobConfirmationCode(request);
   }
 
   /// Sends a sign in with email link to provided email address.
@@ -171,8 +185,12 @@ class FirebaseAuth implements InternalTokenProvider {
     assert(email != null);
     assert(settings != null);
 
-    final OobCodeRequest request = OobCodeRequest.emailLink(email: email, settings: settings);
-    return _firebaseAuthApi._firebaseAuthService.sendOobCode(request);
+    final Relyingparty request = Relyingparty()
+      ..requestType = OobCodeType.passwordReset.value
+      ..email = email
+      ..updateWith(settings);
+
+    return _firebaseAuthApi.getOobConfirmationCode(request);
   }
 
   /// Checks if link is an email sign-in link.
@@ -201,15 +219,12 @@ class FirebaseAuth implements InternalTokenProvider {
   ///    Enable them in the Auth section of the Firebase console.
   ///  * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
   ///  * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
-  Future<AuthResult> signInWithEmailAndLink({String email, String link}) async {
+  Future<AuthResult> signInWithEmailAndLink({@required String email, @required String link}) async {
     assert(email != null);
     assert(link != null);
 
     final EmailPasswordAuthCredential credential = EmailPasswordAuthCredential.withLink(email: email, link: link);
-    final AuthResult result = await _signInAndRetrieveData(credential, isReauthentication: false);
-
-    _updateCurrentUser(result.user, saveToDisk: true);
-    return result;
+    return _signInAndRetrieveData(credential, isReauthentication: false);
   }
 
   /// Gets the cached current user, or null if there is none.
@@ -227,22 +242,28 @@ class FirebaseAuth implements InternalTokenProvider {
     }
   }
 
-  Future<AuthResult> _signInAndRetrieveDataEmailAndLink(String email, String link) {
+  Future<AuthResult> _signInAndRetrieveDataEmailAndLink(String email, String link) async {
     assert(email != null && email.isNotEmpty);
     assert(link != null && link.isNotEmpty);
 
     final Uri uri = Uri.parse(link);
     final Map<String, String> params = uri.queryParameters;
+    final String oobCode = params['oobCode'];
 
+    final IdentitytoolkitRelyingpartyEmailLinkSigninRequest request =
+        IdentitytoolkitRelyingpartyEmailLinkSigninRequest()
+          ..email = email
+          ..oobCode = oobCode;
 
+    final EmailLinkSigninResponse response = await _firebaseAuthApi.emailLinkSignin(request);
 
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
 
+    final AdditionalUserInfoImpl additionalUserInfo =
+        AdditionalUserInfoImpl(providerId: ProviderType.password, isNewUser: response.isNewUser);
 
-
-
-
-
-
+    return AuthResult._(user, additionalUserInfo);
   }
 
   /// Completes a sign-in flow once we have [accessToken] and [refreshToken] for the user.
@@ -409,5 +430,20 @@ class FirebaseAuth implements InternalTokenProvider {
     if (!isBackground && !_autoRefreshScheduled) {
       _scheduleAutoTokenRefresh();
     }
+  }
+}
+
+extension on Relyingparty {
+  void updateWith(ActionCodeSettings settings) {
+    this
+          ..continueUrl = settings?.continueUrl
+          ..iOSBundleId = settings?.iOSBundleId
+          ..androidPackageName = settings?.androidPackageName
+          ..androidInstallApp = settings?.androidInstallIfNotAvailable
+          ..androidMinimumVersion = settings?.androidMinimumVersion
+          ..canHandleCodeInApp = settings?.handleCodeInApp
+        // TODO(long1eu): Add the dynamic link when moving to protobuf
+        // ..dynamicLinkDomain = settings?.dynamicLinkDomain
+        ;
   }
 }

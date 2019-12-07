@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 25/11/2019
 
-part of models;
+part of firebase_auth;
 
 abstract class EmailAuthProvider {
   /// Creates an [AuthCredential] for an email & password sign in.

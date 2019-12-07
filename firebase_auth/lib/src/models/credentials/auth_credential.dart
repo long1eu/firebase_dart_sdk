@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 24/11/2019
 
-part of models;
+part of firebase_auth;
 
 /// Represents a credential.
 mixin AuthCredential {

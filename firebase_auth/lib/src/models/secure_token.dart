@@ -1,8 +1,8 @@
 // File created by
 // Lung Razvan <long1eu>
-// on 06/12/2019
+// on 07/12/2019
 
-part of requests;
+part of firebase_auth;
 
 /// Represents the parameters for the token endpoint.
 abstract class SecureTokenRequest implements Built<SecureTokenRequest, SecureTokenRequestBuilder> {

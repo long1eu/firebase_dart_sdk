@@ -5,32 +5,30 @@
 part of firebase_auth;
 
 class FirebaseUser with UserInfoMixin {
-  FirebaseUser({
-    @required SecureTokenApi secureTokenApi,
-    @required FirebaseAuth auth,
-  })  : assert(secureTokenApi != null),
+  FirebaseUser._({@required SecureTokenApi secureTokenApi, @required FirebaseAuth auth})
+      : assert(secureTokenApi != null),
         assert(auth != null),
         _secureTokenApi = secureTokenApi,
-        _configuration = auth._configuration,
         _auth = auth;
 
   /// Constructs a user with Secure Token Service tokens, and obtains user details from the getAccountInfo endpoint.
   static Future<FirebaseUser> _retrieveUserWithAuth(
       FirebaseAuth auth, String accessToken, DateTime accessTokenExpirationDate, String refreshToken,
       {bool anonymous}) async {
-    final HttpService secureTokenService =
-        HttpService(configuration: auth._configuration, host: 'https://securetoken.googleapis.com');
     final SecureTokenApi secureTokenApi = SecureTokenApi(
-      secureTokenService: SecureTokenService(service: secureTokenService),
+      client: auth._apiKeyClient,
       accessToken: accessToken,
       accessTokenExpirationDate: accessTokenExpirationDate,
       refreshToken: refreshToken,
     );
 
-    final FirebaseUser user = FirebaseUser(secureTokenApi: secureTokenApi, auth: auth);
-    final String firebaseAccessToken = await user._getToken();
+    final FirebaseUser user = FirebaseUser._(secureTokenApi: secureTokenApi, auth: auth);
+    final String newAccessToken = await user._getToken();
 
-    final List<UserDataResponse> response = await auth._firebaseAuthApi.getAccountInfo(firebaseAccessToken);
+    final IdentitytoolkitRelyingpartyGetAccountInfoRequest request = IdentitytoolkitRelyingpartyGetAccountInfoRequest()
+      ..idToken = newAccessToken;
+
+    final GetAccountInfoResponse response = await auth._firebaseAuthApi.getAccountInfo(request);
 
     return user
       .._isAnonymous = anonymous
@@ -38,7 +36,6 @@ class FirebaseUser with UserInfoMixin {
   }
 
   final SecureTokenApi _secureTokenApi;
-  final AuthRequestConfiguration _configuration;
   final FirebaseAuth _auth;
 
   bool _isAnonymous;
@@ -101,8 +98,8 @@ class FirebaseUser with UserInfoMixin {
     }
   }
 
-  void _updateWithUserDataResponse(List<UserDataResponse> response) {
-    final UserDataResponse user = response.first;
+  void _updateWithUserDataResponse(GetAccountInfoResponse response) {
+    final gitkit.UserInfo user = response.users.first;
 
     _userInfo = UserInfoImpl(
       uid: user.localId,
@@ -114,11 +111,21 @@ class FirebaseUser with UserInfoMixin {
     );
     __hasEmailPasswordCredential = user.passwordHash?.isNotEmpty ?? false;
     _metadata = UserMetadataImpl(
-      lastSignInDate: DateTime.fromMillisecondsSinceEpoch(user.lastLoginAt, isUtc: true),
-      creationDate: DateTime.fromMillisecondsSinceEpoch(user.createdAt, isUtc: true),
+      lastSignInDate: DateTime.fromMillisecondsSinceEpoch(int.parse(user.lastLoginAt), isUtc: true),
+      creationDate: DateTime.fromMillisecondsSinceEpoch(int.parse(user.createdAt), isUtc: true),
     );
 
-    _providerData = user.providerUserInfo.map((ProviderUserInfo info) => info.userInfo).toList();
+    _providerData = user.providerUserInfo
+        ?.map((UserInfoProviderUserInfo info) => UserInfoImpl(
+              providerId: info.providerId,
+              uid: info.federatedId,
+              displayName: info.displayName,
+              photoUrl: info.photoUrl,
+              email: info.email,
+              phoneNumber: info.phoneNumber,
+            ))
+        ?.toList();
+    _providerData ??= <UserInfo>[];
   }
 
   void _signOutIfTokenIsInvalid(FirebaseAuthError e) {
