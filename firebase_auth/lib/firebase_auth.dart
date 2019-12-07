@@ -3,6 +3,7 @@ library firebase_auth;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:_discoveryapis_commons/_discoveryapis_commons.dart';
 import 'package:built_collection/built_collection.dart';
@@ -28,6 +29,7 @@ part 'src/data/user_storage.dart';
 part 'src/firebase_auth.dart';
 part 'src/firebase_user.dart';
 part 'src/models/action_code_settings.dart';
+part 'src/models/sign_in_with_game_center_request.dart';
 part 'src/models/credentials/auth_credential.dart';
 part 'src/models/credentials/auth_providers.dart';
 part 'src/models/credentials/provider_type.dart';

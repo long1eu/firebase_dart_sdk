@@ -32,6 +32,19 @@ abstract class FacebookAuthCredentialImpl
   static Serializer<FacebookAuthCredentialImpl> get serializer => _$facebookAuthCredentialImplSerializer;
 }
 
+abstract class GameCenterAuthCredentialImpl
+    with AuthCredential
+    implements Built<GameCenterAuthCredentialImpl, GameCenterAuthCredentialImplBuilder>, GameCenterAuthCredential {
+  factory GameCenterAuthCredentialImpl() = _$GameCenterAuthCredentialImpl;
+
+  GameCenterAuthCredentialImpl._();
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<GameCenterAuthCredentialImpl> get serializer => _$gameCenterAuthCredentialImplSerializer;
+}
+
 abstract class GithubAuthCredentialImpl
     with AuthCredential
     implements Built<GithubAuthCredentialImpl, GithubAuthCredentialImplBuilder>, GithubAuthCredential {
@@ -56,6 +69,19 @@ abstract class GoogleAuthCredentialImpl
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
   static Serializer<GoogleAuthCredentialImpl> get serializer => _$googleAuthCredentialImplSerializer;
+}
+
+abstract class OAuthCredentialImpl
+    with AuthCredential
+    implements Built<OAuthCredentialImpl, OAuthCredentialImplBuilder>, OAuthCredential {
+  factory OAuthCredentialImpl() = _$OAuthCredentialImpl;
+
+  OAuthCredentialImpl._();
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<OAuthCredentialImpl> get serializer => _$oAuthCredentialImplSerializer;
 }
 
 abstract class TwitterAuthCredentialImpl

@@ -23,6 +23,27 @@ class FacebookAuthProvider {
   }
 }
 
+class GameCenterAuthProvider {
+  /// Creates an [AuthCredential] for a Facebook sign in.
+  static AuthCredential getCredential({
+    @required String playerId,
+    @required String publicKeyUrl,
+    @required Uint8List signature,
+    @required Uint8List salt,
+    @required DateTime timestamp,
+    @required String displayName,
+  }) {
+    return GameCenterAuthCredential(
+      playerId: playerId,
+      publicKeyUrl: publicKeyUrl,
+      signature: signature,
+      salt: salt,
+      timestamp: timestamp,
+      displayName: displayName,
+    );
+  }
+}
+
 class GithubAuthProvider {
   /// Creates an [AuthCredential] for a GitHub sign in.
   static AuthCredential getCredential(String token) {
@@ -34,6 +55,25 @@ class GoogleAuthProvider {
   /// Creates an [AuthCredential] for a Google sign in.
   static AuthCredential getCredential({@required String idToken, @required String accessToken}) {
     return GoogleAuthCredential(idToken: idToken, accessToken: accessToken);
+  }
+}
+
+class OAuthProvider {
+  /// Creates an [AuthCredential] corresponding to the specified provider ID.
+  static AuthCredential getCredential(String providerId) {
+    assert(
+        providerId != ProviderType.facebook,
+        'Sign in with Facebook is not supported via generic IDP; the Facebook TOS dictate that you must use the '
+        'Facebook iOS SDK for Facebook login.');
+    assert(providerId != ProviderType.apple || !Platform.isIOS,
+        'Sign in with Apple is not supported via generic IDP; You must use the Apple iOS SDK for Sign in with Apple.');
+
+    return OAuthCredential(providerId: providerId);
+  }
+
+  static AuthCredential getCredentialWithAccessToken(
+      {@required String providerId, @required String accessToken, String idToken}) {
+    return OAuthCredential(providerId: providerId, idToken: idToken, accessToken: accessToken);
   }
 }
 
