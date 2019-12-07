@@ -1,21 +1,21 @@
 // File created by
 // Lung Razvan <long1eu>
-// on 04/12/2019
+// on 06/12/2019
 
-part of requests;
+part of firebase_auth;
 
 abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCodeSettingsBuilder> {
   /// Settings related to handling action codes.
   ///
-  /// If [canHandleCodeInApp] is true you must specify the [iOSBundleId].
-  /// If [androidInstallApp] is true you must specify the [androidPackageName].
+  /// If [handleCodeInApp] is true you must specify the [iOSBundleId].
+  /// If [androidInstallIfNotAvailable] is true you must specify the [androidPackageName].
   factory ActionCodeSettings({
     String continueUrl,
     String iOSBundleId,
     String androidPackageName,
-    bool androidInstallApp,
+    bool androidInstallIfNotAvailable,
     String androidMinimumVersion,
-    bool canHandleCodeInApp = false,
+    bool handleCodeInApp = false,
     String dynamicLinkDomain,
   }) {
     return _$ActionCodeSettings((ActionCodeSettingsBuilder b) {
@@ -24,9 +24,9 @@ abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCod
         ..continueUrl = continueUrl
         ..iOSBundleId = iOSBundleId
         ..androidPackageName = androidPackageName
-        ..androidInstallApp = androidInstallApp
+        ..androidInstallIfNotAvailable = androidInstallIfNotAvailable
         ..androidMinimumVersion = androidMinimumVersion
-        ..canHandleCodeInApp = canHandleCodeInApp ?? false
+        ..handleCodeInApp = handleCodeInApp ?? false
         ..dynamicLinkDomain = dynamicLinkDomain;
     });
   }
@@ -47,7 +47,7 @@ abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCod
 
   /// Indicates whether or not the Android app should be installed if not already available.
   @nullable
-  bool get androidInstallApp;
+  bool get androidInstallIfNotAvailable;
 
   /// The minimum Android version supported, if available.
   @nullable
@@ -59,7 +59,7 @@ abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCod
   /// When set to true, the action code link will be sent as a universal link and will be open by the app if installed.
   /// In the false case, the code will be sent to the web widget first and then on continue will redirect to the app if
   /// installed.
-  bool get canHandleCodeInApp;
+  bool get handleCodeInApp;
 
   /// The Firebase Dynamic Link domain used for out of band code flow.
   ///

@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 25/11/2019
 
-part of models;
+part of firebase_auth;
 
 /// Represents user data returned from an identity provider.
 abstract class UserInfo {

@@ -1,4 +1,184 @@
+// File created by
+// Lung Razvan <long1eu>
+// on 07/12/2019
+
 part of firebase_auth;
+
+abstract class EmailPasswordAuthCredentialImpl
+    with AuthCredential
+    implements
+        Built<EmailPasswordAuthCredentialImpl, EmailPasswordAuthCredentialImplBuilder>,
+        EmailPasswordAuthCredential {
+  factory EmailPasswordAuthCredentialImpl() = _$EmailPasswordAuthCredentialImpl;
+
+  EmailPasswordAuthCredentialImpl._();
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<EmailPasswordAuthCredentialImpl> get serializer => _$emailPasswordAuthCredentialImplSerializer;
+}
+
+abstract class FacebookAuthCredentialImpl
+    with AuthCredential
+    implements Built<FacebookAuthCredentialImpl, FacebookAuthCredentialImplBuilder>, FacebookAuthCredential {
+  factory FacebookAuthCredentialImpl() = _$FacebookAuthCredentialImpl;
+
+  FacebookAuthCredentialImpl._();
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<FacebookAuthCredentialImpl> get serializer => _$facebookAuthCredentialImplSerializer;
+}
+
+abstract class GithubAuthCredentialImpl
+    with AuthCredential
+    implements Built<GithubAuthCredentialImpl, GithubAuthCredentialImplBuilder>, GithubAuthCredential {
+  factory GithubAuthCredentialImpl() = _$GithubAuthCredentialImpl;
+
+  GithubAuthCredentialImpl._();
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<GithubAuthCredentialImpl> get serializer => _$githubAuthCredentialImplSerializer;
+}
+
+abstract class GoogleAuthCredentialImpl
+    with AuthCredential
+    implements Built<GoogleAuthCredentialImpl, GoogleAuthCredentialImplBuilder>, GoogleAuthCredential {
+  factory GoogleAuthCredentialImpl() = _$GoogleAuthCredentialImpl;
+
+  GoogleAuthCredentialImpl._();
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<GoogleAuthCredentialImpl> get serializer => _$googleAuthCredentialImplSerializer;
+}
+
+abstract class TwitterAuthCredentialImpl
+    with AuthCredential
+    implements Built<TwitterAuthCredentialImpl, TwitterAuthCredentialImplBuilder>, TwitterAuthCredential {
+  factory TwitterAuthCredentialImpl() = _$TwitterAuthCredentialImpl;
+
+  TwitterAuthCredentialImpl._();
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<TwitterAuthCredentialImpl> get serializer => _$twitterAuthCredentialImplSerializer;
+}
+
+abstract class AdditionalUserInfoImpl
+    implements Built<AdditionalUserInfoImpl, AdditionalUserInfoImplBuilder>, AdditionalUserInfo {
+  factory AdditionalUserInfoImpl({
+    String providerId,
+    Map<String, dynamic> profile,
+    String username,
+    bool isNewUser,
+  }) {
+    MapBuilder<String, JsonObject> data;
+    if (profile != null) {
+      data = MapBuilder<String, JsonObject>();
+      for (String key in profile.keys) {
+        data[key] = JsonObject(profile[key]);
+      }
+    }
+
+    return _$AdditionalUserInfoImpl((AdditionalUserInfoImplBuilder b) {
+      b
+        ..providerId = providerId
+        ..profile = data
+        ..username = username
+        ..isNewUser = isNewUser;
+    });
+  }
+
+  factory AdditionalUserInfoImpl.newAnonymous() {
+    return _$AdditionalUserInfoImpl((AdditionalUserInfoImplBuilder b) => b.isNewUser = true);
+  }
+
+  factory AdditionalUserInfoImpl.fromJson(Map<dynamic, dynamic> json) => serializers.deserializeWith(serializer, json);
+
+  AdditionalUserInfoImpl._();
+
+  static Serializer<AdditionalUserInfoImpl> get serializer => _$additionalUserInfoImplSerializer;
+}
+
+abstract class UserInfoImpl implements Built<UserInfoImpl, UserInfoImplBuilder>, UserInfo {
+  factory UserInfoImpl({
+    String uid,
+    String providerId,
+    String displayName,
+    String photoUrl,
+    String email,
+    String phoneNumber,
+    bool isEmailVerified,
+  }) {
+    return _$UserInfoImpl((UserInfoImplBuilder b) {
+      b
+        ..uid = uid
+        ..providerId = providerId
+        ..displayName = displayName
+        ..photoUrl = photoUrl
+        ..email = email
+        ..phoneNumber = phoneNumber
+        ..isEmailVerified = isEmailVerified;
+    });
+  }
+
+  factory UserInfoImpl.fromJson(Map<dynamic, dynamic> json) => serializers.deserializeWith(serializer, json);
+
+  UserInfoImpl._();
+
+  UserInfoImpl copyWith({
+    String uid,
+    String providerId,
+    String displayName,
+    String photoUrl,
+    String email,
+    String phoneNumber,
+    bool isEmailVerified,
+  }) {
+    return _$UserInfoImpl((UserInfoImplBuilder b) {
+      b
+        ..uid = uid ?? this.uid
+        ..providerId = providerId ?? this.providerId
+        ..displayName = displayName ?? this.displayName
+        ..photoUrl = photoUrl ?? this.photoUrl
+        ..email = email ?? this.email
+        ..phoneNumber = phoneNumber ?? this.phoneNumber
+        ..isEmailVerified = isEmailVerified ?? this.isEmailVerified;
+    });
+  }
+
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<UserInfoImpl> get serializer => _$userInfoImplSerializer;
+}
+
+abstract class UserMetadataImpl implements Built<UserMetadataImpl, UserMetadataImplBuilder>, UserMetadata {
+  factory UserMetadataImpl({
+    @required DateTime lastSignInDate,
+    @required DateTime creationDate,
+  }) {
+    return _$UserMetadataImpl((UserMetadataImplBuilder b) {
+      b
+        ..lastSignInDate = lastSignInDate
+        ..creationDate = creationDate;
+    });
+  }
+
+  factory UserMetadataImpl.fromJson(Map<dynamic, dynamic> json) => serializers.deserializeWith(serializer, json);
+
+  UserMetadataImpl._();
+
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<UserMetadataImpl> get serializer => _$userMetadataImplSerializer;
+}
 
 _$FirebaseUserSerializer _$firebaseUserSerializer = _$FirebaseUserSerializer();
 
@@ -36,8 +216,6 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       serializers.serialize(object.displayName, specifiedType: const FullType(String)),
       'metadata',
       serializers.serialize(object.metadata, specifiedType: const FullType(UserMetadataImpl)),
-      'configuration',
-      serializers.serialize(object.metadata, specifiedType: const FullType(AuthRequestConfiguration)),
       'accessToken',
       serializers.serialize(object._secureTokenApi._accessToken, specifiedType: const FullType(String)),
       'accessTokenExpirationDate',
@@ -60,7 +238,6 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
     String photoUrl;
     String displayName;
     UserMetadataImpl metadata;
-    AuthRequestConfiguration configuration;
     String accessToken;
     DateTime accessTokenExpirationDate;
     String refreshToken;
@@ -107,9 +284,6 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
         case 'metadata':
           metadata = serializers.deserialize(value, specifiedType: const FullType(UserMetadataImpl));
           break;
-        case 'configuration':
-          configuration = serializers.deserialize(value, specifiedType: const FullType(AuthRequestConfiguration));
-          break;
         case 'accessToken':
           accessToken = serializers.deserialize(value, specifiedType: const FullType(String));
           break;
@@ -125,18 +299,14 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       }
     }
 
-    final HttpService secureTokenService =
-        HttpService(configuration: configuration, host: 'https://securetoken.googleapis.com');
     final SecureTokenApi secureTokenApi = SecureTokenApi(
-      secureTokenService: SecureTokenService(service: secureTokenService),
+      client: auth._apiKeyClient,
       accessToken: accessToken,
       accessTokenExpirationDate: accessTokenExpirationDate,
       refreshToken: refreshToken,
     );
 
-    final FirebaseUser user = FirebaseUser(secureTokenApi: secureTokenApi, auth: auth);
-
-    return user
+    return FirebaseUser._(secureTokenApi: secureTokenApi, auth: auth)
       .._isAnonymous = isAnonymous
       .._userInfo = UserInfoImpl(
         uid: uid,

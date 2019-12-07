@@ -3,7 +3,7 @@
 // on 05/12/2019
 
 
-part of models;
+part of firebase_auth;
 
 class ProviderType {
   static const String password = 'password';

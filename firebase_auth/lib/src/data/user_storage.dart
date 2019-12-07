@@ -15,7 +15,7 @@ class UserStorage {
   final String _appName;
 
   void save(FirebaseUser user) {
-    if (user == null) {
+    if (user != null) {
       final Map<String, dynamic> data = serializers.serializeWith(FirebaseUser.serializer, user);
       _userBox.put(_userKey, jsonEncode(data));
     } else {

@@ -7,7 +7,6 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_internal/firebase_internal.dart';
 import 'package:hive/hive.dart';
 import 'package:meta/meta.dart';
-import 'package:googleapis/identitytoolkit/v3.dart';
 
 Future<void> main() async {
   Hive.init('./hives');
@@ -27,8 +26,8 @@ Future<void> main() async {
 
   FirebaseAuth.instance.onAuthStateChanged.listen(print);
 
-  final AuthResult user = await FirebaseAuth.instance.signInAnonymously();
-  print(user.user.refreshToken);
+  // await FirebaseAuth.instance.signInAnonymously();
+  // print(FirebaseAuth.instance.currentUser);
 }
 
 class Dependencies extends PlatformDependencies {
