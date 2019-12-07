@@ -24,5 +24,5 @@ part 'src/data/secure_token_service.dart';
 part 'src/data/user_storage.dart';
 part 'src/firebase_auth.dart';
 part 'src/firebase_user.dart';
-part 'src/firebase_user.g.dart';
+part 'src/firebase_user.m.dart';
 part 'src/util/errors.dart';

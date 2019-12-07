@@ -7,7 +7,7 @@ part of models;
 /// Represents a credential.
 mixin AuthCredential {
   /// The identity provider for the credential
-  ProviderType get provider;
+  String get provider;
 
   @memoized
   Map<String, dynamic> get json;

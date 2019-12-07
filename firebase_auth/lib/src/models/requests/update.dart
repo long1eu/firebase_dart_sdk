@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 23/11/2019
 
-part of models;
+part of requests;
 
 abstract class UpdateRequest implements Built<UpdateRequest, UpdateRequestBuilder> {
   factory UpdateRequest.changeEmail({
@@ -176,7 +176,7 @@ abstract class ProviderUserInfo implements Built<ProviderUserInfo, ProviderUserI
   ProviderUserInfo._();
 
   /// The ID of the identity provider.
-  ProviderType get providerId;
+  String get providerId;
 
   ///	The user's display name at the identity provider.
   @nullable

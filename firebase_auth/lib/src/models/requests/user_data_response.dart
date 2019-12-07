@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 23/11/2019
 
-part of models;
+part of requests;
 
 abstract class UserDataResponse implements Built<UserDataResponse, UserDataResponseBuilder> {
   factory UserDataResponse([void Function(UserDataResponseBuilder b) updates]) = _$UserDataResponse;

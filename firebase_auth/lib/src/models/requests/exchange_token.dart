@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 23/11/2019
 
-part of models;
+part of requests;
 
 abstract class ExchangeRefreshTokenRequest
     implements Built<ExchangeRefreshTokenRequest, ExchangeRefreshTokenRequestBuilder> {

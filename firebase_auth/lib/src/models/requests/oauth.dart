@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 24/11/2019
 
-part of models;
+part of requests;
 
 abstract class OAuthRequest implements Built<OAuthRequest, OAuthRequestBuilder> {
   factory OAuthRequest([void Function(OAuthRequestBuilder b) updates]) = _$OAuthRequest;
@@ -76,7 +76,7 @@ abstract class OAuthResponse implements Built<OAuthResponse, OAuthResponseBuilde
   String get federatedId;
 
   /// The linked provider ID (e.g. "google.com" for the Google provider).
-  ProviderType get providerId;
+  String get providerId;
 
   /// The uid of the authenticated user.
   String get localId;

@@ -7,12 +7,15 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_internal/firebase_internal.dart';
 import 'package:hive/hive.dart';
 import 'package:meta/meta.dart';
+import 'package:googleapis/identitytoolkit/v3.dart';
 
 Future<void> main() async {
   Hive.init('./hives');
 
   final Box<dynamic> box =
       await Hive.openBox<dynamic>('firebase_auth', encryptionKey: 'dEtk7JiOCJirguAJEM7wOSkcNtfZO0DG'.codeUnits);
+
+  print(box.values);
 
   final Dependencies dependencies = Dependencies(box: box);
   final FirebaseOptions options = FirebaseOptions(
@@ -24,15 +27,8 @@ Future<void> main() async {
 
   FirebaseAuth.instance.onAuthStateChanged.listen(print);
 
-  if (FirebaseAuth.instance.currentUser != null) {
-    await FirebaseAuth.instance.getAccessToken();
-    print(FirebaseAuth.instance.currentUser.refreshToken);
-  }
-
-  await Future<void>.delayed(Duration(seconds: 1));
-
-  // print(FirebaseAuth.instance.currentUser);
-  // print(await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: password));
+  final AuthResult user = await FirebaseAuth.instance.signInAnonymously();
+  print(user.user.refreshToken);
 }
 
 class Dependencies extends PlatformDependencies {

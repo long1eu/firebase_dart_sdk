@@ -23,7 +23,7 @@ class FirebaseAuth implements InternalTokenProvider {
         AuthRequestConfiguration(apiKey: app.options.apiKey, languageCode: app.platformDependencies.locale);
 
     final HttpService identityToolkitService =
-        HttpService(configuration: configuration, host: 'https://identitytoolkit.googleapis.com/v1/accounts');
+        HttpService(configuration: configuration, host: 'https://www.googleapis.com/identitytoolkit/v3/relyingparty');
 
     final FirebaseAuthApi firebaseAuthApi =
         FirebaseAuthApi(firebaseAuthService: FirebaseAuthService(service: identityToolkitService));
@@ -175,8 +175,75 @@ class FirebaseAuth implements InternalTokenProvider {
     return _firebaseAuthApi._firebaseAuthService.sendOobCode(request);
   }
 
+  /// Checks if link is an email sign-in link.
+  bool isSignInWithEmailLink(String link) {
+    if (link == null || link.isEmpty) {
+      return false;
+    }
+
+    final Uri uri = Uri.tryParse(link);
+    if (uri == null) {
+      return false;
+    }
+
+    final Map<String, String> params = uri.queryParameters;
+    if (params.isEmpty) {
+      return false;
+    }
+
+    return params.containsKey('oobCode') && params['mode'] == 'signIn';
+  }
+
+  /// Signs in using an email address and email sign-in link.
+  ///
+  /// Errors:
+  ///  * [FirebaseAuthError.operationNotAllowed] - Indicates that email and email sign-in link accounts are not enabled.
+  ///    Enable them in the Auth section of the Firebase console.
+  ///  * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
+  ///  * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
+  Future<AuthResult> signInWithEmailAndLink({String email, String link}) async {
+    assert(email != null);
+    assert(link != null);
+
+    final EmailPasswordAuthCredential credential = EmailPasswordAuthCredential.withLink(email: email, link: link);
+    final AuthResult result = await _signInAndRetrieveData(credential, isReauthentication: false);
+
+    _updateCurrentUser(result.user, saveToDisk: true);
+    return result;
+  }
+
   /// Gets the cached current user, or null if there is none.
   FirebaseUser get currentUser => _currentUser;
+
+  /// Signs in Firebase with the given 3rd party credentials (e.g. a Facebook login Access Token, a Google ID
+  /// Token/Access Token pair, etc.) and returns additional identity provider data.
+  Future<AuthResult> _signInAndRetrieveData(AuthCredential credential, {@required bool isReauthentication}) {
+    if (credential is EmailPasswordAuthCredential) {
+      if (credential.link != null) {
+        return _signInAndRetrieveDataEmailAndLink(credential.email, credential.link);
+      } else {
+        //
+      }
+    }
+  }
+
+  Future<AuthResult> _signInAndRetrieveDataEmailAndLink(String email, String link) {
+    assert(email != null && email.isNotEmpty);
+    assert(link != null && link.isNotEmpty);
+
+    final Uri uri = Uri.parse(link);
+    final Map<String, String> params = uri.queryParameters;
+
+
+
+
+
+
+
+
+
+
+  }
 
   /// Completes a sign-in flow once we have [accessToken] and [refreshToken] for the user.
   Future<FirebaseUser> _completeSignInWithAccessToken(String accessToken, int expiresIn, String refreshToken,

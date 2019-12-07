@@ -13,7 +13,7 @@ abstract class UserInfo {
 
   /// The provider identifier.
   @nullable
-  ProviderType get providerId;
+  String get providerId;
 
   /// The name of the user.
   @nullable
@@ -44,7 +44,7 @@ abstract class AdditionalUserInfo {
 
   /// Returns the provider ID for specifying which provider the information in [profile] is for.
   @nullable
-  ProviderType get providerId;
+  String get providerId;
 
   /// Returns a Map containing IDP-specific user data if the provider is one of Facebook, GitHub, Google, Twitter,
   /// Microsoft, or Yahoo.

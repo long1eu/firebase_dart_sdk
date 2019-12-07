@@ -10,24 +10,18 @@ import 'package:built_value/json_object.dart';
 import 'package:built_value/serializer.dart';
 import 'package:built_value/standard_json_plugin.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/src/models/requests/index.dart';
 import 'package:meta/meta.dart';
+
+export 'requests/index.dart';
 
 part 'credentials/auth_credential.dart';
 part 'credentials/auth_providers.dart';
 part 'credentials/impl.dart';
+part 'credentials/provider_type.dart';
 part 'index.g.dart';
-part 'requests/auth_request_configuration.dart';
-part 'requests/base_auth.dart';
-part 'requests/create_auth_uri.dart';
-part 'requests/exchange_token.dart';
-part 'requests/oauth.dart';
-part 'requests/oob_code.dart';
-part 'requests/reset_password.dart';
-part 'requests/update.dart';
-part 'requests/user_data_response.dart';
 part 'user/impl.dart';
 part 'user/user.dart';
-part 'requests/action_code_settings.dart';
 
 @SerializersFor(<Type>[
   AdditionalUserInfoImpl,
@@ -63,7 +57,6 @@ Serializers serializers = (_$serializers.toBuilder() //
       ..add(FirebaseUser.serializer)
       ..add(OobCodeType.serializer)
       ..add(ProfileAttribute.serializer)
-      ..add(ProviderType.serializer)
       ..addBuilderFactory(
         const FullType(BuiltList, <FullType>[FullType(UserInfoImpl)]),
         () => ListBuilder<UserInfoImpl>(),
