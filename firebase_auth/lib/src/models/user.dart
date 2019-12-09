@@ -9,6 +9,7 @@ abstract class UserInfo {
   const UserInfo._();
 
   /// The provider's user ID for the user.
+  @nullable
   String get uid;
 
   /// The provider identifier.

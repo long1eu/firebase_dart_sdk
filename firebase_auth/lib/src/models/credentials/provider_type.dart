@@ -7,6 +7,7 @@ part of firebase_auth;
 
 class ProviderType {
   static const String password = 'password';
+  static const String phone = 'phone';
   static const String facebook = 'facebook.com';
   static const String gameCenter = 'gc.apple.com';
   static const String github = 'github.com';

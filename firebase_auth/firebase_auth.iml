@@ -10,5 +10,8 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Dart SDK" level="project" />
     <orderEntry type="library" name="Dart Packages" level="project" />
+    <orderEntry type="library" name="firebase-app" level="application" />
+    <orderEntry type="library" name="firebase-auth" level="application" />
+    <orderEntry type="library" name="material" level="application" />
   </component>
 </module>

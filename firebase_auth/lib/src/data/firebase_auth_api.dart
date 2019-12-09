@@ -10,8 +10,8 @@ class FirebaseAuthApi {
   FirebaseAuthApi({@required Client client})
       : assert(client != null),
         _requester = IdentitytoolkitApi(client).relyingparty,
-        _rawRequester =
-            ApiRequester(client, 'https://www.googleapis.com/', 'identitytoolkit/v3/relyingparty/', _identitytoolkitUserAgent);
+        _rawRequester = ApiRequester(
+            client, 'https://www.googleapis.com/', 'identitytoolkit/v3/relyingparty/', _identitytoolkitUserAgent);
 
   final RelyingpartyResourceApi _requester;
   final ApiRequester _rawRequester;
@@ -49,5 +49,26 @@ class FirebaseAuthApi {
     return _rawRequester
         .request('signInWithGameCenter', 'POST', body: jsonEncode(request.json))
         .then((dynamic data) => SignInWithGameCenterResponse.fromJson(data));
+  }
+
+  Future<IdentitytoolkitRelyingpartySendVerificationCodeResponse> sendVerificationCode(
+      IdentitytoolkitRelyingpartySendVerificationCodeRequest request) {
+    return _requester.sendVerificationCode(request).then(
+          (IdentitytoolkitRelyingpartySendVerificationCodeResponse response) => response,
+          onError: (dynamic error, [StackTrace s]) =>
+              _onError<IdentitytoolkitRelyingpartySendVerificationCodeResponse>(error),
+        );
+  }
+
+  Future<IdentitytoolkitRelyingpartyGetProjectConfigResponse> getProjectConfig() {
+    return _requester.getProjectConfig();
+  }
+
+  Future<GetRecaptchaParamResponse> getRecaptchaParam() {
+    return _requester.getRecaptchaParam();
+  }
+
+  Future<T> _onError<T>(dynamic e) {
+    return Future<T>.error(FirebaseAuthError(e.message.split(' : ')[0], ''));
   }
 }

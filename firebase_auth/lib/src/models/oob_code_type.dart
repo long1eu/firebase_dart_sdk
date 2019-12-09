@@ -18,10 +18,10 @@ class OobCodeType {
   static const OobCodeType verifyEmail = OobCodeType._(1, 'VERIFY_EMAIL');
 
   /// Requests an email sign-in link.
-  static const OobCodeType emailLinkSignIn = OobCodeType._(1, 'EMAIL_SIGNIN');
+  static const OobCodeType emailLinkSignIn = OobCodeType._(2, 'EMAIL_SIGNIN');
 
   /// Requests an verify before update email.
-  static const OobCodeType verifyBeforeUpdateEmail = OobCodeType._(1, 'VERIFY_AND_CHANGE_EMAIL');
+  static const OobCodeType verifyBeforeUpdateEmail = OobCodeType._(3, 'VERIFY_AND_CHANGE_EMAIL');
 
   static const List<OobCodeType> values = <OobCodeType>[
     passwordReset,

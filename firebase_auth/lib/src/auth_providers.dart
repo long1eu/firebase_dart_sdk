@@ -77,6 +77,16 @@ class OAuthProvider {
   }
 }
 
+class PhoneNumberProvider {
+  static AuthCredential getCredential({@required String verificationId, @required String verificationCode}) {
+    return PhoneAuthCredential(verificationId: verificationId, verificationCode: verificationCode);
+  }
+
+  static AuthCredential getCredentialWithTemporaryProof({@required String temporaryProof, @required String phoneNumber}) {
+    return PhoneAuthCredential(temporaryProof: temporaryProof, phoneNumber: phoneNumber);
+  }
+}
+
 class TwitterAuthProvider {
   /// Creates an [AuthCredential] for a Google sign in.
   static AuthCredential getCredential({@required String authToken, @required String authTokenSecret}) {

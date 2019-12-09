@@ -6,12 +6,6 @@ part of firebase_auth;
 // BuiltValueGenerator
 // **************************************************************************
 
-Serializer<SignInWithGameCenterRequest>
-    _$signInWithGameCenterRequestSerializer =
-    new _$SignInWithGameCenterRequestSerializer();
-Serializer<SignInWithGameCenterResponse>
-    _$signInWithGameCenterResponseSerializer =
-    new _$SignInWithGameCenterResponseSerializer();
 Serializer<EmailPasswordAuthCredentialImpl>
     _$emailPasswordAuthCredentialImplSerializer =
     new _$EmailPasswordAuthCredentialImplSerializer();
@@ -26,6 +20,8 @@ Serializer<GoogleAuthCredentialImpl> _$googleAuthCredentialImplSerializer =
     new _$GoogleAuthCredentialImplSerializer();
 Serializer<OAuthCredentialImpl> _$oAuthCredentialImplSerializer =
     new _$OAuthCredentialImplSerializer();
+Serializer<PhoneAuthCredentialImpl> _$phoneAuthCredentialImplSerializer =
+    new _$PhoneAuthCredentialImplSerializer();
 Serializer<TwitterAuthCredentialImpl> _$twitterAuthCredentialImplSerializer =
     new _$TwitterAuthCredentialImplSerializer();
 Serializer<AdditionalUserInfoImpl> _$additionalUserInfoImplSerializer =
@@ -38,201 +34,12 @@ Serializer<SecureTokenRequest> _$secureTokenRequestSerializer =
     new _$SecureTokenRequestSerializer();
 Serializer<SecureTokenResponse> _$secureTokenResponseSerializer =
     new _$SecureTokenResponseSerializer();
-
-class _$SignInWithGameCenterRequestSerializer
-    implements StructuredSerializer<SignInWithGameCenterRequest> {
-  @override
-  final Iterable<Type> types = const [
-    SignInWithGameCenterRequest,
-    _$SignInWithGameCenterRequest
-  ];
-  @override
-  final String wireName = 'SignInWithGameCenterRequest';
-
-  @override
-  Iterable<Object> serialize(
-      Serializers serializers, SignInWithGameCenterRequest object,
-      {FullType specifiedType = FullType.unspecified}) {
-    final result = <Object>[];
-    if (object.playerId != null) {
-      result
-        ..add('playerId')
-        ..add(serializers.serialize(object.playerId,
-            specifiedType: const FullType(String)));
-    }
-    if (object.publicKeyUrl != null) {
-      result
-        ..add('publicKeyUrl')
-        ..add(serializers.serialize(object.publicKeyUrl,
-            specifiedType: const FullType(String)));
-    }
-    if (object.signature != null) {
-      result
-        ..add('signature')
-        ..add(serializers.serialize(object.signature,
-            specifiedType: const FullType(String)));
-    }
-    if (object.salt != null) {
-      result
-        ..add('salt')
-        ..add(serializers.serialize(object.salt,
-            specifiedType: const FullType(String)));
-    }
-    if (object.timestamp != null) {
-      result
-        ..add('timestamp')
-        ..add(serializers.serialize(object.timestamp,
-            specifiedType: const FullType(int)));
-    }
-    if (object.accessToken != null) {
-      result
-        ..add('idToken')
-        ..add(serializers.serialize(object.accessToken,
-            specifiedType: const FullType(String)));
-    }
-    if (object.displayName != null) {
-      result
-        ..add('displayName')
-        ..add(serializers.serialize(object.displayName,
-            specifiedType: const FullType(String)));
-    }
-    return result;
-  }
-
-  @override
-  SignInWithGameCenterRequest deserialize(
-      Serializers serializers, Iterable<Object> serialized,
-      {FullType specifiedType = FullType.unspecified}) {
-    final result = new SignInWithGameCenterRequestBuilder();
-
-    final iterator = serialized.iterator;
-    while (iterator.moveNext()) {
-      final key = iterator.current as String;
-      iterator.moveNext();
-      final dynamic value = iterator.current;
-      switch (key) {
-        case 'playerId':
-          result.playerId = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'publicKeyUrl':
-          result.publicKeyUrl = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'signature':
-          result.signature = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'salt':
-          result.salt = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'timestamp':
-          result.timestamp = serializers.deserialize(value,
-              specifiedType: const FullType(int)) as int;
-          break;
-        case 'idToken':
-          result.accessToken = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'displayName':
-          result.displayName = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-      }
-    }
-
-    return result.build();
-  }
-}
-
-class _$SignInWithGameCenterResponseSerializer
-    implements StructuredSerializer<SignInWithGameCenterResponse> {
-  @override
-  final Iterable<Type> types = const [
-    SignInWithGameCenterResponse,
-    _$SignInWithGameCenterResponse
-  ];
-  @override
-  final String wireName = 'SignInWithGameCenterResponse';
-
-  @override
-  Iterable<Object> serialize(
-      Serializers serializers, SignInWithGameCenterResponse object,
-      {FullType specifiedType = FullType.unspecified}) {
-    final result = <Object>[
-      'idToken',
-      serializers.serialize(object.idToken,
-          specifiedType: const FullType(String)),
-      'refreshToken',
-      serializers.serialize(object.refreshToken,
-          specifiedType: const FullType(String)),
-      'localId',
-      serializers.serialize(object.localId,
-          specifiedType: const FullType(String)),
-      'playerId',
-      serializers.serialize(object.playerId,
-          specifiedType: const FullType(String)),
-      'expiresIn',
-      serializers.serialize(object.expiresIn,
-          specifiedType: const FullType(String)),
-      'isNewUser',
-      serializers.serialize(object.isNewUser,
-          specifiedType: const FullType(bool)),
-      'displayName',
-      serializers.serialize(object.displayName,
-          specifiedType: const FullType(String)),
-    ];
-
-    return result;
-  }
-
-  @override
-  SignInWithGameCenterResponse deserialize(
-      Serializers serializers, Iterable<Object> serialized,
-      {FullType specifiedType = FullType.unspecified}) {
-    final result = new SignInWithGameCenterResponseBuilder();
-
-    final iterator = serialized.iterator;
-    while (iterator.moveNext()) {
-      final key = iterator.current as String;
-      iterator.moveNext();
-      final dynamic value = iterator.current;
-      switch (key) {
-        case 'idToken':
-          result.idToken = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'refreshToken':
-          result.refreshToken = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'localId':
-          result.localId = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'playerId':
-          result.playerId = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'expiresIn':
-          result.expiresIn = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-        case 'isNewUser':
-          result.isNewUser = serializers.deserialize(value,
-              specifiedType: const FullType(bool)) as bool;
-          break;
-        case 'displayName':
-          result.displayName = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
-      }
-    }
-
-    return result.build();
-  }
-}
+Serializer<SignInWithGameCenterRequest>
+    _$signInWithGameCenterRequestSerializer =
+    new _$SignInWithGameCenterRequestSerializer();
+Serializer<SignInWithGameCenterResponse>
+    _$signInWithGameCenterResponseSerializer =
+    new _$SignInWithGameCenterResponseSerializer();
 
 class _$EmailPasswordAuthCredentialImplSerializer
     implements StructuredSerializer<EmailPasswordAuthCredentialImpl> {
@@ -674,6 +481,91 @@ class _$OAuthCredentialImplSerializer
   }
 }
 
+class _$PhoneAuthCredentialImplSerializer
+    implements StructuredSerializer<PhoneAuthCredentialImpl> {
+  @override
+  final Iterable<Type> types = const [
+    PhoneAuthCredentialImpl,
+    _$PhoneAuthCredentialImpl
+  ];
+  @override
+  final String wireName = 'PhoneAuthCredentialImpl';
+
+  @override
+  Iterable<Object> serialize(
+      Serializers serializers, PhoneAuthCredentialImpl object,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = <Object>[
+      'provider',
+      serializers.serialize(object.provider,
+          specifiedType: const FullType(String)),
+    ];
+    if (object.verificationId != null) {
+      result
+        ..add('verificationId')
+        ..add(serializers.serialize(object.verificationId,
+            specifiedType: const FullType(String)));
+    }
+    if (object.verificationCode != null) {
+      result
+        ..add('verificationCode')
+        ..add(serializers.serialize(object.verificationCode,
+            specifiedType: const FullType(String)));
+    }
+    if (object.temporaryProof != null) {
+      result
+        ..add('temporaryProof')
+        ..add(serializers.serialize(object.temporaryProof,
+            specifiedType: const FullType(String)));
+    }
+    if (object.phoneNumber != null) {
+      result
+        ..add('phoneNumber')
+        ..add(serializers.serialize(object.phoneNumber,
+            specifiedType: const FullType(String)));
+    }
+    return result;
+  }
+
+  @override
+  PhoneAuthCredentialImpl deserialize(
+      Serializers serializers, Iterable<Object> serialized,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = new PhoneAuthCredentialImplBuilder();
+
+    final iterator = serialized.iterator;
+    while (iterator.moveNext()) {
+      final key = iterator.current as String;
+      iterator.moveNext();
+      final dynamic value = iterator.current;
+      switch (key) {
+        case 'verificationId':
+          result.verificationId = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'verificationCode':
+          result.verificationCode = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'temporaryProof':
+          result.temporaryProof = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'phoneNumber':
+          result.phoneNumber = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'provider':
+          result.provider = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+      }
+    }
+
+    return result.build();
+  }
+}
+
 class _$TwitterAuthCredentialImplSerializer
     implements StructuredSerializer<TwitterAuthCredentialImpl> {
   @override
@@ -822,10 +714,13 @@ class _$UserInfoImplSerializer implements StructuredSerializer<UserInfoImpl> {
   @override
   Iterable<Object> serialize(Serializers serializers, UserInfoImpl object,
       {FullType specifiedType = FullType.unspecified}) {
-    final result = <Object>[
-      'uid',
-      serializers.serialize(object.uid, specifiedType: const FullType(String)),
-    ];
+    final result = <Object>[];
+    if (object.uid != null) {
+      result
+        ..add('uid')
+        ..add(serializers.serialize(object.uid,
+            specifiedType: const FullType(String)));
+    }
     if (object.providerId != null) {
       result
         ..add('providerId')
@@ -1109,6 +1004,201 @@ class _$SecureTokenResponseSerializer
   }
 }
 
+class _$SignInWithGameCenterRequestSerializer
+    implements StructuredSerializer<SignInWithGameCenterRequest> {
+  @override
+  final Iterable<Type> types = const [
+    SignInWithGameCenterRequest,
+    _$SignInWithGameCenterRequest
+  ];
+  @override
+  final String wireName = 'SignInWithGameCenterRequest';
+
+  @override
+  Iterable<Object> serialize(
+      Serializers serializers, SignInWithGameCenterRequest object,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = <Object>[];
+    if (object.playerId != null) {
+      result
+        ..add('playerId')
+        ..add(serializers.serialize(object.playerId,
+            specifiedType: const FullType(String)));
+    }
+    if (object.publicKeyUrl != null) {
+      result
+        ..add('publicKeyUrl')
+        ..add(serializers.serialize(object.publicKeyUrl,
+            specifiedType: const FullType(String)));
+    }
+    if (object.signature != null) {
+      result
+        ..add('signature')
+        ..add(serializers.serialize(object.signature,
+            specifiedType: const FullType(String)));
+    }
+    if (object.salt != null) {
+      result
+        ..add('salt')
+        ..add(serializers.serialize(object.salt,
+            specifiedType: const FullType(String)));
+    }
+    if (object.timestamp != null) {
+      result
+        ..add('timestamp')
+        ..add(serializers.serialize(object.timestamp,
+            specifiedType: const FullType(int)));
+    }
+    if (object.accessToken != null) {
+      result
+        ..add('idToken')
+        ..add(serializers.serialize(object.accessToken,
+            specifiedType: const FullType(String)));
+    }
+    if (object.displayName != null) {
+      result
+        ..add('displayName')
+        ..add(serializers.serialize(object.displayName,
+            specifiedType: const FullType(String)));
+    }
+    return result;
+  }
+
+  @override
+  SignInWithGameCenterRequest deserialize(
+      Serializers serializers, Iterable<Object> serialized,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = new SignInWithGameCenterRequestBuilder();
+
+    final iterator = serialized.iterator;
+    while (iterator.moveNext()) {
+      final key = iterator.current as String;
+      iterator.moveNext();
+      final dynamic value = iterator.current;
+      switch (key) {
+        case 'playerId':
+          result.playerId = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'publicKeyUrl':
+          result.publicKeyUrl = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'signature':
+          result.signature = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'salt':
+          result.salt = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'timestamp':
+          result.timestamp = serializers.deserialize(value,
+              specifiedType: const FullType(int)) as int;
+          break;
+        case 'idToken':
+          result.accessToken = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'displayName':
+          result.displayName = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+      }
+    }
+
+    return result.build();
+  }
+}
+
+class _$SignInWithGameCenterResponseSerializer
+    implements StructuredSerializer<SignInWithGameCenterResponse> {
+  @override
+  final Iterable<Type> types = const [
+    SignInWithGameCenterResponse,
+    _$SignInWithGameCenterResponse
+  ];
+  @override
+  final String wireName = 'SignInWithGameCenterResponse';
+
+  @override
+  Iterable<Object> serialize(
+      Serializers serializers, SignInWithGameCenterResponse object,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = <Object>[
+      'idToken',
+      serializers.serialize(object.idToken,
+          specifiedType: const FullType(String)),
+      'refreshToken',
+      serializers.serialize(object.refreshToken,
+          specifiedType: const FullType(String)),
+      'localId',
+      serializers.serialize(object.localId,
+          specifiedType: const FullType(String)),
+      'playerId',
+      serializers.serialize(object.playerId,
+          specifiedType: const FullType(String)),
+      'expiresIn',
+      serializers.serialize(object.expiresIn,
+          specifiedType: const FullType(String)),
+      'isNewUser',
+      serializers.serialize(object.isNewUser,
+          specifiedType: const FullType(bool)),
+      'displayName',
+      serializers.serialize(object.displayName,
+          specifiedType: const FullType(String)),
+    ];
+
+    return result;
+  }
+
+  @override
+  SignInWithGameCenterResponse deserialize(
+      Serializers serializers, Iterable<Object> serialized,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = new SignInWithGameCenterResponseBuilder();
+
+    final iterator = serialized.iterator;
+    while (iterator.moveNext()) {
+      final key = iterator.current as String;
+      iterator.moveNext();
+      final dynamic value = iterator.current;
+      switch (key) {
+        case 'idToken':
+          result.idToken = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'refreshToken':
+          result.refreshToken = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'localId':
+          result.localId = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'playerId':
+          result.playerId = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'expiresIn':
+          result.expiresIn = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'isNewUser':
+          result.isNewUser = serializers.deserialize(value,
+              specifiedType: const FullType(bool)) as bool;
+          break;
+        case 'displayName':
+          result.displayName = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+      }
+    }
+
+    return result.build();
+  }
+}
+
 class _$ActionCodeSettings extends ActionCodeSettings {
   @override
   final String continueUrl;
@@ -1271,353 +1361,6 @@ class ActionCodeSettingsBuilder
             androidMinimumVersion: androidMinimumVersion,
             handleCodeInApp: handleCodeInApp,
             dynamicLinkDomain: dynamicLinkDomain);
-    replace(_$result);
-    return _$result;
-  }
-}
-
-class _$SignInWithGameCenterRequest extends SignInWithGameCenterRequest {
-  @override
-  final String playerId;
-  @override
-  final String publicKeyUrl;
-  @override
-  final String signature;
-  @override
-  final String salt;
-  @override
-  final int timestamp;
-  @override
-  final String accessToken;
-  @override
-  final String displayName;
-
-  factory _$SignInWithGameCenterRequest(
-          [void Function(SignInWithGameCenterRequestBuilder) updates]) =>
-      (new SignInWithGameCenterRequestBuilder()..update(updates)).build();
-
-  _$SignInWithGameCenterRequest._(
-      {this.playerId,
-      this.publicKeyUrl,
-      this.signature,
-      this.salt,
-      this.timestamp,
-      this.accessToken,
-      this.displayName})
-      : super._();
-
-  @override
-  SignInWithGameCenterRequest rebuild(
-          void Function(SignInWithGameCenterRequestBuilder) updates) =>
-      (toBuilder()..update(updates)).build();
-
-  @override
-  SignInWithGameCenterRequestBuilder toBuilder() =>
-      new SignInWithGameCenterRequestBuilder()..replace(this);
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(other, this)) return true;
-    return other is SignInWithGameCenterRequest &&
-        playerId == other.playerId &&
-        publicKeyUrl == other.publicKeyUrl &&
-        signature == other.signature &&
-        salt == other.salt &&
-        timestamp == other.timestamp &&
-        accessToken == other.accessToken &&
-        displayName == other.displayName;
-  }
-
-  @override
-  int get hashCode {
-    return $jf($jc(
-        $jc(
-            $jc(
-                $jc(
-                    $jc($jc($jc(0, playerId.hashCode), publicKeyUrl.hashCode),
-                        signature.hashCode),
-                    salt.hashCode),
-                timestamp.hashCode),
-            accessToken.hashCode),
-        displayName.hashCode));
-  }
-
-  @override
-  String toString() {
-    return (newBuiltValueToStringHelper('SignInWithGameCenterRequest')
-          ..add('playerId', playerId)
-          ..add('publicKeyUrl', publicKeyUrl)
-          ..add('signature', signature)
-          ..add('salt', salt)
-          ..add('timestamp', timestamp)
-          ..add('accessToken', accessToken)
-          ..add('displayName', displayName))
-        .toString();
-  }
-}
-
-class SignInWithGameCenterRequestBuilder
-    implements
-        Builder<SignInWithGameCenterRequest,
-            SignInWithGameCenterRequestBuilder> {
-  _$SignInWithGameCenterRequest _$v;
-
-  String _playerId;
-  String get playerId => _$this._playerId;
-  set playerId(String playerId) => _$this._playerId = playerId;
-
-  String _publicKeyUrl;
-  String get publicKeyUrl => _$this._publicKeyUrl;
-  set publicKeyUrl(String publicKeyUrl) => _$this._publicKeyUrl = publicKeyUrl;
-
-  String _signature;
-  String get signature => _$this._signature;
-  set signature(String signature) => _$this._signature = signature;
-
-  String _salt;
-  String get salt => _$this._salt;
-  set salt(String salt) => _$this._salt = salt;
-
-  int _timestamp;
-  int get timestamp => _$this._timestamp;
-  set timestamp(int timestamp) => _$this._timestamp = timestamp;
-
-  String _accessToken;
-  String get accessToken => _$this._accessToken;
-  set accessToken(String accessToken) => _$this._accessToken = accessToken;
-
-  String _displayName;
-  String get displayName => _$this._displayName;
-  set displayName(String displayName) => _$this._displayName = displayName;
-
-  SignInWithGameCenterRequestBuilder();
-
-  SignInWithGameCenterRequestBuilder get _$this {
-    if (_$v != null) {
-      _playerId = _$v.playerId;
-      _publicKeyUrl = _$v.publicKeyUrl;
-      _signature = _$v.signature;
-      _salt = _$v.salt;
-      _timestamp = _$v.timestamp;
-      _accessToken = _$v.accessToken;
-      _displayName = _$v.displayName;
-      _$v = null;
-    }
-    return this;
-  }
-
-  @override
-  void replace(SignInWithGameCenterRequest other) {
-    if (other == null) {
-      throw new ArgumentError.notNull('other');
-    }
-    _$v = other as _$SignInWithGameCenterRequest;
-  }
-
-  @override
-  void update(void Function(SignInWithGameCenterRequestBuilder) updates) {
-    if (updates != null) updates(this);
-  }
-
-  @override
-  _$SignInWithGameCenterRequest build() {
-    final _$result = _$v ??
-        new _$SignInWithGameCenterRequest._(
-            playerId: playerId,
-            publicKeyUrl: publicKeyUrl,
-            signature: signature,
-            salt: salt,
-            timestamp: timestamp,
-            accessToken: accessToken,
-            displayName: displayName);
-    replace(_$result);
-    return _$result;
-  }
-}
-
-class _$SignInWithGameCenterResponse extends SignInWithGameCenterResponse {
-  @override
-  final String idToken;
-  @override
-  final String refreshToken;
-  @override
-  final String localId;
-  @override
-  final String playerId;
-  @override
-  final String expiresIn;
-  @override
-  final bool isNewUser;
-  @override
-  final String displayName;
-
-  factory _$SignInWithGameCenterResponse(
-          [void Function(SignInWithGameCenterResponseBuilder) updates]) =>
-      (new SignInWithGameCenterResponseBuilder()..update(updates)).build();
-
-  _$SignInWithGameCenterResponse._(
-      {this.idToken,
-      this.refreshToken,
-      this.localId,
-      this.playerId,
-      this.expiresIn,
-      this.isNewUser,
-      this.displayName})
-      : super._() {
-    if (idToken == null) {
-      throw new BuiltValueNullFieldError(
-          'SignInWithGameCenterResponse', 'idToken');
-    }
-    if (refreshToken == null) {
-      throw new BuiltValueNullFieldError(
-          'SignInWithGameCenterResponse', 'refreshToken');
-    }
-    if (localId == null) {
-      throw new BuiltValueNullFieldError(
-          'SignInWithGameCenterResponse', 'localId');
-    }
-    if (playerId == null) {
-      throw new BuiltValueNullFieldError(
-          'SignInWithGameCenterResponse', 'playerId');
-    }
-    if (expiresIn == null) {
-      throw new BuiltValueNullFieldError(
-          'SignInWithGameCenterResponse', 'expiresIn');
-    }
-    if (isNewUser == null) {
-      throw new BuiltValueNullFieldError(
-          'SignInWithGameCenterResponse', 'isNewUser');
-    }
-    if (displayName == null) {
-      throw new BuiltValueNullFieldError(
-          'SignInWithGameCenterResponse', 'displayName');
-    }
-  }
-
-  @override
-  SignInWithGameCenterResponse rebuild(
-          void Function(SignInWithGameCenterResponseBuilder) updates) =>
-      (toBuilder()..update(updates)).build();
-
-  @override
-  SignInWithGameCenterResponseBuilder toBuilder() =>
-      new SignInWithGameCenterResponseBuilder()..replace(this);
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(other, this)) return true;
-    return other is SignInWithGameCenterResponse &&
-        idToken == other.idToken &&
-        refreshToken == other.refreshToken &&
-        localId == other.localId &&
-        playerId == other.playerId &&
-        expiresIn == other.expiresIn &&
-        isNewUser == other.isNewUser &&
-        displayName == other.displayName;
-  }
-
-  @override
-  int get hashCode {
-    return $jf($jc(
-        $jc(
-            $jc(
-                $jc(
-                    $jc($jc($jc(0, idToken.hashCode), refreshToken.hashCode),
-                        localId.hashCode),
-                    playerId.hashCode),
-                expiresIn.hashCode),
-            isNewUser.hashCode),
-        displayName.hashCode));
-  }
-
-  @override
-  String toString() {
-    return (newBuiltValueToStringHelper('SignInWithGameCenterResponse')
-          ..add('idToken', idToken)
-          ..add('refreshToken', refreshToken)
-          ..add('localId', localId)
-          ..add('playerId', playerId)
-          ..add('expiresIn', expiresIn)
-          ..add('isNewUser', isNewUser)
-          ..add('displayName', displayName))
-        .toString();
-  }
-}
-
-class SignInWithGameCenterResponseBuilder
-    implements
-        Builder<SignInWithGameCenterResponse,
-            SignInWithGameCenterResponseBuilder> {
-  _$SignInWithGameCenterResponse _$v;
-
-  String _idToken;
-  String get idToken => _$this._idToken;
-  set idToken(String idToken) => _$this._idToken = idToken;
-
-  String _refreshToken;
-  String get refreshToken => _$this._refreshToken;
-  set refreshToken(String refreshToken) => _$this._refreshToken = refreshToken;
-
-  String _localId;
-  String get localId => _$this._localId;
-  set localId(String localId) => _$this._localId = localId;
-
-  String _playerId;
-  String get playerId => _$this._playerId;
-  set playerId(String playerId) => _$this._playerId = playerId;
-
-  String _expiresIn;
-  String get expiresIn => _$this._expiresIn;
-  set expiresIn(String expiresIn) => _$this._expiresIn = expiresIn;
-
-  bool _isNewUser;
-  bool get isNewUser => _$this._isNewUser;
-  set isNewUser(bool isNewUser) => _$this._isNewUser = isNewUser;
-
-  String _displayName;
-  String get displayName => _$this._displayName;
-  set displayName(String displayName) => _$this._displayName = displayName;
-
-  SignInWithGameCenterResponseBuilder();
-
-  SignInWithGameCenterResponseBuilder get _$this {
-    if (_$v != null) {
-      _idToken = _$v.idToken;
-      _refreshToken = _$v.refreshToken;
-      _localId = _$v.localId;
-      _playerId = _$v.playerId;
-      _expiresIn = _$v.expiresIn;
-      _isNewUser = _$v.isNewUser;
-      _displayName = _$v.displayName;
-      _$v = null;
-    }
-    return this;
-  }
-
-  @override
-  void replace(SignInWithGameCenterResponse other) {
-    if (other == null) {
-      throw new ArgumentError.notNull('other');
-    }
-    _$v = other as _$SignInWithGameCenterResponse;
-  }
-
-  @override
-  void update(void Function(SignInWithGameCenterResponseBuilder) updates) {
-    if (updates != null) updates(this);
-  }
-
-  @override
-  _$SignInWithGameCenterResponse build() {
-    final _$result = _$v ??
-        new _$SignInWithGameCenterResponse._(
-            idToken: idToken,
-            refreshToken: refreshToken,
-            localId: localId,
-            playerId: playerId,
-            expiresIn: expiresIn,
-            isNewUser: isNewUser,
-            displayName: displayName);
     replace(_$result);
     return _$result;
   }
@@ -2469,6 +2212,145 @@ class OAuthCredentialImplBuilder
   }
 }
 
+class _$PhoneAuthCredentialImpl extends PhoneAuthCredentialImpl {
+  @override
+  final String verificationId;
+  @override
+  final String verificationCode;
+  @override
+  final String temporaryProof;
+  @override
+  final String phoneNumber;
+  @override
+  final String provider;
+
+  factory _$PhoneAuthCredentialImpl(
+          [void Function(PhoneAuthCredentialImplBuilder) updates]) =>
+      (new PhoneAuthCredentialImplBuilder()..update(updates)).build();
+
+  _$PhoneAuthCredentialImpl._(
+      {this.verificationId,
+      this.verificationCode,
+      this.temporaryProof,
+      this.phoneNumber,
+      this.provider})
+      : super._() {
+    if (provider == null) {
+      throw new BuiltValueNullFieldError('PhoneAuthCredentialImpl', 'provider');
+    }
+  }
+
+  @override
+  PhoneAuthCredentialImpl rebuild(
+          void Function(PhoneAuthCredentialImplBuilder) updates) =>
+      (toBuilder()..update(updates)).build();
+
+  @override
+  PhoneAuthCredentialImplBuilder toBuilder() =>
+      new PhoneAuthCredentialImplBuilder()..replace(this);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is PhoneAuthCredentialImpl &&
+        verificationId == other.verificationId &&
+        verificationCode == other.verificationCode &&
+        temporaryProof == other.temporaryProof &&
+        phoneNumber == other.phoneNumber &&
+        provider == other.provider;
+  }
+
+  @override
+  int get hashCode {
+    return $jf($jc(
+        $jc(
+            $jc($jc($jc(0, verificationId.hashCode), verificationCode.hashCode),
+                temporaryProof.hashCode),
+            phoneNumber.hashCode),
+        provider.hashCode));
+  }
+
+  @override
+  String toString() {
+    return (newBuiltValueToStringHelper('PhoneAuthCredentialImpl')
+          ..add('verificationId', verificationId)
+          ..add('verificationCode', verificationCode)
+          ..add('temporaryProof', temporaryProof)
+          ..add('phoneNumber', phoneNumber)
+          ..add('provider', provider))
+        .toString();
+  }
+}
+
+class PhoneAuthCredentialImplBuilder
+    implements
+        Builder<PhoneAuthCredentialImpl, PhoneAuthCredentialImplBuilder> {
+  _$PhoneAuthCredentialImpl _$v;
+
+  String _verificationId;
+  String get verificationId => _$this._verificationId;
+  set verificationId(String verificationId) =>
+      _$this._verificationId = verificationId;
+
+  String _verificationCode;
+  String get verificationCode => _$this._verificationCode;
+  set verificationCode(String verificationCode) =>
+      _$this._verificationCode = verificationCode;
+
+  String _temporaryProof;
+  String get temporaryProof => _$this._temporaryProof;
+  set temporaryProof(String temporaryProof) =>
+      _$this._temporaryProof = temporaryProof;
+
+  String _phoneNumber;
+  String get phoneNumber => _$this._phoneNumber;
+  set phoneNumber(String phoneNumber) => _$this._phoneNumber = phoneNumber;
+
+  String _provider;
+  String get provider => _$this._provider;
+  set provider(String provider) => _$this._provider = provider;
+
+  PhoneAuthCredentialImplBuilder();
+
+  PhoneAuthCredentialImplBuilder get _$this {
+    if (_$v != null) {
+      _verificationId = _$v.verificationId;
+      _verificationCode = _$v.verificationCode;
+      _temporaryProof = _$v.temporaryProof;
+      _phoneNumber = _$v.phoneNumber;
+      _provider = _$v.provider;
+      _$v = null;
+    }
+    return this;
+  }
+
+  @override
+  void replace(PhoneAuthCredentialImpl other) {
+    if (other == null) {
+      throw new ArgumentError.notNull('other');
+    }
+    _$v = other as _$PhoneAuthCredentialImpl;
+  }
+
+  @override
+  void update(void Function(PhoneAuthCredentialImplBuilder) updates) {
+    if (updates != null) updates(this);
+  }
+
+  @override
+  _$PhoneAuthCredentialImpl build() {
+    final _$result = _$v ??
+        new _$PhoneAuthCredentialImpl._(
+            verificationId: verificationId,
+            verificationCode: verificationCode,
+            temporaryProof: temporaryProof,
+            phoneNumber: phoneNumber,
+            provider: provider);
+    replace(_$result);
+    return _$result;
+  }
+}
+
 class _$TwitterAuthCredentialImpl extends TwitterAuthCredentialImpl {
   @override
   final String authToken;
@@ -2734,11 +2616,7 @@ class _$UserInfoImpl extends UserInfoImpl {
       this.email,
       this.phoneNumber,
       this.isEmailVerified})
-      : super._() {
-    if (uid == null) {
-      throw new BuiltValueNullFieldError('UserInfoImpl', 'uid');
-    }
-  }
+      : super._();
 
   @override
   UserInfoImpl rebuild(void Function(UserInfoImplBuilder) updates) =>
@@ -3199,6 +3077,353 @@ class SecureTokenResponseBuilder
             refreshToken: refreshToken,
             accessToken: accessToken,
             idToken: idToken);
+    replace(_$result);
+    return _$result;
+  }
+}
+
+class _$SignInWithGameCenterRequest extends SignInWithGameCenterRequest {
+  @override
+  final String playerId;
+  @override
+  final String publicKeyUrl;
+  @override
+  final String signature;
+  @override
+  final String salt;
+  @override
+  final int timestamp;
+  @override
+  final String accessToken;
+  @override
+  final String displayName;
+
+  factory _$SignInWithGameCenterRequest(
+          [void Function(SignInWithGameCenterRequestBuilder) updates]) =>
+      (new SignInWithGameCenterRequestBuilder()..update(updates)).build();
+
+  _$SignInWithGameCenterRequest._(
+      {this.playerId,
+      this.publicKeyUrl,
+      this.signature,
+      this.salt,
+      this.timestamp,
+      this.accessToken,
+      this.displayName})
+      : super._();
+
+  @override
+  SignInWithGameCenterRequest rebuild(
+          void Function(SignInWithGameCenterRequestBuilder) updates) =>
+      (toBuilder()..update(updates)).build();
+
+  @override
+  SignInWithGameCenterRequestBuilder toBuilder() =>
+      new SignInWithGameCenterRequestBuilder()..replace(this);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is SignInWithGameCenterRequest &&
+        playerId == other.playerId &&
+        publicKeyUrl == other.publicKeyUrl &&
+        signature == other.signature &&
+        salt == other.salt &&
+        timestamp == other.timestamp &&
+        accessToken == other.accessToken &&
+        displayName == other.displayName;
+  }
+
+  @override
+  int get hashCode {
+    return $jf($jc(
+        $jc(
+            $jc(
+                $jc(
+                    $jc($jc($jc(0, playerId.hashCode), publicKeyUrl.hashCode),
+                        signature.hashCode),
+                    salt.hashCode),
+                timestamp.hashCode),
+            accessToken.hashCode),
+        displayName.hashCode));
+  }
+
+  @override
+  String toString() {
+    return (newBuiltValueToStringHelper('SignInWithGameCenterRequest')
+          ..add('playerId', playerId)
+          ..add('publicKeyUrl', publicKeyUrl)
+          ..add('signature', signature)
+          ..add('salt', salt)
+          ..add('timestamp', timestamp)
+          ..add('accessToken', accessToken)
+          ..add('displayName', displayName))
+        .toString();
+  }
+}
+
+class SignInWithGameCenterRequestBuilder
+    implements
+        Builder<SignInWithGameCenterRequest,
+            SignInWithGameCenterRequestBuilder> {
+  _$SignInWithGameCenterRequest _$v;
+
+  String _playerId;
+  String get playerId => _$this._playerId;
+  set playerId(String playerId) => _$this._playerId = playerId;
+
+  String _publicKeyUrl;
+  String get publicKeyUrl => _$this._publicKeyUrl;
+  set publicKeyUrl(String publicKeyUrl) => _$this._publicKeyUrl = publicKeyUrl;
+
+  String _signature;
+  String get signature => _$this._signature;
+  set signature(String signature) => _$this._signature = signature;
+
+  String _salt;
+  String get salt => _$this._salt;
+  set salt(String salt) => _$this._salt = salt;
+
+  int _timestamp;
+  int get timestamp => _$this._timestamp;
+  set timestamp(int timestamp) => _$this._timestamp = timestamp;
+
+  String _accessToken;
+  String get accessToken => _$this._accessToken;
+  set accessToken(String accessToken) => _$this._accessToken = accessToken;
+
+  String _displayName;
+  String get displayName => _$this._displayName;
+  set displayName(String displayName) => _$this._displayName = displayName;
+
+  SignInWithGameCenterRequestBuilder();
+
+  SignInWithGameCenterRequestBuilder get _$this {
+    if (_$v != null) {
+      _playerId = _$v.playerId;
+      _publicKeyUrl = _$v.publicKeyUrl;
+      _signature = _$v.signature;
+      _salt = _$v.salt;
+      _timestamp = _$v.timestamp;
+      _accessToken = _$v.accessToken;
+      _displayName = _$v.displayName;
+      _$v = null;
+    }
+    return this;
+  }
+
+  @override
+  void replace(SignInWithGameCenterRequest other) {
+    if (other == null) {
+      throw new ArgumentError.notNull('other');
+    }
+    _$v = other as _$SignInWithGameCenterRequest;
+  }
+
+  @override
+  void update(void Function(SignInWithGameCenterRequestBuilder) updates) {
+    if (updates != null) updates(this);
+  }
+
+  @override
+  _$SignInWithGameCenterRequest build() {
+    final _$result = _$v ??
+        new _$SignInWithGameCenterRequest._(
+            playerId: playerId,
+            publicKeyUrl: publicKeyUrl,
+            signature: signature,
+            salt: salt,
+            timestamp: timestamp,
+            accessToken: accessToken,
+            displayName: displayName);
+    replace(_$result);
+    return _$result;
+  }
+}
+
+class _$SignInWithGameCenterResponse extends SignInWithGameCenterResponse {
+  @override
+  final String idToken;
+  @override
+  final String refreshToken;
+  @override
+  final String localId;
+  @override
+  final String playerId;
+  @override
+  final String expiresIn;
+  @override
+  final bool isNewUser;
+  @override
+  final String displayName;
+
+  factory _$SignInWithGameCenterResponse(
+          [void Function(SignInWithGameCenterResponseBuilder) updates]) =>
+      (new SignInWithGameCenterResponseBuilder()..update(updates)).build();
+
+  _$SignInWithGameCenterResponse._(
+      {this.idToken,
+      this.refreshToken,
+      this.localId,
+      this.playerId,
+      this.expiresIn,
+      this.isNewUser,
+      this.displayName})
+      : super._() {
+    if (idToken == null) {
+      throw new BuiltValueNullFieldError(
+          'SignInWithGameCenterResponse', 'idToken');
+    }
+    if (refreshToken == null) {
+      throw new BuiltValueNullFieldError(
+          'SignInWithGameCenterResponse', 'refreshToken');
+    }
+    if (localId == null) {
+      throw new BuiltValueNullFieldError(
+          'SignInWithGameCenterResponse', 'localId');
+    }
+    if (playerId == null) {
+      throw new BuiltValueNullFieldError(
+          'SignInWithGameCenterResponse', 'playerId');
+    }
+    if (expiresIn == null) {
+      throw new BuiltValueNullFieldError(
+          'SignInWithGameCenterResponse', 'expiresIn');
+    }
+    if (isNewUser == null) {
+      throw new BuiltValueNullFieldError(
+          'SignInWithGameCenterResponse', 'isNewUser');
+    }
+    if (displayName == null) {
+      throw new BuiltValueNullFieldError(
+          'SignInWithGameCenterResponse', 'displayName');
+    }
+  }
+
+  @override
+  SignInWithGameCenterResponse rebuild(
+          void Function(SignInWithGameCenterResponseBuilder) updates) =>
+      (toBuilder()..update(updates)).build();
+
+  @override
+  SignInWithGameCenterResponseBuilder toBuilder() =>
+      new SignInWithGameCenterResponseBuilder()..replace(this);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is SignInWithGameCenterResponse &&
+        idToken == other.idToken &&
+        refreshToken == other.refreshToken &&
+        localId == other.localId &&
+        playerId == other.playerId &&
+        expiresIn == other.expiresIn &&
+        isNewUser == other.isNewUser &&
+        displayName == other.displayName;
+  }
+
+  @override
+  int get hashCode {
+    return $jf($jc(
+        $jc(
+            $jc(
+                $jc(
+                    $jc($jc($jc(0, idToken.hashCode), refreshToken.hashCode),
+                        localId.hashCode),
+                    playerId.hashCode),
+                expiresIn.hashCode),
+            isNewUser.hashCode),
+        displayName.hashCode));
+  }
+
+  @override
+  String toString() {
+    return (newBuiltValueToStringHelper('SignInWithGameCenterResponse')
+          ..add('idToken', idToken)
+          ..add('refreshToken', refreshToken)
+          ..add('localId', localId)
+          ..add('playerId', playerId)
+          ..add('expiresIn', expiresIn)
+          ..add('isNewUser', isNewUser)
+          ..add('displayName', displayName))
+        .toString();
+  }
+}
+
+class SignInWithGameCenterResponseBuilder
+    implements
+        Builder<SignInWithGameCenterResponse,
+            SignInWithGameCenterResponseBuilder> {
+  _$SignInWithGameCenterResponse _$v;
+
+  String _idToken;
+  String get idToken => _$this._idToken;
+  set idToken(String idToken) => _$this._idToken = idToken;
+
+  String _refreshToken;
+  String get refreshToken => _$this._refreshToken;
+  set refreshToken(String refreshToken) => _$this._refreshToken = refreshToken;
+
+  String _localId;
+  String get localId => _$this._localId;
+  set localId(String localId) => _$this._localId = localId;
+
+  String _playerId;
+  String get playerId => _$this._playerId;
+  set playerId(String playerId) => _$this._playerId = playerId;
+
+  String _expiresIn;
+  String get expiresIn => _$this._expiresIn;
+  set expiresIn(String expiresIn) => _$this._expiresIn = expiresIn;
+
+  bool _isNewUser;
+  bool get isNewUser => _$this._isNewUser;
+  set isNewUser(bool isNewUser) => _$this._isNewUser = isNewUser;
+
+  String _displayName;
+  String get displayName => _$this._displayName;
+  set displayName(String displayName) => _$this._displayName = displayName;
+
+  SignInWithGameCenterResponseBuilder();
+
+  SignInWithGameCenterResponseBuilder get _$this {
+    if (_$v != null) {
+      _idToken = _$v.idToken;
+      _refreshToken = _$v.refreshToken;
+      _localId = _$v.localId;
+      _playerId = _$v.playerId;
+      _expiresIn = _$v.expiresIn;
+      _isNewUser = _$v.isNewUser;
+      _displayName = _$v.displayName;
+      _$v = null;
+    }
+    return this;
+  }
+
+  @override
+  void replace(SignInWithGameCenterResponse other) {
+    if (other == null) {
+      throw new ArgumentError.notNull('other');
+    }
+    _$v = other as _$SignInWithGameCenterResponse;
+  }
+
+  @override
+  void update(void Function(SignInWithGameCenterResponseBuilder) updates) {
+    if (updates != null) updates(this);
+  }
+
+  @override
+  _$SignInWithGameCenterResponse build() {
+    final _$result = _$v ??
+        new _$SignInWithGameCenterResponse._(
+            idToken: idToken,
+            refreshToken: refreshToken,
+            localId: localId,
+            playerId: playerId,
+            expiresIn: expiresIn,
+            isNewUser: isNewUser,
+            displayName: displayName);
     replace(_$result);
     return _$result;
   }

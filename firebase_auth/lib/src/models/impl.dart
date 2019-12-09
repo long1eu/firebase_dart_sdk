@@ -84,6 +84,19 @@ abstract class OAuthCredentialImpl
   static Serializer<OAuthCredentialImpl> get serializer => _$oAuthCredentialImplSerializer;
 }
 
+abstract class PhoneAuthCredentialImpl
+    with AuthCredential
+    implements Built<PhoneAuthCredentialImpl, PhoneAuthCredentialImplBuilder>, PhoneAuthCredential {
+  factory PhoneAuthCredentialImpl() = _$PhoneAuthCredentialImpl;
+
+  PhoneAuthCredentialImpl._();
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<PhoneAuthCredentialImpl> get serializer => _$phoneAuthCredentialImplSerializer;
+}
+
 abstract class TwitterAuthCredentialImpl
     with AuthCredential
     implements Built<TwitterAuthCredentialImpl, TwitterAuthCredentialImplBuilder>, TwitterAuthCredential {
