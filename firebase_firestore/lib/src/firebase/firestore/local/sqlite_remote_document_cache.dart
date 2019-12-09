@@ -17,8 +17,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/proto/google/firebase/firestore/proto/maybe_document.pb.dart'
-    as proto;
+import 'package:firebase_firestore/src/proto/index.dart' as proto;
 import 'package:protobuf/protobuf.dart';
 
 class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
@@ -94,8 +93,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       results[key] = null;
     }
 
-    final LongQuery longQuery = LongQuery(
-        db, 'SELECT contents FROM remote_documents WHERE path IN (', null, args, ') ORDER BY path');
+    final LongQuery longQuery =
+        LongQuery(db, 'SELECT contents FROM remote_documents WHERE path IN (', null, args, ') ORDER BY path');
 
     while (longQuery.hasMoreSubqueries) {
       final List<Map<String, dynamic>> rows = await longQuery.performNextSubquery();
@@ -109,8 +108,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(
-      Query query) async {
+  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(Query query) async {
     // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
     final int immediateChildrenPathLength = prefix.length + 1;

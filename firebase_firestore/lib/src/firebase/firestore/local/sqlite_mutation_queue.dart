@@ -17,11 +17,9 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/google/firebase/firestore/proto/mutation.pb.dart'
-    as proto;
+import 'package:firebase_firestore/src/proto/index.dart' as proto;
 import 'package:protobuf/protobuf.dart';
 
 /// A mutation queue for a specific user, backed by SQLite.
@@ -29,7 +27,7 @@ class SQLiteMutationQueue implements MutationQueue {
   /// Creates a mutation queue for the given user, in the SQLite database wrapped by the persistence interface.
   SQLiteMutationQueue(this.db, this.serializer, User user)
       : uid = user.isAuthenticated ? user.uid : '',
-        _lastStreamToken = WriteStream.emptyStreamToken;
+        _lastStreamToken = Uint8List(0);
 
   final sq.SQLitePersistence db;
   final LocalSerializer serializer;
@@ -43,10 +41,6 @@ class SQLiteMutationQueue implements MutationQueue {
   /// [_nextBatchId] as an instance-level property. Should we ever relax this constraint we'll need to revisit this.
   int _nextBatchId;
 
-  /// An identifier for the highest numbered batch that has been acknowledged by the server. All [MutationBatch]es in
-  /// this queue with batch_ids less than or equal to this value are considered to have been acknowledged by the server.
-  int _lastAcknowledgedBatchId;
-
   /// A stream token that was previously sent by the server.
   ///
   /// See [StreamingWriteRequest] in datastore.proto for more details about usage.
@@ -59,16 +53,10 @@ class SQLiteMutationQueue implements MutationQueue {
   @override
   Future<void> start() async {
     await _loadNextBatchIdAcrossAllUsers();
-
-    // On restart, _nextBatchId may end up lower than lastAcknowledgedBatchId since it's computed from the queue
-    // contents, and there may be no mutations in the queue. In this case, we need to reset [lastAcknowledgedBatchId]
-    // (which is safe since the queue must be empty).
-    _lastAcknowledgedBatchId = MutationBatch.unknown;
-
     final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
-          SELECT last_acknowledged_batch_id, last_stream_token
+          SELECT last_stream_token
           FROM mutation_queues
           WHERE uid = ?;
         ''',
@@ -77,20 +65,13 @@ class SQLiteMutationQueue implements MutationQueue {
 
     if (result.isNotEmpty) {
       final Map<String, dynamic> row = result.first;
-      final int lastAcknowledgedBatchId = row['last_acknowledged_batch_id'];
       final Uint8List lastStreamToken = row['last_stream_token'];
-
-      _lastAcknowledgedBatchId = lastAcknowledgedBatchId;
       _lastStreamToken = lastStreamToken;
     }
 
     if (result.isEmpty) {
       // Ensure we write a default entry in mutation_queues since [loadNextBatchIdAcrossAllUsers] depends upon every
       // queue having an entry.
-      await _writeMutationQueueMetadata();
-    } else if (_lastAcknowledgedBatchId >= _nextBatchId) {
-      hardAssert(await isEmpty(), 'Reset _nextBatchId is only possible when the queue is empty');
-      _lastAcknowledgedBatchId = MutationBatch.unknown;
       await _writeMutationQueueMetadata();
     }
   }
@@ -164,11 +145,6 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken) async {
-    final int batchId = batch.batchId;
-    hardAssert(
-        batchId > _lastAcknowledgedBatchId, 'Mutation batchIds must be acknowledged in order');
-
-    _lastAcknowledgedBatchId = batchId;
     _lastStreamToken = checkNotNull(streamToken);
     await _writeMutationQueueMetadata();
   }
@@ -191,7 +167,7 @@ class SQLiteMutationQueue implements MutationQueue {
         VALUES (?, ?, ?);
         ''',
         // @formatter:on
-        <dynamic>[uid, _lastAcknowledgedBatchId, _lastStreamToken]);
+        <dynamic>[uid, -1, _lastStreamToken]);
   }
 
   @override
@@ -258,9 +234,7 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch> getNextMutationBatchAfterBatchId(int batchId) async {
-    // All batches with [batchId] <= [lastAcknowledgedBatchId] have been acknowledged so the first unacknowledged batch
-    // after [batchId] will have a [batchID] larger than both of these values.
-    final int _nextBatchId = max(batchId, _lastAcknowledgedBatchId) + 1;
+    final int _nextBatchId = batchId + 1;
 
     final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
@@ -304,8 +278,7 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
-      DocumentKey documentKey) async {
+  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(DocumentKey documentKey) async {
     final String path = EncodedPath.encode(documentKey.path);
 
     final List<MutationBatch> result = <MutationBatch>[];
@@ -332,8 +305,7 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
-      Iterable<DocumentKey> documentKeys) async {
+  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(Iterable<DocumentKey> documentKeys) async {
     final List<Object> args = <Object>[];
     for (DocumentKey key in documentKeys) {
       args.add(EncodedPath.encode(key.path));

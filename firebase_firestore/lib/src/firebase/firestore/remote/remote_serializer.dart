@@ -51,8 +51,8 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/existence_filte
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/index.dart' as proto_beta;
-import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
+import 'package:firebase_firestore/src/proto/google/firestore/v1/index.dart' as proto_v1;
+import 'package:firebase_firestore/src/proto/index.dart' as proto;
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
 
@@ -114,17 +114,15 @@ class RemoteSerializer {
   }
 
   String _encodeQueryPath(ResourcePath path) {
-    if (path.length == 0) {
-      // If the path is empty, the backend requires we leave off the /documents at the end.
-      return databaseName;
-    }
     return _encodeResourceName(databaseId, path);
   }
 
   ResourcePath _decodeQueryPath(String name) {
     final ResourcePath resource = _decodeResourceName(name);
     if (resource.length == 4) {
-      // Path missing the trailing documents path segment, indicating an empty path.
+      // In v1beta1 queries for collections at the root did not have a trailing "/documents". In v1 all resource paths
+      // contain "/documents". Preserve the ability to read the v1 form for compatibility with queries persisted in the
+      // local query cache.
       return ResourcePath.empty;
     } else {
       return _extractLocalPathFromResourceName(resource);
@@ -168,8 +166,8 @@ class RemoteSerializer {
   // Values
 
   /// Converts the [FieldValue] model passed into the [Value] proto equivalent.
-  proto_beta.Value encodeValue(FieldValue value) {
-    final proto_beta.Value builder = proto_beta.Value.create();
+  proto_v1.Value encodeValue(FieldValue value) {
+    final proto_v1.Value builder = proto_v1.Value.create();
 
     if (value is NullValue) {
       return builder //
@@ -208,35 +206,35 @@ class RemoteSerializer {
   }
 
   /// Converts from the proto [Value] format to the model [FieldValue] format
-  FieldValue decodeValue(proto_beta.Value proto) {
+  FieldValue decodeValue(proto_v1.Value proto) {
     switch (proto.whichValueType()) {
-      case proto_beta.Value_ValueType.booleanValue:
+      case proto_v1.Value_ValueType.booleanValue:
         return BoolValue.valueOf(proto.booleanValue);
-      case proto_beta.Value_ValueType.integerValue:
+      case proto_v1.Value_ValueType.integerValue:
         return IntegerValue.valueOf(proto.integerValue.toInt());
-      case proto_beta.Value_ValueType.doubleValue:
+      case proto_v1.Value_ValueType.doubleValue:
         return DoubleValue.valueOf(proto.doubleValue);
-      case proto_beta.Value_ValueType.referenceValue:
+      case proto_v1.Value_ValueType.referenceValue:
         final ResourcePath resourceName = _decodeResourceName(proto.referenceValue);
         final DatabaseId id = DatabaseId.forDatabase(resourceName[1], resourceName[3]);
         final DocumentKey key = DocumentKey.fromPath(_extractLocalPathFromResourceName(resourceName));
         return ReferenceValue.valueOf(id, key);
-      case proto_beta.Value_ValueType.mapValue:
+      case proto_v1.Value_ValueType.mapValue:
         return _decodeMapValue(proto.mapValue);
-      case proto_beta.Value_ValueType.geoPointValue:
+      case proto_v1.Value_ValueType.geoPointValue:
         final dynamic /*proto.LatLng*/ latLng = proto.geoPointValue;
         return GeoPointValue.valueOf(_decodeGeoPoint(latLng));
-      case proto_beta.Value_ValueType.arrayValue:
+      case proto_v1.Value_ValueType.arrayValue:
         return _decodeArrayValue(proto.arrayValue);
-      case proto_beta.Value_ValueType.timestampValue:
+      case proto_v1.Value_ValueType.timestampValue:
         final Timestamp timestamp = decodeTimestamp(proto.timestampValue);
         return TimestampValue.valueOf(timestamp);
-      case proto_beta.Value_ValueType.nullValue:
+      case proto_v1.Value_ValueType.nullValue:
         return NullValue.nullValue();
 
-      case proto_beta.Value_ValueType.stringValue:
+      case proto_v1.Value_ValueType.stringValue:
         return StringValue.valueOf(proto.stringValue);
-      case proto_beta.Value_ValueType.bytesValue:
+      case proto_v1.Value_ValueType.bytesValue:
         final Blob bytes = Blob(Uint8List.fromList(proto.bytesValue));
         return BlobValue.valueOf(bytes);
       default:
@@ -278,7 +276,7 @@ class RemoteSerializer {
 
   // PORTING NOTE: There's no encodeFields here because there's no way to write  it that doesn't
   // involve creating a temporary map.
-  ObjectValue decodeMapFields(Map<String, proto_beta.Value> fields) {
+  ObjectValue decodeMapFields(Map<String, proto_v1.Value> fields) {
     ObjectValue result = ObjectValue.empty;
     for (String key in fields.keys) {
       final FieldPath path = FieldPath.fromSingleSegment(key);
@@ -288,7 +286,7 @@ class RemoteSerializer {
     return result;
   }
 
-  ObjectValue decodeDocumentFields(Map<String, proto_beta.Value> fields) {
+  ObjectValue decodeDocumentFields(Map<String, proto_v1.Value> fields) {
     ObjectValue result = ObjectValue.empty;
     for (String key in fields.keys) {
       final FieldPath path = FieldPath.fromSingleSegment(key);
@@ -514,13 +512,13 @@ class RemoteSerializer {
 
   // Queries
 
-  MapEntry<String, String> encodeListenRequestLabels(QueryData queryData) {
+  Map<String, String> encodeListenRequestLabels(QueryData queryData) {
     final String value = _encodeLabel(queryData.purpose);
     if (value == null) {
-      return null;
+      return <String, String>{};
     }
 
-    return MapEntry<String, String>('goog-listen-tags', value);
+    return <String, String>{'goog-listen-tags': value};
   }
 
   String _encodeLabel(QueryPurpose purpose) {
@@ -536,8 +534,8 @@ class RemoteSerializer {
     }
   }
 
-  proto_beta.Target encodeTarget(QueryData queryData) {
-    final proto_beta.Target builder = proto_beta.Target.create();
+  proto_v1.Target encodeTarget(QueryData queryData) {
+    final proto_v1.Target builder = proto_v1.Target.create();
     final Query query = queryData.query;
 
     if (query.isDocumentQuery) {
@@ -859,7 +857,7 @@ class RemoteSerializer {
     final List<FieldValue> indexComponents = List<FieldValue>(valuesCount);
 
     for (int i = 0; i < valuesCount; i++) {
-      final proto_beta.Value valueProto = value.values[i];
+      final proto_v1.Value valueProto = value.values[i];
       indexComponents[i] = decodeValue(valueProto);
     }
     return Bound(position: indexComponents, before: value.before);

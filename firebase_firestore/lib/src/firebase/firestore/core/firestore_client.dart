@@ -32,7 +32,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.d
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
@@ -121,19 +121,13 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Starts listening to a query. */
   Future<QueryListener> listen(Query query, ListenOptions options) async {
     final QueryListener queryListener = QueryListener(query, options, stopListening);
-    await asyncQueue.enqueue(
-      () => eventManager.addQueryListener(queryListener),
-      'FirestoreClinet listen',
-    );
+    await asyncQueue.enqueue(() => eventManager.addQueryListener(queryListener), 'FirestoreClinet listen');
     return queryListener;
   }
 
   /// Stops listening to a query previously listened to.
   void stopListening(QueryListener listener) {
-    asyncQueue.enqueueAndForget(
-      () => eventManager.removeQueryListener(listener),
-      'FirestoreClinet stopListening',
-    );
+    asyncQueue.enqueueAndForget(() => eventManager.removeQueryListener(listener), 'FirestoreClinet stopListening');
   }
 
   Future<Document> getDocumentFromLocalCache(DocumentKey docKey) {

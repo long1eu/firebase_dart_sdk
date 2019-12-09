@@ -28,8 +28,6 @@ void main() {
   test('testAcknowledgeThenRemove', () => testCase.testAcknowledgeThenRemove());
   test('testLookupMutationBatch', () => testCase.testLookupMutationBatch());
   test('testNextMutationBatchAfterBatchId', () => testCase.testNextMutationBatchAfterBatchId());
-  test('testNextMutationBatchAfterBatchIdSkipsAcknowledgedBatches',
-      () => testCase.testNextMutationBatchAfterBatchIdSkipsAcknowledgedBatches());
   test('testAllMutationBatchesAffectingDocumentKey', () => testCase.testAllMutationBatchesAffectingDocumentKey());
   test('testAllMutationBatchesAffectingDocumentKeys', () => testCase.testAllMutationBatchesAffectingDocumentKeys());
   test('testAllMutationBatchesAffectingDocumentLotsOfDocumentKeys',

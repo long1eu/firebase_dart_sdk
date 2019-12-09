@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 27/11/2019
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_common/firebase_common.dart';
@@ -50,9 +51,29 @@ Future<void> main() async {
 
   final FirebaseFirestore firestore = FirebaseFirestore(databaseId, queue, app, client);
 
-  final DocumentSnapshot data = await firestore.document('messages/00J0fQA7cSSQ5oYmfxL6').get();
+  final DocumentReference document = firestore.document('messages/00J0fQA7cSSQ5oYmfxL6');
+  StreamSubscription<Map<String, Object>> sub =
+      document.snapshots.map((DocumentSnapshot data) => data.data).listen(print);
 
-  print(data.data);
+  final DocumentSnapshot doc = await document.get();
+
+  if (!doc.exists) {
+    await document.set(<String, String>{'first': 'values'});
+  }
+
+  await Future<void>.delayed(const Duration(seconds: 5));
+  await sub.cancel();
+
+  await Future<void>.delayed(const Duration(seconds: 15));
+
+  sub = document.snapshots.map((DocumentSnapshot data) => data.data).listen(print);
+  await Future<void>.delayed(const Duration(seconds: 5));
+  await sub.cancel();
+  await Future<void>.delayed(const Duration(seconds: 33));
+  print('done');
+  await Future<void>.delayed(const Duration(seconds: 5));
+  sub = document.snapshots.map((DocumentSnapshot data) => data.data).listen(print);
+  await Future<void>.delayed(const Duration(seconds: 5));
 }
 
 class Dependencies extends PlatformDependencies {

@@ -11,7 +11,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_schema.da
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
-import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
+import 'package:firebase_firestore/src/proto/index.dart' as proto;
 import 'package:test/test.dart';
 
 import 'mock/database_mock.dart';

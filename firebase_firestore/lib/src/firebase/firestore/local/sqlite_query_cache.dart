@@ -18,7 +18,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/google/firebase/firestore/proto/target.pb.dart' as proto;
+import 'package:firebase_firestore/src/proto/index.dart' as proto;
 
 /// Cached Queries backed by SQLite.
 class SQLiteQueryCache implements QueryCache {

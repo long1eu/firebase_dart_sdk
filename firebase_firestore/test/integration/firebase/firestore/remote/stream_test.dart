@@ -8,11 +8,11 @@ import 'package:firebase_firestore/src/firebase/firestore/auth/empty_credentials
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/stream.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/datastore.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/watch_stream.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';

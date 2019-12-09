@@ -15,7 +15,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/set_mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
@@ -58,7 +57,7 @@ class MutationQueueTestCase {
     final MutationBatch batch1 = await _addMutationBatch();
 
     await _persistence.runTransaction('testAcknowledgeThenRemove', () async {
-      await _mutationQueue.acknowledgeBatch(batch1, WriteStream.emptyStreamToken);
+      await _mutationQueue.acknowledgeBatch(batch1, Uint8List(0));
       await _mutationQueue.removeMutationBatch(batch1);
     });
 
@@ -121,24 +120,6 @@ class MutationQueueTestCase {
     final MutationBatch last = batches[batches.length - 1];
     final MutationBatch notFound = await _mutationQueue.getNextMutationBatchAfterBatchId(last.batchId);
     expect(notFound, isNull);
-  }
-
-  @testMethod
-  Future<void> testNextMutationBatchAfterBatchIdSkipsAcknowledgedBatches() async {
-    final List<MutationBatch> batches = await _createBatches(3);
-
-    MutationBatch result = await _mutationQueue.getNextMutationBatchAfterBatchId(MutationBatch.unknown);
-    expect(result, batches[0]);
-
-    await _acknowledgeBatch(batches[0]);
-    result = await _mutationQueue.getNextMutationBatchAfterBatchId(MutationBatch.unknown);
-    expect(result, batches[1]);
-
-    result = await _mutationQueue.getNextMutationBatchAfterBatchId(batches[0].batchId);
-    expect(result, batches[1]);
-
-    result = await _mutationQueue.getNextMutationBatchAfterBatchId(batches[1].batchId);
-    expect(result, batches[2]);
   }
 
   @testMethod
@@ -354,11 +335,6 @@ class MutationQueueTestCase {
       batches.add(await _addMutationBatch());
     }
     return batches;
-  }
-
-  Future<void> _acknowledgeBatch(MutationBatch batch) async {
-    await _persistence.runTransaction(
-        'Ack batchId', () => _mutationQueue.acknowledgeBatch(batch, WriteStream.emptyStreamToken));
   }
 
   /// Calls [_removeMutationBatches] on the mutation queue in a new transaction and commits.

@@ -18,8 +18,8 @@ dependencies:
       url: https://github.com/fluttercommunity/firebase_dart_sdk
       path: firebase_database_collection
 
-  protobuf: ^0.13.15
-  grpc: ^2.1.1
+  protobuf: ^1.0.1
+  grpc: ^2.1.3
   rxdart: ^0.22.2
 
 
@@ -32,4 +32,4 @@ dev_dependencies:
   moor_ffi: ^0.2.0
   uuid: ^2.0.0
 
-latest_commit: aa19fc6355756e05f112b65d803148bac7e48b3a
+latest_commit: 557749eeddbecdc274498760bddbae7c230e6765

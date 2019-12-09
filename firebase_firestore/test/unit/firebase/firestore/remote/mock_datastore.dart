@@ -11,14 +11,12 @@ import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/write_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/firestore_channel.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 import 'package:grpc/src/shared/status.dart';
@@ -29,36 +27,31 @@ import '../spec/spec_test_case.dart';
 /// the parts that would normally be sent from the backend.
 class MockDatastore extends Datastore {
   factory MockDatastore(AsyncQueue workerQueue) {
-    final RemoteSerializer serializer =
-        RemoteSerializer(DatabaseId.forDatabase('project', 'database'));
+    final DatabaseId databaseId = DatabaseId.forDatabase('project', 'database');
+    final RemoteSerializer serializer = RemoteSerializer(databaseId);
+    final DatabaseInfo databaseInfo = DatabaseInfo(databaseId, 'persistenceKey', 'host', sslEnabled: false);
 
-    final DatabaseInfo databaseInfo = DatabaseInfo(
-      DatabaseId.forDatabase('project', 'database'),
-      'persistenceKey',
-      'host',
-      sslEnabled: false,
-    );
+    final ClientChannel clientChannel =
+        ClientChannel(databaseInfo.host, options: const ChannelOptions(credentials: ChannelCredentials.insecure()));
 
-    final ClientChannel clientChannel = ClientChannel(databaseInfo.host,
-        options: ChannelOptions(
-            credentials: databaseInfo.sslEnabled
-                ? const ChannelCredentials.secure()
-                : const ChannelCredentials.insecure()));
-
-    final FirestoreChannel channel = FirestoreChannel(
-      workerQueue,
-      EmptyCredentialsProvider(),
-      clientChannel,
-      databaseInfo.databaseId,
-    );
-
-    return MockDatastore._(databaseInfo, workerQueue, serializer, channel);
+    final ChannelOptionsProvider channelOptionsProvider =
+        ChannelOptionsProvider(databaseId: databaseId, credentialsProvider: EmptyCredentialsProvider());
+    return MockDatastore._(databaseInfo, workerQueue, serializer,
+        FirestoreClient(clientChannel, channelOptionsProvider), channelOptionsProvider);
   }
 
-  MockDatastore._(DatabaseInfo databaseInfo, AsyncQueue workerQueue, RemoteSerializer serializer,
-      FirestoreChannel channel)
-      : super.init(databaseInfo, workerQueue, serializer, channel);
+  MockDatastore._(
+    DatabaseInfo databaseInfo,
+    AsyncQueue workerQueue,
+    RemoteSerializer serializer,
+    FirestoreClient client,
+    ChannelOptionsProvider optionsProvider,
+  )   : _serializer = serializer,
+        _client = client,
+        super.test(databaseInfo, workerQueue, serializer, client, optionsProvider);
 
+  final RemoteSerializer _serializer;
+  final FirestoreClient _client;
   _MockWatchStream _watchStream;
 
   _MockWriteStream _writeStream;
@@ -68,14 +61,10 @@ class MockDatastore extends Datastore {
   int _watchStreamRequestCount = 0;
 
   @override
-  WatchStream createWatchStream(WatchStreamCallback listener) {
-    return _watchStream = _MockWatchStream(this, workerQueue, listener);
-  }
+  WatchStream get watchStream => _watchStream = _MockWatchStream(this, _serializer, workerQueue);
 
   @override
-  WriteStream createWriteStream(WriteStreamCallback listener) {
-    return _writeStream = _MockWriteStream(this, workerQueue, listener);
-  }
+  WriteStream get writeStream => _writeStream = _MockWriteStream(this, _serializer, workerQueue);
 
   int get writeStreamRequestCount => _writeStreamRequestCount;
 
@@ -105,8 +94,8 @@ class MockDatastore extends Datastore {
   }
 
   /// Injects a stream failure as though it had come from the backend.
-  Future<void> failWatchStream(GrpcError status) async {
-    await _watchStream.failStream(status);
+  void failWatchStream(GrpcError status) {
+    _watchStream.failStream(status);
   }
 
   /// Returns the map of active targets on the watch stream, keyed by target ID.
@@ -121,8 +110,8 @@ class MockDatastore extends Datastore {
 }
 
 class _MockWatchStream extends WatchStream {
-  _MockWatchStream(this._datastore, AsyncQueue workerQueue, WatchStreamCallback listener)
-      : super(/*channel:*/ null, workerQueue, _datastore.serializer, listener);
+  _MockWatchStream(this._datastore, RemoteSerializer serializer, AsyncQueue workerQueue)
+      : super.test(_datastore._client, serializer, StreamController<StreamEvent>.broadcast(), workerQueue);
 
   final MockDatastore _datastore;
 
@@ -132,10 +121,12 @@ class _MockWatchStream extends WatchStream {
   final Map<int, QueryData> _activeTargets = <int, QueryData>{};
 
   @override
+  // ignore: must_call_super
   Future<void> start() async {
     hardAssert(!_open, 'Trying to start already started watch stream');
     _open = true;
-    await listener.onOpen();
+
+    addEvent(const OpenEvent());
   }
 
   @override
@@ -158,8 +149,7 @@ class _MockWatchStream extends WatchStream {
   @override
   void watchQuery(QueryData queryData) {
     final String resumeToken = toDebugString(queryData.resumeToken);
-    SpecTestCase.log('      watchQuery(${queryData.query}, ${queryData.targetId}, '
-        '$resumeToken)');
+    SpecTestCase.log('      watchQuery(${queryData.query}, ${queryData.targetId}, $resumeToken)');
     // Snapshot version is ignored on the wire
     final QueryData sentQueryData = queryData.copyWith(
         snapshotVersion: SnapshotVersion.none,
@@ -176,13 +166,14 @@ class _MockWatchStream extends WatchStream {
   }
 
   /// Injects a stream failure as though it had come from the backend.
-  Future<void> failStream(GrpcError status) async {
+  void failStream(GrpcError status) {
     _open = false;
-    await listener.onClose(status);
+    addEvent(CloseEvent(status));
   }
 
   /// Injects a watch change as though it had come from the backend.
   Future<void> writeWatchChange(WatchChange change, SnapshotVersion snapshotVersion) async {
+    SnapshotVersion _snapshotVersion = snapshotVersion;
     if (change is WatchChangeWatchTargetChange) {
       if (change.cause != null && change.cause.code != StatusCode.ok) {
         for (int targetId in change.targetIds) {
@@ -201,38 +192,40 @@ class _MockWatchStream extends WatchStream {
         // If the list of target IDs is not empty, we reset the snapshot version
         // to [none] as done in
         // `RemoteSerializer.decodeVersionFromListenResponse()`.
-        snapshotVersion = SnapshotVersion.none;
+        _snapshotVersion = SnapshotVersion.none;
       }
     }
-    await listener.onWatchChange(snapshotVersion, change);
+
+    addEvent(OnWatchChange(_snapshotVersion, change));
   }
 }
 
 class _MockWriteStream extends WriteStream {
-  _MockWriteStream(this._datastore, AsyncQueue workerQueue, WriteStreamCallback listener)
-      : sentWrites = <List<Mutation>>[],
-        super(/*channel=*/ null, workerQueue, _datastore.serializer, listener);
+  _MockWriteStream(this._datastore, RemoteSerializer serializer, AsyncQueue workerQueue)
+      : _sentWrites = <List<Mutation>>[],
+        super.test(_datastore._client, serializer, StreamController<StreamEvent>.broadcast(), workerQueue);
 
   final MockDatastore _datastore;
 
   bool _open = false;
 
-  /*p*/
-  final List<List<Mutation>> sentWrites;
+  final List<List<Mutation>> _sentWrites;
 
   @override
+  // ignore: must_call_super
   Future<void> start() async {
     hardAssert(!_open, 'Trying to start already started write stream');
     handshakeComplete = false;
     _open = true;
-    sentWrites.clear();
-    await listener.onOpen();
+    _sentWrites.clear();
+
+    addEvent(const OpenEvent());
   }
 
   @override
   Future<void> stop() async {
     await super.stop();
-    sentWrites.clear();
+    _sentWrites.clear();
     _open = false;
     handshakeComplete = false;
   }
@@ -253,35 +246,36 @@ class _MockWriteStream extends WriteStream {
     _datastore._writeStreamRequestCount += 1;
     handshakeComplete = true;
 
-    await listener.onHandshakeComplete();
+    addEvent(const HandshakeCompleteEvent());
   }
 
   @override
   void writeMutations(List<Mutation> mutations) {
     _datastore._writeStreamRequestCount += 1;
-    sentWrites.add(mutations);
+    _sentWrites.add(mutations);
   }
 
   /// Injects a write ack as though it had come from the backend in response to
   /// a write.
   Future<void> ackWrite(SnapshotVersion commitVersion, List<MutationResult> results) async {
-    await listener.onWriteResponse(commitVersion, results);
+    addEvent(OnWriteResponse(commitVersion, results));
   }
 
   /// Injects a stream failure as though it had come from the backend.
   Future<void> failStream(GrpcError status) async {
     _open = false;
-    sentWrites.clear();
-    await listener.onClose(status);
+    _sentWrites.clear();
+
+    addEvent(CloseEvent(status));
   }
 
   /// Returns a previous write that had been 'sent to the backend'.
   List<Mutation> waitForWriteSend() {
-    hardAssert(sentWrites.isNotEmpty, 'Writes need to happen before you can wait on them.');
-    return sentWrites.removeAt(0);
+    hardAssert(_sentWrites.isNotEmpty, 'Writes need to happen before you can wait on them.');
+    return _sentWrites.removeAt(0);
   }
 
   /// Returns the number of writes that have been sent to the backend but not
   /// waited on yet.
-  int get writesSent => sentWrites.length;
+  int get writesSent => _sentWrites.length;
 }

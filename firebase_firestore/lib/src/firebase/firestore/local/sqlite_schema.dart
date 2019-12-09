@@ -160,6 +160,7 @@ class SQLiteSchema {
     });
   }
 
+  /// Note: as of this migration, [last_acknowledged_batch_id] is no longer used by the code.
   Future<void> _removeAcknowledgedMutations() async {
     final List<Map<String, dynamic>> data =
         await db.query('SELECT uid, last_acknowledged_batch_id FROM mutation_queues');

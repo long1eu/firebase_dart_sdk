@@ -34,7 +34,6 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/existence_filte
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart' as asserts;
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
@@ -44,6 +43,8 @@ import '../../../../util/test_util.dart';
 import '../local/mock/database_mock.dart';
 import '../remote/mock_datastore.dart';
 import 'query_event.dart';
+
+const Duration _delayDuration = Duration(milliseconds: 0);
 
 class SpecTestCase implements RemoteStoreCallback {
   SpecTestCase(this.getPersistence, this.isExcluded);
@@ -167,7 +168,7 @@ class SpecTestCase implements RemoteStoreCallback {
     if (isError) {
       log('~~~onError~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     }
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await Future<void>.delayed(_delayDuration);
     await _remoteStore.shutdown();
     await _localPersistence.shutdown();
     log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
@@ -339,7 +340,8 @@ class SpecTestCase implements RemoteStoreCallback {
 
     final int actualId = await _eventManager.addQueryListener(listener);
     expect(actualId, expectedId);
-    await Future<void>.delayed(const Duration(milliseconds: 32));
+
+    await Future<void>.delayed(_delayDuration);
   }
 
   Future<void> _doUnlisten(List<dynamic> unlistenSpec) async {
@@ -378,7 +380,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _writeWatchChange(WatchChange change, SnapshotVersion version) async {
     await _datastore.writeWatchChange(change, version);
-    await Future<void>.delayed(const Duration(milliseconds: 32));
+    await Future<void>.delayed(_delayDuration);
   }
 
   Future<void> _doWatchAck(List<dynamic> ackedTargets) async {
@@ -407,12 +409,12 @@ class SpecTestCase implements RemoteStoreCallback {
 
     final List<int> targetIds = _parseIntList(watchRemoveSpec['targetIds'].cast<int>());
     final WatchChangeWatchTargetChange change =
-        WatchChangeWatchTargetChange(WatchTargetChangeType.removed, targetIds, WatchStream.emptyResumeToken, error);
+        WatchChangeWatchTargetChange(WatchTargetChangeType.removed, targetIds, Uint8List(0), error);
 
     await _writeWatchChange(change, SnapshotVersion.none);
     // Unlike web, the MockDatastore detects a watch removal with cause and will remove active targets
 
-    await Future<void>.delayed(const Duration(milliseconds: 32));
+    await Future<void>.delayed(_delayDuration);
   }
 
   Future<void> _doWatchEntity(Map<String, dynamic> watchEntity) async {
@@ -493,7 +495,8 @@ class SpecTestCase implements RemoteStoreCallback {
     expect(runBackoffTimer, isTrue);
 
     final GrpcError status = GrpcError.custom(error['code'], error['message']);
-    await _datastore.failWatchStream(status);
+    print('_datastore.isWatchStreamOpen: ${_datastore.isWatchStreamOpen}');
+    _datastore.failWatchStream(status);
     // Unlike web, stream should re-open synchronously (if we have active listeners).
     if (_queryListeners.isNotEmpty) {
       assert(_datastore.isWatchStreamOpen, 'Watch stream is open');
@@ -564,7 +567,7 @@ class SpecTestCase implements RemoteStoreCallback {
     // requests sent before shutdown.
     await _remoteStore.fillWritePipeline();
     await _remoteStore.disableNetwork();
-    await Future<void>.delayed(const Duration(milliseconds: 32));
+    await Future<void>.delayed(_delayDuration);
   }
 
   Future<void> _doEnableNetwork() async {

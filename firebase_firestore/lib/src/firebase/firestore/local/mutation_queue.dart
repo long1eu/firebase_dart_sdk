@@ -15,10 +15,6 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 /// A queue of mutations to apply to the remote store.
 abstract class MutationQueue {
   /// Starts the mutation queue, performing any initial reads that might be required to establish invariants, etc.
-  ///
-  /// After starting, the mutation queue must guarantee that the [highestAcknowledgedBatchId] is less than
-  /// [nextBatchId]. This prevents the local store from creating new batches that the mutation queue would consider
-  /// erroneously acknowledged.
   Future<void> start();
 
   /// Returns true if this queue contains no mutation batches.
