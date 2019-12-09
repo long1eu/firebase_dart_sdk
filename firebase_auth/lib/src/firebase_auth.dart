@@ -12,8 +12,6 @@ const Duration _kMaxWaitTimeForBackoff = Duration(minutes: 16);
 /// The amount of time before the token expires that proactive refresh should be attempted.
 const Duration _kTokenRefreshHeadStart = Duration(minutes: 5);
 
-const List<String> _authorizedDomains = <String>['firebaseapp.com', 'web.app'];
-
 class FirebaseAuth implements InternalTokenProvider {
   FirebaseAuth._(this._app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage)
       : _platformDependencies = _app.platformDependencies;
@@ -289,7 +287,7 @@ class FirebaseAuth implements InternalTokenProvider {
   ///       exceeded.
   ///   * [FirebaseAuthError.invalidPhoneNumber] - Indicates that the phone number provided is invalid.
   ///   * [FirebaseAuthError.missingPhoneNumber] - Indicates that the phone number provided was not provided.
-  Future<String> verifyPhoneNumber(String phoneNumber, {UrlPresenter presenter}) async {
+  Future<String> verifyPhoneNumber({@required String phoneNumber, UrlPresenter presenter}) async {
     assert(phoneNumber != null);
     final IdentitytoolkitRelyingpartySendVerificationCodeRequest request =
         IdentitytoolkitRelyingpartySendVerificationCodeRequest()..phoneNumber = phoneNumber;
@@ -304,6 +302,47 @@ class FirebaseAuth implements InternalTokenProvider {
     final IdentitytoolkitRelyingpartySendVerificationCodeResponse response =
         await _firebaseAuthApi.sendVerificationCode(request);
     return response.sessionInfo;
+  }
+
+  /// Tries to sign in a user with a given Custom Token [token].
+  ///
+  /// If successful, it also signs the user in into the app and updates the [onAuthStateChanged] stream.
+  ///
+  /// Use this method after you retrieve a Firebase Auth Custom Token from your server.
+  ///
+  /// If the user identified by the [uid] specified in the token doesn't have an account already, one will be created
+  /// automatically.
+  ///
+  /// Read how to use Custom Token authentication and the cases where it is useful in
+  /// [the guides](https://firebase.google.com/docs/auth/android/custom-auth).
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.invalidCustomToken] - Indicates a validation error with the custom token.
+  ///   * [FirebaseAuthError.customTokenMismatch] - Indicates the service account and the API key belong to different
+  ///       projects. Also ensure your app's SHA1 is correct in the Firebase console.
+  Future<AuthResult> signInWithCustomToken({@required String token}) async {
+    assert(token != null);
+
+    final IdentitytoolkitRelyingpartyVerifyCustomTokenRequest request =
+        IdentitytoolkitRelyingpartyVerifyCustomTokenRequest()..token = token;
+
+    final VerifyCustomTokenResponse response = await _firebaseAuthApi._requester.verifyCustomToken(request);
+
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+    final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(isNewUser: response.isNewUser);
+    return AuthResult._(user, additionalUserInfo);
+  }
+
+  /// Signs out the current user and clears it from the disk cache.
+  ///
+  /// If successful, it signs the user out of the app and updates
+  /// the [onAuthStateChanged] stream.
+  Future<void> signOut() async {
+    if (currentUser == null) {
+      return;
+    }
+    _updateCurrentUser(null, saveToDisk: true);
   }
 
   /// Gets the cached current user, or null if there is none.
@@ -333,7 +372,7 @@ class FirebaseAuth implements InternalTokenProvider {
           ..returnIdpCredential = true;
     credential.prepareVerifyAssertionRequest(request);
 
-    final VerifyAssertionResponse response = await _firebaseAuthApi._requester.verifyAssertion(request);
+    final VerifyAssertionResponse response = await _firebaseAuthApi.verifyAssertion(request);
 
     final AuthCredential oAuthCredential = OAuthCredential(
       providerId: response.providerId,
@@ -374,10 +413,8 @@ class FirebaseAuth implements InternalTokenProvider {
           ..oobCode = oobCode;
 
     final EmailLinkSigninResponse response = await _firebaseAuthApi.emailLinkSignin(request);
-
     final FirebaseUser user =
         await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
-
     final AdditionalUserInfoImpl additionalUserInfo =
         AdditionalUserInfoImpl(providerId: ProviderType.password, isNewUser: response.isNewUser);
 

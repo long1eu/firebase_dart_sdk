@@ -72,6 +72,10 @@ class FirebaseAuthApi {
     return _requester.verifyAssertion(request);
   }
 
+  Future<VerifyCustomTokenResponse> verifyCustomToken(IdentitytoolkitRelyingpartyVerifyCustomTokenRequest request) {
+    return _requester.verifyCustomToken(request);
+  }
+
   Future<T> _onError<T>(dynamic e) {
     return Future<T>.error(FirebaseAuthError(e.message.split(' : ')[0], ''));
   }
