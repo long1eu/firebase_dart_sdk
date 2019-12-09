@@ -68,6 +68,10 @@ class FirebaseAuthApi {
     return _requester.getRecaptchaParam();
   }
 
+  Future<VerifyAssertionResponse> verifyAssertion(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    return _requester.verifyAssertion(request);
+  }
+
   Future<T> _onError<T>(dynamic e) {
     return Future<T>.error(FirebaseAuthError(e.message.split(' : ')[0], ''));
   }

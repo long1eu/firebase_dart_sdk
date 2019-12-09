@@ -12,8 +12,10 @@ mixin AuthCredential {
   @memoized
   Map<String, dynamic> get json;
 
-  /// A request to the verifyAssertion endpoint uses this as the postBody parameter.
-  String get postBody => json.keys.map((String key) => '$key=${json[key]}').join('&');
+  /// Called immediately before a request to the verifyAssertion endpoint is made.
+  ///
+  /// Implementers should update the passed request instance with their credentials.
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request);
 }
 
 /// Internal implementation of [AuthCredential] for Email/Password credentials.
@@ -46,11 +48,6 @@ abstract class EmailPasswordAuthCredential with AuthCredential {
   /// The email sign-in link.
   @nullable
   String get link;
-
-  @override
-  String get postBody {
-    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a EmailPasswordAuthCredential.');
-  }
 }
 
 /// Internal implementation of [AuthCredential] for the Facebook IdP.
@@ -105,11 +102,6 @@ abstract class GameCenterAuthCredential with AuthCredential {
 
   /// The date and time that the signature was created.
   String get displayName;
-
-  @override
-  String get postBody {
-    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a GameCenterAuthCredential.');
-  }
 }
 
 /// Internal implementation of [AuthCredential] for GitHub credentials.
@@ -166,14 +158,13 @@ abstract class OAuthCredential with AuthCredential {
   factory OAuthCredential.withSession({
     @required String providerId,
     @required String sessionId,
-    @required String oAuthResponseURLString,
+    @required String oAuthResponseUrlString,
   }) {
     return _$OAuthCredentialImpl((OAuthCredentialImplBuilder b) {
       b
         ..provider = providerId
         ..sessionId = sessionId
-        ..oAuthResponseURLString = oAuthResponseURLString
-      ;
+        ..requestUri = oAuthResponseUrlString;
     });
   }
 
@@ -193,7 +184,7 @@ abstract class OAuthCredential with AuthCredential {
   String get sessionId;
 
   /// A string representation of the response URL corresponding to this OAuthCredential.
-  String get oAuthResponseURLString;
+  String get requestUri;
 
   String get idToken;
 
