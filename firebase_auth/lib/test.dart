@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 25/11/2019
 
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_internal/firebase_internal.dart';
@@ -18,16 +20,22 @@ Future<void> main() async {
 
   final Dependencies dependencies = Dependencies(box: box);
   final FirebaseOptions options = FirebaseOptions(
-      apiKey: 'AIzaSyApD5DJ2oSzosgy-pT0HPfqtCNh7st9dwM', applicationId: '1:233259864964:android:ef48439a0cc0263d');
+      apiKey: 'AIzaSyATj6OD0ja_nA2kaDxAlD3glZDTJiOQKL0', applicationId: '1:233259864964:ios:2577b6e25824fac5d583d1');
   FirebaseApp.withOptions(options, dependencies);
-
-  const String email = 'lungrazvan@gmail.cl';
-  const String password = '123456';
 
   FirebaseAuth.instance.onAuthStateChanged.listen(print);
 
-  // await FirebaseAuth.instance.signInAnonymously();
-  // print(FirebaseAuth.instance.currentUser);
+  print(FirebaseAuth.instance.currentUser.refreshToken);
+  print(await FirebaseAuth.instance.getAccessToken());
+
+  /*final String verificationId = await FirebaseAuth.instance.verifyPhoneNumber('+40755769229');
+
+  final String code = stdin.readLineSync();
+  final AuthCredential credential =
+      PhoneNumberProvider.getCredential(verificationId: verificationId, verificationCode: code);
+  print(credential);
+
+  await FirebaseAuth.instance.signInWithCredential(credential);*/
 }
 
 class Dependencies extends PlatformDependencies {

@@ -39,7 +39,6 @@ class FirebaseUser with UserInfoMixin {
   final FirebaseAuth _auth;
 
   bool _isAnonymous;
-  String _refreshToken;
   List<UserInfo> _providerData;
   UserMetadataImpl _metadata;
 
@@ -51,7 +50,7 @@ class FirebaseUser with UserInfoMixin {
   /// A refresh token; useful for obtaining new access tokens independently.
   ///
   /// This property should only be used for advanced scenarios, and is not typically needed.
-  String get refreshToken => _refreshToken;
+  String get refreshToken => _secureTokenApi._refreshToken;
 
   /// Profile data for each identity provider, if any.
   ///

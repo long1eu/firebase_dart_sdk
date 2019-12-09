@@ -112,13 +112,14 @@ class FirebaseOptions {
 
   @override
   int get hashCode =>
-      apiKey.hashCode * 31 ^
-      applicationId.hashCode * 31 ^
-      databaseUrl.hashCode * 31 ^
-      gaTrackingId.hashCode * 31 ^
-      gcmSenderId.hashCode * 31 ^
-      storageBucket.hashCode * 31 ^
-      projectId.hashCode * 31;
+      apiKey.hashCode ^
+      applicationId.hashCode ^
+      databaseUrl.hashCode ^
+      gaTrackingId.hashCode ^
+      gcmSenderId.hashCode ^
+      storageBucket.hashCode ^
+      projectId.hashCode ^
+      dataCollectionEnabled.hashCode;
 
   @override
   String toString() {

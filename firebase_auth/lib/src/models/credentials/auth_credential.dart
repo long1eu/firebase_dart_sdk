@@ -172,7 +172,8 @@ abstract class OAuthCredential with AuthCredential {
       b
         ..provider = providerId
         ..sessionId = sessionId
-        ..oAuthResponseURLString = oAuthResponseURLString;
+        ..oAuthResponseURLString = oAuthResponseURLString
+      ;
     });
   }
 
@@ -202,6 +203,40 @@ abstract class OAuthCredential with AuthCredential {
 
   /// The pending token used when completing the headful-lite flow.
   String get pendingToken;
+}
+
+abstract class PhoneAuthCredential with AuthCredential {
+  factory PhoneAuthCredential({
+    String verificationId,
+    String verificationCode,
+    String temporaryProof,
+    String phoneNumber,
+  }) {
+    return _$PhoneAuthCredentialImpl((PhoneAuthCredentialImplBuilder b) {
+      b
+        ..provider = ProviderType.phone
+        ..verificationId = verificationId
+        ..verificationCode = verificationCode
+        ..temporaryProof = temporaryProof
+        ..phoneNumber = phoneNumber;
+    });
+  }
+
+  /// The verification ID obtained from invoking [FirebaseAuth.verifyPhoneNumber]
+  @nullable
+  String get verificationId;
+
+  /// The verification code provided by the user.
+  @nullable
+  String get verificationCode;
+
+  /// The a temporary proof code pertaining to this credential, returned from the backend.
+  @nullable
+  String get temporaryProof;
+
+  /// The a phone number pertaining to this credential, returned from the backend.
+  @nullable
+  String get phoneNumber;
 }
 
 abstract class TwitterAuthCredential with AuthCredential {
