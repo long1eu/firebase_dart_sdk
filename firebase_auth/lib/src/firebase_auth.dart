@@ -311,7 +311,7 @@ class FirebaseAuth implements InternalTokenProvider {
 
   /// Signs in Firebase with the given 3rd party credentials (e.g. a Facebook login Access Token, a Google ID
   /// Token/Access Token pair, etc.) and returns additional identity provider data.
-  Future<AuthResult> _signInAndRetrieveData(AuthCredential credential, {@required bool isReauthentication}) {
+  Future<AuthResult> _signInAndRetrieveData(AuthCredential credential, {@required bool isReauthentication}) async {
     if (credential is EmailPasswordAuthCredential) {
       if (credential.link != null) {
         return _signInAndRetrieveDataEmailAndLink(credential.email, credential.link);
@@ -321,9 +321,43 @@ class FirebaseAuth implements InternalTokenProvider {
     } else if (credential is GameCenterAuthCredential) {
       return _signInAndRetrieveDataGameCenter(credential);
     } else if (credential is PhoneAuthCredential) {
-      return _signInAndRetrieveDataPhone(
-          credential, isReauthentication ? AuthOperationType.reauthenticate : AuthOperationType.signUpOrSignIn);
+      final AuthOperationType operation =
+          isReauthentication ? AuthOperationType.reauthenticate : AuthOperationType.signUpOrSignIn;
+      return _signInAndRetrieveDataPhone(credential, operation);
     }
+
+    final IdentitytoolkitRelyingpartyVerifyAssertionRequest request =
+        IdentitytoolkitRelyingpartyVerifyAssertionRequest()
+          ..returnSecureToken = true
+          ..autoCreate = true
+          ..returnIdpCredential = true;
+    credential.prepareVerifyAssertionRequest(request);
+
+    final VerifyAssertionResponse response = await _firebaseAuthApi._requester.verifyAssertion(request);
+
+    final AuthCredential oAuthCredential = OAuthCredential(
+      providerId: response.providerId,
+      idToken: response.oauthIdToken,
+      accessToken: response.oauthAccessToken,
+      secret: response.oauthTokenSecret,
+      pendingToken: response.oauthRequestToken,
+    );
+
+    if (response.needConfirmation) {
+      return Future<AuthResult>.error(FirebaseAuthCredentialAlreadyInUseError(credential, response.email));
+    }
+
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+
+    final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(
+      providerId: response.providerId,
+      profile: response.rawUserInfo != null ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo)) : null,
+      username: response.screenName,
+      isNewUser: response.isNewUser,
+    );
+
+    return AuthResult._(user, additionalUserInfo, oAuthCredential);
   }
 
   Future<AuthResult> _signInAndRetrieveDataEmailAndLink(String email, String link) async {
@@ -399,6 +433,14 @@ class FirebaseAuth implements InternalTokenProvider {
 
     final IdentitytoolkitRelyingpartyVerifyPhoneNumberResponse response =
         await _firebaseAuthApi._requester.verifyPhoneNumber(request);
+
+    // Check whether or not the successful response is actually the special case phone auth flow that returns a
+    // temporary proof and phone number.
+    if (response.temporaryProof != null && response.phoneNumber != null) {
+      final PhoneAuthCredential credential = PhoneAuthProvider.getCredentialWithTemporaryProof(
+          temporaryProof: response.temporaryProof, phoneNumber: response.phoneNumber);
+      return Future<AuthResult>.error(FirebaseAuthCredentialAlreadyInUseError(credential));
+    }
 
     final FirebaseUser user =
         await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);

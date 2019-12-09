@@ -388,8 +388,8 @@ class _$OAuthCredentialImplSerializer
       'sessionId',
       serializers.serialize(object.sessionId,
           specifiedType: const FullType(String)),
-      'oAuthResponseURLString',
-      serializers.serialize(object.oAuthResponseURLString,
+      'requestUri',
+      serializers.serialize(object.requestUri,
           specifiedType: const FullType(String)),
       'idToken',
       serializers.serialize(object.idToken,
@@ -454,8 +454,8 @@ class _$OAuthCredentialImplSerializer
           result.sessionId = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
-        case 'oAuthResponseURLString':
-          result.oAuthResponseURLString = serializers.deserialize(value,
+        case 'requestUri':
+          result.requestUri = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
         case 'idToken':
@@ -1997,7 +1997,7 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
   @override
   final String sessionId;
   @override
-  final String oAuthResponseURLString;
+  final String requestUri;
   @override
   final String idToken;
   @override
@@ -2016,7 +2016,7 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
       this.scopes,
       this.customParameters,
       this.sessionId,
-      this.oAuthResponseURLString,
+      this.requestUri,
       this.idToken,
       this.accessToken,
       this.secret,
@@ -2028,9 +2028,8 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
     if (sessionId == null) {
       throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'sessionId');
     }
-    if (oAuthResponseURLString == null) {
-      throw new BuiltValueNullFieldError(
-          'OAuthCredentialImpl', 'oAuthResponseURLString');
+    if (requestUri == null) {
+      throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'requestUri');
     }
     if (idToken == null) {
       throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'idToken');
@@ -2063,7 +2062,7 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
         scopes == other.scopes &&
         customParameters == other.customParameters &&
         sessionId == other.sessionId &&
-        oAuthResponseURLString == other.oAuthResponseURLString &&
+        requestUri == other.requestUri &&
         idToken == other.idToken &&
         accessToken == other.accessToken &&
         secret == other.secret &&
@@ -2081,7 +2080,7 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
                             $jc($jc($jc(0, provider.hashCode), scopes.hashCode),
                                 customParameters.hashCode),
                             sessionId.hashCode),
-                        oAuthResponseURLString.hashCode),
+                        requestUri.hashCode),
                     idToken.hashCode),
                 accessToken.hashCode),
             secret.hashCode),
@@ -2095,7 +2094,7 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
           ..add('scopes', scopes)
           ..add('customParameters', customParameters)
           ..add('sessionId', sessionId)
-          ..add('oAuthResponseURLString', oAuthResponseURLString)
+          ..add('requestUri', requestUri)
           ..add('idToken', idToken)
           ..add('accessToken', accessToken)
           ..add('secret', secret)
@@ -2127,10 +2126,9 @@ class OAuthCredentialImplBuilder
   String get sessionId => _$this._sessionId;
   set sessionId(String sessionId) => _$this._sessionId = sessionId;
 
-  String _oAuthResponseURLString;
-  String get oAuthResponseURLString => _$this._oAuthResponseURLString;
-  set oAuthResponseURLString(String oAuthResponseURLString) =>
-      _$this._oAuthResponseURLString = oAuthResponseURLString;
+  String _requestUri;
+  String get requestUri => _$this._requestUri;
+  set requestUri(String requestUri) => _$this._requestUri = requestUri;
 
   String _idToken;
   String get idToken => _$this._idToken;
@@ -2156,7 +2154,7 @@ class OAuthCredentialImplBuilder
       _scopes = _$v.scopes?.toBuilder();
       _customParameters = _$v.customParameters?.toBuilder();
       _sessionId = _$v.sessionId;
-      _oAuthResponseURLString = _$v.oAuthResponseURLString;
+      _requestUri = _$v.requestUri;
       _idToken = _$v.idToken;
       _accessToken = _$v.accessToken;
       _secret = _$v.secret;
@@ -2189,7 +2187,7 @@ class OAuthCredentialImplBuilder
               scopes: _scopes?.build(),
               customParameters: _customParameters?.build(),
               sessionId: sessionId,
-              oAuthResponseURLString: oAuthResponseURLString,
+              requestUri: requestUri,
               idToken: idToken,
               accessToken: accessToken,
               secret: secret,

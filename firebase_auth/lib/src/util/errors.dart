@@ -553,3 +553,12 @@ class FirebaseAuthError extends FirebaseError {
   @override
   String toString() => 'FirebaseAuthError($code, $message)';
 }
+
+class FirebaseAuthCredentialAlreadyInUseError extends FirebaseAuthError {
+  const FirebaseAuthCredentialAlreadyInUseError(this.credential, [this.email])
+      : super._(17025, 'This credential is already associated with a different user account.');
+
+  final AuthCredential credential;
+
+  final String email;
+}

@@ -14,6 +14,11 @@ abstract class EmailPasswordAuthCredentialImpl
   EmailPasswordAuthCredentialImpl._();
 
   @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a EmailPasswordAuthCredential.');
+  }
+
+  @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
   static Serializer<EmailPasswordAuthCredentialImpl> get serializer => _$emailPasswordAuthCredentialImplSerializer;
@@ -25,6 +30,13 @@ abstract class FacebookAuthCredentialImpl
   factory FacebookAuthCredentialImpl() = _$FacebookAuthCredentialImpl;
 
   FacebookAuthCredentialImpl._();
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..postBody = 'provider=$provider&access_token=$accessToken'
+      ..requestUri = 'http://localhost';
+  }
 
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
@@ -40,6 +52,11 @@ abstract class GameCenterAuthCredentialImpl
   GameCenterAuthCredentialImpl._();
 
   @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a GameCenterAuthCredential.');
+  }
+
+  @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
   static Serializer<GameCenterAuthCredentialImpl> get serializer => _$gameCenterAuthCredentialImplSerializer;
@@ -51,6 +68,13 @@ abstract class GithubAuthCredentialImpl
   factory GithubAuthCredentialImpl() = _$GithubAuthCredentialImpl;
 
   GithubAuthCredentialImpl._();
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..postBody = 'provider=$provider&access_token=$token'
+      ..requestUri = 'http://localhost';
+  }
 
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
@@ -66,6 +90,13 @@ abstract class GoogleAuthCredentialImpl
   GoogleAuthCredentialImpl._();
 
   @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..postBody = 'provider=$provider&id_token=$idToken&access_token=$accessToken'
+      ..requestUri = 'http://localhost';
+  }
+
+  @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
   static Serializer<GoogleAuthCredentialImpl> get serializer => _$googleAuthCredentialImplSerializer;
@@ -77,6 +108,24 @@ abstract class OAuthCredentialImpl
   factory OAuthCredentialImpl() = _$OAuthCredentialImpl;
 
   OAuthCredentialImpl._();
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    final Map<String, String> fields = <String, String>{
+      ...customParameters.asMap(),
+      if (scopes.isNotEmpty) 'scope': scopes.join(','),
+      'provider': provider,
+      'id_token': idToken,
+      'access_token': accessToken,
+      'oauth_token_secret': secret,
+    };
+
+    request
+      ..postBody = fields.keys.map((String key) => '$key=${fields[key]}').join('&')
+      ..requestUri = requestUri ?? 'http://localhost'
+      ..sessionId = sessionId
+      ..pendingIdToken = pendingToken;
+  }
 
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
@@ -92,6 +141,11 @@ abstract class PhoneAuthCredentialImpl
   PhoneAuthCredentialImpl._();
 
   @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a PhoneAuthCredential.');
+  }
+
+  @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
   static Serializer<PhoneAuthCredentialImpl> get serializer => _$phoneAuthCredentialImplSerializer;
@@ -103,6 +157,13 @@ abstract class TwitterAuthCredentialImpl
   factory TwitterAuthCredentialImpl() = _$TwitterAuthCredentialImpl;
 
   TwitterAuthCredentialImpl._();
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..postBody = 'provider=$provider&access_token=$authToken&oauth_token_secret=$authTokenSecret'
+      ..requestUri = 'http://localhost';
+  }
 
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);

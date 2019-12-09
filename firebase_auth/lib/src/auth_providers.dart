@@ -77,7 +77,7 @@ class OAuthProvider {
   }
 }
 
-class PhoneNumberProvider {
+class PhoneAuthProvider {
   static AuthCredential getCredential({@required String verificationId, @required String verificationCode}) {
     return PhoneAuthCredential(verificationId: verificationId, verificationCode: verificationCode);
   }
