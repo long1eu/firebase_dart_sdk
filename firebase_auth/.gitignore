@@ -11,3 +11,4 @@ build/
 doc/api/
 configs/
 hives/
+lib/src/models/mirrors.dart

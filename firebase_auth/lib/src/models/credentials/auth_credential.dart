@@ -7,7 +7,7 @@ part of firebase_auth;
 /// Represents a credential.
 mixin AuthCredential {
   /// The identity provider for the credential
-  String get provider;
+  String get providerId;
 
   @memoized
   Map<String, dynamic> get json;
@@ -20,20 +20,12 @@ mixin AuthCredential {
 
 /// Internal implementation of [AuthCredential] for Email/Password credentials.
 abstract class EmailPasswordAuthCredential with AuthCredential {
-  factory EmailPasswordAuthCredential.withPassword({@required String email, @required String password}) {
+  factory EmailPasswordAuthCredential._({@required String email, String password, String link}) {
     return _$EmailPasswordAuthCredentialImpl((EmailPasswordAuthCredentialImplBuilder b) {
       b
-        ..provider = ProviderType.password
+        ..providerId = ProviderType.password
         ..email = email
-        ..password = password;
-    });
-  }
-
-  factory EmailPasswordAuthCredential.withLink({@required String email, @required String link}) {
-    return _$EmailPasswordAuthCredentialImpl((EmailPasswordAuthCredentialImplBuilder b) {
-      b
-        ..provider = ProviderType.password
-        ..email = email
+        ..password = password
         ..link = link;
     });
   }
@@ -52,11 +44,11 @@ abstract class EmailPasswordAuthCredential with AuthCredential {
 
 /// Internal implementation of [AuthCredential] for the Facebook IdP.
 abstract class FacebookAuthCredential with AuthCredential {
-  factory FacebookAuthCredential(String accessToken) {
+  factory FacebookAuthCredential._(String accessToken) {
     return _$FacebookAuthCredentialImpl((FacebookAuthCredentialImplBuilder b) {
       b
-        ..accessToken = accessToken
-        ..provider = ProviderType.facebook;
+        ..providerId = ProviderType.facebook
+        ..accessToken = accessToken;
     });
   }
 
@@ -66,7 +58,7 @@ abstract class FacebookAuthCredential with AuthCredential {
 
 /// Internal implementation of [AuthCredential] for Game Center credentials.
 abstract class GameCenterAuthCredential with AuthCredential {
-  factory GameCenterAuthCredential({
+  factory GameCenterAuthCredential._({
     @required String playerId,
     @required String publicKeyUrl,
     @required Uint8List signature,
@@ -76,6 +68,7 @@ abstract class GameCenterAuthCredential with AuthCredential {
   }) {
     return _$GameCenterAuthCredentialImpl((GameCenterAuthCredentialImplBuilder b) {
       b
+        ..providerId = ProviderType.gameCenter
         ..playerId = playerId
         ..publicKeyUrl = publicKeyUrl
         ..signature = signature
@@ -106,10 +99,10 @@ abstract class GameCenterAuthCredential with AuthCredential {
 
 /// Internal implementation of [AuthCredential] for GitHub credentials.
 abstract class GithubAuthCredential with AuthCredential {
-  factory GithubAuthCredential(String token) {
+  factory GithubAuthCredential._(String token) {
     return _$GithubAuthCredentialImpl((GithubAuthCredentialImplBuilder b) {
       b
-        ..provider = ProviderType.github
+        ..providerId = ProviderType.github
         ..token = token;
     });
   }
@@ -120,10 +113,10 @@ abstract class GithubAuthCredential with AuthCredential {
 
 /// Internal implementation of [AuthCredential] for the Google IdP.
 abstract class GoogleAuthCredential with AuthCredential {
-  factory GoogleAuthCredential({@required String idToken, @required String accessToken}) {
+  factory GoogleAuthCredential._({@required String idToken, @required String accessToken}) {
     return _$GoogleAuthCredentialImpl((GoogleAuthCredentialImplBuilder b) {
       b
-        ..provider = ProviderType.google
+        ..providerId = ProviderType.google
         ..idToken = idToken
         ..accessToken = accessToken;
     });
@@ -138,39 +131,32 @@ abstract class GoogleAuthCredential with AuthCredential {
 
 /// Internal implementation of [AuthCredential] for GitHub credentials.
 abstract class OAuthCredential with AuthCredential {
-  factory OAuthCredential({
+  factory OAuthCredential._({
     @required String providerId,
+    List<String> scopes,
+    Map<String, String> customParameters,
+    String sessionId,
+    String requestUri,
     String idToken,
     String accessToken,
     String secret,
     String pendingToken,
+    String nonce,
   }) {
     return _$OAuthCredentialImpl((OAuthCredentialImplBuilder b) {
       b
-        ..provider = providerId
+        ..providerId = providerId
+        ..scopes = scopes == null ? null : ListBuilder<String>(scopes)
+        ..customParameters = customParameters == null ? null : MapBuilder<String, String>(customParameters)
+        ..sessionId = sessionId
+        ..requestUri = requestUri
         ..idToken = idToken
         ..accessToken = accessToken
         ..secret = secret
-        ..pendingToken = pendingToken;
+        ..pendingToken = pendingToken
+        ..nonce = nonce;
     });
   }
-
-  factory OAuthCredential.withSession({
-    @required String providerId,
-    @required String sessionId,
-    @required String oAuthResponseUrlString,
-  }) {
-    return _$OAuthCredentialImpl((OAuthCredentialImplBuilder b) {
-      b
-        ..provider = providerId
-        ..sessionId = sessionId
-        ..requestUri = oAuthResponseUrlString;
-    });
-  }
-
-  /// The provider ID associated with the credential being created.
-  @override
-  String get provider;
 
   /// Used to configure the OAuth scopes.
   @nullable
@@ -181,23 +167,55 @@ abstract class OAuthCredential with AuthCredential {
   BuiltMap<String, String> get customParameters;
 
   /// The session ID used when completing the headful-lite flow.
+  @nullable
   String get sessionId;
 
   /// A string representation of the response URL corresponding to this OAuthCredential.
+  @nullable
   String get requestUri;
 
+  @nullable
   String get idToken;
 
+  @nullable
   String get accessToken;
 
+  @nullable
   String get secret;
 
   /// The pending token used when completing the headful-lite flow.
+  ///
+  /// Where the IdP response is encrypted.
+  @nullable
+  String get pendingToken;
+
+  @nullable
+  String get nonce;
+}
+
+/// The SAML Auth credential class.
+abstract class SamlAuthCredential with AuthCredential {
+  factory SamlAuthCredential._({
+    @required String providerId,
+    @required String signInMethod,
+    @required String pendingToken,
+  }) {
+    return _$SamlAuthCredentialImpl((SamlAuthCredentialImplBuilder b) {
+      b
+        ..providerId = ProviderType.phone
+        ..providerId = providerId
+        ..signInMethod = signInMethod
+        ..pendingToken = pendingToken;
+    });
+  }
+
+  String get signInMethod;
+
   String get pendingToken;
 }
 
 abstract class PhoneAuthCredential with AuthCredential {
-  factory PhoneAuthCredential({
+  factory PhoneAuthCredential._({
     String verificationId,
     String verificationCode,
     String temporaryProof,
@@ -205,7 +223,7 @@ abstract class PhoneAuthCredential with AuthCredential {
   }) {
     return _$PhoneAuthCredentialImpl((PhoneAuthCredentialImplBuilder b) {
       b
-        ..provider = ProviderType.phone
+        ..providerId = ProviderType.phone
         ..verificationId = verificationId
         ..verificationCode = verificationCode
         ..temporaryProof = temporaryProof
@@ -231,10 +249,10 @@ abstract class PhoneAuthCredential with AuthCredential {
 }
 
 abstract class TwitterAuthCredential with AuthCredential {
-  factory TwitterAuthCredential({@required String authToken, @required String authTokenSecret}) {
+  factory TwitterAuthCredential._({@required String authToken, @required String authTokenSecret}) {
     return _$TwitterAuthCredentialImpl((TwitterAuthCredentialImplBuilder b) {
       b
-        ..provider = ProviderType.twitter
+        ..providerId = ProviderType.twitter
         ..authToken = authToken
         ..authTokenSecret = authTokenSecret;
     });

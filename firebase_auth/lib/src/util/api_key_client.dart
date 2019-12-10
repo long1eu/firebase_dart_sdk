@@ -4,7 +4,7 @@
 
 part of firebase_auth;
 
-const String sdkVersion = '0.0.0';
+const String sdkVersion = '0.0.1';
 
 /// Adds 'key' query parameter when making HTTP requests.
 ///
@@ -29,20 +29,20 @@ class ApiKeyClient extends DelegatingClient {
           'Tried to make a HTTP request which has already a "key" query parameter. Adding the API key would override that existing value.'));
     }
 
-    if (url.query == '') {
-      url = url.replace(query: 'key=$_encodedApiKey');
+    if (url.queryParameters.isEmpty) {
+      url = url.replace(queryParameters: <String, String>{'key': _encodedApiKey});
     } else {
-      url = url.replace(query: '${url.query}&key=$_encodedApiKey');
+      url = url.replace(queryParameters: <String, String>{...url.queryParameters, 'key': _encodedApiKey});
     }
 
     final RequestImpl modifiedRequest = RequestImpl(request.method, url, request.finalize());
-    modifiedRequest.headers //
-      ..addAll(request.headers)
-      ..addAll(<String, String>{
-        if (_headers != null) ...(_headers() ?? <String, String>{}),
-        if (locale != null) 'X-Firebase-Locale': locale,
-        'X-Client-Version': '${Platform.operatingSystem}/FirebaseSDK/$sdkVersion/dart',
-      });
+    final Map<String, String> headers = <String, String>{
+      ...request.headers,
+      if (_headers != null) ..._headers() ?? <String, String>{},
+      if (locale != null) 'X-Firebase-Locale': locale,
+      'X-Client-Version': '${Platform.operatingSystem}/FirebaseSDK/$sdkVersion/dart',
+    };
+    modifiedRequest.headers.addAll(headers);
 
     return baseClient.send(modifiedRequest);
   }
@@ -50,7 +50,7 @@ class ApiKeyClient extends DelegatingClient {
 
 /// Base class for delegating HTTP clients.
 ///
-/// Depending on [closeUnderlyingClient] it will close the client it is  delegating to or not.
+/// Depending on [closeUnderlyingClient] it will close the client it is delegating to or not.
 abstract class DelegatingClient extends BaseClient {
   DelegatingClient(this.baseClient, {this.closeUnderlyingClient = true});
 

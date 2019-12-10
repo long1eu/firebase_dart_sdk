@@ -2,8 +2,6 @@
 // Lung Razvan <long1eu>
 // on 25/11/2019
 
-import 'dart:io';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_internal/firebase_internal.dart';
@@ -27,6 +25,10 @@ Future<void> main() async {
 
   print(FirebaseAuth.instance.currentUser.refreshToken);
   print(await FirebaseAuth.instance.getAccessToken());
+
+  while (true) {
+    await Future.delayed(const Duration(seconds: 1));
+  }
 
   /*final String verificationId = await FirebaseAuth.instance.verifyPhoneNumber('+40755769229');
 
@@ -63,5 +65,5 @@ class Dependencies extends PlatformDependencies {
   String get locale => 'en';
 
   @override
-  Stream<bool> get isBackgroundChanged => Stream<bool>.fromIterable(<bool>[true]);
+  Stream<bool> get isBackgroundChanged => Stream<bool>.fromIterable(<bool>[false]);
 }

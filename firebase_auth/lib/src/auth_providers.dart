@@ -7,19 +7,19 @@ part of firebase_auth;
 abstract class EmailAuthProvider {
   /// Creates an [AuthCredential] for an email & password sign in.
   static AuthCredential getCredential({@required String email, @required String password}) {
-    return EmailPasswordAuthCredential.withPassword(email: email, password: password);
+    return EmailPasswordAuthCredential._(email: email, password: password);
   }
 
   /// Creates an [AuthCredential] for an email & link sign in.
   static AuthCredential getCredentialWithLink({@required String email, @required String link}) {
-    return EmailPasswordAuthCredential.withLink(email: email, link: link);
+    return EmailPasswordAuthCredential._(email: email, link: link);
   }
 }
 
 class FacebookAuthProvider {
   /// Creates an [AuthCredential] for a Facebook sign in.
   static AuthCredential getCredential(String accessToken) {
-    return FacebookAuthCredential(accessToken);
+    return FacebookAuthCredential._(accessToken);
   }
 }
 
@@ -33,7 +33,7 @@ class GameCenterAuthProvider {
     @required DateTime timestamp,
     @required String displayName,
   }) {
-    return GameCenterAuthCredential(
+    return GameCenterAuthCredential._(
       playerId: playerId,
       publicKeyUrl: publicKeyUrl,
       signature: signature,
@@ -47,49 +47,80 @@ class GameCenterAuthProvider {
 class GithubAuthProvider {
   /// Creates an [AuthCredential] for a GitHub sign in.
   static AuthCredential getCredential(String token) {
-    return GithubAuthCredential(token);
+    return GithubAuthCredential._(token);
   }
 }
 
 class GoogleAuthProvider {
   /// Creates an [AuthCredential] for a Google sign in.
   static AuthCredential getCredential({@required String idToken, @required String accessToken}) {
-    return GoogleAuthCredential(idToken: idToken, accessToken: accessToken);
+    return GoogleAuthCredential._(idToken: idToken, accessToken: accessToken);
   }
 }
 
 class OAuthProvider {
-  /// Creates an [AuthCredential] corresponding to the specified provider ID.
-  static AuthCredential getCredential(String providerId) {
-    assert(
-        providerId != ProviderType.facebook,
-        'Sign in with Facebook is not supported via generic IDP; the Facebook TOS dictate that you must use the '
-        'Facebook iOS SDK for Facebook login.');
-    assert(providerId != ProviderType.apple || !Platform.isIOS,
-        'Sign in with Apple is not supported via generic IDP; You must use the Apple iOS SDK for Sign in with Apple.');
+  static AuthCredential getCredentialWithAccessToken({
+    @required String providerId,
+    @required String accessToken,
+    List<String> scopes,
+    String idToken,
+    String nonce,
+    String pendingToken,
+  }) {
+    assert(nonce == null || pendingToken == null);
+    return OAuthCredential._(
+      providerId: providerId,
+      accessToken: accessToken,
+      idToken: idToken,
+      nonce: nonce,
 
-    return OAuthCredential(providerId: providerId);
+      scopes: scopes,
+      pendingToken: pendingToken,
+    );
   }
 
-  static AuthCredential getCredentialWithAccessToken(
-      {@required String providerId, @required String accessToken, String idToken}) {
-    return OAuthCredential(providerId: providerId, idToken: idToken, accessToken: accessToken);
+  static AuthCredential getCredentialOAuth1({
+    @required String providerId,
+    @required String oauthToken,
+    @required String oauthTokenSecret,
+  }) {
+    return OAuthCredential._(
+      providerId: providerId,
+      accessToken: oauthToken,
+      secret: oauthTokenSecret,
+    );
+  }
+}
+
+class SamlAuthProvider {
+  static AuthCredential getCredential({
+    @required String providerId,
+    @required String signInMethod,
+    @required String pendingToken,
+  }) {
+    assert(providerId.startsWith('saml.'), 'SAML provider IDs must be prefixed with "saml."');
+    return SamlAuthCredential._(
+      providerId: providerId,
+      signInMethod: signInMethod,
+      pendingToken: pendingToken,
+    );
   }
 }
 
 class PhoneAuthProvider {
   static AuthCredential getCredential({@required String verificationId, @required String verificationCode}) {
-    return PhoneAuthCredential(verificationId: verificationId, verificationCode: verificationCode);
+    return PhoneAuthCredential._(verificationId: verificationId, verificationCode: verificationCode);
   }
 
-  static AuthCredential getCredentialWithTemporaryProof({@required String temporaryProof, @required String phoneNumber}) {
-    return PhoneAuthCredential(temporaryProof: temporaryProof, phoneNumber: phoneNumber);
+  static AuthCredential getCredentialWithTemporaryProof(
+      {@required String temporaryProof, @required String phoneNumber}) {
+    return PhoneAuthCredential._(temporaryProof: temporaryProof, phoneNumber: phoneNumber);
   }
 }
 
 class TwitterAuthProvider {
   /// Creates an [AuthCredential] for a Google sign in.
   static AuthCredential getCredential({@required String authToken, @required String authTokenSecret}) {
-    return TwitterAuthCredential(authToken: authToken, authTokenSecret: authTokenSecret);
+    return TwitterAuthCredential._(authToken: authToken, authTokenSecret: authTokenSecret);
   }
 }

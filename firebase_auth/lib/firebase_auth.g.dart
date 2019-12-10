@@ -20,6 +20,8 @@ Serializer<GoogleAuthCredentialImpl> _$googleAuthCredentialImplSerializer =
     new _$GoogleAuthCredentialImplSerializer();
 Serializer<OAuthCredentialImpl> _$oAuthCredentialImplSerializer =
     new _$OAuthCredentialImplSerializer();
+Serializer<SamlAuthCredentialImpl> _$samlAuthCredentialImplSerializer =
+    new _$SamlAuthCredentialImplSerializer();
 Serializer<PhoneAuthCredentialImpl> _$phoneAuthCredentialImplSerializer =
     new _$PhoneAuthCredentialImplSerializer();
 Serializer<TwitterAuthCredentialImpl> _$twitterAuthCredentialImplSerializer =
@@ -59,8 +61,8 @@ class _$EmailPasswordAuthCredentialImplSerializer
       'email',
       serializers.serialize(object.email,
           specifiedType: const FullType(String)),
-      'provider',
-      serializers.serialize(object.provider,
+      'providerId',
+      serializers.serialize(object.providerId,
           specifiedType: const FullType(String)),
     ];
     if (object.password != null) {
@@ -102,8 +104,8 @@ class _$EmailPasswordAuthCredentialImplSerializer
           result.link = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
-        case 'provider':
-          result.provider = serializers.deserialize(value,
+        case 'providerId':
+          result.providerId = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
       }
@@ -131,8 +133,8 @@ class _$FacebookAuthCredentialImplSerializer
       'accessToken',
       serializers.serialize(object.accessToken,
           specifiedType: const FullType(String)),
-      'provider',
-      serializers.serialize(object.provider,
+      'providerId',
+      serializers.serialize(object.providerId,
           specifiedType: const FullType(String)),
     ];
 
@@ -155,8 +157,8 @@ class _$FacebookAuthCredentialImplSerializer
           result.accessToken = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
-        case 'provider':
-          result.provider = serializers.deserialize(value,
+        case 'providerId':
+          result.providerId = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
       }
@@ -199,8 +201,8 @@ class _$GameCenterAuthCredentialImplSerializer
       'displayName',
       serializers.serialize(object.displayName,
           specifiedType: const FullType(String)),
-      'provider',
-      serializers.serialize(object.provider,
+      'providerId',
+      serializers.serialize(object.providerId,
           specifiedType: const FullType(String)),
     ];
 
@@ -243,8 +245,8 @@ class _$GameCenterAuthCredentialImplSerializer
           result.displayName = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
-        case 'provider':
-          result.provider = serializers.deserialize(value,
+        case 'providerId':
+          result.providerId = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
       }
@@ -272,8 +274,8 @@ class _$GithubAuthCredentialImplSerializer
       'token',
       serializers.serialize(object.token,
           specifiedType: const FullType(String)),
-      'provider',
-      serializers.serialize(object.provider,
+      'providerId',
+      serializers.serialize(object.providerId,
           specifiedType: const FullType(String)),
     ];
 
@@ -296,8 +298,8 @@ class _$GithubAuthCredentialImplSerializer
           result.token = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
-        case 'provider':
-          result.provider = serializers.deserialize(value,
+        case 'providerId':
+          result.providerId = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
       }
@@ -328,8 +330,8 @@ class _$GoogleAuthCredentialImplSerializer
       'accessToken',
       serializers.serialize(object.accessToken,
           specifiedType: const FullType(String)),
-      'provider',
-      serializers.serialize(object.provider,
+      'providerId',
+      serializers.serialize(object.providerId,
           specifiedType: const FullType(String)),
     ];
 
@@ -356,8 +358,8 @@ class _$GoogleAuthCredentialImplSerializer
           result.accessToken = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
-        case 'provider':
-          result.provider = serializers.deserialize(value,
+        case 'providerId':
+          result.providerId = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
       }
@@ -382,26 +384,8 @@ class _$OAuthCredentialImplSerializer
       Serializers serializers, OAuthCredentialImpl object,
       {FullType specifiedType = FullType.unspecified}) {
     final result = <Object>[
-      'provider',
-      serializers.serialize(object.provider,
-          specifiedType: const FullType(String)),
-      'sessionId',
-      serializers.serialize(object.sessionId,
-          specifiedType: const FullType(String)),
-      'requestUri',
-      serializers.serialize(object.requestUri,
-          specifiedType: const FullType(String)),
-      'idToken',
-      serializers.serialize(object.idToken,
-          specifiedType: const FullType(String)),
-      'accessToken',
-      serializers.serialize(object.accessToken,
-          specifiedType: const FullType(String)),
-      'secret',
-      serializers.serialize(object.secret,
-          specifiedType: const FullType(String)),
-      'pendingToken',
-      serializers.serialize(object.pendingToken,
+      'providerId',
+      serializers.serialize(object.providerId,
           specifiedType: const FullType(String)),
     ];
     if (object.scopes != null) {
@@ -418,6 +402,48 @@ class _$OAuthCredentialImplSerializer
             specifiedType: const FullType(BuiltMap,
                 const [const FullType(String), const FullType(String)])));
     }
+    if (object.sessionId != null) {
+      result
+        ..add('sessionId')
+        ..add(serializers.serialize(object.sessionId,
+            specifiedType: const FullType(String)));
+    }
+    if (object.requestUri != null) {
+      result
+        ..add('requestUri')
+        ..add(serializers.serialize(object.requestUri,
+            specifiedType: const FullType(String)));
+    }
+    if (object.idToken != null) {
+      result
+        ..add('idToken')
+        ..add(serializers.serialize(object.idToken,
+            specifiedType: const FullType(String)));
+    }
+    if (object.accessToken != null) {
+      result
+        ..add('accessToken')
+        ..add(serializers.serialize(object.accessToken,
+            specifiedType: const FullType(String)));
+    }
+    if (object.secret != null) {
+      result
+        ..add('secret')
+        ..add(serializers.serialize(object.secret,
+            specifiedType: const FullType(String)));
+    }
+    if (object.pendingToken != null) {
+      result
+        ..add('pendingToken')
+        ..add(serializers.serialize(object.pendingToken,
+            specifiedType: const FullType(String)));
+    }
+    if (object.nonce != null) {
+      result
+        ..add('nonce')
+        ..add(serializers.serialize(object.nonce,
+            specifiedType: const FullType(String)));
+    }
     return result;
   }
 
@@ -433,10 +459,6 @@ class _$OAuthCredentialImplSerializer
       iterator.moveNext();
       final dynamic value = iterator.current;
       switch (key) {
-        case 'provider':
-          result.provider = serializers.deserialize(value,
-              specifiedType: const FullType(String)) as String;
-          break;
         case 'scopes':
           result.scopes.replace(serializers.deserialize(value,
                   specifiedType:
@@ -474,6 +496,74 @@ class _$OAuthCredentialImplSerializer
           result.pendingToken = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
+        case 'nonce':
+          result.nonce = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'providerId':
+          result.providerId = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+      }
+    }
+
+    return result.build();
+  }
+}
+
+class _$SamlAuthCredentialImplSerializer
+    implements StructuredSerializer<SamlAuthCredentialImpl> {
+  @override
+  final Iterable<Type> types = const [
+    SamlAuthCredentialImpl,
+    _$SamlAuthCredentialImpl
+  ];
+  @override
+  final String wireName = 'SamlAuthCredentialImpl';
+
+  @override
+  Iterable<Object> serialize(
+      Serializers serializers, SamlAuthCredentialImpl object,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = <Object>[
+      'signInMethod',
+      serializers.serialize(object.signInMethod,
+          specifiedType: const FullType(String)),
+      'pendingToken',
+      serializers.serialize(object.pendingToken,
+          specifiedType: const FullType(String)),
+      'providerId',
+      serializers.serialize(object.providerId,
+          specifiedType: const FullType(String)),
+    ];
+
+    return result;
+  }
+
+  @override
+  SamlAuthCredentialImpl deserialize(
+      Serializers serializers, Iterable<Object> serialized,
+      {FullType specifiedType = FullType.unspecified}) {
+    final result = new SamlAuthCredentialImplBuilder();
+
+    final iterator = serialized.iterator;
+    while (iterator.moveNext()) {
+      final key = iterator.current as String;
+      iterator.moveNext();
+      final dynamic value = iterator.current;
+      switch (key) {
+        case 'signInMethod':
+          result.signInMethod = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'pendingToken':
+          result.pendingToken = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
+        case 'providerId':
+          result.providerId = serializers.deserialize(value,
+              specifiedType: const FullType(String)) as String;
+          break;
       }
     }
 
@@ -496,8 +586,8 @@ class _$PhoneAuthCredentialImplSerializer
       Serializers serializers, PhoneAuthCredentialImpl object,
       {FullType specifiedType = FullType.unspecified}) {
     final result = <Object>[
-      'provider',
-      serializers.serialize(object.provider,
+      'providerId',
+      serializers.serialize(object.providerId,
           specifiedType: const FullType(String)),
     ];
     if (object.verificationId != null) {
@@ -555,8 +645,8 @@ class _$PhoneAuthCredentialImplSerializer
           result.phoneNumber = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
-        case 'provider':
-          result.provider = serializers.deserialize(value,
+        case 'providerId':
+          result.providerId = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
       }
@@ -587,8 +677,8 @@ class _$TwitterAuthCredentialImplSerializer
       'authTokenSecret',
       serializers.serialize(object.authTokenSecret,
           specifiedType: const FullType(String)),
-      'provider',
-      serializers.serialize(object.provider,
+      'providerId',
+      serializers.serialize(object.providerId,
           specifiedType: const FullType(String)),
     ];
 
@@ -615,8 +705,8 @@ class _$TwitterAuthCredentialImplSerializer
           result.authTokenSecret = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
-        case 'provider':
-          result.provider = serializers.deserialize(value,
+        case 'providerId':
+          result.providerId = serializers.deserialize(value,
               specifiedType: const FullType(String)) as String;
           break;
       }
@@ -1375,22 +1465,22 @@ class _$EmailPasswordAuthCredentialImpl
   @override
   final String link;
   @override
-  final String provider;
+  final String providerId;
 
   factory _$EmailPasswordAuthCredentialImpl(
           [void Function(EmailPasswordAuthCredentialImplBuilder) updates]) =>
       (new EmailPasswordAuthCredentialImplBuilder()..update(updates)).build();
 
   _$EmailPasswordAuthCredentialImpl._(
-      {this.email, this.password, this.link, this.provider})
+      {this.email, this.password, this.link, this.providerId})
       : super._() {
     if (email == null) {
       throw new BuiltValueNullFieldError(
           'EmailPasswordAuthCredentialImpl', 'email');
     }
-    if (provider == null) {
+    if (providerId == null) {
       throw new BuiltValueNullFieldError(
-          'EmailPasswordAuthCredentialImpl', 'provider');
+          'EmailPasswordAuthCredentialImpl', 'providerId');
     }
   }
 
@@ -1410,14 +1500,14 @@ class _$EmailPasswordAuthCredentialImpl
         email == other.email &&
         password == other.password &&
         link == other.link &&
-        provider == other.provider;
+        providerId == other.providerId;
   }
 
   @override
   int get hashCode {
     return $jf($jc(
         $jc($jc($jc(0, email.hashCode), password.hashCode), link.hashCode),
-        provider.hashCode));
+        providerId.hashCode));
   }
 
   @override
@@ -1426,7 +1516,7 @@ class _$EmailPasswordAuthCredentialImpl
           ..add('email', email)
           ..add('password', password)
           ..add('link', link)
-          ..add('provider', provider))
+          ..add('providerId', providerId))
         .toString();
   }
 }
@@ -1449,9 +1539,9 @@ class EmailPasswordAuthCredentialImplBuilder
   String get link => _$this._link;
   set link(String link) => _$this._link = link;
 
-  String _provider;
-  String get provider => _$this._provider;
-  set provider(String provider) => _$this._provider = provider;
+  String _providerId;
+  String get providerId => _$this._providerId;
+  set providerId(String providerId) => _$this._providerId = providerId;
 
   EmailPasswordAuthCredentialImplBuilder();
 
@@ -1460,7 +1550,7 @@ class EmailPasswordAuthCredentialImplBuilder
       _email = _$v.email;
       _password = _$v.password;
       _link = _$v.link;
-      _provider = _$v.provider;
+      _providerId = _$v.providerId;
       _$v = null;
     }
     return this;
@@ -1483,7 +1573,10 @@ class EmailPasswordAuthCredentialImplBuilder
   _$EmailPasswordAuthCredentialImpl build() {
     final _$result = _$v ??
         new _$EmailPasswordAuthCredentialImpl._(
-            email: email, password: password, link: link, provider: provider);
+            email: email,
+            password: password,
+            link: link,
+            providerId: providerId);
     replace(_$result);
     return _$result;
   }
@@ -1493,21 +1586,21 @@ class _$FacebookAuthCredentialImpl extends FacebookAuthCredentialImpl {
   @override
   final String accessToken;
   @override
-  final String provider;
+  final String providerId;
 
   factory _$FacebookAuthCredentialImpl(
           [void Function(FacebookAuthCredentialImplBuilder) updates]) =>
       (new FacebookAuthCredentialImplBuilder()..update(updates)).build();
 
-  _$FacebookAuthCredentialImpl._({this.accessToken, this.provider})
+  _$FacebookAuthCredentialImpl._({this.accessToken, this.providerId})
       : super._() {
     if (accessToken == null) {
       throw new BuiltValueNullFieldError(
           'FacebookAuthCredentialImpl', 'accessToken');
     }
-    if (provider == null) {
+    if (providerId == null) {
       throw new BuiltValueNullFieldError(
-          'FacebookAuthCredentialImpl', 'provider');
+          'FacebookAuthCredentialImpl', 'providerId');
     }
   }
 
@@ -1525,19 +1618,19 @@ class _$FacebookAuthCredentialImpl extends FacebookAuthCredentialImpl {
     if (identical(other, this)) return true;
     return other is FacebookAuthCredentialImpl &&
         accessToken == other.accessToken &&
-        provider == other.provider;
+        providerId == other.providerId;
   }
 
   @override
   int get hashCode {
-    return $jf($jc($jc(0, accessToken.hashCode), provider.hashCode));
+    return $jf($jc($jc(0, accessToken.hashCode), providerId.hashCode));
   }
 
   @override
   String toString() {
     return (newBuiltValueToStringHelper('FacebookAuthCredentialImpl')
           ..add('accessToken', accessToken)
-          ..add('provider', provider))
+          ..add('providerId', providerId))
         .toString();
   }
 }
@@ -1551,16 +1644,16 @@ class FacebookAuthCredentialImplBuilder
   String get accessToken => _$this._accessToken;
   set accessToken(String accessToken) => _$this._accessToken = accessToken;
 
-  String _provider;
-  String get provider => _$this._provider;
-  set provider(String provider) => _$this._provider = provider;
+  String _providerId;
+  String get providerId => _$this._providerId;
+  set providerId(String providerId) => _$this._providerId = providerId;
 
   FacebookAuthCredentialImplBuilder();
 
   FacebookAuthCredentialImplBuilder get _$this {
     if (_$v != null) {
       _accessToken = _$v.accessToken;
-      _provider = _$v.provider;
+      _providerId = _$v.providerId;
       _$v = null;
     }
     return this;
@@ -1583,7 +1676,7 @@ class FacebookAuthCredentialImplBuilder
   _$FacebookAuthCredentialImpl build() {
     final _$result = _$v ??
         new _$FacebookAuthCredentialImpl._(
-            accessToken: accessToken, provider: provider);
+            accessToken: accessToken, providerId: providerId);
     replace(_$result);
     return _$result;
   }
@@ -1603,7 +1696,7 @@ class _$GameCenterAuthCredentialImpl extends GameCenterAuthCredentialImpl {
   @override
   final String displayName;
   @override
-  final String provider;
+  final String providerId;
 
   factory _$GameCenterAuthCredentialImpl(
           [void Function(GameCenterAuthCredentialImplBuilder) updates]) =>
@@ -1616,7 +1709,7 @@ class _$GameCenterAuthCredentialImpl extends GameCenterAuthCredentialImpl {
       this.salt,
       this.timestamp,
       this.displayName,
-      this.provider})
+      this.providerId})
       : super._() {
     if (playerId == null) {
       throw new BuiltValueNullFieldError(
@@ -1642,9 +1735,9 @@ class _$GameCenterAuthCredentialImpl extends GameCenterAuthCredentialImpl {
       throw new BuiltValueNullFieldError(
           'GameCenterAuthCredentialImpl', 'displayName');
     }
-    if (provider == null) {
+    if (providerId == null) {
       throw new BuiltValueNullFieldError(
-          'GameCenterAuthCredentialImpl', 'provider');
+          'GameCenterAuthCredentialImpl', 'providerId');
     }
   }
 
@@ -1667,7 +1760,7 @@ class _$GameCenterAuthCredentialImpl extends GameCenterAuthCredentialImpl {
         salt == other.salt &&
         timestamp == other.timestamp &&
         displayName == other.displayName &&
-        provider == other.provider;
+        providerId == other.providerId;
   }
 
   @override
@@ -1681,7 +1774,7 @@ class _$GameCenterAuthCredentialImpl extends GameCenterAuthCredentialImpl {
                     salt.hashCode),
                 timestamp.hashCode),
             displayName.hashCode),
-        provider.hashCode));
+        providerId.hashCode));
   }
 
   @override
@@ -1693,7 +1786,7 @@ class _$GameCenterAuthCredentialImpl extends GameCenterAuthCredentialImpl {
           ..add('salt', salt)
           ..add('timestamp', timestamp)
           ..add('displayName', displayName)
-          ..add('provider', provider))
+          ..add('providerId', providerId))
         .toString();
   }
 }
@@ -1728,9 +1821,9 @@ class GameCenterAuthCredentialImplBuilder
   String get displayName => _$this._displayName;
   set displayName(String displayName) => _$this._displayName = displayName;
 
-  String _provider;
-  String get provider => _$this._provider;
-  set provider(String provider) => _$this._provider = provider;
+  String _providerId;
+  String get providerId => _$this._providerId;
+  set providerId(String providerId) => _$this._providerId = providerId;
 
   GameCenterAuthCredentialImplBuilder();
 
@@ -1742,7 +1835,7 @@ class GameCenterAuthCredentialImplBuilder
       _salt = _$v.salt;
       _timestamp = _$v.timestamp;
       _displayName = _$v.displayName;
-      _provider = _$v.provider;
+      _providerId = _$v.providerId;
       _$v = null;
     }
     return this;
@@ -1771,7 +1864,7 @@ class GameCenterAuthCredentialImplBuilder
             salt: salt,
             timestamp: timestamp,
             displayName: displayName,
-            provider: provider);
+            providerId: providerId);
     replace(_$result);
     return _$result;
   }
@@ -1781,19 +1874,19 @@ class _$GithubAuthCredentialImpl extends GithubAuthCredentialImpl {
   @override
   final String token;
   @override
-  final String provider;
+  final String providerId;
 
   factory _$GithubAuthCredentialImpl(
           [void Function(GithubAuthCredentialImplBuilder) updates]) =>
       (new GithubAuthCredentialImplBuilder()..update(updates)).build();
 
-  _$GithubAuthCredentialImpl._({this.token, this.provider}) : super._() {
+  _$GithubAuthCredentialImpl._({this.token, this.providerId}) : super._() {
     if (token == null) {
       throw new BuiltValueNullFieldError('GithubAuthCredentialImpl', 'token');
     }
-    if (provider == null) {
+    if (providerId == null) {
       throw new BuiltValueNullFieldError(
-          'GithubAuthCredentialImpl', 'provider');
+          'GithubAuthCredentialImpl', 'providerId');
     }
   }
 
@@ -1811,19 +1904,19 @@ class _$GithubAuthCredentialImpl extends GithubAuthCredentialImpl {
     if (identical(other, this)) return true;
     return other is GithubAuthCredentialImpl &&
         token == other.token &&
-        provider == other.provider;
+        providerId == other.providerId;
   }
 
   @override
   int get hashCode {
-    return $jf($jc($jc(0, token.hashCode), provider.hashCode));
+    return $jf($jc($jc(0, token.hashCode), providerId.hashCode));
   }
 
   @override
   String toString() {
     return (newBuiltValueToStringHelper('GithubAuthCredentialImpl')
           ..add('token', token)
-          ..add('provider', provider))
+          ..add('providerId', providerId))
         .toString();
   }
 }
@@ -1837,16 +1930,16 @@ class GithubAuthCredentialImplBuilder
   String get token => _$this._token;
   set token(String token) => _$this._token = token;
 
-  String _provider;
-  String get provider => _$this._provider;
-  set provider(String provider) => _$this._provider = provider;
+  String _providerId;
+  String get providerId => _$this._providerId;
+  set providerId(String providerId) => _$this._providerId = providerId;
 
   GithubAuthCredentialImplBuilder();
 
   GithubAuthCredentialImplBuilder get _$this {
     if (_$v != null) {
       _token = _$v.token;
-      _provider = _$v.provider;
+      _providerId = _$v.providerId;
       _$v = null;
     }
     return this;
@@ -1868,7 +1961,7 @@ class GithubAuthCredentialImplBuilder
   @override
   _$GithubAuthCredentialImpl build() {
     final _$result = _$v ??
-        new _$GithubAuthCredentialImpl._(token: token, provider: provider);
+        new _$GithubAuthCredentialImpl._(token: token, providerId: providerId);
     replace(_$result);
     return _$result;
   }
@@ -1880,13 +1973,14 @@ class _$GoogleAuthCredentialImpl extends GoogleAuthCredentialImpl {
   @override
   final String accessToken;
   @override
-  final String provider;
+  final String providerId;
 
   factory _$GoogleAuthCredentialImpl(
           [void Function(GoogleAuthCredentialImplBuilder) updates]) =>
       (new GoogleAuthCredentialImplBuilder()..update(updates)).build();
 
-  _$GoogleAuthCredentialImpl._({this.idToken, this.accessToken, this.provider})
+  _$GoogleAuthCredentialImpl._(
+      {this.idToken, this.accessToken, this.providerId})
       : super._() {
     if (idToken == null) {
       throw new BuiltValueNullFieldError('GoogleAuthCredentialImpl', 'idToken');
@@ -1895,9 +1989,9 @@ class _$GoogleAuthCredentialImpl extends GoogleAuthCredentialImpl {
       throw new BuiltValueNullFieldError(
           'GoogleAuthCredentialImpl', 'accessToken');
     }
-    if (provider == null) {
+    if (providerId == null) {
       throw new BuiltValueNullFieldError(
-          'GoogleAuthCredentialImpl', 'provider');
+          'GoogleAuthCredentialImpl', 'providerId');
     }
   }
 
@@ -1916,13 +2010,13 @@ class _$GoogleAuthCredentialImpl extends GoogleAuthCredentialImpl {
     return other is GoogleAuthCredentialImpl &&
         idToken == other.idToken &&
         accessToken == other.accessToken &&
-        provider == other.provider;
+        providerId == other.providerId;
   }
 
   @override
   int get hashCode {
     return $jf($jc($jc($jc(0, idToken.hashCode), accessToken.hashCode),
-        provider.hashCode));
+        providerId.hashCode));
   }
 
   @override
@@ -1930,7 +2024,7 @@ class _$GoogleAuthCredentialImpl extends GoogleAuthCredentialImpl {
     return (newBuiltValueToStringHelper('GoogleAuthCredentialImpl')
           ..add('idToken', idToken)
           ..add('accessToken', accessToken)
-          ..add('provider', provider))
+          ..add('providerId', providerId))
         .toString();
   }
 }
@@ -1948,9 +2042,9 @@ class GoogleAuthCredentialImplBuilder
   String get accessToken => _$this._accessToken;
   set accessToken(String accessToken) => _$this._accessToken = accessToken;
 
-  String _provider;
-  String get provider => _$this._provider;
-  set provider(String provider) => _$this._provider = provider;
+  String _providerId;
+  String get providerId => _$this._providerId;
+  set providerId(String providerId) => _$this._providerId = providerId;
 
   GoogleAuthCredentialImplBuilder();
 
@@ -1958,7 +2052,7 @@ class GoogleAuthCredentialImplBuilder
     if (_$v != null) {
       _idToken = _$v.idToken;
       _accessToken = _$v.accessToken;
-      _provider = _$v.provider;
+      _providerId = _$v.providerId;
       _$v = null;
     }
     return this;
@@ -1981,15 +2075,13 @@ class GoogleAuthCredentialImplBuilder
   _$GoogleAuthCredentialImpl build() {
     final _$result = _$v ??
         new _$GoogleAuthCredentialImpl._(
-            idToken: idToken, accessToken: accessToken, provider: provider);
+            idToken: idToken, accessToken: accessToken, providerId: providerId);
     replace(_$result);
     return _$result;
   }
 }
 
 class _$OAuthCredentialImpl extends OAuthCredentialImpl {
-  @override
-  final String provider;
   @override
   final BuiltList<String> scopes;
   @override
@@ -2006,42 +2098,29 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
   final String secret;
   @override
   final String pendingToken;
+  @override
+  final String nonce;
+  @override
+  final String providerId;
 
   factory _$OAuthCredentialImpl(
           [void Function(OAuthCredentialImplBuilder) updates]) =>
       (new OAuthCredentialImplBuilder()..update(updates)).build();
 
   _$OAuthCredentialImpl._(
-      {this.provider,
-      this.scopes,
+      {this.scopes,
       this.customParameters,
       this.sessionId,
       this.requestUri,
       this.idToken,
       this.accessToken,
       this.secret,
-      this.pendingToken})
+      this.pendingToken,
+      this.nonce,
+      this.providerId})
       : super._() {
-    if (provider == null) {
-      throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'provider');
-    }
-    if (sessionId == null) {
-      throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'sessionId');
-    }
-    if (requestUri == null) {
-      throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'requestUri');
-    }
-    if (idToken == null) {
-      throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'idToken');
-    }
-    if (accessToken == null) {
-      throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'accessToken');
-    }
-    if (secret == null) {
-      throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'secret');
-    }
-    if (pendingToken == null) {
-      throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'pendingToken');
+    if (providerId == null) {
+      throw new BuiltValueNullFieldError('OAuthCredentialImpl', 'providerId');
     }
   }
 
@@ -2058,7 +2137,6 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
   bool operator ==(Object other) {
     if (identical(other, this)) return true;
     return other is OAuthCredentialImpl &&
-        provider == other.provider &&
         scopes == other.scopes &&
         customParameters == other.customParameters &&
         sessionId == other.sessionId &&
@@ -2066,7 +2144,9 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
         idToken == other.idToken &&
         accessToken == other.accessToken &&
         secret == other.secret &&
-        pendingToken == other.pendingToken;
+        pendingToken == other.pendingToken &&
+        nonce == other.nonce &&
+        providerId == other.providerId;
   }
 
   @override
@@ -2077,20 +2157,23 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
                 $jc(
                     $jc(
                         $jc(
-                            $jc($jc($jc(0, provider.hashCode), scopes.hashCode),
-                                customParameters.hashCode),
-                            sessionId.hashCode),
-                        requestUri.hashCode),
-                    idToken.hashCode),
-                accessToken.hashCode),
-            secret.hashCode),
-        pendingToken.hashCode));
+                            $jc(
+                                $jc(
+                                    $jc($jc(0, scopes.hashCode),
+                                        customParameters.hashCode),
+                                    sessionId.hashCode),
+                                requestUri.hashCode),
+                            idToken.hashCode),
+                        accessToken.hashCode),
+                    secret.hashCode),
+                pendingToken.hashCode),
+            nonce.hashCode),
+        providerId.hashCode));
   }
 
   @override
   String toString() {
     return (newBuiltValueToStringHelper('OAuthCredentialImpl')
-          ..add('provider', provider)
           ..add('scopes', scopes)
           ..add('customParameters', customParameters)
           ..add('sessionId', sessionId)
@@ -2098,7 +2181,9 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
           ..add('idToken', idToken)
           ..add('accessToken', accessToken)
           ..add('secret', secret)
-          ..add('pendingToken', pendingToken))
+          ..add('pendingToken', pendingToken)
+          ..add('nonce', nonce)
+          ..add('providerId', providerId))
         .toString();
   }
 }
@@ -2106,10 +2191,6 @@ class _$OAuthCredentialImpl extends OAuthCredentialImpl {
 class OAuthCredentialImplBuilder
     implements Builder<OAuthCredentialImpl, OAuthCredentialImplBuilder> {
   _$OAuthCredentialImpl _$v;
-
-  String _provider;
-  String get provider => _$this._provider;
-  set provider(String provider) => _$this._provider = provider;
 
   ListBuilder<String> _scopes;
   ListBuilder<String> get scopes =>
@@ -2146,11 +2227,18 @@ class OAuthCredentialImplBuilder
   String get pendingToken => _$this._pendingToken;
   set pendingToken(String pendingToken) => _$this._pendingToken = pendingToken;
 
+  String _nonce;
+  String get nonce => _$this._nonce;
+  set nonce(String nonce) => _$this._nonce = nonce;
+
+  String _providerId;
+  String get providerId => _$this._providerId;
+  set providerId(String providerId) => _$this._providerId = providerId;
+
   OAuthCredentialImplBuilder();
 
   OAuthCredentialImplBuilder get _$this {
     if (_$v != null) {
-      _provider = _$v.provider;
       _scopes = _$v.scopes?.toBuilder();
       _customParameters = _$v.customParameters?.toBuilder();
       _sessionId = _$v.sessionId;
@@ -2159,6 +2247,8 @@ class OAuthCredentialImplBuilder
       _accessToken = _$v.accessToken;
       _secret = _$v.secret;
       _pendingToken = _$v.pendingToken;
+      _nonce = _$v.nonce;
+      _providerId = _$v.providerId;
       _$v = null;
     }
     return this;
@@ -2183,7 +2273,6 @@ class OAuthCredentialImplBuilder
     try {
       _$result = _$v ??
           new _$OAuthCredentialImpl._(
-              provider: provider,
               scopes: _scopes?.build(),
               customParameters: _customParameters?.build(),
               sessionId: sessionId,
@@ -2191,7 +2280,9 @@ class OAuthCredentialImplBuilder
               idToken: idToken,
               accessToken: accessToken,
               secret: secret,
-              pendingToken: pendingToken);
+              pendingToken: pendingToken,
+              nonce: nonce,
+              providerId: providerId);
     } catch (_) {
       String _$failedField;
       try {
@@ -2210,6 +2301,122 @@ class OAuthCredentialImplBuilder
   }
 }
 
+class _$SamlAuthCredentialImpl extends SamlAuthCredentialImpl {
+  @override
+  final String signInMethod;
+  @override
+  final String pendingToken;
+  @override
+  final String providerId;
+
+  factory _$SamlAuthCredentialImpl(
+          [void Function(SamlAuthCredentialImplBuilder) updates]) =>
+      (new SamlAuthCredentialImplBuilder()..update(updates)).build();
+
+  _$SamlAuthCredentialImpl._(
+      {this.signInMethod, this.pendingToken, this.providerId})
+      : super._() {
+    if (signInMethod == null) {
+      throw new BuiltValueNullFieldError(
+          'SamlAuthCredentialImpl', 'signInMethod');
+    }
+    if (pendingToken == null) {
+      throw new BuiltValueNullFieldError(
+          'SamlAuthCredentialImpl', 'pendingToken');
+    }
+    if (providerId == null) {
+      throw new BuiltValueNullFieldError(
+          'SamlAuthCredentialImpl', 'providerId');
+    }
+  }
+
+  @override
+  SamlAuthCredentialImpl rebuild(
+          void Function(SamlAuthCredentialImplBuilder) updates) =>
+      (toBuilder()..update(updates)).build();
+
+  @override
+  SamlAuthCredentialImplBuilder toBuilder() =>
+      new SamlAuthCredentialImplBuilder()..replace(this);
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) return true;
+    return other is SamlAuthCredentialImpl &&
+        signInMethod == other.signInMethod &&
+        pendingToken == other.pendingToken &&
+        providerId == other.providerId;
+  }
+
+  @override
+  int get hashCode {
+    return $jf($jc($jc($jc(0, signInMethod.hashCode), pendingToken.hashCode),
+        providerId.hashCode));
+  }
+
+  @override
+  String toString() {
+    return (newBuiltValueToStringHelper('SamlAuthCredentialImpl')
+          ..add('signInMethod', signInMethod)
+          ..add('pendingToken', pendingToken)
+          ..add('providerId', providerId))
+        .toString();
+  }
+}
+
+class SamlAuthCredentialImplBuilder
+    implements Builder<SamlAuthCredentialImpl, SamlAuthCredentialImplBuilder> {
+  _$SamlAuthCredentialImpl _$v;
+
+  String _signInMethod;
+  String get signInMethod => _$this._signInMethod;
+  set signInMethod(String signInMethod) => _$this._signInMethod = signInMethod;
+
+  String _pendingToken;
+  String get pendingToken => _$this._pendingToken;
+  set pendingToken(String pendingToken) => _$this._pendingToken = pendingToken;
+
+  String _providerId;
+  String get providerId => _$this._providerId;
+  set providerId(String providerId) => _$this._providerId = providerId;
+
+  SamlAuthCredentialImplBuilder();
+
+  SamlAuthCredentialImplBuilder get _$this {
+    if (_$v != null) {
+      _signInMethod = _$v.signInMethod;
+      _pendingToken = _$v.pendingToken;
+      _providerId = _$v.providerId;
+      _$v = null;
+    }
+    return this;
+  }
+
+  @override
+  void replace(SamlAuthCredentialImpl other) {
+    if (other == null) {
+      throw new ArgumentError.notNull('other');
+    }
+    _$v = other as _$SamlAuthCredentialImpl;
+  }
+
+  @override
+  void update(void Function(SamlAuthCredentialImplBuilder) updates) {
+    if (updates != null) updates(this);
+  }
+
+  @override
+  _$SamlAuthCredentialImpl build() {
+    final _$result = _$v ??
+        new _$SamlAuthCredentialImpl._(
+            signInMethod: signInMethod,
+            pendingToken: pendingToken,
+            providerId: providerId);
+    replace(_$result);
+    return _$result;
+  }
+}
+
 class _$PhoneAuthCredentialImpl extends PhoneAuthCredentialImpl {
   @override
   final String verificationId;
@@ -2220,7 +2427,7 @@ class _$PhoneAuthCredentialImpl extends PhoneAuthCredentialImpl {
   @override
   final String phoneNumber;
   @override
-  final String provider;
+  final String providerId;
 
   factory _$PhoneAuthCredentialImpl(
           [void Function(PhoneAuthCredentialImplBuilder) updates]) =>
@@ -2231,10 +2438,11 @@ class _$PhoneAuthCredentialImpl extends PhoneAuthCredentialImpl {
       this.verificationCode,
       this.temporaryProof,
       this.phoneNumber,
-      this.provider})
+      this.providerId})
       : super._() {
-    if (provider == null) {
-      throw new BuiltValueNullFieldError('PhoneAuthCredentialImpl', 'provider');
+    if (providerId == null) {
+      throw new BuiltValueNullFieldError(
+          'PhoneAuthCredentialImpl', 'providerId');
     }
   }
 
@@ -2255,7 +2463,7 @@ class _$PhoneAuthCredentialImpl extends PhoneAuthCredentialImpl {
         verificationCode == other.verificationCode &&
         temporaryProof == other.temporaryProof &&
         phoneNumber == other.phoneNumber &&
-        provider == other.provider;
+        providerId == other.providerId;
   }
 
   @override
@@ -2265,7 +2473,7 @@ class _$PhoneAuthCredentialImpl extends PhoneAuthCredentialImpl {
             $jc($jc($jc(0, verificationId.hashCode), verificationCode.hashCode),
                 temporaryProof.hashCode),
             phoneNumber.hashCode),
-        provider.hashCode));
+        providerId.hashCode));
   }
 
   @override
@@ -2275,7 +2483,7 @@ class _$PhoneAuthCredentialImpl extends PhoneAuthCredentialImpl {
           ..add('verificationCode', verificationCode)
           ..add('temporaryProof', temporaryProof)
           ..add('phoneNumber', phoneNumber)
-          ..add('provider', provider))
+          ..add('providerId', providerId))
         .toString();
   }
 }
@@ -2304,9 +2512,9 @@ class PhoneAuthCredentialImplBuilder
   String get phoneNumber => _$this._phoneNumber;
   set phoneNumber(String phoneNumber) => _$this._phoneNumber = phoneNumber;
 
-  String _provider;
-  String get provider => _$this._provider;
-  set provider(String provider) => _$this._provider = provider;
+  String _providerId;
+  String get providerId => _$this._providerId;
+  set providerId(String providerId) => _$this._providerId = providerId;
 
   PhoneAuthCredentialImplBuilder();
 
@@ -2316,7 +2524,7 @@ class PhoneAuthCredentialImplBuilder
       _verificationCode = _$v.verificationCode;
       _temporaryProof = _$v.temporaryProof;
       _phoneNumber = _$v.phoneNumber;
-      _provider = _$v.provider;
+      _providerId = _$v.providerId;
       _$v = null;
     }
     return this;
@@ -2343,7 +2551,7 @@ class PhoneAuthCredentialImplBuilder
             verificationCode: verificationCode,
             temporaryProof: temporaryProof,
             phoneNumber: phoneNumber,
-            provider: provider);
+            providerId: providerId);
     replace(_$result);
     return _$result;
   }
@@ -2355,14 +2563,14 @@ class _$TwitterAuthCredentialImpl extends TwitterAuthCredentialImpl {
   @override
   final String authTokenSecret;
   @override
-  final String provider;
+  final String providerId;
 
   factory _$TwitterAuthCredentialImpl(
           [void Function(TwitterAuthCredentialImplBuilder) updates]) =>
       (new TwitterAuthCredentialImplBuilder()..update(updates)).build();
 
   _$TwitterAuthCredentialImpl._(
-      {this.authToken, this.authTokenSecret, this.provider})
+      {this.authToken, this.authTokenSecret, this.providerId})
       : super._() {
     if (authToken == null) {
       throw new BuiltValueNullFieldError(
@@ -2372,9 +2580,9 @@ class _$TwitterAuthCredentialImpl extends TwitterAuthCredentialImpl {
       throw new BuiltValueNullFieldError(
           'TwitterAuthCredentialImpl', 'authTokenSecret');
     }
-    if (provider == null) {
+    if (providerId == null) {
       throw new BuiltValueNullFieldError(
-          'TwitterAuthCredentialImpl', 'provider');
+          'TwitterAuthCredentialImpl', 'providerId');
     }
   }
 
@@ -2393,13 +2601,13 @@ class _$TwitterAuthCredentialImpl extends TwitterAuthCredentialImpl {
     return other is TwitterAuthCredentialImpl &&
         authToken == other.authToken &&
         authTokenSecret == other.authTokenSecret &&
-        provider == other.provider;
+        providerId == other.providerId;
   }
 
   @override
   int get hashCode {
     return $jf($jc($jc($jc(0, authToken.hashCode), authTokenSecret.hashCode),
-        provider.hashCode));
+        providerId.hashCode));
   }
 
   @override
@@ -2407,7 +2615,7 @@ class _$TwitterAuthCredentialImpl extends TwitterAuthCredentialImpl {
     return (newBuiltValueToStringHelper('TwitterAuthCredentialImpl')
           ..add('authToken', authToken)
           ..add('authTokenSecret', authTokenSecret)
-          ..add('provider', provider))
+          ..add('providerId', providerId))
         .toString();
   }
 }
@@ -2426,9 +2634,9 @@ class TwitterAuthCredentialImplBuilder
   set authTokenSecret(String authTokenSecret) =>
       _$this._authTokenSecret = authTokenSecret;
 
-  String _provider;
-  String get provider => _$this._provider;
-  set provider(String provider) => _$this._provider = provider;
+  String _providerId;
+  String get providerId => _$this._providerId;
+  set providerId(String providerId) => _$this._providerId = providerId;
 
   TwitterAuthCredentialImplBuilder();
 
@@ -2436,7 +2644,7 @@ class TwitterAuthCredentialImplBuilder
     if (_$v != null) {
       _authToken = _$v.authToken;
       _authTokenSecret = _$v.authTokenSecret;
-      _provider = _$v.provider;
+      _providerId = _$v.providerId;
       _$v = null;
     }
     return this;
@@ -2461,7 +2669,7 @@ class TwitterAuthCredentialImplBuilder
         new _$TwitterAuthCredentialImpl._(
             authToken: authToken,
             authTokenSecret: authTokenSecret,
-            provider: provider);
+            providerId: providerId);
     replace(_$result);
     return _$result;
   }

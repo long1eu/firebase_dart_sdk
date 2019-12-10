@@ -5,7 +5,6 @@
 part of firebase_auth;
 
 abstract class EmailPasswordAuthCredentialImpl
-    with AuthCredential
     implements
         Built<EmailPasswordAuthCredentialImpl, EmailPasswordAuthCredentialImplBuilder>,
         EmailPasswordAuthCredential {
@@ -25,7 +24,6 @@ abstract class EmailPasswordAuthCredentialImpl
 }
 
 abstract class FacebookAuthCredentialImpl
-    with AuthCredential
     implements Built<FacebookAuthCredentialImpl, FacebookAuthCredentialImplBuilder>, FacebookAuthCredential {
   factory FacebookAuthCredentialImpl() = _$FacebookAuthCredentialImpl;
 
@@ -34,7 +32,7 @@ abstract class FacebookAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'provider=$provider&access_token=$accessToken'
+      ..postBody = 'providerId=$providerId&access_token=$accessToken'
       ..requestUri = 'http://localhost';
   }
 
@@ -45,7 +43,6 @@ abstract class FacebookAuthCredentialImpl
 }
 
 abstract class GameCenterAuthCredentialImpl
-    with AuthCredential
     implements Built<GameCenterAuthCredentialImpl, GameCenterAuthCredentialImplBuilder>, GameCenterAuthCredential {
   factory GameCenterAuthCredentialImpl() = _$GameCenterAuthCredentialImpl;
 
@@ -63,7 +60,6 @@ abstract class GameCenterAuthCredentialImpl
 }
 
 abstract class GithubAuthCredentialImpl
-    with AuthCredential
     implements Built<GithubAuthCredentialImpl, GithubAuthCredentialImplBuilder>, GithubAuthCredential {
   factory GithubAuthCredentialImpl() = _$GithubAuthCredentialImpl;
 
@@ -72,7 +68,7 @@ abstract class GithubAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'provider=$provider&access_token=$token'
+      ..postBody = 'providerId=$providerId&access_token=$token'
       ..requestUri = 'http://localhost';
   }
 
@@ -83,7 +79,6 @@ abstract class GithubAuthCredentialImpl
 }
 
 abstract class GoogleAuthCredentialImpl
-    with AuthCredential
     implements Built<GoogleAuthCredentialImpl, GoogleAuthCredentialImplBuilder>, GoogleAuthCredential {
   factory GoogleAuthCredentialImpl() = _$GoogleAuthCredentialImpl;
 
@@ -92,7 +87,7 @@ abstract class GoogleAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'provider=$provider&id_token=$idToken&access_token=$accessToken'
+      ..postBody = 'providerId=$providerId&id_token=$idToken&access_token=$accessToken'
       ..requestUri = 'http://localhost';
   }
 
@@ -102,9 +97,7 @@ abstract class GoogleAuthCredentialImpl
   static Serializer<GoogleAuthCredentialImpl> get serializer => _$googleAuthCredentialImplSerializer;
 }
 
-abstract class OAuthCredentialImpl
-    with AuthCredential
-    implements Built<OAuthCredentialImpl, OAuthCredentialImplBuilder>, OAuthCredential {
+abstract class OAuthCredentialImpl implements Built<OAuthCredentialImpl, OAuthCredentialImplBuilder>, OAuthCredential {
   factory OAuthCredentialImpl() = _$OAuthCredentialImpl;
 
   OAuthCredentialImpl._();
@@ -114,7 +107,7 @@ abstract class OAuthCredentialImpl
     final Map<String, String> fields = <String, String>{
       ...customParameters.asMap(),
       if (scopes.isNotEmpty) 'scope': scopes.join(','),
-      'provider': provider,
+      'providerId': providerId,
       'id_token': idToken,
       'access_token': accessToken,
       'oauth_token_secret': secret,
@@ -133,8 +126,26 @@ abstract class OAuthCredentialImpl
   static Serializer<OAuthCredentialImpl> get serializer => _$oAuthCredentialImplSerializer;
 }
 
+abstract class SamlAuthCredentialImpl
+    implements Built<SamlAuthCredentialImpl, SamlAuthCredentialImplBuilder>, SamlAuthCredential {
+  factory SamlAuthCredentialImpl() = _$SamlAuthCredentialImpl;
+
+  SamlAuthCredentialImpl._();
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..requestUri = 'http://localhost'
+      ..pendingIdToken = pendingToken;
+  }
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<SamlAuthCredentialImpl> get serializer => _$samlAuthCredentialImplSerializer;
+}
+
 abstract class PhoneAuthCredentialImpl
-    with AuthCredential
     implements Built<PhoneAuthCredentialImpl, PhoneAuthCredentialImplBuilder>, PhoneAuthCredential {
   factory PhoneAuthCredentialImpl() = _$PhoneAuthCredentialImpl;
 
@@ -152,7 +163,6 @@ abstract class PhoneAuthCredentialImpl
 }
 
 abstract class TwitterAuthCredentialImpl
-    with AuthCredential
     implements Built<TwitterAuthCredentialImpl, TwitterAuthCredentialImplBuilder>, TwitterAuthCredential {
   factory TwitterAuthCredentialImpl() = _$TwitterAuthCredentialImpl;
 
@@ -161,7 +171,7 @@ abstract class TwitterAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'provider=$provider&access_token=$authToken&oauth_token_secret=$authTokenSecret'
+      ..postBody = 'provider=$providerId&access_token=$authToken&oauth_token_secret=$authTokenSecret'
       ..requestUri = 'http://localhost';
   }
 
