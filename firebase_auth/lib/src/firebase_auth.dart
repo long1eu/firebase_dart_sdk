@@ -482,7 +482,7 @@ class FirebaseAuth implements InternalTokenProvider {
     }
 
     final IdentitytoolkitRelyingpartyVerifyPhoneNumberResponse response =
-        await _firebaseAuthApi._requester.verifyPhoneNumber(request);
+        await _firebaseAuthApi.verifyPhoneNumber(request);
 
     // Check whether or not the successful response is actually the special case phone auth flow that returns a
     // temporary proof and phone number.
