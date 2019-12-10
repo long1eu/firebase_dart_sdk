@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 25/11/2019
 
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_internal/firebase_internal.dart';
@@ -23,21 +25,21 @@ Future<void> main() async {
 
   FirebaseAuth.instance.onAuthStateChanged.listen(print);
 
-  print(FirebaseAuth.instance.currentUser.refreshToken);
+  final FirebaseUser user = FirebaseAuth.instance.currentUser;
+  print(user.refreshToken);
   print(await FirebaseAuth.instance.getAccessToken());
 
-  while (true) {
-    await Future.delayed(const Duration(seconds: 1));
-  }
 
-  /*final String verificationId = await FirebaseAuth.instance.verifyPhoneNumber('+40755769229');
+  final String verificationId = await FirebaseAuth.instance.verifyPhoneNumber(phoneNumber: '+40755769229');
 
   final String code = stdin.readLineSync();
   final AuthCredential credential =
-      PhoneNumberProvider.getCredential(verificationId: verificationId, verificationCode: code);
+      PhoneAuthProvider.getCredential(verificationId: verificationId, verificationCode: code);
   print(credential);
 
-  await FirebaseAuth.instance.signInWithCredential(credential);*/
+  await FirebaseAuth.instance.signInWithCredential(credential);
+
+  await user.linkWithCredential(EmailAuthProvider.getCredential(email: 'lung.razvan@gmail.com', password: '123456'));
 }
 
 class Dependencies extends PlatformDependencies {

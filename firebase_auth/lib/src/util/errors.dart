@@ -25,6 +25,7 @@ class FirebaseAuthError extends FirebaseError {
         return userNotFound;
       case 'ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL':
         return accountExistsWithDifferentCredential;
+      case 'CREDENTIAL_TOO_OLD_LOGIN_AGAIN':
       case 'REQUIRES_RECENT_LOGIN':
         return requiresRecentLogin;
       case 'PROVIDER_ALREADY_LINKED':

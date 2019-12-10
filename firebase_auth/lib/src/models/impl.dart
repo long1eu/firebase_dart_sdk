@@ -210,6 +210,15 @@ abstract class AdditionalUserInfoImpl
     return _$AdditionalUserInfoImpl((AdditionalUserInfoImplBuilder b) => b.isNewUser = true);
   }
 
+  factory AdditionalUserInfoImpl.fromVerifyAssertionResponse(VerifyAssertionResponse response) {
+    return AdditionalUserInfoImpl(
+      providerId: response.providerId,
+      profile: response.rawUserInfo != null ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo)) : null,
+      username: response.screenName,
+      isNewUser: response.isNewUser,
+    );
+  }
+
   factory AdditionalUserInfoImpl.fromJson(Map<dynamic, dynamic> json) => serializers.deserializeWith(serializer, json);
 
   AdditionalUserInfoImpl._();
@@ -243,7 +252,7 @@ abstract class UserInfoImpl implements Built<UserInfoImpl, UserInfoImplBuilder>,
 
   UserInfoImpl._();
 
-  UserInfoImpl copyWith({
+  UserInfoImpl _copyWith({
     String uid,
     String providerId,
     String displayName,
@@ -426,14 +435,14 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
         photoUrl: photoUrl,
         phoneNumber: phoneNumber,
       )
-      ..__hasEmailPasswordCredential = hasEmailPasswordCredential
+      .._hasEmailPasswordCredential = hasEmailPasswordCredential
       .._metadata = metadata
       .._providerData = providerUserInfo;
   }
 }
 
 mixin UserInfoMixin implements UserInfo {
-  UserInfo _userInfo;
+  UserInfoImpl _userInfo;
 
   @override
   String get uid => _userInfo.uid;

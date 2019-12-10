@@ -1,6 +1,7 @@
 library firebase_auth;
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -14,8 +15,8 @@ import 'package:built_value/serializer.dart';
 import 'package:firebase_auth/src/models/serializers.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_internal/firebase_internal.dart';
-import 'package:googleapis/identitytoolkit/v3.dart' as gitkit;
 import 'package:googleapis/identitytoolkit/v3.dart';
+import 'package:googleapis/identitytoolkit/v3.dart' as gitkit;
 import 'package:hive/hive.dart';
 import 'package:http/http.dart';
 import 'package:meta/meta.dart';
@@ -43,4 +44,5 @@ part 'src/models/user.dart';
 part 'src/util/api_key_client.dart';
 part 'src/util/errors.dart';
 part 'src/util/http_server.dart';
+part 'src/util/sequential_runner.dart';
 part 'src/util/web_utils.dart';

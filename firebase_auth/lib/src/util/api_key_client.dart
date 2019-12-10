@@ -22,7 +22,7 @@ class ApiKeyClient extends DelegatingClient {
   String locale;
 
   @override
-  Future<StreamedResponse> send(BaseRequest request) {
+  Future<StreamedResponse> send(BaseRequest request) async {
     Uri url = request.url;
     if (url.queryParameters.containsKey('key')) {
       return Future<StreamedResponse>.error(Exception(
@@ -44,7 +44,8 @@ class ApiKeyClient extends DelegatingClient {
     };
     modifiedRequest.headers.addAll(headers);
 
-    return baseClient.send(modifiedRequest);
+    final StreamedResponse response = await baseClient.send(modifiedRequest);
+    return _validateResponse(response);
   }
 }
 
@@ -86,5 +87,39 @@ class RequestImpl extends BaseRequest {
       return null;
     }
     return ByteStream(_stream);
+  }
+}
+
+Future<StreamedResponse> _validateResponse(StreamedResponse response) async {
+  final int statusCode = response.statusCode;
+
+  if (statusCode < 200 || statusCode >= 400) {
+    // Some error happened, try to decode the response and fetch the error.
+    final Stream<String> stringStream = _decodeStreamAsText(response);
+    if (stringStream != null) {
+      final dynamic jsonResponse = await stringStream.transform(json.decoder).first;
+      if (jsonResponse is Map && jsonResponse['error'] is Map) {
+        final Map<dynamic, dynamic> error = jsonResponse['error'];
+        final dynamic codeValue = error['code'];
+        final String message = error['message'];
+
+        throw FirebaseAuthError(message, '');
+      }
+    }
+  }
+
+  return response;
+}
+
+Stream<String> _decodeStreamAsText(StreamedResponse response) {
+  // TODO: Correctly handle the response content-types, using correct
+  // decoder.
+  // Currently we assume that the api endpoint is responding with json
+  // encoded in UTF8.
+  final String contentType = response.headers['content-type'];
+  if (contentType != null && contentType.toLowerCase().startsWith('application/json')) {
+    return response.stream.transform(const Utf8Decoder(allowMalformed: true));
+  } else {
+    return null;
   }
 }
