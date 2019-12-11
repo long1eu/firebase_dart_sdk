@@ -27,6 +27,8 @@ Future<void> main() async {
 
   final FirebaseUser user = FirebaseAuth.instance.currentUser;
 
+  FirebaseAuth.instance;
+
   print(user.refreshToken);
   print(await FirebaseAuth.instance.getAccessToken());
 

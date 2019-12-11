@@ -85,4 +85,8 @@ class FirebaseAuthApi {
   Future<DeleteAccountResponse> deleteAccount(IdentitytoolkitRelyingpartyDeleteAccountRequest request) {
     return _requester.deleteAccount(request);
   }
+
+  Future<ResetPasswordResponse> resetPassword(IdentitytoolkitRelyingpartyResetPasswordRequest request) {
+    return _requester.resetPassword(request);
+  }
 }

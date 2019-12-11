@@ -115,6 +115,81 @@ class FirebaseUser with UserInfoMixin {
     return _updateOrLinkPhoneNumberCredential(credential, isLinkOperation: false);
   }
 
+  /// Updates the user profile information.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
+  ///   * [FirebaseAuthError.userNotFound] - Indicates the user account was not found.
+  Future<void> updateProfile(UserUpdateInfo userUpdateInfo) async {
+    assert(userUpdateInfo != null);
+    return _runUserUpdateTransaction(
+      (_, gitkit.IdentitytoolkitRelyingpartySetAccountInfoRequest request) {
+        if (userUpdateInfo.hasDisplayName) {
+          request.displayName = userUpdateInfo.displayName;
+        }
+
+        if (userUpdateInfo.hasPhotoUrl) {
+          request.photoUrl = userUpdateInfo.photoUrl;
+        }
+      },
+    );
+  }
+
+  /// Reloads the user's profile data from the server.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
+  ///       security threshold. Use reauthenticate methods to resolve.
+  Future<void> reload() async => _getAccountInfoRefreshingCache();
+
+  /// Renews the user’s authentication tokens by validating a fresh set of [credential]s supplied by the user and
+  /// returns additional identity provider data.
+  ///
+  /// This is used to prevent or resolve [FirebaseAuthError.requiresRecentLogin] response to operations that require a
+  /// recent sign-in.
+  ///
+  /// If the user associated with the supplied credential is different from the current user, or if the validation of
+  /// the supplied credentials fails; an error is returned and the current user remains signed in.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.invalidCredential] - Indicates the supplied credential is invalid. This could happen if it
+  ///       has expired or it is malformed.
+  ///   * [FirebaseAuthError.operationNotAllowed] - Indicates that accounts with the identity provider represented by
+  ///       the credential are not enabled. Enable them in the Auth section of the Firebase console.
+  ///   * [FirebaseAuthError.emailAlreadyInUse] -  Indicates the email asserted by the credential (e.g. the email in a
+  ///       Facebook access token) is already in use by an existing account, that cannot be authenticated with this
+  ///       method. Call [fetchProvidersForEmail] for this user’s email and then prompt them to sign in with any of the
+  ///       sign-in providers returned. This error will only be thrown if the "One account per email address" setting is
+  ///       enabled in the Firebase console, under Auth settings. Please note that the error code raised in this
+  ///       specific situation may not be the same on Web and Android.
+  ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
+  ///   * [FirebaseAuthError.wrongPassword] - Indicates the user attempted reauthentication with an incorrect password,
+  ///       if credential is of the type [EmailPasswordAuthCredential].
+  ///   * [FirebaseAuthError.userMismatch] -  Indicates that an attempt was made to reauthenticate with a user which is
+  ///       not the current user.
+  ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
+  Future<AuthResult> reauthenticateWithCredential(AuthCredential credential) async {
+    assert(credential != null);
+    try {
+      final AuthResult result = await _auth._signInAndRetrieveData(credential, isReauthentication: true);
+      if (result.user.uid != _auth.uid) {
+        throw FirebaseAuthError.userMismatch;
+      }
+
+      // Successful reauthenticate
+      await _setTokenService(result.user._secureTokenApi);
+      return result;
+    } on FirebaseAuthError catch (e) {
+      // If "user not found" error returned by backend, translate to user mismatch error which is
+      // more accurate.
+      if (e == FirebaseAuthError.userNotFound) {
+        throw FirebaseAuthError.userMismatch;
+      }
+
+      rethrow;
+    }
+  }
+
   /// Obtains the id token result for the current user, forcing a [refresh] if desired.
   ///
   /// Useful when authenticating against your own backend. Use our server SDKs or follow the official documentation to
@@ -210,128 +285,6 @@ class FirebaseUser with UserInfoMixin {
     }
   }
 
-  /// Initiates email verification for the user.
-  ///
-  /// Errors:
-  ///   * [FirebaseAuthError.invalidRecipientEmail] - Indicates an invalid recipient email was sent in the request.
-  ///   * [FirebaseAuthError.invalidSender] - Indicates the supplied credential is invalid. This could happen if it
-  ///       has expired or it is malformed.
-  ///   * [FirebaseAuthError.credentialAlreadyInUse] - Indicates an invalid sender email is set in the console for this
-  ///       action.
-  ///   * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
-  ///   * [FirebaseAuthError.userNotFound] - Indicates the user account was not found.
-  Future<void> sendEmailVerification({ActionCodeSettings settings}) async {
-    final String accessToken = await _getToken();
-
-    final Relyingparty request = Relyingparty()
-      ..requestType = OobCodeType.verifyEmail.value
-      ..idToken = accessToken
-      ..updateWith(settings);
-
-    try {
-      return _firebaseAuthApi.getOobConfirmationCode(request);
-    } on DetailedApiRequestError catch (error) {
-      throw FirebaseAuthError(error.message, '');
-    }
-  }
-
-  /// Reloads the user's profile data from the server.
-  ///
-  /// Errors:
-  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
-  ///       security threshold. Use reauthenticate methods to resolve.
-  Future<void> reload() async => _getAccountInfoRefreshingCache();
-
-  /// Deletes the current user (also signs out the user).
-  ///
-  /// Errors:
-  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
-  ///       security threshold. Use reauthenticate methods to resolve.
-  Future<void> delete() async {
-    final String accessToken = await _getToken();
-
-    final IdentitytoolkitRelyingpartyDeleteAccountRequest request = IdentitytoolkitRelyingpartyDeleteAccountRequest()
-      ..localId = uid
-      ..idToken = accessToken;
-
-    try {
-      await _firebaseAuthApi._requester.deleteAccount(request);
-
-      _auth._signOutByForce(uid);
-    } on FirebaseAuthError catch (e) {
-      _signOutIfTokenIsInvalid(e);
-      rethrow;
-    }
-  }
-
-  /// Updates the user profile information.
-  ///
-  /// Errors:
-  ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
-  ///   * [FirebaseAuthError.userNotFound] - Indicates the user account was not found.
-  Future<void> updateProfile(UserUpdateInfo userUpdateInfo) async {
-    assert(userUpdateInfo != null);
-    return _runUserUpdateTransaction(
-      (_, gitkit.IdentitytoolkitRelyingpartySetAccountInfoRequest request) {
-        if (userUpdateInfo.hasDisplayName) {
-          request.displayName = userUpdateInfo.displayName;
-        }
-
-        if (userUpdateInfo.hasPhotoUrl) {
-          request.photoUrl = userUpdateInfo.photoUrl;
-        }
-      },
-    );
-  }
-
-  /// Renews the user’s authentication tokens by validating a fresh set of [credential]s supplied by the user and
-  /// returns additional identity provider data.
-  ///
-  /// This is used to prevent or resolve [FirebaseAuthError.requiresRecentLogin] response to operations that require a
-  /// recent sign-in.
-  ///
-  /// If the user associated with the supplied credential is different from the current user, or if the validation of
-  /// the supplied credentials fails; an error is returned and the current user remains signed in.
-  ///
-  /// Errors:
-  ///   * [FirebaseAuthError.invalidCredential] - Indicates the supplied credential is invalid. This could happen if it
-  ///       has expired or it is malformed.
-  ///   * [FirebaseAuthError.operationNotAllowed] - Indicates that accounts with the identity provider represented by
-  ///       the credential are not enabled. Enable them in the Auth section of the Firebase console.
-  ///   * [FirebaseAuthError.emailAlreadyInUse] -  Indicates the email asserted by the credential (e.g. the email in a
-  ///       Facebook access token) is already in use by an existing account, that cannot be authenticated with this
-  ///       method. Call [fetchProvidersForEmail] for this user’s email and then prompt them to sign in with any of the
-  ///       sign-in providers returned. This error will only be thrown if the "One account per email address" setting is
-  ///       enabled in the Firebase console, under Auth settings. Please note that the error code raised in this
-  ///       specific situation may not be the same on Web and Android.
-  ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
-  ///   * [FirebaseAuthError.wrongPassword] - Indicates the user attempted reauthentication with an incorrect password,
-  ///       if credential is of the type [EmailPasswordAuthCredential].
-  ///   * [FirebaseAuthError.userMismatch] -  Indicates that an attempt was made to reauthenticate with a user which is
-  ///       not the current user.
-  ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
-  Future<AuthResult> reauthenticateWithCredential(AuthCredential credential) async {
-    assert(credential != null);
-    try {
-      final AuthResult result = await _auth._signInAndRetrieveData(credential, isReauthentication: true);
-      if (result.user.uid != _auth.uid) {
-        throw FirebaseAuthError.userMismatch;
-      }
-
-      // Successful reauthenticate
-      await _setTokenService(result.user._secureTokenApi);
-      return result;
-    } on FirebaseAuthError catch (e) {
-      // If "user not found" error returned by backend, translate to user mismatch error which is
-      // more accurate.
-      if (e == FirebaseAuthError.userNotFound) {
-        throw FirebaseAuthError.userMismatch;
-      }
-
-      rethrow;
-    }
-  }
-
   /// Disassociates a user account from a third-party identity provider with this user.
   ///
   /// This will prevent the user from signing in to this account with those credentials.
@@ -373,6 +326,53 @@ class FirebaseUser with UserInfoMixin {
       _updateSecureToken(response.idToken, response.expiresIn, response.refreshToken);
     }
     _updateStore();
+  }
+
+  /// Initiates email verification for the user.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.invalidRecipientEmail] - Indicates an invalid recipient email was sent in the request.
+  ///   * [FirebaseAuthError.invalidSender] - Indicates the supplied credential is invalid. This could happen if it
+  ///       has expired or it is malformed.
+  ///   * [FirebaseAuthError.credentialAlreadyInUse] - Indicates an invalid sender email is set in the console for this
+  ///       action.
+  ///   * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
+  ///   * [FirebaseAuthError.userNotFound] - Indicates the user account was not found.
+  Future<void> sendEmailVerification({ActionCodeSettings settings}) async {
+    final String accessToken = await _getToken();
+
+    final Relyingparty request = Relyingparty()
+      ..requestType = ActionCodeOperation.verifyEmail.value
+      ..idToken = accessToken
+      ..updateWith(settings);
+
+    try {
+      return _firebaseAuthApi.getOobConfirmationCode(request);
+    } on DetailedApiRequestError catch (error) {
+      throw FirebaseAuthError(error.message, '');
+    }
+  }
+
+  /// Deletes the current user (also signs out the user).
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
+  ///       security threshold. Use reauthenticate methods to resolve.
+  Future<void> delete() async {
+    final String accessToken = await _getToken();
+
+    final IdentitytoolkitRelyingpartyDeleteAccountRequest request = IdentitytoolkitRelyingpartyDeleteAccountRequest()
+      ..localId = uid
+      ..idToken = accessToken;
+
+    try {
+      await _firebaseAuthApi._requester.deleteAccount(request);
+
+      _auth._signOutByForce(uid);
+    } on FirebaseAuthError catch (e) {
+      _signOutIfTokenIsInvalid(e);
+      rethrow;
+    }
   }
 
   /// The cached access token.

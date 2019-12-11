@@ -12,9 +12,10 @@ const Duration _kMaxWaitTimeForBackoff = Duration(minutes: 16);
 /// The amount of time before the token expires that proactive refresh should be attempted.
 const Duration _kTokenRefreshHeadStart = Duration(minutes: 5);
 
+// ignore_for_file: prefer_constructors_over_static_methods
 class FirebaseAuth implements InternalTokenProvider {
-  FirebaseAuth._(this._app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage)
-      : _platformDependencies = _app.platformDependencies;
+  FirebaseAuth._(this.app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage)
+      : _platformDependencies = app.platformDependencies;
 
   factory FirebaseAuth.getInstance(FirebaseApp app) {
     _authStateChangedSubjects[FirebaseApp.instance.name] = BehaviorSubject<FirebaseUser>();
@@ -33,7 +34,9 @@ class FirebaseAuth implements InternalTokenProvider {
     return _instances[FirebaseApp.instance.name] = auth;
   }
 
-  // ignore: prefer_constructors_over_static_methods
+  /// The auth object for the default Firebase app.
+  ///
+  /// The default Firebase app must have already been configured or an exception will be raised.
   static FirebaseAuth get instance {
     if (_instances.containsKey(FirebaseApp.instance.name)) {
       return _instances[FirebaseApp.instance.name];
@@ -44,7 +47,9 @@ class FirebaseAuth implements InternalTokenProvider {
     }
   }
 
-  final FirebaseApp _app;
+  /// The [FirebaseApp] object that this auth object is connected to.
+  final FirebaseApp app;
+
   final FirebaseAuthApi _firebaseAuthApi;
   final UserStorage _userStorage;
   final PlatformDependencies _platformDependencies;
@@ -75,7 +80,7 @@ class FirebaseAuth implements InternalTokenProvider {
 
   /// Receive [FirebaseUser] each time the user signIn or signOut
   Stream<FirebaseUser> get onAuthStateChanged {
-    return _authStateChangedSubjects[_app.name];
+    return _authStateChangedSubjects[app.name];
   }
 
   /// Returns a list of sign-in methods that can be used to sign in a given user (identified by its main email address).
@@ -167,12 +172,8 @@ class FirebaseAuth implements InternalTokenProvider {
 
   /// Asynchronously creates and becomes an anonymous user.
   ///
-  /// If there is already an anonymous user signed in, that user will be
-  /// returned instead. If there is any other existing user signed in, that
-  /// user will be signed out.
-  ///
-  /// **Important**: You must enable Anonymous accounts in the Auth section
-  /// of the Firebase console before being able to use them.
+  /// If there is already an anonymous user signed in, that user will be returned instead. If there is any other
+  /// existing user signed in, that user will be signed out.
   ///
   /// Errors:
   ///   • [FirebaseAuthError.operationNotAllowed] - Indicates that Anonymous accounts are not enabled.
@@ -252,10 +253,59 @@ class FirebaseAuth implements InternalTokenProvider {
     return AuthResult._(user, additionalUserInfo);
   }
 
-  // todo confirmPasswordReset
-  // todo checkActionCode
-  // todo verifyPasswordReset
-  // todo applyActionCode
+  /// Resets the password using the email code sent to the user and a new password.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
+  ///   * [FirebaseAuthError.operationNotAllowed] - Indicates the administrator disabled sign in with the specified
+  ///       identity provider.
+  ///   * [FirebaseAuthError.expiredActionCode] - Indicates the OOB code is expired.
+  ///   * [FirebaseAuthError.invalidActionCode] - Indicates the OOB code is invalid.
+  Future<void> confirmPasswordReset({@required String oobCode, @required String newPassword}) async {
+    assert(oobCode != null && oobCode.isNotEmpty);
+    assert(newPassword != null && newPassword.isNotEmpty);
+
+    final IdentitytoolkitRelyingpartyResetPasswordRequest request = IdentitytoolkitRelyingpartyResetPasswordRequest()
+      ..oobCode = oobCode
+      ..newPassword = newPassword;
+
+    return _firebaseAuthApi.resetPassword(request);
+  }
+
+  /// Checks the validity of an out of band code.
+  ///
+  /// Return the metadata corresponding to the action code.
+  Future<ActionCodeInfo> checkActionCode(String oobCode) async {
+    assert(oobCode != null && oobCode.isNotEmpty);
+
+    final IdentitytoolkitRelyingpartyResetPasswordRequest request = IdentitytoolkitRelyingpartyResetPasswordRequest()
+      ..oobCode = oobCode;
+
+    final gitkit.ResetPasswordResponse response = await _firebaseAuthApi.resetPassword(request);
+
+    final ActionCodeOperation operation = ActionCodeOperation.values
+        .firstWhere((ActionCodeOperation it) => it.value == response.requestType, orElse: () => null);
+    return ActionCodeInfo._(operation, response.email, response.newEmail);
+  }
+
+  /// Checks the validity of a verify password reset code
+  ///
+  /// Returns the email address of the user for which the out of band code applies.
+  Future<String> verifyPasswordReset(String oobCode) async {
+    final ActionCodeInfo response = await checkActionCode(oobCode);
+    return response.email;
+  }
+
+  /// Applies out of band code.
+  ///
+  /// This method will not work for out of band codes which require an additional parameter, such as password reset
+  /// code.
+  Future<void> applyActionCode(String oobCode) async {
+    assert(oobCode != null && oobCode.isNotEmpty);
+    final IdentitytoolkitRelyingpartySetAccountInfoRequest request = IdentitytoolkitRelyingpartySetAccountInfoRequest()
+      ..oobCode = oobCode;
+    return _firebaseAuthApi.setAccountInfo(request);
+  }
 
   /// Triggers the Firebase Authentication backend to send a password-reset email to the given email address, which must
   /// correspond to an existing user of your app.
@@ -352,7 +402,7 @@ class FirebaseAuth implements InternalTokenProvider {
     final bool isTest = Platform.environment['FIREBASE_AUTH_TEST'] ?? false;
     // We don't check the app if we are in a test
     if (!isTest) {
-      final String token = await getRecaptchaToken(presenter ?? print, _app.options.apiKey, languageCode);
+      final String token = await getRecaptchaToken(presenter ?? print, app.options.apiKey, languageCode);
       request.recaptchaToken = token;
     }
 
@@ -629,7 +679,7 @@ class FirebaseAuth implements InternalTokenProvider {
   }
 
   void _dispatchUser(FirebaseUser user) {
-    _authStateChangedSubjects[_app.name].add(user);
+    _authStateChangedSubjects[app.name].add(user);
   }
 
   @override
