@@ -318,11 +318,13 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       'hasEmailPasswordCredential',
       serializers.serialize(object._hasEmailPasswordCredential, specifiedType: const FullType(bool)),
       'providerData',
-      serializers.serialize(BuiltList<UserInfoImpl>(object.providerData),
-          specifiedType: const FullType(
-            BuiltList,
-            <FullType>[FullType(UserInfoImpl)],
-          )),
+      serializers.serialize(
+        BuiltMap<String, UserInfoImpl>(object.providerData),
+        specifiedType: const FullType(
+          BuiltMap,
+          <FullType>[FullType(String), FullType(UserInfoImpl)],
+        ),
+      ),
       'email',
       serializers.serialize(object.email, specifiedType: const FullType(String)),
       'phoneNumber',
@@ -350,7 +352,7 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
     String uid;
     bool isAnonymous;
     bool hasEmailPasswordCredential;
-    List<UserInfo> providerUserInfo;
+    Map<String, UserInfo> providerUserInfo;
     String email;
     String phoneNumber;
     bool isEmailVerified;
@@ -378,12 +380,12 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
           hasEmailPasswordCredential = serializers.deserialize(value, specifiedType: const FullType(bool));
           break;
         case 'providerData':
-          final BuiltList<UserInfoImpl> _info = serializers.deserialize(value,
+          final BuiltMap<String, UserInfoImpl> _info = serializers.deserialize(value,
               specifiedType: const FullType(
-                BuiltList,
-                <FullType>[FullType(UserInfoImpl)],
+                BuiltMap,
+                <FullType>[FullType(String), FullType(UserInfoImpl)],
               ));
-          providerUserInfo = _info.toList();
+          providerUserInfo = _info.asMap();
           break;
         case 'email':
           email = serializers.deserialize(value, specifiedType: const FullType(String));

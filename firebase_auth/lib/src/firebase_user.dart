@@ -45,7 +45,7 @@ class FirebaseUser with UserInfoMixin {
   SecureTokenApi _secureTokenApi;
   bool _isAnonymous;
   bool _isEmailVerified;
-  List<UserInfo> _providerData;
+  Map<String, UserInfo> _providerData;
   UserMetadataImpl _metadata;
 
   /// Whether or not the user can be authenticated by using Firebase email and password.
@@ -54,7 +54,7 @@ class FirebaseUser with UserInfoMixin {
   /// Profile data for each identity provider, if any.
   ///
   /// This data is cached on sign-in and updated when linking or unlinking.
-  List<UserInfo> get providerData => _providerData.toList();
+  List<UserInfo> get providerData => _providerData.values.toList();
 
   /// Indicates the user represents an anonymous user.
   bool get isAnonymous => _isAnonymous;
@@ -66,6 +66,54 @@ class FirebaseUser with UserInfoMixin {
 
   /// Metadata associated with the Firebase user in question.
   UserMetadata get metadata => _metadata;
+
+  /// Updates the email address of the user.
+  ///
+  /// The original email address recipient will receive an email that allows them to revoke the email address change,
+  /// in order to protect them from account hijacking.
+  ///
+  /// May fail if there is already an account with this email address that was created using email and password
+  /// authentication.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.invalidRecipientEmail] - Indicates an invalid recipient email was sent in the request.
+  ///   * [FirebaseAuthError.invalidSender] - Indicates an invalid sender email is set in the console for this action.
+  ///   * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
+  ///   * [FirebaseAuthError.emailAlreadyInUse] - Indicates the email is already in use by another account.
+  ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
+  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
+  ///       security threshold. Use reauthenticate methods to resolve.
+  Future<void> updateEmail(String email) async {
+    assert(email != null);
+    return _updateEmailAndPassword(email, null);
+  }
+
+  /// Updates the password of the user.
+  ///
+  /// Anonymous users who update both their email and password will no longer be anonymous. They will be able to log in
+  /// with these credentials.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
+  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
+  ///       security threshold. Use reauthenticate methods to resolve.
+  Future<void> updatePassword(String password) async {
+    assert(password != null);
+    return _updateEmailAndPassword(null, password);
+  }
+
+  /// Updates the phone number of the user.
+  ///
+  /// The new phone number credential corresponding to the phone number to be added to the Firebase account, if a phone
+  /// number is already linked to the account, this new phone number will replace it.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
+  ///       security threshold. Use reauthenticate methods to resolve.
+  Future<void> updatePhoneNumberCredential(PhoneAuthCredential credential) async {
+    assert(credential != null);
+    return _updateOrLinkPhoneNumberCredential(credential, isLinkOperation: false);
+  }
 
   /// Obtains the id token result for the current user, forcing a [refresh] if desired.
   ///
@@ -216,57 +264,116 @@ class FirebaseUser with UserInfoMixin {
     }
   }
 
-  /// Updates the email address of the user.
-  ///
-  /// The original email address recipient will receive an email that allows them to revoke the email address change,
-  /// in order to protect them from account hijacking.
-  ///
-  /// May fail if there is already an account with this email address that was created using email and password
-  /// authentication.
+  /// Updates the user profile information.
   ///
   /// Errors:
-  ///   * [FirebaseAuthError.invalidRecipientEmail] - Indicates an invalid recipient email was sent in the request.
-  ///   * [FirebaseAuthError.invalidSender] - Indicates an invalid sender email is set in the console for this action.
-  ///   * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
-  ///   * [FirebaseAuthError.emailAlreadyInUse] - Indicates the email is already in use by another account.
+  ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
+  ///   * [FirebaseAuthError.userNotFound] - Indicates the user account was not found.
+  Future<void> updateProfile(UserUpdateInfo userUpdateInfo) async {
+    assert(userUpdateInfo != null);
+    return _runUserUpdateTransaction(
+      (_, gitkit.IdentitytoolkitRelyingpartySetAccountInfoRequest request) {
+        if (userUpdateInfo.hasDisplayName) {
+          request.displayName = userUpdateInfo.displayName;
+        }
+
+        if (userUpdateInfo.hasPhotoUrl) {
+          request.photoUrl = userUpdateInfo.photoUrl;
+        }
+      },
+    );
+  }
+
+  /// Renews the user’s authentication tokens by validating a fresh set of [credential]s supplied by the user and
+  /// returns additional identity provider data.
+  ///
+  /// This is used to prevent or resolve [FirebaseAuthError.requiresRecentLogin] response to operations that require a
+  /// recent sign-in.
+  ///
+  /// If the user associated with the supplied credential is different from the current user, or if the validation of
+  /// the supplied credentials fails; an error is returned and the current user remains signed in.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.invalidCredential] - Indicates the supplied credential is invalid. This could happen if it
+  ///       has expired or it is malformed.
+  ///   * [FirebaseAuthError.operationNotAllowed] - Indicates that accounts with the identity provider represented by
+  ///       the credential are not enabled. Enable them in the Auth section of the Firebase console.
+  ///   * [FirebaseAuthError.emailAlreadyInUse] -  Indicates the email asserted by the credential (e.g. the email in a
+  ///       Facebook access token) is already in use by an existing account, that cannot be authenticated with this
+  ///       method. Call [fetchProvidersForEmail] for this user’s email and then prompt them to sign in with any of the
+  ///       sign-in providers returned. This error will only be thrown if the "One account per email address" setting is
+  ///       enabled in the Firebase console, under Auth settings. Please note that the error code raised in this
+  ///       specific situation may not be the same on Web and Android.
+  ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
+  ///   * [FirebaseAuthError.wrongPassword] - Indicates the user attempted reauthentication with an incorrect password,
+  ///       if credential is of the type [EmailPasswordAuthCredential].
+  ///   * [FirebaseAuthError.userMismatch] -  Indicates that an attempt was made to reauthenticate with a user which is
+  ///       not the current user.
   ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
-  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
-  ///       security threshold. Use reauthenticate methods to resolve.
-  Future<void> updateEmail(String email) async {
-    assert(email != null);
-    return _updateEmailAndPassword(email, null);
-  }
-
-  /// Updates the phone number of the user.
-  ///
-  /// The new phone number credential corresponding to the phone number to be added to the Firebase account, if a phone
-  /// number is already linked to the account, this new phone number will replace it.
-  ///
-  /// Errors:
-  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
-  ///       security threshold. Use reauthenticate methods to resolve.
-  Future<void> updatePhoneNumberCredential(PhoneAuthCredential credential) async {
+  Future<AuthResult> reauthenticateWithCredential(AuthCredential credential) async {
     assert(credential != null);
-    return _updateOrLinkPhoneNumberCredential(credential, isLinkOperation: false);
+    try {
+      final AuthResult result = await _auth._signInAndRetrieveData(credential, isReauthentication: true);
+      if (result.user.uid != _auth.uid) {
+        throw FirebaseAuthError.userMismatch;
+      }
+
+      // Successful reauthenticate
+      await _setTokenService(result.user._secureTokenApi);
+      return result;
+    } on FirebaseAuthError catch (e) {
+      // If "user not found" error returned by backend, translate to user mismatch error which is
+      // more accurate.
+      if (e == FirebaseAuthError.userNotFound) {
+        throw FirebaseAuthError.userMismatch;
+      }
+
+      rethrow;
+    }
   }
 
-  /// Updates the password of the user.
+  /// Disassociates a user account from a third-party identity provider with this user.
   ///
-  /// Anonymous users who update both their email and password will no longer be anonymous. They will be able to log in
-  /// with these credentials.
+  /// This will prevent the user from signing in to this account with those credentials.
+  ///
+  /// Use the [ProviderType] class to get the correct [providerId].
   ///
   /// Errors:
-  ///   * [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
-  ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
-  ///       security threshold. Use reauthenticate methods to resolve.
-  Future<void> updatePassword(String password) async {
-    assert(password != null);
-    return _updateEmailAndPassword(null, password);
-  }
+  /// * [FirebaseAuthError.invalidRecipientEmail] - Indicates an invalid recipient email was sent in the request.
+  /// * [FirebaseAuthError.invalidSender] - Indicates an invalid sender email is set in the console for this action.
+  /// * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
+  /// * [FirebaseAuthError.userNotFound] - Indicates the user account was not found.
+  Future<void> unlinkFromProvider(String providerId) async {
+    assert(providerId != null);
 
-  // todo: updateProfile
-  // todo: reauthenticateWithCredential
-  // todo: unlinkFromProvider
+    if (!_providerData.containsKey(providerId)) {
+      throw FirebaseAuthError.noSuchProvider;
+    }
+
+    final String accessToken = await _getToken();
+    final IdentitytoolkitRelyingpartySetAccountInfoRequest request = IdentitytoolkitRelyingpartySetAccountInfoRequest()
+      ..idToken = accessToken
+      ..deleteProvider = <String>[providerId];
+
+    final SetAccountInfoResponse response = await _firebaseAuthApi.setAccountInfo(request);
+    // We can't just use the provider info objects in SetAccountInfoResponse because they don't have localId and email
+    // fields. Remove the specific provider manually.
+    _providerData.remove(providerId);
+
+    if (providerId == ProviderType.password) {
+      _hasEmailPasswordCredential = false;
+    }
+
+    // After successfully unlinking a phone auth provider, remove the phone number from the cached user info.
+    if (providerId == ProviderType.phone) {
+      _userInfo = _userInfo.rebuild((UserInfoImplBuilder b) => b.phoneNumber = null);
+    }
+
+    if (response.idToken != null && response.refreshToken != null) {
+      _updateSecureToken(response.idToken, response.expiresIn, response.refreshToken);
+    }
+    _updateStore();
+  }
 
   /// The cached access token.
   ///
@@ -428,15 +535,22 @@ class FirebaseUser with UserInfoMixin {
     });
   }
 
-  /// Sets a new token service for this instance.
+  /// Creates and sets a new token service for this instance.
   void _updateSecureToken(String accessToken, String expiresIn, String refreshToken) {
     final DateTime accessTokenExpirationDate = DateTime.now().add(Duration(seconds: int.parse(expiresIn))).toUtc();
-    _secureTokenApi = SecureTokenApi(
+    final SecureTokenApi secureTokenApi = SecureTokenApi(
       client: _auth._apiKeyClient,
       accessToken: accessToken,
       accessTokenExpirationDate: accessTokenExpirationDate,
       refreshToken: refreshToken,
     );
+    _setTokenService(secureTokenApi);
+  }
+
+  /// Sets a new token service for this instance.
+  Future<void> _setTokenService(SecureTokenApi secureTokenApi) async {
+    await secureTokenApi.fetchAccessToken();
+    _secureTokenApi = secureTokenApi;
     _updateStore();
   }
 
@@ -498,17 +612,18 @@ class FirebaseUser with UserInfoMixin {
       creationDate: DateTime.fromMillisecondsSinceEpoch(int.parse(user.createdAt), isUtc: true),
     );
 
-    _providerData = user.providerUserInfo
-        ?.map((UserInfoProviderUserInfo info) => UserInfoImpl(
-              providerId: info.providerId,
-              uid: info.federatedId,
-              displayName: info.displayName,
-              photoUrl: info.photoUrl,
-              email: info.email,
-              phoneNumber: info.phoneNumber,
-            ))
-        ?.toList();
-    _providerData ??= <UserInfo>[];
+    _providerData =
+        user.providerUserInfo.asMap()?.map((_, UserInfoProviderUserInfo info) => MapEntry<String, UserInfoImpl>(
+                info.providerId,
+                UserInfoImpl(
+                  providerId: info.providerId,
+                  uid: info.federatedId,
+                  displayName: info.displayName,
+                  photoUrl: info.photoUrl,
+                  email: info.email,
+                  phoneNumber: info.phoneNumber,
+                ))) ??
+            <String, UserInfo>{};
   }
 
   void _updateStore() {
