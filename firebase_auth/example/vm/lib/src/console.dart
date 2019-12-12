@@ -10,13 +10,13 @@ class Console {
   int _characters = 0;
 
   void print([Object object]) {
-    final String string = _sanitize(object);
+    final String string = _normalize(object);
     stdout.write(string);
     _characters += string.length;
   }
 
   void printTabbed([Object object, int tabCount = 4]) {
-    final String string = _sanitize(object);
+    final String string = _normalize(object);
     stdout //
       ..write(''.padRight(tabCount, ' '))
       ..write(string);
@@ -24,13 +24,13 @@ class Console {
   }
 
   void println([Object object]) {
-    final String string = _sanitize(object);
+    final String string = _normalize(object);
     stdout.writeln(string);
     _characters += string.length;
   }
 
   void printlnTabbed([Object object, int tabCount = 4]) {
-    final String string = _sanitize(object);
+    final String string = _normalize(object);
     stdout
       ..write(''.padRight(tabCount, ' '))
       ..writeln(string);
@@ -53,8 +53,8 @@ class Console {
     stdout.write(_moveUpOne);
   }
 
-  String _sanitize(Object object) {
-    return object == null ? '' : object.toString().replaceAll('\n', '');
+  String _normalize(Object object) {
+    return object == null ? '' : object.toString();
   }
 
   void clearScreen() {

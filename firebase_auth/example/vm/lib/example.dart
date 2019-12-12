@@ -1,6 +1,7 @@
 library firebase_auth_example;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,10 +14,11 @@ import 'file:///Users/long1eu/.pub-cache/hosted/pub.dartlang.org/intl-0.16.0/lib
 
 import 'src/utils/email_validator.dart';
 
+part 'src/auth/action_code.dart';
+part 'src/auth/action_code_info.dart';
 part 'src/auth/create_user.dart';
 part 'src/auth/current_user.dart';
 part 'src/auth/fetch_sign_in_methods.dart';
-part 'src/auth/action_code_info.dart';
 part 'src/auth/language_code.dart';
 part 'src/auth/send_email_verification.dart';
 part 'src/auth/sign_in_with_email_and_password.dart';
@@ -54,6 +56,6 @@ void printTitle() {
 }
 
 void close() {
-  stdout.writeln();
+  console.clearScreen();
   exit(0);
 }

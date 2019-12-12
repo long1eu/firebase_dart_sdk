@@ -23,8 +23,10 @@ class MultipleStringOption extends Option<List<String>> {
 
   @override
   int showField() {
-    console.print(_fieldBuilder(_result.length));
-    return 1;
+    final String field = _fieldBuilder(_result.length);
+    final int lines = const LineSplitter().convert(field).length;
+    console.print(field);
+    return lines;
   }
 
   @override

@@ -56,20 +56,15 @@ Future<void> noUserOptionsDialog() async {
       case FirebaseAuthOptions.signInWithEmailAndPassword:
         result = await _signInWithEmailAndPassword(option);
         break;
-        break;
       case FirebaseAuthOptions.sendSignInWithEmailLink:
         break;
       case FirebaseAuthOptions.signInAnonymously:
         break;
       case FirebaseAuthOptions.signInWithCustomToken:
         break;
-      case FirebaseAuthOptions.signInWithCredential:
-        break;
       case FirebaseAuthOptions.verifyPhoneNumber:
         break;
-      case FirebaseAuthOptions.sendPasswordResetEmail:
-        break;
-      case FirebaseAuthOptions.isSignInWithEmailLink:
+      case FirebaseAuthOptions.signInWithCredential:
         break;
     }
   }

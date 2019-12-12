@@ -30,7 +30,7 @@ class MultipleOptions extends Option<int> {
     console.println(question);
     for (int i = 0; i <= _optionsCount; i++) {
       console //
-        ..print(_tab)
+        ..printTabbed()
         ..print('(${i + 1})'.padLeft(4, ' '))
         ..print(': ')
         ..println(i == _optionsCount ? 'Exit' : _builder(i));

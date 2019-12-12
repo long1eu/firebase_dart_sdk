@@ -20,7 +20,7 @@ Future<AuthResult> _createUser(FirebaseAuthOptions option) async {
         return 'Try a valid email address.';
       } else {
         if (response.isEmpty || response.length < 6) {
-          return 'Try a passwprd with at least 6 characters.';
+          return 'Try a password with at least 6 characters.';
         }
       }
 
