@@ -4,7 +4,7 @@
 
 part of firebase_auth_example;
 
-Future<void> _changeLanguageCode(AppOption option) async {
+Future<void> _changeLanguageCode(FirebaseAuthOptions option) async {
   final String currentLanguage = _getLanguageMessage();
   final StringOption option = StringOption(
     question: 'Great. $currentLanguage What is the new language?',
@@ -28,7 +28,7 @@ Future<void> _changeLanguageCode(AppOption option) async {
     ..println(_getLanguageMessage())
     ..println();
 
-  return showOptionsDialog();
+  return noUserOptionsDialog();
 }
 
 String _getLanguageMessage() {

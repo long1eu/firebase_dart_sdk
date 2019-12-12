@@ -17,6 +17,15 @@ class ActionCodeInfo {
 
   /// The current email address in the case of [ActionCodeOperation.recoverEmail].
   final String forEmail;
+
+  @override
+  String toString() {
+    return (IndentingBuiltValueToStringHelper('ActionCodeInfo')
+          ..add('operation', operation)
+          ..add('email', email)
+          ..add('forEmail', forEmail))
+        .toString();
+  }
 }
 
 /// Types of OOB Confirmation Code requests.

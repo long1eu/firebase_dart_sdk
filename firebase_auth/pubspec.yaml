@@ -5,7 +5,7 @@ homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
 author: long1eu <home@long1.eu>
 
 environment:
-  sdk: '>=2.6.0 <3.0.0'
+  sdk: '>=2.7.0 <3.0.0'
 
 dependencies:
   firebase_common:

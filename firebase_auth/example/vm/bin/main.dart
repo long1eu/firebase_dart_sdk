@@ -6,7 +6,7 @@ import '../lib/example.dart';
 
 // ignore_for_file: avoid_relative_lib_imports
 Future<void> main(List<String> arguments) async {
-  clearScreen();
+  printTitle();
 
   final Progress progress = Progress('Initializing')..show();
   await init();
@@ -15,7 +15,9 @@ Future<void> main(List<String> arguments) async {
   final FirebaseUser user = FirebaseAuth.instance.currentUser;
   if (user == null) {
     await noUserWelcome();
-  } else {}
+  } else {
+    await userWelcome();
+  }
 
   close();
 }

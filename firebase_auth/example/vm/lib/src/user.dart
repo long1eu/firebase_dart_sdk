@@ -1,20 +1,22 @@
 // File created by
 // Lung Razvan <long1eu>
-// on 11/12/2019
+// on 12/12/2019
 
 part of firebase_auth_example;
 
-Future<void> noUserWelcome() async {
-  console //
-    ..println('Welcome!'.bold.reset)
-    ..println('');
+Future<void> userWelcome() async {
+  final FirebaseUser user = FirebaseAuth.instance.currentUser;
 
-  return noUserOptionsDialog();
+  console //
+    ..println('Welcome ${getUserName(user).cyan.reset}'.bold + '!'.bold.reset)
+    ..println();
+
+  return userOptionsDialog();
 }
 
-Future<void> noUserOptionsDialog() async {
-  const List<FirebaseAuthOptions> options = FirebaseAuthOptions.authValues;
-  console.println('Auth'.bold.red.reset);
+Future<void> userOptionsDialog() async {
+  const List<FirebaseAuthOptions> options = FirebaseAuthOptions.userValues;
+  console.println('User'.bold.red.reset);
   final MultipleOptions multipleOptions = MultipleOptions(
     question: 'What do you want to do?',
     optionsCount: options.length,
@@ -36,7 +38,7 @@ Future<void> noUserOptionsDialog() async {
     },
   );
 
-  AuthResult result;
+  bool signOut = false;
   final int optionIndex = await multipleOptions.show();
   if (optionIndex == -1) {
     close();
@@ -44,41 +46,37 @@ Future<void> noUserOptionsDialog() async {
     console.clearScreen();
     final FirebaseAuthOptions option = options[optionIndex];
     switch (option) {
-      case FirebaseAuthOptions.languageCode:
-        await _changeLanguageCode(option);
+      case FirebaseAuthOptions.currentUser:
+        signOut = await _currentUser(option);
         break;
-      case FirebaseAuthOptions.fetchSignInMethodsForEmail:
-        await _fetchSignInMethod(option);
+      case FirebaseAuthOptions.sendEmailVerification:
+        signOut = await _sendEmailVerification(option);
         break;
-      case FirebaseAuthOptions.createUserWithEmailAndPassword:
-        result = await _createUser(option);
+      case FirebaseAuthOptions.delete:
         break;
-      case FirebaseAuthOptions.signInWithEmailAndPassword:
-        result = await _signInWithEmailAndPassword(option);
+      case FirebaseAuthOptions.updateAccount:
         break;
+      case FirebaseAuthOptions.reauthenticateWithCredential:
         break;
-      case FirebaseAuthOptions.sendSignInWithEmailLink:
+      case FirebaseAuthOptions.linkProvider:
         break;
-      case FirebaseAuthOptions.signInAnonymously:
+      case FirebaseAuthOptions.unlinkProvider:
         break;
-      case FirebaseAuthOptions.signInWithCustomToken:
-        break;
-      case FirebaseAuthOptions.signInWithCredential:
-        break;
-      case FirebaseAuthOptions.verifyPhoneNumber:
-        break;
-      case FirebaseAuthOptions.sendPasswordResetEmail:
-        break;
-      case FirebaseAuthOptions.isSignInWithEmailLink:
+      case FirebaseAuthOptions.signOut:
+        await FirebaseAuth.instance.signOut();
+        console.clearScreen();
+        signOut = true;
         break;
     }
   }
 
   // We use this so we allow the user to observe the completion message.
   await Future<void>.delayed(const Duration(seconds: 1));
-  if (result == null) {
+  if (signOut) {
     return noUserOptionsDialog();
   } else {
     return userWelcome();
   }
 }
+
+

@@ -319,7 +319,7 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       serializers.serialize(object._hasEmailPasswordCredential, specifiedType: const FullType(bool)),
       'providerData',
       serializers.serialize(
-        BuiltMap<String, UserInfoImpl>(object.providerData),
+        BuiltMap<String, UserInfoImpl>(object._providerData),
         specifiedType: const FullType(
           BuiltMap,
           <FullType>[FullType(String), FullType(UserInfoImpl)],

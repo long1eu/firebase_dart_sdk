@@ -34,8 +34,8 @@ Serializers serializers = (_$serializers.toBuilder() //
       ..add(FirebaseUser.serializer)
       ..add(SecureTokenGrantType.serializer)
       ..addBuilderFactory(
-        const FullType(BuiltList, <FullType>[FullType(UserInfoImpl)]),
-        () => ListBuilder<UserInfoImpl>(),
+        const FullType(BuiltMap, <FullType>[FullType(String), FullType(UserInfoImpl)]),
+        () => MapBuilder<String, UserInfoImpl>(),
       )
       ..addPlugin(StandardJsonPlugin()))
     .build();

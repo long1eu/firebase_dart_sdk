@@ -17,6 +17,10 @@ extension NewString on String {
 
   String get reverse => '$_reverse$this';
 
+  String get underline => '\x1B[4m$this';
+
+  String get concealed => '\x1B[8m$this';
+
   String get reset => '${this}$_reset';
 }
 

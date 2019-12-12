@@ -5,10 +5,11 @@ description: A sample command-line application.
 # author: long1eu <lung.razvan@gmail.com>
 
 environment:
-  sdk: '>=2.6.0 <3.0.0'
+  sdk: '>=2.7.0 <3.0.0'
 
 dependencies:
   email_validator: ^1.0.3
+  intl: ^0.16.0
   firebase_auth:
     path: ../../
 

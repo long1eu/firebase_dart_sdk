@@ -44,7 +44,6 @@ class FirebaseUser with UserInfoMixin {
 
   SecureTokenApi _secureTokenApi;
   bool _isAnonymous;
-  bool _isEmailVerified;
   Map<String, UserInfo> _providerData;
   UserMetadataImpl _metadata;
 
@@ -346,11 +345,7 @@ class FirebaseUser with UserInfoMixin {
       ..idToken = accessToken
       ..updateWith(settings);
 
-    try {
-      return _firebaseAuthApi.getOobConfirmationCode(request);
-    } on DetailedApiRequestError catch (error) {
-      throw FirebaseAuthError(error.message, '');
-    }
+    return _firebaseAuthApi.getOobConfirmationCode(request);
   }
 
   /// Deletes the current user (also signs out the user).

@@ -7,7 +7,6 @@ part of firebase_auth_example;
 final Console console = Console();
 
 class Console {
-  int _lines = 1;
   int _characters = 0;
 
   void print([Object object]) {
@@ -16,25 +15,25 @@ class Console {
     _characters += string.length;
   }
 
-  void printTabbed([Object object]) {
+  void printTabbed([Object object, int tabCount = 4]) {
     final String string = _sanitize(object);
-    stdout..write(_tab)..write(string);
+    stdout //
+      ..write(''.padRight(tabCount, ' '))
+      ..write(string);
     _characters += string.length;
   }
 
   void println([Object object]) {
     final String string = _sanitize(object);
     stdout.writeln(string);
-    _lines++;
     _characters += string.length;
   }
 
-  void printlnTabbed([Object object]) {
+  void printlnTabbed([Object object, int tabCount = 4]) {
     final String string = _sanitize(object);
     stdout
-      ..write(_tab)
+      ..write(''.padRight(tabCount, ' '))
       ..writeln(string);
-    _lines++;
     _characters += string.length;
   }
 
@@ -51,7 +50,6 @@ class Console {
   }
 
   void moveUp() {
-    _lines--;
     stdout.write(_moveUpOne);
   }
 

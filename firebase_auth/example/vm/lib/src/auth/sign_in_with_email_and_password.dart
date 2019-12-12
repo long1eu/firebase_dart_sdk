@@ -4,9 +4,9 @@
 
 part of firebase_auth_example;
 
-Future<AuthResult> _createUser(FirebaseAuthOptions option) async {
+Future<AuthResult> _signInWithEmailAndPassword(FirebaseAuthOptions option) async {
   final MultipleStringOption option = MultipleStringOption(
-    question: 'Let\'s create you account.',
+    question: 'Great! Please enter your credentials.',
     fieldsCount: 2,
     fieldBuilder: (int i) {
       if (i == 0) {
@@ -32,8 +32,8 @@ Future<AuthResult> _createUser(FirebaseAuthOptions option) async {
   final String email = results[0];
   final String password = results[1];
 
-  final Progress progress = Progress('Creating Account')..show();
-  final AuthResult user = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: password);
+  final Progress progress = Progress('Siging in')..show();
+  final AuthResult user = await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
   await progress.cancel();
   console.clearScreen();
   return user;

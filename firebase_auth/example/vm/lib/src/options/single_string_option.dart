@@ -8,7 +8,7 @@ class StringOption extends Option<String> {
   StringOption({
     @required String question,
     @required SimpleOptionValidator<String> validator,
-    @required FieldBuilder fieldBuilder,
+    FieldBuilder fieldBuilder,
   })  : _validator = validator,
         _fieldBuilder = fieldBuilder,
         super(question);

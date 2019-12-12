@@ -4,7 +4,7 @@
 
 part of firebase_auth_example;
 
-Future<void> _fetchSignInMethod(AppOption option) async {
+Future<void> _fetchSignInMethod(FirebaseAuthOptions option) async {
   final StringOption option = StringOption(
     question: 'What is the email address?',
     validator: (String response) {
