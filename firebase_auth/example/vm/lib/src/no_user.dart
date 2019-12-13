@@ -13,7 +13,7 @@ Future<void> noUserWelcome() async {
 }
 
 Future<void> noUserOptionsDialog() async {
-  const List<FirebaseAuthOptions> options = FirebaseAuthOptions.authValues;
+  const List<FirebaseAuthOption> options = FirebaseAuthOption.authValues;
   console.println('Auth'.bold.red.reset);
   final MultipleOptions multipleOptions = MultipleOptions(
     question: 'What do you want to do?',
@@ -42,38 +42,51 @@ Future<void> noUserOptionsDialog() async {
     close();
   } else {
     console.clearScreen();
-    final FirebaseAuthOptions option = options[optionIndex];
-    switch (option) {
-      case FirebaseAuthOptions.languageCode:
-        await _changeLanguageCode(option);
-        break;
-      case FirebaseAuthOptions.fetchSignInMethodsForEmail:
-        await _fetchSignInMethod(option);
-        break;
-      case FirebaseAuthOptions.createUserWithEmailAndPassword:
-        result = await _createUser(option);
-        break;
-      case FirebaseAuthOptions.signInWithEmailAndPassword:
-        result = await _signInWithEmailAndPassword(option);
-        break;
-      case FirebaseAuthOptions.sendSignInWithEmailLink:
-        break;
-      case FirebaseAuthOptions.signInAnonymously:
-        break;
-      case FirebaseAuthOptions.signInWithCustomToken:
-        break;
-      case FirebaseAuthOptions.verifyPhoneNumber:
-        break;
-      case FirebaseAuthOptions.signInWithCredential:
-        break;
-    }
-  }
+    try {
+      final FirebaseAuthOption option = options[optionIndex];
+      switch (option) {
+        case FirebaseAuthOption.languageCode:
+          await _changeLanguageCode(option);
+          break;
+        case FirebaseAuthOption.fetchSignInMethodsForEmail:
+          await _fetchSignInMethod(option);
+          break;
+        case FirebaseAuthOption.createUserWithEmailAndPassword:
+          result = await _createUser(option);
+          break;
+        case FirebaseAuthOption.signInWithEmailAndPassword:
+          result = await _signInWithEmailAndPassword(option);
+          break;
+        case FirebaseAuthOption.sendSignInWithEmailLink:
+          result = await _sendSignInWithEmailLink(option);
+          break;
+        case FirebaseAuthOption.signInAnonymously:
+          result = await _signInAnonymously(option);
+          break;
+        case FirebaseAuthOption.signInWithCustomToken:
+          result = await _singInWithCustomToken(option);
+          break;
+        case FirebaseAuthOption.signInWithPhoneNumber:
+          result = await _sendSignInWithPhoneNumber(option);
+          break;
+        case FirebaseAuthOption.signInWithCredential:
+          break;
+      }
+    } on FirebaseAuthError catch (error) {
+      await _stopAllProgress();
+      console //
+        ..clearScreen()
+        ..println('${'ERROR:'.bold.red.reset} ${error.message.red}'.reset)
+        ..print('Press Enter to return.');
 
-  // We use this so we allow the user to observe the completion message.
-  await Future<void>.delayed(const Duration(seconds: 1));
-  if (result == null) {
-    return noUserOptionsDialog();
-  } else {
-    return userWelcome();
+      await console.nextLine;
+      console.clearScreen();
+    }
+
+    if (result == null) {
+      return noUserOptionsDialog();
+    } else {
+      return userWelcome();
+    }
   }
 }

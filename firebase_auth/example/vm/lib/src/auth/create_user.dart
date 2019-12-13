@@ -4,7 +4,7 @@
 
 part of firebase_auth_example;
 
-Future<AuthResult> _createUser(FirebaseAuthOptions option) async {
+Future<AuthResult> _createUser(FirebaseAuthOption option) async {
   final MultipleStringOption option = MultipleStringOption(
     question: 'Let\'s create you account.',
     fieldsCount: 2,

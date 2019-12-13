@@ -4,7 +4,7 @@
 
 part of firebase_auth_example;
 
-Future<String> _actionCode(String question) async {
+Future<String> _actionCodeLink(String question) async {
   final StringOption option = StringOption(
     question: question,
     fieldBuilder: () => 'link: ',
@@ -27,6 +27,10 @@ Future<String> _actionCode(String question) async {
   final ActionCodeInfo value = await FirebaseAuth.instance.checkActionCode(oobCode);
   await progress.cancel();
   _printActionCodeInfo(value);
+  return url;
+}
 
-  return oobCode;
+Future<String> _actionCode(String question) async {
+  final String url = await _actionCodeLink(question);
+  return Uri.parse(url).queryParameters['oobCode'];
 }

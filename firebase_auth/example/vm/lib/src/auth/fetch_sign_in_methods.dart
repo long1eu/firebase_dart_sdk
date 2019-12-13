@@ -4,7 +4,7 @@
 
 part of firebase_auth_example;
 
-Future<void> _fetchSignInMethod(FirebaseAuthOptions option) async {
+Future<void> _fetchSignInMethod(FirebaseAuthOption option) async {
   final StringOption option = StringOption(
     question: 'What is the email address?',
     validator: (String response) {
@@ -24,7 +24,12 @@ Future<void> _fetchSignInMethod(FirebaseAuthOptions option) async {
   console
     ..removeLines()
     ..println(_getResultMessage(result, providers))
-    ..println();
+    ..println()
+    ..print('Press Enter to return.');
+
+  await console.nextLine;
+  console.clearScreen();
+  return false;
 }
 
 String _getResultMessage(String email, List<String> providers) {

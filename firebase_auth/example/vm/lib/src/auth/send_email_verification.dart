@@ -4,7 +4,7 @@
 
 part of firebase_auth_example;
 
-Future<bool> _sendEmailVerification(FirebaseAuthOptions option) async {
+Future<bool> _sendEmailVerification(FirebaseAuthOption option) async {
   final FirebaseUser user = FirebaseAuth.instance.currentUser;
 
   Progress progress = Progress('Sending email')..show();
@@ -20,7 +20,7 @@ Future<bool> _sendEmailVerification(FirebaseAuthOptions option) async {
   console //
     ..println('${user.email.bold.cyan.reset} successfuly was verified.')
     ..println()
-    ..print('Press any Enter to return.');
+    ..print('Press Enter to return.');
 
   await console.nextLine;
   console.clearScreen();

@@ -4,7 +4,7 @@
 
 part of firebase_auth_example;
 
-Future<AuthResult> _signInWithEmailAndPassword(FirebaseAuthOptions option) async {
+Future<AuthResult> _signInWithEmailAndPassword(FirebaseAuthOption option) async {
   final MultipleStringOption option = MultipleStringOption(
     question: 'Great! Please enter your credentials.',
     fieldsCount: 2,

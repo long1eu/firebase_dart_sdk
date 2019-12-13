@@ -10,7 +10,8 @@ class MultipleStringOption extends Option<List<String>> {
     @required int fieldsCount,
     @required IndexedFieldBuilder fieldBuilder,
     @required MultipleStringOptionValidator validator,
-  })  : _fieldsCount = fieldsCount,
+  })  : assert(fieldsCount > 0 || fieldsCount == -1),
+        _fieldsCount = fieldsCount,
         _fieldBuilder = fieldBuilder,
         _validator = validator,
         _result = <String>[],
@@ -19,7 +20,12 @@ class MultipleStringOption extends Option<List<String>> {
   final MultipleStringOptionValidator _validator;
   final IndexedFieldBuilder _fieldBuilder;
   final List<String> _result;
+
+  /// A values of -1 indicate that there is an unlimited number of fields and that we return the result once the user
+  /// submits an empty response
   final int _fieldsCount;
+
+  bool get unlimitedFields => _fieldsCount == -1;
 
   @override
   int showField() {
@@ -31,11 +37,13 @@ class MultipleStringOption extends Option<List<String>> {
 
   @override
   void onAnswer(String response) {
-    if (_result.length < _fieldsCount - 1) {
+    if (unlimitedFields && response.isNotEmpty || _result.length < _fieldsCount - 1) {
       _result.add(response);
       askQuestion();
     } else {
-      _result.add(response);
+      if (!unlimitedFields) {
+        _result.add(response);
+      }
       complete(_result);
     }
   }

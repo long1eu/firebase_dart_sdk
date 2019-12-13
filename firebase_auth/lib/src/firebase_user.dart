@@ -608,7 +608,7 @@ class FirebaseUser with UserInfoMixin {
     );
 
     _providerData =
-        user.providerUserInfo.asMap()?.map((_, UserInfoProviderUserInfo info) => MapEntry<String, UserInfoImpl>(
+        user.providerUserInfo?.asMap()?.map((_, UserInfoProviderUserInfo info) => MapEntry<String, UserInfoImpl>(
                 info.providerId,
                 UserInfoImpl(
                   providerId: info.providerId,

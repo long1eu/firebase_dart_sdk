@@ -216,8 +216,9 @@ class FirebaseAuth implements InternalTokenProvider {
 
     final VerifyCustomTokenResponse response = await _firebaseAuthApi._requester.verifyCustomToken(request);
 
+    final String expiresIn = response.expiresIn ?? '3600';
     final FirebaseUser user =
-        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+        await _completeSignInWithAccessToken(response.idToken, int.parse(expiresIn), response.refreshToken);
     final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(isNewUser: response.isNewUser);
     return AuthResult._(user, additionalUserInfo);
   }
@@ -347,7 +348,7 @@ class FirebaseAuth implements InternalTokenProvider {
     assert(settings != null);
 
     final Relyingparty request = Relyingparty()
-      ..requestType = OobCodeType.passwordReset.value
+      ..requestType = OobCodeType.emailLinkSignIn.value
       ..email = email
       ..updateWith(settings);
 
@@ -614,7 +615,7 @@ class FirebaseAuth implements InternalTokenProvider {
       return;
     }
     _lastNotifiedUserToken = token;
-    if (_autoRefreshTokens) {
+    if (_autoRefreshTokens && _currentUser != null) {
       // Schedule new refresh task after successful attempt.
       _scheduleAutoTokenRefresh();
     }
@@ -684,16 +685,16 @@ class FirebaseAuth implements InternalTokenProvider {
 
   @override
   Future<GetTokenResult> getAccessToken({bool forceRefresh = false}) async {
+    if (_currentUser == null) {
+      return null;
+    }
+
     if (!_autoRefreshTokens) {
       print('Token auto-refresh enabled.');
       _autoRefreshTokens = true;
       _scheduleAutoTokenRefresh();
 
       _backgroundChangedSub = _platformDependencies.isBackgroundChanged.listen(_backgroundStateChanged);
-    }
-
-    if (_currentUser == null) {
-      return null;
     }
 
     final String token = await _currentUser._getToken(forceRefresh: forceRefresh);

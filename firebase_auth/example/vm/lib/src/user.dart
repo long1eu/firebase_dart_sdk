@@ -15,7 +15,7 @@ Future<void> userWelcome() async {
 }
 
 Future<void> userOptionsDialog() async {
-  const List<FirebaseAuthOptions> options = FirebaseAuthOptions.userValues;
+  const List<FirebaseAuthOption> options = FirebaseAuthOption.userValues;
   console.println('User'.bold.red.reset);
   final MultipleOptions multipleOptions = MultipleOptions(
     question: 'What do you want to do?',
@@ -43,30 +43,45 @@ Future<void> userOptionsDialog() async {
   if (optionIndex == -1) {
     close();
   } else {
-    console.clearScreen();
-    final FirebaseAuthOptions option = options[optionIndex];
-    switch (option) {
-      case FirebaseAuthOptions.currentUser:
-        signOut = await _currentUser(option);
-        break;
-      case FirebaseAuthOptions.sendEmailVerification:
-        signOut = await _sendEmailVerification(option);
-        break;
-      case FirebaseAuthOptions.delete:
-        break;
-      case FirebaseAuthOptions.updateAccount:
-        break;
-      case FirebaseAuthOptions.reauthenticateWithCredential:
-        break;
-      case FirebaseAuthOptions.linkProvider:
-        break;
-      case FirebaseAuthOptions.unlinkProvider:
-        break;
-      case FirebaseAuthOptions.signOut:
-        await FirebaseAuth.instance.signOut();
-        console.clearScreen();
-        signOut = true;
-        break;
+    try {
+      console.clearScreen();
+      final FirebaseAuthOption option = options[optionIndex];
+      switch (option) {
+        case FirebaseAuthOption.currentUser:
+          signOut = await _currentUser(option);
+          break;
+        case FirebaseAuthOption.sendEmailVerification:
+          // TODO(long1eu): anonymous users don't have an email address
+          signOut = await _sendEmailVerification(option);
+          break;
+        case FirebaseAuthOption.delete:
+          break;
+        case FirebaseAuthOption.updateAccount:
+          break;
+        case FirebaseAuthOption.createCustomToken:
+          signOut = await _createCustomToken(option);
+          break;
+        case FirebaseAuthOption.reauthenticateWithCredential:
+          break;
+        case FirebaseAuthOption.linkProvider:
+          break;
+        case FirebaseAuthOption.unlinkProvider:
+          break;
+        case FirebaseAuthOption.signOut:
+          await FirebaseAuth.instance.signOut();
+          console.clearScreen();
+          signOut = true;
+          break;
+      }
+    } on FirebaseAuthError catch (error) {
+      await _stopAllProgress();
+      console //
+        ..clearScreen()
+        ..println(error.message.red.reset)
+        ..print('Press Enter to return.');
+
+      await console.nextLine;
+      console.clearScreen();
     }
   }
 
@@ -78,5 +93,3 @@ Future<void> userOptionsDialog() async {
     return userWelcome();
   }
 }
-
-

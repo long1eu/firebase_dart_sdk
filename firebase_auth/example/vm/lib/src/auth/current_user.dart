@@ -4,7 +4,8 @@
 
 part of firebase_auth_example;
 
-Future<bool> _currentUser(FirebaseAuthOptions option) async {
+Future<bool> _currentUser(FirebaseAuthOption option) async {
+  console.clearScreen();
   final FirebaseUser user = FirebaseAuth.instance.currentUser;
   final Progress progress = Progress('Getting latest account info')..show();
   await user.reload();
@@ -23,7 +24,6 @@ Future<bool> _currentUser(FirebaseAuthOptions option) async {
   if (user.phoneNumber != null) {
     console.printlnTabbed(_field('phoneNumber', user.phoneNumber));
   }
-
   if (user.isEmailVerified != null) {
     console.printlnTabbed(_field('isEmailVerified', user.isEmailVerified.toString()));
   }
@@ -42,9 +42,13 @@ Future<bool> _currentUser(FirebaseAuthOptions option) async {
     user.providerData.forEach(_printProvider);
   }
 
+  final GetTokenResult token = await user.getIdToken();
+  console.println('Token'.bold.yellow.reset);
+  _printTokenResult(token);
+
   console //
     ..println()
-    ..print('Press any Enter to return.');
+    ..print('Press Enter to return.');
 
   await console.nextLine;
   console.clearScreen();
@@ -77,3 +81,40 @@ void _printProvider(UserInfo user) {
     console.printlnTabbed(_field('isEmailVerified', user.isEmailVerified.toString()), 6);
   }
 }
+
+void _printTokenResult(GetTokenResult token) {
+  final DateFormat format = DateFormat.yMMMMd().add_Hm();
+
+  if (token.claims.containsKey('auth_time')) {
+    console.printlnTabbed(_field('authentication', format.format(token.authTimestamp)));
+  }
+  console
+    ..printlnTabbed(_field('issuedAt', format.format(token.issuedAtTimestamp)))
+    ..printlnTabbed(_field('expiration', format.format(token.expirationTimestamp)))
+    ..printlnTabbed(_field('signInProvider', token.signInProvider));
+
+  if (token.extraClaims != null) {
+    console.printlnTabbed('claims'.underline.reset);
+    for (MapEntry<String, dynamic> entry in token.extraClaims.entries) {
+      console
+        ..printTabbed('${entry.key}: ', 6)
+        ..println(entry.value.toString().bold.cyan.reset);
+    }
+  }
+
+  final List<List<int>> chunks = _split('token: ${token.token}'.codeUnits, 80);
+  final String firstLine = String.fromCharCodes(chunks.removeAt(0)).split('token: ')[1];
+  console.printlnTabbed('token: ${firstLine.bold.cyan.reset}');
+  chunks.map((List<int> it) => String.fromCharCodes(it).bold.cyan.reset).forEach(console.printlnTabbed);
+}
+
+List<List<int>> _split(List<int> list, int size) {
+  final int len = list.length;
+  final List<List<int>> chunks = <List<int>>[];
+  for (int i = 0; i < len; i += size) {
+    final int end = (i + size < len) ? i + size : len;
+    chunks.add(list.sublist(i, end));
+  }
+  return chunks;
+}
+

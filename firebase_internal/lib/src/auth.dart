@@ -21,6 +21,7 @@ class GetTokenResult {
   static const String _issuedAtTimestamp = 'iat';
   static const String _firebaseKey = 'firebase';
   static const String _signInProvider = 'sign_in_provider';
+  static const String _extraClaims = 'extra_claims';
 
   /// Firebase Auth ID Token. Useful for authenticating calls against your own backend. Verify the integrity and
   /// validity of the token in your server either by using our server SDKs or following the documentation.
@@ -46,18 +47,23 @@ class GetTokenResult {
   /// Note, this does not map to provider IDs. For example, anonymous and custom authentications are not considered
   /// providers. We chose the name here to map the name used in the ID token.
   String get signInProvider {
-    // Sign in provider lives inside the 'firebase' element of the JSON
+    // Sign in provider might live inside the 'firebase' element of the JSON
     final Map<String, dynamic> firebaseElem = claims[_firebaseKey];
     if (firebaseElem != null) {
       final String provider = firebaseElem[_signInProvider];
       return provider;
+    } else {
+      return claims[_signInProvider];
     }
-    return null;
+  }
+
+  Map<String, dynamic> get extraClaims {
+    return claims[_extraClaims];
   }
 
   DateTime _getTimeFromClaimsSafely(String key) {
     final int milliseconds = claims[key] ?? 0;
-    return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+    return DateTime.fromMillisecondsSinceEpoch(milliseconds * 1000);
   }
 
   @override

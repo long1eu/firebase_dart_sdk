@@ -19,6 +19,7 @@ class FirebaseAuthError extends FirebaseError {
         return invalidEmail;
       case 'WRONG_PASSWORD':
         return wrongPassword;
+      case 'TOO_MANY_ATTEMPTS_TRY_LATER':
       case 'TOO_MANY_REQUESTS':
         return tooManyRequests;
       case 'USER_NOT_FOUND':
@@ -76,6 +77,7 @@ class FirebaseAuthError extends FirebaseError {
         return invalidPhoneNumber;
       case 'MISSING_VERIFICATION_CODE':
         return missingVerificationCode;
+      case 'INVALID_CODE':
       case 'INVALID_VERIFICATION_CODE':
         return invalidVerificationCode;
       case 'MISSING_VERIFICATION_ID':
