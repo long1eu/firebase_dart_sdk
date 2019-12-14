@@ -28,17 +28,17 @@ part 'src/auth/sign_in_with_custom_token.dart';
 part 'src/auth/sign_in_with_email_and_link.dart';
 part 'src/auth/sign_in_with_email_and_password.dart';
 part 'src/auth/sign_in_with_phone_number.dart';
-part 'src/codes.dart';
-part 'src/console.dart';
 part 'src/initialize.dart';
 part 'src/no_user.dart';
 part 'src/options.dart';
-part 'src/options/multiple_string_option.dart';
-part 'src/options/option.dart';
-part 'src/options/simple_selection_list_option.dart';
-part 'src/options/single_string_option.dart';
-part 'src/progress.dart';
 part 'src/user.dart';
+part 'src/utils/codes.dart';
+part 'src/utils/console.dart';
+part 'src/widgets/multiple_string_option.dart';
+part 'src/widgets/option.dart';
+part 'src/widgets/progress.dart';
+part 'src/widgets/simple_selection_list_option.dart';
+part 'src/widgets/single_string_option.dart';
 
 final bool hasColor = stdout.supportsAnsiEscapes;
 
