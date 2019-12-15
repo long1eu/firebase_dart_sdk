@@ -22,7 +22,6 @@ Future<AuthResult> _signInWithCredential(FirebaseAuthOption option) async {
     },
   );
 
-  AuthResult result;
   final int optionIndex = await multipleOptions.show();
   if (optionIndex == -1) {
     close();
@@ -35,8 +34,10 @@ Future<AuthResult> _signInWithCredential(FirebaseAuthOption option) async {
         return _signInWithCredentialEmailAndPassword(option);
         break;
       case FirebaseAuthOption.phoneCredentials:
+        return _sendSignInWithPhoneNumber(option);
         break;
       case FirebaseAuthOption.googleCredentials:
+        return _signInWithCredentialGoogle(option);
         break;
       case FirebaseAuthOption.playGamesCredentials:
         break;

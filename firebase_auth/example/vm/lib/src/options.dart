@@ -32,7 +32,7 @@ class FirebaseAuthOption {
   static const FirebaseAuthOption createCustomToken = FirebaseAuthOption._(13, 'Create custom token', 'Do you want to check the sith in with custom token functionality? Here is the right place to get a valid custom token.');
   static const FirebaseAuthOption reauthenticateWithCredential = FirebaseAuthOption._(14, 'Reauthenticate', 'It might be that it has been a long time since you proved your identity. Let\'s do that now.');
   static const FirebaseAuthOption linkProvider = FirebaseAuthOption._(15, 'Link a new Provider', 'You can chosse to add another social media account, like Facebook or Tweeter, to this account.');
-  static const FirebaseAuthOption unlinkProvider = FirebaseAuthOption._(16, 'UnlinkFromProvider', 'Remove a social media account so you can no loger use it to login.');
+  static const FirebaseAuthOption unlinkProvider = FirebaseAuthOption._(16, 'Unlink from provider', 'Remove a social media account so you can no loger use it to login.');
   static const FirebaseAuthOption signOut = FirebaseAuthOption._(17, 'Sign Out', 'See you later.');
 
   // Update account

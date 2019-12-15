@@ -19,14 +19,14 @@ typedef GetRecaptchaToken = Future<String> Function();
 /// Once the user successfully verified the app, the HTTP server will redirect the user agent to a URL pointing to a
 /// locally running HTTP server. Which in turn will be able to extract the recaptcha token.
 Future<String> getRecaptchaToken(UrlPresenter urlPresenter, String apiKey, String languageCode) async {
-  final HttpServer server = await HttpServer.bindSecure('localhost', 0, SecurityContext.defaultContext);
+  final HttpServer server = await HttpServer.bind('localhost', 0);
   final Stream<HttpRequest> events = server.asBroadcastStream();
 
   try {
     final int port = server.port;
     final String state = randomString(32);
 
-    urlPresenter(Uri.https(
+    urlPresenter(Uri.http(
       'localhost:$port',
       '__/auth/handler',
       <String, String>{
