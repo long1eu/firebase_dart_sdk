@@ -70,6 +70,7 @@ Future<void> noUserOptionsDialog() async {
           result = await _sendSignInWithPhoneNumber(option);
           break;
         case FirebaseAuthOption.signInWithCredential:
+          result = await _signInWithCredential(option);
           break;
       }
     } on FirebaseAuthError catch (error) {

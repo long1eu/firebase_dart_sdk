@@ -447,18 +447,17 @@ class FirebaseAuth implements InternalTokenProvider {
       pendingToken: response.oauthRequestToken,
     );
 
-    if (response.needConfirmation) {
+    if (response.needConfirmation ?? false) {
       return Future<AuthResult>.error(FirebaseAuthCredentialAlreadyInUseError(credential, response.email));
     }
 
     final FirebaseUser user =
         await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
-
     final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(
       providerId: response.providerId,
       profile: response.rawUserInfo != null ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo)) : null,
       username: response.screenName,
-      isNewUser: response.isNewUser,
+      isNewUser: response.isNewUser ?? false,
     );
 
     return AuthResult._(user, additionalUserInfo, oAuthCredential);

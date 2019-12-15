@@ -5,7 +5,7 @@
 part of firebase_auth_example;
 
 class FirebaseAuthOption {
-  const FirebaseAuthOption._(this.i, this.name, this.description);
+  const FirebaseAuthOption._(this.i, this.name, [this.description]);
 
   final int i;
   final String name;
@@ -41,7 +41,21 @@ class FirebaseAuthOption {
   static const FirebaseAuthOption updateDisplayName = FirebaseAuthOption._(20, 'Display name', 'You can change your name, it\'s free :D.');
   static const FirebaseAuthOption updatePhotoUrl = FirebaseAuthOption._(21, 'Photo', 'Have a new fancy picture?');
   static const FirebaseAuthOption updatePhoneNumberCredential = FirebaseAuthOption._(22, 'Phone number', 'You can change your phone number.');
-  // @formatter:on
+
+  // Credentials
+  static const FirebaseAuthOption emailAndPasswordCredentials = FirebaseAuthOption._(23, 'Email and password');
+  static const FirebaseAuthOption phoneCredentials = FirebaseAuthOption._(24, 'Phone');
+  static const FirebaseAuthOption googleCredentials = FirebaseAuthOption._(25, 'Google');
+  static const FirebaseAuthOption playGamesCredentials = FirebaseAuthOption._(26, 'Play Games');
+  static const FirebaseAuthOption gameCenterCredentials = FirebaseAuthOption._(27, 'Game Center');
+  static const FirebaseAuthOption facebookCredentials = FirebaseAuthOption._(28, 'Facebook');
+  static const FirebaseAuthOption twitterCredentials = FirebaseAuthOption._(29, 'Twitter');
+  static const FirebaseAuthOption githubCredentials = FirebaseAuthOption._(30, 'GitHub');
+  static const FirebaseAuthOption yahooCredentials = FirebaseAuthOption._(31, 'Yahoo');
+  static const FirebaseAuthOption microsoftCredentials = FirebaseAuthOption._(32, 'Microsoft');
+  static const FirebaseAuthOption appleCredentials = FirebaseAuthOption._(33, 'Apple');
+
+// @formatter:on
 
   static const List<FirebaseAuthOption> authValues = <FirebaseAuthOption>[
     languageCode,
@@ -75,6 +89,20 @@ class FirebaseAuthOption {
     updatePhoneNumberCredential,
   ];
 
+  static const List<FirebaseAuthOption> credentialsValues = <FirebaseAuthOption>[
+    emailAndPasswordCredentials,
+    phoneCredentials,
+    googleCredentials,
+    playGamesCredentials,
+    gameCenterCredentials,
+    facebookCredentials,
+    twitterCredentials,
+    githubCredentials,
+    yahooCredentials,
+    microsoftCredentials,
+    appleCredentials,
+  ];
+
   static const List<String> _names = <String>[
     'languageCode',
     'fetchSignInMethodsForEmail',
@@ -99,6 +127,17 @@ class FirebaseAuthOption {
     'updateDisplayName',
     'updatePhotoUrl',
     'updatePhoneNumberCredential',
+    'emailAndPasswordCredentials',
+    'phoneCredentials',
+    'googleCredentials',
+    'playGamesCredentials',
+    'gameCenterCredentials',
+    'facebookCredentials',
+    'twitterCredentials',
+    'githubCredentials',
+    'yahooCredentials',
+    'microsoftCredentials',
+    'appleCredentials',
   ];
 
   @override
