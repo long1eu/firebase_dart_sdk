@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-
-const buildUrl = require("build-url");
+import * as rp from "request-promise-native";
+import {config} from "./config";
 
 admin.initializeApp();
 
@@ -19,16 +19,21 @@ export const createCustomToken = functions.https.onCall(async (data, context) =>
     return result;
 });
 
-export const handler = functions.https.onRequest((request, response) => {
+export const handler = functions.https.onCall(async (data, context) => {
+    if (data.provider === 'github.com') {
+        if (!data.code) {
+            return new functions.https.HttpsError('invalid-argument', 'You need to provide the code.');
+        }
 
-
-    // Auth response for facebook. The only reason for having this is the fact that facebook doesn't allow redirects
-    // to localhost. This is needed to the cli example app.
-    if (request.hostname.includes('facebook.com') && request.query.continue_uri) {
-        const redirectUrl = buildUrl(decodeURIComponent(request.query.continue_uri), {queryParams: request.query,});
-        console.log(`redirectUrl: ${redirectUrl}`);
-        response.redirect(redirectUrl);
+        return rp.post('https://github.com/login/oauth/access_token', {
+            json: true,
+            body: {
+                client_id: config.githubClientId,
+                client_secret: config.githubClientSecret,
+                code: data.code,
+            }
+        });
     } else {
-        response.status(403).send('Forbidden');
+        return new functions.https.HttpsError('unimplemented', 'This provider is not implemented.')
     }
 });

@@ -46,14 +46,12 @@ class FirebaseAuthOption {
   static const FirebaseAuthOption emailAndPasswordCredentials = FirebaseAuthOption._(23, 'Email and password');
   static const FirebaseAuthOption phoneCredentials = FirebaseAuthOption._(24, 'Phone');
   static const FirebaseAuthOption googleCredentials = FirebaseAuthOption._(25, 'Google');
-  static const FirebaseAuthOption playGamesCredentials = FirebaseAuthOption._(26, 'Play Games');
-  static const FirebaseAuthOption gameCenterCredentials = FirebaseAuthOption._(27, 'Game Center');
-  static const FirebaseAuthOption facebookCredentials = FirebaseAuthOption._(28, 'Facebook');
-  static const FirebaseAuthOption twitterCredentials = FirebaseAuthOption._(29, 'Twitter');
-  static const FirebaseAuthOption githubCredentials = FirebaseAuthOption._(30, 'GitHub');
-  static const FirebaseAuthOption yahooCredentials = FirebaseAuthOption._(31, 'Yahoo');
-  static const FirebaseAuthOption microsoftCredentials = FirebaseAuthOption._(32, 'Microsoft');
-  static const FirebaseAuthOption appleCredentials = FirebaseAuthOption._(33, 'Apple');
+  static const FirebaseAuthOption facebookCredentials = FirebaseAuthOption._(26, 'Facebook');
+  static const FirebaseAuthOption twitterCredentials = FirebaseAuthOption._(27, 'Twitter');
+  static const FirebaseAuthOption githubCredentials = FirebaseAuthOption._(28, 'GitHub');
+  static const FirebaseAuthOption yahooCredentials = FirebaseAuthOption._(29, 'Yahoo');
+  static const FirebaseAuthOption microsoftCredentials = FirebaseAuthOption._(30, 'Microsoft');
+  static const FirebaseAuthOption appleCredentials = FirebaseAuthOption._(31, 'Apple');
 
 // @formatter:on
 
@@ -93,8 +91,6 @@ class FirebaseAuthOption {
     emailAndPasswordCredentials,
     phoneCredentials,
     googleCredentials,
-    playGamesCredentials,
-    gameCenterCredentials,
     facebookCredentials,
     twitterCredentials,
     githubCredentials,
@@ -130,8 +126,6 @@ class FirebaseAuthOption {
     'emailAndPasswordCredentials',
     'phoneCredentials',
     'googleCredentials',
-    'playGamesCredentials',
-    'gameCenterCredentials',
     'facebookCredentials',
     'twitterCredentials',
     'githubCredentials',

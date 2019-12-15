@@ -24,6 +24,7 @@ String _twitterAccessTokenSecret;
 String _facebookAccessToken;
 String _googleClientId;
 String _googleClientSecret;
+String _githubClientId;
 
 final List<String> _variablesNames = <String>[
   'twitterConsumerKey',
@@ -33,6 +34,7 @@ final List<String> _variablesNames = <String>[
   'facebookAccessToken',
   'googleClientId',
   'googleClientSecret',
+  'githubClientId',
 ];
 
 Future<void> _initializeSecrets(File configFile) async {
@@ -59,6 +61,9 @@ Future<void> _initializeSecrets(File configFile) async {
         break;
       case 'googleClientSecret':
         _googleClientSecret = config[variable];
+        break;
+      case 'githubClientId':
+        _githubClientId = config[variable];
         break;
     }
   }

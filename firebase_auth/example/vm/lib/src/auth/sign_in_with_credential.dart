@@ -39,10 +39,6 @@ Future<AuthResult> _signInWithCredential(FirebaseAuthOption option) async {
       case FirebaseAuthOption.googleCredentials:
         return _signInWithCredentialGoogle(option);
         break;
-      case FirebaseAuthOption.playGamesCredentials:
-        break;
-      case FirebaseAuthOption.gameCenterCredentials:
-        break;
       case FirebaseAuthOption.facebookCredentials:
         return _signInWithCredentialFacebook(option);
         break;
@@ -50,6 +46,7 @@ Future<AuthResult> _signInWithCredential(FirebaseAuthOption option) async {
         return _signInWithCredentialTwitter(option);
         break;
       case FirebaseAuthOption.githubCredentials:
+        return _signInWithCredentialGitHub(option);
         break;
       case FirebaseAuthOption.yahooCredentials:
         break;

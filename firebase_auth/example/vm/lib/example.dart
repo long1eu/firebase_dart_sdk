@@ -35,6 +35,7 @@ part 'src/auth/sign_in_with_phone_number.dart';
 part 'src/credentials/sign_in_with_credential_email_and_password.dart';
 part 'src/credentials/sign_in_with_credential_facebook.dart';
 part 'src/credentials/sign_in_with_credential_twitter.dart';
+part 'src/credentials/sign_in_with_credential_github.dart';
 part 'src/credentials/sign_in_with_credential_google.dart';
 part 'src/initialize.dart';
 part 'src/no_user.dart';
