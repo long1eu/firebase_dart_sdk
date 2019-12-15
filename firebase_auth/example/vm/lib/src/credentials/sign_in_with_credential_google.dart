@@ -10,7 +10,7 @@ Future<AuthResult> _signInWithCredentialGoogle(FirebaseAuthOption option) async 
       'accounts.google.com',
       'o/oauth2/device/code',
       <String, String>{
-        'client_id': '233259864964-nheocpjikl28sp3refc4mqshb7clnprs.apps.googleusercontent.com',
+        'client_id': _googleClientId,
         'scope': 'email profile',
       },
     ),
@@ -18,8 +18,8 @@ Future<AuthResult> _signInWithCredentialGoogle(FirebaseAuthOption option) async 
       'oauth2.googleapis.com',
       'token',
       <String, String>{
-        'client_id': '233259864964-nheocpjikl28sp3refc4mqshb7clnprs.apps.googleusercontent.com',
-        'client_secret': 'E4oZUwE05-y9UE9nmI70mmoy',
+        'client_id': _googleClientId,
+        'client_secret': _googleClientSecret,
         'grant_type': 'http://oauth.net/grant_type/device/1.0',
       },
     ),

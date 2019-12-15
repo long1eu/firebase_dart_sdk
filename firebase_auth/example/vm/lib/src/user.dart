@@ -82,6 +82,15 @@ Future<void> userOptionsDialog() async {
 
       await console.nextLine;
       console.clearScreen();
+    } on StateError catch (error) {
+      await _stopAllProgress();
+      console //
+        ..clearScreen()
+        ..println('${'ERROR:'.bold.red.reset} ${error.message.red}'.reset)
+        ..print('Press Enter to return.');
+
+      await console.nextLine;
+      console.clearScreen();
     }
   }
 

@@ -11,8 +11,10 @@ import 'package:hive/hive.dart';
 import 'package:http/http.dart';
 import 'package:meta/meta.dart';
 import 'package:pedantic/pedantic.dart';
-
-import 'file:///Users/long1eu/.pub-cache/hosted/pub.dartlang.org/intl-0.16.0/lib/intl.dart';
+import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
+import 'package:convert/convert.dart';
+import 'package:crypto/crypto.dart';
 
 import 'src/utils/email_validator.dart';
 
@@ -32,6 +34,7 @@ part 'src/auth/sign_in_with_email_and_password.dart';
 part 'src/auth/sign_in_with_phone_number.dart';
 part 'src/credentials/sign_in_with_credential_email_and_password.dart';
 part 'src/credentials/sign_in_with_credential_facebook.dart';
+part 'src/credentials/sign_in_with_credential_twitter.dart';
 part 'src/credentials/sign_in_with_credential_google.dart';
 part 'src/initialize.dart';
 part 'src/no_user.dart';

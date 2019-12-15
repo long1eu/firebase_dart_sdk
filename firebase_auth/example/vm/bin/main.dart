@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -9,7 +10,8 @@ Future<void> main(List<String> arguments) async {
   printTitle();
 
   final Progress progress = Progress('Initializing')..show();
-  await init();
+
+  await init(File(arguments[0]));
   await progress.cancel();
 
   final FirebaseUser user = FirebaseAuth.instance.currentUser;

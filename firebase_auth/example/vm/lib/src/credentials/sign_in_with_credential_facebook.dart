@@ -10,7 +10,7 @@ Future<AuthResult> _signInWithCredentialFacebook(FirebaseAuthOption option) asyn
       'graph.facebook.com',
       'v5.0/device/login',
       <String, String>{
-        'access_token': '419828908898516|18b08ea1546a6796dd90487566d86362',
+        'access_token': _facebookAccessToken,
         'scope': 'email',
       },
     ),
@@ -18,7 +18,7 @@ Future<AuthResult> _signInWithCredentialFacebook(FirebaseAuthOption option) asyn
       'graph.facebook.com',
       'v5.0/device/login_status',
       <String, String>{
-        'access_token': '419828908898516|18b08ea1546a6796dd90487566d86362',
+        'access_token': _facebookAccessToken,
       },
     ),
     providerName: 'Facebook',

@@ -171,7 +171,7 @@ abstract class TwitterAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'provider=$providerId&access_token=$authToken&oauth_token_secret=$authTokenSecret'
+      ..postBody = 'providerId=$providerId&access_token=$authToken&oauth_token_secret=$authTokenSecret'
       ..requestUri = 'http://localhost';
   }
 
@@ -193,6 +193,9 @@ abstract class AdditionalUserInfoImpl
     if (profile != null) {
       data = MapBuilder<String, JsonObject>();
       for (String key in profile.keys) {
+        if (profile[key] == null) {
+          continue;
+        }
         data[key] = JsonObject(profile[key]);
       }
     }

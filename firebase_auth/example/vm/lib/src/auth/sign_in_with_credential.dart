@@ -47,6 +47,7 @@ Future<AuthResult> _signInWithCredential(FirebaseAuthOption option) async {
         return _signInWithCredentialFacebook(option);
         break;
       case FirebaseAuthOption.twitterCredentials:
+        return _signInWithCredentialTwitter(option);
         break;
       case FirebaseAuthOption.githubCredentials:
         break;
