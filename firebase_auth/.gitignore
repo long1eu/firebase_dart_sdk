@@ -9,3 +9,8 @@ build/
 
 # Directory created by dartdoc
 doc/api/
+configs/
+hives/
+lib/src/models/mirrors.dart
+example/vm/bin/config.json
+example/vm/bin/main_production.dart

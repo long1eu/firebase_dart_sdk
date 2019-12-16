@@ -18,8 +18,9 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
 class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
-  SQLiteLruReferenceDelegate(this.persistence) : _currentSequenceNumber = ListenSequence.invalid {
-    garbageCollector = LruGarbageCollector(this);
+  SQLiteLruReferenceDelegate(this.persistence, LruGarbageCollectorParams params)
+      : _currentSequenceNumber = ListenSequence.invalid {
+    garbageCollector = LruGarbageCollector(this, params);
   }
 
   final SQLitePersistence persistence;
@@ -38,15 +39,14 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
-    hardAssert(_currentSequenceNumber == ListenSequence.invalid,
-        'Starting a transaction without committing the previous one');
+    hardAssert(
+        _currentSequenceNumber == ListenSequence.invalid, 'Starting a transaction without committing the previous one');
     _currentSequenceNumber = listenSequence.next;
   }
 
   @override
   Future<void> onTransactionCommitted() async {
-    hardAssert(_currentSequenceNumber != ListenSequence.invalid,
-        'Committing a transaction without having started one');
+    hardAssert(_currentSequenceNumber != ListenSequence.invalid, 'Committing a transaction without having started one');
     _currentSequenceNumber = ListenSequence.invalid;
   }
 
@@ -58,7 +58,22 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  int get targetCount => persistence.queryCache.targetCount;
+  Future<int> getSequenceNumberCount() async {
+    final int targetCount = persistence.queryCache.targetCount;
+    final Map<String, dynamic> data = (await persistence.query(
+            // @formatter:off
+            '''
+              SELECT COUNT(*) as count
+              FROM (SELECT sequence_number
+                    FROM target_documents
+                    GROUP BY path
+                    HAVING COUNT(*) = 1
+                       AND target_id = 0);'''
+            // @formatter:on
+            ))
+        .first;
+    return targetCount + data['count'];
+  }
 
   @override
   Future<void> forEachTarget(Consumer<QueryData> consumer) async {
@@ -117,9 +132,9 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
         <String>[EncodedPath.encode(key.path)])).isNotEmpty;
   }
 
-  /// Returns true if anything would prevent this document from being garbage collected, given that
-  /// the document in question is not present in any targets and has a sequence number less than or
-  /// equal to the upper bound for the collection run.
+  /// Returns true if anything would prevent this document from being garbage collected, given that the document in
+  /// question is not present in any targets and has a sequence number less than or equal to the upper bound for the
+  /// collection run.
   Future<bool> _isPinned(DocumentKey key) async {
     if (inMemoryPins.containsKey(key)) {
       return true;
@@ -198,4 +213,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
         // @formatter:on
         <dynamic>[path, currentSequenceNumber]);
   }
+
+  @override
+  int get byteSize => persistence.byteSize;
 }

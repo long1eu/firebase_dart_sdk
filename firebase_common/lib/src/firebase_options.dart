@@ -42,7 +42,7 @@ class FirebaseOptions {
   static const String _gcmSenderId = 'gcm_defaultSenderId';
   static const String _storageBucket = 'google_storage_bucket';
   static const String _projectId = 'project_id';
-  static const String _dataColectionEnabled = 'data_colection_enabled';
+  static const String _dataCollectionEnabled = 'data_collection_enabled';
 
   /// API key used for authenticating requests from your app, e.g.
   /// AIzaSyDdVgKwhZl0sTTTLZ7iTmt1r3N2cJLnaDk, used to identify your app to
@@ -60,7 +60,7 @@ class FirebaseOptions {
 
   /// The tracking ID for Google Analytics, e.g. UA-12345678-1, used to
   /// configure Google Analytics.
-  // TODO: unhide once an API (AppInvite) starts reading it.
+  // TODO(long1eu): unhide once an API (AppInvite) starts reading it.
   @keepForSdk
   final String gaTrackingId;
 
@@ -112,13 +112,14 @@ class FirebaseOptions {
 
   @override
   int get hashCode =>
-      apiKey.hashCode * 31 ^
-      applicationId.hashCode * 31 ^
-      databaseUrl.hashCode * 31 ^
-      gaTrackingId.hashCode * 31 ^
-      gcmSenderId.hashCode * 31 ^
-      storageBucket.hashCode * 31 ^
-      projectId.hashCode * 31;
+      apiKey.hashCode ^
+      applicationId.hashCode ^
+      databaseUrl.hashCode ^
+      gaTrackingId.hashCode ^
+      gcmSenderId.hashCode ^
+      storageBucket.hashCode ^
+      projectId.hashCode ^
+      dataCollectionEnabled.hashCode;
 
   @override
   String toString() {

@@ -18,7 +18,7 @@ class FieldPath extends BasePath<FieldPath> {
   factory FieldPath.fromServerFormat(String path) {
     final List<String> res = <String>[];
     StringBuffer buffer = StringBuffer();
-    // TODO: We should make this more strict.
+    // TODO(long1eu): We should make this more strict.
     //  Right now, it allows non-identifier path components, even if they aren't escaped.
     int i = 0;
 

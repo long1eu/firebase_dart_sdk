@@ -34,7 +34,6 @@ import 'package:firebase_firestore/src/firebase/firestore/remote/existence_filte
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_stream.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart' as asserts;
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
@@ -45,6 +44,8 @@ import '../local/mock/database_mock.dart';
 import '../remote/mock_datastore.dart';
 import 'query_event.dart';
 
+const Duration _delayDuration = Duration(milliseconds: 0);
+
 class SpecTestCase implements RemoteStoreCallback {
   SpecTestCase(this.getPersistence, this.isExcluded);
 
@@ -52,16 +53,14 @@ class SpecTestCase implements RemoteStoreCallback {
   static const bool _debug = true;
   static const bool _runBenchmarkTests = false;
 
-  // Disables all other tests; useful for debugging. Multiple tests can have
-  // this tag and they'll all be run (but all others won't).
+  // Disables all other tests; useful for debugging. Multiple tests can have this tag and they'll all be run (but all
+  // others won't).
   static const String exclusiveTag = 'exclusive';
 
-  // Tags on tests that should be excluded from execution, useful to allow the
-  // platforms to temporarily diverge or for features that are designed to be
-  // platform specific (such as 'multi-client').
-  static final Set<String> _disabledTags = _runBenchmarkTests
-      ? <String>{'no-android', 'multi-client'}
-      : <String>{'no-android', 'benchmark', 'multi-client'};
+  // Tags on tests that should be excluded from execution, useful to allow the platforms to temporarily diverge or for
+  // features that are designed to be platform specific (such as 'multi-client').
+  static final Set<String> _disabledTags =
+      _runBenchmarkTests ? <String>{'no-android', 'multi-client'} : <String>{'no-android', 'benchmark', 'multi-client'};
 
   final Future<Persistence> Function(bool garbageCollectionEnabled, String name) getPersistence;
   final bool Function(Set<String> tags) isExcluded;
@@ -71,9 +70,7 @@ class SpecTestCase implements RemoteStoreCallback {
   bool _garbageCollectionEnabled;
   bool _networkEnabled = true;
 
-  //
   // Parts of the Firestore system that the spec tests need to control.
-  //
 
   Persistence _localPersistence;
   AsyncQueue _queue;
@@ -85,8 +82,7 @@ class SpecTestCase implements RemoteStoreCallback {
   /// Events to be checked by the expectations.
   List<QueryEvent> _events;
 
-  /// A dictionary for tracking the listens on queries. Note that the identity
-  /// of the listeners is used to remove them.
+  /// A dictionary for tracking the listens on queries. Note that the identity of the listeners is used to remove them.
   Map<Query, QueryListener> _queryListeners;
 
   /// Set of documents that are expected to be in limbo. Verified at every step.
@@ -95,21 +91,17 @@ class SpecTestCase implements RemoteStoreCallback {
   /// Set of expected active targets, keyed by target ID.
   Map<int, QueryData> _expectedActiveTargets;
 
-  /// The writes that have been sent to the [SyncEngine] via
-  /// [SyncEngine.writeMutations] but not yet acknowledged by calling
-  /// receiveWriteAck/Error. They are tracked per-user.
+  /// The writes that have been sent to the [SyncEngine] via [SyncEngine.writeMutations] but not yet acknowledged by
+  /// calling receiveWriteAck/Error. They are tracked per-user.
   ///
-  /// It is mostly an implementation detail used internally to validate that
-  /// the writes sent to the mock backend by the [SyncEngine] match the user
-  /// mutations that initiated them.
+  /// It is mostly an implementation detail used internally to validate that the writes sent to the mock backend by the
+  /// [SyncEngine] match the user mutations that initiated them.
   ///
-  /// It is exposed specifically for use [_doRestart] to test persistence
-  /// scenarios where the [SyncEngine] is restarted while the [Persistence]
-  /// implementation still has outstanding persisted mutations.
+  /// It is exposed specifically for use [_doRestart] to test persistence scenarios where the [SyncEngine] is restarted
+  /// while the [Persistence] implementation still has outstanding persisted mutations.
   ///
-  /// Note: The size of the list for the current user will generally be the
-  /// same as [_writesSent], but not necessarily, since the [RemoteStore] limits
-  /// the number of outstanding writes to the backend at a given time.
+  /// Note: The size of the list for the current user will generally be the same as [_writesSent], but not necessarily,
+  /// since the [RemoteStore] limits the number of outstanding writes to the backend at a given time.
   Map<User, List<Pair<Mutation, Future<void>>>> _outstandingWrites;
 
   final List<DocumentKey> _acknowledgedDocs = <DocumentKey>[];
@@ -121,9 +113,8 @@ class SpecTestCase implements RemoteStoreCallback {
 
   static void info(String line) {
     if (_debug) {
-      // Print log information out directly to cut down on logger-related cruft
-      // like the extra line for the date and class method which are always
-      // SpecTestCase+info
+      // Print log information out directly to cut down on logger-related cruft like the extra line for the date and
+      // class method which are always SpecTestCase+info
       Log.d('SpecTestCase', line);
     } else {
       Log.i('SpecTestCase', line);
@@ -136,9 +127,7 @@ class SpecTestCase implements RemoteStoreCallback {
     }
   }
 
-  //
   // Methods for tracking state of writes.
-  //
 
   bool _shouldRun(Set<String> tags) {
     for (String tag in tags) {
@@ -175,18 +164,17 @@ class SpecTestCase implements RemoteStoreCallback {
     _expectedActiveTargets = <int, QueryData>{};
   }
 
-  Future<void> specTearDown([bool isError = false]) async {
+  Future<void> specTearDown({bool isError = false}) async {
     if (isError) {
       log('~~~onError~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     }
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await Future<void>.delayed(_delayDuration);
     await _remoteStore.shutdown();
     await _localPersistence.shutdown();
     log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
   }
 
-  /// Sets up a new client. Is used to initially setup the client initially and
-  /// after every restart.
+  /// Sets up a new client. Is used to initially setup the client initially and after every restart.
   Future<void> _initClient([bool isRestart = false]) async {
     log('    Set up a new client.');
 
@@ -220,14 +208,12 @@ class SpecTestCase implements RemoteStoreCallback {
     return writes;
   }
 
-  //
   // Methods for mocking out the grpc streams.
-  //
 
   /// Validates that a write was sent and matches the expected write.
   void _validateNextWriteSent(Mutation expectedWrite) {
     final List<Mutation> request = _datastore.waitForWriteSend();
-    // TODO: Batch writes not supported yet
+    // TODO(long1eu): Batch writes not supported yet
     expect(request.length, 1);
     final Mutation actualWrite = request[0];
     expect(actualWrite, expectedWrite);
@@ -236,9 +222,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
   int _writesSent() => _datastore.writesSent;
 
-  //
   // Methods for constructing objects from specs.
-  //
 
   /// The format for a query is string|{path, limit?}.
   /// https://github.com/firebase/firebase-js-sdk/blob/master/packages/firestore/test/unit/specs/spec_test_runner.ts#L1115
@@ -282,9 +266,7 @@ class SpecTestCase implements RemoteStoreCallback {
     final Map<String, dynamic> options = jsonDoc['options'];
     final DocumentState documentState = options['hasLocalMutations'] ?? false
         ? DocumentState.localMutations
-        : (options['hasCommittedMutations'] ?? false
-            ? DocumentState.committedMutations
-            : DocumentState.synced);
+        : (options['hasCommittedMutations'] ?? false ? DocumentState.committedMutations : DocumentState.synced);
 
     final Map<String, Object> values = _parseMap(jsonDoc['value']);
     final Document document = doc(jsonDoc['key'], version, values, documentState);
@@ -330,15 +312,13 @@ class SpecTestCase implements RemoteStoreCallback {
     return result;
   }
 
-  //
   // Methods for doing the steps of the spec test.
-  //
 
   Future<void> _doListen(List<dynamic> listenSpec) async {
     final int expectedId = listenSpec[0];
     final Query query = _parseQuery(listenSpec[1]);
 
-    // TODO: Allow customizing listen options in spec tests
+    // TODO(long1eu): Allow customizing listen options in spec tests
     const ListenOptions options = ListenOptions(
       includeDocumentMetadataChanges: true,
       includeQueryMetadataChanges: true,
@@ -360,7 +340,8 @@ class SpecTestCase implements RemoteStoreCallback {
 
     final int actualId = await _eventManager.addQueryListener(listener);
     expect(actualId, expectedId);
-    await Future<void>.delayed(const Duration(milliseconds: 32));
+
+    await Future<void>.delayed(_delayDuration);
   }
 
   Future<void> _doUnlisten(List<dynamic> unlistenSpec) async {
@@ -399,7 +380,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _writeWatchChange(WatchChange change, SnapshotVersion version) async {
     await _datastore.writeWatchChange(change, version);
-    await Future<void>.delayed(const Duration(milliseconds: 32));
+    await Future<void>.delayed(_delayDuration);
   }
 
   Future<void> _doWatchAck(List<dynamic> ackedTargets) async {
@@ -427,20 +408,18 @@ class SpecTestCase implements RemoteStoreCallback {
     }
 
     final List<int> targetIds = _parseIntList(watchRemoveSpec['targetIds'].cast<int>());
-    final WatchChangeWatchTargetChange change = WatchChangeWatchTargetChange(
-        WatchTargetChangeType.removed, targetIds, WatchStream.emptyResumeToken, error);
+    final WatchChangeWatchTargetChange change =
+        WatchChangeWatchTargetChange(WatchTargetChangeType.removed, targetIds, Uint8List(0), error);
 
     await _writeWatchChange(change, SnapshotVersion.none);
-    // Unlike web, the MockDatastore detects a watch removal with cause and will
-    // remove active targets
+    // Unlike web, the MockDatastore detects a watch removal with cause and will remove active targets
 
-    await Future<void>.delayed(const Duration(milliseconds: 32));
+    await Future<void>.delayed(_delayDuration);
   }
 
   Future<void> _doWatchEntity(Map<String, dynamic> watchEntity) async {
     if (watchEntity.containsKey('docs')) {
-      asserts.hardAssert(
-          !watchEntity.containsKey('doc'), 'Exactly one of |doc| or |docs| needs to be set.');
+      asserts.hardAssert(!watchEntity.containsKey('doc'), 'Exactly one of |doc| or |docs| needs to be set.');
       final List<dynamic> docs = watchEntity['docs'];
       for (int i = 0; i < docs.length; ++i) {
         final Map<String, dynamic> doc = docs[i];
@@ -458,18 +437,14 @@ class SpecTestCase implements RemoteStoreCallback {
       final Map<String, dynamic> docSpec = watchEntity['doc'];
       final String key = docSpec['key'];
 
-      final Map<String, Object> value =
-          docSpec['value'] == null ? null : _parseMap(docSpec['value']);
+      final Map<String, Object> value = docSpec['value'] == null ? null : _parseMap(docSpec['value']);
       final int version = docSpec['version'];
 
-      final MaybeDocument document =
-          value != null ? doc(key, version, value) : deletedDoc(key, version);
+      final MaybeDocument document = value != null ? doc(key, version, value) : deletedDoc(key, version);
 
       final List<int> updated = _parseIntList(watchEntity['targets'] ?? <int>[].cast<int>());
-      final List<int> removed =
-          _parseIntList((watchEntity['removedTargets'] ?? <int>[]).cast<int>());
-      final WatchChange change =
-          WatchChangeDocumentChange(updated, removed, document.key, document);
+      final List<int> removed = _parseIntList((watchEntity['removedTargets'] ?? <int>[]).cast<int>());
+      final WatchChange change = WatchChangeDocumentChange(updated, removed, document.key, document);
 
       await _writeWatchChange(change, SnapshotVersion.none);
     } else if (watchEntity.containsKey('key')) {
@@ -484,15 +459,13 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _doWatchFilter(List<dynamic> watchFilter) async {
     final List<int> targets = _parseIntList(watchFilter[0].cast<int>());
-    asserts.hardAssert(
-        targets.length == 1, 'ExistenceFilters currently support exactly one target only.');
+    asserts.hardAssert(targets.length == 1, 'ExistenceFilters currently support exactly one target only.');
 
     final int keyCount = watchFilter.isEmpty ? 0 : watchFilter.length - 1;
 
-    // TODO: extend this with different existence filters over time.
+    // TODO(long1eu): extend this with different existence filters over time.
     final ExistenceFilter filter = ExistenceFilter(keyCount);
-    final WatchChangeExistenceFilterWatchChange change =
-        WatchChangeExistenceFilterWatchChange(targets[0], filter);
+    final WatchChangeExistenceFilterWatchChange change = WatchChangeExistenceFilterWatchChange(targets[0], filter);
 
     await _writeWatchChange(change, SnapshotVersion.none);
   }
@@ -504,8 +477,7 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   Future<void> _doWatchSnapshot(Map<String, dynamic> watchSnapshot) async {
-    // The client will only respond to watchSnapshots if they are on a target
-    // change with an empty set of target IDs.
+    // The client will only respond to watchSnapshots if they are on a target change with an empty set of target IDs.
     final List<int> targets = _parseIntList(watchSnapshot['targetIds']?.cast<int>());
     final String resumeToken = watchSnapshot['resumeToken'] ?? '';
 
@@ -519,13 +491,13 @@ class SpecTestCase implements RemoteStoreCallback {
     final Map<String, dynamic> error = spec['error'];
 
     final bool runBackoffTimer = spec['runBackoffTimer'];
-    // TODO: Incorporate backoff in Android Spec Tests.
+    // TODO(long1eu): Incorporate backoff in Android Spec Tests.
     expect(runBackoffTimer, isTrue);
 
     final GrpcError status = GrpcError.custom(error['code'], error['message']);
-    await _datastore.failWatchStream(status);
-    // Unlike web, stream should re-open synchronously (if we have active
-    // listeners).
+    print('_datastore.isWatchStreamOpen: ${_datastore.isWatchStreamOpen}');
+    _datastore.failWatchStream(status);
+    // Unlike web, stream should re-open synchronously (if we have active listeners).
     if (_queryListeners.isNotEmpty) {
       assert(_datastore.isWatchStreamOpen, 'Watch stream is open');
     }
@@ -534,15 +506,11 @@ class SpecTestCase implements RemoteStoreCallback {
   Future<void> _doWriteAck(Map<String, dynamic> writeAckSpec) async {
     final int _version = writeAckSpec['version'];
     final bool keepInQueue = writeAckSpec['keepInQueue'] ?? false;
-    assert(
-        !keepInQueue,
-        '"keepInQueue=true" is not supported on Android and should only be set'
-        ' in multi-client tests');
+    assert(!keepInQueue, '"keepInQueue=true" is not supported on Android and should only be set in multi-client tests');
     final Pair<Mutation, Future<void>> write = _getCurrentOutstandingWrites().removeAt(0);
     _validateNextWriteSent(write.first);
 
-    final MutationResult mutationResult =
-        MutationResult(version(_version), /*transformResults:*/ null);
+    final MutationResult mutationResult = MutationResult(version(_version), /*transformResults:*/ null);
     await _datastore.ackWrite(version(_version), <MutationResult>[mutationResult]);
   }
 
@@ -595,11 +563,11 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _doDisableNetwork() async {
     _networkEnabled = false;
-    // Make sure to execute all writes that are currently queued. This allows us
-    // to assert on the total number of requests sent before shutdown.
+    // Make sure to execute all writes that are currently queued. This allows us to assert on the total number of
+    // requests sent before shutdown.
     await _remoteStore.fillWritePipeline();
     await _remoteStore.disableNetwork();
-    await Future<void>.delayed(const Duration(milliseconds: 32));
+    await Future<void>.delayed(_delayDuration);
   }
 
   Future<void> _doEnableNetwork() async {
@@ -616,6 +584,7 @@ class SpecTestCase implements RemoteStoreCallback {
     if (_localPersistence is SQLitePersistence) {
       final SQLitePersistence persistence = _localPersistence;
       final DatabaseMock databaseMock = persistence.database;
+      // ignore: cascade_invocations
       databaseMock.renamePath = false;
     }
 
@@ -628,6 +597,7 @@ class SpecTestCase implements RemoteStoreCallback {
     if (_localPersistence is SQLitePersistence) {
       final SQLitePersistence persistence = _localPersistence;
       final DatabaseMock databaseMock = persistence.database;
+      // ignore: cascade_invocations
       databaseMock.renamePath = true;
     }
   }
@@ -648,7 +618,7 @@ class SpecTestCase implements RemoteStoreCallback {
     } else if (step.containsKey('userDelete')) {
       await _doDelete(step['userDelete']);
     } else if (step.containsKey('drainQueue')) {
-      // TODO:{05/10/2018 12:05}-long1eu: add a comment here to explain why are we not using this
+      // TODO(long1eu): add a comment here to explain why are we not using this
     } else if (step.containsKey('watchAck')) {
       await _doWatchAck(step['watchAck']);
     } else if (step.containsKey('watchCurrent')) {
@@ -666,8 +636,7 @@ class SpecTestCase implements RemoteStoreCallback {
     } else if (step.containsKey('watchStreamClose')) {
       await _doWatchStreamClose(step['watchStreamClose']);
     } else if (step.containsKey('watchProto')) {
-      // watchProto isn't yet used, and it's unclear how to create arbitrary
-      // protos from JSON.
+      // watchProto isn't yet used, and it's unclear how to create arbitrary protos from JSON.
       throw asserts.fail('watchProto is not yet supported.');
     } else if (step.containsKey('writeAck')) {
       await _doWriteAck(step['writeAck']);
@@ -682,26 +651,21 @@ class SpecTestCase implements RemoteStoreCallback {
         await _doDisableNetwork();
       }
     } else if (step.containsKey('changeUser')) {
-      // NOTE: Map<String, dynamic>.getString('foo') where 'foo' is mapped to
-      // null will return 'null'. Explicitly testing for isNull here allows the
-      // null value to be preserved. This is important because the
-      // unauthenticated user is represented as having a null uid as a value for
-      // 'changeUser'.
+      // NOTE: Map<String, dynamic>.getString('foo') where 'foo' is mapped to null will return 'null'. Explicitly
+      // testing for isNull here allows the null value to be preserved. This is important because the unauthenticated
+      // user is represented as having a null uid as a value for 'changeUser'.
       final String uid = step['changeUser'];
       await _doChangeUser(uid);
     } else if (step.containsKey('restart')) {
       await _doRestart();
     } else if (step.containsKey('applyClientState')) {
-      throw asserts.fail('"applyClientState"is not supported on Android and should only be '
-          'used in multi-client tests');
+      throw asserts.fail('"applyClientState"is not supported on Android and should only be used in multi-client tests');
     } else {
       throw asserts.fail('Unknown step: $step');
     }
   }
 
-  //
   // Methods for validating expectations.
-  //
 
   void _assertEventMatches(Map<String, dynamic> expected, QueryEvent actual) {
     final Query expectedQuery = _parseQuery(expected['query']);
@@ -747,8 +711,7 @@ class SpecTestCase implements RemoteStoreCallback {
     }
 
     // Sort both the expected and actual events by the query's canonical ID.
-    _events.sort(
-        (QueryEvent q1, QueryEvent q2) => q1.query.canonicalId.compareTo(q2.query.canonicalId));
+    _events.sort((QueryEvent q1, QueryEvent q2) => q1.query.canonicalId.compareTo(q2.query.canonicalId));
 
     final List<Map<String, dynamic>> expectedEvents = <Map<String, dynamic>>[];
     for (int i = 0; i < stepExpectations.length; ++i) {
@@ -807,9 +770,8 @@ class SpecTestCase implements RemoteStoreCallback {
           final Query query = _parseQuery(queryDataJson['query']);
           final String resumeToken = queryDataJson['resumeToken'];
 
-          // TODO: populate the purpose of the target once it's possible to
-          // encode that in the spec tests. For now, hard-code that it's a
-          // listen despite the fact that it's not always the right value.
+          // TODO(long1eu): populate the purpose of the target once it's possible to encode that in the spec tests. For
+          //  now, hard-code that it's a listen despite the fact that it's not always the right value.
           _expectedActiveTargets[targetId] = QueryData(
             query,
             targetId,
@@ -826,8 +788,7 @@ class SpecTestCase implements RemoteStoreCallback {
     _validateUserCallbacks(expected);
     // Always validate that the expected limbo docs match the actual limbo docs.
     _validateLimboDocs();
-    // Always validate that the expected active targets match the actual active
-    // targets.
+    // Always validate that the expected active targets match the actual active targets.
     _validateActiveTargets();
   }
 
@@ -845,8 +806,7 @@ class SpecTestCase implements RemoteStoreCallback {
       final List<dynamic> expectedRejectedDocs = userCallbacks['rejectedDocs'];
       for (int i = 0; i < expectedRejectedDocs.length; i++) {
         final String documentKey = expectedRejectedDocs[i];
-        expect(_rejectedDocs.contains(key(documentKey)), isTrue,
-            reason: 'Expected rejection for $documentKey');
+        expect(_rejectedDocs.contains(key(documentKey)), isTrue, reason: 'Expected rejection for $documentKey');
       }
     } else {
       expect(_acknowledgedDocs, isEmpty);
@@ -855,10 +815,8 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   void _validateLimboDocs() {
-    // Make a copy so it can modified while checking against the expected limbo
-    // docs.
-    final Map<DocumentKey, int> actualLimboDocs =
-        Map<DocumentKey, int>.from(_syncEngine.getCurrentLimboDocuments());
+    // Make a copy so it can modified while checking against the expected limbo docs.
+    final Map<DocumentKey, int> actualLimboDocs = Map<DocumentKey, int>.from(_syncEngine.getCurrentLimboDocuments());
 
     // Validate that each limbo doc has an expected active target
     for (MapEntry<DocumentKey, int> limboDoc in actualLimboDocs.entries) {
@@ -884,9 +842,8 @@ class SpecTestCase implements RemoteStoreCallback {
       final QueryData expectedTarget = expected.value;
       final QueryData actualTarget = actualTargets[expected.key];
 
-      // TODO: validate the purpose of the target once it's possible to encode
-      // that in the spec tests. For now, only validate properties that can be
-      // validated.
+      // TODO(long1eu): validate the purpose of the target once it's possible to encode that in the spec tests. For now,
+      //  only validate properties that can be validated.
       // expect(actualTarget, expectedTarget);
 
       expect(actualTarget.query, expectedTarget.query);
@@ -953,9 +910,7 @@ class SpecTestCase implements RemoteStoreCallback {
     return tags;
   }
 
-  //
   // RemoteStoreCallback Methods
-  //
 
   @override
   Future<void> handleRemoteEvent(RemoteEvent remoteEvent) async {

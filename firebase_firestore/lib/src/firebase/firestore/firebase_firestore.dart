@@ -23,13 +23,13 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:firebase_firestore/src/firebase/firestore/write_batch.dart';
+import 'package:firebase_internal/firebase_internal.dart';
 import 'package:meta/meta.dart';
 
 /// Represents a Firestore Database and is the entry point for all Firestore operations
 ///
-/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
-/// mocks. Subclassing is not supported in production code and new SDK releases may break code that
-/// does so.
+/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
+/// not supported in production code and new SDK releases may break code that does so.
 @publicApi
 class FirebaseFirestore {
   @visibleForTesting
@@ -55,20 +55,30 @@ class FirebaseFirestore {
   }
 
   @publicApi
-  static Future<FirebaseFirestore> getInstance(FirebaseApp app,
-      {String database = DatabaseId.defaultDatabaseId, OpenDatabase openDatabase}) async {
+  static Future<FirebaseFirestore> getInstance(
+    FirebaseApp app, {
+    String database = DatabaseId.defaultDatabaseId,
+    OpenDatabase openDatabase,
+    FirebaseFirestoreSettings settings,
+  }) async {
     checkNotNull(app, 'Provided FirebaseApp must not be null.');
     checkNotNull(openDatabase, 'Provided openDatabase must not be null.');
 
-    final FirestoreMultiDbComponent component = FirestoreMultiDbComponent(app, app.getAuthProvider);
+    final FirestoreMultiDbComponent component =
+        FirestoreMultiDbComponent(app, app.platformDependencies.authProvider, settings);
     checkNotNull(component, 'Firestore component is not present.');
 
     final FirebaseFirestore firestore = await component.get(database, openDatabase);
     return firestore;
   }
 
-  static Future<FirebaseFirestore> newInstance(FirebaseApp app, String database,
-      [InternalTokenProvider authProvider, OpenDatabase openDatabase]) async {
+  static Future<FirebaseFirestore> newInstance(
+    FirebaseApp app,
+    String database, {
+    InternalTokenProvider authProvider,
+    OpenDatabase openDatabase,
+    FirebaseFirestoreSettings settings,
+  }) async {
     final String projectId = app.options.projectId;
     if (projectId == null) {
       throw ArgumentError('FirebaseOptions.getProjectId() cannot be null');
@@ -85,25 +95,16 @@ class FirebaseFirestore {
       provider = FirebaseAuthCredentialsProvider(authProvider);
     }
 
-    // Firestore uses a different database for each app name. Note that we don't use
-    // app.getPersistenceKey() here because it includes the application ID which is related to the
-    // project ID. We already include the project ID when resolving the database, so there is no
-    // need to include it in the persistence key.
+    // Firestore uses a different database for each app name. Note that we don't use app.getPersistenceKey() here
+    // because it includes the application ID which is related to the project ID. We already include the project ID when
+    // resolving the database, so there is no need to include it in the persistence key.
     final String persistenceKey = app.name;
 
-    final FirebaseFirestoreSettings settings = FirebaseFirestoreSettings();
-    final FirestoreClient client = await FirestoreClient.initialize(
-      DatabaseInfo(
-        databaseId,
-        persistenceKey,
-        settings.host,
-        sslEnabled: settings.sslEnabled,
-      ),
-      provider,
-      queue,
-      openDatabase,
-      usePersistence: settings.persistenceEnabled,
-    );
+    settings ??= FirebaseFirestoreSettings();
+    final DatabaseInfo databaseInfo =
+        DatabaseInfo(databaseId, persistenceKey, settings.host, sslEnabled: settings.sslEnabled);
+    final FirestoreClient client =
+        await FirestoreClient.initialize(databaseInfo, settings, provider, queue, openDatabase);
 
     return FirebaseFirestore(databaseId, queue, app, client);
   }
@@ -111,13 +112,13 @@ class FirebaseFirestore {
   void _ensureClientConfigured() {
     hardAssert(
         client != null,
-        'You must call FirebaseApp.initializeApp first. Don\'t try to get a firestore instance '
-        'using the default constructor. Use [FirebaseFirestore.instance] for the default '
-        'instance or [FirebaseFirestore.getInstance(app)] for a specific FirebaseApp.');
+        'You must call FirebaseApp.initializeApp first. Don\'t try to get a firestore instance using the default '
+        'constructor. Use [FirebaseFirestore.instance] for the default instance or [FirebaseFirestore.getInstance(app)]'
+        ' for a specific FirebaseApp.');
   }
 
-  /// Gets a [CollectionReference] instance that refers to the collection at the specified path
-  /// within the database. [collectionPath] is a slash-separated path to a collection.
+  /// Gets a [CollectionReference] instance that refers to the collection at the specified path within the database.
+  /// [collectionPath] is a slash-separated path to a collection.
   @publicApi
   CollectionReference collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
@@ -126,8 +127,8 @@ class FirebaseFirestore {
     return CollectionReference(resourcePath, this);
   }
 
-  /// Gets a [DocumentReference] instance that refers to the document at the specified path within
-  /// the database. [documentPath] is a slash-separated path to a document.
+  /// Gets a [DocumentReference] instance that refers to the document at the specified path within the database.
+  /// [documentPath] is a slash-separated path to a document.
   @publicApi
   DocumentReference document(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
@@ -135,9 +136,9 @@ class FirebaseFirestore {
     return DocumentReference.forPath(ResourcePath.fromString(documentPath), this);
   }
 
-  /// Executes the given [updateFunction] and then attempts to commit the changes applied within the
-  /// transaction. If any document read within the transaction has changed, the [updateFunction]
-  /// will be retried. If it fails to commit after 5 attempts, the transaction will fail.
+  /// Executes the given [updateFunction] and then attempts to commit the changes applied within the transaction. If any
+  /// document read within the transaction has changed, the [updateFunction] will be retried. If it fails to commit
+  /// after 5 attempts, the transaction will fail.
   ///
   /// [updateFunction] the function to execute within the transaction context.
   Future<TResult> runTransaction<TResult>(TransactionCallback<TResult> updateFunction) {
@@ -182,9 +183,9 @@ class FirebaseFirestore {
     return client.enableNetwork();
   }
 
-  /// Disables network access for this instance. While the network is disabled, any snapshot
-  /// listeners or get() calls will return results from cache, and any write operations will be
-  /// queued until network usage is re-enabled via a call to [enableNetwork].
+  /// Disables network access for this instance. While the network is disabled, any snapshot listeners or get() calls
+  /// will return results from cache, and any write operations will be queued until network usage is re-enabled via a
+  /// call to [enableNetwork].
   ///
   /// Returns a [Future] that will be completed once networking is disabled.
   @publicApi

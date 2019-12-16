@@ -1,0 +1,471 @@
+[
+  {
+    "code": 17000,
+    "name": "invalidCustomToken",
+    "codeName": "INVALID_CUSTOM_TOKEN",
+    "doc": "Indicates a validation error with the custom token.",
+    "message": "The custom token format is incorrect. Please check the documentation."
+  },
+  {
+    "code": 17002,
+    "name": "customTokenMismatch",
+    "codeName": "CUSTOM_TOKEN_MISMATCH",
+    "doc": "Indicates the service account and the API key belong to different projects.",
+    "message": "The custom token corresponds to a different audience."
+  },
+  {
+    "code": 17004,
+    "name": "invalidCredential",
+    "codeName": "INVALID_CREDENTIAL",
+    "doc": "Indicates the IDP token or requestUri is invalid.",
+    "message": "The supplied auth credential is malformed or has expired."
+  },
+  {
+    "code": 17005,
+    "name": "userDisabled",
+    "codeName": "USER_DISABLED",
+    "doc": "Indicates the user's account is disabled on the server.",
+    "message": "The user account has been disabled by an administrator."
+  },
+  {
+    "code": 17006,
+    "name": "operationNotAllowed",
+    "codeName": "OPERATION_NOT_ALLOWED",
+    "doc": "Indicates the administrator disabled sign in with the specified identity provider.",
+    "message": "The given sign-in provider is disabled for this Firebase project. Enable it in the Firebase console, under the sign-in method tab of the Auth section."
+  },
+  {
+    "code": 17007,
+    "name": "emailAlreadyInUse",
+    "codeName": "EMAIL_ALREADY_IN_USE",
+    "doc": "Indicates the email used to attempt a sign up is already in use.",
+    "message": "The email address is already in use by another account."
+  },
+  {
+    "code": 17008,
+    "name": "invalidEmail",
+    "codeName": "INVALID_EMAIL",
+    "doc": "Indicates the email is invalid.",
+    "message": "The email address is badly formatted."
+  },
+  {
+    "code": 17009,
+    "name": "wrongPassword",
+    "codeName": "WRONG_PASSWORD",
+    "doc": "Indicates the user attempted sign in with a wrong password.",
+    "message": "The password is invalid or the user does not have a password."
+  },
+  {
+    "code": 17010,
+    "name": "tooManyRequests",
+    "codeName": "TOO_MANY_REQUESTS",
+    "doc": "Indicates that too many requests were made to a server method.",
+    "message": "We have blocked all requests from this device due to unusual activity. Try again later."
+  },
+  {
+    "code": 17011,
+    "name": "userNotFound",
+    "codeName": "USER_NOT_FOUND",
+    "doc": "Indicates the user account was not found.",
+    "message": "There is no user record corresponding to this identifier. The user may have been deleted."
+  },
+  {
+    "code": 17012,
+    "name": "accountExistsWithDifferentCredential",
+    "codeName": "ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL",
+    "doc": "Indicates account linking is required.",
+    "message": "An account already exists with the same email address but different sign-in credentials. Sign in using a provider associated with this email address."
+  },
+  {
+    "code": 17014,
+    "name": "requiresRecentLogin",
+    "codeName": "REQUIRES_RECENT_LOGIN",
+    "doc": "Indicates the user has attempted to change email or password more than 5 minutes after signing in.",
+    "message": "This operation is sensitive and requires recent authentication. Log in again before retrying this request."
+  },
+  {
+    "code": 17015,
+    "name": "providerAlreadyLinked",
+    "codeName": "PROVIDER_ALREADY_LINKED",
+    "doc": "Indicates an attempt to link a provider to which the account is already linked.",
+    "message": "[ERROR_PROVIDER_ALREADY_LINKED] - User can only be linked to one identity for the given provider."
+  },
+  {
+    "code": 17016,
+    "name": "noSuchProvider",
+    "codeName": "NO_SUCH_PROVIDER",
+    "doc": "Indicates an attempt to unlink a provider that is not linked.",
+    "message": "User was not linked to an account with the given provider."
+  },
+  {
+    "code": 17017,
+    "name": "invalidUserToken",
+    "codeName": "INVALID_USER_TOKEN",
+    "doc": "Indicates user's saved auth credential is invalid, the user needs to sign in again.",
+    "message": "This user's credential isn't valid for this project. This can happen if the user's token has been tampered with, or if the user doesn’t belong to the project associated with the API key used in your request."
+  },
+  {
+    "code": 17020,
+    "name": "networkError",
+    "codeName": "NETWORK_REQUEST_FAILED",
+    "doc": "Indicates a network error occurred (such as a timeout, interrupted connection, or unreachable host). These types of errors are often recoverable with a retry. The `NSUnderlyingError` field in the `NSError.userInfo` dictionary will contain the error encountered.",
+    "message": "Network error (such as timeout, interrupted connection or unreachable host) has occurred."
+  },
+  {
+    "code": 17021,
+    "name": "userTokenExpired",
+    "codeName": "USER_TOKEN_EXPIRED",
+    "doc": "Indicates the saved token has expired, for example, the user may have changed account password on another device. The user needs to sign in again on the device that made this request.",
+    "message": "The user's credential is no longer valid. The user must sign in again."
+  },
+  {
+    "code": 17023,
+    "name": "invalidAPIKey",
+    "codeName": "INVALID_API_KEY",
+    "doc": "Indicates an invalid API key was supplied in the request.",
+    "message": "An invalid API Key was supplied in the request."
+  },
+  {
+    "code": 17024,
+    "name": "userMismatch",
+    "codeName": "USER_MISMATCH",
+    "doc": "Indicates that an attempt was made to reauthenticate with a user which is not the current user.",
+    "message": "The supplied credentials do not correspond to the previously signed in user."
+  },
+  {
+    "code": 17025,
+    "name": "credentialAlreadyInUse",
+    "codeName": "CREDENTIAL_ALREADY_IN_USE",
+    "doc": "Indicates an attempt to link with a credential that has already been linked with a different Firebase account",
+    "message": "This credential is already associated with a different user account."
+  },
+  {
+    "code": 17026,
+    "name": "weakPassword",
+    "codeName": "WEAK_PASSWORD",
+    "doc": "Indicates an attempt to set a password that is considered too weak.",
+    "message": "The password must be 6 characters long or more."
+  },
+  {
+    "code": 17028,
+    "name": "appNotAuthorized",
+    "codeName": "APP_NOT_AUTHORIZED",
+    "doc": "Indicates the App is not authorized to use Firebase Authentication with the provided API Key.",
+    "message": "This app is not authorized to use Firebase Authentication with the provided API key. Review your key configuration in the Google API console and ensure that it accepts requests from your app's bundle ID."
+  },
+  {
+    "code": 17029,
+    "name": "expiredActionCode",
+    "codeName": "EXPIRED_ACTION_CODE",
+    "doc": "Indicates the OOB code is expired.",
+    "message": "The action code has expired."
+  },
+  {
+    "code": 17030,
+    "name": "invalidActionCode",
+    "codeName": "INVALID_ACTION_CODE",
+    "doc": "Indicates the OOB code is invalid.",
+    "message": "The action code is invalid. This can happen if the code is malformed, expired, or has already been used."
+  },
+  {
+    "code": 17031,
+    "name": "invalidMessagePayload",
+    "codeName": "INVALID_MESSAGE_PAYLOAD",
+    "doc": "Indicates that there are invalid parameters in the payload during a \"send password reset email\" attempt.",
+    "message": "The action code is invalid. This can happen if the code is malformed, expired, or has already been used."
+  },
+  {
+    "code": 17032,
+    "name": "invalidSender",
+    "codeName": "INVALID_SENDER",
+    "doc": "Indicates that the sender email is invalid during a \"send password reset email\" attempt.",
+    "message": "The email template corresponding to this action contains invalid characters in its message. Please fix by going to the Auth email templates section in the Firebase Console."
+  },
+  {
+    "code": 17033,
+    "name": "invalidRecipientEmail",
+    "codeName": "INVALID_RECIPIENT_EMAIL",
+    "doc": "Indicates that the recipient email is invalid.",
+    "message": "The action code is invalid. This can happen if the code is malformed, expired, or has already been used."
+  },
+  {
+    "code": 17034,
+    "name": "missingEmail",
+    "codeName": "MISSING_EMAIL",
+    "doc": "Indicates that an email address was expected but one was not provided.",
+    "message": "An email address must be provided."
+  },
+  {
+    "code": 17036,
+    "name": "missingIosBundleID",
+    "codeName": "MISSING_IOS_BUNDLE_ID",
+    "doc": "Indicates that the iOS bundle ID is missing when a iOS App Store ID is provided.",
+    "message": "An iOS Bundle ID must be provided if an App Store ID is provided."
+  },
+  {
+    "code": 17037,
+    "name": "missingAndroidPackageName",
+    "codeName": "MISSING_ANDROID_PKG_NAME",
+    "doc": "Indicates that the android package name is missing when the `androidInstallApp` flag is set to true.",
+    "message": "An Android Package Name must be provided if the Android App is required to be installed."
+  },
+  {
+    "code": 17038,
+    "name": "unauthorizedDomain",
+    "codeName": "UNAUTHORIZED_DOMAIN",
+    "doc": "Indicates that the domain specified in the continue URL is not whitelisted in the Firebase console.",
+    "message": "The domain of the continue URL is not whitelisted. Please whitelist the domain in the Firebase console."
+  },
+  {
+    "code": 17039,
+    "name": "invalidContinueURI",
+    "codeName": "INVALID_CONTINUE_URI",
+    "doc": "Indicates that the domain specified in the continue URI is not valid.",
+    "message": "The continue URL provided in the request is invalid."
+  },
+  {
+    "code": 17040,
+    "name": "missingContinueURI",
+    "codeName": "MISSING_CONTINUE_URI",
+    "doc": "Indicates that a continue URI was not provided in a request to the backend which requires one.",
+    "message": "A continue URL must be provided in the request."
+  },
+  {
+    "code": 17041,
+    "name": "missingPhoneNumber",
+    "codeName": "MISSING_PHONE_NUMBER",
+    "doc": "Indicates that a phone number was not provided in a call to `verifyPhoneNumber:completion:`.",
+    "message": "To send verification codes, provide a phone number for the recipient."
+  },
+  {
+    "code": 17042,
+    "name": "invalidPhoneNumber",
+    "codeName": "INVALID_PHONE_NUMBER",
+    "doc": "Indicates that an invalid phone number was provided in a call to `verifyPhoneNumber:completion:`.",
+    "message": "The format of the phone number provided is incorrect. Please enter the phone number in a format that can be parsed into E.164 format. E.164 phone numbers are written in the format [+][country code][subscriber number including area code]."
+  },
+  {
+    "code": 17043,
+    "name": "missingVerificationCode",
+    "codeName": "MISSING_VERIFICATION_CODE",
+    "doc": "Indicates that the phone auth credential was created with an empty verification code.",
+    "message": "The phone auth credential was created with an empty SMS verification Code."
+  },
+  {
+    "code": 17044,
+    "name": "invalidVerificationCode",
+    "codeName": "INVALID_VERIFICATION_CODE",
+    "doc": "Indicates that an invalid verification code was used in the verifyPhoneNumber request.",
+    "message": "The SMS verification code used to create the phone auth credential is invalid. Please resend the verification code SMS and be sure to use the verification code provided by the user."
+  },
+  {
+    "code": 17045,
+    "name": "missingVerificationID",
+    "codeName": "MISSING_VERIFICATION_ID",
+    "doc": "Indicates that the phone auth credential was created with an empty verification ID.",
+    "message": "The phone auth credential was created with an empty verification ID."
+  },
+  {
+    "code": 17046,
+    "name": "invalidVerificationID",
+    "codeName": "INVALID_VERIFICATION_ID",
+    "doc": "Indicates that an invalid verification ID was used in the verifyPhoneNumber request.",
+    "message": "The verification ID used to create the phone auth credential is invalid."
+  },
+  {
+    "code": 17047,
+    "name": "missingAppCredential",
+    "codeName": "MISSING_APP_CREDENTIAL",
+    "doc": "Indicates that the APNS device token is missing in the verifyClient request.",
+    "message": "The phone verification request is missing an APNs Device token. Firebase Auth automatically detects APNs Device Tokens, however, if method swizzling is disabled, the APNs token must be set via the APNSToken property on FIRAuth or by calling setAPNSToken:type on FIRAuth."
+  },
+  {
+    "code": 17048,
+    "name": "invalidAppCredential",
+    "codeName": "INVALID_APP_CREDENTIAL",
+    "doc": "Indicates that an invalid APNS device token was used in the verifyClient request.",
+    "message": "The APNs device token provided is either incorrect or does not match the private certificate uploaded to the Firebase Console."
+  },
+  {
+    "code": 17051,
+    "name": "sessionExpired",
+    "codeName": "SESSION_EXPIRED",
+    "doc": "Indicates that the SMS code has expired.",
+    "message": "The SMS code has expired. Please re-send the verification code to try again."
+  },
+  {
+    "code": 17052,
+    "name": "quotaExceeded",
+    "codeName": "QUOTA_EXCEEDED",
+    "doc": "Indicates that the quota of SMS messages for a given project has been exceeded.",
+    "message": "The phone verification quota for this project has been exceeded."
+  },
+  {
+    "code": 17053,
+    "name": "missingAppToken",
+    "codeName": "MISSING_APP_TOKEN",
+    "doc": "Indicates that the APNs device token could not be obtained. The app may not have set up remote notification correctly, or may fail to forward the APNs device token to FIRAuth if app delegate swizzling is disabled.",
+    "message": "There seems to be a problem with your project's Firebase phone number authentication set-up, please make sure to follow the instructions found at https://firebase.google.com/docs/auth/ios/phone-auth"
+  },
+  {
+    "code": 17054,
+    "name": "notificationNotForwarded",
+    "codeName": "NOTIFICATION_NOT_FORWARDED",
+    "doc": "Indicates that the app fails to forward remote notification to FIRAuth.",
+    "message": "If app delegate swizzling is disabled, remote notifications received by UIApplicationDelegate need to be forwarded to FIRAuth's canHandleNotificaton: method."
+  },
+  {
+    "code": 17055,
+    "name": "appNotVerified",
+    "codeName": "APP_NOT_VERIFIED",
+    "doc": "Indicates that the app could not be verified by Firebase during phone number authentication.",
+    "message": "Firebase could not retrieve the silent push notification and therefore could not verify your app. Ensure that you configured your app correctly to receive push notifications."
+  },
+  {
+    "code": 17056,
+    "name": "captchaCheckFailed",
+    "codeName": "CAPTCHA_CHECK_FAILED",
+    "doc": "Indicates that the reCAPTCHA token is not valid.",
+    "message": "The reCAPTCHA response token provided is either invalid, expired or already"
+  },
+  {
+    "code": 17057,
+    "name": "webContextAlreadyPresented",
+    "codeName": "WEB_CONTEXT_ALREADY_PRESENTED",
+    "doc": "Indicates that an attempt was made to present a new web context while one was already being presented.",
+    "message": "User interaction is still ongoing, another view cannot be presented."
+  },
+  {
+    "code": 17058,
+    "name": "webContextCancelled",
+    "codeName": "WEB_CONTEXT_CANCELLED",
+    "doc": "Indicates that the URL presentation was cancelled prematurely by the user.",
+    "message": "The interaction was cancelled by the user."
+  },
+  {
+    "code": 17059,
+    "name": "appVerificationUserInteractionFailure",
+    "codeName": "APP_VERIFICATION_FAILED",
+    "doc": "Indicates a general failure during the app verification flow.",
+    "message": "The app verification process has failed, print and inspect the error details for more information"
+  },
+  {
+    "code": 17060,
+    "name": "invalidClientID",
+    "codeName": "INVALID_CLIENT_ID",
+    "doc": "Indicates that the clientID used to invoke a web flow is invalid.",
+    "message": "The OAuth client ID provided is either invalid or does not match the specified API key."
+  },
+  {
+    "code": 17061,
+    "name": "webNetworkRequestFailed",
+    "codeName": "WEB_NETWORK_REQUEST_FAILED",
+    "doc": "Indicates that a network request within a SFSafariViewController or WKWebView failed.",
+    "message": null
+  },
+  {
+    "code": 17062,
+    "name": "webInternalError",
+    "codeName": "WEB_INTERNAL_ERROR",
+    "doc": "Indicates that an internal error occurred within a SFSafariViewController or WKWebView.",
+    "message": "An internal error has occurred within the SFSafariViewController or WKWebView."
+  },
+  {
+    "code": 17063,
+    "name": "webSignInUserInteractionFailure",
+    "codeName": "WEB_USER_INTERACTION_FAILURE",
+    "doc": "Indicates a general failure during a web sign-in flow.",
+    "message": null
+  },
+  {
+    "code": 17066,
+    "name": "localPlayerNotAuthenticated",
+    "codeName": "LOCAL_PLAYER_NOT_AUTHENTICATED",
+    "doc": "Indicates that the local player was not authenticated prior to attempting Game Center signin.",
+    "message": "The local player is not authenticated. Please log the local player in to Game Center."
+  },
+  {
+    "code": 17067,
+    "name": "nullUser",
+    "codeName": "NULL_USER",
+    "doc": "Indicates that a non-null user was expected as an argmument to the operation but a null user was provided.",
+    "message": "A null user object was provided as the argument for an operation which requires a non-null user object."
+  },
+  {
+    "code": 17068,
+    "name": "dynamicLinkNotActivated",
+    "codeName": "DYNAMIC_LINK_NOT_ACTIVATED",
+    "doc": "Indicates that a Firebase Dynamic Link is not activated.",
+    "message": "Please activate Dynamic Links in the Firebase Console and agree to the terms and conditions."
+  },
+  {
+    "code": 17071,
+    "name": "invalidProviderID",
+    "codeName": "INVALID_PROVIDER_ID",
+    "doc": "Represents the error code for when the given provider id for a web operation is invalid.",
+    "message": "The provider ID provided for the attempted web operation is invalid."
+  },
+  {
+    "code": 17074,
+    "name": "invalidDynamicLinkDomain",
+    "codeName": "INVALID_DYNAMIC_LINK_DOMAIN",
+    "doc": "Indicates that the Firebase Dynamic Link domain used is either not configured or is unauthorized for the current project.",
+    "message": "The Firebase Dynamic Link domain used is either not configured or is unauthorized for the current project."
+  },
+  {
+    "code": 17075,
+    "name": "rejectedCredential",
+    "codeName": "REJECTED_CREDENTIAL",
+    "doc": "Indicates that the credential is rejected because it's misformed or mismatching.",
+    "message": "The request contains malformed or mismatching credentials."
+  },
+  {
+    "code": 17076,
+    "name": "gameKitNotLinked",
+    "codeName": "GAME_KIT_NOT_LINKED",
+    "doc": "Indicates that the GameKit framework is not linked prior to attempting Game Center signin.",
+    "message": "The GameKit framework is not linked. Please turn on the Game Center capability."
+  },
+  {
+    "code": 17094,
+    "name": "missingOrInvalidNonce",
+    "codeName": "MISSING_OR_INVALID_NONCE",
+    "doc": "Indicates that the nonce is missing or invalid.",
+    "message": "The request contains malformed or mismatched credentials."
+  },
+  {
+    "code": 17992,
+    "name": "emailExists",
+    "codeName": "EMAIL_EXISTS",
+    "doc": "Indicates the email used to attempt a sign up is already in use.",
+    "message": "The email address is already in use, try to login."
+  },
+  {
+    "code": 17993,
+    "name": "missingClientIdentifier",
+    "codeName": "MISSING_CLIENT_IDENTIFIER",
+    "doc": "Indicates an error for when the client identifier is missing.",
+    "message": "The request does not contain any client identifier."
+  },
+  {
+    "code": 17995,
+    "name": "keychainError",
+    "codeName": "KEYCHAIN_ERROR",
+    "doc": "Indicates an error occurred while attempting to access the keychain.",
+    "message": "An error occurred when accessing the keychain. The @c NSLocalizedFailureReasonErrorKey field in the @c NSError.userInfo dictionary will contain more information about the error encountered"
+  },
+  {
+    "code": 17999,
+    "name": "internalError",
+    "codeName": "INTERNAL_ERROR",
+    "doc": "Indicates an internal error occurred.",
+    "message": "An internal error has occurred, print and inspect the error details for more information."
+  },
+  {
+    "code": 18000,
+    "name": "malformedJWT",
+    "codeName": "MALFORMED_JWT",
+    "doc": "Raised when a JWT fails to parse correctly. May be accompanied by an underlying error describing which step of the JWT parsing process failed.",
+    "message": "Failed to parse JWT. Check the userInfo dictionary for the full token."
+  }
+]

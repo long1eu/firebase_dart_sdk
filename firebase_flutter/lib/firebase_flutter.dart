@@ -13,6 +13,7 @@ import 'package:firebase_flutter/database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:user_preferences/user_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 Future<void> runFirebaseApp({
   @required Widget app,
@@ -22,8 +23,11 @@ Future<void> runFirebaseApp({
   final Map<String, String> googleConfig = await FirebaseFlutter.googleConfig;
   final String uid = googleConfig['uid'];
 
+  FirebaseAuth.instance;
+
   String documentsDirectory = googleConfig['documents_directory'];
   String databaseDirectory = documentsDirectory;
+
 
   if (Platform.isAndroid) {
     documentsDirectory = Directory(documentsDirectory).parent.path;

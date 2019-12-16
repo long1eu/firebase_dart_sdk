@@ -71,7 +71,7 @@ Future<void> _execute<TState extends StorageTaskState>(
 
   final String referenceUrl = arguments[1];
 
-  // TODO:{22/10/2018 14:15}-long1eu: this is not good since we don't know if
+  // TODO(long1eu):{22/10/2018 14:15}-long1eu: this is not good since we don't know if
   // this is the right FirestoreStorage instance
   final StorageReference storage =
       FirebaseStorage.instance.getReferenceFromUrl(referenceUrl);

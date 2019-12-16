@@ -12,22 +12,21 @@ import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dar
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 
-/// EventManager is responsible for mapping queries to query event listeners. It handles 'fan-out.'
-/// (Identical queries will re-use the same watch on the backend.)
+/// EventManager is responsible for mapping queries to query event listeners. It handles 'fan-out.' (Identical queries
+/// will re-use the same watch on the backend.)
 class EventManager implements SyncEngineCallback {
   EventManager(this._syncEngine) : _queries = <Query, QueryListenersInfo>{} {
     _syncEngine.syncEngineListener = this;
   }
 
   final SyncEngine _syncEngine;
-
   final Map<Query, QueryListenersInfo> _queries;
 
   OnlineState _onlineState = OnlineState.unknown;
 
-  /// Adds a query listener that will be called with new snapshots for the query. The [EventManager]
-  /// is responsible for multiplexing many listeners to a single listen in the [SyncEngine] and will
-  /// perform a listen if it's the first [QueryListener] added for a query.
+  /// Adds a query listener that will be called with new snapshots for the query. The [EventManager] is responsible for
+  /// multiplexing many listeners to a single listen in the [SyncEngine] and will perform a listen if it's the first
+  /// [QueryListener] added for a query.
   ///
   /// Returns the targetId of the listen call in the [SyncEngine].
   Future<int> addQueryListener(QueryListener queryListener) async {
@@ -114,7 +113,6 @@ class QueryListenersInfo {
   QueryListenersInfo() : _listeners = <QueryListener>[];
 
   final List<QueryListener> _listeners;
-
   ViewSnapshot _viewSnapshot;
   int _targetId;
 }
@@ -149,10 +147,8 @@ class ListenOptions {
     bool waitForSyncWhenOnline,
   }) {
     return ListenOptions(
-      includeDocumentMetadataChanges:
-          includeDocumentMetadataChanges ?? this.includeDocumentMetadataChanges ?? false,
-      includeQueryMetadataChanges:
-          includeQueryMetadataChanges ?? this.includeQueryMetadataChanges ?? false,
+      includeDocumentMetadataChanges: includeDocumentMetadataChanges ?? this.includeDocumentMetadataChanges ?? false,
+      includeQueryMetadataChanges: includeQueryMetadataChanges ?? this.includeQueryMetadataChanges ?? false,
       waitForSyncWhenOnline: waitForSyncWhenOnline ?? this.waitForSyncWhenOnline ?? false,
     );
   }

@@ -18,9 +18,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.d
 import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
-/// View is responsible for computing the final merged truth of what docs are in a query. It gets
-/// notified of local and remote changes to docs, and applies the query filters and limits to
-/// determine the most correct possible results.
+/// View is responsible for computing the final merged truth of what docs are in a query. It gets notified of local and
+/// remote changes to docs, and applies the query filters and limits to determine the most correct possible results.
 class View {
   View(this.query, this._syncedDocuments) {
     _syncState = ViewSnapshotSyncState.none;
@@ -33,19 +32,17 @@ class View {
 
   ViewSnapshotSyncState _syncState;
 
-  /// A flag whether the view is current with the backend. A view is considered current after it has
-  /// seen the current flag from the backend and did not lose consistency within the watch stream
-  /// (e.g. because of an existence filter mismatch).
+  /// A flag whether the view is current with the backend. A view is considered current after it has seen the current
+  /// flag from the backend and did not lose consistency within the watch stream (e.g. because of an existence filter
+  /// mismatch).
   bool _current = false;
 
   DocumentSet documentSet;
 
-  /// The set of documents that the server has told us belongs to the target associated with this
-  /// view.
+  /// The set of documents that the server has told us belongs to the target associated with this view.
   ImmutableSortedSet<DocumentKey> _syncedDocuments;
 
-  ImmutableSortedSet<DocumentKey> get syncedDocuments =>
-      ImmutableSortedSet<DocumentKey>(_syncedDocuments.toList());
+  ImmutableSortedSet<DocumentKey> get syncedDocuments => ImmutableSortedSet<DocumentKey>(_syncedDocuments.toList());
 
   /// Documents in the view but not in the remote target
   ImmutableSortedSet<DocumentKey> _limboDocuments;
@@ -55,14 +52,13 @@ class View {
   /// Documents that have local changes
   ImmutableSortedSet<DocumentKey> mutatedKeys;
 
-  /// Iterates over a set of doc changes, applies the query limit, and computes what the new results
-  /// should be, what the changes were, and whether we may need to go back to the local cache for
-  /// more results. Does not make any changes to the view.
+  /// Iterates over a set of doc changes, applies the query limit, and computes what the new results should be, what the
+  /// changes were, and whether we may need to go back to the local cache for more results. Does not make any changes to
+  /// the view.
   ///
-  /// If this is being called with a refill, then start with [previousChanges] of docs and changes
-  /// instead of the current view. Returns a new set of docs, changes, and refill flag.
-  ViewDocumentChanges computeDocChanges<D extends MaybeDocument>(
-      ImmutableSortedMap<DocumentKey, D> docChanges,
+  /// If this is being called with a refill, then start with [previousChanges] of docs and changes instead of the
+  /// current view. Returns a new set of docs, changes, and refill flag.
+  ViewDocumentChanges computeDocChanges<D extends MaybeDocument>(ImmutableSortedMap<DocumentKey, D> docChanges,
       [ViewDocumentChanges previousChanges]) {
     final DocumentViewChangeSet changeSet =
         previousChanges != null ? previousChanges.changeSet : DocumentViewChangeSet();
@@ -76,14 +72,13 @@ class View {
     DocumentSet newDocumentSet = oldDocumentSet;
     bool needsRefill = false;
 
-    // Track the last doc in a (full) limit. This is necessary, because some update (a delete, or an
-    // update moving a doc past the old limit) might mean there is some other document in the local
-    // cache that either should come (1) between the old last limit doc and the new last document,
-    // in the case of updates, or (2) after the new last document, in the case of deletes. So we
-    // keep this doc at the old limit to compare the updates to.
+    // Track the last doc in a (full) limit. This is necessary, because some update (a delete, or an update moving a doc
+    // past the old limit) might mean there is some other document in the local cache that either should come (1)
+    // between the old last limit doc and the new last document, in the case of updates, or (2) after the new last
+    // document, in the case of deletes. So we keep this doc at the old limit to compare the updates to.
     //
-    // Note that this should never get used in a refill (when previousChanges is set), because there
-    // will only be adds -- no deletes or updates.
+    // Note that this should never get used in a refill (when previousChanges is set), because there will only be adds
+    // -- no deletes or updates.
     final Document lastDocInLimit =
         (query.hasLimit && oldDocumentSet.length == query.getLimit()) ? oldDocumentSet.last : null;
 
@@ -106,11 +101,9 @@ class View {
 
       final bool oldDocHadPendingMutations = oldDoc != null && mutatedKeys.contains(oldDoc.key);
 
-      // We only consider committed mutations for documents that were mutated during the lifetime of
-      // the view.
+      // We only consider committed mutations for documents that were mutated during the lifetime of the view.
       final bool newDocHasPendingMutations = newDoc != null &&
-          (newDoc.hasLocalMutations ||
-              (mutatedKeys.contains(newDoc.key) && newDoc.hasCommittedMutations));
+          (newDoc.hasLocalMutations || (mutatedKeys.contains(newDoc.key) && newDoc.hasCommittedMutations));
 
       bool changeApplied = false;
 
@@ -123,8 +116,8 @@ class View {
             changeApplied = true;
 
             if (lastDocInLimit != null && query.comparator(newDoc, lastDocInLimit) > 0) {
-              // This doc moved from inside the limit to after the limit. That means there may be
-              // some doc in the local cache that's actually less than this one.
+              // This doc moved from inside the limit to after the limit. That means there may be some doc in the local
+              // cache that's actually less than this one.
               needsRefill = true;
             }
           }
@@ -139,8 +132,8 @@ class View {
         changeSet.addChange(DocumentViewChange(DocumentViewChangeType.removed, oldDoc));
         changeApplied = true;
         if (lastDocInLimit != null) {
-          // A doc was removed from a full limit query. We'll need to requery from the local cache
-          // to see if we know about some other doc that should be in the results.
+          // A doc was removed from a full limit query. We'll need to requery from the local cache to see if we know
+          // about some other doc that should be in the results.
           needsRefill = true;
         }
       }
@@ -169,25 +162,23 @@ class View {
       }
     }
 
-    hardAssert(!needsRefill || previousChanges == null,
-        'View was refilled using docs that themselves needed refilling.');
+    hardAssert(
+        !needsRefill || previousChanges == null, 'View was refilled using docs that themselves needed refilling.');
 
     return ViewDocumentChanges._(newDocumentSet, changeSet, newMutatedKeys, needsRefill);
   }
 
   bool shouldWaitForSyncedDocument(Document oldDoc, Document newDoc) {
-    // We suppress the initial change event for documents that were modified as part of a write
-    // acknowledgment (e.g. when the value of a server transform is applied) as Watch will send us
-    // the same document again. By suppressing the event, we only raise two user visible events (one
-    // with [hasPendingWrites] and the final state of the document) instead of three (one with
-    // [hasPendingWrites], the modified document with [hasPendingWrites] and the final state of the
-    // document).
+    // We suppress the initial change event for documents that were modified as part of a write acknowledgment (e.g.
+    // when the value of a server transform is applied) as Watch will send us the same document again. By suppressing
+    // the event, we only raise two user visible events (one with [hasPendingWrites] and the final state of the
+    // document) instead of three (one with [hasPendingWrites], the modified document with [hasPendingWrites] and the
+    // final state of the document).
     return oldDoc.hasLocalMutations && newDoc.hasCommittedMutations && !newDoc.hasLocalMutations;
   }
 
-  /// Updates the view with the given [ViewDocumentChanges] and updates limbo docs and sync state
-  /// from the given (optional) target change. Returns a new [ViewChange] with the given docs,
-  /// changes, and sync state.
+  /// Updates the view with the given [ViewDocumentChanges] and updates limbo docs and sync state from the given
+  /// (optional) target change. Returns a new [ViewChange] with the given docs, changes, and sync state.
   ViewChange applyChanges(ViewDocumentChanges docChanges, [TargetChange targetChange]) {
     hardAssert(!docChanges.needsRefill, 'Cannot apply changes that need a refill');
 
@@ -234,13 +225,13 @@ class View {
     return ViewChange(snapshot, limboDocumentChanges);
   }
 
-  /// Applies an [OnlineState] change to the view, potentially generating a [ViewChange] if the
-  /// view's syncState changes as a result.
+  /// Applies an [OnlineState] change to the view, potentially generating a [ViewChange] if the view's syncState changes
+  /// as a result.
   ViewChange applyOnlineStateChange(OnlineState onlineState) {
     if (_current && onlineState == OnlineState.offline) {
-      // If we're offline, set `current` to false and then call applyChanges() to refresh our
-      // syncState and generate a [ViewChange] as appropriate. We are guaranteed to get a new
-      // [TargetChange] that sets `current` back to true once the client is back online.
+      // If we're offline, set `current` to false and then call applyChanges() to refresh our syncState and generate a
+      // [ViewChange] as appropriate. We are guaranteed to get a new [TargetChange] that sets `current` back to true
+      // once the client is back online.
       _current = false;
       return applyChanges(ViewDocumentChanges._(
         documentSet,
@@ -260,8 +251,7 @@ class View {
         _syncedDocuments = _syncedDocuments.insert(documentKey);
       }
       for (DocumentKey documentKey in targetChange.modifiedDocuments) {
-        hardAssert(_syncedDocuments.contains(documentKey),
-            'Modified document $documentKey not found in view.');
+        hardAssert(_syncedDocuments.contains(documentKey), 'Modified document $documentKey not found in view.');
       }
       for (DocumentKey documentKey in targetChange.removedDocuments) {
         _syncedDocuments = _syncedDocuments.remove(documentKey);
@@ -276,7 +266,7 @@ class View {
       return <LimboDocumentChange>[];
     }
 
-    // TODO: Do this incrementally so that it's not quadratic when updating many documents.
+    // TODO(long1eu): Do this incrementally so that it's not quadratic when updating many documents.
     final ImmutableSortedSet<DocumentKey> oldLimboDocs = _limboDocuments;
     _limboDocuments = DocumentKey.emptyKeySet;
     for (Document doc in documentSet) {
@@ -314,10 +304,10 @@ class View {
       return false;
     }
 
-    // If there are local changes to the doc, they might explain why the server doesn't know that
-    // it's part of the query. So don't put it in limbo.
+    // If there are local changes to the doc, they might explain why the server doesn't know that it's part of the
+    // query. So don't put it in limbo.
     //
-    // TODO: Ideally, we would only consider changes that might actually affect this specific query.
+    // TODO(long1eu): Ideally, we would only consider changes that might actually affect this specific query.
     if (doc.hasLocalMutations) {
       return false;
     }
@@ -333,9 +323,8 @@ class View {
     } else if (change.type == DocumentViewChangeType.modified) {
       return 2;
     } else if (change.type == DocumentViewChangeType.metadata) {
-      // A metadata change is converted to a modified change at the public api layer. Since we sort
-      // by document key and then change type, metadata and modified changes must be sorted
-      // equivalently.
+      // A metadata change is converted to a modified change at the public api layer. Since we sort by document key and
+      // then change type, metadata and modified changes must be sorted equivalently.
       return 2;
     } else if (change.type == DocumentViewChangeType.removed) {
       return 0;
@@ -373,8 +362,8 @@ class ViewDocumentChanges {
   /// The diff of these docs with the previous set of docs.
   final DocumentViewChangeSet changeSet;
 
-  /// Whether the set of documents passed in was not sufficient to calculate the new state of the
-  /// view and there needs to be another pass based on the local cache.
+  /// Whether the set of documents passed in was not sufficient to calculate the new state of the view and there needs
+  /// to be another pass based on the local cache.
   final bool needsRefill;
 
   final ImmutableSortedSet<DocumentKey> mutatedKeys;

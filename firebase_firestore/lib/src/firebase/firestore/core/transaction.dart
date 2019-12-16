@@ -14,18 +14,18 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutatio
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/datastore.dart';
+import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Internal transaction object responsible for accumulating the mutations to perform and the base
 /// versions for any documents read.
 class Transaction {
-  Transaction(this.datastore)
+  Transaction(this._transactionClient)
       : readVersions = <DocumentKey, SnapshotVersion>{},
         mutations = <Mutation>[],
         committed = false;
 
-  final Datastore datastore;
+  final TransactionClient _transactionClient;
   final Map<DocumentKey, SnapshotVersion> readVersions;
   final List<Mutation> mutations;
   bool committed;
@@ -45,8 +45,8 @@ class Transaction {
       final SnapshotVersion existingVersion = readVersions[doc.key];
       if (existingVersion != doc.version) {
         // This transaction will fail no matter what.
-        throw FirebaseFirestoreError('Document version changed between two reads.',
-            FirebaseFirestoreErrorCode.failedPrecondition);
+        throw FirebaseFirestoreError(
+            'Document version changed between two reads.', FirebaseFirestoreErrorCode.failedPrecondition);
       }
     } else {
       readVersions[doc.key] = docVersion;
@@ -57,16 +57,15 @@ class Transaction {
   /// ignoring any local changes.
   Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
     if (committed) {
-      return Future<List<MaybeDocument>>.error(FirebaseFirestoreError(
-          'Transaction has already completed.', FirebaseFirestoreErrorCode.failedPrecondition));
+      return Future<List<MaybeDocument>>.error(
+          FirebaseFirestoreError('Transaction has already completed.', FirebaseFirestoreErrorCode.failedPrecondition));
     }
     if (mutations.isNotEmpty) {
       return Future<List<MaybeDocument>>.error(FirebaseFirestoreError(
-          'Transactions lookups are invalid after writes.',
-          FirebaseFirestoreErrorCode.failedPrecondition));
+          'Transactions lookups are invalid after writes.', FirebaseFirestoreErrorCode.failedPrecondition));
     }
 
-    final List<MaybeDocument> result = await datastore.lookup(keys);
+    final List<MaybeDocument> result = await _transactionClient.lookup(keys);
     result.forEach(_recordVersion);
     return result;
   }
@@ -125,8 +124,8 @@ class Transaction {
 
   Future<void> commit() {
     if (committed) {
-      return Future<void>.error(FirebaseFirestoreError(
-          'Transaction has already completed.', FirebaseFirestoreErrorCode.failedPrecondition));
+      return Future<void>.error(
+          FirebaseFirestoreError('Transaction has already completed.', FirebaseFirestoreErrorCode.failedPrecondition));
     }
     final Set<DocumentKey> unwritten = Set<DocumentKey>.from(readVersions.keys);
     // For each mutation, note that the doc was written.
@@ -135,11 +134,10 @@ class Transaction {
     }
     if (unwritten.isNotEmpty) {
       return Future<void>.error(FirebaseFirestoreError(
-          'Every document read in a transaction must also be written.',
-          FirebaseFirestoreErrorCode.failedPrecondition));
+          'Every document read in a transaction must also be written.', FirebaseFirestoreErrorCode.failedPrecondition));
     }
     committed = true;
 
-    return datastore.commit(mutations);
+    return _transactionClient.commit(mutations);
   }
 }

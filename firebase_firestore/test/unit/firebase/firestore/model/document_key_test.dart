@@ -10,8 +10,7 @@ import '../../../../util/comparator_test.dart';
 
 void main() {
   test('testConstructor', () {
-    final ResourcePath path =
-        ResourcePath.fromSegments(<String>['rooms', 'firestore', 'messages', '1']);
+    final ResourcePath path = ResourcePath.fromSegments(<String>['rooms', 'firestore', 'messages', '1']);
     final DocumentKey key = DocumentKey.fromPath(path);
     expect(key.path, path);
   });
@@ -39,6 +38,6 @@ void main() {
   });
 
   test('testUnevenNumberOfSegmentsAreRejected', () {
-    expect(() => DocumentKey.fromSegments(<String>['a']), throwsArgumentError);
+    expect(() => DocumentKey.fromSegments(<String>['a']), throwsA(isA<AssertionError>()));
   });
 }

@@ -26,6 +26,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 import '../unit/firebase/firestore/local/mock/database_mock.dart';
 import 'prod_provider/firestore_provider.dart';
 
+// ignore: avoid_classes_with_only_static_members
 /// A set of helper methods for tests
 class IntegrationTestUtil {
   static int dbIndex = 0;
@@ -56,10 +57,9 @@ class IntegrationTestUtil {
     return FirebaseFirestoreSettings();
   }
 
-  /// Initializes a new Firestore instance that uses the default project,
-  /// customized with the provided settings if provided.
-  static Future<FirebaseFirestore> testFirestore(
-      [FirebaseFirestoreSettings settings, String dbPath]) async {
+  /// Initializes a new Firestore instance that uses the default project, customized with the provided settings if
+  /// provided.
+  static Future<FirebaseFirestore> testFirestore([FirebaseFirestoreSettings settings, String dbPath]) async {
     settings ??= newTestSettings();
     return testFirestoreInstance(
       provider.projectId,
@@ -69,8 +69,7 @@ class IntegrationTestUtil {
     );
   }
 
-  /// Initializes a new Firestore instance that uses a non-existing default
-  /// project.
+  /// Initializes a new Firestore instance that uses a non-existing default project.
   static Future<FirebaseFirestore> testAlternateFirestore() async {
     return testFirestoreInstance(
       badProjectId,
@@ -95,39 +94,24 @@ class IntegrationTestUtil {
     }
   }
 
-  static Future<FirebaseFirestore> forTests(
-      DatabaseId databaseId,
-      String persistenceKey,
-      CredentialsProvider provider,
-      AsyncQueue queue,
-      OpenDatabase openDatabase,
-      FirebaseFirestoreSettings settings) async {
-    final FirestoreClient client = await FirestoreClient.initialize(
-      DatabaseInfo(
-        databaseId,
-        persistenceKey,
-        settings.host,
-        sslEnabled: settings.sslEnabled,
-      ),
-      provider,
-      queue,
-      openDatabase,
-      usePersistence: settings.persistenceEnabled,
-    );
+  static Future<FirebaseFirestore> forTests(DatabaseId databaseId, String persistenceKey, CredentialsProvider provider,
+      AsyncQueue queue, OpenDatabase openDatabase, FirebaseFirestoreSettings settings) async {
+    final DatabaseInfo databaseInfo =
+        DatabaseInfo(databaseId, persistenceKey, settings.host, sslEnabled: settings.sslEnabled);
+    final FirestoreClient client =
+        await FirestoreClient.initialize(databaseInfo, settings, provider, queue, openDatabase);
 
     return FirebaseFirestore(databaseId, queue, null, client);
   }
 
-  /// Initializes a new Firestore instance that can be used in testing. It is
-  /// guaranteed to not share state with other instances returned from this
-  /// call.
-  static Future<FirebaseFirestore> testFirestoreInstance(String projectId, LogLevel logLevel,
-      FirebaseFirestoreSettings settings, String dbPath) async {
-    // This unfortunately is a global setting that affects existing Firestore
-    // clients.
+  /// Initializes a new Firestore instance that can be used in testing. It is guaranteed to not share state with other
+  /// instances returned from this call.
+  static Future<FirebaseFirestore> testFirestoreInstance(
+      String projectId, LogLevel logLevel, FirebaseFirestoreSettings settings, String dbPath) async {
+    // This unfortunately is a global setting that affects existing Firestore clients.
     Log.level = logLevel;
 
-    // TODO: Remove this once this is ready to ship.
+    // TODO(long1eu): Remove this once this is ready to ship.
     Persistence.indexingSupportEnabled = true;
 
     final DatabaseId databaseId = DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
@@ -190,8 +174,7 @@ class IntegrationTestUtil {
     return (await testFirestore()).collection(name == null ? autoId() : '$name${autoId()}');
   }
 
-  static Future<CollectionReference> testCollectionWithDocs(
-      Map<String, Map<String, Object>> docs) async {
+  static Future<CollectionReference> testCollectionWithDocs(Map<String, Map<String, Object>> docs) async {
     final CollectionReference collection = await testCollection();
     final CollectionReference writer = (await testFirestore()).collection(collection.id);
 
@@ -199,8 +182,7 @@ class IntegrationTestUtil {
     return collection;
   }
 
-  static Future<void> writeAllDocs(
-      CollectionReference collection, Map<String, Map<String, Object>> docs) async {
+  static Future<void> writeAllDocs(CollectionReference collection, Map<String, Map<String, Object>> docs) async {
     for (MapEntry<String, Map<String, Object>> doc in docs.entries) {
       await collection.document(doc.key).set(doc.value);
     }

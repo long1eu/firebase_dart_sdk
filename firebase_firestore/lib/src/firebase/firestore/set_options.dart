@@ -34,11 +34,8 @@ class SetOptions {
   /// within the document.
   @publicApi
   factory SetOptions.mergeFields(List<String> fields) {
-    final List<model.FieldPath> fieldPaths = <model.FieldPath>[];
-    for (String field in fields) {
-      fieldPaths.add(FieldPath.fromDotSeparatedPath(field).internalPath);
-    }
-
+    final Set<model.FieldPath> fieldPaths =
+        fields.map((String field) => FieldPath.fromDotSeparatedPath(field).internalPath).toSet();
     return SetOptions._(true, FieldMask(fieldPaths));
   }
 
@@ -49,12 +46,7 @@ class SetOptions {
   /// the fields specified here in its to data argument.
   @publicApi
   factory SetOptions.mergeFieldPaths(List<FieldPath> fields) {
-    final List<model.FieldPath> fieldPaths = <model.FieldPath>[];
-
-    for (FieldPath field in fields) {
-      fieldPaths.add(field.internalPath);
-    }
-
+    final Set<model.FieldPath> fieldPaths = fields.map((FieldPath field) => field.internalPath).toSet();
     return SetOptions._(true, FieldMask(fieldPaths));
   }
 

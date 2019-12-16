@@ -34,6 +34,9 @@ class TimerId implements Comparable<TimerId> {
   /// failure.
   static const TimerId onlineStateTimeout = TimerId._(5);
 
+  /// A timer used to periodically attempt LRU Garbage collection
+  static const TimerId garbageCollection = TimerId._(6);
+
   @override
   int compareTo(TimerId other) => _i.compareTo(other._i);
 
@@ -47,8 +50,7 @@ class TimerId implements Comparable<TimerId> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is TimerId && runtimeType == other.runtimeType && _i == other._i;
+      identical(this, other) || other is TimerId && runtimeType == other.runtimeType && _i == other._i;
 
   @override
   int get hashCode => _i.hashCode;
@@ -60,6 +62,7 @@ class TimerId implements Comparable<TimerId> {
     'writeStreamIdle',
     'writeStreamConnectionBackoff',
     'onlineStateTimeout',
+    'garbageCollection',
   ];
 
   @override
@@ -124,30 +127,26 @@ class AsyncQueue {
       _runNext();
     }
 
-    final T result = await taskEntry.completer.future;
+    return taskEntry.completer.future;
     //print('----QUEUE => done $caller');
-    return result;
+
   }
 
-  /// Queue and run this Runnable task immediately after every other already queued task. Unlike
-  /// [enqueue], returns void instead of a Future for use when we have no need to 'wait' on the task
-  /// completing.
-  void enqueueAndForget<T>(Task<T> task, [String caller = '']) =>
-      enqueue<T>(task, '$caller-enqueueAndForget');
+  /// Queue and run this Runnable task immediately after every other already queued task. Unlike [enqueue], returns void
+  /// instead of a Future for use when we have no need to 'wait' on the task completing.
+  void enqueueAndForget<T>(Task<T> task, [String caller = '']) => enqueue<T>(task, '$caller-enqueueAndForget');
 
   /// Schedule a task after the specified delay.
   ///
   /// The returned [DelayedTask] can be used to cancel the task prior to its running.
-  DelayedTask<T> enqueueAfterDelay<T>(TimerId timerId, Duration delay, Task<T> task,
-      [String caller]) {
-    // todo since this is a singleton decide if we should keep it this way and removed the assert
-    //  below or remove the singleton implementation and uncomment this. Having this as a singleton
-    //  is not necessary a very good idea in case of multiple Firestore instances.
-    //
+  DelayedTask<T> enqueueAfterDelay<T>(TimerId timerId, Duration delay, Task<T> task, [String caller]) {
+    // todo since this is a singleton decide if we should keep it this way and removed the assert below or remove the
+    //  singleton implementation and uncomment this. Having this as a singleton is not necessary a very good idea in
+    //  case of multiple Firestore instances.
+
     // While not necessarily harmful, we currently don't expect to have multiple tasks with the
     // same timer id in the queue, so defensively reject them.
-    // hardAssert(!containsDelayedTask(timerId),
-    //     'Attempted to schedule multiple operations with timer id $timerId.');
+    // hardAssert(!containsDelayedTask(timerId), 'Attempted to schedule multiple operations with timer id $timerId.');
 
     final DelayedTask<T> delayedTask = _createAndScheduleDelayedTask(timerId, delay, task, caller);
     _delayedTasks.add(delayedTask);
@@ -166,17 +165,16 @@ class AsyncQueue {
     return false;
   }
 
-  /// Runs some or all delayed tasks early, blocking until completion. [lastTimerId] Only delayed
-  /// tasks up to and including one that was scheduled using this TimerId will be run. Method throws
-  /// if no matching task exists. Pass TimerId.ALL to run all delayed tasks.
+  /// Runs some or all delayed tasks early, blocking until completion. [lastTimerId] Only delayed tasks up to and
+  /// including one that was scheduled using this [TimerId] will be run. Method throws if no matching task exists.
+  /// Pass [TimerId.all] to run all delayed tasks.
   @visibleForTesting
   Future<void> runDelayedTasksUntil(TimerId lastTimerId) async {
     hardAssert(lastTimerId == TimerId.all || containsDelayedTask(lastTimerId),
         'Attempted to run tasks until missing TimerId: $lastTimerId');
 
-    // NOTE: For performance we could store the tasks sorted, but [runDelayedTasksUntil] is only
-    // called from tests, and the size is guaranteed to be small since we don't allow duplicate
-    // TimerIds.
+    // NOTE: For performance we could store the tasks sorted, but [runDelayedTasksUntil] is only called from tests, and
+    // the size is guaranteed to be small since we don't allow duplicate TimerIds.
     _delayedTasks.sort();
 
     // We copy the list before enumerating to avoid concurrent modification as we remove tasks
@@ -190,8 +188,7 @@ class AsyncQueue {
       }
     }
 
-    await Future.wait<dynamic>(
-        result.map((DelayedTask<dynamic> it) => enqueue<dynamic>(it.task, it.caller)));
+    await Future.wait<dynamic>(result.map((DelayedTask<dynamic> it) => enqueue<dynamic>(it.task, it.caller)));
   }
 
   /// Runs the next available [Task] in the queue.
@@ -217,10 +214,9 @@ class AsyncQueue {
     }
   }
 
-  /// Creates and returns a DelayedTask that has been scheduled to be executed on the provided queue
-  /// after the provided delay.
-  DelayedTask<T> _createAndScheduleDelayedTask<T>(
-      TimerId timerId, Duration delay, Task<T> task, String caller) {
+  /// Creates and returns a DelayedTask that has been scheduled to be executed on the provided queue after the provided
+  /// delay.
+  DelayedTask<T> _createAndScheduleDelayedTask<T>(TimerId timerId, Duration delay, Task<T> task, String caller) {
     return DelayedTask<T>._(
       caller,
       timerId,
@@ -238,8 +234,7 @@ class AsyncQueue {
   }
 }
 
-/// Represents a Task scheduled to be run in the future on an AsyncQueue. Supports cancellation
-/// (via [cancel()]) and early execution (via [skipDelay()]).
+/// Represents a Task scheduled to be run in the future on an AsyncQueue. Supports cancellation.
 class DelayedTask<T> implements Comparable<DelayedTask<T>> {
   DelayedTask._(
     this.caller,
@@ -278,10 +273,10 @@ class DelayedTask<T> implements Comparable<DelayedTask<T>> {
   Future<void> _handleDelayElapsed() async {
     if (scheduledFuture != null) {
       _markDone();
-      await queue.enqueue(task, '$caller-delayed');
+      await queue.enqueue(task, '$caller-delayed').catchError(print);
     }
 
-    return null;
+    return;
   }
 
   /// Marks this delayed task as done, notifying the AsyncQueue that it should be removed.

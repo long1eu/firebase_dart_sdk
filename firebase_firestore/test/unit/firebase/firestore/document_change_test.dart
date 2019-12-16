@@ -42,14 +42,12 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
     final ViewDocumentChanges initialChanges = view.computeDocChanges(initialDocs);
     final TargetChange initialTargetChange = ackTarget(initialDocsList);
-    final ViewSnapshot initialSnapshot =
-        view.applyChanges(initialChanges, initialTargetChange).snapshot;
+    final ViewSnapshot initialSnapshot = view.applyChanges(initialChanges, initialTargetChange).snapshot;
 
     final ViewDocumentChanges updateChanges = view.computeDocChanges(updates);
     final TargetChange updateTargetChange =
-        targetChange(Uint8List.fromList(<int>[]), true, addedList, modifiedList, removedList);
-    final ViewSnapshot updatedSnapshot =
-        view.applyChanges(updateChanges, updateTargetChange).snapshot;
+        targetChange(Uint8List.fromList(<int>[]), addedList, modifiedList, removedList, current: true);
+    final ViewSnapshot updatedSnapshot = view.applyChanges(updateChanges, updateTargetChange).snapshot;
 
     if (updatedSnapshot == null) {
       // Nothing changed, no positions to verify
@@ -78,11 +76,7 @@ void main() {
 
   test('testAdditions', () {
     final Query query = Query(path('c'));
-    final List<Document> initialDocs = <Document>[
-      doc('c/a', 1, map()),
-      doc('c/c', 1, map()),
-      doc('c/e', 1, map())
-    ];
+    final List<Document> initialDocs = <Document>[doc('c/a', 1, map()), doc('c/c', 1, map()), doc('c/e', 1, map())];
     final List<Document> adds = <Document>[doc('c/d', 2, map()), doc('c/b', 2, map())];
 
     validatePositions(query, initialDocs, adds, <Document>[], <NoDocument>[]);
@@ -90,11 +84,7 @@ void main() {
 
   test('testDeletions', () {
     final Query query = Query(path('c'));
-    final List<Document> initialDocs = <Document>[
-      doc('c/a', 1, map()),
-      doc('c/b', 1, map()),
-      doc('c/c', 1, map())
-    ];
+    final List<Document> initialDocs = <Document>[doc('c/a', 1, map()), doc('c/b', 1, map()), doc('c/c', 1, map())];
     final List<NoDocument> deletes = <NoDocument>[deletedDoc('c/a', 2), deletedDoc('c/c', 2)];
     validatePositions(query, initialDocs, <Document>[], <Document>[], deletes);
   });

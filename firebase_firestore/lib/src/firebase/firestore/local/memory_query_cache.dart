@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:firebase_database_collection/firebase_database_collection.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_cache.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
@@ -15,8 +16,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
 
-/// An implementation of the [QueryCache] protocol that merely keeps queries in memory, suitable for
-/// online only clients with persistence disabled.
+/// An implementation of the [QueryCache] protocol that merely keeps queries in memory, suitable for online only clients
+/// with persistence disabled.
 class MemoryQueryCache implements QueryCache {
   MemoryQueryCache(this.persistence);
 
@@ -80,8 +81,8 @@ class MemoryQueryCache implements QueryCache {
     references.removeReferencesForId(queryData.targetId);
   }
 
-  /// Drops any targets with sequence number less than or equal to the upper bound, excepting those
-  /// present in [activeTargetIds]. Document associations for the removed targets are also removed.
+  /// Drops any targets with sequence number less than or equal to the upper bound, excepting those present in
+  /// [activeTargetIds]. Document associations for the removed targets are also removed.
   int removeQueries(int upperBound, Set<int> activeTargetIds) {
     int removed = 0;
     queries.removeWhere((Query query, QueryData queryData) {
@@ -135,4 +136,12 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<bool> containsKey(DocumentKey key) async => references.containsKey(key);
+
+  int getByteSize(LocalSerializer serializer) {
+    int count = 0;
+    for (QueryData value in queries.values) {
+      count += serializer.encodeQueryData(value).writeToBuffer().length;
+    }
+    return count;
+  }
 }

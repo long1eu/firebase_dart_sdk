@@ -11,10 +11,10 @@ dependencies:
   flutter:
     sdk: flutter
 
-  path_provider: ^1.2.0
-  firebase_auth: ^0.14.0+5
-  sqflite: ^1.1.6+4
-  connectivity: ^0.4.4
+  path_provider: ^1.4.5
+  firebase_auth: ^0.15.0+1
+  sqflite: ^1.1.7+3
+  connectivity: ^0.4.5+7
 
   firebase_common:
     git:

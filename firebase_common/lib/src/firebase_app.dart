@@ -7,7 +7,7 @@ import 'dart:io';
 
 import 'package:firebase_common/src/annotations.dart';
 import 'package:firebase_common/src/firebase_options.dart';
-import 'package:firebase_common/src/internal/internal_token_provider.dart';
+import 'package:firebase_common/src/platform_dependencies.dart';
 import 'package:firebase_common/src/util/base64_utils.dart';
 import 'package:firebase_common/src/util/log.dart';
 import 'package:firebase_common/src/util/preconditions.dart';
@@ -15,14 +15,11 @@ import 'package:firebase_common/src/util/to_string_helper.dart';
 import 'package:meta/meta.dart';
 import 'package:user_preferences/user_preferences.dart';
 
-typedef IsNetworkConnected = Future<bool> Function();
-
 /// The signature that gets called when [FirebaseApp] gets deleted. This is
 /// triggered when [FirebaseApp.delete] is called. [FirebaseApp] public
 /// methods start throwing after delete is called, so name and options are
 /// passed in to be able to identify the instance.
-typedef OnFirebaseAppDelete = void Function(
-    String firebaseAppName, FirebaseOptions options);
+typedef OnFirebaseAppDelete = void Function(String firebaseAppName, FirebaseOptions options);
 
 /// Used to deliver notifications about whether the app is in the background.
 /// The first callback is invoked inline if the app is in the background.
@@ -30,10 +27,7 @@ typedef OnFirebaseAppDelete = void Function(
 /// [isInBackground] is true, if the app is in the background and automatic
 /// resource management is enabled.
 @keepForSdk
-typedef OnBackgroundStateChanged = void Function(
-    {@required bool isInBackground});
-
-typedef IsBackground = bool Function();
+typedef OnBackgroundStateChanged = void Function({@required bool isInBackground});
 
 @publicApi
 class FirebaseApp {
@@ -47,12 +41,7 @@ class FirebaseApp {
   /// The [FirebaseOptions] values used by the default app instance are read
   /// from string resources.
   @publicApi
-  factory FirebaseApp(
-    Map<String, String> json,
-    InternalTokenProvider tokenProvider,
-    IsNetworkConnected isNetworkConnected, [
-    IsBackground lifecycleHandler,
-  ]) {
+  factory FirebaseApp(Map<String, String> json, [PlatformDependencies dependencies]) {
     if (instances.containsKey(defaultAppName)) {
       return instance;
     }
@@ -66,13 +55,10 @@ class FirebaseApp {
           'for ${Platform.operatingSystem}');
     }
 
-    return FirebaseApp.withOptions(firebaseOptions, tokenProvider,
-        isNetworkConnected, defaultAppName, lifecycleHandler);
+    return FirebaseApp.withOptions(firebaseOptions, dependencies);
   }
 
-  FirebaseApp._(
-      this._name, this._options, this.getAuthProvider, this.isNetworkConnected,
-      [this.isInBackground]);
+  FirebaseApp._(this._name, this._options, this.platformDependencies);
 
   /// Initializes the default [FirebaseApp] instance. Same as but it uses
   /// [FirebaseApp.defaultAppName] as name.
@@ -82,19 +68,16 @@ class FirebaseApp {
   /// name are ignored (trimmed).
   /// Returns an instance of [FirebaseApp]
   factory FirebaseApp.withOptions(
-    FirebaseOptions options,
-    InternalTokenProvider tokenProvider,
-    IsNetworkConnected isNetworkConnected, [
+    FirebaseOptions options, [
+    PlatformDependencies platformDependencies,
     String name = defaultAppName,
-    IsBackground lifecycleHandler,
   ]) {
     final String normalizedName = _normalize(name);
 
-    Preconditions.checkState(!instances.containsKey(normalizedName),
-        'FirebaseApp name $normalizedName already exists!');
+    Preconditions.checkState(
+        !instances.containsKey(normalizedName), 'FirebaseApp name $normalizedName already exists!');
 
-    final FirebaseApp firebaseApp = FirebaseApp._(normalizedName, options,
-        tokenProvider, isNetworkConnected, lifecycleHandler);
+    final FirebaseApp firebaseApp = FirebaseApp._(normalizedName, options, platformDependencies);
     instances[normalizedName] = firebaseApp;
 
     return firebaseApp;
@@ -106,8 +89,7 @@ class FirebaseApp {
   static FirebaseApp get instance {
     final FirebaseApp defaultApp = instances[defaultAppName];
     if (defaultApp == null) {
-      throw StateError(
-          'Default FirebaseApp is not initialized. Make sure to call '
+      throw StateError('Default FirebaseApp is not initialized. Make sure to call '
           '[FirebaseApp()] first.');
     }
 
@@ -126,35 +108,27 @@ class FirebaseApp {
     }
 
     final List<String> availableAppNames = _getAllAppNames();
-    final String availableAppNamesMessage = availableAppNames.isNotEmpty
-        ? 'Available app names: ${availableAppNames.join(', ')}.'
-        : '';
+    final String availableAppNamesMessage =
+        availableAppNames.isNotEmpty ? 'Available app names: ${availableAppNames.join(', ')}.' : '';
 
-    throw StateError(
-        'FirebaseApp with name $name does\'t exist. $availableAppNamesMessage');
+    throw StateError('FirebaseApp with name $name does\'t exist. $availableAppNamesMessage');
   }
 
   static const String logTag = 'FirebaseApp';
   static const String defaultAppName = '[DEFAULT]';
 
   static const String firebaseAppPrefs = 'com.google.firebase.common.prefs';
-  static const String _dataCollectionDefaultEnabledPreferenceKey =
-      'firebase_data_collection_default_enabled';
+  static const String _dataCollectionDefaultEnabledPreferenceKey = 'firebase_data_collection_default_enabled';
 
   static final Map<String, FirebaseApp> instances = <String, FirebaseApp>{};
 
   final String _name;
   final FirebaseOptions _options;
-  final InternalTokenProvider getAuthProvider;
-  final IsNetworkConnected isNetworkConnected;
+  final PlatformDependencies platformDependencies;
 
-  final StreamController<bool> _dataColectionChangeSink =
-      StreamController<bool>.broadcast();
-  final List<OnBackgroundStateChanged> backgroundStateChangeObservers =
-      <OnBackgroundStateChanged>[];
+  final StreamController<bool> _dataCollectionChangeSink = StreamController<bool>.broadcast();
+  final List<OnBackgroundStateChanged> backgroundStateChangeObservers = <OnBackgroundStateChanged>[];
   final List<OnFirebaseAppDelete> _onDeleteObservers = <OnFirebaseAppDelete>[];
-
-  IsBackground isInBackground;
 
   bool automaticResourceManagementEnabled = true;
   bool deleted = false;
@@ -188,7 +162,7 @@ class FirebaseApp {
   }
 
   @keepForSdk
-  Stream<dynamic> get onDataCollectionChange => _dataColectionChangeSink.stream;
+  Stream<dynamic> get onDataCollectionChange => _dataCollectionChangeSink.stream;
 
   /// If set to true it indicates that Firebase should close database
   /// connections automatically when the app is in the background.
@@ -200,7 +174,7 @@ class FirebaseApp {
     if (automaticResourceManagementEnabled != enabled) {
       automaticResourceManagementEnabled = enabled;
 
-      final bool inBackground = isInBackground();
+      final bool inBackground = platformDependencies.isBackground;
       if (enabled && inBackground) {
         // Automatic resource management has been enabled while the app is in
         // the background, notify the listeners of the app being in the
@@ -240,15 +214,13 @@ class FirebaseApp {
         ..putBool(_dataCollectionDefaultEnabledPreferenceKey, enabled)
         ..apply();
 
-      _dataColectionChangeSink.add(enabled);
+      _dataCollectionChangeSink.add(enabled);
     }
   }
 
   bool _readAutoDataCollectionEnabled() {
-    if (UserPreferences.instance
-        .contains(_dataCollectionDefaultEnabledPreferenceKey)) {
-      return UserPreferences.instance
-          .getBool(_dataCollectionDefaultEnabledPreferenceKey, true);
+    if (UserPreferences.instance.contains(_dataCollectionDefaultEnabledPreferenceKey)) {
+      return UserPreferences.instance.getBool(_dataCollectionDefaultEnabledPreferenceKey, true);
     }
 
     return options.dataCollectionEnabled ?? true;
@@ -279,7 +251,7 @@ class FirebaseApp {
   @keepForSdk
   void addBackgroundStateChangeObserver(OnBackgroundStateChanged observer) {
     _checkNotDeleted();
-    if (automaticResourceManagementEnabled && isInBackground()) {
+    if (automaticResourceManagementEnabled && platformDependencies.isBackground) {
       observer(isInBackground: true);
     }
     backgroundStateChangeObservers.add(observer);
@@ -295,10 +267,8 @@ class FirebaseApp {
   /// Use this key to store data per FirebaseApp.
   @keepForSdk
   String get persistenceKey {
-    final String encodedName =
-        Base64Utils.encodeUrlSafeNoPadding(name.codeUnits);
-    final String encodedApplicationId =
-        Base64Utils.encodeUrlSafeNoPadding(options.applicationId.codeUnits);
+    final String encodedName = Base64Utils.encodeUrlSafeNoPadding(name.codeUnits);
+    final String encodedApplicationId = Base64Utils.encodeUrlSafeNoPadding(options.applicationId.codeUnits);
 
     return '$encodedName+$encodedApplicationId';
   }
@@ -329,7 +299,7 @@ class FirebaseApp {
 
   @visibleForTesting
   static void clearInstancesForTest() {
-    // TODO: also delete, once functionality is implemented.
+    // TODO(long1eu): also delete, once functionality is implemented.
     instances.clear();
   }
 
@@ -337,10 +307,8 @@ class FirebaseApp {
   /// persistence key after the app has been deleted.
   @keepForSdk
   static String getPersistenceKeyFor(String name, FirebaseOptions options) {
-    final String encodedName =
-        Base64Utils.encodeUrlSafeNoPadding(name.codeUnits);
-    final String encodedApplicationId =
-        Base64Utils.encodeUrlSafeNoPadding(options.applicationId.codeUnits);
+    final String encodedName = Base64Utils.encodeUrlSafeNoPadding(name.codeUnits);
+    final String encodedApplicationId = Base64Utils.encodeUrlSafeNoPadding(options.applicationId.codeUnits);
 
     return '$encodedName+$encodedApplicationId';
   }
@@ -363,19 +331,13 @@ class FirebaseApp {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FirebaseApp &&
-          runtimeType == other.runtimeType &&
-          _name == other._name;
+      identical(this, other) || other is FirebaseApp && runtimeType == other.runtimeType && _name == other._name;
 
   @override
   int get hashCode => _name.hashCode * 31;
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
-          ..add('name', name)
-          ..add('options', options))
-        .toString();
+    return (ToStringHelper(runtimeType)..add('name', name)..add('options', options)).toString();
   }
 }

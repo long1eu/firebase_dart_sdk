@@ -23,18 +23,15 @@ void main() {
     final ObjectValue firstValue = util.wrapList(<dynamic>['a', 1]);
     final ObjectValue secondValue = util.wrapList(<dynamic>['b', 1]);
 
-    final QuerySnapshot foo =
-    querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
-    final QuerySnapshot fooDup =
-    querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
+    final QuerySnapshot foo = querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
+    final QuerySnapshot fooDup = querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
     final QuerySnapshot differentPath =
-    querySnapshot('bar', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
+        querySnapshot('bar', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
     final QuerySnapshot differentDoc =
-    querySnapshot('foo', util.map(), util.map(<dynamic>['a', secondValue]), true, false);
+        querySnapshot('foo', util.map(), util.map(<dynamic>['a', secondValue]), true, false);
     final QuerySnapshot noPendingWrites =
-    querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), false, false);
-    final QuerySnapshot fromCache =
-    querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), true, true);
+        querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), false, false);
+    final QuerySnapshot fromCache = querySnapshot('foo', util.map(), util.map(<dynamic>['a', firstValue]), true, true);
 
     expect(fooDup, foo);
     expect(differentPath, isNot(foo));
@@ -50,19 +47,14 @@ void main() {
   });
 
   test('testIncludeMetadataChanges', () {
-    final Document doc1Old = util.docForValue(
-        'foo/bar', 1, util.wrapList(<String>['a', 'b']), DocumentState.localMutations);
-    final Document doc1New =
-    util.docForValue('foo/bar', 1, util.wrapList(<String>['a', 'b']), DocumentState.synced);
-    final Document doc2Old =
-    util.docForValue('foo/baz', 1, util.wrapList(<String>['a', 'b']), DocumentState.synced);
-    final Document doc2New =
-    util.docForValue('foo/baz', 1, util.wrapList(<String>['a', 'c']), DocumentState.synced);
+    final Document doc1Old =
+        util.docForValue('foo/bar', 1, util.wrapList(<String>['a', 'b']), DocumentState.localMutations);
+    final Document doc1New = util.docForValue('foo/bar', 1, util.wrapList(<String>['a', 'b']), DocumentState.synced);
+    final Document doc2Old = util.docForValue('foo/baz', 1, util.wrapList(<String>['a', 'b']), DocumentState.synced);
+    final Document doc2New = util.docForValue('foo/baz', 1, util.wrapList(<String>['a', 'c']), DocumentState.synced);
 
-    final DocumentSet oldDocuments =
-    util.docSet(Document.keyComparator, <Document>[doc1Old, doc2Old]);
-    final DocumentSet newDocuments =
-    util.docSet(Document.keyComparator, <Document>[doc1New, doc2New]);
+    final DocumentSet oldDocuments = util.docSet(Document.keyComparator, <Document>[doc1Old, doc2Old]);
+    final DocumentSet newDocuments = util.docSet(Document.keyComparator, <Document>[doc1New, doc2New]);
 
     final List<DocumentViewChange> documentChanges = <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.metadata, doc1New),
@@ -81,8 +73,7 @@ void main() {
       excludesMetadataChanges: false,
     );
 
-    final QuerySnapshot snapshot =
-    QuerySnapshot(Query(fooQuery, firestore), viewSnapshot, firestore);
+    final QuerySnapshot snapshot = QuerySnapshot(Query(fooQuery, firestore), viewSnapshot, firestore);
 
     final QueryDocumentSnapshot doc1Snap = QueryDocumentSnapshot.fromDocument(
       firestore,

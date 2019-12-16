@@ -20,7 +20,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/value/object_val
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
+import 'package:firebase_firestore/src/proto/index.dart' as proto;
 import 'package:fixnum/fixnum.dart';
 
 /// Serializer for values stored in the LocalStore.
@@ -64,12 +64,10 @@ class LocalSerializer {
     }
   }
 
-  /// Encodes a Document for local storage. This differs from the v1beta1 RPC serializer for
-  /// Documents in that it preserves the updateTime, which is considered an output only value by the
-  /// server.
+  /// Encodes a Document for local storage. This differs from the v1 RPC serializer for Documents in that it preserves
+  /// the updateTime, which is considered an output only value by the server.
   proto.Document _encodeDocument(Document document) {
-    final proto.Document builder = proto.Document.create();
-    builder.name = rpcSerializer.encodeKey(document.key);
+    final proto.Document builder = proto.Document.create()..name = rpcSerializer.encodeKey(document.key);
 
     final ObjectValue value = document.data;
     for (MapEntry<String, FieldValue> entry in value.internalValue) {

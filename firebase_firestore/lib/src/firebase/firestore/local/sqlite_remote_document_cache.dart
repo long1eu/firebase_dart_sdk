@@ -17,8 +17,7 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/proto/google/firebase/firestore/proto/maybe_document.pb.dart'
-    as proto;
+import 'package:firebase_firestore/src/proto/index.dart' as proto;
 import 'package:protobuf/protobuf.dart';
 
 class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
@@ -90,13 +89,12 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     final Map<DocumentKey, MaybeDocument> results = <DocumentKey, MaybeDocument>{};
     for (DocumentKey key in documentKeys) {
-      // Make sure each key has a corresponding entry, which is null in case the document is not
-      // found.
+      // Make sure each key has a corresponding entry, which is null in case the document is not found.
       results[key] = null;
     }
 
-    final LongQuery longQuery = LongQuery(
-        db, 'SELECT contents FROM remote_documents WHERE path IN (', null, args, ') ORDER BY path');
+    final LongQuery longQuery =
+        LongQuery(db, 'SELECT contents FROM remote_documents WHERE path IN (', null, args, ') ORDER BY path');
 
     while (longQuery.hasMoreSubqueries) {
       final List<Map<String, dynamic>> rows = await longQuery.performNextSubquery();
@@ -110,8 +108,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(
-      Query query) async {
+  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(Query query) async {
     // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
     final int immediateChildrenPathLength = prefix.length + 1;
@@ -133,11 +130,10 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         <String>[prefixPath, prefixSuccessorPath]);
 
     for (Map<String, dynamic> row in result) {
-      // TODO: Actually implement a single-collection query
-      //  The query is actually returning any path that starts with the query path prefix which may
-      //  include documents in subcollections. For example, a query on 'rooms' will return
-      //  rooms/abc/messages/xyx but we shouldn't match it. Fix this by discarding rows with
-      //  document keys more than one segment longer than the query path.
+      // TODO(long1eu): Actually implement a single-collection query
+      //  The query is actually returning any path that starts with the query path prefix which may include documents in
+      //  subcollections. For example, a query on 'rooms' will return rooms/abc/messages/xyx but we shouldn't match it.
+      //  Fix this by discarding rows with document keys more than one segment longer than the query path.
 
       final String _path = row['path'];
       final ResourcePath path = EncodedPath.decodeResourcePath(_path);

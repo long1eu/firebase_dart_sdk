@@ -5,13 +5,21 @@ homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
 author: long1eu <home@long1.eu>
 
 environment:
-  sdk: '>=2.0.0 <3.0.0'
+  sdk: '>=2.7.0 <3.0.0'
 
 dependencies:
   firebase_common:
-    git:
-      url: https://github.com/fluttercommunity/firebase_dart_sdk
-      path: firebase_common
+    path: ../firebase_common
+  firebase_internal:
+    path: ../firebase_internal
+  built_value: ^7.0.0
+  built_collection: ^4.3.0
+  hive: ^1.1.1
+  rxdart: ^0.23.1
+  googleapis: ^0.54.0
+  googleapis_auth: ^0.2.11
 
 dev_dependencies:
-  test: ^1.6.8
+  test: ^1.9.4
+  build_runner: ^1.7.2
+  built_value_generator: ^7.0.0

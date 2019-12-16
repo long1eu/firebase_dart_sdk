@@ -17,21 +17,19 @@ import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
 
-/// A readonly view of the local state of all documents we're tracking (i.e. we have a cached
-/// version in [remoteDocumentCache] or local mutations for the document). The view is computed by
-/// applying the mutations in the [MutationQueue] to the [RemoteDocumentCache].
-// TODO: Turn this into the UnifiedDocumentCache / whatever.
+/// A readonly view of the local state of all documents we're tracking (i.e. we have a cached version in
+/// [remoteDocumentCache] or local mutations for the document). The view is computed by applying the mutations in the
+/// [MutationQueue] to the [RemoteDocumentCache].
+// TODO(long1eu): Turn this into the UnifiedDocumentCache / whatever.
 class LocalDocumentsView {
   const LocalDocumentsView(this.remoteDocumentCache, this.mutationQueue);
 
   final RemoteDocumentCache remoteDocumentCache;
   final MutationQueue mutationQueue;
 
-  /// Returns the the local view of the document identified by [key]. If we don't have any cached
-  /// state it returns null
+  /// Returns the the local view of the document identified by [key]. If we don't have any cached state it returns null
   Future<MaybeDocument> getDocument(DocumentKey key) async {
-    final List<MutationBatch> batches =
-        await mutationQueue.getAllMutationBatchesAffectingDocumentKey(key);
+    final List<MutationBatch> batches = await mutationQueue.getAllMutationBatchesAffectingDocumentKey(key);
     return _getDocument(key, batches);
   }
 
@@ -46,42 +44,36 @@ class LocalDocumentsView {
     return document;
   }
 
-  // Returns the view of the given [docs] as they would appear after applying all mutations in
-  // the given [batches].
+  // Returns the view of the given [docs] as they would appear after applying all mutations in the given [batches].
   Map<DocumentKey, MaybeDocument> _applyLocalMutationsToDocuments(
       Map<DocumentKey, MaybeDocument> docs, List<MutationBatch> batches) {
     return docs.map((DocumentKey key, MaybeDocument value) {
       return MapEntry<DocumentKey, MaybeDocument>(
           key,
           batches.fold(
-              value,
-              (MaybeDocument localView, MutationBatch batch) =>
-                  batch.applyToLocalView(key, localView)));
+              value, (MaybeDocument localView, MutationBatch batch) => batch.applyToLocalView(key, localView)));
     });
   }
 
   /// Gets the local view of the documents identified by [keys].
   ///
-  /// If we don't have cached state for a document in [keys], a [NoDocument] will be stored for
-  /// that key in the resulting set.
-  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> getDocuments(
-      Iterable<DocumentKey> keys) async {
+  /// If we don't have cached state for a document in [keys], a [NoDocument] will be stored for that key in the
+  /// resulting set.
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> getDocuments(Iterable<DocumentKey> keys) async {
     final Map<DocumentKey, MaybeDocument> docs = await remoteDocumentCache.getAll(keys);
     return getLocalViewOfDocuments(docs);
   }
 
-  /// Similar to [getDocuments], but creates the local view from the given [baseDocs] without
-  /// retrieving documents from the local store.
+  /// Similar to [getDocuments], but creates the local view from the given [baseDocs] without retrieving documents from
+  /// the local store.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> getLocalViewOfDocuments(
       Map<DocumentKey, MaybeDocument> baseDocs) async {
-    ImmutableSortedMap<DocumentKey, MaybeDocument> results =
-        DocumentCollections.emptyMaybeDocumentMap();
+    ImmutableSortedMap<DocumentKey, MaybeDocument> results = DocumentCollections.emptyMaybeDocumentMap();
 
-    final List<MutationBatch> batches =
-        await mutationQueue.getAllMutationBatchesAffectingDocumentKeys(baseDocs.keys);
+    final List<MutationBatch> batches = await mutationQueue.getAllMutationBatchesAffectingDocumentKeys(baseDocs.keys);
     final Map<DocumentKey, MaybeDocument> docs = _applyLocalMutationsToDocuments(baseDocs, batches);
     for (MapEntry<DocumentKey, MaybeDocument> entry in docs.entries) {
-      // TODO: Don't conflate missing / deleted.
+      // TODO(long1eu): Don't conflate missing / deleted.
       final MaybeDocument maybeDoc = entry.value ??
           NoDocument(
             entry.key,
@@ -95,9 +87,9 @@ class LocalDocumentsView {
   }
 
   /// Performs a query against the local view of all documents.
-  // TODO: The Querying implementation here should move 100% to [SimpleQueryEngine]. Instead, we
-  //  should just provide a [getCollectionDocuments] method here that return all the documents in a
-  //  given collection so that [SimpleQueryEngine] can do that and then filter in memory.
+  // TODO(long1eu): The Querying implementation here should move 100% to [SimpleQueryEngine]. Instead, we should just
+  //  provide a [getCollectionDocuments] method here that return all the documents in a given collection so that
+  //  [SimpleQueryEngine] can do that and then filter in memory.
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(Query query) async {
     final ResourcePath path = query.path;
     final bool isDocumentKey = DocumentKey.isDocumentKey(path);
@@ -109,8 +101,7 @@ class LocalDocumentsView {
   }
 
   /// Performs a simple document lookup for the given path.
-  Future<ImmutableSortedMap<DocumentKey, Document>> _getDocumentsMatchingDocumentQuery(
-      ResourcePath path) async {
+  Future<ImmutableSortedMap<DocumentKey, Document>> _getDocumentsMatchingDocumentQuery(ResourcePath path) async {
     ImmutableSortedMap<DocumentKey, Document> result = DocumentCollections.emptyDocumentMap();
     // Just do a simple document lookup.
     final MaybeDocument doc = await getDocument(DocumentKey.fromPath(path));
@@ -121,13 +112,10 @@ class LocalDocumentsView {
   }
 
   /// Queries the remote documents and overlays mutations.
-  Future<ImmutableSortedMap<DocumentKey, Document>> _getDocumentsMatchingCollectionQuery(
-      Query query) async {
-    ImmutableSortedMap<DocumentKey, Document> results =
-        await remoteDocumentCache.getAllDocumentsMatchingQuery(query);
+  Future<ImmutableSortedMap<DocumentKey, Document>> _getDocumentsMatchingCollectionQuery(Query query) async {
+    ImmutableSortedMap<DocumentKey, Document> results = await remoteDocumentCache.getAllDocumentsMatchingQuery(query);
 
-    final List<MutationBatch> matchingBatches =
-        await mutationQueue.getAllMutationBatchesAffectingQuery(query);
+    final List<MutationBatch> matchingBatches = await mutationQueue.getAllMutationBatchesAffectingQuery(query);
     for (MutationBatch batch in matchingBatches) {
       for (Mutation mutation in batch.mutations) {
         // Only process documents belonging to the collection.
@@ -137,8 +125,7 @@ class LocalDocumentsView {
 
         final DocumentKey key = mutation.key;
         final MaybeDocument baseDoc = results[key];
-        final MaybeDocument mutatedDoc =
-            mutation.applyToLocalView(baseDoc, baseDoc, batch.localWriteTime);
+        final MaybeDocument mutatedDoc = mutation.applyToLocalView(baseDoc, baseDoc, batch.localWriteTime);
         if (mutatedDoc is Document) {
           results = results.insert(key, mutatedDoc);
         } else {

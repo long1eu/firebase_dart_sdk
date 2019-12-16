@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
+import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_lru_reference_delegate.dart';
@@ -47,17 +48,17 @@ class SQLitePersistence extends Persistence {
   @override
   SQLiteLruReferenceDelegate referenceDelegate;
 
-  static Future<SQLitePersistence> create(String persistenceKey, DatabaseId databaseId,
-      LocalSerializer serializer, OpenDatabase openDatabase) async {
+  int get byteSize => _db.file.lengthSync();
+
+  static Future<SQLitePersistence> create(String persistenceKey, DatabaseId databaseId, LocalSerializer serializer,
+      OpenDatabase openDatabase, LruGarbageCollectorParams params) async {
     final String databaseName = sDatabaseName(persistenceKey, databaseId);
 
-    final SQLitePersistence persistence =
-        SQLitePersistence._(serializer, openDatabase, databaseName);
+    final SQLitePersistence persistence = SQLitePersistence._(serializer, openDatabase, databaseName);
 
     final SQLiteQueryCache queryCache = SQLiteQueryCache(persistence, serializer);
-    final SQLiteRemoteDocumentCache remoteDocumentCache =
-        SQLiteRemoteDocumentCache(persistence, serializer);
-    final SQLiteLruReferenceDelegate referenceDelegate = SQLiteLruReferenceDelegate(persistence);
+    final SQLiteRemoteDocumentCache remoteDocumentCache = SQLiteRemoteDocumentCache(persistence, serializer);
+    final SQLiteLruReferenceDelegate referenceDelegate = SQLiteLruReferenceDelegate(persistence, params);
 
     return persistence
       ..queryCache = queryCache
@@ -65,10 +66,9 @@ class SQLitePersistence extends Persistence {
       ..referenceDelegate = referenceDelegate;
   }
 
-  /// Creates the database name that is used to identify the database to be used
-  /// with a Firestore instance. Note that this needs to stay stable across
-  /// releases. The database is uniquely identified by a persistence key -
-  /// usually the Firebase app name - and a DatabaseId (project and database).
+  /// Creates the database name that is used to identify the database to be used with a Firestore instance. Note that
+  /// this needs to stay stable across releases. The database is uniquely identified by a persistence key - usually the
+  /// Firebase app name - and a DatabaseId (project and database).
   ///
   /// Format is [firestore.{persistence-key}.{project-id}.{database-id}].
   @visibleForTesting
@@ -152,8 +152,8 @@ class SQLitePersistence extends Persistence {
     return _db.delete(statement, args);
   }
 
-  /// Configures database connections just the way we like them, delegating to SQLiteSchema to
-  /// actually do the work of migration.
+  /// Configures database connections just the way we like them, delegating to SQLiteSchema to actually do the work of
+  /// migration.
   ///
   /// The order of events when opening a new connection is as follows:
   ///   * New connection
@@ -161,13 +161,12 @@ class SQLitePersistence extends Persistence {
   ///   * onCreate / onUpgrade (optional; if version already matches these aren't called)
   ///   * onOpen
   ///
-  /// This attempts to obtain exclusive access to the database and attempts to do so as early as
-  /// possible.
+  /// This attempts to obtain exclusive access to the database and attempts to do so as early as possible.
   static Future<Database> _openDb(String databaseName, OpenDatabase openDatabase) async {
     bool configured;
 
     /// Ensures that onConfigure has been called. This should be called first from all methods.
-    void ensureConfigured(Database db) async {
+    FutureOr<void> ensureConfigured(Database db) async {
       if (!configured) {
         configured = true;
         await db.query('PRAGMA locking_mode = EXCLUSIVE;');
@@ -213,25 +212,22 @@ class SQLitePersistence extends Persistence {
 
 /// Encapsulates a query whose parameter list is so long that it might exceed SQLite limit.
 ///
-/// SQLite limits maximum number of host parameters to 999 (see https://www.sqlite.org/limits.html).
-/// This class wraps most of the messy details of splitting a large query into several smaller ones.
+/// SQLite limits maximum number of host parameters to 999 (see https://www.sqlite.org/limits.html). This class wraps
+/// most of the messy details of splitting a large query into several smaller ones.
 ///
 /// The class is configured to contain a "template" for each subquery:
 ///   * head -- the beginning of the query, will be the same for each subquery
 ///   * tail -- the end of the query, also the same for each subquery
 ///
-/// Then the host parameters will be inserted in-between head and tail; if there are too many
-/// arguments for a single query, several subqueries will be issued. Each subquery which will have
-/// the following form:
+/// Then the host parameters will be inserted in-between head and tail; if there are too many arguments for a single
+/// query, several subqueries will be issued. Each subquery which will have the following form:
 ///
 /// [head][an auto-generated comma-separated list of '?' placeholders][_tail]
 ///
-/// To use this class, keep calling [performNextSubquery], which will issue the next subquery, as
-/// long as [hasMoreSubqueries] returns true. Note that if the parameter list is empty, not even a
-/// single query will be issued.
+/// To use this class, keep calling [performNextSubquery], which will issue the next subquery, as long as
+/// [hasMoreSubqueries] returns true. Note that if the parameter list is empty, not even a single query will be issued.
 ///
-/// For example, imagine for demonstration purposes that the limit were 2, and the [LongQuery] was
-/// created like this:
+/// For example, imagine for demonstration purposes that the limit were 2, and the [LongQuery] was created like this:
 ///
 /// ```dart
 ///   final List<String> args = <String>['foo', 'bar', 'baz', 'spam', 'eggs'];
@@ -253,8 +249,8 @@ class SQLitePersistence extends Persistence {
 class LongQuery {
   /// Creates a new [LongQuery] with parameters that describe a template for creating each subquery.
   ///
-  /// If [argsHead] is provided, it should contain the parameters that will be reissued in each
-  /// subquery, i.e. subqueries take the form:
+  /// If [argsHead] is provided, it should contain the parameters that will be reissued in each subquery, i.e.
+  /// subqueries take the form:
   ///
   /// [_head][_argsHead][an auto-generated comma-separated list of '?' placeholders][_tail]
   LongQuery(this._db, this._head, List<dynamic> argsHead, List<dynamic> argsIter, this._tail)
@@ -277,11 +273,11 @@ class LongQuery {
 
   final List<Object> _argsIter;
 
-  // Limit for the number of host parameters beyond which a query will be split into several
-  // subqueries. Deliberately set way below 999 as a safety measure because this class doesn't
-  // attempt to check for placeholders in the query {@link head}; if it only relied on the number
-  // of placeholders it itself generates, in that situation it would still exceed the SQLite limit.
-  static final int _limit = 900;
+  // Limit for the number of host parameters beyond which a query will be split into several subqueries. Deliberately
+  // set way below 999 as a safety measure because this class doesn't attempt to check for placeholders in the query
+  // [head]; if it only relied on the number of placeholders it itself generates, in that situation it would still
+  // exceed the SQLite limit.
+  static const int _limit = 900;
 
   int j = 0;
 
@@ -297,9 +293,9 @@ class LongQuery {
 
     for (int i = 0; j < _argsIter.length && i < _limit - _argsHead.length; i++) {
       if (i > 0) {
-        placeholdersBuilder.write(", ");
+        placeholdersBuilder.write(', ');
       }
-      placeholdersBuilder.write("?");
+      placeholdersBuilder.write('?');
 
       subqueryArgs.add(_argsIter[j]);
       j++;

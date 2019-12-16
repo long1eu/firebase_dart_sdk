@@ -12,8 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Represents a filter to be applied to query.
 class RelationFilter extends Filter {
-  /// Creates a new filter that compares fields and values. Only intended to be called from
-  /// [Filter.create].
+  /// Creates a new filter that compares fields and values. Only intended to be called from [Filter.create].
   const RelationFilter(this.field, this.operator, this.value);
 
   final FilterOperator operator;
@@ -26,8 +25,8 @@ class RelationFilter extends Filter {
     if (field.isKeyField) {
       final DocumentKey refValue = value.value;
       hardAssert(refValue is DocumentKey, 'Comparing on key, but filter value not a DocumentKey');
-      hardAssert(operator != FilterOperator.arrayContains,
-          'ARRAY_CONTAINS queries don\'t make sense on document keys.');
+      hardAssert(
+          operator != FilterOperator.arrayContains, 'ARRAY_CONTAINS queries don\'t make sense on document keys.');
       final int comparison = doc.key.compareTo(refValue);
       return _matchesComparison(comparison);
     } else {
@@ -40,8 +39,7 @@ class RelationFilter extends Filter {
     if (operator == FilterOperator.arrayContains) {
       return other is ArrayValue && other.internalValue.contains(value);
     } else {
-      // Only compare types with matching backend order (such as double and
-      // int).
+      // Only compare types with matching backend order (such as double and int).
       return value.typeOrder == other.typeOrder && _matchesComparison(other.compareTo(value));
     }
   }
@@ -63,12 +61,10 @@ class RelationFilter extends Filter {
     }
   }
 
-  bool get isInequality =>
-      operator != FilterOperator.equal && operator != FilterOperator.arrayContains;
+  bool get isInequality => operator != FilterOperator.equal && operator != FilterOperator.arrayContains;
 
-  // TODO: Technically, this won't be unique if two values have the same
-  // description, such as the int 3 and the string '3'. So we should add the
-  // types in here somehow, too.
+  // TODO(long1eu): Technically, this won't be unique if two values have the same description, such as the int 3 and the
+  //  string '3'. So we should add the types in here somehow, too.
   @override
   String get canonicalId => '${field.canonicalString} $operator $value';
 

@@ -10,9 +10,7 @@ import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart'
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/patch_mutation.dart';
@@ -22,8 +20,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version
 import 'package:firebase_firestore/src/firebase/firestore/model/unknown_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/google/firestore/v1beta1/index.dart' as proto_beta;
-import 'package:firebase_firestore/src/proto/google/index.dart' as proto;
+import 'package:firebase_firestore/src/proto/google/firestore/v1/index.dart' as proto_;
+import 'package:firebase_firestore/src/proto/index.dart' as proto;
 import 'package:fixnum/fixnum.dart';
 import 'package:test/test.dart';
 
@@ -41,11 +39,8 @@ void main() {
 
   test('testEncodesMutationBatch', () {
     final Mutation set = setMutation('foo/bar', map(<dynamic>['a', 'b', 'num', 1]));
-    final Mutation patch = PatchMutation(
-        key('bar/baz'),
-        wrapMap(map(<dynamic>['a', 'b', 'num', 1])),
-        FieldMask(<FieldPath>[field('a')]),
-        Precondition(exists: true));
+    final Mutation patch = PatchMutation(key('bar/baz'), wrapMap(map(<dynamic>['a', 'b', 'num', 1])),
+        fieldMask(<String>['a']), Precondition(exists: true));
 
     final Mutation del = deleteMutation('baz/quux');
     final Timestamp writeTime = Timestamp.now();
@@ -54,21 +49,20 @@ void main() {
     final proto.Write setProto = (proto.Write.create()
           ..update = (proto.Document.create()
             ..name = 'projects/p/databases/d/documents/foo/bar'
-            ..fields['a'] = (proto_beta.Value.create()..stringValue = 'b')
-            ..fields['num'] = (proto_beta.Value.create()..integerValue = Int64(1))))
+            ..fields['a'] = (proto_.Value.create()..stringValue = 'b')
+            ..fields['num'] = (proto_.Value.create()..integerValue = Int64(1))))
         .freeze();
 
     final proto.Write patchProto = (proto.Write.create()
           ..update = (proto.Document.create()
             ..name = 'projects/p/databases/d/documents/bar/baz'
-            ..fields['a'] = (proto_beta.Value.create()..stringValue = 'b')
-            ..fields['num'] = (proto_beta.Value.create()..integerValue = Int64(1)))
+            ..fields['a'] = (proto_.Value.create()..stringValue = 'b')
+            ..fields['num'] = (proto_.Value.create()..integerValue = Int64(1)))
           ..updateMask = (proto.DocumentMask.create()..fieldPaths.add('a'))
           ..currentDocument = (proto.Precondition.create()..exists = true))
         .freeze();
 
-    final proto.Write delProto =
-        (proto.Write.create()..delete = 'projects/p/databases/d/documents/baz/quux').freeze();
+    final proto.Write delProto = (proto.Write.create()..delete = 'projects/p/databases/d/documents/baz/quux').freeze();
 
     final proto.Timestamp writeTimeProto = (proto.Timestamp.create()
           ..seconds = Int64(writeTime.seconds)
@@ -95,7 +89,7 @@ void main() {
     final proto.MaybeDocument maybeDocProto = proto.MaybeDocument.create()
       ..document = (proto.Document.create()
         ..name = 'projects/p/databases/d/documents/some/path'
-        ..fields['foo'] = (proto_beta.Value.create()..stringValue = 'bar')
+        ..fields['foo'] = (proto_.Value.create()..stringValue = 'bar')
         ..updateTime = (proto.Timestamp.create()
           ..seconds = Int64()
           ..nanos = 42000))

@@ -114,7 +114,7 @@ class DocumentSet extends Iterable<Document> {
   }
 
   /// Returns a copy of the documents in this set as array. This is O(n) in the size of the set.
-  // TODO:Consider making this backed by the set instead to achieve O(1)?
+  // TODO(long1eu):Consider making this backed by the set instead to achieve O(1)?
   @override
   List<Document> toList({bool growable = true}) {
     final List<Document> documents = <Document>[];
