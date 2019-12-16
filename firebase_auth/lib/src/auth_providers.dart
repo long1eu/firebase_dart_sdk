@@ -73,7 +73,6 @@ class OAuthProvider {
       accessToken: accessToken,
       idToken: idToken,
       nonce: nonce,
-
       scopes: scopes,
       pendingToken: pendingToken,
     );

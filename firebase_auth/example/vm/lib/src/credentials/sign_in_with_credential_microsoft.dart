@@ -4,25 +4,31 @@
 
 part of firebase_auth_example;
 
-Future<AuthResult> _signInWithCredentialGitHub(FirebaseAuthOption option) async {
+Future<AuthResult> _signInWithCredentialMicrosoft(FirebaseAuthOption option) async {
   final HttpServer server = await HttpServer.bind('localhost', 55937);
   final String state = Uuid().v4();
+  const String redirectUri = 'http://localhost:55937/__/auth/handler';
   final Uri uri = Uri.https(
-    'github.com',
-    'login/oauth/authorize',
+    'login.microsoftonline.com',
+    'common/oauth2/v2.0/authorize',
     <String, String>{
-      'client_id': _githubClientId,
-      'scope': 'read:user user:email',
+      'client_id': _microsoftClientId,
+      'response_type': 'code',
+      'redirect_uri': redirectUri,
+      'response_type': 'code',
+      'response_mode': 'query',
+      'scope': 'openid profile email',
       'state': state,
     },
   );
 
   console //
-    ..println('Visit this link and login with GitHub')
+    ..println('Visit this link and login with Microsoft')
     ..println(uri);
 
   final HttpRequest request = await server.first;
   final Map<String, dynamic> data = request.requestedUri.queryParameters;
+  print('data: $data');
   final String code = data['code'];
   final String receivedState = data['state'];
 
@@ -48,7 +54,8 @@ Future<AuthResult> _signInWithCredentialGitHub(FirebaseAuthOption option) async 
     body: jsonEncode(
       <String, dynamic>{
         'data': <String, String>{
-          'provider': ProviderType.github,
+          'provider': 'microsoft.com',
+          'redirect_uri': redirectUri,
           'code': code,
         },
       },
@@ -56,13 +63,17 @@ Future<AuthResult> _signInWithCredentialGitHub(FirebaseAuthOption option) async 
   );
   await progress.cancel();
 
-  final Map<String, dynamic> accessTokenResponse = jsonDecode(response.body)['result'];
-  if (response.statusCode > 200) {
-    throw StateError(accessTokenResponse['error']);
+  print(response.body);
+  final Map<String, dynamic> accessTokenResponse = jsonDecode(response.body)['result'] ?? jsonDecode(response.body);
+  if (response.statusCode > 200 || accessTokenResponse.containsKey('error')) {
+    print(response.body);
+    throw StateError(accessTokenResponse['error'].toString());
   }
+
   final String accessToken = accessTokenResponse['access_token'];
 
-  final AuthCredential credential = GithubAuthProvider.getCredential(accessToken);
+  final AuthCredential credential =
+      OAuthProvider.getCredentialWithAccessToken(providerId: 'microsoft.com', accessToken: accessToken);
 
   console.println();
   progress = Progress('Siging in')..show();

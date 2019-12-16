@@ -49,8 +49,10 @@ Future<AuthResult> _signInWithCredential(FirebaseAuthOption option) async {
         return _signInWithCredentialGitHub(option);
         break;
       case FirebaseAuthOption.yahooCredentials:
+        return _signInWithCredentialYahoo(option);
         break;
       case FirebaseAuthOption.microsoftCredentials:
+        return _signInWithCredentialMicrosoft(option);
         break;
       case FirebaseAuthOption.appleCredentials:
         break;

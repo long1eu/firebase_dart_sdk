@@ -27,6 +27,15 @@
             "value": "application/json"
           }
         ]
+      },
+      {
+        "source": "/.well-known/microsoft-identity-association.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
       }
     ]
   }

@@ -105,12 +105,12 @@ abstract class OAuthCredentialImpl implements Built<OAuthCredentialImpl, OAuthCr
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     final Map<String, String> fields = <String, String>{
-      ...customParameters.asMap(),
-      if (scopes.isNotEmpty) 'scope': scopes.join(','),
+      if (customParameters != null) ...customParameters.asMap(),
+      if (scopes != null && scopes.isNotEmpty) 'scope': scopes.join(' '),
+      if (idToken != null) 'id_token': idToken,
+      if (secret != null) 'oauth_token_secret': secret,
       'providerId': providerId,
-      'id_token': idToken,
       'access_token': accessToken,
-      'oauth_token_secret': secret,
     };
 
     request
