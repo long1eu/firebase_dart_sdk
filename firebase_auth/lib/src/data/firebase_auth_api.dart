@@ -27,6 +27,11 @@ class FirebaseAuthApi {
     return _requester.getAccountInfo(request);
   }
 
+  /// Calls the getAccountInfo endpoint, which returns account info for a given account.
+  Future<SetAccountInfoResponse> setAccountInfo(IdentitytoolkitRelyingpartySetAccountInfoRequest request) {
+    return _requester.setAccountInfo(request);
+  }
+
   /// Calls the createAuthURI endpoint, which is responsible for creating the URI used by the IdP to authenticate the
   /// user.
   Future<CreateAuthUriResponse> createAuthUri(IdentitytoolkitRelyingpartyCreateAuthUriRequest request) {
@@ -53,11 +58,7 @@ class FirebaseAuthApi {
 
   Future<IdentitytoolkitRelyingpartySendVerificationCodeResponse> sendVerificationCode(
       IdentitytoolkitRelyingpartySendVerificationCodeRequest request) {
-    return _requester.sendVerificationCode(request).then(
-          (IdentitytoolkitRelyingpartySendVerificationCodeResponse response) => response,
-          onError: (dynamic error, [StackTrace s]) =>
-              _onError<IdentitytoolkitRelyingpartySendVerificationCodeResponse>(error),
-        );
+    return _requester.sendVerificationCode(request);
   }
 
   Future<IdentitytoolkitRelyingpartyGetProjectConfigResponse> getProjectConfig() {
@@ -76,7 +77,16 @@ class FirebaseAuthApi {
     return _requester.verifyCustomToken(request);
   }
 
-  Future<T> _onError<T>(dynamic e) {
-    return Future<T>.error(FirebaseAuthError(e.message.split(' : ')[0], ''));
+  Future<IdentitytoolkitRelyingpartyVerifyPhoneNumberResponse> verifyPhoneNumber(
+      IdentitytoolkitRelyingpartyVerifyPhoneNumberRequest request) {
+    return _requester.verifyPhoneNumber(request);
+  }
+
+  Future<DeleteAccountResponse> deleteAccount(IdentitytoolkitRelyingpartyDeleteAccountRequest request) {
+    return _requester.deleteAccount(request);
+  }
+
+  Future<ResetPasswordResponse> resetPassword(IdentitytoolkitRelyingpartyResetPasswordRequest request) {
+    return _requester.resetPassword(request);
   }
 }

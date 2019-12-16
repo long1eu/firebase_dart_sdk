@@ -20,7 +20,7 @@ typedef GetRecaptchaToken = Future<String> Function();
 /// locally running HTTP server. Which in turn will be able to extract the recaptcha token.
 Future<String> getRecaptchaToken(UrlPresenter urlPresenter, String apiKey, String languageCode) async {
   final HttpServer server = await HttpServer.bind('localhost', 0);
-  final Observable<HttpRequest> events = Observable<HttpRequest>(server).asBroadcastStream();
+  final Stream<HttpRequest> events = server.asBroadcastStream();
 
   try {
     final int port = server.port;

@@ -74,6 +74,6 @@ class SecureTokenApi {
 
   bool get hasValidAccessToken {
     return _accessToken != null &&
-        _accessTokenExpirationDate.difference(DateTime.now().toUtc()) > const Duration(minutes: 5);
+        _accessTokenExpirationDate.difference(DateTime.now().toUtc()) > _kTokenRefreshHeadStart;
   }
 }

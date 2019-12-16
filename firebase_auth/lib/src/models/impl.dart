@@ -5,7 +5,6 @@
 part of firebase_auth;
 
 abstract class EmailPasswordAuthCredentialImpl
-    with AuthCredential
     implements
         Built<EmailPasswordAuthCredentialImpl, EmailPasswordAuthCredentialImplBuilder>,
         EmailPasswordAuthCredential {
@@ -25,7 +24,6 @@ abstract class EmailPasswordAuthCredentialImpl
 }
 
 abstract class FacebookAuthCredentialImpl
-    with AuthCredential
     implements Built<FacebookAuthCredentialImpl, FacebookAuthCredentialImplBuilder>, FacebookAuthCredential {
   factory FacebookAuthCredentialImpl() = _$FacebookAuthCredentialImpl;
 
@@ -34,7 +32,7 @@ abstract class FacebookAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'provider=$provider&access_token=$accessToken'
+      ..postBody = 'providerId=$providerId&access_token=$accessToken'
       ..requestUri = 'http://localhost';
   }
 
@@ -45,7 +43,6 @@ abstract class FacebookAuthCredentialImpl
 }
 
 abstract class GameCenterAuthCredentialImpl
-    with AuthCredential
     implements Built<GameCenterAuthCredentialImpl, GameCenterAuthCredentialImplBuilder>, GameCenterAuthCredential {
   factory GameCenterAuthCredentialImpl() = _$GameCenterAuthCredentialImpl;
 
@@ -63,7 +60,6 @@ abstract class GameCenterAuthCredentialImpl
 }
 
 abstract class GithubAuthCredentialImpl
-    with AuthCredential
     implements Built<GithubAuthCredentialImpl, GithubAuthCredentialImplBuilder>, GithubAuthCredential {
   factory GithubAuthCredentialImpl() = _$GithubAuthCredentialImpl;
 
@@ -72,7 +68,7 @@ abstract class GithubAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'provider=$provider&access_token=$token'
+      ..postBody = 'providerId=$providerId&access_token=$token'
       ..requestUri = 'http://localhost';
   }
 
@@ -83,7 +79,6 @@ abstract class GithubAuthCredentialImpl
 }
 
 abstract class GoogleAuthCredentialImpl
-    with AuthCredential
     implements Built<GoogleAuthCredentialImpl, GoogleAuthCredentialImplBuilder>, GoogleAuthCredential {
   factory GoogleAuthCredentialImpl() = _$GoogleAuthCredentialImpl;
 
@@ -92,7 +87,7 @@ abstract class GoogleAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'provider=$provider&id_token=$idToken&access_token=$accessToken'
+      ..postBody = 'providerId=$providerId&id_token=$idToken&access_token=$accessToken'
       ..requestUri = 'http://localhost';
   }
 
@@ -102,9 +97,7 @@ abstract class GoogleAuthCredentialImpl
   static Serializer<GoogleAuthCredentialImpl> get serializer => _$googleAuthCredentialImplSerializer;
 }
 
-abstract class OAuthCredentialImpl
-    with AuthCredential
-    implements Built<OAuthCredentialImpl, OAuthCredentialImplBuilder>, OAuthCredential {
+abstract class OAuthCredentialImpl implements Built<OAuthCredentialImpl, OAuthCredentialImplBuilder>, OAuthCredential {
   factory OAuthCredentialImpl() = _$OAuthCredentialImpl;
 
   OAuthCredentialImpl._();
@@ -112,12 +105,12 @@ abstract class OAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     final Map<String, String> fields = <String, String>{
-      ...customParameters.asMap(),
-      if (scopes.isNotEmpty) 'scope': scopes.join(','),
-      'provider': provider,
-      'id_token': idToken,
+      if (customParameters != null) ...customParameters.asMap(),
+      if (scopes != null && scopes.isNotEmpty) 'scope': scopes.join(' '),
+      if (idToken != null) 'id_token': idToken,
+      if (secret != null) 'oauth_token_secret': secret,
+      'providerId': providerId,
       'access_token': accessToken,
-      'oauth_token_secret': secret,
     };
 
     request
@@ -133,8 +126,26 @@ abstract class OAuthCredentialImpl
   static Serializer<OAuthCredentialImpl> get serializer => _$oAuthCredentialImplSerializer;
 }
 
+abstract class SamlAuthCredentialImpl
+    implements Built<SamlAuthCredentialImpl, SamlAuthCredentialImplBuilder>, SamlAuthCredential {
+  factory SamlAuthCredentialImpl() = _$SamlAuthCredentialImpl;
+
+  SamlAuthCredentialImpl._();
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..requestUri = 'http://localhost'
+      ..pendingIdToken = pendingToken;
+  }
+
+  @override
+  Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
+
+  static Serializer<SamlAuthCredentialImpl> get serializer => _$samlAuthCredentialImplSerializer;
+}
+
 abstract class PhoneAuthCredentialImpl
-    with AuthCredential
     implements Built<PhoneAuthCredentialImpl, PhoneAuthCredentialImplBuilder>, PhoneAuthCredential {
   factory PhoneAuthCredentialImpl() = _$PhoneAuthCredentialImpl;
 
@@ -152,7 +163,6 @@ abstract class PhoneAuthCredentialImpl
 }
 
 abstract class TwitterAuthCredentialImpl
-    with AuthCredential
     implements Built<TwitterAuthCredentialImpl, TwitterAuthCredentialImplBuilder>, TwitterAuthCredential {
   factory TwitterAuthCredentialImpl() = _$TwitterAuthCredentialImpl;
 
@@ -161,7 +171,7 @@ abstract class TwitterAuthCredentialImpl
   @override
   void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'provider=$provider&access_token=$authToken&oauth_token_secret=$authTokenSecret'
+      ..postBody = 'providerId=$providerId&access_token=$authToken&oauth_token_secret=$authTokenSecret'
       ..requestUri = 'http://localhost';
   }
 
@@ -183,6 +193,9 @@ abstract class AdditionalUserInfoImpl
     if (profile != null) {
       data = MapBuilder<String, JsonObject>();
       for (String key in profile.keys) {
+        if (profile[key] == null) {
+          continue;
+        }
         data[key] = JsonObject(profile[key]);
       }
     }
@@ -198,6 +211,15 @@ abstract class AdditionalUserInfoImpl
 
   factory AdditionalUserInfoImpl.newAnonymous() {
     return _$AdditionalUserInfoImpl((AdditionalUserInfoImplBuilder b) => b.isNewUser = true);
+  }
+
+  factory AdditionalUserInfoImpl.fromVerifyAssertionResponse(VerifyAssertionResponse response) {
+    return AdditionalUserInfoImpl(
+      providerId: response.providerId,
+      profile: response.rawUserInfo != null ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo)) : null,
+      username: response.screenName,
+      isNewUser: response.isNewUser ?? false,
+    );
   }
 
   factory AdditionalUserInfoImpl.fromJson(Map<dynamic, dynamic> json) => serializers.deserializeWith(serializer, json);
@@ -233,7 +255,7 @@ abstract class UserInfoImpl implements Built<UserInfoImpl, UserInfoImplBuilder>,
 
   UserInfoImpl._();
 
-  UserInfoImpl copyWith({
+  UserInfoImpl _copyWith({
     String uid,
     String providerId,
     String displayName,
@@ -299,11 +321,13 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       'hasEmailPasswordCredential',
       serializers.serialize(object._hasEmailPasswordCredential, specifiedType: const FullType(bool)),
       'providerData',
-      serializers.serialize(BuiltList<UserInfoImpl>(object.providerData),
-          specifiedType: const FullType(
-            BuiltList,
-            <FullType>[FullType(UserInfoImpl)],
-          )),
+      serializers.serialize(
+        BuiltMap<String, UserInfoImpl>(object._providerData),
+        specifiedType: const FullType(
+          BuiltMap,
+          <FullType>[FullType(String), FullType(UserInfoImpl)],
+        ),
+      ),
       'email',
       serializers.serialize(object.email, specifiedType: const FullType(String)),
       'phoneNumber',
@@ -331,7 +355,7 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
     String uid;
     bool isAnonymous;
     bool hasEmailPasswordCredential;
-    List<UserInfo> providerUserInfo;
+    Map<String, UserInfo> providerUserInfo;
     String email;
     String phoneNumber;
     bool isEmailVerified;
@@ -359,12 +383,12 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
           hasEmailPasswordCredential = serializers.deserialize(value, specifiedType: const FullType(bool));
           break;
         case 'providerData':
-          final BuiltList<UserInfoImpl> _info = serializers.deserialize(value,
+          final BuiltMap<String, UserInfoImpl> _info = serializers.deserialize(value,
               specifiedType: const FullType(
-                BuiltList,
-                <FullType>[FullType(UserInfoImpl)],
+                BuiltMap,
+                <FullType>[FullType(String), FullType(UserInfoImpl)],
               ));
-          providerUserInfo = _info.toList();
+          providerUserInfo = _info.asMap();
           break;
         case 'email':
           email = serializers.deserialize(value, specifiedType: const FullType(String));
@@ -416,14 +440,14 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
         photoUrl: photoUrl,
         phoneNumber: phoneNumber,
       )
-      ..__hasEmailPasswordCredential = hasEmailPasswordCredential
+      .._hasEmailPasswordCredential = hasEmailPasswordCredential
       .._metadata = metadata
       .._providerData = providerUserInfo;
   }
 }
 
 mixin UserInfoMixin implements UserInfo {
-  UserInfo _userInfo;
+  UserInfoImpl _userInfo;
 
   @override
   String get uid => _userInfo.uid;

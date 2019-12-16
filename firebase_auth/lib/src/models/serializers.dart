@@ -12,19 +12,30 @@ import 'package:firebase_auth/firebase_auth.dart';
 part 'serializers.g.dart';
 
 @SerializersFor(<Type>[
-  AdditionalUserInfoImpl,
-  FacebookAuthCredentialImpl,
-  GithubAuthCredentialImpl,
+  PhoneAuthCredentialImpl,
+  ActionCodeSettings,
   GoogleAuthCredentialImpl,
-  TwitterAuthCredentialImpl,
+  SamlAuthCredentialImpl,
+  GameCenterAuthCredentialImpl,
+  EmailPasswordAuthCredentialImpl,
+  SignInWithGameCenterResponse,
+  OAuthCredentialImpl,
+  AdditionalUserInfoImpl,
+  SecureTokenRequest,
   UserInfoImpl,
+  SecureTokenResponse,
+  GithubAuthCredentialImpl,
+  FacebookAuthCredentialImpl,
   UserMetadataImpl,
+  SignInWithGameCenterRequest,
+  TwitterAuthCredentialImpl,
 ])
 Serializers serializers = (_$serializers.toBuilder() //
       ..add(FirebaseUser.serializer)
+      ..add(SecureTokenGrantType.serializer)
       ..addBuilderFactory(
-        const FullType(BuiltList, <FullType>[FullType(UserInfoImpl)]),
-        () => ListBuilder<UserInfoImpl>(),
+        const FullType(BuiltMap, <FullType>[FullType(String), FullType(UserInfoImpl)]),
+        () => MapBuilder<String, UserInfoImpl>(),
       )
       ..addPlugin(StandardJsonPlugin()))
     .build();

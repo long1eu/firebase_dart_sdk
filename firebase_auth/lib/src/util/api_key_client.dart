@@ -4,7 +4,7 @@
 
 part of firebase_auth;
 
-const String sdkVersion = '0.0.0';
+const String sdkVersion = '0.0.1';
 
 /// Adds 'key' query parameter when making HTTP requests.
 ///
@@ -22,35 +22,36 @@ class ApiKeyClient extends DelegatingClient {
   String locale;
 
   @override
-  Future<StreamedResponse> send(BaseRequest request) {
+  Future<StreamedResponse> send(BaseRequest request) async {
     Uri url = request.url;
     if (url.queryParameters.containsKey('key')) {
       return Future<StreamedResponse>.error(Exception(
           'Tried to make a HTTP request which has already a "key" query parameter. Adding the API key would override that existing value.'));
     }
 
-    if (url.query == '') {
-      url = url.replace(query: 'key=$_encodedApiKey');
+    if (url.queryParameters.isEmpty) {
+      url = url.replace(queryParameters: <String, String>{'key': _encodedApiKey});
     } else {
-      url = url.replace(query: '${url.query}&key=$_encodedApiKey');
+      url = url.replace(queryParameters: <String, String>{...url.queryParameters, 'key': _encodedApiKey});
     }
 
     final RequestImpl modifiedRequest = RequestImpl(request.method, url, request.finalize());
-    modifiedRequest.headers //
-      ..addAll(request.headers)
-      ..addAll(<String, String>{
-        if (_headers != null) ...(_headers() ?? <String, String>{}),
-        if (locale != null) 'X-Firebase-Locale': locale,
-        'X-Client-Version': '${Platform.operatingSystem}/FirebaseSDK/$sdkVersion/dart',
-      });
+    final Map<String, String> headers = <String, String>{
+      ...request.headers,
+      if (_headers != null) ..._headers() ?? <String, String>{},
+      if (locale != null) 'X-Firebase-Locale': locale,
+      'X-Client-Version': '${Platform.operatingSystem}/FirebaseSDK/$sdkVersion/dart',
+    };
+    modifiedRequest.headers.addAll(headers);
 
-    return baseClient.send(modifiedRequest);
+    final StreamedResponse response = await baseClient.send(modifiedRequest);
+    return _validateResponse(response);
   }
 }
 
 /// Base class for delegating HTTP clients.
 ///
-/// Depending on [closeUnderlyingClient] it will close the client it is  delegating to or not.
+/// Depending on [closeUnderlyingClient] it will close the client it is delegating to or not.
 abstract class DelegatingClient extends BaseClient {
   DelegatingClient(this.baseClient, {this.closeUnderlyingClient = true});
 
@@ -86,5 +87,40 @@ class RequestImpl extends BaseRequest {
       return null;
     }
     return ByteStream(_stream);
+  }
+}
+
+Future<StreamedResponse> _validateResponse(StreamedResponse response) async {
+  final int statusCode = response.statusCode;
+
+  if (statusCode < 200 || statusCode >= 400) {
+    // Some error happened, try to decode the response and fetch the error.
+    final Stream<String> stringStream = _decodeStreamAsText(response);
+    if (stringStream != null) {
+      final dynamic jsonResponse = await stringStream.transform(json.decoder).first;
+      if (jsonResponse is Map && jsonResponse['error'] is Map) {
+        final Map<dynamic, dynamic> error = jsonResponse['error'];
+        final dynamic codeValue = error['code'];
+        String message = error['message'];
+        message = message.split(' : ')[0];
+
+        throw FirebaseAuthError(message, '');
+      }
+    }
+  }
+
+  return response;
+}
+
+Stream<String> _decodeStreamAsText(StreamedResponse response) {
+  // TODO: Correctly handle the response content-types, using correct
+  // decoder.
+  // Currently we assume that the api endpoint is responding with json
+  // encoded in UTF8.
+  final String contentType = response.headers['content-type'];
+  if (contentType != null && contentType.toLowerCase().startsWith('application/json')) {
+    return response.stream.transform(const Utf8Decoder(allowMalformed: true));
+  } else {
+    return null;
   }
 }

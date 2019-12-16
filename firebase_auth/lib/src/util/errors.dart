@@ -19,12 +19,14 @@ class FirebaseAuthError extends FirebaseError {
         return invalidEmail;
       case 'WRONG_PASSWORD':
         return wrongPassword;
+      case 'TOO_MANY_ATTEMPTS_TRY_LATER':
       case 'TOO_MANY_REQUESTS':
         return tooManyRequests;
       case 'USER_NOT_FOUND':
         return userNotFound;
       case 'ACCOUNT_EXISTS_WITH_DIFFERENT_CREDENTIAL':
         return accountExistsWithDifferentCredential;
+      case 'CREDENTIAL_TOO_OLD_LOGIN_AGAIN':
       case 'REQUIRES_RECENT_LOGIN':
         return requiresRecentLogin;
       case 'PROVIDER_ALREADY_LINKED':
@@ -35,6 +37,7 @@ class FirebaseAuthError extends FirebaseError {
         return invalidUserToken;
       case 'NETWORK_REQUEST_FAILED':
         return networkError;
+      case 'TOKEN_EXPIRED':
       case 'USER_TOKEN_EXPIRED':
         return userTokenExpired;
       case 'INVALID_API_KEY':
@@ -75,6 +78,7 @@ class FirebaseAuthError extends FirebaseError {
         return invalidPhoneNumber;
       case 'MISSING_VERIFICATION_CODE':
         return missingVerificationCode;
+      case 'INVALID_CODE':
       case 'INVALID_VERIFICATION_CODE':
         return invalidVerificationCode;
       case 'MISSING_VERIFICATION_ID':

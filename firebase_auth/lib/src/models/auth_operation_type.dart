@@ -11,7 +11,7 @@ class AuthOperationType {
   final String value;
   final int _i;
 
-  /// Indicates that the operation type is uspecified.
+  /// Indicates that the operation type is unspecified.
   static const AuthOperationType unspecified = AuthOperationType._(0, 'VERIFY_OP_UNSPECIFIED');
 
   /// Indicates that the operation type is sign in or sign up.

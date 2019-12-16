@@ -25,17 +25,24 @@ Future<void> main() async {
 
   FirebaseAuth.instance.onAuthStateChanged.listen(print);
 
-  print(FirebaseAuth.instance.currentUser.refreshToken);
+  final FirebaseUser user = FirebaseAuth.instance.currentUser;
+
+  FirebaseAuth.instance;
+
+  print(user.refreshToken);
   print(await FirebaseAuth.instance.getAccessToken());
 
-  /*final String verificationId = await FirebaseAuth.instance.verifyPhoneNumber('+40755769229');
+
+  final String verificationId = await FirebaseAuth.instance.verifyPhoneNumber(phoneNumber: '+40755769229');
 
   final String code = stdin.readLineSync();
   final AuthCredential credential =
-      PhoneNumberProvider.getCredential(verificationId: verificationId, verificationCode: code);
+      PhoneAuthProvider.getCredential(verificationId: verificationId, verificationCode: code);
   print(credential);
 
-  await FirebaseAuth.instance.signInWithCredential(credential);*/
+  await FirebaseAuth.instance.signInWithCredential(credential);
+
+  await user.linkWithCredential(EmailAuthProvider.getCredential(email: 'lung.razvan@gmail.com', password: '123456'));
 }
 
 class Dependencies extends PlatformDependencies {
@@ -63,5 +70,5 @@ class Dependencies extends PlatformDependencies {
   String get locale => 'en';
 
   @override
-  Stream<bool> get isBackgroundChanged => Stream<bool>.fromIterable(<bool>[true]);
+  Stream<bool> get isBackgroundChanged => Stream<bool>.fromIterable(<bool>[false]);
 }

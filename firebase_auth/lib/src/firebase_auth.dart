@@ -12,15 +12,17 @@ const Duration _kMaxWaitTimeForBackoff = Duration(minutes: 16);
 /// The amount of time before the token expires that proactive refresh should be attempted.
 const Duration _kTokenRefreshHeadStart = Duration(minutes: 5);
 
+// ignore_for_file: prefer_constructors_over_static_methods
 class FirebaseAuth implements InternalTokenProvider {
-  FirebaseAuth._(this._app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage)
-      : _platformDependencies = _app.platformDependencies;
+  FirebaseAuth._(this.app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage)
+      : _platformDependencies = app.platformDependencies;
 
   factory FirebaseAuth.getInstance(FirebaseApp app) {
     _authStateChangedSubjects[FirebaseApp.instance.name] = BehaviorSubject<FirebaseUser>();
 
     // init the identity toolkit client
-    final Client apiKeyClient = ApiKeyClient(app.options.apiKey, app.platformDependencies.headersBuilder);
+    final ApiKeyClient apiKeyClient = ApiKeyClient(app.options.apiKey, app.platformDependencies.headersBuilder)
+      ..locale = app.platformDependencies.locale;
     final FirebaseAuthApi firebaseAuthApi = FirebaseAuthApi(client: apiKeyClient);
 
     final UserStorage userStorage = UserStorage(userBox: app.platformDependencies.box, appName: app.name);
@@ -33,7 +35,9 @@ class FirebaseAuth implements InternalTokenProvider {
     return _instances[FirebaseApp.instance.name] = auth;
   }
 
-  // ignore: prefer_constructors_over_static_methods
+  /// The auth object for the default Firebase app.
+  ///
+  /// The default Firebase app must have already been configured or an exception will be raised.
   static FirebaseAuth get instance {
     if (_instances.containsKey(FirebaseApp.instance.name)) {
       return _instances[FirebaseApp.instance.name];
@@ -44,7 +48,9 @@ class FirebaseAuth implements InternalTokenProvider {
     }
   }
 
-  final FirebaseApp _app;
+  /// The [FirebaseApp] object that this auth object is connected to.
+  final FirebaseApp app;
+
   final FirebaseAuthApi _firebaseAuthApi;
   final UserStorage _userStorage;
   final PlatformDependencies _platformDependencies;
@@ -70,66 +76,12 @@ class FirebaseAuth implements InternalTokenProvider {
   /// The string used to set this property must be a language code that follows BCP 47.
   set languageCode(String languageCode) => _apiKeyClient.locale = languageCode;
 
+  /// Gets the cached current user, or null if there is none.
+  FirebaseUser get currentUser => _currentUser;
+
   /// Receive [FirebaseUser] each time the user signIn or signOut
   Stream<FirebaseUser> get onAuthStateChanged {
-    return _authStateChangedSubjects[_app.name];
-  }
-
-  /// Asynchronously creates and becomes an anonymous user.
-  ///
-  /// If there is already an anonymous user signed in, that user will be
-  /// returned instead. If there is any other existing user signed in, that
-  /// user will be signed out.
-  ///
-  /// **Important**: You must enable Anonymous accounts in the Auth section
-  /// of the Firebase console before being able to use them.
-  ///
-  /// Errors:
-  ///   • [FirebaseAuthError.operationNotAllowed] - Indicates that Anonymous accounts are not enabled.
-  Future<AuthResult> signInAnonymously() async {
-    if (_currentUser != null && _currentUser.isAnonymous) {
-      return _ensureUserPersistence(AuthResult._(_currentUser));
-    }
-
-    final IdentitytoolkitRelyingpartySignupNewUserRequest request = IdentitytoolkitRelyingpartySignupNewUserRequest();
-    final SignupNewUserResponse response = await _firebaseAuthApi.signupNewUser(request);
-
-    final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, int.parse(response.expiresIn), response.refreshToken,
-        anonymous: true);
-
-    return AuthResult._(user, AdditionalUserInfoImpl.newAnonymous());
-  }
-
-  /// Tries to create a new user account with the given email address and password.
-  ///
-  /// If successful, it also signs the user in into the app and updates
-  /// the [onAuthStateChanged] stream.
-  ///
-  /// Errors:
-  ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
-  ///   * [FirebaseAuthError.emailAlreadyInUse] - Indicates the email used to attempt sign up already exists. Call
-  ///       [fetchSignInMethodsForEmail] to check which sign-in mechanisms the user used, and prompt the user to sign in
-  ///       with one of those.
-  ///   * [FirebaseAuthError.operationNotAllowed] -  Indicates that email and password accounts are not enabled. Enable
-  ///       them in the Auth section of the Firebase console.
-  ///   * [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
-  Future<AuthResult> createUserWithEmailAndPassword({@required String email, @required String password}) async {
-    assert(email != null);
-    assert(password != null);
-
-    final IdentitytoolkitRelyingpartySignupNewUserRequest request = IdentitytoolkitRelyingpartySignupNewUserRequest()
-      ..email = email
-      ..password = password;
-    final SignupNewUserResponse response = await _firebaseAuthApi.signupNewUser(request);
-
-    final FirebaseUser user =
-        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
-
-    final AdditionalUserInfoImpl additionalUserInfo =
-        AdditionalUserInfoImpl(providerId: ProviderType.password, isNewUser: true);
-
-    return AuthResult._(user, additionalUserInfo);
+    return _authStateChangedSubjects[app.name];
   }
 
   /// Returns a list of sign-in methods that can be used to sign in a given user (identified by its main email address).
@@ -137,7 +89,10 @@ class FirebaseAuth implements InternalTokenProvider {
   /// This method is useful when you support multiple authentication mechanisms if you want to implement an email-first
   /// authentication flow.
   ///
-  /// An empty `List` is returned if the user could not be found.
+  /// An empty `List` is returned if the user could not be found. A null list indicates that the user has an account,
+  /// but there are no providers registered. This can happen if the user unlinked all providers. The user can regain
+  /// access to his account by resetting the password. When the reset flow is completes successful the
+  /// [ProviderType.password] is linked to his account.
   ///
   /// Errors:
   ///   * [FirebaseAuthError.invalidEmail] - If the [email] address is malformed.
@@ -150,83 +105,10 @@ class FirebaseAuth implements InternalTokenProvider {
 
     final CreateAuthUriResponse response = await _firebaseAuthApi.createAuthUri(request);
 
-    return response.registered ? response.allProviders.toList() : <String>[];
+    return response.registered ? response.allProviders?.toList() : <String>[];
   }
 
-  /// Triggers the Firebase Authentication backend to send a password-reset email to the given email address, which must
-  /// correspond to an existing user of your app.
-  ///
-  /// Errors:
-  ///  * [FirebaseAuthError.invalidRecipientEmail] - Indicates an invalid recipient email was sent in the request.
-  ///  * [FirebaseAuthError.invalidSender] - Indicates an invalid sender email is set in the console for this action.
-  ///  * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
-  ///  * [FirebaseAuthError.missingIosBundleID] - Indicates that the iOS bundle ID is missing when
-  ///     [ActionCodeSettings.handleCodeInApp] is set to true.
-  ///  * [FirebaseAuthError.missingAndroidPackageName] - Indicates that the android package name is missing when the
-  ///     [ActionCodeSettings.androidInstallApp] flag is set to true.
-  ///  * [FirebaseAuthError.unauthorizedDomain] - Indicates that the domain specified in the continue URL is not
-  ///     whitelisted in the Firebase console.
-  ///  * [FirebaseAuthError.invalidContinueURI] - Indicates that the domain specified in the continue URI is not valid.
-  ///  * [FirebaseAuthError.userNotFound] - Indicates that there is no user corresponding to the given [email] address.
-  Future<void> sendPasswordResetEmail({@required String email, ActionCodeSettings settings}) async {
-    assert(email != null);
-
-    final Relyingparty request = Relyingparty()
-      ..requestType = OobCodeType.passwordReset.value
-      ..email = email
-      ..updateWith(settings);
-
-    return _firebaseAuthApi.getOobConfirmationCode(request);
-  }
-
-  /// Sends a sign in with email link to provided email address.
-  Future<void> sendSignInWithEmailLink({@required String email, @required ActionCodeSettings settings}) async {
-    assert(email != null);
-    assert(settings != null);
-
-    final Relyingparty request = Relyingparty()
-      ..requestType = OobCodeType.passwordReset.value
-      ..email = email
-      ..updateWith(settings);
-
-    return _firebaseAuthApi.getOobConfirmationCode(request);
-  }
-
-  /// Checks if link is an email sign-in link.
-  bool isSignInWithEmailLink(String link) {
-    if (link == null || link.isEmpty) {
-      return false;
-    }
-
-    final Uri uri = Uri.tryParse(link);
-    if (uri == null) {
-      return false;
-    }
-
-    final Map<String, String> params = uri.queryParameters;
-    if (params.isEmpty) {
-      return false;
-    }
-
-    return params.containsKey('oobCode') && params['mode'] == 'signIn';
-  }
-
-  /// Signs in using an email address and email sign-in link.
-  ///
-  /// Errors:
-  ///  * [FirebaseAuthError.operationNotAllowed] - Indicates that email and email sign-in link accounts are not enabled.
-  ///     Enable them in the Auth section of the Firebase console.
-  ///  * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
-  ///  * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
-  Future<AuthResult> signInWithEmailAndLink({@required String email, @required String link}) async {
-    assert(email != null);
-    assert(link != null);
-
-    final EmailPasswordAuthCredential credential = EmailPasswordAuthCredential.withLink(email: email, link: link);
-    return _signInAndRetrieveData(credential, isReauthentication: false);
-  }
-
-  /// Tries to sign in a user with the given email address and password.
+  /// Signs in a user with the given email address and password.
   ///
   /// If successful, it also signs the user in into the app and updates the [onAuthStateChanged] stream.
   ///
@@ -240,6 +122,21 @@ class FirebaseAuth implements InternalTokenProvider {
     assert(email != null);
     assert(password != null);
     final AuthCredential credential = EmailAuthProvider.getCredential(email: email, password: password);
+    return _signInAndRetrieveData(credential, isReauthentication: false);
+  }
+
+  /// Signs in using an email address and email sign-in link.
+  ///
+  /// Errors:
+  ///  * [FirebaseAuthError.operationNotAllowed] - Indicates that email and email sign-in link accounts are not enabled.
+  ///       Enable them in the Auth section of the Firebase console.
+  ///  * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
+  ///  * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
+  Future<AuthResult> signInWithEmailAndLink({@required String email, @required String link}) async {
+    assert(email != null);
+    assert(link != null);
+
+    final EmailPasswordAuthCredential credential = EmailAuthProvider.getCredentialWithLink(email: email, link: link);
     return _signInAndRetrieveData(credential, isReauthentication: false);
   }
 
@@ -277,31 +174,26 @@ class FirebaseAuth implements InternalTokenProvider {
     return _signInAndRetrieveData(credential, isReauthentication: false);
   }
 
-  /// Starts the phone number authentication flow by sending a verification code to the specified phone number.
+  /// Asynchronously creates and becomes an anonymous user.
   ///
-  /// You can use [presenter] to present the user with the recaptcha url in order to verify the app.
+  /// If there is already an anonymous user signed in, that user will be returned instead. If there is any other
+  /// existing user signed in, that user will be signed out.
+  ///
   /// Errors:
-  ///   * [FirebaseAuthError.captchaCheckFailed] - Indicates that the reCAPTCHA token obtained by the Firebase Auth is
-  ///       invalid or has expired.
-  ///   * [FirebaseAuthError.quotaExceeded] - Indicates that the phone verification quota for this project has been
-  ///       exceeded.
-  ///   * [FirebaseAuthError.invalidPhoneNumber] - Indicates that the phone number provided is invalid.
-  ///   * [FirebaseAuthError.missingPhoneNumber] - Indicates that the phone number provided was not provided.
-  Future<String> verifyPhoneNumber({@required String phoneNumber, UrlPresenter presenter}) async {
-    assert(phoneNumber != null);
-    final IdentitytoolkitRelyingpartySendVerificationCodeRequest request =
-        IdentitytoolkitRelyingpartySendVerificationCodeRequest()..phoneNumber = phoneNumber;
-
-    final bool isTest = Platform.environment['FIREBASE_AUTH_TEST'] ?? false;
-    // We don't check the app if we are in a test
-    if (!isTest) {
-      final String token = await getRecaptchaToken(presenter ?? print, _app.options.apiKey, languageCode);
-      request.recaptchaToken = token;
+  ///   • [FirebaseAuthError.operationNotAllowed] - Indicates that Anonymous accounts are not enabled.
+  Future<AuthResult> signInAnonymously() async {
+    if (_currentUser != null && _currentUser.isAnonymous) {
+      return _ensureUserPersistence(AuthResult._(_currentUser));
     }
 
-    final IdentitytoolkitRelyingpartySendVerificationCodeResponse response =
-        await _firebaseAuthApi.sendVerificationCode(request);
-    return response.sessionInfo;
+    final IdentitytoolkitRelyingpartySignupNewUserRequest request = IdentitytoolkitRelyingpartySignupNewUserRequest();
+    final SignupNewUserResponse response = await _firebaseAuthApi.signupNewUser(request);
+
+    final FirebaseUser user = await _completeSignInWithAccessToken(
+        response.idToken, int.parse(response.expiresIn), response.refreshToken,
+        anonymous: true);
+
+    return AuthResult._(user, AdditionalUserInfoImpl.newAnonymous());
   }
 
   /// Tries to sign in a user with a given Custom Token [token].
@@ -328,10 +220,143 @@ class FirebaseAuth implements InternalTokenProvider {
 
     final VerifyCustomTokenResponse response = await _firebaseAuthApi._requester.verifyCustomToken(request);
 
+    final String expiresIn = response.expiresIn ?? '3600';
     final FirebaseUser user =
-        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+        await _completeSignInWithAccessToken(response.idToken, int.parse(expiresIn), response.refreshToken);
     final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(isNewUser: response.isNewUser);
     return AuthResult._(user, additionalUserInfo);
+  }
+
+  /// Tries to create a new user account with the given email address and password.
+  ///
+  /// If successful, it also signs the user in into the app and updates
+  /// the [onAuthStateChanged] stream.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
+  ///   * [FirebaseAuthError.emailAlreadyInUse] - Indicates the email used to attempt sign up already exists. Call
+  ///       [fetchSignInMethodsForEmail] to check which sign-in mechanisms the user used, and prompt the user to sign in
+  ///       with one of those.
+  ///   * [FirebaseAuthError.operationNotAllowed] -  Indicates that email and password accounts are not enabled. Enable
+  ///       them in the Auth section of the Firebase console.
+  ///   * [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
+  Future<AuthResult> createUserWithEmailAndPassword({@required String email, @required String password}) async {
+    assert(email != null);
+    assert(password != null);
+
+    final IdentitytoolkitRelyingpartySignupNewUserRequest request = IdentitytoolkitRelyingpartySignupNewUserRequest()
+      ..email = email
+      ..password = password;
+    final SignupNewUserResponse response = await _firebaseAuthApi.signupNewUser(request);
+
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+
+    final AdditionalUserInfoImpl additionalUserInfo =
+        AdditionalUserInfoImpl(providerId: ProviderType.password, isNewUser: true);
+
+    return AuthResult._(user, additionalUserInfo);
+  }
+
+  /// Resets the password using the email code sent to the user and a new password.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
+  ///   * [FirebaseAuthError.operationNotAllowed] - Indicates the administrator disabled sign in with the specified
+  ///       identity provider.
+  ///   * [FirebaseAuthError.expiredActionCode] - Indicates the OOB code is expired.
+  ///   * [FirebaseAuthError.invalidActionCode] - Indicates the OOB code is invalid.
+  Future<void> confirmPasswordReset({@required String oobCode, @required String newPassword}) async {
+    assert(oobCode != null && oobCode.isNotEmpty);
+    assert(newPassword != null && newPassword.isNotEmpty);
+
+    final IdentitytoolkitRelyingpartyResetPasswordRequest request = IdentitytoolkitRelyingpartyResetPasswordRequest()
+      ..oobCode = oobCode
+      ..newPassword = newPassword;
+
+    return _firebaseAuthApi.resetPassword(request);
+  }
+
+  /// Checks the validity of an out of band code.
+  ///
+  /// Return the metadata corresponding to the action code.
+  Future<ActionCodeInfo> checkActionCode(String oobCode) async {
+    assert(oobCode != null && oobCode.isNotEmpty);
+
+    final IdentitytoolkitRelyingpartyResetPasswordRequest request = IdentitytoolkitRelyingpartyResetPasswordRequest()
+      ..oobCode = oobCode;
+
+    final gitkit.ResetPasswordResponse response = await _firebaseAuthApi.resetPassword(request);
+
+    final ActionCodeOperation operation = ActionCodeOperation.values
+        .firstWhere((ActionCodeOperation it) => it.value == response.requestType, orElse: () => null);
+    return ActionCodeInfo._(operation, response.email, response.newEmail);
+  }
+
+  /// Checks the validity of a verify password reset code
+  ///
+  /// Returns the email address of the user for which the out of band code applies.
+  Future<String> verifyPasswordReset(String oobCode) async {
+    final ActionCodeInfo response = await checkActionCode(oobCode);
+    return response.email;
+  }
+
+  /// Applies out of band code.
+  ///
+  /// This method will not work for out of band codes which require an additional parameter, such as password reset
+  /// code.
+  Future<void> applyActionCode(String oobCode) async {
+    assert(oobCode != null && oobCode.isNotEmpty);
+    final IdentitytoolkitRelyingpartySetAccountInfoRequest request = IdentitytoolkitRelyingpartySetAccountInfoRequest()
+      ..oobCode = oobCode;
+    return _firebaseAuthApi.setAccountInfo(request);
+  }
+
+  /// Triggers the Firebase Authentication backend to send a password-reset email to the given email address, which must
+  /// correspond to an existing user of your app.
+  ///
+  /// Errors:
+  ///  * [FirebaseAuthError.invalidRecipientEmail] - Indicates an invalid recipient email was sent in the request.
+  ///  * [FirebaseAuthError.invalidSender] - Indicates an invalid sender email is set in the console for this action.
+  ///  * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
+  ///  * [FirebaseAuthError.missingIosBundleID] - Indicates that the iOS bundle ID is missing when
+  ///     [ActionCodeSettings.handleCodeInApp] is set to true.
+  ///  * [FirebaseAuthError.missingAndroidPackageName] - Indicates that the android package name is missing when the
+  ///     [ActionCodeSettings.androidInstallApp] flag is set to true.
+  ///  * [FirebaseAuthError.unauthorizedDomain] - Indicates that the domain specified in the continue URL is not
+  ///     whitelisted in the Firebase console.
+  ///  * [FirebaseAuthError.invalidContinueURI] - Indicates that the domain specified in the continue URI is not valid.
+  ///  * [FirebaseAuthError.userNotFound] - Indicates that there is no user corresponding to the given [email] address.
+  Future<void> sendPasswordResetEmail({@required String email, ActionCodeSettings settings}) async {
+    assert(email != null);
+
+    final Relyingparty request = Relyingparty()
+      ..requestType = OobCodeType.passwordReset.value
+      ..email = email
+      ..updateWith(settings);
+
+    return _firebaseAuthApi.getOobConfirmationCode(request);
+  }
+
+  /// Signs in using an email address and email sign-in link.
+  ///
+  /// If successful, it also signs the user in into the app and updates the [onAuthStateChanged] stream.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.operationNotAllowed] - Indicates that email and email sign-in link accounts are not
+  ///       enabled. Enable them in the Auth section of the Firebase console.
+  ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
+  ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
+  Future<void> sendSignInWithEmailLink({@required String email, @required ActionCodeSettings settings}) async {
+    assert(email != null);
+    assert(settings != null);
+
+    final Relyingparty request = Relyingparty()
+      ..requestType = OobCodeType.emailLinkSignIn.value
+      ..email = email
+      ..updateWith(settings);
+
+    return _firebaseAuthApi.getOobConfirmationCode(request);
   }
 
   /// Signs out the current user and clears it from the disk cache.
@@ -345,8 +370,51 @@ class FirebaseAuth implements InternalTokenProvider {
     _updateCurrentUser(null, saveToDisk: true);
   }
 
-  /// Gets the cached current user, or null if there is none.
-  FirebaseUser get currentUser => _currentUser;
+  /// Checks if link is an email sign-in link.
+  bool isSignInWithEmailLink(String link) {
+    if (link == null || link.isEmpty) {
+      return false;
+    }
+
+    final Uri uri = Uri.tryParse(link);
+    if (uri == null) {
+      return false;
+    }
+
+    final Map<String, String> params = uri.queryParameters;
+    if (params.isEmpty) {
+      return false;
+    }
+
+    return params.containsKey('oobCode') && params['mode'] == 'signIn';
+  }
+
+  /// Starts the phone number authentication flow by sending a verification code to the specified phone number.
+  ///
+  /// You can use [presenter] to present the user with the recaptcha url in order to verify the app.
+  /// Errors:
+  ///   * [FirebaseAuthError.captchaCheckFailed] - Indicates that the reCAPTCHA token obtained by the Firebase Auth is
+  ///       invalid or has expired.
+  ///   * [FirebaseAuthError.quotaExceeded] - Indicates that the phone verification quota for this project has been
+  ///       exceeded.
+  ///   * [FirebaseAuthError.invalidPhoneNumber] - Indicates that the phone number provided is invalid.
+  ///   * [FirebaseAuthError.missingPhoneNumber] - Indicates that the phone number provided was not provided.
+  Future<String> verifyPhoneNumber({@required String phoneNumber, UrlPresenter presenter}) async {
+    assert(phoneNumber != null);
+    final IdentitytoolkitRelyingpartySendVerificationCodeRequest request =
+        IdentitytoolkitRelyingpartySendVerificationCodeRequest()..phoneNumber = phoneNumber;
+
+    final bool isTest = Platform.environment['FIREBASE_AUTH_TEST'] ?? false;
+    // We don't check the app if we are in a test
+    if (!isTest) {
+      final String token = await getRecaptchaToken(presenter ?? print, app.options.apiKey, languageCode);
+      request.recaptchaToken = token;
+    }
+
+    final IdentitytoolkitRelyingpartySendVerificationCodeResponse response =
+        await _firebaseAuthApi.sendVerificationCode(request);
+    return response.sessionInfo;
+  }
 
   /// Signs in Firebase with the given 3rd party credentials (e.g. a Facebook login Access Token, a Google ID
   /// Token/Access Token pair, etc.) and returns additional identity provider data.
@@ -374,7 +442,7 @@ class FirebaseAuth implements InternalTokenProvider {
 
     final VerifyAssertionResponse response = await _firebaseAuthApi.verifyAssertion(request);
 
-    final AuthCredential oAuthCredential = OAuthCredential(
+    final AuthCredential oAuthCredential = OAuthCredential._(
       providerId: response.providerId,
       idToken: response.oauthIdToken,
       accessToken: response.oauthAccessToken,
@@ -382,18 +450,17 @@ class FirebaseAuth implements InternalTokenProvider {
       pendingToken: response.oauthRequestToken,
     );
 
-    if (response.needConfirmation) {
+    if (response.needConfirmation ?? false) {
       return Future<AuthResult>.error(FirebaseAuthCredentialAlreadyInUseError(credential, response.email));
     }
 
     final FirebaseUser user =
         await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
-
     final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(
       providerId: response.providerId,
       profile: response.rawUserInfo != null ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo)) : null,
       username: response.screenName,
-      isNewUser: response.isNewUser,
+      isNewUser: response.isNewUser ?? false,
     );
 
     return AuthResult._(user, additionalUserInfo, oAuthCredential);
@@ -469,7 +536,7 @@ class FirebaseAuth implements InternalTokenProvider {
     }
 
     final IdentitytoolkitRelyingpartyVerifyPhoneNumberResponse response =
-        await _firebaseAuthApi._requester.verifyPhoneNumber(request);
+        await _firebaseAuthApi.verifyPhoneNumber(request);
 
     // Check whether or not the successful response is actually the special case phone auth flow that returns a
     // temporary proof and phone number.
@@ -551,7 +618,7 @@ class FirebaseAuth implements InternalTokenProvider {
       return;
     }
     _lastNotifiedUserToken = token;
-    if (_autoRefreshTokens) {
+    if (_autoRefreshTokens && _currentUser != null) {
       // Schedule new refresh task after successful attempt.
       _scheduleAutoTokenRefresh();
     }
@@ -616,21 +683,21 @@ class FirebaseAuth implements InternalTokenProvider {
   }
 
   void _dispatchUser(FirebaseUser user) {
-    _authStateChangedSubjects[_app.name].add(user);
+    _authStateChangedSubjects[app.name].add(user);
   }
 
   @override
   Future<GetTokenResult> getAccessToken({bool forceRefresh = false}) async {
+    if (_currentUser == null) {
+      return null;
+    }
+
     if (!_autoRefreshTokens) {
       print('Token auto-refresh enabled.');
       _autoRefreshTokens = true;
       _scheduleAutoTokenRefresh();
 
       _backgroundChangedSub = _platformDependencies.isBackgroundChanged.listen(_backgroundStateChanged);
-    }
-
-    if (_currentUser == null) {
-      return null;
     }
 
     final String token = await _currentUser._getToken(forceRefresh: forceRefresh);
