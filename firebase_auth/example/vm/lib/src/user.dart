@@ -119,8 +119,6 @@ Future<void> userOptionsDialog() async {
     }
   }
 
-  // We use this so we allow the user to observe the completion message.
-  await Future<void>.delayed(const Duration(seconds: 1));
   if (signOut) {
     return noUserOptionsDialog();
   } else {

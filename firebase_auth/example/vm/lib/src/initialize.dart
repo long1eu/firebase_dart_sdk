@@ -4,10 +4,10 @@
 
 part of firebase_auth_example;
 
-Future<void> init(File configFile) async {
+Future<void> init(Map<String, String> config) async {
   Hive.init('./hives');
 
-  await _initializeSecrets(configFile);
+  await _initializeSecrets(config);
 
   final Box<dynamic> firebaseBox =
       await Hive.openBox<dynamic>('firebase_auth', encryptionKey: _hiveEncryptionKey.codeUnits);
@@ -44,8 +44,7 @@ final List<String> _variablesNames = <String>[
   'microsoftClientId',
 ];
 
-Future<void> _initializeSecrets(File configFile) async {
-  final Map<String, String> config = Map<String, String>.from(jsonDecode(await configFile.readAsString()));
+Future<void> _initializeSecrets(Map<String, String> config) async {
   for (String variable in _variablesNames) {
     switch (variable) {
       case 'apiKey':
