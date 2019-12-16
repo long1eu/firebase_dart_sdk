@@ -31,16 +31,16 @@ Future<AuthResult> _signInWithCredential(FirebaseAuthOption option) async {
     final FirebaseAuthOption option = options[optionIndex];
     switch (option) {
       case FirebaseAuthOption.emailAndPasswordCredentials:
-        return _signInWithCredentialEmailAndPassword(option);
+        return _signInWithEmailAndPasswordCredential(option);
         break;
       case FirebaseAuthOption.phoneCredentials:
-        return _sendSignInWithPhoneNumber(option);
+        return _sendSignInWithPhoneNumberCredential(option);
         break;
       case FirebaseAuthOption.googleCredentials:
-        return _signInWithCredentialGoogle(option);
+        return _signInWithGoogleCredential(option);
         break;
       case FirebaseAuthOption.facebookCredentials:
-        return _signInWithCredentialFacebook(option);
+        return _signInWithFacebookCredential(option);
         break;
       case FirebaseAuthOption.twitterCredentials:
         return _signInWithCredentialTwitter(option);
@@ -49,12 +49,15 @@ Future<AuthResult> _signInWithCredential(FirebaseAuthOption option) async {
         return _signInWithCredentialGitHub(option);
         break;
       case FirebaseAuthOption.yahooCredentials:
-        return _signInWithCredentialYahoo(option);
+        throw StateError('Not yet implemented.');
+        return _signInWithYahooCredential(option);
         break;
       case FirebaseAuthOption.microsoftCredentials:
-        return _signInWithCredentialMicrosoft(option);
+        throw StateError('Not yet implemented.');
+        return _signInWithMicrosoftCredential(option);
         break;
       case FirebaseAuthOption.appleCredentials:
+        throw StateError('Not yet implemented.');
         break;
     }
   }

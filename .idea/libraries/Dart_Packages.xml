@@ -532,6 +532,7 @@
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/rxdart-0.23.0-dev.3/lib" />
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/rxdart-0.22.2/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/rxdart-0.23.1/lib" />
             </list>
           </value>
         </entry>
@@ -815,6 +816,7 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/quiver-2.1.2+1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/rxdart-0.22.2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/rxdart-0.23.0-dev.3/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/rxdart-0.23.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/shelf-0.7.5/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/shelf_packages_handler-1.0.4/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/shelf_static-0.2.8/lib" />

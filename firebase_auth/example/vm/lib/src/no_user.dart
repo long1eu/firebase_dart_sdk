@@ -67,7 +67,7 @@ Future<void> noUserOptionsDialog() async {
           result = await _singInWithCustomToken(option);
           break;
         case FirebaseAuthOption.signInWithPhoneNumber:
-          result = await _sendSignInWithPhoneNumber(option);
+          result = await _sendSignInWithPhoneNumberCredential(option);
           break;
         case FirebaseAuthOption.signInWithCredential:
           result = await _signInWithCredential(option);

@@ -218,7 +218,7 @@ abstract class AdditionalUserInfoImpl
       providerId: response.providerId,
       profile: response.rawUserInfo != null ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo)) : null,
       username: response.screenName,
-      isNewUser: response.isNewUser,
+      isNewUser: response.isNewUser ?? false,
     );
   }
 

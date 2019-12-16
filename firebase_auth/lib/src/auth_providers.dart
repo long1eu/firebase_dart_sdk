@@ -63,18 +63,26 @@ class OAuthProvider {
     @required String providerId,
     @required String accessToken,
     List<String> scopes,
+    Map<String, String> customParameters,
+    String sessionId,
+    String requestUri,
     String idToken,
-    String nonce,
+    String secret,
     String pendingToken,
+    String nonce,
   }) {
     assert(nonce == null || pendingToken == null);
     return OAuthCredential._(
       providerId: providerId,
       accessToken: accessToken,
-      idToken: idToken,
-      nonce: nonce,
       scopes: scopes,
+      customParameters: customParameters,
+      sessionId: sessionId,
+      requestUri: requestUri,
+      idToken: idToken,
+      secret: secret,
       pendingToken: pendingToken,
+      nonce: nonce,
     );
   }
 

@@ -15,7 +15,7 @@ dependencies:
   built_value: ^7.0.0
   built_collection: ^4.3.0
   hive: ^1.1.1
-  rxdart: ^0.23.0-dev.3
+  rxdart: ^0.23.1
   googleapis: ^0.54.0
   googleapis_auth: ^0.2.11
 

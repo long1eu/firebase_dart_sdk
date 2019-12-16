@@ -51,21 +51,42 @@ Future<void> userOptionsDialog() async {
           signOut = await _currentUser(option);
           break;
         case FirebaseAuthOption.sendEmailVerification:
-          // TODO(long1eu): anonymous users don't have an email address
+          if (FirebaseAuth.instance.currentUser.isAnonymous) {
+            throw StateError('Anonymous users don\'t have a email address to verify. :D');
+          }
           signOut = await _sendEmailVerification(option);
           break;
         case FirebaseAuthOption.delete:
+          console.println('Are you sure you want to delete your account? (yes/no)');
+          final String response = await console.nextLine;
+          if (response == 'yes') {
+            await FirebaseAuth.instance.currentUser.delete();
+            signOut = true;
+            console //
+              ..println('Account deleted')
+              ..print('Press Enter to return.');
+
+            await console.nextLine;
+          }
+          console.clearScreen();
           break;
         case FirebaseAuthOption.updateAccount:
+          signOut = await _updateProfile(option);
           break;
         case FirebaseAuthOption.createCustomToken:
           signOut = await _createCustomToken(option);
           break;
         case FirebaseAuthOption.reauthenticateWithCredential:
+          final AuthResult result = await _reauthenticateWithCredential(option);
+          signOut = result == null;
           break;
         case FirebaseAuthOption.linkProvider:
+          final AuthResult result = await _linkProvider(option);
+          signOut = result == null;
           break;
         case FirebaseAuthOption.unlinkProvider:
+          await _unlinkProvider(option);
+          signOut = false;
           break;
         case FirebaseAuthOption.signOut:
           await FirebaseAuth.instance.signOut();
@@ -75,11 +96,15 @@ Future<void> userOptionsDialog() async {
       }
     } on FirebaseAuthError catch (error) {
       await _stopAllProgress();
-      console //
-        ..clearScreen()
-        ..println(error.message.red.reset)
-        ..print('Press Enter to return.');
+      console.clearScreen();
+      if (error == FirebaseAuthError.userTokenExpired) {
+        signOut = true;
+        console.println('Your session has expired you need to login again.');
+      } else {
+        console.println(error.message.red.reset);
+      }
 
+      console.print('Press Enter to return.');
       await console.nextLine;
       console.clearScreen();
     } on StateError catch (error) {

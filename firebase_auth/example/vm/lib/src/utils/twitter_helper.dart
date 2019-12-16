@@ -1,79 +1,25 @@
 // File created by
 // Lung Razvan <long1eu>
-// on 14/12/2019
+// on 16/12/2019
 
-part of firebase_auth_example;
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
-Future<AuthResult> _signInWithCredentialTwitter(FirebaseAuthOption option) async {
-  final TwitterClient client = TwitterClient(
-    consumerKey: _twitterConsumerKey,
-    consumerKeySecret: _twitterConsumerKeySecret,
-    accessToken: _twitterAccessToken,
-    accessTokenSecret: _twitterAccessTokenSecret,
-  );
+import 'package:convert/convert.dart';
+import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart';
+import 'package:meta/meta.dart';
+import 'package:uuid/uuid.dart';
 
-  Progress progress = Progress('Getting Twitter configuration')..show();
-  await client.initialize();
-  await progress.cancel();
-  final TwitterRequestToken requestToken = client._requestToken;
-  final HttpServer server = client._server;
-
-  // add proper message
-  console
-    ..println('Visit this link and login with Twitter')
-    ..println('https://api.twitter.com/oauth/authenticate?oauth_token=${requestToken.token}');
-
-  final HttpRequest request = await server.first;
-  final Map<String, dynamic> data = request.requestedUri.queryParameters;
-  final String oauthToken = data['oauth_token'];
-  final String oauthVerifier = data['oauth_verifier'];
-
-  if (request.method != 'GET') {
-    throw Exception('Invalid response from server (expected GET request callback, got: ${request.method}).');
-  }
-  if (requestToken.token != oauthToken) {
-    throw StateError('The request doesn\'t match.');
-  }
-
-  request.response
-    ..statusCode = 200
-    ..headers.set('content-type', 'text/html; charset=UTF-8')
-    ..write(_successHtml);
-  await request.response.flush();
-  await request.response.close();
-  await server.close();
-
-  progress = Progress('Validating credentials')..show();
-  final Response response = await client.post('oauth/access_token', headers: <String, String>{
-    'oauth_token': requestToken.token,
-    'oauth_verifier': oauthVerifier,
-  });
-  await progress.cancel();
-
-  if (response.statusCode > 200) {
-    throw StateError(response.body);
-  }
-
-  final Map<String, String> queryParameters = response.body.queryParameters;
-  final String userAuthToken = queryParameters['oauth_token'];
-  final String userAuthTokenSecret = queryParameters['oauth_token_secret'];
-  final AuthCredential credential =
-      TwitterAuthProvider.getCredential(authToken: userAuthToken, authTokenSecret: userAuthTokenSecret);
-
-  console.println();
-  progress = Progress('Siging in')..show();
-  final AuthResult auth = await FirebaseAuth.instance.signInWithCredential(credential);
-  await progress.cancel();
-  console.clearScreen();
-  return auth;
-}
+import 'extensions.dart';
 
 class TwitterRequestToken {
-  const TwitterRequestToken({this.token, this.tokenSecret, this.port});
+  const TwitterRequestToken({this.token, this.tokenSecret});
 
   final String token;
   final String tokenSecret;
-  final int port;
 }
 
 class TwitterClient extends BaseClient {
@@ -94,13 +40,17 @@ class TwitterClient extends BaseClient {
   TwitterRequestToken _requestToken;
   HttpServer _server;
 
+  TwitterRequestToken get requestToken => _requestToken;
+
+  HttpServer get server => _server;
+
   Future<void> initialize() async {
     _server = await HttpServer.bind('localhost', 55937);
-    _requestToken = await _getRequestToken(_server.port);
+    _requestToken = await _getRequestToken();
   }
 
-  Future<TwitterRequestToken> _getRequestToken(int port) async {
-    final Uri redirectUrl = Uri.http('localhost:$port', '__/auth/handler');
+  Future<TwitterRequestToken> _getRequestToken() async {
+    final Uri redirectUrl = Uri.http('localhost:55937', '__/auth/handler');
 
     final Response response =
         await this.post('oauth/request_token', headers: <String, String>{'oauth_callback': redirectUrl.toString()});
@@ -111,7 +61,7 @@ class TwitterClient extends BaseClient {
     final bool callbackConfirmed = responseData['oauth_callback_confirmed'] == 'true';
     assert(callbackConfirmed);
 
-    return TwitterRequestToken(token: token, tokenSecret: tokenSecret, port: port);
+    return TwitterRequestToken(token: token, tokenSecret: tokenSecret);
   }
 
   @override
@@ -154,27 +104,7 @@ class TwitterClient extends BaseClient {
   String _encode(String data) => percent.encode(data.codeUnits);
 }
 
-extension on Map<String, String> {
-  List<String> get pairs {
-    return keys.map((String key) => '$key=${percent.encode(this[key].codeUnits)}').toList()..sort();
-  }
-
-  List<String> pairsWhere(bool Function(String key) test) {
-    return keys.where(test).map((String key) => '$key=${percent.encode(this[key].codeUnits)}').toList()..sort();
-  }
-}
-
-extension on String {
-  Map<String, String> get queryParameters {
-    return split('&')
-        .map((String value) => value.split('='))
-        .toList()
-        .asMap()
-        .map((_, List<String> value) => MapEntry<String, String>(value[0], value[1]));
-  }
-}
-
-const String _successHtml = '''<!DOCTYPE html>
+String get authSuccessHtml => '''<!DOCTYPE html>
 <html class="mdl-js">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">

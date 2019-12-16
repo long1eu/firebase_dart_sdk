@@ -89,7 +89,10 @@ class FirebaseAuth implements InternalTokenProvider {
   /// This method is useful when you support multiple authentication mechanisms if you want to implement an email-first
   /// authentication flow.
   ///
-  /// An empty `List` is returned if the user could not be found.
+  /// An empty `List` is returned if the user could not be found. A null list indicates that the user has an account,
+  /// but there are no providers registered. This can happen if the user unlinked all providers. The user can regain
+  /// access to his account by resetting the password. When the reset flow is completes successful the
+  /// [ProviderType.password] is linked to his account.
   ///
   /// Errors:
   ///   * [FirebaseAuthError.invalidEmail] - If the [email] address is malformed.
@@ -102,7 +105,7 @@ class FirebaseAuth implements InternalTokenProvider {
 
     final CreateAuthUriResponse response = await _firebaseAuthApi.createAuthUri(request);
 
-    return response.registered ? response.allProviders.toList() : <String>[];
+    return response.registered ? response.allProviders?.toList() : <String>[];
   }
 
   /// Signs in a user with the given email address and password.

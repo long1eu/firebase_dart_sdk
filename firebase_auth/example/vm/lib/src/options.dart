@@ -94,9 +94,11 @@ class FirebaseAuthOption {
     facebookCredentials,
     twitterCredentials,
     githubCredentials,
+    /*
     yahooCredentials,
     microsoftCredentials,
     appleCredentials,
+    */
   ];
 
   static const List<String> _names = <String>[

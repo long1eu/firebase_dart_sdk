@@ -37,6 +37,7 @@ class FirebaseAuthError extends FirebaseError {
         return invalidUserToken;
       case 'NETWORK_REQUEST_FAILED':
         return networkError;
+      case 'TOKEN_EXPIRED':
       case 'USER_TOKEN_EXPIRED':
         return userTokenExpired;
       case 'INVALID_API_KEY':

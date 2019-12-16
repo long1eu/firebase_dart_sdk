@@ -10,13 +10,14 @@ Future<void> init(File configFile) async {
   await _initializeSecrets(configFile);
 
   final Box<dynamic> firebaseBox =
-      await Hive.openBox<dynamic>('firebase_auth', encryptionKey: 'dEtk7JiOCJirguAJEM7wOSkcNtfZO0DG'.codeUnits);
+      await Hive.openBox<dynamic>('firebase_auth', encryptionKey: _hiveEncryptionKey.codeUnits);
   final Dependencies dependencies = Dependencies(box: firebaseBox);
-  final FirebaseOptions options =
-      FirebaseOptions(apiKey: 'AIzaSyDsSL36xeTPP-JdGZBdadhEm2bxNpMqlUQ', applicationId: 'appId');
+  final FirebaseOptions options = FirebaseOptions(apiKey: _apiKey, applicationId: 'appId');
   FirebaseApp.withOptions(options, dependencies);
 }
 
+String _apiKey;
+String _hiveEncryptionKey;
 String _twitterConsumerKey;
 String _twitterConsumerKeySecret;
 String _twitterAccessToken;
@@ -29,6 +30,8 @@ String _yahooClientId;
 String _microsoftClientId;
 
 final List<String> _variablesNames = <String>[
+  'apiKey',
+  'hiveEncryptionKey',
   'twitterConsumerKey',
   'twitterConsumerKeySecret',
   'twitterAccessToken',
@@ -45,6 +48,12 @@ Future<void> _initializeSecrets(File configFile) async {
   final Map<String, String> config = Map<String, String>.from(jsonDecode(await configFile.readAsString()));
   for (String variable in _variablesNames) {
     switch (variable) {
+      case 'apiKey':
+        _apiKey = config[variable];
+        break;
+      case 'hiveEncryptionKey':
+        _hiveEncryptionKey = config[variable];
+        break;
       case 'twitterConsumerKey':
         _twitterConsumerKey = config[variable];
         break;
