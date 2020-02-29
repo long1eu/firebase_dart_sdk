@@ -1,4 +1,4 @@
-name: firebase_common
+name: firebase_common_dart
 description: A starting point for Dart libraries or applications.
 version: 0.0.1
 homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
@@ -9,11 +9,11 @@ environment:
 
 dependencies:
   user_preferences: ^0.1.1+4
-  firebase_internal:
+  firebase_internal_dart:
     git:
       url: https://github.com/fluttercommunity/firebase_dart_sdk
       ref: develop
-      path: firebase_internal
+      path: firebase_internal_dart
 
 dev_dependencies:
   test: ^1.12.0

@@ -1,4 +1,4 @@
-name: firebase_firestore
+name: firebase_firestore_dart
 description: A starting point for Dart libraries or applications.
 version: 0.0.1+1
 author: long1eu <home@long.1eu>
@@ -7,24 +7,23 @@ environment:
   sdk: '>=2.2.2 <3.0.0'
 
 dependencies:
-  firebase_common:
-    path: ../firebase_common
-    # git:
-    #   url: https://github.com/fluttercommunity/firebase_dart_sdk
-    #   path: firebase_common
-
-  firebase_database_collection:
+  firebase_common_dart:
     git:
       url: https://github.com/fluttercommunity/firebase_dart_sdk
-      path: firebase_database_collection
+      path: firebase_common_dart
+  firebase_database_collection_dart:
+    git:
+      url: https://github.com/fluttercommunity/firebase_dart_sdk
+      path: firebase_database_collection_dart
+  firebase_internal_dart:
+    git:
+      url: https://github.com/fluttercommunity/firebase_dart_sdk
+      path: firebase_internal_dart
 
   protobuf: ^1.0.1
   grpc: ^2.1.3
   rxdart: ^0.22.2
 
-
-  firebase_internal:
-    path: ../firebase_internal
 
 dev_dependencies:
   test: ^1.6.8
