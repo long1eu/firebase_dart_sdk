@@ -23,7 +23,6 @@ import 'package:firebase_storage/src/update_metadata_task.dart';
 /// Represents a reference to a Google Cloud Storage object. Developers can
 /// upload and download objects, get/set object metadata, and delete an object
 /// at a specified path. (see <a href='https://cloud.google.com/storage/'>Google Cloud Storage</a>)
-@publicApi
 class StorageReference {
   // region Constructors
   StorageReference(this.storageUri, this.storage)
@@ -47,7 +46,6 @@ class StorageReference {
   /// child = foo///bar    path = foo/bar
   ///
   /// [pathString] is the relative path from this reference.
-  @publicApi
   StorageReference child(String pathString) {
     Preconditions.checkArgument(pathString != null && pathString.isNotEmpty,
         'childName cannot be null or empty');
@@ -76,7 +74,6 @@ class StorageReference {
   /// path = (root)        parent = (null)
   ///
   /// @return the parent {@link StorageReference}.
-  @publicApi
   StorageReference get parent {
     String path = storageUri.path;
 
@@ -97,14 +94,12 @@ class StorageReference {
 
   /// Returns a new instance of [StorageReference] pointing to the root
   /// location.
-  @publicApi
   StorageReference get root {
     final Uri child = storageUri.replace(path: '');
     return StorageReference(child, storage);
   }
 
   /// Returns the short name of this object.
-  @publicApi
   String get name {
     final String path = storageUri.path;
     assert(path != null);
@@ -117,7 +112,6 @@ class StorageReference {
 
   /// Returns the full path to this object, not including the Google Cloud
   /// Storage bucket.
-  @publicApi
   String get path {
     final String path = storageUri.path;
     assert(path != null);
@@ -125,7 +119,6 @@ class StorageReference {
   }
 
   /// Return the Google Cloud Storage bucket that holds this object.
-  @publicApi
   String get bucket => storageUri.authority;
 
   FirebaseApp get app => storage.app;
@@ -140,7 +133,6 @@ class StorageReference {
    * @return An instance of {@link UploadTask} which can be used to monitor and manage the upload.
    */
   @SuppressWarnings('ConstantConditions')
-  @publicApi
   UploadTask putBytes(List<int> bytes) {
     Preconditions.checkArgument(bytes != null, 'bytes cannot be null');
 
@@ -160,7 +152,6 @@ class StorageReference {
    * @return An instance of {@link UploadTask} which can be used to monitor and manage the upload.
    */
 
-  @publicApi
   UploadTask putBytes(List<int> bytes, StorageMetadata metadata) {
     Preconditions.checkArgument(bytes != null, 'bytes cannot be null');
     Preconditions.checkArgument(metadata != null, 'metadata cannot be null');
@@ -178,7 +169,6 @@ class StorageReference {
    * @return An instance of {@link UploadTask} which can be used to monitor or manage the upload.
    */
   @SuppressWarnings('ConstantConditions')
-  @publicApi
   UploadTask putFile(Uri uri) {
     Preconditions.checkArgument(uri != null, 'uri cannot be null');
 
@@ -197,7 +187,6 @@ class StorageReference {
    * @return An instance of {@link UploadTask} which can be used to monitor or manage the upload.
    */
   @SuppressWarnings('ConstantConditions')
-  @publicApi
   UploadTask putFile(Uri uri, StorageMetadata metadata) {
     Preconditions.checkArgument(uri != null, 'uri cannot be null');
     Preconditions.checkArgument(metadata != null, 'metadata cannot be null');
@@ -219,7 +208,6 @@ class StorageReference {
    * @return An instance of {@link UploadTask} which can be used to monitor or manage the upload.
    */
   @SuppressWarnings('ConstantConditions')
-  @publicApi
   UploadTask putFile(Uri uri, StorageMetadata metadata, Uri existingUploadUri) {
     Preconditions.checkArgument(uri != null, 'uri cannot be null');
     Preconditions.checkArgument(metadata != null, 'metadata cannot be null');
@@ -237,7 +225,6 @@ class StorageReference {
    * @return An instance of {@link UploadTask} which can be used to monitor and manage the upload.
    */
   @SuppressWarnings('ConstantConditions')
-  @publicApi
   UploadTask putStream(InputStream stream) {
     Preconditions.checkArgument(stream != null, 'stream cannot be null');
 
@@ -256,7 +243,6 @@ class StorageReference {
    * @return An instance of {@link UploadTask} which can be used to monitor and manage the upload.
    */
   @SuppressWarnings('ConstantConditions')
-  @publicApi
   UploadTask putStream(InputStream stream, StorageMetadata metadata) {
     Preconditions.checkArgument(stream != null, 'stream cannot be null');
     Preconditions.checkArgument(metadata != null, 'metadata cannot be null');
@@ -269,7 +255,6 @@ class StorageReference {
 
   /// Returns the set of active upload tasks currently in progress or recently
   /// completed.
-  @publicApi
   List<UploadTask> get activeUploadTasks {
     return StorageTaskManager.instance.getUploadTasksUnder(this);
   }
@@ -277,13 +262,11 @@ class StorageReference {
 
   /// Returns the set of active download tasks currently in progress or recently
   /// completed.
-  @publicApi
   List<FileDownloadTask> get activeDownloadTasks {
     return StorageTaskManager.instance.getDownloadTasksUnder(this);
   }
 
   /// Retrieves metadata associated with an object at this [StorageReference].
-  @publicApi
   Future<StorageMetadata> get metadata => GetMetadataTask.execute(this);
 
   /// Retrieves a long lived download URL with a revokable token. This can be
@@ -291,14 +274,12 @@ class StorageReference {
   /// the Firebase Console if desired.
   ///
   /// Returns the [Uri] representing the download URL.
-  @publicApi
   Future<Uri> get downloadUrl => GetDownloadUrlTask.execute(this);
 
   /// Updates the metadata associated with this [StorageReference].
   ///
   /// Returns a [Future] that will return the final [StorageMetadata] once the
   /// operation is complete.
-  @publicApi
   Future<StorageMetadata> updateMetadata(StorageMetadata metadata) {
     Preconditions.checkNotNull(metadata);
     return UpdateMetadataTask.execute(this, metadata);
@@ -315,7 +296,6 @@ class StorageReference {
   /// [RangeError] will be returned.
   ///
   /// Returns the bytes downloaded.
-  @publicApi
   Future<List<int>> getBytes(final int maxDownloadSizeBytes) {
     final Completer<List<int>> pendingResult = Completer<List<int>>();
     final StreamedTask<DownloadStreamTaskSnapshot> task =
@@ -341,7 +321,6 @@ class StorageReference {
   ///
   /// Returns a [Task] that can be used to monitor or manage the
   /// download.
-  @publicApi
   Task<DownloadTaskSnapshot> getFile(File destinationFile) {
     return FileDownloadTask.schedule(this, destinationFile);
   }
@@ -351,7 +330,6 @@ class StorageReference {
   ///
   /// Returns a [StreamedTask] that can be used to monitor or manage the
   /// download.
-  @publicApi
   StreamedTask<DownloadStreamTaskSnapshot> get stream {
     return StreamDownloadTask.schedule(this);
   }
@@ -359,7 +337,6 @@ class StorageReference {
   /// Deletes the object at this [StorageReference].
   ///
   /// Return a Future that indicates whether the operation succeeded or failed.
-  @publicApi
   Future<void> delete() => DeleteStorageTask.execute(this);
 
   /// Returns this object in URI form, which can then be shared and passed into

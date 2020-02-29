@@ -18,7 +18,7 @@ class ApiKeyClient extends DelegatingClient {
   final String _encodedApiKey;
   final HeaderBuilder _headers;
 
-  String locale;
+  String locale = 'en';
 
   @override
   Future<StreamedResponse> send(BaseRequest request) async {

@@ -248,10 +248,16 @@
             <list>
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_common/lib" />
               <option value="$PROJECT_DIR$/firebase_common/lib" />
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ea4eba97ca9ac6185c4d1352468ad0f72511b367/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_common/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_common_dart">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-d726800a30c0341e2e9207c938df893dc9e5a173/firebase_common_dart/lib" />
             </list>
           </value>
         </entry>
@@ -278,6 +284,13 @@
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
               <option value="$PROJECT_DIR$/firebase_internal/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_internal/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_internal_dart">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-d726800a30c0341e2e9207c938df893dc9e5a173/firebase_internal_dart/lib" />
             </list>
           </value>
         </entry>
@@ -996,7 +1009,8 @@
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_common/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_internal/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ea4eba97ca9ac6185c4d1352468ad0f72511b367/firebase_common/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-d726800a30c0341e2e9207c938df893dc9e5a173/firebase_common_dart/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-d726800a30c0341e2e9207c938df893dc9e5a173/firebase_internal_dart/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ff41463debfc5e5261c694e8bd1d912e7be0e24b/firebase_auth/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_discoveryapis_commons-0.1.8+1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_discoveryapis_commons-0.1.9/lib" />

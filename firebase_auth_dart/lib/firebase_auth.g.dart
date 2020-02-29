@@ -463,14 +463,12 @@ class _$OAuthCredentialImplSerializer
           result.scopes.replace(serializers.deserialize(value,
                   specifiedType:
                       const FullType(BuiltList, const [const FullType(String)]))
-              as BuiltList<dynamic>);
+              as BuiltList<Object>);
           break;
         case 'customParameters':
           result.customParameters.replace(serializers.deserialize(value,
-              specifiedType: const FullType(BuiltMap, const [
-                const FullType(String),
-                const FullType(String)
-              ])) as BuiltMap<dynamic, dynamic>);
+              specifiedType: const FullType(BuiltMap,
+                  const [const FullType(String), const FullType(String)])));
           break;
         case 'sessionId':
           result.sessionId = serializers.deserialize(value,
@@ -745,7 +743,7 @@ class _$AdditionalUserInfoImplSerializer
       result
         ..add('profile')
         ..add(serializers.serialize(object.profile,
-            specifiedType: const FullType(MapBuilder,
+            specifiedType: const FullType(BuiltMap,
                 const [const FullType(String), const FullType(JsonObject)])));
     }
     if (object.username != null) {
@@ -774,11 +772,9 @@ class _$AdditionalUserInfoImplSerializer
               specifiedType: const FullType(String)) as String;
           break;
         case 'profile':
-          result.profile = serializers.deserialize(value,
-              specifiedType: const FullType(MapBuilder, const [
-                const FullType(String),
-                const FullType(JsonObject)
-              ])) as MapBuilder<String, JsonObject>;
+          result.profile.replace(serializers.deserialize(value,
+              specifiedType: const FullType(BuiltMap,
+                  const [const FullType(String), const FullType(JsonObject)])));
           break;
         case 'username':
           result.username = serializers.deserialize(value,
@@ -2679,7 +2675,7 @@ class _$AdditionalUserInfoImpl extends AdditionalUserInfoImpl {
   @override
   final String providerId;
   @override
-  final MapBuilder<String, JsonObject> profile;
+  final BuiltMap<String, JsonObject> profile;
   @override
   final String username;
   @override
@@ -2744,7 +2740,8 @@ class AdditionalUserInfoImplBuilder
   set providerId(String providerId) => _$this._providerId = providerId;
 
   MapBuilder<String, JsonObject> _profile;
-  MapBuilder<String, JsonObject> get profile => _$this._profile;
+  MapBuilder<String, JsonObject> get profile =>
+      _$this._profile ??= new MapBuilder<String, JsonObject>();
   set profile(MapBuilder<String, JsonObject> profile) =>
       _$this._profile = profile;
 
@@ -2761,7 +2758,7 @@ class AdditionalUserInfoImplBuilder
   AdditionalUserInfoImplBuilder get _$this {
     if (_$v != null) {
       _providerId = _$v.providerId;
-      _profile = _$v.profile;
+      _profile = _$v.profile?.toBuilder();
       _username = _$v.username;
       _isNewUser = _$v.isNewUser;
       _$v = null;
@@ -2784,12 +2781,25 @@ class AdditionalUserInfoImplBuilder
 
   @override
   _$AdditionalUserInfoImpl build() {
-    final _$result = _$v ??
-        new _$AdditionalUserInfoImpl._(
-            providerId: providerId,
-            profile: profile,
-            username: username,
-            isNewUser: isNewUser);
+    _$AdditionalUserInfoImpl _$result;
+    try {
+      _$result = _$v ??
+          new _$AdditionalUserInfoImpl._(
+              providerId: providerId,
+              profile: _profile?.build(),
+              username: username,
+              isNewUser: isNewUser);
+    } catch (_) {
+      String _$failedField;
+      try {
+        _$failedField = 'profile';
+        _profile?.build();
+      } catch (e) {
+        throw new BuiltValueNestedFieldError(
+            'AdditionalUserInfoImpl', _$failedField, e.toString());
+      }
+      rethrow;
+    }
     replace(_$result);
     return _$result;
   }

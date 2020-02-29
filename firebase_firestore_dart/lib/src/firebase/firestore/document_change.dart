@@ -13,7 +13,6 @@ import 'package:firebase_firestore/src/firebase/firestore/query_document_snapsho
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
-@publicApi
 enum DocumentChangeType {
   /// Indicates a new document was added to the set of documents matching the query.
   added,
@@ -32,7 +31,6 @@ enum DocumentChangeType {
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
-@publicApi
 class DocumentChange {
   @visibleForTesting
   DocumentChange(this.document, this.type, this.oldIndex, this.newIndex);

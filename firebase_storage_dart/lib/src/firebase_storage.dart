@@ -16,7 +16,6 @@ import 'package:meta/meta.dart';
 /// FirebaseApp, the FirebaseStorage instance will initialize with the default
 /// [FirebaseApp] obtainable from [FirebaseApp.instance]. The storage location
 /// in this case will come the json configuration file downloaded from the web.
-@publicApi
 class FirebaseStorage {
   FirebaseStorage._(this.bucketName, this.app)
       : isNetworkConnected = app.isNetworkConnected;
@@ -25,7 +24,6 @@ class FirebaseStorage {
   /// and/or a custom Storage Bucket.
   ///
   /// [url] is the gs:// url to your Firebase Storage Bucket.
-  @publicApi
   factory FirebaseStorage.getInstance({FirebaseApp app, String url}) {
     if (app == null && url == null) {
       return instance;
@@ -91,7 +89,6 @@ class FirebaseStorage {
   static FirebaseStorage _defaultInstance;
 
   /// Returns the [FirebaseStorage], initialized with the default [FirebaseApp].
-  @publicApi
   static FirebaseStorage get instance => _defaultInstance ??=
       FirebaseStorage.getInstance(app: FirebaseApp.instance);
 
@@ -108,10 +105,8 @@ class FirebaseStorage {
 
   final IsNetworkConnected isNetworkConnected;
 
-  @publicApi
   final FirebaseApp app;
 
-  @publicApi
   final String bucketName;
 
   /// Returns the maximum time to retry an upload if a failure occurs.
@@ -129,7 +124,6 @@ class FirebaseStorage {
 
   /// Creates a new [StorageReference] initialized at the root Firebase Storage
   /// location.
-  @publicApi
   // TODO(long1eu):{22/10/2018 11:38}-long1eu: cache this, there is no need to recalculate it
   StorageReference get reference {
     if (bucketName == null || bucketName.isEmpty) {
@@ -148,7 +142,6 @@ class FirebaseStorage {
   /// [StorageReference.toString]. An error is thrown if [fullUrl] is not
   /// associated with the [FirebaseApp] used to initialize this
   /// [FirebaseStorage].
-  @publicApi
   StorageReference getReferenceFromUrl(String fullUrl) {
     Preconditions.checkArgument(fullUrl != null && fullUrl.isNotEmpty,
         'location must not be null or empty');
@@ -179,7 +172,6 @@ class FirebaseStorage {
   /// with, for instance 'path/to/object'
   ///
   /// Returns an instance of [StorageReference] at the given child path.
-  @publicApi
   StorageReference getReference(String location) {
     Preconditions.checkArgument(location != null && location.isNotEmpty,
         'location must not be null or empty');

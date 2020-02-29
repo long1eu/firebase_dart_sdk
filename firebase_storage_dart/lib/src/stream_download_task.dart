@@ -19,7 +19,6 @@ import 'package:firebase_storage/src/storage_task.dart';
 import 'package:firebase_storage/src/streamed_task.dart';
 
 /// A task that downloads bytes of a GCS blob.
-@publicApi
 class StreamDownloadTask extends StorageTask<DownloadStreamTaskSnapshot> {
   StreamDownloadTask._(this.reference, SendPort sendPort)
       : _sender = ExponentialBackoffSender(

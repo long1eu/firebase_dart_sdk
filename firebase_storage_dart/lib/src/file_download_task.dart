@@ -20,7 +20,6 @@ import 'package:firebase_storage/src/storage_task.dart';
 import 'package:firebase_storage/src/task.dart';
 
 /// A task that downloads bytes of a GCS blob to a specified File.
-@publicApi
 class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
   FileDownloadTask._(this.reference, this._destinationFile, SendPort sendPort)
       : _sender = ExponentialBackoffSender(
@@ -258,7 +257,6 @@ class FileDownloadTask extends StorageTask<DownloadTaskSnapshot> {
   }
 
   @override
-  @publicApi
   void onCanceled() {
     _sender.cancel();
     _error = StorageException.fromErrorStatus(Status.resultCanceled);

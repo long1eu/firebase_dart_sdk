@@ -5,17 +5,14 @@
 import 'package:firebase_common/firebase_common.dart';
 
 /// Sentinel values that can be used when writing document fields with [set] or [update].
-@publicApi
 abstract class FieldValue {
   const FieldValue._(this.elements);
 
   /// Returns a sentinel for use with update() to mark a field for deletion.
-  @publicApi
   factory FieldValue.delete() => _deleteInstance;
 
   /// Returns a sentinel for use with set() or update() to include a server-generated timestamp in
   /// the written data.
-  @publicApi
   factory FieldValue.serverTimestamp() => _serverTimestampInstance;
 
   /// Returns a special value that can be used with set() or update() that tells the server to union
@@ -24,7 +21,6 @@ abstract class FieldValue {
   /// modified is not already an array it will be overwritten with an array containing exactly the
   /// specified elements. The [elements] to union into the array. Returns the [FieldValue] sentinel
   /// for use in a call to set() or update().
-  @publicApi
   factory FieldValue.arrayUnion(List<Object> elements) {
     return _ArrayUnionFieldValue._(elements);
   }
@@ -36,7 +32,6 @@ abstract class FieldValue {
   ///
   /// The [elements] to remove from the array. Returns the [FieldValue] sentinel for use in a call
   /// to set() or update().
-  @publicApi
   factory FieldValue.arrayRemove(List<Object> elements) {
     return _ArrayRemoveFieldValue._(elements);
   }

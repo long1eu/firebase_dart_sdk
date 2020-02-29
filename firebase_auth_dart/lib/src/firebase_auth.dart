@@ -14,19 +14,20 @@ const Duration _kTokenRefreshHeadStart = Duration(minutes: 5);
 
 // ignore_for_file: prefer_constructors_over_static_methods
 class FirebaseAuth implements InternalTokenProvider {
-  FirebaseAuth._(this.app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage)
-      : _platformDependencies = app.platformDependencies;
+  FirebaseAuth._(this.app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage);
 
   factory FirebaseAuth.getInstance(FirebaseApp app) {
     _authStateChangedSubjects[FirebaseApp.instance.name] = BehaviorSubject<FirebaseUser>();
 
     // init the identity toolkit client
-    final ApiKeyClient apiKeyClient = ApiKeyClient(app.options.apiKey, app.platformDependencies.headersBuilder)
-      ..locale = app.platformDependencies.locale;
+    final ApiKeyClient apiKeyClient = ApiKeyClient(app.options.apiKey, app.headersBuilder);
     final FirebaseAuthApi firebaseAuthApi = FirebaseAuthApi(client: apiKeyClient);
 
-    final UserStorage userStorage = UserStorage(userBox: app.platformDependencies.box, appName: app.name);
+    final UserStorage userStorage = UserStorage(localStorage: app.storage, appName: app.name);
     final FirebaseAuth auth = FirebaseAuth._(app, firebaseAuthApi, apiKeyClient, userStorage);
+    if (app.authProvider == app) {
+      app.authProvider = auth;
+    }
     final FirebaseUser user = userStorage.get(auth);
     auth
       .._updateCurrentUser(user, saveToDisk: false)
@@ -53,9 +54,9 @@ class FirebaseAuth implements InternalTokenProvider {
 
   final FirebaseAuthApi _firebaseAuthApi;
   final UserStorage _userStorage;
-  final PlatformDependencies _platformDependencies;
   final ApiKeyClient _apiKeyClient;
 
+  // TODO(long1eu): Is there a reason to cancel the reauth subscription?
   StreamSubscription<bool> _backgroundChangedSub;
   bool _isAppInBackground;
 
@@ -697,7 +698,7 @@ class FirebaseAuth implements InternalTokenProvider {
       _autoRefreshTokens = true;
       _scheduleAutoTokenRefresh();
 
-      _backgroundChangedSub = _platformDependencies.isBackgroundChanged.listen(_backgroundStateChanged);
+      _backgroundChangedSub = app.onBackgroundChanged.listen(_backgroundStateChanged);
     }
 
     final String token = await _currentUser._getToken(forceRefresh: forceRefresh);

@@ -10,7 +10,6 @@ import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
-@publicApi
 class SnapshotMetadata {
   const SnapshotMetadata(this.hasPendingWrites, this.isFromCache);
 

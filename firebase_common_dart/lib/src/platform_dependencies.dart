@@ -2,33 +2,31 @@
 // Lung Razvan <long1eu>
 // on 25/11/2019
 
-import 'package:firebase_internal/firebase_internal.dart';
-import 'package:hive/hive.dart';
+import 'package:firebase_internal_dart/firebase_internal.dart';
+import 'package:rxdart/rxdart.dart';
 
-/// This class should hold object that the Firebase services depend upon and platform specific.
+/// This class should hold services that Firebase depends on and are platform specific.
 abstract class PlatformDependencies {
   const PlatformDependencies();
 
-  AuthUrlPresenter get authUrlPresenter;
+  /// This stream should emit true then the app enters in background and false otherwise
+  BehaviorSubject<bool> get onBackgroundChanged;
 
-  Stream<bool> get isBackgroundChanged;
-
-  Box<dynamic> get box;
+  /// This stream should emit true when there is an internet connection and false otherwise
+  BehaviorSubject<bool> get onNetworkConnected;
 
   HeaderBuilder get headersBuilder;
 
-  String get locale;
+  LocalStorage get storage;
 
   InternalTokenProvider get authProvider;
+}
 
-  Future<bool> get isNetworkConnected;
+abstract class LocalStorage {
+  String get(String key);
 
-  bool get isBackground;
+  Future<void> set(String key, String value);
 }
 
 /// Signature used to retrieved platform specific headers for every request made by Firebase services.
 typedef HeaderBuilder = Map<String, String> Function();
-
-/// Signature used to receiving the locale for requests made by Firebase services that provides a way to change the
-/// locale of the action.
-typedef CurrentLocale = String Function();

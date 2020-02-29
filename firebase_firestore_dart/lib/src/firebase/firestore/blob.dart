@@ -9,14 +9,12 @@ import 'package:collection/collection.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
-@publicApi
 class Blob implements Comparable<Blob> {
   Blob(Uint8List bytes) : bytes = Uint8List.fromList(bytes);
 
   final Uint8List bytes;
 
   @override
-  @publicApi
   int compareTo(Blob other) {
     final int size = min(bytes.length, other.bytes.length);
 

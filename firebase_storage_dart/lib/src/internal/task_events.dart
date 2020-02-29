@@ -170,7 +170,6 @@ class SnapshotBase<TResult extends StorageTaskState>
       <dynamic>[error == null ? null : error.toString(), referenceUrl];
 
   /// Returns the target of the upload.
-  @publicApi
   StorageReference get storage {
     // ignore: only_throw_errors
     throw 'If we want to implement this we need to make sure we have the proper'
@@ -179,7 +178,6 @@ class SnapshotBase<TResult extends StorageTaskState>
 }
 
 /// Encapsulates state about the running [FileDownloadTask]
-@publicApi
 class DownloadTaskSnapshot extends SnapshotBase<DownloadTaskSnapshot> {
   factory DownloadTaskSnapshot(
       String referenceUrl,
@@ -201,11 +199,9 @@ class DownloadTaskSnapshot extends SnapshotBase<DownloadTaskSnapshot> {
       : super._(error, referenceUrl);
 
   /// Return the total bytes downloaded so far.
-  @publicApi
   final int bytesTransferred;
 
   /// Returns the total bytes to upload.
-  @publicApi
   final int totalByteCount;
 
   static DownloadTaskSnapshot deserialized(List<dynamic> values) {
@@ -258,11 +254,9 @@ class DownloadStreamTaskSnapshot
       this.bytesTransferred, this.totalByteCount, this.data)
       : super._(error, referenceUrl);
 
-  @publicApi
   final int bytesTransferred;
 
   /// Returns the total bytes to upload.
-  @publicApi
   final int totalByteCount;
 
   @override

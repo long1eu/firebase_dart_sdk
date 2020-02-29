@@ -4,7 +4,6 @@
 
 import 'package:firebase_common/firebase_common.dart';
 
-@publicApi
 class FirebaseFirestoreErrorCode {
   const FirebaseFirestoreErrorCode._(this.value);
 
@@ -72,7 +71,6 @@ class FirebaseFirestoreErrorCode {
   String toString() => _names[value];
 }
 
-@publicApi
 class FirebaseFirestoreError extends FirebaseError {
   FirebaseFirestoreError(
     String message,

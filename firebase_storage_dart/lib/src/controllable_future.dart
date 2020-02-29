@@ -6,14 +6,12 @@ import 'package:firebase_storage/src/cancellable_future.dart';
 
 /// Represents an asynchronous operation that can be paused, resumed and
 /// canceled.
-@publicApi
 abstract class ControllableFuture<TState> extends CancellableFuture<TState> {
   /// Attempts to pause the task. A paused task can later be resumed.
   ///
   /// Returns true if this task was successfully paused or is in the process of
   /// being paused. Returns false if the task is already completed or in a state
   /// that cannot be paused.
-  @publicApi
   bool pause();
 
   /// Attempts to resume this task.
@@ -21,10 +19,8 @@ abstract class ControllableFuture<TState> extends CancellableFuture<TState> {
   /// Returns true if the task is successfully resumed or is in the process of
   /// being resumed. Returns false if the task is already completed or in a
   /// state that cannot be resumed.
-  @publicApi
   bool resume();
 
   /// Returns true if the task has been paused.
-  @publicApi
   bool get isPaused;
 }

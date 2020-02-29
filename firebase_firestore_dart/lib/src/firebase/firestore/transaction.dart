@@ -27,7 +27,6 @@ typedef TransactionCallback<TResult> = Future<TResult> Function(Transaction);
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
-@publicApi
 class Transaction {
   Transaction(this._transaction, this._firestore)
       : assert(_transaction != null),
@@ -46,7 +45,6 @@ class Transaction {
   /// [options] An object to configure the set behavior.
   ///
   /// Returns this Transaction instance. Used for chaining method calls.
-  @publicApi
   Transaction set(DocumentReference documentRef, Map<String, Object> data, [SetOptions options]) {
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
@@ -67,7 +65,6 @@ class Transaction {
   /// fields within the document.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  @publicApi
   Transaction updateFromList(DocumentReference documentRef, List<Object> data) {
     final UserDataParsedUpdateData parsedData =
         _firestore.dataConverter.parseUpdateDataFromList(collectUpdateArguments(1, data));
@@ -82,7 +79,6 @@ class Transaction {
   /// fields within the document.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  @publicApi
   Transaction update(DocumentReference documentRef, Map<String, Object> data) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter.parseUpdateData(data);
     return _update(documentRef, parsedData);
@@ -99,7 +95,6 @@ class Transaction {
   /// [documentRef] The [DocumentReference] to delete.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  @publicApi
   Transaction delete(DocumentReference documentRef) {
     _firestore.validateReference(documentRef);
     _transaction.delete(documentRef.key);

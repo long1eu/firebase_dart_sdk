@@ -5,26 +5,26 @@
 part of firebase_auth;
 
 class UserStorage {
-  const UserStorage({@required Box<dynamic> userBox, @required String appName})
-      : assert(userBox != null),
+  const UserStorage({@required LocalStorage localStorage, @required String appName})
+      : assert(localStorage != null),
         assert(appName != null),
-        _userBox = userBox,
+        _localStorage = localStorage,
         _appName = appName;
 
-  final Box<dynamic> _userBox;
+  final LocalStorage _localStorage;
   final String _appName;
 
   void save(FirebaseUser user) {
     if (user != null) {
       final Map<String, dynamic> data = serializers.serializeWith(FirebaseUser.serializer, user);
-      _userBox.put(_userKey, jsonEncode(data));
+      _localStorage.set(_userKey, jsonEncode(data));
     } else {
-      _userBox.delete(_userKey);
+      _localStorage.set(_userKey, null);
     }
   }
 
   FirebaseUser get(FirebaseAuth auth) {
-    final String json = _userBox.get(_userKey);
+    final String json = _localStorage.get(_userKey);
     if (json == null) {
       return null;
     }

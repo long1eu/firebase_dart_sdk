@@ -12,7 +12,6 @@ import 'package:firebase_storage/src/storage_task_manager.dart';
 import 'package:meta/meta.dart';
 
 /// A controllable Task that has a synchronized state machine.
-@publicApi
 abstract class StorageTask<TResult extends StorageTaskState> {
   StorageTask(this._sendPort) : _completer = Completer<void>();
 
@@ -111,7 +110,6 @@ abstract class StorageTask<TResult extends StorageTaskState> {
   ///
   /// Returns true if the task is successfully resumed, false if the task has an
   /// unrecoverable error or has entered another state that precludes resume.
-  @publicApi
   bool resume() {
     if (tryChangeState(state: kInternalStateQueued, userInitiated: true)) {
       resetState();
@@ -126,7 +124,6 @@ abstract class StorageTask<TResult extends StorageTaskState> {
   /// Returns true if this task is successfully being paused. Note that a task
   /// may not be immediately paused if it was executing another action and can
   /// still fail or complete.
-  @publicApi
   bool pause() {
     return tryChangeState(
         states: <int>[kInternalStatePaused, kInternalStatePausing],
@@ -136,7 +133,6 @@ abstract class StorageTask<TResult extends StorageTaskState> {
   /// Attempts to cancel the task. A canceled task cannot be resumed later.
   ///
   /// Returns true if this task is successfully being canceled.
-  @publicApi
   bool cancel() {
     return tryChangeState(
         states: <int>[kInternalStateCanceled, kInternalStateCanceling],
@@ -144,28 +140,22 @@ abstract class StorageTask<TResult extends StorageTaskState> {
   }
 
   /// Returns true if the Task is complete, false otherwise.
-  @publicApi
   bool get isComplete => (_currentState & kStateComplete) != 0;
 
   /// Returns true if the Task has completed successfully, false otherwise.
-  @publicApi
   bool get isSuccessful => (_currentState & kStatesSuccess) != 0;
 
   /// Returns true if the task has been canceled.
-  @publicApi
   bool get isCanceled => _currentState == kInternalStateCanceled;
 
   /// Returns true if the task is currently running.
-  @publicApi
   bool get isInProgress => (_currentState & kStatesInprogress) != 0;
 
   /// Returns true if the task has been paused.
-  @publicApi
   bool get isPaused => (_currentState & kStatesPaused) != 0;
 
   /// Returns the current state of the task. This method will return state at
   /// any point of the tasks execution and may not be the final result..
-  @publicApi
   TResult get snapshot => snapState;
 
   //@visibleForTesting
@@ -270,22 +260,16 @@ abstract class StorageTask<TResult extends StorageTaskState> {
     Log.d(_tag, 'Event sent: ${event.type}');
   }
 
-  @publicApi
   void onQueued() {}
 
-  @publicApi
   void onProgress() {}
 
-  @publicApi
   void onPaused() {}
 
-  @publicApi
   void onFailure() {}
 
-  @publicApi
   void onSuccess() {}
 
-  @publicApi
   void onCanceled() {}
 
   TResult _getFinalResult() {

@@ -7,7 +7,6 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_storage/src/internal/task_events.dart';
 import 'package:firebase_storage/src/task.dart';
 
-@publicApi
 abstract class StreamedTask<TState extends StorageTaskState>
     extends Task<TState> {
   /// The task itself can not be resumed, however the [data] stream can be used

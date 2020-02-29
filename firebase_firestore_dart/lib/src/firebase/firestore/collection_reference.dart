@@ -20,7 +20,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
-@publicApi
 class CollectionReference extends Query {
   CollectionReference(ResourcePath path, FirebaseFirestore firestore)
       : assert(
@@ -30,7 +29,6 @@ class CollectionReference extends Query {
         super(core.Query(path), firestore);
 
   /// Return The id of the collection.
-  @publicApi
   String get id => query.path.last;
 
   /// Gets a [DocumentReference] to the document that contains this collection. Only subcollections
@@ -38,7 +36,6 @@ class CollectionReference extends Query {
   ///
   /// Returns the [DocumentReference] that contains this collection or null if this is a root
   /// collection.
-  @publicApi
   DocumentReference get parent {
     final ResourcePath parentPath = query.path.popLast();
     if (parentPath.isEmpty) {
@@ -52,7 +49,6 @@ class CollectionReference extends Query {
   /// string.
   ///
   /// Returns the path of this collection.
-  @publicApi
   String get path => query.path.canonicalString;
 
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within
@@ -61,7 +57,6 @@ class CollectionReference extends Query {
   /// [documentPath] a slash-separated relative path to a document.
   ///
   /// Returns the [DocumentReference] instance.
-  @publicApi
   DocumentReference document([String documentPath]) {
     documentPath ??= autoId();
     checkNotNull(documentPath, 'Provided document path must not be null.');
@@ -76,7 +71,6 @@ class CollectionReference extends Query {
   ///
   /// Returns a Future that will be resolved with the [DocumentReference] of the newly created
   /// document.
-  @publicApi
   Future<DocumentReference> add(Map<String, Object> data) async {
     checkNotNull(data, 'Provided data must not be null.');
     final DocumentReference ref = document();

@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 23/11/2019
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_common_dart/firebase_common.dart';
 import 'package:meta/meta.dart';
 
 import 'auth.dart';
@@ -41,9 +41,7 @@ class InternalTokenResult {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is InternalTokenResult &&
-          runtimeType == other.runtimeType &&
-          token == other.token;
+      other is InternalTokenResult && runtimeType == other.runtimeType && token == other.token;
 
   @override
   int get hashCode => token.hashCode * 31;

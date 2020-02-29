@@ -27,7 +27,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
-@publicApi
 class WriteBatch {
   WriteBatch(this._firestore) : assert(_firestore != null);
 
@@ -44,7 +43,6 @@ class WriteBatch {
   /// [options] is an object to configure the set behavior.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  @publicApi
   WriteBatch set(DocumentReference documentRef, Map<String, Object> data, [SetOptions options]) {
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
@@ -66,7 +64,6 @@ class WriteBatch {
   /// reference nested fields within the document.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  @publicApi
   WriteBatch updateFromList(DocumentReference documentRef, List<Object> data) {
     final UserDataParsedUpdateData parsedData =
         _firestore.dataConverter.parseUpdateDataFromList(collectUpdateArguments(1, data));
@@ -85,7 +82,6 @@ class WriteBatch {
   /// fields within the document.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  @publicApi
   WriteBatch update(DocumentReference documentRef, Map<String, Object> data) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter.parseUpdateData(data);
 
@@ -100,7 +96,6 @@ class WriteBatch {
   /// [documentRef] The [DocumentReference] to delete.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  @publicApi
   WriteBatch delete(DocumentReference documentRef) {
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
@@ -109,7 +104,6 @@ class WriteBatch {
   }
 
   /// Commits all of the writes in this write batch as a single atomic unit.
-  @publicApi
   Future<void> commit() async {
     _verifyNotCommitted();
     _committed = true;

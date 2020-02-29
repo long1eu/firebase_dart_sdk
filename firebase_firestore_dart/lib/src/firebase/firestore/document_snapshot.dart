@@ -31,7 +31,6 @@ import 'package:meta/meta.dart';
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
-@publicApi
 class DocumentSnapshot {
   DocumentSnapshot(
     this._firestore,
@@ -58,19 +57,15 @@ class DocumentSnapshot {
   final DocumentKey _key;
 
   /// Is null if the document doesn't exist
-  @publicApi
   final Document document;
 
   /// The metadata for this document snapshot.
-  @publicApi
   final SnapshotMetadata metadata;
 
   /// The id of the document.
-  @publicApi
   String get id => _key.path.last;
 
   /// Returns true if the document existed in this snapshot.
-  @publicApi
   bool get exists => document != null;
 
   /// Returns the fields of the document as a Map or null if the document doesn't exist. Field values will be converted
@@ -86,7 +81,6 @@ class DocumentSnapshot {
   /// value.
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
-  @publicApi
   Map<String, Object> getData(ServerTimestampBehavior serverTimestampBehavior) {
     checkNotNull(serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
     return document == null ? null : _convertObject(document.data, FieldValueOptions(serverTimestampBehavior));
@@ -97,7 +91,6 @@ class DocumentSnapshot {
   /// [field] the path to the field.
   ///
   /// Returns true if the field exists.
-  @publicApi
   bool contains(String field) {
     return containsPath(FieldPath.fromDotSeparatedPath(field));
   }
@@ -107,7 +100,6 @@ class DocumentSnapshot {
   /// [fieldPath] the path to the field.
   ///
   /// Returns true if the field exists.
-  @publicApi
   bool containsPath(FieldPath fieldPath) {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
     return (document != null) && (document.getField(fieldPath.internalPath) != null);
@@ -122,7 +114,6 @@ class DocumentSnapshot {
   /// value.
   ///
   /// Returns the value at the given field or null.
-  @publicApi
   Object get(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
     return getField(FieldPath.fromDotSeparatedPath(field), serverTimestampBehavior ?? ServerTimestampBehavior.none);
   }
@@ -134,7 +125,6 @@ class DocumentSnapshot {
   /// value.
   ///
   /// Returns the value at the given field or null.
-  @publicApi
   Object getField(FieldPath fieldPath, [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     checkNotNull(fieldPath, 'Provided field path must not be null.');
@@ -147,7 +137,6 @@ class DocumentSnapshot {
   /// [field] the path to the field.
   ///
   /// Returns the value of the field
-  @publicApi
   bool getBool(String field) => _getTypedValue<bool>(field);
 
   /// Returns the value of the field as a double.
@@ -156,7 +145,6 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a number.
   /// Returns the value of the field
-  @publicApi
   double getDouble(String field) {
     final num val = _getTypedValue(field);
     return val != null ? val.toDouble() : null;
@@ -168,7 +156,6 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a number.
   /// Returns the value of the field
-  @publicApi
   int getInt(String field) {
     final num val = _getTypedValue(field);
     return val != null ? val.toInt() : null;
@@ -180,7 +167,6 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a String.
   /// Returns the value of the field
-  @publicApi
   String getString(String field) => _getTypedValue(field);
 
   /// Returns the value of the field as a [DateTime].
@@ -191,7 +177,6 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a Date.
   /// Returns the value of the field
-  @publicApi
   DateTime getDate(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     checkNotNull(field, 'Provided field path must not be null.');
@@ -209,7 +194,6 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a timestamp field.
   /// Returns the value of the field
-  @publicApi
   Timestamp getTimestamp(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     checkNotNull(field, 'Provided field path must not be null.');
@@ -225,7 +209,6 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a Blob.
   /// Returns the value of the field
-  @publicApi
   Blob getBlob(String field) => _getTypedValue(field);
 
   /// Returns the value of the field as a [GeoPoint].
@@ -234,7 +217,6 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a [GeoPoint].
   /// Returns the value of the field
-  @publicApi
   GeoPoint getGeoPoint(String field) => _getTypedValue(field);
 
   /// Returns the value of the field as a [DocumentReference].
@@ -243,13 +225,11 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a [DocumentReference].
   /// Returns the value of the field
-  @publicApi
   DocumentReference getDocumentReference(String field) => _getTypedValue(field);
 
   /// Gets the reference to the document.
   ///
   /// Returns the reference to the document.
-  @publicApi
   DocumentReference get reference => DocumentReference(_key, _firestore);
 
   T _getTypedValue<T>(String field) {

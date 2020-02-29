@@ -13,7 +13,6 @@ import 'package:meta/meta.dart';
 /// as size and content type. You may also store custom metadata key value
 /// pairs. Metadata values may be used to authorize operations using declarative
 /// validation rules.
-@publicApi
 class StorageMetadata {
   // TODO(long1eu):{23/10/2018 15:11}-long1eu: find a way to create metadata for update
   /// Creates a [StorageMetadata] object to hold metadata for a
@@ -52,7 +51,6 @@ class StorageMetadata {
             _MetadataValue<Map<String, String>>.withDefaultValue(
                 <String, String>{});
 
-  @publicApi
   factory StorageMetadata.update({
     String contentEncoding,
     String cacheControl,
@@ -154,31 +152,24 @@ class StorageMetadata {
   final StorageReference _reference;
 
   /// Return the owning Google Cloud Storage bucket for the [StorageReference]
-  @publicApi
   final String bucket;
 
   /// Returns a version String indicating what version of the [StorageReference]
-  @publicApi
   final String generation;
 
   /// Returns a version String indicating the version of this [StorageMetadata]
-  @publicApi
   final String metadataGeneration;
 
   /// Returns the time the [StorageReference] was created.
-  @publicApi
   final int creationTimeMillis;
 
   /// Returns the time the [StorageReference] was last updated.
-  @publicApi
   final int updatedTimeMillis;
 
   /// Returns the stored Size in bytes of the [StorageReference] object
-  @publicApi
   final int sizeBytes;
 
   /// Return the MD5Hash of the [StorageReference] object
-  @publicApi
   final String md5Hash;
 
   final _MetadataValue<String> _contentEncoding;
@@ -232,14 +223,12 @@ class StorageMetadata {
   }
 
   /// Return the content type of the [StorageReference].
-  @publicApi
   String get contentType => _contentType.value;
 
   /// Returns custom metadata for a [StorageReference]
   ///
   /// The [key] for which the metadata should be returned. Returns the metadata
   /// stored in the object the given key.
-  @publicApi
   String operator [](String key) {
     if (key == null || key.isEmpty) {
       return null;
@@ -249,14 +238,12 @@ class StorageMetadata {
   }
 
   /// Returns the keys for custom metadata.
-  @publicApi
   Set<String> get customMetadataKeys {
     final Map<String, String> metadata = _customMetadata.value;
     return metadata.keys.toSet();
   }
 
   /// Returns a simple name of the [StorageReference] object
-  @publicApi
   String get name {
     if (path == null || path.isEmpty) {
       return null;
@@ -270,24 +257,19 @@ class StorageMetadata {
   }
 
   /// Returns the Cache Control setting of the [StorageReference]
-  @publicApi
   String get cacheControl => _cacheControl.value;
 
   /// Returns the content disposition of the [StorageReference]
-  @publicApi
   String get contentDisposition => _contentDisposition.value;
 
   /// Returns the content encoding for the [StorageReference]
-  @publicApi
   String get contentEncoding => _contentEncoding.value;
 
   /// Returns the content language for the [StorageReference]
-  @publicApi
   String get contentLanguage => _contentLanguage.value;
 
   /// Returns the associated [StorageReference] for which this metadata belongs
   /// to.
-  @publicApi
   StorageReference get reference {
     if (_reference == null) {
       if (_storage != null) {

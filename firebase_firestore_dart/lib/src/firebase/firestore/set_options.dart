@@ -11,7 +11,6 @@ import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_m
 /// [SetOptions] objects returned by [merge], [mergeField] and [mergeFieldPaths], the set() calls in
 /// [DocumentReference], [WriteBatch] and [Transaction] can be configured to perform granular merges
 /// instead of overwriting the target documents in their entirety.
-@publicApi
 class SetOptions {
   const SetOptions._(this.merge, this.fieldMask)
       : assert(fieldMask != null && merge, 'Cannot specify a fieldMask for non-merge sets()');
@@ -32,7 +31,6 @@ class SetOptions {
   ///
   /// [fields] the list of fields to merge. Fields can contain dots to reference nested fields
   /// within the document.
-  @publicApi
   factory SetOptions.mergeFields(List<String> fields) {
     final Set<model.FieldPath> fieldPaths =
         fields.map((String field) => FieldPath.fromDotSeparatedPath(field).internalPath).toSet();
@@ -44,7 +42,6 @@ class SetOptions {
   ///
   /// It is an error to pass a SetOptions object to a set() call that is missing a value for any of
   /// the fields specified here in its to data argument.
-  @publicApi
   factory SetOptions.mergeFieldPaths(List<FieldPath> fields) {
     final Set<model.FieldPath> fieldPaths = fields.map((FieldPath field) => field.internalPath).toSet();
     return SetOptions._(true, FieldMask(fieldPaths));

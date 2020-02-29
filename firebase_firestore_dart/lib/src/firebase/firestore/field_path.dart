@@ -9,7 +9,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// A [FieldPath] refers to a field in a document. The path may consist of a single field name
 /// (referring to a top level field in the document), or a list of field names (referring to a
 /// nested field in the document).
-@publicApi
 class FieldPath {
   const FieldPath(this.internalPath);
 
@@ -23,7 +22,6 @@ class FieldPath {
   /// [fieldNames] a list of field names.
   ///
   /// Return a FieldPath that points to a field location in a document.
-  @publicApi
   factory FieldPath.of(List<String> fieldNames) {
     checkArgument(fieldNames != null && fieldNames.isNotEmpty,
         'Invalid field path. Provided path must not be null or empty.');
@@ -59,7 +57,6 @@ class FieldPath {
 
   /// Returns a special sentinel [FieldPath] to refer to the id of a document. It can be used in
   /// queries to sort or filter by the document id.
-  @publicApi
   static FieldPath documentId() => documentIdInstance;
 
   @override

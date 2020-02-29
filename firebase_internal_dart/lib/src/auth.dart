@@ -5,7 +5,7 @@
 import 'dart:convert';
 
 import 'package:collection/collection.dart';
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_common_dart/firebase_common.dart';
 
 /// Result object that contains a Firebase Auth ID Token.
 class GetTokenResult {

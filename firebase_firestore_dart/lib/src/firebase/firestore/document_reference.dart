@@ -32,7 +32,6 @@ import 'package:rxdart/rxdart.dart';
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing
 /// is not supported in production code and new SDK releases may break code that does so.
-@publicApi
 class DocumentReference {
   // TODO(long1eu): We should checkNotNull(firestore), but tests are currently cheating and setting it to null.
   DocumentReference(this.key, this.firestore) : assert(key != null);
@@ -51,13 +50,11 @@ class DocumentReference {
   /// Gets the Firestore instance associated with this document reference.
   final FirebaseFirestore firestore;
 
-  @publicApi
   String get id => key.path.last;
 
   /// Gets a [CollectionReference] to the collection that contains this document.
   ///
   /// Returns the [CollectionReference] that contains this document.
-  @publicApi
   CollectionReference get parent {
     return CollectionReference(key.path.popLast(), firestore);
   }
@@ -65,7 +62,6 @@ class DocumentReference {
   /// Gets the path of this document (relative to the root of the database) as a slash-separated  string.
   ///
   /// Returns the path of this document.
-  @publicApi
   String get path => key.path.canonicalString;
 
   /// Gets a [CollectionReference] instance that refers to the subcollection at the specified path relative to this
@@ -74,7 +70,6 @@ class DocumentReference {
   /// [collectionPath] a slash-separated relative path to a subcollection.
   ///
   /// Returns the [CollectionReference] instance.
-  @publicApi
   CollectionReference collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
     return CollectionReference(key.path.appendField(ResourcePath.fromString(collectionPath)), firestore);
@@ -87,7 +82,6 @@ class DocumentReference {
   /// [options] an object to configure the set behavior.
   ///
   /// Returns a Future that will be resolved when the write finishes.
-  @publicApi
   Future<void> set(Map<String, Object> data, [SetOptions options]) async {
     options ??= SetOptions.overwrite;
     checkNotNull(data, 'Provided data must not be null.');
@@ -108,7 +102,6 @@ class DocumentReference {
   /// field/value pairs.
   ///
   /// Returns a Future that will be resolved when the write finishes.
-  @publicApi
   Future<void> updateFromList(List<Object> data) async {
     final UserDataParsedUpdateData parsedData =
         firestore.dataConverter.parseUpdateDataFromList(collectUpdateArguments(1, data));
@@ -123,7 +116,6 @@ class DocumentReference {
   /// document.
   ///
   /// Returns a Future that will be resolved when the write finishes.
-  @publicApi
   Future<void> update(Map<String, Object> data) async {
     final UserDataParsedUpdateData parsedData = firestore.dataConverter.parseUpdateData(data);
     await voidErrorTransformer(
@@ -133,7 +125,6 @@ class DocumentReference {
   /// Deletes the document referred to by this [DocumentReference].
   ///
   /// Returns a Future that will be resolved when the delete completes.
-  @publicApi
   Future<void> delete() {
     return voidErrorTransformer(() => firestore.client.write(<DeleteMutation>[DeleteMutation(key, Precondition.none)]));
   }
@@ -147,7 +138,6 @@ class DocumentReference {
   /// [source] a value to configure the get behavior.
   ///
   /// Returns a Future that will be resolved with the contents of the [Document] at this [DocumentReference].
-  @publicApi
   Future<DocumentSnapshot> get([Source source]) async {
     source ??= Source.defaultSource;
 
@@ -188,13 +178,11 @@ class DocumentReference {
     }).first;
   }
 
-  @publicApi
   Stream<DocumentSnapshot> get snapshots {
     final ListenOptions options = _internalOptions(MetadataChanges.exclude);
     return _getSnapshotsInternal(options);
   }
 
-  @publicApi
   Stream<DocumentSnapshot> getSnapshots([MetadataChanges changes]) {
     final ListenOptions options = _internalOptions(changes ?? MetadataChanges.exclude);
     return _getSnapshotsInternal(options);

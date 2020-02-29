@@ -19,7 +19,6 @@ import 'package:firebase_firestore/src/firebase/firestore/snapshot_metadata.dart
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
-@publicApi
 class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   QuerySnapshot(this.query, this.snapshot, this._firestore)
       : assert(query != null),
@@ -27,11 +26,9 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
         assert(_firestore != null),
         metadata = SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
 
-  @publicApi
   final Query query;
 
   /// Returns the metadata for this document snapshot.
-  @publicApi
   final SnapshotMetadata metadata;
 
   final ViewSnapshot snapshot;
@@ -54,7 +51,6 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// [metadataChanges] Indicates whether metadata-only changes (i.e. only [Query.metadata] changed) should be included.
   ///
   /// Returns the list of document changes since the last snapshot.
-  @publicApi
   List<DocumentChange> getDocumentChanges(MetadataChanges metadataChanges) {
     if (metadataChanges == MetadataChanges.include && snapshot.excludesMetadataChanges) {
       throw ArgumentError('To include metadata changes with your document changes, you must also pass '
@@ -72,7 +68,6 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Returns the documents in this [QuerySnapshot] as a List in order of the query.
   ///
   /// Returns the list of documents.
-  @publicApi
   List<DocumentSnapshot> get documents {
     final List<DocumentSnapshot> res = List<DocumentSnapshot>(snapshot.documents.length);
     int i = 0;
@@ -84,17 +79,14 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   }
 
   /// Returns true if there are no documents in the QuerySnapshot.
-  @publicApi
   @override
   bool get isEmpty => snapshot.documents.isEmpty;
 
   /// Returns the number of documents in the QuerySnapshot.
-  @publicApi
   @override
   int get length => snapshot.documents.length;
 
   @override
-  @publicApi
   Iterator<QueryDocumentSnapshot> get iterator {
     return () sync* {
       final Iterator<core.Document> it = snapshot.documents.iterator;

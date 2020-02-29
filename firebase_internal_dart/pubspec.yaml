@@ -13,7 +13,6 @@ dependencies:
       url: https://github.com/fluttercommunity/firebase_dart_sdk
       ref: develop
       path: firebase_common_dart
-  hive: ^1.4.1+1
 
 dev_dependencies:
   test: ^1.12.0

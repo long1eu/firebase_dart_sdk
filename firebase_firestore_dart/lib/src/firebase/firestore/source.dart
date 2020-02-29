@@ -9,7 +9,6 @@ import 'package:firebase_firestore/src/firebase/firestore/query.dart';
 /// value, these methods can be configured to fetch results only from the server, only from the
 /// local cache, or attempt to fetch results from the server and fall back to the cache (which is
 /// the default).
-@publicApi
 enum Source {
   /// Causes Firestore to try to retrieve an up-to-date (server-retrieved) snapshot, but fall back
   /// to  returning cached data if the server can't be reached.

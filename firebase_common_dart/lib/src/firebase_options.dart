@@ -2,8 +2,7 @@
 // Lung Razvan <long1eu>
 // on 16/09/2018
 
-import 'package:firebase_common/src/annotations.dart';
-import 'package:firebase_common/src/util/to_string_helper.dart';
+import 'package:firebase_common_dart/src/util/to_string_helper.dart';
 import 'package:meta/meta.dart';
 
 class FirebaseOptions {
@@ -42,47 +41,38 @@ class FirebaseOptions {
   static const String _gcmSenderId = 'gcm_defaultSenderId';
   static const String _storageBucket = 'google_storage_bucket';
   static const String _projectId = 'project_id';
-  static const String _dataCollectionEnabled = 'data_collection_enabled';
 
   /// API key used for authenticating requests from your app, e.g.
   /// AIzaSyDdVgKwhZl0sTTTLZ7iTmt1r3N2cJLnaDk, used to identify your app to
   /// Google servers.
-  @publicApi
   final String apiKey;
 
   /// The Google App ID that is used to uniquely identify an instance of an app.
-  @publicApi
   final String applicationId;
 
   /// The database root URL, e.g. http://abc-xyz-123.firebaseio.com.
-  @publicApi
   final String databaseUrl;
 
   /// The tracking ID for Google Analytics, e.g. UA-12345678-1, used to
   /// configure Google Analytics.
   // TODO(long1eu): unhide once an API (AppInvite) starts reading it.
-  @keepForSdk
   final String gaTrackingId;
 
   /// The Project Number from the Google Developer's console, for example
   /// 012345678901, used to configure Google Cloud Messaging.
-  @publicApi
   final String gcmSenderId;
 
   /// The Google Cloud Storage bucket name, e.g.
   /// abc-xyz-123.storage.firebase.com.
-  @publicApi
   final String storageBucket;
 
   /// The Google Cloud project ID, e.g. my-project-1234
-  @publicApi
   final String projectId;
 
   /// Determine whether automatic data collection is enabled or disabled in all
   /// SDKs.
   /// Note: this value is respected by all SDKs unless overridden by the
   /// developer via SDK specific mechanisms.
-  @publicApi
   final bool dataCollectionEnabled;
 
   Map<String, String> toJson() {

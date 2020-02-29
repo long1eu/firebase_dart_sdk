@@ -9,7 +9,6 @@ import 'storage_reference.dart';
 import 'storage_task.dart';
 
 /// Represents an Exception resulting from an operation on a [StorageReference].
-@publicApi
 class StorageException extends FirebaseError {
   StorageException(
       /*@ErrorCode*/ this.errorCode, this._cause, this.httpResultCode)
@@ -23,7 +22,6 @@ class StorageException extends FirebaseError {
     }
   }
 
-  @publicApi
   factory StorageException.fromErrorStatus(Status status) {
     Preconditions.checkNotNull(status);
     Preconditions.checkArgument(
@@ -31,7 +29,6 @@ class StorageException extends FirebaseError {
     return StorageException(_calculateErrorCode(status), null, 0);
   }
 
-  @publicApi
   factory StorageException.fromExceptionAndHttpCode(
       dynamic exception, int httpResultCode) {
     if (exception is StorageException) {
@@ -44,7 +41,6 @@ class StorageException extends FirebaseError {
         exception, httpResultCode);
   }
 
-  @publicApi
   factory StorageException.fromException(dynamic exception) {
     final StorageException se =
         StorageException.fromExceptionAndHttpCode(exception, 0);
@@ -130,12 +126,10 @@ class StorageException extends FirebaseError {
   }
 
   /// Returns the cause of this error, or null if there is no cause.
-  @publicApi
   dynamic get cause => _cause == this ? null : _cause;
 
   /// Returns true if this request failed due to a network condition that may be
   /// resolved in a future attempt.
-  @publicApi
   bool get isRecoverableException =>
       errorCode == ErrorCode.errorRetryLimitExceeded;
 }

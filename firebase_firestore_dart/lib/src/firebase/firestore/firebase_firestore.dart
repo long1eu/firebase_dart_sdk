@@ -30,7 +30,6 @@ import 'package:meta/meta.dart';
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
-@publicApi
 class FirebaseFirestore {
   @visibleForTesting
   FirebaseFirestore(this.databaseId, this._asyncQueue, this.firebaseApp, this.client)
@@ -45,7 +44,6 @@ class FirebaseFirestore {
   final UserDataConverter dataConverter;
   final FirestoreClient client;
 
-  @publicApi
   static FirebaseFirestore get instance {
     final FirebaseApp app = FirebaseApp.instance;
     if (app == null) {
@@ -54,7 +52,6 @@ class FirebaseFirestore {
     return FirestoreMultiDbComponent.instances[DatabaseId.defaultDatabaseId];
   }
 
-  @publicApi
   static Future<FirebaseFirestore> getInstance(
     FirebaseApp app, {
     String database = DatabaseId.defaultDatabaseId,
@@ -119,7 +116,6 @@ class FirebaseFirestore {
 
   /// Gets a [CollectionReference] instance that refers to the collection at the specified path within the database.
   /// [collectionPath] is a slash-separated path to a collection.
-  @publicApi
   CollectionReference collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
     _ensureClientConfigured();
@@ -129,7 +125,6 @@ class FirebaseFirestore {
 
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within the database.
   /// [documentPath] is a slash-separated path to a document.
-  @publicApi
   DocumentReference document(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
     _ensureClientConfigured();
@@ -158,7 +153,6 @@ class FirebaseFirestore {
   /// Creates a write batch, used for performing multiple writes as a single atomic operation.
   ///
   /// Returns the created [WriteBatch] object.
-  @publicApi
   WriteBatch batch() {
     _ensureClientConfigured();
     return WriteBatch(this);
@@ -177,7 +171,6 @@ class FirebaseFirestore {
   /// Re-enables network usage for this instance after a prior call to [disableNetwork].
   ///
   /// Returns a [Future] that will be completed once networking is enabled.
-  @publicApi
   Future<void> enableNetwork() {
     _ensureClientConfigured();
     return client.enableNetwork();
@@ -188,14 +181,12 @@ class FirebaseFirestore {
   /// call to [enableNetwork].
   ///
   /// Returns a [Future] that will be completed once networking is disabled.
-  @publicApi
   Future<void> disableNetwork() {
     _ensureClientConfigured();
     return client.disableNetwork();
   }
 
   /// Globally enables / disables Firestore logging for the SDK.
-  @publicApi
   static void setLoggingEnabled({bool loggingEnabled = false}) {
     if (loggingEnabled) {
       Log.level = LogLevel.d;

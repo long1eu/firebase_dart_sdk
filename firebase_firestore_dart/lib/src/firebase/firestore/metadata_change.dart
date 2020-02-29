@@ -8,5 +8,4 @@ import 'package:firebase_firestore/src/firebase/firestore/query.dart';
 
 /// Indicates whether metadata-only changes (i.e. only [DocumentSnapshot.metadata] or
 /// [Query.metadata] changed) should trigger snapshot events.
-@publicApi
 enum MetadataChanges { exclude, include }

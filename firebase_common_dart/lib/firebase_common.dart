@@ -1,6 +1,5 @@
 library firebase_common;
 
-export 'src/annotations.dart';
 export 'src/errors/firebase_api_not_available_error.dart';
 export 'src/errors/firebase_error.dart';
 export 'src/errors/firebase_network_error.dart';

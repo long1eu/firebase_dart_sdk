@@ -5,7 +5,6 @@
 import 'package:firebase_common/firebase_common.dart';
 
 /// Settings used to configure a FirebaseFirestore instance.
-@publicApi
 class FirebaseFirestoreSettings {
   /// Constructs a FirebaseFirestoreSettings object
   FirebaseFirestoreSettings({
@@ -22,7 +21,6 @@ class FirebaseFirestoreSettings {
   static const String _defaultHost = 'firestore.googleapis.com';
 
   /// Constant to use with [cacheSizeBytes] to disable garbage collection.
-  @publicApi
   static const int cacheSizeUnlimited = -1;
 
   static const int _minimumCacheBytes = 1 * 1024 * 1024; // 1 MB
@@ -35,15 +33,12 @@ class FirebaseFirestoreSettings {
   static const int _defaultCacheSizeBytes = cacheSizeUnlimited;
 
   /// The host of the Firestore backend.
-  @publicApi
   final String host;
 
   /// Enables or disables SSL for communication. The default is to use SSL.
-  @publicApi
   final bool sslEnabled;
 
   /// Enables or disables local persistent storage. The default is to use local persistent storage.
-  @publicApi
   final bool persistenceEnabled;
 
   /// Sets an approximate cache size threshold for the on-disk data. If the cache grows beyond this size, Firestore will
@@ -52,7 +47,6 @@ class FirebaseFirestoreSettings {
   ///
   /// By default, collection is disabled (the value is set to [cacheSizeUnlimited]). In a future release, collection
   /// will be enabled by default, with a default cache size of 100 MB. The minimum value is 1 MB.
-  @publicApi
   final int cacheSizeBytes;
 
   FirebaseFirestoreSettings copyWith({

@@ -21,7 +21,6 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
-@publicApi
 class QueryDocumentSnapshot extends DocumentSnapshot {
   QueryDocumentSnapshot._(
     FirebaseFirestore firestore,
@@ -51,7 +50,6 @@ class QueryDocumentSnapshot extends DocumentSnapshot {
   ///
   /// Returns the fields of the document as a Map.
   @override
-  @publicApi
   Map<String, Object> get data {
     final Map<String, Object> result = super.data;
     hardAssert(result != null, 'Data in a QueryDocumentSnapshot should be non-null');
@@ -66,7 +64,6 @@ class QueryDocumentSnapshot extends DocumentSnapshot {
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
   @override
-  @publicApi
   Map<String, Object> getData(ServerTimestampBehavior serverTimestampBehavior) {
     Preconditions.checkNotNull(serverTimestampBehavior);
     final Map<String, Object> result = super.getData(serverTimestampBehavior);
