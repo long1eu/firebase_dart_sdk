@@ -231,8 +231,8 @@
         <entry key="firebase_common">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ea4eba97ca9ac6185c4d1352468ad0f72511b367/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_common/lib" />
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ea4eba97ca9ac6185c4d1352468ad0f72511b367/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_common/lib" />
             </list>
@@ -603,6 +603,13 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path-1.6.4/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="path_provider">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider-1.6.1/lib" />
             </list>
           </value>
         </entry>
@@ -1026,6 +1033,7 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/package_config-1.9.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/package_resolver-1.0.10/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path-1.6.4/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider-1.6.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/pedantic-1.8.0+1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/pedantic-1.9.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/petitparser-2.4.0/lib" />
