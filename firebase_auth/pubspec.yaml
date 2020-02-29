@@ -11,10 +11,12 @@ dependencies:
   firebase_common:
     git:
       url: https://github.com/fluttercommunity/firebase_dart_sdk
+      ref: develop
       path: firebase_common
   firebase_internal:
     git:
       url: https://github.com/fluttercommunity/firebase_dart_sdk
+      ref: develop
       path: firebase_internal
 
   built_value: ^7.0.9

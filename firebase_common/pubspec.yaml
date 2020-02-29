@@ -12,6 +12,7 @@ dependencies:
   firebase_internal:
     git:
       url: https://github.com/fluttercommunity/firebase_dart_sdk
+      ref: develop
       path: firebase_internal
 
 dev_dependencies:
