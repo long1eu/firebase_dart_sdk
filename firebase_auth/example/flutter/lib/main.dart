@@ -6,13 +6,13 @@ import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_example/dependencies.dart';
+import 'package:firebase_auth_example/signin_page.dart';
 import 'package:firebase_common/firebase_common.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
 import './register_page.dart';
-import './signin_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +33,7 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       title: 'Firebase Auth Demo',
       home: MyHomePage(title: 'Firebase Auth Demo'),
     );
@@ -41,7 +41,7 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+  const MyHomePage({Key key, this.title}) : super(key: key);
 
   final String title;
 
@@ -62,20 +62,20 @@ class _MyHomePageState extends State<MyHomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Container(
-            child: RaisedButton(
-              child: const Text('Test registration'),
-              onPressed: () => _pushPage(context, RegisterPage()),
-            ),
             padding: const EdgeInsets.all(16),
             alignment: Alignment.center,
+            child: RaisedButton(
+              onPressed: () => _pushPage(context, RegisterPage()),
+              child: const Text('Test registration'),
+            ),
           ),
           Container(
-            child: RaisedButton(
-              child: const Text('Test SignIn/SignOut'),
-              onPressed: () => _pushPage(context, SignInPage()),
-            ),
             padding: const EdgeInsets.all(16),
             alignment: Alignment.center,
+            child: RaisedButton(
+              onPressed: () => _pushPage(context, SignInPage()),
+              child: const Text('Test SignIn/SignOut'),
+            ),
           ),
         ],
       ),

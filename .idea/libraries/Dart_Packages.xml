@@ -228,6 +228,13 @@
             </list>
           </value>
         </entry>
+        <entry key="firebase_auth">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ff41463debfc5e5261c694e8bd1d912e7be0e24b/firebase_auth/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="firebase_common">
           <value>
             <list>
@@ -936,6 +943,7 @@
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_common/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ea4eba97ca9ac6185c4d1352468ad0f72511b367/firebase_common/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ff41463debfc5e5261c694e8bd1d912e7be0e24b/firebase_auth/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_discoveryapis_commons-0.1.8+1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_discoveryapis_commons-0.1.9/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_fe_analyzer_shared-1.0.1/lib" />
