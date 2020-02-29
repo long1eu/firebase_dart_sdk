@@ -9,8 +9,7 @@ const String sdkVersion = '0.0.1';
 /// Adds 'key' query parameter when making HTTP requests.
 ///
 /// If 'key' is already present on the URI, it will complete with an exception.
-/// This will prevent accidental overrides of a query parameter with the API
-/// key.
+/// This will prevent accidental overrides of a query parameter with the API key.
 class ApiKeyClient extends DelegatingClient {
   ApiKeyClient(String apiKey, this._headers, {Client client})
       : _encodedApiKey = Uri.encodeQueryComponent(apiKey),
@@ -113,10 +112,8 @@ Future<StreamedResponse> _validateResponse(StreamedResponse response) async {
 }
 
 Stream<String> _decodeStreamAsText(StreamedResponse response) {
-  // TODO: Correctly handle the response content-types, using correct
-  // decoder.
-  // Currently we assume that the api endpoint is responding with json
-  // encoded in UTF8.
+  // TODO(long1eu): Correctly handle the response content-types, using correct decoder.
+  // Currently we assume that the api endpoint is responding with json encoded in UTF8.
   final String contentType = response.headers['content-type'];
   if (contentType != null && contentType.toLowerCase().startsWith('application/json')) {
     return response.stream.transform(const Utf8Decoder(allowMalformed: true));

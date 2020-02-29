@@ -72,7 +72,7 @@ Future<GoogleAuthCredential> _getGoogleAuthCredential() async {
       },
     ),
     providerName: 'Google',
-    codeResponseBuilder: (Map<String, dynamic> response) {
+    codeResponseBuilder:   (Map<String, dynamic> response) {
       return CodeResponse(
         code: response['device_code'],
         userCode: response['user_code'],

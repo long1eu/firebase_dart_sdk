@@ -50,7 +50,7 @@ abstract class AdditionalUserInfo {
   /// Returns a Map containing IDP-specific user data if the provider is one of Facebook, GitHub, Google, Twitter,
   /// Microsoft, or Yahoo.
   @nullable
-  MapBuilder<String, JsonObject> get profile;
+  BuiltMap<String, JsonObject> get profile;
 
   /// Returns the username if the provider is GitHub or Twitter
   @nullable

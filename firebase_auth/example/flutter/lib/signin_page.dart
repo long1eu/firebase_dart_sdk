@@ -5,8 +5,10 @@
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth_example/http_server.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 final FirebaseAuth _auth = FirebaseAuth.instance;
 final GoogleSignIn _googleSignIn = GoogleSignIn();
@@ -276,10 +278,12 @@ class _GoogleSignInSectionState extends State<_GoogleSignInSection> {
   }
 
   // Example code of how to sign in with google.
-  void _signInWithGoogle() async {
+  Future<void> _signInWithGoogle() async {
     if (Platform.isMacOS) {
-
-
+      final String token = await loginWithGoogle((Uri uri) {
+        launch(uri.toString());
+      });
+      print(token);
     } else {
       final GoogleSignInAccount googleUser = await _googleSignIn.signIn();
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
