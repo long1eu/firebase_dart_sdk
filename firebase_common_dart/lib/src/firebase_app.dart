@@ -62,7 +62,7 @@ class FirebaseApp with PlatformDependenciesMixin {
         !instances.containsKey(normalizedName), 'FirebaseApp name $normalizedName already exists!');
 
     final String _dataCollectionDefaultEnabled =
-        platformDependencies.storage.get(_dataCollectionDefaultEnabledPreferenceKey) ?? 'true';
+        platformDependencies?.storage?.get(_dataCollectionDefaultEnabledPreferenceKey) ?? 'true';
     final FirebaseApp firebaseApp = FirebaseApp._(
       normalizedName,
       options,
@@ -265,11 +265,11 @@ mixin PlatformDependenciesMixin implements PlatformDependencies, LocalStorage, I
   InternalTokenProvider _authProvider;
 
   void _init() {
-    _onBackgroundChanged = _dependencies.onBackgroundChanged;
-    _onNetworkConnected = _dependencies.onNetworkConnected;
-    _headersBuilder = _dependencies.headersBuilder;
-    _storage = _dependencies.storage;
-    _authProvider = _dependencies.authProvider;
+    _onBackgroundChanged = _dependencies?.onBackgroundChanged;
+    _onNetworkConnected = _dependencies?.onNetworkConnected;
+    _headersBuilder = _dependencies?.headersBuilder;
+    _storage = _dependencies?.storage;
+    _authProvider = _dependencies?.authProvider;
   }
 
   /// This stream should emit true then the app enters in background and false otherwise
