@@ -10,7 +10,7 @@ Future<void> init(Map<String, String> config) async {
   await _initializeSecrets(config);
 
   final Box<dynamic> firebaseBox =
-      await Hive.openBox<dynamic>('firebase_auth', encryptionKey: _hiveEncryptionKey.codeUnits);
+      await Hive.openBox<dynamic>('firebase_auth', encryptionCipher: HiveAesCipher(_hiveEncryptionKey.codeUnits));
   final Dependencies dependencies = Dependencies(box: firebaseBox);
   final FirebaseOptions options = FirebaseOptions(apiKey: _apiKey, applicationId: 'appId');
   FirebaseApp.withOptions(options, dependencies);
