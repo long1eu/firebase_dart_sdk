@@ -15,7 +15,7 @@ import 'package:firebase_internal_dart/firebase_internal.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 
-class FirebaseApp with PlatformDependenciesMixin {
+class FirebaseApp with _PlatformDependenciesMixin {
   /// Initializes the default FirebaseApp instance using string resource values
   /// populated from the map you provide. It also initializes Firebase
   /// Analytics. Returns the default FirebaseApp, if either it has been
@@ -253,7 +253,7 @@ class FirebaseApp with PlatformDependenciesMixin {
 }
 
 // ignore_for_file: close_sinks
-mixin PlatformDependenciesMixin implements PlatformDependencies, LocalStorage, InternalTokenProvider {
+mixin _PlatformDependenciesMixin implements PlatformDependencies, LocalStorage, InternalTokenProvider {
   final Map<String, String> _map = <String, String>{};
 
   PlatformDependencies get _dependencies;
