@@ -596,7 +596,7 @@ class FirebaseUser with UserInfoMixin {
     _userInfo = UserInfoImpl(
       uid: user.localId,
       email: user.email,
-      isEmailVerified: user.emailVerified,
+      isEmailVerified: user.emailVerified ?? false,
       displayName: user.displayName,
       photoUrl: user.photoUrl,
       phoneNumber: user.phoneNumber,

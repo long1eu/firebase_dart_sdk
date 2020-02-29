@@ -232,6 +232,7 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ea4eba97ca9ac6185c4d1352468ad0f72511b367/firebase_common/lib" />
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_common/lib" />
             </list>
@@ -277,6 +278,13 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_firestore/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_internal">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
             </list>
           </value>
         </entry>
@@ -918,6 +926,8 @@
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_firestore/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_common/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_database_collection/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_common/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ea4eba97ca9ac6185c4d1352468ad0f72511b367/firebase_common/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_discoveryapis_commons-0.1.8+1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_discoveryapis_commons-0.1.9/lib" />
