@@ -61,7 +61,7 @@ class SignInPageState extends State<SignInPage> {
   }
 
   // Example code for sign out.
-  void _signOut() async {
+  Future<void> _signOut() async {
     await _auth.signOut();
   }
 }
@@ -277,13 +277,20 @@ class _GoogleSignInSectionState extends State<_GoogleSignInSection> {
 
   // Example code of how to sign in with google.
   void _signInWithGoogle() async {
-    final GoogleSignInAccount googleUser = await _googleSignIn.signIn();
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-    final AuthCredential credential = GoogleAuthProvider.getCredential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-    final FirebaseUser user = (await _auth.signInWithCredential(credential)).user;
+    if (Platform.isMacOS) {
+
+
+    } else {
+      final GoogleSignInAccount googleUser = await _googleSignIn.signIn();
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.getCredential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await _auth.signInWithCredential(credential);
+    }
+
+    final FirebaseUser user = _auth.currentUser;
     assert(user.email != null);
     assert(user.displayName != null);
     assert(!user.isAnonymous);
