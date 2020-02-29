@@ -3,12 +3,9 @@
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
     <content url="file://$MODULE_DIR$/../firebase_auth_dart">
-      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/build" />
-      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/example/flutter/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/.pub" />
-      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/example/flutter/build" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/ios/.symlinks/plugins/firebase_core/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/ios/.symlinks/plugins/firebase_core/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/ios/.symlinks/plugins/firebase_core/build" />
@@ -81,9 +78,14 @@
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/macos/Flutter/ephemeral/.symlinks/plugins/url_launcher_web/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/macos/Flutter/ephemeral/.symlinks/plugins/url_launcher_web/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/macos/Flutter/ephemeral/.symlinks/plugins/url_launcher_web/build" />
-      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/example/vm/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/vm/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/vm/build" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/build" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/example/flutter/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/example/flutter/build" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_auth_dart/example/vm/.dart_tool" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Dart SDK" level="project" />
