@@ -17,6 +17,9 @@ class FirebaseAuth implements InternalTokenProvider {
   FirebaseAuth._(this.app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage);
 
   factory FirebaseAuth.getInstance(FirebaseApp app) {
+    if (_instances.containsKey(FirebaseApp.instance.name)) {
+      return _instances[FirebaseApp.instance.name];
+    }
     _authStateChangedSubjects[FirebaseApp.instance.name] = BehaviorSubject<FirebaseUser>();
 
     // init the identity toolkit client
@@ -25,15 +28,15 @@ class FirebaseAuth implements InternalTokenProvider {
 
     final UserStorage userStorage = UserStorage(localStorage: app.storage, appName: app.name);
     final FirebaseAuth auth = FirebaseAuth._(app, firebaseAuthApi, apiKeyClient, userStorage);
+    _instances[FirebaseApp.instance.name] = auth;
+
     if (app.authProvider == app) {
       app.authProvider = auth;
     }
     final FirebaseUser user = userStorage.get(auth);
-    auth
+    return auth
       .._updateCurrentUser(user, saveToDisk: false)
       .._lastNotifiedUserToken = user?._rawAccessToken;
-
-    return _instances[FirebaseApp.instance.name] = auth;
   }
 
   /// The auth object for the default Firebase app.
