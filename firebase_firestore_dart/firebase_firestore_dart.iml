@@ -6,15 +6,19 @@
       <sourceFolder url="file://$MODULE_DIR$/res" type="java-resource" />
       <sourceFolder url="file://$MODULE_DIR$/lib" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/test/res" type="java-test-resource" />
-      <excludeFolder url="file://$MODULE_DIR$/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/../firebase_firestore/.pub" />
-      <excludeFolder url="file://$MODULE_DIR$/build" />
       <excludeFolder url="file://$MODULE_DIR$/../firebase_firestore/examples/vm_example/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/../firebase_firestore/examples/vm_example/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/../firebase_firestore/examples/vm_example/build" />
       <excludeFolder url="file://$MODULE_DIR$/../firebase_firestore/test/vm/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/../firebase_firestore/test/vm/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/../firebase_firestore/test/vm/build" />
+      <excludeFolder url="file://$MODULE_DIR$/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/build" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/vm_example/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/vm_example/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/vm_example/build" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Bundled Protobuf Distribution" level="application" />

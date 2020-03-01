@@ -9,10 +9,11 @@ environment:
 
 dependencies:
   firebase_common_dart:
-    git:
-      url: https://github.com/fluttercommunity/firebase_dart_sdk
-      ref: develop
-      path: firebase_common_dart
+    path: ../firebase_common_dart
+    # git:
+    #   url: https://github.com/fluttercommunity/firebase_dart_sdk
+    #   ref: develop
+    #   path: firebase_common_dart
 
 dev_dependencies:
   test: ^1.12.0
