@@ -100,10 +100,12 @@ Future<StreamedResponse> _validateResponse(StreamedResponse response) async {
       if (jsonResponse is Map && jsonResponse['error'] is Map) {
         final Map<dynamic, dynamic> error = jsonResponse['error'];
         final dynamic codeValue = error['code'];
-        String message = error['message'];
-        message = message.split(' : ')[0];
+        String code = error['message'];
+        final List<String> parts = code.split(' : ');
+        final String message = parts.length == 2 ? parts[1] : '';
+        code = parts[0];
 
-        throw FirebaseAuthError(message, '');
+        throw FirebaseAuthError(code, message);
       }
     }
   }

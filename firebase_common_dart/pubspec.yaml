@@ -10,11 +10,11 @@ environment:
 dependencies:
   rxdart: ^0.23.1
   firebase_internal_dart:
-    path: ../firebase_internal_dart
-    # git:
-    #   url: https://github.com/fluttercommunity/firebase_dart_sdk
-    #   ref: develop
-    #   path: firebase_internal_dart
+    # path: ../firebase_internal_dart
+    git:
+      url: https://github.com/fluttercommunity/firebase_dart_sdk
+      ref: develop
+      path: firebase_internal_dart
 
 dev_dependencies:
   test: ^1.12.0
