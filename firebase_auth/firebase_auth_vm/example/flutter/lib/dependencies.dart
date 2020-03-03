@@ -3,7 +3,7 @@
 // on 29/02/2020
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_internal/firebase_internal.dart';
+import 'package:firebase_internal/_firebase_internal_vm.dart';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 

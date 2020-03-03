@@ -5,7 +5,7 @@ import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
-import 'package:firebase_internal/firebase_internal.dart';
+import 'package:firebase_internal/_firebase_internal_vm.dart';
 import 'package:grpc/grpc.dart';
 
 class FirestoreCallCredentials {

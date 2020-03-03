@@ -5,7 +5,8 @@
 import 'dart:convert';
 
 import 'package:collection/collection.dart';
-import 'package:firebase_core_vm/firebase_common.dart';
+
+import 'util/to_string_helper.dart';
 
 /// Result object that contains a Firebase Auth ID Token.
 class GetTokenResult {
@@ -33,7 +34,8 @@ class GetTokenResult {
   final Map<String, dynamic> claims;
 
   /// Returns the time at which this ID token will expire
-  DateTime get expirationTimestamp => _getTimeFromClaimsSafely(_expirationTimestamp);
+  DateTime get expirationTimestamp =>
+      _getTimeFromClaimsSafely(_expirationTimestamp);
 
   /// Returns the authentication timestamp. This is the time the user authenticated (signed in) and not the time the
   /// token was refreshed.
@@ -41,7 +43,8 @@ class GetTokenResult {
 
   /// Returns the issued at timestamp. This is the time the ID token was last refreshed and not the authentication
   /// timestamp.
-  DateTime get issuedAtTimestamp => _getTimeFromClaimsSafely(_issuedAtTimestamp);
+  DateTime get issuedAtTimestamp =>
+      _getTimeFromClaimsSafely(_issuedAtTimestamp);
 
   /// Returns the sign-in provider through which the ID token was obtained (anonymous, custom, phone, password, etc).
   /// Note, this does not map to provider IDs. For example, anonymous and custom authentications are not considered
@@ -75,7 +78,8 @@ class GetTokenResult {
           const MapEquality<String, dynamic>().equals(claims, other.claims);
 
   @override
-  int get hashCode => token.hashCode * 31 ^ const MapEquality<String, dynamic>().hash(claims);
+  int get hashCode =>
+      token.hashCode * 31 ^ const MapEquality<String, dynamic>().hash(claims);
 
   @override
   String toString() {

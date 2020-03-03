@@ -53,7 +53,8 @@ class LogLevel implements Comparable<LogLevel> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is LogLevel && runtimeType == other.runtimeType && _i == other._i;
+      identical(this, other) ||
+      other is LogLevel && runtimeType == other.runtimeType && _i == other._i;
 
   @override
   int get hashCode => _i.hashCode * 31;

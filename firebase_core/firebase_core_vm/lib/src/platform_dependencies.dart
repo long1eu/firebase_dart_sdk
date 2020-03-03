@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 25/11/2019
 
-import 'package:_firebase_internal_vm/firebase_internal.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// This class should hold services that Firebase depends on and are platform specific.

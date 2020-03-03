@@ -1,3 +1,8 @@
-## 1.0.0
+## 0.0.2
 
-- Initial version, created by Stagehand
+- Update README
+- Moved util files from firebase_core_vm
+
+## 0.0.1
+
+- Initial version

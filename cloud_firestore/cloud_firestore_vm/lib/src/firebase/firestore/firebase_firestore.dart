@@ -23,7 +23,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
 import 'package:firebase_firestore/src/firebase/firestore/write_batch.dart';
-import 'package:firebase_internal/firebase_internal.dart';
+import 'package:firebase_internal/_firebase_internal_vm.dart';
 import 'package:meta/meta.dart';
 
 /// Represents a Firestore Database and is the entry point for all Firestore operations

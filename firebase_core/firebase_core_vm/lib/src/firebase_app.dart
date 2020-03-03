@@ -11,7 +11,7 @@ import 'package:firebase_core_vm/src/util/base64_utils.dart';
 import 'package:firebase_core_vm/src/util/log.dart';
 import 'package:firebase_core_vm/src/util/preconditions.dart';
 import 'package:firebase_core_vm/src/util/to_string_helper.dart';
-import 'package:_firebase_internal_vm/firebase_internal.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 

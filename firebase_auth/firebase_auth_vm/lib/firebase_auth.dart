@@ -15,7 +15,7 @@ import 'package:built_value/serializer.dart';
 import 'package:firebase_auth_vm/src/models/serializers.dart';
 import 'package:firebase_core_vm/firebase_common.dart';
 import 'package:firebase_core_vm/platform_dependencies.dart';
-import 'package:_firebase_internal_vm/firebase_internal.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:googleapis/identitytoolkit/v3.dart';
 import 'package:googleapis/identitytoolkit/v3.dart' as gitkit;
 import 'package:http/http.dart';

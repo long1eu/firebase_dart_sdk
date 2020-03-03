@@ -12,7 +12,7 @@ import 'package:firebase_firestore/src/firebase/firestore/core/database_info.dar
 import 'package:firebase_firestore/src/firebase/firestore/core/firestore_client.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
-import 'package:firebase_internal/firebase_internal.dart';
+import 'package:firebase_internal/_firebase_internal_vm.dart';
 import 'package:hive/hive.dart';
 import 'package:moor_ffi/database.dart' as sql;
 

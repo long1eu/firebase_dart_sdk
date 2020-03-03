@@ -8,7 +8,7 @@ import 'package:firebase_common/firebase_common.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
 import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_internal/firebase_internal.dart';
+import 'package:firebase_internal/_firebase_internal_vm.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// [FirebaseAuthCredentialsProvider] uses Firebase Auth via [FirebaseApp] to get an auth token.

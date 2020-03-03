@@ -2,10 +2,12 @@
 // Lung Razvan <long1eu>
 // on 23/11/2019
 
-import 'package:firebase_core_vm/firebase_common.dart';
+import 'dart:async';
+
 import 'package:meta/meta.dart';
 
 import 'auth.dart';
+import 'util/to_string_helper.dart';
 
 /// Provides a way for [FirebaseApp] to get an access token if there exists
 /// a logged in user.
@@ -35,19 +37,17 @@ class InternalTokenResult {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is InternalTokenResult && runtimeType == other.runtimeType && token == other.token;
+      other is InternalTokenResult &&
+          runtimeType == other.runtimeType &&
+          token == other.token;
 
   @override
   int get hashCode => token.hashCode * 31;
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)..add('token', token)).toString();
+    return (ToStringHelper(runtimeType) //
+          ..add('token', token))
+        .toString();
   }
-}
-
-/// Internal use only, indicates that no signed-in user and operations like
-/// [InternalTokenProvider.getAccessToken] will fail.
-class FirebaseNoSignedInUserError extends FirebaseError {
-  FirebaseNoSignedInUserError(String message) : super(message);
 }
