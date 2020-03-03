@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_database_collection/firebase_database_collection.dart';
+import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 

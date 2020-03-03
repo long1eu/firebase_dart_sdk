@@ -1,8 +1,7 @@
 name: _firebase_database_collection_vm
 description: For internal use of the Firestore and Realtime Database packages
-version: 0.0.1
+version: 0.0.2
 homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
-author: long1eu <home@long1.eu>
 
 environment:
   sdk: '>=2.0.0 <3.0.0'

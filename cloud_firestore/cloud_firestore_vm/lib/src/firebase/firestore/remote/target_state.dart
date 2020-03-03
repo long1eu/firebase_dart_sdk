@@ -4,7 +4,7 @@
 
 import 'dart:typed_data';
 
-import 'package:firebase_database_collection/firebase_database_collection.dart';
+import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';

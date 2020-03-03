@@ -4,21 +4,20 @@
 
 import 'dart:math';
 
-import 'package:firebase_database_collection/src/immutable_sorted_map.dart';
-import 'package:firebase_database_collection/src/immutable_sorted_map_iterator.dart';
-import 'package:firebase_database_collection/src/llrb_black_value_node.dart';
-import 'package:firebase_database_collection/src/llrb_empty_node.dart';
-import 'package:firebase_database_collection/src/llrb_node.dart';
-import 'package:firebase_database_collection/src/llrb_red_value_node.dart';
-import 'package:firebase_database_collection/src/lltb_value_node.dart';
+import 'package:_firebase_database_collection_vm/src/immutable_sorted_map.dart';
+import 'package:_firebase_database_collection_vm/src/immutable_sorted_map_iterator.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_black_value_node.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_empty_node.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_node.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_red_value_node.dart';
+import 'package:_firebase_database_collection_vm/src/lltb_value_node.dart';
 
 /// This is a red-black tree backed implementation of ImmutableSortedMap. This
 /// has better asymptotic complexity for large collections, but performs worse
 /// in practice than an ArraySortedMap for small collections. It also uses about
 /// twice as much memory.
 class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
-  RBTreeSortedMap(this.comparator, [LLRBNode<K, V> root])
-      : _root = root ?? LLRBEmptyNode<K, V>();
+  RBTreeSortedMap(this.comparator, [LLRBNode<K, V> root]) : _root = root ?? LLRBEmptyNode<K, V>();
 
   factory RBTreeSortedMap.fromMap(Map<K, V> values, Comparator<K> comparator) {
     return RBTreeSortedMapBuilder.buildFrom(
@@ -34,10 +33,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   Comparator<K> comparator;
 
   static RBTreeSortedMap<A, C> buildFrom<A, B, C>(
-      List<A> keys,
-      Map<B, C> values,
-      KeyTranslator<A, B> translator,
-      Comparator<A> comparator) {
+      List<A> keys, Map<B, C> values, KeyTranslator<A, B> translator, Comparator<A> comparator) {
     return RBTreeSortedMapBuilder.buildFrom(
       keys,
       values,
@@ -53,7 +49,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   LLRBNode<K, V> getNode(K key) {
     LLRBNode<K, V> node = _root;
     while (!node.isEmpty) {
-      final int cmp = this.comparator(key, node.key);
+      final int cmp = comparator(key, node.key);
       if (cmp < 0) {
         node = node.left;
       } else if (cmp == 0) {
@@ -79,18 +75,15 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
     if (!containsKey(key)) {
       return this;
     } else {
-      final LLRBNode<K, V> newRoot = _root
-          .remove(key, comparator)
-          .copy(null, null, LLRBNodeColor.black, null, null);
+      final LLRBNode<K, V> newRoot = _root.remove(key, comparator).copy(null, null, LLRBNodeColor.black, null, null);
       return RBTreeSortedMap<K, V>(comparator, newRoot);
     }
   }
 
   @override
   ImmutableSortedMap<K, V> insert(K key, V value) {
-    final LLRBNode<K, V> newRoot = _root
-        .insert(key, value, comparator)
-        .copy(null, null, LLRBNodeColor.black, null, null);
+    final LLRBNode<K, V> newRoot =
+        _root.insert(key, value, comparator).copy(null, null, LLRBNodeColor.black, null, null);
     return RBTreeSortedMap<K, V>(comparator, newRoot);
   }
 
@@ -136,7 +129,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
     LLRBNode<K, V> node = _root;
     LLRBNode<K, V> rightParent;
     while (!node.isEmpty) {
-      final int cmp = this.comparator(key, node.key);
+      final int cmp = comparator(key, node.key);
       if (cmp == 0) {
         if (!node.left.isEmpty) {
           node = node.left;
@@ -156,8 +149,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
         node = node.right;
       }
     }
-    throw ArgumentError(
-        'Couldn\'t find predecessor key of non-present key: $key');
+    throw ArgumentError('Couldn\'t find predecessor key of non-present key: $key');
   }
 
   @override
@@ -165,7 +157,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
     LLRBNode<K, V> node = _root;
     LLRBNode<K, V> leftParent;
     while (!node.isEmpty) {
-      final int cmp = this.comparator(node.key, key);
+      final int cmp = comparator(node.key, key);
       if (cmp == 0) {
         if (!node.right.isEmpty) {
           node = node.right;
@@ -185,8 +177,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
         node = node.left;
       }
     }
-    throw ArgumentError(
-        'Couldn\'t find successor key of non-present key: $key');
+    throw ArgumentError('Couldn\'t find successor key of non-present key: $key');
   }
 
   @override
@@ -195,7 +186,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
     int prunedNodes = 0;
     LLRBNode<K, V> node = _root;
     while (!node.isEmpty) {
-      final int cmp = this.comparator(key, node.key);
+      final int cmp = comparator(key, node.key);
       if (cmp == 0) {
         return prunedNodes + node.left.length;
       } else if (cmp < 0) {
@@ -226,8 +217,7 @@ class RBTreeSortedMapBuilder<A, B, C> {
   }
 
   void _buildPennant(LLRBNodeColor color, int chunkSize, int start) {
-    final LLRBNode<A, C> treeRoot =
-        _buildBalancedTree(start + 1, chunkSize - 1);
+    final LLRBNode<A, C> treeRoot = _buildBalancedTree(start + 1, chunkSize - 1);
     final A key = keys[start];
     LLRBValueNode<A, C> node;
     if (color == LLRBNodeColor.red) {
@@ -261,12 +251,8 @@ class RBTreeSortedMapBuilder<A, B, C> {
   }
 
   static RBTreeSortedMap<A, C> buildFrom<A, B, C>(
-      List<A> keys,
-      Map<B, C> values,
-      KeyTranslator<A, B> translator,
-      Comparator<A> comparator) {
-    final RBTreeSortedMapBuilder<A, B, C> builder =
-        RBTreeSortedMapBuilder<A, B, C>(keys, values, translator);
+      List<A> keys, Map<B, C> values, KeyTranslator<A, B> translator, Comparator<A> comparator) {
+    final RBTreeSortedMapBuilder<A, B, C> builder = RBTreeSortedMapBuilder<A, B, C>(keys, values, translator);
     keys.sort(comparator);
     final Iterator<BooleanChunk> it = Base1_2(keys.length).iterator;
     int index = keys.length;
@@ -283,7 +269,7 @@ class RBTreeSortedMapBuilder<A, B, C> {
     }
     return RBTreeSortedMap<A, C>(
       comparator,
-      builder._root == null ? LLRBEmptyNode<A, C>() : builder._root,
+      builder._root ?? LLRBEmptyNode<A, C>(),
     );
   }
 }

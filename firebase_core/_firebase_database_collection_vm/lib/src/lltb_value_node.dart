@@ -2,10 +2,10 @@
 // Lung Razvan <long1eu>
 // on 19/09/2018
 
-import 'package:firebase_database_collection/src/llrb_black_value_node.dart';
-import 'package:firebase_database_collection/src/llrb_empty_node.dart';
-import 'package:firebase_database_collection/src/llrb_node.dart';
-import 'package:firebase_database_collection/src/llrb_red_value_node.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_black_value_node.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_empty_node.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_node.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_red_value_node.dart';
 
 abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   LLRBValueNode(this.key, this.value, LLRBNode<K, V> left, LLRBNode<K, V> right)
@@ -28,16 +28,14 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
 
   LLRBNodeColor get color;
 
-  LLRBValueNode<K, V> copyWith(
-      K key, V value, LLRBNode<K, V> left, LLRBNode<K, V> right);
+  LLRBValueNode<K, V> copyWith(K key, V value, LLRBNode<K, V> left, LLRBNode<K, V> right);
 
   @override
-  LLRBValueNode<K, V> copy(K key, V value, LLRBNodeColor color,
-      LLRBNode<K, V> left, LLRBNode<K, V> right) {
-    final K newKey = key == null ? this.key : key;
-    final V newValue = value == null ? this.value : value;
-    final LLRBNode<K, V> newLeft = left == null ? this.left : left;
-    final LLRBNode<K, V> newRight = right == null ? this.right : right;
+  LLRBValueNode<K, V> copy(K key, V value, LLRBNodeColor color, LLRBNode<K, V> left, LLRBNode<K, V> right) {
+    final K newKey = key ?? this.key;
+    final V newValue = value ?? this.value;
+    final LLRBNode<K, V> newLeft = left ?? this.left;
+    final LLRBNode<K, V> newRight = right ?? this.right;
     if (color == LLRBNodeColor.red) {
       return LLRBRedValueNode<K, V>(newKey, newValue, newLeft, newRight);
     } else {
@@ -87,8 +85,7 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
           return LLRBEmptyNode<K, V>();
         } else {
           final LLRBNode<K, V> smallest = n.right.min;
-          n = n.copyWith(smallest.key, smallest.value, null,
-              (n.right as LLRBValueNode<K, V>).removeMin());
+          n = n.copyWith(smallest.key, smallest.value, null, (n.right as LLRBValueNode<K, V>).removeMin());
         }
       }
       n = n.copyWith(null, null, null, n.right.remove(key, comparator));
@@ -125,8 +122,7 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   }
 
   @override
-  bool shortCircuitingInOrderTraversal(
-      ShortCircuitingNodeVisitor<K, V> visitor) {
+  bool shortCircuitingInOrderTraversal(ShortCircuitingNodeVisitor<K, V> visitor) {
     if (left.shortCircuitingInOrderTraversal(visitor)) {
       if (visitor.shouldContinue(key, value)) {
         return right.shortCircuitingInOrderTraversal(visitor);
@@ -136,8 +132,7 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   }
 
   @override
-  bool shortCircuitingReverseOrderTraversal(
-      ShortCircuitingNodeVisitor<K, V> visitor) {
+  bool shortCircuitingReverseOrderTraversal(ShortCircuitingNodeVisitor<K, V> visitor) {
     if (right.shortCircuitingReverseOrderTraversal(visitor)) {
       if (visitor.shouldContinue(key, value)) {
         return left.shortCircuitingReverseOrderTraversal(visitor);
@@ -164,8 +159,7 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
         n = n._moveRedLeft();
       }
 
-      n = n.copyWith(
-          null, null, (n.left as LLRBValueNode<K, V>).removeMin(), null);
+      n = n.copyWith(null, null, (n.left as LLRBValueNode<K, V>).removeMin(), null);
       return n._fixUp();
     }
   }
@@ -173,8 +167,7 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   LLRBValueNode<K, V> _moveRedLeft() {
     LLRBValueNode<K, V> n = _colorFlip();
     if (n.right.left.isRed) {
-      n = n.copyWith(
-          null, null, null, (n.right as LLRBValueNode<K, V>)._rotateRight());
+      n = n.copyWith(null, null, null, (n.right as LLRBValueNode<K, V>)._rotateRight());
       n = n._rotateLeft();
       n = n._colorFlip();
     }
@@ -205,22 +198,18 @@ abstract class LLRBValueNode<K, V> implements LLRBNode<K, V> {
   }
 
   LLRBValueNode<K, V> _rotateLeft() {
-    final LLRBValueNode<K, V> newLeft = copy(null, null, LLRBNodeColor.red,
-        null, (right as LLRBValueNode<K, V>).left);
+    final LLRBValueNode<K, V> newLeft = copy(null, null, LLRBNodeColor.red, null, (right as LLRBValueNode<K, V>).left);
     return right.copy(null, null, color, newLeft, null) as LLRBValueNode<K, V>;
   }
 
   LLRBValueNode<K, V> _rotateRight() {
-    final LLRBValueNode<K, V> newRight = copy(null, null, LLRBNodeColor.red,
-        (left as LLRBValueNode<K, V>).right, null);
+    final LLRBValueNode<K, V> newRight = copy(null, null, LLRBNodeColor.red, (left as LLRBValueNode<K, V>).right, null);
     return left.copy(null, null, color, null, newRight) as LLRBValueNode<K, V>;
   }
 
   LLRBValueNode<K, V> _colorFlip() {
-    final LLRBNode<K, V> newLeft =
-        left.copy(null, null, _oppositeColor(left), null, null);
-    final LLRBNode<K, V> newRight =
-        right.copy(null, null, _oppositeColor(right), null, null);
+    final LLRBNode<K, V> newLeft = left.copy(null, null, _oppositeColor(left), null, null);
+    final LLRBNode<K, V> newRight = right.copy(null, null, _oppositeColor(right), null, null);
 
     return copy(null, null, _oppositeColor(this), newLeft, newRight);
   }

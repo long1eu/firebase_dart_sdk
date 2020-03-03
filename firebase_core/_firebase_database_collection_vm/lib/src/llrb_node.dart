@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 19/09/2018
 
+// ignore: one_member_abstracts
 abstract class ShortCircuitingNodeVisitor<K, V> {
   bool shouldContinue(K key, V value);
 }
@@ -21,8 +22,7 @@ enum LLRBNodeColor { red, black }
 abstract class LLRBNode<K, V> {
   const LLRBNode();
 
-  LLRBNode<K, V> copy(K key, V value, LLRBNodeColor color, LLRBNode<K, V> left,
-      LLRBNode<K, V> right);
+  LLRBNode<K, V> copy(K key, V value, LLRBNodeColor color, LLRBNode<K, V> left, LLRBNode<K, V> right);
 
   LLRBNode<K, V> insert(K key, V value, Comparator<K> comparator);
 
@@ -48,9 +48,7 @@ abstract class LLRBNode<K, V> {
 
   void inOrderTraversal(NodeVisitor<K, V> visitor);
 
-  bool shortCircuitingInOrderTraversal(
-      ShortCircuitingNodeVisitor<K, V> visitor);
+  bool shortCircuitingInOrderTraversal(ShortCircuitingNodeVisitor<K, V> visitor);
 
-  bool shortCircuitingReverseOrderTraversal(
-      ShortCircuitingNodeVisitor<K, V> visitor);
+  bool shortCircuitingReverseOrderTraversal(ShortCircuitingNodeVisitor<K, V> visitor);
 }

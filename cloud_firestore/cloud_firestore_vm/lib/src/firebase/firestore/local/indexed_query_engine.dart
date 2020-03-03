@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:firebase_database_collection/firebase_database_collection.dart';
+import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/index_range.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/nan_filter.dart';

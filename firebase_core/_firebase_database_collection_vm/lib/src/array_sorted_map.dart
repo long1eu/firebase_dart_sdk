@@ -2,8 +2,8 @@
 // Lung Razvan <long1eu>
 // on 19/09/2018
 
-import 'package:firebase_database_collection/src/llrb_node.dart';
-import 'package:firebase_database_collection/src/rb_tree_sorted_map.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_node.dart';
+import 'package:_firebase_database_collection_vm/src/rb_tree_sorted_map.dart';
 
 import 'immutable_sorted_map.dart';
 
@@ -18,12 +18,13 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
         values = values ?? <V>[];
 
   factory ArraySortedMap.fromMap(Map<K, V> map, Comparator<K> comparator) {
-    return buildFrom<K, K, V>(List<K>.from(map.keys), map,
-        ImmutableSortedMap.identityTranslator<K>(), comparator);
+    return buildFrom<K, K, V>(List<K>.from(map.keys), map, ImmutableSortedMap.identityTranslator<K>(), comparator);
   }
 
-  static ArraySortedMap<A, C> buildFrom<A, B, C>(List<A> keys, Map<B, C> values,
-      KeyTranslator<A, B> translator, Comparator<A> comparator) {
+  // constructors can't have types
+  // ignore: prefer_constructors_over_static_methods
+  static ArraySortedMap<A, C> buildFrom<A, B, C>(
+      List<A> keys, Map<B, C> values, KeyTranslator<A, B> translator, Comparator<A> comparator) {
     keys.sort(comparator);
     final int length = keys.length;
     final List<A> keyArray = List<A>(length);
@@ -151,7 +152,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
     // if there's no exact match, findKeyOrInsertPosition will return the index
     // *after* the closest match, but since this is a reverse iterator, we want
     // to start just *before* the closest match.
-    if (pos < keys.length && this.comparator(keys[pos], key) == 0) {
+    if (pos < keys.length && comparator(keys[pos], key) == 0) {
       return _getIterable(pos, true).iterator;
     } else {
       return _getIterable(pos - 1, true).iterator;
@@ -199,7 +200,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   /// collection size this still should be as fast a as binary search.
   int _findKeyOrInsertPosition(K key) {
     int newPos = 0;
-    while (newPos < keys.length && this.comparator(keys[newPos], key) < 0) {
+    while (newPos < keys.length && comparator(keys[newPos], key) < 0) {
       newPos++;
     }
     return newPos;
@@ -210,7 +211,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   int findKey(K key) {
     int i = 0;
     for (K otherKey in keys) {
-      if (this.comparator(key, otherKey) == 0) {
+      if (comparator(key, otherKey) == 0) {
         return i;
       }
       i++;

@@ -11,10 +11,7 @@ dependencies:
     git:
       url: https://github.com/fluttercommunity/firebase_dart_sdk
       path: firebase_core_vm
-  firebase_database_collection_vm:
-    git:
-      url: https://github.com/fluttercommunity/firebase_dart_sdk
-      path: firebase_database_collection_vm
+  _firebase_database_collection_vm:  ^0.0.2
   _firebase_internal_vm:
     git:
       url: https://github.com/fluttercommunity/firebase_dart_sdk

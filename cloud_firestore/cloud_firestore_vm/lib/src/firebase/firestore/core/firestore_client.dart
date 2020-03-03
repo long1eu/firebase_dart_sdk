@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_database_collection/firebase_database_collection.dart';
+import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/database_info.dart';

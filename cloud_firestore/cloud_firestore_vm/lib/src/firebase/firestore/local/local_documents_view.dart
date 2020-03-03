@@ -3,7 +3,7 @@
 // on 20/09/2018
 import 'dart:async';
 
-import 'package:firebase_database_collection/firebase_database_collection.dart';
+import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';

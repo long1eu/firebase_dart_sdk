@@ -2,8 +2,8 @@
 // Lung Razvan <long1eu>
 // on 19/09/2018
 
-import 'package:firebase_database_collection/src/llrb_node.dart';
-import 'package:firebase_database_collection/src/llrb_red_value_node.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_node.dart';
+import 'package:_firebase_database_collection_vm/src/llrb_red_value_node.dart';
 
 class LLRBEmptyNode<K, V> implements LLRBNode<K, V> {
   LLRBEmptyNode()
@@ -11,8 +11,7 @@ class LLRBEmptyNode<K, V> implements LLRBNode<K, V> {
         value = null;
 
   @override
-  LLRBNode<K, V> copy(K key, V value, LLRBNodeColor color, LLRBNode<K, V> left,
-      LLRBNode<K, V> right) {
+  LLRBNode<K, V> copy(K key, V value, LLRBNodeColor color, LLRBNode<K, V> left, LLRBNode<K, V> right) {
     return this;
   }
 
@@ -57,15 +56,13 @@ class LLRBEmptyNode<K, V> implements LLRBNode<K, V> {
   }
 
   @override
-  bool shortCircuitingInOrderTraversal(
-      ShortCircuitingNodeVisitor<K, V> visitor) {
+  bool shortCircuitingInOrderTraversal(ShortCircuitingNodeVisitor<K, V> visitor) {
     // No-op
     return true;
   }
 
   @override
-  bool shortCircuitingReverseOrderTraversal(
-      ShortCircuitingNodeVisitor<K, V> visitor) {
+  bool shortCircuitingReverseOrderTraversal(ShortCircuitingNodeVisitor<K, V> visitor) {
     // No-op
     return true;
   }

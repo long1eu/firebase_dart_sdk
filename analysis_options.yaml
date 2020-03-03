@@ -30,7 +30,6 @@ linter:
     - avoid_implementing_value_types
     - avoid_init_to_null
     - avoid_null_checks_in_equality_operators
-    - avoid_positional_boolean_parameters
     - avoid_relative_lib_imports
     - avoid_renaming_method_parameters
     - avoid_return_types_on_setters
@@ -73,7 +72,6 @@ linter:
     - package_api_docs
     - package_names
     - package_prefixed_library_names
-    - parameter_assignments
     - prefer_adjacent_string_concatenation
     - prefer_asserts_in_initializer_lists
     - prefer_collection_literals

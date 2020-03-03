@@ -7,7 +7,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
-import 'package:firebase_database_collection/firebase_database_collection.dart';
+import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/order_by.dart';

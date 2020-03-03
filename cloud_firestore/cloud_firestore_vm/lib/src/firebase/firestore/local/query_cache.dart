@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:firebase_database_collection/firebase_database_collection.dart';
+import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';

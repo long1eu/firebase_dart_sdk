@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 19/09/2018
 
-import 'package:firebase_database_collection/src/immutable_sorted_map.dart';
+import 'package:_firebase_database_collection_vm/src/immutable_sorted_map.dart';
 
 class ImmutableSortedSet<T> extends Iterable<T> {
   factory ImmutableSortedSet([List<T> elements, Comparator<T> comparator]) {
@@ -10,6 +10,7 @@ class ImmutableSortedSet<T> extends Iterable<T> {
       elements ?? <T>[],
       <T, void>{},
       ImmutableSortedMap.identityTranslator(),
+      // ignore: avoid_as
       comparator ?? (T a, T b) => (a as Comparable<T>).compareTo(b),
     ));
   }
@@ -69,10 +70,7 @@ class ImmutableSortedSet<T> extends Iterable<T> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ImmutableSortedSet &&
-          runtimeType == other.runtimeType &&
-          _map == other._map;
+      identical(this, other) || other is ImmutableSortedSet && runtimeType == other.runtimeType && _map == other._map;
 
   @override
   int get hashCode => _map.hashCode;
