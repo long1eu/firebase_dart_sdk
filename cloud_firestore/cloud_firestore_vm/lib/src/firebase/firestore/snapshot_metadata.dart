@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 25/09/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
 
 /// Metadata about a snapshot, describing the state of the snapshot.

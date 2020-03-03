@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 25/09/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 
 /// Settings used to configure a FirebaseFirestore instance.
 class FirebaseFirestoreSettings {

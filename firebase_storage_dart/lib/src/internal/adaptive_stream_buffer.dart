@@ -6,7 +6,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 
 /// AdaptiveStreamBuffer is a wrapper around ByteBuffer that reads all data into a local buffer. It
 /// provides access to the underlying buffer and methods to manipulate its state.

@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/network/network_request.dart';
 import 'package:meta/meta.dart';
 import 'package:mockito/mockito.dart';

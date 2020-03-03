@@ -8,6 +8,13 @@
       <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/build" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/example/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/example/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/example/build" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/example/ios/Flutter/App.framework/flutter_assets/packages" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/example/macos/Flutter/ephemeral/App.framework/Resources/flutter_assets/packages" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/example/macos/Flutter/ephemeral/App.framework/Versions/A/Resources/flutter_assets/packages" />
+      <excludeFolder url="file://$MODULE_DIR$/../firebase_core_vm/example/macos/Flutter/ephemeral/App.framework/Versions/Current/Resources/flutter_assets/packages" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

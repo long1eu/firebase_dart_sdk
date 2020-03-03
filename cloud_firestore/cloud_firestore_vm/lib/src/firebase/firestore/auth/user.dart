@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 
 /// Simple wrapper around a nullable UID. Mostly exists to make code more
 /// readable and for use as a key in maps (since keys cannot be null).

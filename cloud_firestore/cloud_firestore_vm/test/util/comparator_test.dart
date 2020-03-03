@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 27/09/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 
 /// Tests that a given [Comparator] (or the implementation of [Comparable]) is
 /// correct. To use, repeatedly call [addEqualityGroup] with sets of objects

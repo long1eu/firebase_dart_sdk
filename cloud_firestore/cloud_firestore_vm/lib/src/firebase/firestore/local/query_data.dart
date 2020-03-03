@@ -5,7 +5,7 @@
 import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';

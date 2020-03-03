@@ -5,7 +5,7 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/cancel_exception.dart';
 import 'package:firebase_storage_vm/src/internal/exponential_backoff_sender.dart';
 import 'package:firebase_storage_vm/src/internal/task_events.dart';

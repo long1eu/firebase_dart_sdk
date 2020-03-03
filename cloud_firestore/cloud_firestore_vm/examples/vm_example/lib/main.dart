@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/firebase_firestore.dart';
 
 import 'credentials.dart';

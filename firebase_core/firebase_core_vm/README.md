@@ -1,6 +1,6 @@
-# Firebase Common for Dart
+# Firebase Core
 
-A Dart implementation of the Firebase Core API, which enables connecting to multiple Firebase apps.
+Dart implementation of the Firebase Core API, which enables connecting to multiple Firebase apps.
 
 *Note*: This library is still under development, and some APIs might not be available yet or work correctly. 
 Please feel free to open an issue [here](https://github.com/fluttercommunity/firebase_flutter_sdk/issues) or even a
@@ -8,4 +8,10 @@ Please feel free to open an issue [here](https://github.com/fluttercommunity/fir
 
 
 ## Usage
-To use this plugin, add `firebase_common` as a [dependency in your pubspec.yaml file](https://flutter.io/platform-plugins/).
+*NOTES*
+* can be used in CLIs, servers and Flutter. 
+* does not work on Web
+* To use this package with the official [firebase_core](https://pub.dev/packages/firebase_core) plugin on Flutter, 
+  see [firebase_core_platform](https://pub.dev/packages/firebase_core_platform) on how to use it.
+  
+

@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 
 class FirebaseFirestoreErrorCode {
   const FirebaseFirestoreErrorCode._(this.value);

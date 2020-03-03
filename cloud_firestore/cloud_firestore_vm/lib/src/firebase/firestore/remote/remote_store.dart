@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:typed_data';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/transaction.dart';

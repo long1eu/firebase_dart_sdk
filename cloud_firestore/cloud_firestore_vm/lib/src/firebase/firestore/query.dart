@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/bound.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';

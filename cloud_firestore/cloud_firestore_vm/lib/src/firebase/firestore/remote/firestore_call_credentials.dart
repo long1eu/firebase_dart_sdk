@@ -3,7 +3,7 @@
 // on 24/09/2018
 import 'dart:async';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:firebase_internal/_firebase_internal_vm.dart';
 import 'package:grpc/grpc.dart';

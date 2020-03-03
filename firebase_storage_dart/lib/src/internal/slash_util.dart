@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 20/10/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 /// URL encodes a string, but leaves slashes unmolested. This is used for
 /// encoding gs uri paths to objects -- where the individual path segments need

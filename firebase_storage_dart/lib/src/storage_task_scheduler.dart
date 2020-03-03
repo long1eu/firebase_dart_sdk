@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:isolate';
 
 import 'package:collection/collection.dart';
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:isolate/isolate.dart';
 import 'package:meta/meta.dart';
 

@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/10/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 /// Represents an internal exception that is thrown to cancel a currently
 /// running task.

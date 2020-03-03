@@ -5,7 +5,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/delete_storage_task.dart';
 import 'package:firebase_storage_vm/src/file_download_task.dart';
 import 'package:firebase_storage_vm/src/firebase_storage.dart';

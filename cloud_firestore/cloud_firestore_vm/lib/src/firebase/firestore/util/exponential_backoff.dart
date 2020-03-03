@@ -4,7 +4,7 @@
 
 import 'dart:math';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 
 /// Helper for running delayed tasks following an exponential backoff curve between attempts using the [backoffFactor]

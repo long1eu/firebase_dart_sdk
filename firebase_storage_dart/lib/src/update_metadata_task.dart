@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/firebase_storage.dart';
 import 'package:firebase_storage_vm/src/internal/exponential_backoff_sender.dart';
 import 'package:firebase_storage_vm/src/network/network_request.dart';

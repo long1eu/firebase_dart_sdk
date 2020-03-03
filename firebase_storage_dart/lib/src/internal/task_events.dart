@@ -3,7 +3,7 @@
 // on 22/10/2018
 
 import 'package:collection/collection.dart';
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/src/file_download_task.dart';
 import 'package:firebase_storage/src/storage_exception.dart';
 import 'package:firebase_storage/src/storage_reference.dart';

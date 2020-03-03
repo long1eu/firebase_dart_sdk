@@ -1,7 +1,7 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 26/09/2018
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
 import 'package:firebase_firestore/src/firebase/firestore/query.dart';
 

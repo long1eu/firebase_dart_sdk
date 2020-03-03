@@ -3,7 +3,7 @@
 // on 22/10/2018
 import 'dart:async';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/internal/task_events.dart';
 
 abstract class Task<TState extends StorageTaskState> {

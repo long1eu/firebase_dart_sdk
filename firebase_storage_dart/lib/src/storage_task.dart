@@ -5,7 +5,7 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/internal/task_events.dart';
 import 'package:firebase_storage_vm/src/storage_reference.dart';
 import 'package:firebase_storage_vm/src/storage_task_manager.dart';

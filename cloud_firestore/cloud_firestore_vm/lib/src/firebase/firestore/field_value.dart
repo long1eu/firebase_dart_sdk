@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 
 /// Sentinel values that can be used when writing document fields with [set] or [update].
 abstract class FieldValue {

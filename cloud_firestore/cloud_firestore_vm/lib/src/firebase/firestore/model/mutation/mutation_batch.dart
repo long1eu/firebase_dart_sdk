@@ -3,7 +3,7 @@
 // on 17/09/2018
 
 import 'package:collection/collection.dart';
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
 import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';

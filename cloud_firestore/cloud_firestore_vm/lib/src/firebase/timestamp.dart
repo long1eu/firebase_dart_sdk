@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 
 /// A Timestamp represents a point in time independent of any time zone or calendar, represented as
 /// seconds and fractions of seconds at nanosecond resolution in UTC Epoch time. It is encoded using

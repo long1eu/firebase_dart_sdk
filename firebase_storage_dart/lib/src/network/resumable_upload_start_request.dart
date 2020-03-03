@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 20/10/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/internal/slash_util.dart';
 import 'package:firebase_storage_vm/src/network/network_request.dart';
 import 'package:firebase_storage_vm/src/network/resumable_network_request.dart';

@@ -12,10 +12,10 @@ dependencies:
     git:
       url: https://github.com/long1eu/dart_sqlite
       path: dart
-  firebase_common:
+  firebase_core:
     git:
       url: https://github.com/fluttercommunity/firebase_dart_sdk
-      path: firebase_common
+      path: firebase_core
   firebase_firestore:
     git:
       url: https://github.com/fluttercommunity/firebase_dart_sdk

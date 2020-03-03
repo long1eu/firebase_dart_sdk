@@ -6,6 +6,7 @@
       <excludeFolder url="file://$MODULE_DIR$/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/build" />
+      <excludeFolder url="file://$MODULE_DIR$/example/flutter/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/build" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/ios/.symlinks/plugins/firebase_core/.pub" />
@@ -56,6 +57,7 @@
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/macos/Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/example/build" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/macos/Flutter/ephemeral/.symlinks/plugins/url_launcher_web/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/flutter/macos/Flutter/ephemeral/.symlinks/plugins/url_launcher_web/build" />
+      <excludeFolder url="file://$MODULE_DIR$/example/vm/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/vm/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/vm/build" />
     </content>

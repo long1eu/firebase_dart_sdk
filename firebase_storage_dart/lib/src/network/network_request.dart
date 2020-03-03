@@ -7,7 +7,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/firebase_storage.dart';
 import 'package:firebase_storage/src/internal/slash_util.dart';
 import 'package:firebase_storage/src/internal/version.dart';

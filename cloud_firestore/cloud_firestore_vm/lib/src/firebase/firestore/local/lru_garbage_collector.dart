@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:collection/collection.dart';
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/firebase_firestore.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:firebase_firestore/src/firebase/firestore/local/lru_delegate.dart';

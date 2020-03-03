@@ -4,7 +4,7 @@
 
 import 'dart:typed_data';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/network/resumable_network_request.dart';
 
 /// A request to upload a single chunk of a large blob.

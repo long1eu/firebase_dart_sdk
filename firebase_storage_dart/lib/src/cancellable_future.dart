@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/10/2018
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage_vm/src/util/wrapped_future.dart';
 
 /// Represents an asynchronous operation that can be canceled.

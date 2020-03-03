@@ -13,7 +13,7 @@ import 'package:built_value/built_value.dart';
 import 'package:built_value/json_object.dart';
 import 'package:built_value/serializer.dart';
 import 'package:firebase_auth_vm/src/models/serializers.dart';
-import 'package:firebase_core_vm/firebase_common.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:firebase_core_vm/platform_dependencies.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:googleapis/identitytoolkit/v3.dart';

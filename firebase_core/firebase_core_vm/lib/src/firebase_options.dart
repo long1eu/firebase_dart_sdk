@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 16/09/2018
 
-import 'package:firebase_core_vm/src/util/to_string_helper.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:meta/meta.dart';
 
 class FirebaseOptions {
@@ -23,6 +23,9 @@ class FirebaseOptions {
   /// Returns the populated options or null if applicationId is missing from
   /// the map.
   factory FirebaseOptions.fromJson(Map<String, String> json) {
+    if (json == null && !json.containsKey(_apiKey)) {
+      return null;
+    }
     return FirebaseOptions(
       applicationId: json[_appId],
       apiKey: json[_apiKey],

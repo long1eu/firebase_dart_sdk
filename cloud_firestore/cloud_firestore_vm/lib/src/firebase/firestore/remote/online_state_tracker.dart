@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:firebase_common/firebase_common.dart';
+import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
 import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
 import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
