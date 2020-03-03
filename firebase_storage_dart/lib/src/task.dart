@@ -4,7 +4,7 @@
 import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/internal/task_events.dart';
+import 'package:firebase_storage_vm/src/internal/task_events.dart';
 
 abstract class Task<TState extends StorageTaskState> {
   /// Attempts to cancel the task. A canceled task cannot be resumed later. A

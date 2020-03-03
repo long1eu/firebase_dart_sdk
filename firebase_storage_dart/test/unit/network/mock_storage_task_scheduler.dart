@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:firebase_storage/src/storage_task_scheduler.dart';
+import 'package:firebase_storage_vm/src/storage_task_scheduler.dart';
 
 class MockStorageTaskScheduler implements StorageTaskScheduler {
   factory MockStorageTaskScheduler() => instance;

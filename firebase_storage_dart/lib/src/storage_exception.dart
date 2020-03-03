@@ -3,7 +3,7 @@
 // on 20/10/2018
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/cancel_exception.dart';
+import 'package:firebase_storage_vm/src/cancel_exception.dart';
 
 import 'storage_reference.dart';
 import 'storage_task.dart';

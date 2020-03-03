@@ -7,7 +7,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/network/network_request.dart';
+import 'package:firebase_storage_vm/src/network/network_request.dart';
 import 'package:meta/meta.dart';
 import 'package:mockito/mockito.dart';
 import 'package:rxdart/rxdart.dart';

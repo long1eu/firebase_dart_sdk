@@ -3,8 +3,8 @@
 // on 22/10/2018
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/internal/util.dart';
-import 'package:firebase_storage/src/storage_reference.dart';
+import 'package:firebase_storage_vm/src/internal/util.dart';
+import 'package:firebase_storage_vm/src/storage_reference.dart';
 import 'package:meta/meta.dart';
 
 /// [FirebaseStorage] is a service that supports uploading and downloading large

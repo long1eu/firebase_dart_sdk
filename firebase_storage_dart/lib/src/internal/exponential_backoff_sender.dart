@@ -7,8 +7,8 @@ import 'dart:isolate';
 import 'dart:math';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/internal/util.dart';
-import 'package:firebase_storage/src/network/network_request.dart';
+import 'package:firebase_storage_vm/src/internal/util.dart';
+import 'package:firebase_storage_vm/src/network/network_request.dart';
 
 /// This is a Network request sender that uses exponential backoff, but also
 /// retries without backoff if the network is unavailable in the client and

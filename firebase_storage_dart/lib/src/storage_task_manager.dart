@@ -2,9 +2,9 @@
 // Lung Razvan <long1eu>
 // on 21/10/2018
 
-import 'package:firebase_storage/src/file_download_task.dart';
-import 'package:firebase_storage/src/storage_reference.dart';
-import 'package:firebase_storage/src/storage_task.dart';
+import 'package:firebase_storage_vm/src/file_download_task.dart';
+import 'package:firebase_storage_vm/src/storage_reference.dart';
+import 'package:firebase_storage_vm/src/storage_task.dart';
 
 // ignore: always_specify_types
 class StorageTaskManager {

@@ -5,9 +5,9 @@
 import 'dart:async';
 import 'dart:isolate';
 
-import 'package:firebase_storage/src/internal/task_events.dart';
-import 'package:firebase_storage/src/streamed_task.dart';
-import 'package:firebase_storage/src/task.dart';
+import 'package:firebase_storage_vm/src/internal/task_events.dart';
+import 'package:firebase_storage_vm/src/streamed_task.dart';
+import 'package:firebase_storage_vm/src/task.dart';
 
 class TaskImpl<TState extends StorageTaskState> extends Task<TState> {
   TaskImpl._(this._received, this._completer) {

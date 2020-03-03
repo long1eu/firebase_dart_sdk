@@ -3,7 +3,7 @@
 // on 21/10/2018
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/util/wrapped_future.dart';
+import 'package:firebase_storage_vm/src/util/wrapped_future.dart';
 
 /// Represents an asynchronous operation that can be canceled.
 abstract class CancellableFuture<TState> extends WrappedFuture<TState> {

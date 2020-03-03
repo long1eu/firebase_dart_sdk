@@ -4,13 +4,13 @@
 
 import 'dart:async';
 
-import 'package:firebase_storage/src/firebase_storage.dart';
-import 'package:firebase_storage/src/internal/exponential_backoff_sender.dart';
-import 'package:firebase_storage/src/network/delete_network_request.dart';
-import 'package:firebase_storage/src/network/network_request.dart';
-import 'package:firebase_storage/src/storage_reference.dart';
-import 'package:firebase_storage/src/storage_task_scheduler.dart';
-import 'package:firebase_storage/src/util/wrapped_future.dart';
+import 'package:firebase_storage_vm/src/firebase_storage.dart';
+import 'package:firebase_storage_vm/src/internal/exponential_backoff_sender.dart';
+import 'package:firebase_storage_vm/src/network/delete_network_request.dart';
+import 'package:firebase_storage_vm/src/network/network_request.dart';
+import 'package:firebase_storage_vm/src/storage_reference.dart';
+import 'package:firebase_storage_vm/src/storage_task_scheduler.dart';
+import 'package:firebase_storage_vm/src/util/wrapped_future.dart';
 
 /// A task that sends network requests to delete a Google Cloud Storage blob.
 class DeleteStorageTask extends WrappedFuture<void> {

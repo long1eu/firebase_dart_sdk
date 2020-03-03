@@ -2,16 +2,12 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/firebase_auth_dart/firebase_auth_dart.iml" filepath="$PROJECT_DIR$/firebase_auth_dart/firebase_auth_dart.iml" />
-      <module fileurl="file://$PROJECT_DIR$/firebase_common_dart/firebase_common_dart.iml" filepath="$PROJECT_DIR$/firebase_common_dart/firebase_common_dart.iml" />
-      <module fileurl="file://$PROJECT_DIR$/firebase_database_collection_dart/firebase_database_collection_dart.iml" filepath="$PROJECT_DIR$/firebase_database_collection_dart/firebase_database_collection_dart.iml" />
-      <module fileurl="file://$PROJECT_DIR$/firebase_firestore_dart/firebase_firestore_dart.iml" filepath="$PROJECT_DIR$/firebase_firestore_dart/firebase_firestore_dart.iml" />
-      <module fileurl="file://$PROJECT_DIR$/firebase_flutter/firebase_flutter.iml" filepath="$PROJECT_DIR$/firebase_flutter/firebase_flutter.iml" />
-      <module fileurl="file://$PROJECT_DIR$/firebase_internal_dart/firebase_internal_dart.iml" filepath="$PROJECT_DIR$/firebase_internal_dart/firebase_internal_dart.iml" />
+      <module fileurl="file://$PROJECT_DIR$/firebase_core/_firebase_database_collection_vm/_firebase_database_collection_vm.iml" filepath="$PROJECT_DIR$/firebase_core/_firebase_database_collection_vm/_firebase_database_collection_vm.iml" />
+      <module fileurl="file://$PROJECT_DIR$/firebase_core/_firebase_internal_vm/_firebase_internal_vm.iml" filepath="$PROJECT_DIR$/firebase_core/_firebase_internal_vm/_firebase_internal_vm.iml" />
+      <module fileurl="file://$PROJECT_DIR$/cloud_firestore/cloud_firestore_vm/cloud_firestore_vm.iml" filepath="$PROJECT_DIR$/cloud_firestore/cloud_firestore_vm/cloud_firestore_vm.iml" />
+      <module fileurl="file://$PROJECT_DIR$/firebase_auth/firebase_auth_vm/firebase_auth_vm.iml" filepath="$PROJECT_DIR$/firebase_auth/firebase_auth_vm/firebase_auth_vm.iml" />
+      <module fileurl="file://$PROJECT_DIR$/firebase_core/firebase_core_vm/firebase_core_vm.iml" filepath="$PROJECT_DIR$/firebase_core/firebase_core_vm/firebase_core_vm.iml" />
       <module fileurl="file://$PROJECT_DIR$/firebase_storage_dart/firebase_storage_dart.iml" filepath="$PROJECT_DIR$/firebase_storage_dart/firebase_storage_dart.iml" />
-      <module fileurl="file://$PROJECT_DIR$/protolite_well_known_types/protolite_well_known_types.iml" filepath="$PROJECT_DIR$/protolite_well_known_types/protolite_well_known_types.iml" />
-      <module fileurl="file://$PROJECT_DIR$/sdk_cloud/sdk_cloud.iml" filepath="$PROJECT_DIR$/sdk_cloud/sdk_cloud.iml" />
-      <module fileurl="file://$PROJECT_DIR$/firebase_auth_dart/example/vm/vm.iml" filepath="$PROJECT_DIR$/firebase_auth_dart/example/vm/vm.iml" />
     </modules>
   </component>
 </project>

@@ -3,7 +3,7 @@
 // on 20/10/2018
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/network/network_request.dart';
+import 'package:firebase_storage_vm/src/network/network_request.dart';
 
 /// Encapsulates a single resumable network request and response
 abstract class ResumableNetworkRequest extends NetworkRequest {

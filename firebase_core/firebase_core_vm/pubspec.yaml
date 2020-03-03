@@ -1,0 +1,21 @@
+name: firebase_core_vm
+description: Firebase Core SDK
+version: 0.0.1
+homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
+author: long1eu <home@long1.eu>
+
+environment:
+  sdk: '>=2.1.0 <3.0.0'
+
+dependencies:
+  rxdart: ^0.23.1
+  _firebase_internal_vm:
+    # path: ../_firebase_internal_vm
+    git:
+      url: https://github.com/fluttercommunity/firebase_dart_sdk
+      ref: develop
+      path: _firebase_internal_vm
+
+dev_dependencies:
+  test: ^1.12.0
+ 

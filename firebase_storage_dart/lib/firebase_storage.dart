@@ -1,1 +1,1 @@
-library firebase_storage;
+library firebase_storage_vm;

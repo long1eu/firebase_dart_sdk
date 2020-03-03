@@ -4,8 +4,8 @@
 import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/internal/task_events.dart';
-import 'package:firebase_storage/src/task.dart';
+import 'package:firebase_storage_vm/src/internal/task_events.dart';
+import 'package:firebase_storage_vm/src/task.dart';
 
 abstract class StreamedTask<TState extends StorageTaskState>
     extends Task<TState> {

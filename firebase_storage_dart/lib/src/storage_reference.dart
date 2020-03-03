@@ -6,19 +6,19 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/delete_storage_task.dart';
-import 'package:firebase_storage/src/file_download_task.dart';
-import 'package:firebase_storage/src/firebase_storage.dart';
-import 'package:firebase_storage/src/get_download_url_task.dart';
-import 'package:firebase_storage/src/get_metadata_task.dart';
-import 'package:firebase_storage/src/internal/slash_util.dart';
-import 'package:firebase_storage/src/internal/task_events.dart';
-import 'package:firebase_storage/src/storage_metadata.dart';
-import 'package:firebase_storage/src/storage_task_manager.dart';
-import 'package:firebase_storage/src/stream_download_task.dart';
-import 'package:firebase_storage/src/streamed_task.dart';
-import 'package:firebase_storage/src/task.dart';
-import 'package:firebase_storage/src/update_metadata_task.dart';
+import 'package:firebase_storage_vm/src/delete_storage_task.dart';
+import 'package:firebase_storage_vm/src/file_download_task.dart';
+import 'package:firebase_storage_vm/src/firebase_storage.dart';
+import 'package:firebase_storage_vm/src/get_download_url_task.dart';
+import 'package:firebase_storage_vm/src/get_metadata_task.dart';
+import 'package:firebase_storage_vm/src/internal/slash_util.dart';
+import 'package:firebase_storage_vm/src/internal/task_events.dart';
+import 'package:firebase_storage_vm/src/storage_metadata.dart';
+import 'package:firebase_storage_vm/src/storage_task_manager.dart';
+import 'package:firebase_storage_vm/src/stream_download_task.dart';
+import 'package:firebase_storage_vm/src/streamed_task.dart';
+import 'package:firebase_storage_vm/src/task.dart';
+import 'package:firebase_storage_vm/src/update_metadata_task.dart';
 
 /// Represents a reference to a Google Cloud Storage object. Developers can
 /// upload and download objects, get/set object metadata, and delete an object

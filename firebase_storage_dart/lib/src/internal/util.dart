@@ -5,8 +5,8 @@
 import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/internal/slash_util.dart';
-import 'package:firebase_storage/src/network/network_request.dart';
+import 'package:firebase_storage_vm/src/internal/slash_util.dart';
+import 'package:firebase_storage_vm/src/network/network_request.dart';
 
 const String _tag = 'StorageUtil';
 const int _maximumTokenWaitTimeMs = 30000;

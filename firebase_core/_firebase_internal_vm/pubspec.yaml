@@ -1,0 +1,19 @@
+name: _firebase_internal_vm
+description: A starting point for Dart libraries or applications.
+version: 0.0.1
+homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
+author: long1eu <home@long1.eu>
+
+environment:
+  sdk: '>=2.1.0 <3.0.0'
+
+dependencies:
+  firebase_core_vm:
+    # path: ../firebase_core_vm
+    git:
+      url: https://github.com/fluttercommunity/firebase_dart_sdk
+      ref: develop
+      path: firebase_core_vm
+
+dev_dependencies:
+  test: ^1.12.0

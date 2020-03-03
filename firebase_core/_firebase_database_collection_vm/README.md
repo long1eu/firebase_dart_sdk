@@ -1,0 +1,1 @@
+For internal use of the Firestore and Realtime Database packages

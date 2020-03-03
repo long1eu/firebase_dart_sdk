@@ -5,15 +5,15 @@
 import 'dart:async';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/firebase_storage.dart';
-import 'package:firebase_storage/src/internal/exponential_backoff_sender.dart';
-import 'package:firebase_storage/src/network/network_request.dart';
-import 'package:firebase_storage/src/network/update_metadata_network_request.dart';
-import 'package:firebase_storage/src/storage_exception.dart';
-import 'package:firebase_storage/src/storage_metadata.dart';
-import 'package:firebase_storage/src/storage_reference.dart';
-import 'package:firebase_storage/src/storage_task_scheduler.dart';
-import 'package:firebase_storage/src/util/wrapped_future.dart';
+import 'package:firebase_storage_vm/src/firebase_storage.dart';
+import 'package:firebase_storage_vm/src/internal/exponential_backoff_sender.dart';
+import 'package:firebase_storage_vm/src/network/network_request.dart';
+import 'package:firebase_storage_vm/src/network/update_metadata_network_request.dart';
+import 'package:firebase_storage_vm/src/storage_exception.dart';
+import 'package:firebase_storage_vm/src/storage_metadata.dart';
+import 'package:firebase_storage_vm/src/storage_reference.dart';
+import 'package:firebase_storage_vm/src/storage_task_scheduler.dart';
+import 'package:firebase_storage_vm/src/util/wrapped_future.dart';
 
 /// A Task that updates metadata on a [StorageReference]
 class UpdateMetadataTask extends WrappedFuture<StorageMetadata> {

@@ -7,8 +7,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/firebase_storage.dart';
-import 'package:firebase_storage/src/storage_task_scheduler.dart';
+import 'package:firebase_storage_vm/src/firebase_storage.dart';
+import 'package:firebase_storage_vm/src/storage_task_scheduler.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
 

@@ -7,9 +7,9 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/cancel_exception.dart';
-import 'package:firebase_storage/src/firebase_storage.dart';
-import 'package:firebase_storage/src/internal/task_events.dart';
+import 'package:firebase_storage_vm/src/cancel_exception.dart';
+import 'package:firebase_storage_vm/src/firebase_storage.dart';
+import 'package:firebase_storage_vm/src/internal/task_events.dart';
 import 'package:firebase_storage/src/storage_reference.dart';
 import 'package:firebase_storage/src/storage_task_manager.dart';
 import 'package:firebase_storage/src/task.dart';

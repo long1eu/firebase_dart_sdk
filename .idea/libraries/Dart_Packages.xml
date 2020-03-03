@@ -18,6 +18,13 @@
             </list>
           </value>
         </entry>
+        <entry key="_firebase_internal_vm">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-4d0b5d238b373f091519b4a98e6bbd5e0bb7e6cd/_firebase_internal_vm/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="analyzer">
           <value>
             <list>
@@ -232,10 +239,17 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_common/lib" />
-              <option value="$PROJECT_DIR$/firebase_common/lib" />
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_common/lib" />
+              <option value="$PROJECT_DIR$/cloud_firestore/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_common/lib" />
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_common/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_common/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_core_vm">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-4d0b5d238b373f091519b4a98e6bbd5e0bb7e6cd/firebase_core_vm/lib" />
             </list>
           </value>
         </entry>
@@ -258,7 +272,7 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
-              <option value="$PROJECT_DIR$/firebase_internal/lib" />
+              <option value="$PROJECT_DIR$/cloud_firestore/firebase_internal/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_internal/lib" />
             </list>
           </value>
@@ -960,6 +974,8 @@
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_firestore/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_common/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_database_collection/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-4d0b5d238b373f091519b4a98e6bbd5e0bb7e6cd/_firebase_internal_vm/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-4d0b5d238b373f091519b4a98e6bbd5e0bb7e6cd/firebase_core_vm/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_common/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_common/lib" />
@@ -1125,8 +1141,8 @@
       <root url="file://$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter_test/lib" />
       <root url="file://$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter_web_plugins/lib" />
       <root url="file://$USER_HOME$/IDE/flutter_dev/flutter/packages/fuchsia_remote_debug_protocol/lib" />
-      <root url="file://$PROJECT_DIR$/firebase_common/lib" />
-      <root url="file://$PROJECT_DIR$/firebase_internal/lib" />
+      <root url="file://$PROJECT_DIR$/cloud_firestore/firebase_common/lib" />
+      <root url="file://$PROJECT_DIR$/cloud_firestore/firebase_internal/lib" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

@@ -3,9 +3,9 @@
 // on 20/10/2018
 
 import 'package:firebase_common/firebase_common.dart';
-import 'package:firebase_storage/src/internal/slash_util.dart';
-import 'package:firebase_storage/src/network/network_request.dart';
-import 'package:firebase_storage/src/network/resumable_network_request.dart';
+import 'package:firebase_storage_vm/src/internal/slash_util.dart';
+import 'package:firebase_storage_vm/src/network/network_request.dart';
+import 'package:firebase_storage_vm/src/network/resumable_network_request.dart';
 
 /// Starts a resumable upload session with GCS.
 class ResumableUploadStartRequest extends ResumableNetworkRequest {
