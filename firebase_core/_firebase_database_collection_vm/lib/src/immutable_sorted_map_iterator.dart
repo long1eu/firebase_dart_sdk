@@ -8,13 +8,16 @@ import 'package:_firebase_database_collection_vm/src/llrb_node.dart';
 import 'package:_firebase_database_collection_vm/src/lltb_value_node.dart';
 
 class ImmutableSortedMapIterator<K, V> implements Iterator<MapEntry<K, V>> {
-  ImmutableSortedMapIterator(LLRBNode<K, V> root, K startKey, Comparator<K> comparator, this.isReverse)
+  ImmutableSortedMapIterator(
+      LLRBNode<K, V> root, K startKey, Comparator<K> comparator, this.isReverse)
       : nodeStack = Queue<LLRBValueNode<K, V>>() {
     LLRBNode<K, V> node = root;
     while (!node.isEmpty) {
       int cmp;
       if (startKey != null) {
-        cmp = isReverse ? comparator(startKey, node.key) : comparator(node.key, startKey);
+        cmp = isReverse
+            ? comparator(startKey, node.key)
+            : comparator(node.key, startKey);
       } else {
         cmp = 1;
       }

@@ -8,7 +8,8 @@ import 'package:_firebase_database_collection_vm/src/lltb_value_node.dart';
 
 class LLRBRedValueNode<K, V> extends LLRBValueNode<K, V> {
   LLRBRedValueNode(K key, V value, [LLRBNode<K, V> left, LLRBNode<K, V> right])
-      : super(key, value, left ?? LLRBEmptyNode<K, V>(), right ?? LLRBEmptyNode<K, V>());
+      : super(key, value, left ?? LLRBEmptyNode<K, V>(),
+            right ?? LLRBEmptyNode<K, V>());
 
   @override
   final LLRBNodeColor color = LLRBNodeColor.red;
@@ -20,7 +21,8 @@ class LLRBRedValueNode<K, V> extends LLRBValueNode<K, V> {
   int get length => left.length + 1 + right.length;
 
   @override
-  LLRBValueNode<K, V> copyWith(K key, V value, LLRBNode<K, V> left, LLRBNode<K, V> right) {
+  LLRBValueNode<K, V> copyWith(
+      K key, V value, LLRBNode<K, V> left, LLRBNode<K, V> right) {
     final K newKey = key ?? this.key;
     final V newValue = value ?? this.value;
     final LLRBNode<K, V> newLeft = left ?? this.left;

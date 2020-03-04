@@ -18,13 +18,14 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
         values = values ?? <V>[];
 
   factory ArraySortedMap.fromMap(Map<K, V> map, Comparator<K> comparator) {
-    return buildFrom<K, K, V>(List<K>.from(map.keys), map, ImmutableSortedMap.identityTranslator<K>(), comparator);
+    return buildFrom<K, K, V>(List<K>.from(map.keys), map,
+        ImmutableSortedMap.identityTranslator<K>(), comparator);
   }
 
   // constructors can't have types
   // ignore: prefer_constructors_over_static_methods
-  static ArraySortedMap<A, C> buildFrom<A, B, C>(
-      List<A> keys, Map<B, C> values, KeyTranslator<A, B> translator, Comparator<A> comparator) {
+  static ArraySortedMap<A, C> buildFrom<A, B, C>(List<A> keys, Map<B, C> values,
+      KeyTranslator<A, B> translator, Comparator<A> comparator) {
     keys.sort(comparator);
     final int length = keys.length;
     final List<A> keyArray = List<A>(length);

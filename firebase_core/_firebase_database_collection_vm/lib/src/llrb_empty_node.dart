@@ -11,7 +11,8 @@ class LLRBEmptyNode<K, V> implements LLRBNode<K, V> {
         value = null;
 
   @override
-  LLRBNode<K, V> copy(K key, V value, LLRBNodeColor color, LLRBNode<K, V> left, LLRBNode<K, V> right) {
+  LLRBNode<K, V> copy(K key, V value, LLRBNodeColor color, LLRBNode<K, V> left,
+      LLRBNode<K, V> right) {
     return this;
   }
 
@@ -56,13 +57,15 @@ class LLRBEmptyNode<K, V> implements LLRBNode<K, V> {
   }
 
   @override
-  bool shortCircuitingInOrderTraversal(ShortCircuitingNodeVisitor<K, V> visitor) {
+  bool shortCircuitingInOrderTraversal(
+      ShortCircuitingNodeVisitor<K, V> visitor) {
     // No-op
     return true;
   }
 
   @override
-  bool shortCircuitingReverseOrderTraversal(ShortCircuitingNodeVisitor<K, V> visitor) {
+  bool shortCircuitingReverseOrderTraversal(
+      ShortCircuitingNodeVisitor<K, V> visitor) {
     // No-op
     return true;
   }

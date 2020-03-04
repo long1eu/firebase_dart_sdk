@@ -22,7 +22,6 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_firebase_internal_vm-0.0.2/lib" />
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-4d0b5d238b373f091519b4a98e6bbd5e0bb7e6cd/_firebase_internal_vm/lib" />
             </list>
           </value>
         </entry>
@@ -257,6 +256,13 @@
             </list>
           </value>
         </entry>
+        <entry key="firebase">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase-7.2.1/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="firebase_auth">
           <value>
             <list>
@@ -267,26 +273,42 @@
         <entry key="firebase_core">
           <value>
             <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core-0.4.4+2/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_core/lib" />
-              <option value="$PROJECT_DIR$/cloud_firestore/firebase_core/lib" />
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_core/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_core/lib" />
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_core/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_core/lib" />
+              <option value="$PROJECT_DIR$/cloud_firestore/firebase_core/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_core_platform_interface">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core_platform_interface-1.0.4/lib" />
             </list>
           </value>
         </entry>
         <entry key="firebase_core_vm">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-4d0b5d238b373f091519b4a98e6bbd5e0bb7e6cd/firebase_core_vm/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core_vm-0.0.4/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core_vm-0.0.3/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_core_web">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core_web-0.1.1+2/lib" />
             </list>
           </value>
         </entry>
         <entry key="firebase_database_collection">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_database_collection/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_database_collection/lib" />
+              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_database_collection/lib" />
             </list>
           </value>
         </entry>
@@ -301,8 +323,8 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
-              <option value="$PROJECT_DIR$/cloud_firestore/firebase_internal/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_internal/lib" />
+              <option value="$PROJECT_DIR$/cloud_firestore/firebase_internal/lib" />
             </list>
           </value>
         </entry>
@@ -414,8 +436,8 @@
         <entry key="grpc">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/grpc-2.1.3/lib" />
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/grpc-2.1.1/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/grpc-2.1.3/lib" />
             </list>
           </value>
         </entry>
@@ -649,8 +671,8 @@
         <entry key="pedantic">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/pedantic-1.8.0+1/lib" />
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/pedantic-1.9.0/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/pedantic-1.8.0+1/lib" />
             </list>
           </value>
         </entry>
@@ -699,8 +721,8 @@
         <entry key="protobuf">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/protobuf-1.0.1/lib" />
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/protobuf-0.13.15/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/protobuf-1.0.1/lib" />
             </list>
           </value>
         </entry>
@@ -1035,8 +1057,6 @@
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_firestore/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_core/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_database_collection/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-4d0b5d238b373f091519b4a98e6bbd5e0bb7e6cd/_firebase_internal_vm/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-4d0b5d238b373f091519b4a98e6bbd5e0bb7e6cd/firebase_core_vm/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_core/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-cbb8418453e6d9bf757c7cbfdec9ed0c67499a49/firebase_core/lib" />
@@ -1084,6 +1104,12 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/email_validator-1.0.4/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/ffi-0.1.3/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/file-5.1.0/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase-7.2.1/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core-0.4.4+2/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core_platform_interface-1.0.4/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core_vm-0.0.3/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core_vm-0.0.4/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core_web-0.1.1+2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/fixnum-0.10.11/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/fixnum-0.10.9/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/front_end-0.1.24/lib" />

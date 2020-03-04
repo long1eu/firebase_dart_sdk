@@ -15,7 +15,8 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
     return ArraySortedMap<K, V>(comparator);
   }
 
-  factory ImmutableSortedMap.fromMap(Map<K, V> values, Comparator<K> comparator) {
+  factory ImmutableSortedMap.fromMap(
+      Map<K, V> values, Comparator<K> comparator) {
     if (values.length < arrayToRbTreeSizeThreshold) {
       return ArraySortedMap<K, V>.fromMap(values, comparator);
     } else {
@@ -32,7 +33,10 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
   static const int arrayToRbTreeSizeThreshold = 25;
 
   static ImmutableSortedMap<A, C> buildFrom<A, B, C>(
-      List<A> keys, Map<B, C> values, KeyTranslator<A, B> translator, Comparator<A> comparator) {
+      List<A> keys,
+      Map<B, C> values,
+      KeyTranslator<A, B> translator,
+      Comparator<A> comparator) {
     if (keys.length < arrayToRbTreeSizeThreshold) {
       return ArraySortedMap.buildFrom(keys, values, translator, comparator);
     } else {
@@ -112,7 +116,8 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
   int get hashCode {
     int result = 0;
     for (MapEntry<K, V> entry in this) {
-      result = result * 31 + entry.key.hashCode * 31 + entry.value.hashCode * 31;
+      result =
+          result * 31 + entry.key.hashCode * 31 + entry.value.hashCode * 31;
     }
 
     return result;
@@ -128,7 +133,12 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
       } else {
         b.write(', ');
       }
-      b..write('(')..write(entry.key)..write('=>')..write(entry.value)..write(')');
+      b
+        ..write('(')
+        ..write(entry.key)
+        ..write('=>')
+        ..write(entry.value)
+        ..write(')');
     }
     b.write('};');
     return b.toString();
