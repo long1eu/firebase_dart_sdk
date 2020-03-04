@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 24/11/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 ///  The maximum wait time before attempting to retry auto refreshing tokens after a failed attempt.
 ///

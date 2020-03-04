@@ -1,4 +1,4 @@
-part of firebase_auth;
+part of firebase_auth_vm;
 
 class FirebaseAuthError extends FirebaseError {
   factory FirebaseAuthError(String name, String message) {

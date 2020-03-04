@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 11/12/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 /// Represents user profile data that can be updated by [updateProfile]
 ///

@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 24/11/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 typedef UpdateSetAccountInfoRequest = void Function(
     gitkit.UserInfo user, IdentitytoolkitRelyingpartySetAccountInfoRequest request);

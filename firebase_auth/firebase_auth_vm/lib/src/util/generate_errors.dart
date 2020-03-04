@@ -38,7 +38,7 @@ String _escape(String item) {
   return item.replaceAll('\'', '\\\'');
 }
 
-const String header = '''part of firebase_auth;
+const String header = '''part of firebase_auth_vm;
 class FirebaseAuthError extends FirebaseError {    
   factory FirebaseAuthError(String name, String message) {
     switch (name) {''';

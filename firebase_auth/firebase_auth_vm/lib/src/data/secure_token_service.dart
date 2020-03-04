@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 25/11/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 const String _securetokenUserAgent = 'dart-api-client securetoken/v1/token';
 

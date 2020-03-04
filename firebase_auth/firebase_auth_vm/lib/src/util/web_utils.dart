@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 08/12/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 String randomString(int length) {
   final Random random = Random();

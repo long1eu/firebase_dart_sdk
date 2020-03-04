@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 09/12/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 /// Function for directing the user or it's user-agent to [uri].
 ///

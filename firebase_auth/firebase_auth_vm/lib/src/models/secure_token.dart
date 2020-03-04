@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 07/12/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 /// Represents the parameters for the token endpoint.
 abstract class SecureTokenRequest implements Built<SecureTokenRequest, SecureTokenRequestBuilder> {

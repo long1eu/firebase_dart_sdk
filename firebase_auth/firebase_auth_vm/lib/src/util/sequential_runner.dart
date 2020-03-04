@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 10/12/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 class SequentialRunner {
   SequentialRunner() : _tasks = Queue<_TaskQueueEntry<void>>();

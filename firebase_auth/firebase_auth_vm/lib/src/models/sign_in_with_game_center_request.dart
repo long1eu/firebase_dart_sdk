@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 07/12/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 abstract class SignInWithGameCenterRequest
     implements Built<SignInWithGameCenterRequest, SignInWithGameCenterRequestBuilder> {

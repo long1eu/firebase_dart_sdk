@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 05/12/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 class ProviderType {
   static const String password = 'password';

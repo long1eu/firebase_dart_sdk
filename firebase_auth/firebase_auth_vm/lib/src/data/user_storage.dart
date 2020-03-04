@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 24/11/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 class UserStorage {
   const UserStorage({@required LocalStorage localStorage, @required String appName})

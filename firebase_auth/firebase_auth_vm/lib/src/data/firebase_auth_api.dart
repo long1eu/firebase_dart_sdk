@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 23/11/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 const String _identitytoolkitUserAgent = 'dart-api-client identitytoolkit/v3';
 

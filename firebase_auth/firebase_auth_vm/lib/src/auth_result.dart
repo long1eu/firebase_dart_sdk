@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 24/11/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 /// Helper object that contains the result of a successful sign-in, link and reauthenticate action.
 ///

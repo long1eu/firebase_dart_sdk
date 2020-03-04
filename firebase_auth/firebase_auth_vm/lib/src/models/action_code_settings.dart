@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 06/12/2019
 
-part of firebase_auth;
+part of firebase_auth_vm;
 
 abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCodeSettingsBuilder> {
   /// Settings related to handling action codes.
