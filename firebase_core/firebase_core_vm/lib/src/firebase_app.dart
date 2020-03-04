@@ -4,36 +4,15 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:firebase_core_vm/src/firebase_options.dart';
 import 'package:firebase_core_vm/src/platform_dependencies.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 
 class FirebaseApp with _PlatformDependenciesMixin {
-  /// Initializes the default FirebaseApp instance using string resource values
-  /// populated from the map you provide. Returns the default FirebaseApp, if
-  /// either it has been initialized previously, or Firebase API keys are
-  /// present in string resources. Returns null otherwise.
-  ///
-  /// This method should be called at app startup.
-  factory FirebaseApp(Map<String, String> json,
-      [PlatformDependencies dependencies]) {
-    if (_instances.containsKey(defaultAppName)) {
-      return instance;
-    }
-
-    final FirebaseOptions firebaseOptions = FirebaseOptions.fromJson(json);
-    if (firebaseOptions == null) {
-      Log.d(_logTag,
-          'Default FirebaseApp failed to initialize because no default options were found. Make you you\'ve added the configuration files on both for ${Platform.operatingSystem}');
-    }
-
-    return FirebaseApp.withOptions(firebaseOptions, dependencies: dependencies);
-  }
-
   FirebaseApp._(this._name, this._options, this._dependencies,
       this._dataCollectionDefaultEnabled);
 
@@ -46,6 +25,10 @@ class FirebaseApp with _PlatformDependenciesMixin {
     PlatformDependencies dependencies,
     String name = defaultAppName,
   }) {
+    if (isWeb) {
+      throw UnimplementedError(
+          'This library doesn\'t work on the web. Try the official Firebase Web SDK.');
+    }
     final String normalizedName = _normalize(name);
 
     Preconditions.checkState(!_instances.containsKey(normalizedName),
@@ -98,7 +81,6 @@ class FirebaseApp with _PlatformDependenciesMixin {
   static const String defaultAppName = '[DEFAULT]';
 
   static final Map<String, FirebaseApp> _instances = <String, FirebaseApp>{};
-  static const String _logTag = 'FirebaseApp';
   static const String _dataCollectionDefaultEnabledPreferenceKey =
       'firebase_data_collection_default_enabled';
 
