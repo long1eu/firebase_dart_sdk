@@ -15,8 +15,6 @@ FirebaseOptions get firebaseOptions {
       projectID: 'flutter-sdk',
       storageBucket: 'flutter-sdk.appspot.com',
       gcmSenderID: '233259864964',
-      clientID:
-          '233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com',
       googleAppID:
           '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
     );

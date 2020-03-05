@@ -39,8 +39,6 @@ If you already have a Firebase project for you mobile/web apps you can skip this
          gcmSenderID: '233259864964',
          databaseURL: 'https://flutter-sdk.firebaseio.com',
          storageBucket: 'flutter-sdk.appspot.com',
-         clientID:
-             '233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com',
          googleAppID:
              '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
        ),
@@ -57,13 +55,6 @@ Note:
 1. Go to the Google Cloud Platform console and select you [project](https://console.cloud.google.com/projectselector2/home/dashboard)
 1. Go to `APIs & Service` -> `Credentials`
 1. Create new credentials for your app by selecting `CREATE CREDENTIALS` and then `API Key`
-
-##### Create Client ID
-If you plan to use Google Sign In, the you need to create a Client ID for you app
-1. Go to the Google Cloud Platform console and select you [project](https://console.cloud.google.com/projectselector2/home/dashboard) 
-1. Go to `APIs & Service` -> `Credentials`
-1. Create new credentials for your app by selecting `CREATE CREDENTIALS` and then `OAuth client ID`
-1. Select `Other` as `Application type`, give it a name (eg. macOS) and then click `Create`
 
 ##### Get configuration from [Firebase console](https://console.firebase.google.com/u/0/)
 1. `projectID` you can be found on the `Project Settings` tab

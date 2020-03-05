@@ -6,7 +6,7 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:meta/meta.dart';
 
 class FirebaseOptions {
-  FirebaseOptions({
+  const FirebaseOptions({
     @required this.apiKey,
     @required this.applicationId,
     this.databaseUrl,
@@ -16,8 +16,9 @@ class FirebaseOptions {
     this.projectId,
     this.dataCollectionEnabled = true,
   })  : assert(apiKey != null),
-        assert(applicationId != null, 'ApplicationId must be set.'),
-        assert(applicationId.trim().isNotEmpty, 'ApplicationId must be set.');
+        // ignore: prefer_is_empty
+        assert(applicationId != null && applicationId.length > 0,
+            'ApplicationId must be set.');
 
   /// Creates a new [FirebaseOptions] instance that is populated from a map.
   /// Returns the populated options or null if applicationId is missing from

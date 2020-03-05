@@ -8,7 +8,6 @@ import 'package:flutter/widgets.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// ignore: prefer_mixin
 class PlatformDependencies extends core.PlatformDependencies
     with WidgetsBindingObserver {
   PlatformDependencies(this._preferences)

@@ -187,8 +187,8 @@
         <entry key="coverage">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/coverage-0.13.7/lib" />
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/coverage-0.13.8/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/coverage-0.13.7/lib" />
             </list>
           </value>
         </entry>
@@ -264,18 +264,10 @@
             </list>
           </value>
         </entry>
-        <entry key="firebase_auth">
-          <value>
-            <list>
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ff41463debfc5e5261c694e8bd1d912e7be0e24b/firebase_auth/lib" />
-            </list>
-          </value>
-        </entry>
         <entry key="firebase_core">
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/firebase_core-0.4.4+2/lib" />
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_core/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_core/lib" />
               <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_core/lib" />
               <option value="$PROJECT_DIR$/cloud_firestore/firebase_core/lib" />
@@ -321,7 +313,6 @@
         <entry key="firebase_internal">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
               <option value="$PROJECT_DIR$/cloud_firestore/firebase_internal/lib" />
             </list>
           </value>
@@ -338,14 +329,13 @@
           <value>
             <list>
               <option value="$USER_HOME$/IDE/flutter/packages/flutter/lib" />
-              <option value="$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter/lib" />
             </list>
           </value>
         </entry>
         <entry key="flutter_driver">
           <value>
             <list>
-              <option value="$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter_driver/lib" />
+              <option value="$USER_HOME$/IDE/flutter/packages/flutter_driver/lib" />
             </list>
           </value>
         </entry>
@@ -353,7 +343,6 @@
           <value>
             <list>
               <option value="$USER_HOME$/IDE/flutter/packages/flutter_test/lib" />
-              <option value="$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter_test/lib" />
             </list>
           </value>
         </entry>
@@ -361,7 +350,6 @@
           <value>
             <list>
               <option value="$USER_HOME$/IDE/flutter/packages/flutter_web_plugins/lib" />
-              <option value="$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter_web_plugins/lib" />
             </list>
           </value>
         </entry>
@@ -375,7 +363,7 @@
         <entry key="fuchsia_remote_debug_protocol">
           <value>
             <list>
-              <option value="$USER_HOME$/IDE/flutter_dev/flutter/packages/fuchsia_remote_debug_protocol/lib" />
+              <option value="$USER_HOME$/IDE/flutter/packages/fuchsia_remote_debug_protocol/lib" />
             </list>
           </value>
         </entry>
@@ -622,13 +610,6 @@
             </list>
           </value>
         </entry>
-        <entry key="oauth2">
-          <value>
-            <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/oauth2-1.5.0/lib" />
-            </list>
-          </value>
-        </entry>
         <entry key="package_config">
           <value>
             <list>
@@ -654,7 +635,7 @@
         <entry key="path_provider">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider-1.6.1/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider-1.6.5/lib" />
             </list>
           </value>
         </entry>
@@ -662,6 +643,13 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider_macos-0.0.4/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="path_provider_platform_interface">
+          <value>
+            <list>
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider_platform_interface-1.0.1/lib" />
             </list>
           </value>
         </entry>
@@ -815,7 +803,6 @@
           <value>
             <list>
               <option value="$USER_HOME$/IDE/flutter/bin/cache/pkg/sky_engine/lib" />
-              <option value="$USER_HOME$/IDE/flutter_dev/flutter/bin/cache/pkg/sky_engine/lib" />
             </list>
           </value>
         </entry>
@@ -1031,8 +1018,8 @@
         <entry key="webkit_inspection_protocol">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/webkit_inspection_protocol-0.5.0/lib" />
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/webkit_inspection_protocol-0.5.0+1/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/webkit_inspection_protocol-0.5.0/lib" />
             </list>
           </value>
         </entry>
@@ -1061,9 +1048,6 @@
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-12da746ade30f59d69ec88f59688908a39d5ab11/firebase_firestore/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_core/lib" />
       <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-2e7587783054b54e1303aa3f42739be3e9a3b036/firebase_database_collection/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_core/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-a9b0ba42f374a24c08d099fdb87280209d9a0b1f/firebase_internal/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/git/firebase_dart_sdk-ff41463debfc5e5261c694e8bd1d912e7be0e24b/firebase_auth/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_discoveryapis_commons-0.1.8+1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_discoveryapis_commons-0.1.9/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/_fe_analyzer_shared-1.0.3/lib" />
@@ -1160,13 +1144,13 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/node_io-1.0.1+2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/node_preamble-1.4.6/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/node_preamble-1.4.8/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/oauth2-1.5.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/package_config-1.1.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/package_config-1.9.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/package_resolver-1.0.10/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path-1.6.4/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider-1.6.1/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider-1.6.5/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider_macos-0.0.4/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/path_provider_platform_interface-1.0.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/pedantic-1.8.0+1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/pedantic-1.9.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/petitparser-2.4.0/lib" />
@@ -1241,14 +1225,10 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/yaml-2.2.0/lib" />
       <root url="file://$USER_HOME$/IDE/flutter/bin/cache/pkg/sky_engine/lib" />
       <root url="file://$USER_HOME$/IDE/flutter/packages/flutter/lib" />
+      <root url="file://$USER_HOME$/IDE/flutter/packages/flutter_driver/lib" />
       <root url="file://$USER_HOME$/IDE/flutter/packages/flutter_test/lib" />
       <root url="file://$USER_HOME$/IDE/flutter/packages/flutter_web_plugins/lib" />
-      <root url="file://$USER_HOME$/IDE/flutter_dev/flutter/bin/cache/pkg/sky_engine/lib" />
-      <root url="file://$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter/lib" />
-      <root url="file://$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter_driver/lib" />
-      <root url="file://$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter_test/lib" />
-      <root url="file://$USER_HOME$/IDE/flutter_dev/flutter/packages/flutter_web_plugins/lib" />
-      <root url="file://$USER_HOME$/IDE/flutter_dev/flutter/packages/fuchsia_remote_debug_protocol/lib" />
+      <root url="file://$USER_HOME$/IDE/flutter/packages/fuchsia_remote_debug_protocol/lib" />
       <root url="file://$PROJECT_DIR$/cloud_firestore/firebase_core/lib" />
       <root url="file://$PROJECT_DIR$/cloud_firestore/firebase_internal/lib" />
     </CLASSES>
