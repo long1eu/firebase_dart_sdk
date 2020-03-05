@@ -7,11 +7,12 @@ const CLIENT_SECRET = '<clientSecret>';
 
 // noinspection JSUnusedGlobalSymbols
 export const authHandler = functions.https.onRequest(async (req, res) => {
-    const code = req.query.code;
-    const token = req.query.refreshToken;
-    const clientId = req.query.clientId;
-    const redirectUrl = req.query.redirectUrl;
-    const codeVerifier = req.query.codeVerifier;
+    const body = JSON.parse(req.body);
+    const code = body.code;
+    const token = body.refreshToken;
+    const clientId = body.clientId;
+    const redirectUrl = body.redirectUrl;
+    const codeVerifier = body.codeVerifier;
 
     if (!code && !token) {
         return res

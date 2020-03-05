@@ -23,6 +23,8 @@ GoogleSignIn _googleSignIn = GoogleSignIn(
 Future<void> main() async {
   if (isDesktop) {
     await GoogleSignInPlatform.register(
+      exchangeEndpoint:
+          'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
       clientId:
           '233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com',
     );

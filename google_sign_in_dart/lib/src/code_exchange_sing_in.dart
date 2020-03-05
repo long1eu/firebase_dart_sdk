@@ -79,7 +79,6 @@ Future<Map<String, dynamic>> _codeExchangeSignIn({
       Uri.https('accounts.google.com', '/o/oauth2/v2/auth', queryParameters);
 
   presenter(authenticationUri);
-  print(authenticationUri);
   return completer.future.timeout(const Duration(minutes: 2));
 }
 
@@ -130,16 +129,15 @@ Future<Map<String, dynamic>> _exchangeCode({
   @required String code,
   @required String codeVerifier,
 }) async {
-  final Uri uri = Uri.parse(exchangeEndpoint).replace(
-    queryParameters: <String, String>{
+  final Response response = await post(
+    exchangeEndpoint,
+    body: json.encode(<String, String>{
       'code': code,
       'codeVerifier': codeVerifier,
       'clientId': clientId,
       'redirectUrl': redirectUrl,
-    },
+    }),
   );
-
-  final Response response = await get(uri);
   if (response.statusCode == 200) {
     return Map<String, dynamic>.from(jsonDecode(response.body));
   } else {

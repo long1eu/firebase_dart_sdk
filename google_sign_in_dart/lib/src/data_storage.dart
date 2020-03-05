@@ -74,7 +74,7 @@ class DataStorage {
     idToken = result['id_token'];
     accessToken = result['access_token'];
     expiresAt = DateTime.now()
-        .add(Duration(seconds: int.parse('${result['expires_in'] - 3590}')));
+        .add(Duration(seconds: int.parse('${result['expires_in']}')));
   }
 
   void saveUserProfile(Map<String, dynamic> result) {

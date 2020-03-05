@@ -298,14 +298,13 @@ class GoogleSignInPlatform extends platform.GoogleSignInPlatform {
     assert(_exchangeEndpoint != null);
     assert(_refreshToken != null);
 
-    final Uri uri = Uri.parse(_exchangeEndpoint).replace(
-      queryParameters: <String, String>{
+    final Response response = await post(
+      _exchangeEndpoint,
+      body: json.encode(<String, String>{
         'refreshToken': _refreshToken,
         'clientId': _clientId,
-      },
+      }),
     );
-
-    final Response response = await get(uri);
     if (response.statusCode == 200) {
       final Map<String, dynamic> result =
           Map<String, dynamic>.from(jsonDecode(response.body));

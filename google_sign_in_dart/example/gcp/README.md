@@ -48,22 +48,4 @@ final GoogleSignInAccount account = await GoogleSignIn().signIn();
 
 ### Provide a code exchange endpoint
 The user `accessToken` expires after about one hour, after witch you need to ask the user to login again. If you want to 
-keep the user logged in, you need to deploy a oAuth code exchange endpoint. Once you have your endpoint you can register
-the package like this. 
-
-    import 'package:flutter/material.dart';
-    import 'package:google_sign_in/google_sign_in.dart';
-    import 'package:google_sign_in_dart/google_sign_in_dart.dart';
-    
-    void main() {
-      if (isDesktop) {
-        GoogleSignInPlatform.register(
-            clientId: <clientId>, 
-            exchangeEndpoint: <endpoint>,
-        );
-      }
-    
-      runApp(MyApp());
-    }
-    
-See instruction on how to [deploy a code exchange endpoint](google_sign_in_dart/example/gcp/README.md).    
+keep the user logged in, you need to deploy a oAuth code exchange endpoint. More info [here](https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/google_sign_in_dart/example/gcp/REAMME.ms)    
