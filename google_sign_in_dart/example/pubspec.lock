@@ -53,7 +53,7 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "4.1.4"
-  google_sign_in_dart:
+  google_sign_in_dartio:
     dependency: "direct main"
     description:
       path: ".."

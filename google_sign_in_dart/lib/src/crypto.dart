@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 02/03/2020
 
-part of '../google_sign_in_dart.dart';
+part of '../google_sign_in_dartio.dart';
 
 const String _charset =
     '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';

@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 02/03/2020
 
-part of '../google_sign_in_dart.dart';
+part of '../google_sign_in_dartio.dart';
 
 /// Creates an authentication Uri and listens on the local web server for the
 /// authorization response.

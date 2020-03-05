@@ -1,51 +1,63 @@
-# google_sign_in_dart
+# OAuth2 code exchange endpoint
 
-A Flutter package that implements [Google Sign In](https://developers.google.com/identity/) in pure Dart. This package 
-is compatible with `google_sign_in` plugin and works on all platforms Flutter supports. 
-
-## Getting Started
-
-### Install and initialization
-1. Depend on it
-    ```yaml
-    dependencies:
-      google_sign_in: ^4.1.4
-      google_sign_in_dart: ^0.0.1
-    ```
-1. Run `flutter pub get`
-1. Import
-    ```dart
-    import 'package:google_sign_in/google_sign_in.dart';
-    import 'package:google_sign_in_dart/google_sign_in_dart.dart';
-    ```        
-1. Register the package
-    ```dart 
-    import 'package:flutter/material.dart';
-    import 'package:google_sign_in/google_sign_in.dart';
-    import 'package:google_sign_in_dart/google_sign_in_dart.dart';
+In order to keep the user logged in, we need an `refresh_token` from Google. This token is obtained by exchanging the 
+`code` we receive when the user logs in. This operation requires your app to be identified by Google using a `Client ID` 
+and a `Client Secret`. The `Client ID` must be shared with you client app and it's used to create the initial authentication
+ request. The `Client Secret` on the other hand, can not be shared due to the fact that the app
+ cannot keep the `Client Secret` confidential. This is why you need to create an endpoint in a trusted environment 
+ (eg. Cloud Function, server), one that can keep both the `Client Secret` confidential, to do the code exchange.
+ 
+ The package is going to make the following two types of request to the same endpoint:
+ 
+ 1. Code exchange
+     ```http request
+     POST <endpoint>
+     Content-Type: application/json
+     
+     {
+       "code": "<code>",
+       "codeVerifier": "<codeVerifier>",
+       "clientId": "<clientId>",
+       "redirectUrl": "<redirectUrl>"
+     }
+     ```
+     You are expected to make a request to the Google `token` endpoint with `grant_type` field set to `authorization_code`.
+      Return the response to the initial request.
+     ```http request
+     POST /token HTTP/1.1
+     Host: oauth2.googleapis.com
+     Content-Type: application/x-www-form-urlencoded
+     
+     code=<code>&
+     client_id=<clientId>&
+     client_secret=<clientSecret>&
+     redirect_uri=<returnUrl>&
+     grant_type=authorization_code
+     ```        
     
-    void main() {
-      if (isDesktop) {
-        GoogleSignInPlatform.register(clientId: <clientId>);
-      }
+1. Refresh token
+   ```http request
+   POST <endpoint>
+   Content-Type: application/json
+   
+   {
+     "refreshToken": "<refreshToken>",
+     "clientId": "<clientId>"
+   }
+   ```                
+   In this case make a request to the same endpoint but with `grant_type` field set to `refresh_token`. Return
+    the response to the initial request.
+     ```http request
+     POST /token HTTP/1.1
+     Host: oauth2.googleapis.com
+     Content-Type: application/x-www-form-urlencoded
+     
+     client_id=<clientId>&
+     client_secret=<clientSecret>&
+     refresh_token=<refresh_token>&
+     grant_type=refresh_token
+     ```        
     
-      runApp(MyApp());
-    }
-    ``` 
-    Note: You might want to `await` for the `register` method to finish before calling any `GoogleSignIn` methods when your app starts.  
+## Example
 
-###  Usage
-You can use the normal `GoogleSignIn` methods.
-```dart 
-final GoogleSignInAccount account = await GoogleSignIn().signIn();
-```
-
-## Obtain a Client ID for your Desktop app
-1. Go to the Google Cloud Platform console and select you [project](https://console.cloud.google.com/projectselector2/home/dashboard) 
-1. Go to `APIs & Service` -> `Credentials`
-1. Create new credentials for your app by selecting `CREATE CREDENTIALS` and then `OAuth client ID`
-1. Select `Other` as `Application type`, give it a name (eg. macOS) and then click `Create`
-
-### Provide a code exchange endpoint
-The user `accessToken` expires after about one hour, after witch you need to ask the user to login again. If you want to 
-keep the user logged in, you need to deploy a oAuth code exchange endpoint. More info [here](https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/google_sign_in_dart/example/gcp/REAMME.ms)    
+You can have a look at `functions` to see how this can be implemented with Google Cloud Function.

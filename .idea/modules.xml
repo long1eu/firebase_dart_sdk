@@ -11,7 +11,7 @@
       <module fileurl="file://$PROJECT_DIR$/firebase_core_flutter_example/firebase_core_flutter_example.iml" filepath="$PROJECT_DIR$/firebase_core_flutter_example/firebase_core_flutter_example.iml" />
       <module fileurl="file://$PROJECT_DIR$/firebase_core/firebase_core_vm/firebase_core_vm.iml" filepath="$PROJECT_DIR$/firebase_core/firebase_core_vm/firebase_core_vm.iml" />
       <module fileurl="file://$PROJECT_DIR$/firebase_storage_dart/firebase_storage_dart.iml" filepath="$PROJECT_DIR$/firebase_storage_dart/firebase_storage_dart.iml" />
-      <module fileurl="file://$PROJECT_DIR$/google_sign_in_dart/google_sign_in_dart.iml" filepath="$PROJECT_DIR$/google_sign_in_dart/google_sign_in_dart.iml" />
+      <module fileurl="file://$PROJECT_DIR$/google_sign_in_dart/google_sign_in_dartio.iml" filepath="$PROJECT_DIR$/google_sign_in_dart/google_sign_in_dartio.iml" />
     </modules>
   </component>
 </project>

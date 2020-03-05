@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 24/11/2019
 
-part of '../google_sign_in_dart.dart';
+part of '../google_sign_in_dartio.dart';
 
 /// Helper class for persisting tokens between sessions
 class DataStorage {

@@ -1,4 +1,4 @@
-# google_sign_in_dart
+# google_sign_in_dartio
 
 A Flutter package that implements [Google Sign In](https://developers.google.com/identity/) in pure Dart. This package 
 is compatible with `google_sign_in` plugin and works on all platforms Flutter supports. 
@@ -10,19 +10,19 @@ is compatible with `google_sign_in` plugin and works on all platforms Flutter su
     ```yaml
     dependencies:
       google_sign_in: ^4.1.4
-      google_sign_in_dart: ^0.0.1
+      google_sign_in_dartio: ^0.0.1
     ```
 1. Run `flutter pub get`
 1. Import
     ```dart
     import 'package:google_sign_in/google_sign_in.dart';
-    import 'package:google_sign_in_dart/google_sign_in_dart.dart';
+    import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
     ```        
 1. Register the package
     ```dart 
     import 'package:flutter/material.dart';
     import 'package:google_sign_in/google_sign_in.dart';
-    import 'package:google_sign_in_dart/google_sign_in_dart.dart';
+    import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
     
     void main() {
       if (isDesktop) {
@@ -53,7 +53,7 @@ the package like this.
 
     import 'package:flutter/material.dart';
     import 'package:google_sign_in/google_sign_in.dart';
-    import 'package:google_sign_in_dart/google_sign_in_dart.dart';
+    import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
     
     void main() {
       if (isDesktop) {

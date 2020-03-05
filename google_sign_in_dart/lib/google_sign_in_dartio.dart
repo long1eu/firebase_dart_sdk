@@ -1,4 +1,4 @@
-library google_sign_in_dart;
+library google_sign_in_dartio;
 
 import 'dart:async';
 import 'dart:convert';

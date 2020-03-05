@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 03/03/2020
 
-part of '../google_sign_in_dart.dart';
+part of '../google_sign_in_dartio.dart';
 
 Future<void> _sendData(HttpRequest request, Object data,
     [String contentType = 'text/html']) async {

@@ -9,7 +9,7 @@ import 'dart:convert' show json;
 
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:google_sign_in_dart/google_sign_in_dart.dart';
+import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
 import 'package:http/http.dart' as http;
 
 GoogleSignIn _googleSignIn = GoogleSignIn(
