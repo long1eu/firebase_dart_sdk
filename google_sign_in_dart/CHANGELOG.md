@@ -1,3 +1,7 @@
+## 0.0.2+1
+
+* update readme 
+
 ## 0.0.2
 
 * update readme 

@@ -66,4 +66,4 @@ the package like this.
       runApp(MyApp());
     }
     
-See instruction on how to [deploy a code exchange endpoint](google_sign_in_dart/example/gcp/README.md).    
+See instruction on how to [deploy a code exchange endpoint](https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/google_sign_in_dart/example/gcp).    

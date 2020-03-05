@@ -1,8 +1,8 @@
 name: google_sign_in_dartio
 description: Flutter package for Google Sign-In, a secure authentication system for signing in with a Google account
   on Flutter platforms that support 'dart:io'.
-version: 0.0.2
-homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
+version: 0.0.2+1
+homepage: https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/google_sign_in_dart
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
