@@ -4,7 +4,8 @@
 
 part of firebase_auth_example;
 
-Future<EmailAndPassword> getEmailAndPassword({bool enableForgetPassword = false}) async {
+Future<EmailAndPassword> getEmailAndPassword(
+    {bool enableForgetPassword = false}) async {
   final MultipleStringOption option = MultipleStringOption(
     question: 'Great! Please enter your credentials.',
     fieldsCount: 2,

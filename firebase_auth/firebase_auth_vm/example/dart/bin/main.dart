@@ -14,7 +14,8 @@ Future<void> main(List<String> arguments, [Map<String, String> config]) async {
   if (arguments.isNotEmpty) {
     final File configFile = File(arguments[0]);
     // ignore: parameter_assignments
-    config = Map<String, String>.from(jsonDecode(await configFile.readAsString()));
+    config =
+        Map<String, String>.from(jsonDecode(await configFile.readAsString()));
   }
 
   await init(config);

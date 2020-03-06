@@ -43,7 +43,8 @@ class MultipleOptions extends Option<int> {
   int showField() {
     if (_descriptionBuilder != null) {
       console
-        ..println('You can use @<number> to get more info. For example: ${'@1'.bold.cyan.reset}')
+        ..println(
+            'You can use @<number> to get more info. For example: ${'@1'.bold.cyan.reset}')
         ..print(_fieldBuilder?.call() ?? 'Option: ');
       return 2;
     } else {
@@ -83,7 +84,8 @@ class MultipleOptions extends Option<int> {
       ..removeLastLine()
       ..moveUp()
       ..removeLastLine()
-      ..println('${'($option)'.cyan.bold} ${_builder(option - 1).reset}: ${_descriptionBuilder(option - 1)}')
+      ..println(
+          '${'($option)'.cyan.bold} ${_builder(option - 1).reset}: ${_descriptionBuilder(option - 1)}')
       ..println();
   }
 }

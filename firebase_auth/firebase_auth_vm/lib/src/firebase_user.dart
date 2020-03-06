@@ -4,11 +4,12 @@
 
 part of firebase_auth_vm;
 
-typedef UpdateSetAccountInfoRequest = void Function(
-    gitkit.UserInfo user, IdentitytoolkitRelyingpartySetAccountInfoRequest request);
+typedef UpdateSetAccountInfoRequest = void Function(gitkit.UserInfo user,
+    IdentitytoolkitRelyingpartySetAccountInfoRequest request);
 
 class FirebaseUser with UserInfoMixin {
-  FirebaseUser._({@required SecureTokenApi secureTokenApi, @required FirebaseAuth auth})
+  FirebaseUser._(
+      {@required SecureTokenApi secureTokenApi, @required FirebaseAuth auth})
       : assert(secureTokenApi != null),
         assert(auth != null),
         _secureTokenApi = secureTokenApi,
@@ -17,7 +18,10 @@ class FirebaseUser with UserInfoMixin {
 
   /// Constructs a user with Secure Token Service tokens, and obtains user details from the getAccountInfo endpoint.
   static Future<FirebaseUser> _retrieveUserWithAuth(
-      FirebaseAuth auth, String accessToken, DateTime accessTokenExpirationDate, String refreshToken,
+      FirebaseAuth auth,
+      String accessToken,
+      DateTime accessTokenExpirationDate,
+      String refreshToken,
       {bool anonymous}) async {
     final SecureTokenApi secureTokenApi = SecureTokenApi(
       client: auth._apiKeyClient,
@@ -26,13 +30,16 @@ class FirebaseUser with UserInfoMixin {
       refreshToken: refreshToken,
     );
 
-    final FirebaseUser user = FirebaseUser._(secureTokenApi: secureTokenApi, auth: auth);
+    final FirebaseUser user =
+        FirebaseUser._(secureTokenApi: secureTokenApi, auth: auth);
     final String newAccessToken = await user._getToken();
 
-    final IdentitytoolkitRelyingpartyGetAccountInfoRequest request = IdentitytoolkitRelyingpartyGetAccountInfoRequest()
-      ..idToken = newAccessToken;
+    final IdentitytoolkitRelyingpartyGetAccountInfoRequest request =
+        IdentitytoolkitRelyingpartyGetAccountInfoRequest()
+          ..idToken = newAccessToken;
 
-    final GetAccountInfoResponse response = await auth._firebaseAuthApi.getAccountInfo(request);
+    final GetAccountInfoResponse response =
+        await auth._firebaseAuthApi.getAccountInfo(request);
 
     return user
       .._isAnonymous = anonymous
@@ -109,9 +116,11 @@ class FirebaseUser with UserInfoMixin {
   /// Errors:
   ///   * [FirebaseAuthError.requiresRecentLogin] - Indicates that the user's last sign-in time does not meet the
   ///       security threshold. Use reauthenticate methods to resolve.
-  Future<void> updatePhoneNumberCredential(PhoneAuthCredential credential) async {
+  Future<void> updatePhoneNumberCredential(
+      PhoneAuthCredential credential) async {
     assert(credential != null);
-    return _updateOrLinkPhoneNumberCredential(credential, isLinkOperation: false);
+    return _updateOrLinkPhoneNumberCredential(credential,
+        isLinkOperation: false);
   }
 
   /// Updates the user profile information.
@@ -167,10 +176,12 @@ class FirebaseUser with UserInfoMixin {
   ///   * [FirebaseAuthError.userMismatch] -  Indicates that an attempt was made to reauthenticate with a user which is
   ///       not the current user.
   ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is malformed.
-  Future<AuthResult> reauthenticateWithCredential(AuthCredential credential) async {
+  Future<AuthResult> reauthenticateWithCredential(
+      AuthCredential credential) async {
     assert(credential != null);
     try {
-      final AuthResult result = await _auth._signInAndRetrieveData(credential, isReauthentication: true);
+      final AuthResult result = await _auth._signInAndRetrieveData(credential,
+          isReauthentication: true);
       if (result.user.uid != _auth.uid) {
         throw FirebaseAuthError.userMismatch;
       }
@@ -223,14 +234,17 @@ class FirebaseUser with UserInfoMixin {
   ///       the credential.
   Future<AuthResult> linkWithCredential(AuthCredential credential) async {
     assert(credential != null);
-    if (providerData.map((UserInfo it) => it.providerId).contains(credential.providerId)) {
+    if (providerData
+        .map((UserInfo it) => it.providerId)
+        .contains(credential.providerId)) {
       return Future<AuthResult>.error(FirebaseAuthError.providerAlreadyLinked);
     }
 
     AuthResult result = AuthResult._(this);
     if (credential is EmailPasswordAuthCredential) {
       if (_hasEmailPasswordCredential) {
-        return Future<AuthResult>.error(FirebaseAuthError.providerAlreadyLinked);
+        return Future<AuthResult>.error(
+            FirebaseAuthError.providerAlreadyLinked);
       }
 
       if (credential.password != null) {
@@ -244,7 +258,8 @@ class FirebaseUser with UserInfoMixin {
       await _linkWithGameCenter(credential);
       return result;
     } else if (credential is PhoneAuthCredential) {
-      await _updateOrLinkPhoneNumberCredential(credential, isLinkOperation: true);
+      await _updateOrLinkPhoneNumberCredential(credential,
+          isLinkOperation: true);
       return result;
     }
     final String accessToken = await _getToken();
@@ -258,7 +273,8 @@ class FirebaseUser with UserInfoMixin {
     request.idToken = accessToken;
 
     try {
-      final VerifyAssertionResponse response = await _firebaseAuthApi.verifyAssertion(request);
+      final VerifyAssertionResponse response =
+          await _firebaseAuthApi.verifyAssertion(request);
 
       final AuthCredential oAuthCredential = OAuthCredential._(
         providerId: response.providerId,
@@ -267,11 +283,13 @@ class FirebaseUser with UserInfoMixin {
         secret: response.oauthTokenSecret,
         pendingToken: response.oauthRequestToken,
       );
-      final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl.fromVerifyAssertionResponse(response);
+      final AdditionalUserInfoImpl additionalUserInfo =
+          AdditionalUserInfoImpl.fromVerifyAssertionResponse(response);
       result = AuthResult._(this, additionalUserInfo, oAuthCredential);
 
       // Update the new token
-      _updateSecureToken(response.idToken, response.expiresIn, response.refreshToken);
+      _updateSecureToken(
+          response.idToken, response.expiresIn, response.refreshToken);
 
       // Get account info to update cached user info.
       await _getAccountInfoRefreshingCache();
@@ -303,11 +321,13 @@ class FirebaseUser with UserInfoMixin {
     }
 
     final String accessToken = await _getToken();
-    final IdentitytoolkitRelyingpartySetAccountInfoRequest request = IdentitytoolkitRelyingpartySetAccountInfoRequest()
-      ..idToken = accessToken
-      ..deleteProvider = <String>[providerId];
+    final IdentitytoolkitRelyingpartySetAccountInfoRequest request =
+        IdentitytoolkitRelyingpartySetAccountInfoRequest()
+          ..idToken = accessToken
+          ..deleteProvider = <String>[providerId];
 
-    final SetAccountInfoResponse response = await _firebaseAuthApi.setAccountInfo(request);
+    final SetAccountInfoResponse response =
+        await _firebaseAuthApi.setAccountInfo(request);
     // We can't just use the provider info objects in SetAccountInfoResponse because they don't have localId and email
     // fields. Remove the specific provider manually.
     _providerData.remove(providerId);
@@ -318,11 +338,13 @@ class FirebaseUser with UserInfoMixin {
 
     // After successfully unlinking a phone auth provider, remove the phone number from the cached user info.
     if (providerId == ProviderType.phone) {
-      _userInfo = _userInfo.rebuild((UserInfoImplBuilder b) => b.phoneNumber = null);
+      _userInfo =
+          _userInfo.rebuild((UserInfoImplBuilder b) => b.phoneNumber = null);
     }
 
     if (response.idToken != null && response.refreshToken != null) {
-      _updateSecureToken(response.idToken, response.expiresIn, response.refreshToken);
+      _updateSecureToken(
+          response.idToken, response.expiresIn, response.refreshToken);
     }
     _updateStore();
   }
@@ -356,9 +378,10 @@ class FirebaseUser with UserInfoMixin {
   Future<void> delete() async {
     final String accessToken = await _getToken();
 
-    final IdentitytoolkitRelyingpartyDeleteAccountRequest request = IdentitytoolkitRelyingpartyDeleteAccountRequest()
-      ..localId = uid
-      ..idToken = accessToken;
+    final IdentitytoolkitRelyingpartyDeleteAccountRequest request =
+        IdentitytoolkitRelyingpartyDeleteAccountRequest()
+          ..localId = uid
+          ..idToken = accessToken;
 
     try {
       await _firebaseAuthApi._requester.deleteAccount(request);
@@ -377,7 +400,8 @@ class FirebaseUser with UserInfoMixin {
   String get _rawAccessToken => _secureTokenApi._accessToken;
 
   /// The expiration date of the cached access token.
-  DateTime get _accessTokenExpirationDate => _secureTokenApi._accessTokenExpirationDate;
+  DateTime get _accessTokenExpirationDate =>
+      _secureTokenApi._accessTokenExpirationDate;
 
   FirebaseAuthApi get _firebaseAuthApi => _auth._firebaseAuthApi;
 
@@ -390,7 +414,8 @@ class FirebaseUser with UserInfoMixin {
     final bool hadEmailPasswordCredential = _hasEmailPasswordCredential;
 
     await _runUserUpdateTransaction(
-      (gitkit.UserInfo user, IdentitytoolkitRelyingpartySetAccountInfoRequest request) {
+      (gitkit.UserInfo user,
+          IdentitytoolkitRelyingpartySetAccountInfoRequest request) {
         request
           ..email = email
           ..password = password;
@@ -405,17 +430,20 @@ class FirebaseUser with UserInfoMixin {
       final String accessToken = await _getToken();
 
       final IdentitytoolkitRelyingpartyGetAccountInfoRequest request =
-          IdentitytoolkitRelyingpartyGetAccountInfoRequest()..idToken = accessToken;
+          IdentitytoolkitRelyingpartyGetAccountInfoRequest()
+            ..idToken = accessToken;
 
       try {
-        final GetAccountInfoResponse response = await _firebaseAuthApi.getAccountInfo(request);
+        final GetAccountInfoResponse response =
+            await _firebaseAuthApi.getAccountInfo(request);
         for (gitkit.UserInfo userAccountInfo in response.users) {
           // Set the account to non-anonymous if there are any providers, even if they're not email/password ones.
           if (userAccountInfo.providerUserInfo.isNotEmpty) {
             _isAnonymous = false;
           }
 
-          for (UserInfoProviderUserInfo providerUserInfo in userAccountInfo.providerUserInfo) {
+          for (UserInfoProviderUserInfo providerUserInfo
+              in userAccountInfo.providerUserInfo) {
             if (providerUserInfo.providerId == ProviderType.password) {
               _hasEmailPasswordCredential = true;
             }
@@ -433,7 +461,8 @@ class FirebaseUser with UserInfoMixin {
   }
 
   /// Links a game center account with this user. On success, the cached user profile data is updated.
-  Future<void> _linkWithEmailLink(EmailPasswordAuthCredential credential) async {
+  Future<void> _linkWithEmailLink(
+      EmailPasswordAuthCredential credential) async {
     final String accessToken = await _getToken();
     final Uri link = Uri.parse(credential.link);
     final String actionCode = link.queryParameters['oobCode'];
@@ -484,10 +513,12 @@ class FirebaseUser with UserInfoMixin {
   }
 
   /// Updates the phone number for the user. On success, the cached user profile data is updated.
-  Future<void> _updateOrLinkPhoneNumberCredential(PhoneAuthCredential credential,
+  Future<void> _updateOrLinkPhoneNumberCredential(
+      PhoneAuthCredential credential,
       {@required bool isLinkOperation}) async {
     final String accessToken = await _getToken();
-    final AuthOperationType operation = isLinkOperation ? AuthOperationType.link : AuthOperationType.update;
+    final AuthOperationType operation =
+        isLinkOperation ? AuthOperationType.link : AuthOperationType.update;
     final IdentitytoolkitRelyingpartyVerifyPhoneNumberRequest request =
         IdentitytoolkitRelyingpartyVerifyPhoneNumberRequest()
           ..sessionInfo = credential.verificationId
@@ -509,19 +540,23 @@ class FirebaseUser with UserInfoMixin {
 
   /// Performs a setAccountInfo request by mutating the results of a getAccountInfo response, atomically in regards to
   /// other calls to this method.
-  Future<void> _runUserUpdateTransaction(UpdateSetAccountInfoRequest updateRequest) {
+  Future<void> _runUserUpdateTransaction(
+      UpdateSetAccountInfoRequest updateRequest) {
     return _runner.enqueue<void>(() async {
       final gitkit.UserInfo user = await _getAccountInfoRefreshingCache();
 
       final String accessToken = await _getToken();
       final IdentitytoolkitRelyingpartySetAccountInfoRequest request =
-          IdentitytoolkitRelyingpartySetAccountInfoRequest()..idToken = accessToken;
+          IdentitytoolkitRelyingpartySetAccountInfoRequest()
+            ..idToken = accessToken;
       updateRequest(user, request);
 
       try {
-        final SetAccountInfoResponse response = await _firebaseAuthApi.setAccountInfo(request);
+        final SetAccountInfoResponse response =
+            await _firebaseAuthApi.setAccountInfo(request);
         if (response.idToken != null && response.refreshToken != null) {
-          _updateSecureToken(response.idToken, response.expiresIn, response.refreshToken);
+          _updateSecureToken(
+              response.idToken, response.expiresIn, response.refreshToken);
         }
       } on FirebaseAuthError catch (e) {
         _signOutIfTokenIsInvalid(e);
@@ -531,8 +566,10 @@ class FirebaseUser with UserInfoMixin {
   }
 
   /// Creates and sets a new token service for this instance.
-  void _updateSecureToken(String accessToken, String expiresIn, String refreshToken) {
-    final DateTime accessTokenExpirationDate = DateTime.now().add(Duration(seconds: int.parse(expiresIn))).toUtc();
+  void _updateSecureToken(
+      String accessToken, String expiresIn, String refreshToken) {
+    final DateTime accessTokenExpirationDate =
+        DateTime.now().add(Duration(seconds: int.parse(expiresIn))).toUtc();
     final SecureTokenApi secureTokenApi = SecureTokenApi(
       client: _auth._apiKeyClient,
       accessToken: accessToken,
@@ -553,10 +590,12 @@ class FirebaseUser with UserInfoMixin {
   Future<gitkit.UserInfo> _getAccountInfoRefreshingCache() async {
     final String accessToken = await _getToken();
 
-    final IdentitytoolkitRelyingpartyGetAccountInfoRequest request = IdentitytoolkitRelyingpartyGetAccountInfoRequest()
-      ..idToken = accessToken;
+    final IdentitytoolkitRelyingpartyGetAccountInfoRequest request =
+        IdentitytoolkitRelyingpartyGetAccountInfoRequest()
+          ..idToken = accessToken;
     try {
-      final GetAccountInfoResponse response = await _firebaseAuthApi.getAccountInfo(request);
+      final GetAccountInfoResponse response =
+          await _firebaseAuthApi.getAccountInfo(request);
       _updateWithUserDataResponse(response);
       _updateStore();
       return response.users.first;
@@ -574,7 +613,8 @@ class FirebaseUser with UserInfoMixin {
     final String oldRefreshToken = _secureTokenApi._refreshToken;
 
     try {
-      final String token = await _secureTokenApi.fetchAccessToken(forceRefresh: forceRefresh);
+      final String token =
+          await _secureTokenApi.fetchAccessToken(forceRefresh: forceRefresh);
 
       tokenUpdate = tokenUpdate ||
           oldAccessToken != _secureTokenApi._accessToken ||
@@ -603,22 +643,27 @@ class FirebaseUser with UserInfoMixin {
     );
     _hasEmailPasswordCredential = user.passwordHash?.isNotEmpty ?? false;
     _metadata = UserMetadataImpl(
-      lastSignInDate: DateTime.fromMillisecondsSinceEpoch(int.parse(user.lastLoginAt), isUtc: true),
-      creationDate: DateTime.fromMillisecondsSinceEpoch(int.parse(user.createdAt), isUtc: true),
+      lastSignInDate: DateTime.fromMillisecondsSinceEpoch(
+          int.parse(user.lastLoginAt),
+          isUtc: true),
+      creationDate: DateTime.fromMillisecondsSinceEpoch(
+          int.parse(user.createdAt),
+          isUtc: true),
     );
 
-    _providerData =
-        user.providerUserInfo?.asMap()?.map((_, UserInfoProviderUserInfo info) => MapEntry<String, UserInfoImpl>(
-                info.providerId,
-                UserInfoImpl(
-                  providerId: info.providerId,
-                  uid: info.federatedId,
-                  displayName: info.displayName,
-                  photoUrl: info.photoUrl,
-                  email: info.email,
-                  phoneNumber: info.phoneNumber,
-                ))) ??
-            <String, UserInfo>{};
+    _providerData = user.providerUserInfo?.asMap()?.map(
+            (_, UserInfoProviderUserInfo info) =>
+                MapEntry<String, UserInfoImpl>(
+                    info.providerId,
+                    UserInfoImpl(
+                      providerId: info.providerId,
+                      uid: info.federatedId,
+                      displayName: info.displayName,
+                      photoUrl: info.photoUrl,
+                      email: info.email,
+                      phoneNumber: info.phoneNumber,
+                    ))) ??
+        <String, UserInfo>{};
   }
 
   void _updateStore() {

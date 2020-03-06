@@ -4,17 +4,20 @@
 
 part of firebase_auth_example;
 
-Future<AuthResult> _signInWithEmailAndPasswordCredential(FirebaseAuthOption option) async {
+Future<AuthResult> _signInWithEmailAndPasswordCredential(
+    FirebaseAuthOption option) async {
   final AuthCredential credential = await _getEmailPasswordAuthCredential();
   return _presentSignInWithCredential(credential);
 }
 
-Future<AuthResult> _sendSignInWithPhoneNumberCredential(FirebaseAuthOption option) async {
+Future<AuthResult> _sendSignInWithPhoneNumberCredential(
+    FirebaseAuthOption option) async {
   final PhoneAuthCredential credential = await _getPhoneAuthCredential();
   return __signInWithPhoneCredential(credential);
 }
 
-Future<AuthResult> __signInWithPhoneCredential(PhoneAuthCredential credential) async {
+Future<AuthResult> __signInWithPhoneCredential(
+    PhoneAuthCredential credential) async {
   try {
     return _presentSignInWithCredential(credential);
   } on FirebaseAuthError catch (error) {
@@ -30,22 +33,26 @@ Future<AuthResult> __signInWithPhoneCredential(PhoneAuthCredential credential) a
   }
 }
 
-Future<AuthResult> _signInWithGoogleCredential(FirebaseAuthOption option) async {
+Future<AuthResult> _signInWithGoogleCredential(
+    FirebaseAuthOption option) async {
   final AuthCredential credential = await _getGoogleAuthCredential();
   return _presentSignInWithCredential(credential);
 }
 
-Future<AuthResult> _signInWithFacebookCredential(FirebaseAuthOption option) async {
+Future<AuthResult> _signInWithFacebookCredential(
+    FirebaseAuthOption option) async {
   final FacebookAuthCredential credential = await _getFacebookAuthCredential();
   return _presentSignInWithCredential(credential);
 }
 
-Future<AuthResult> _signInWithCredentialGitHub(FirebaseAuthOption option) async {
+Future<AuthResult> _signInWithCredentialGitHub(
+    FirebaseAuthOption option) async {
   final AuthCredential credential = await _getGithubAuthCredential();
   return _presentSignInWithCredential(credential);
 }
 
-Future<AuthResult> _signInWithCredentialTwitter(FirebaseAuthOption option) async {
+Future<AuthResult> _signInWithCredentialTwitter(
+    FirebaseAuthOption option) async {
   final TwitterAuthCredential credential = await _getTwitterAuthCredential();
   return _presentSignInWithCredential(credential);
 }
@@ -55,7 +62,8 @@ Future<AuthResult> _signInWithYahooCredential(FirebaseAuthOption option) async {
   return _presentSignInWithCredential(credential);
 }
 
-Future<AuthResult> _signInWithMicrosoftCredential(FirebaseAuthOption option) async {
+Future<AuthResult> _signInWithMicrosoftCredential(
+    FirebaseAuthOption option) async {
   final AuthCredential credential = await _getMicrosoftAuthCredential();
   return _presentSignInWithCredential(credential);
 }

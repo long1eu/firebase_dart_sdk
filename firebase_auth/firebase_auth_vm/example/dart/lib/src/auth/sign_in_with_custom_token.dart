@@ -19,7 +19,8 @@ Future<AuthResult> _singInWithCustomToken(FirebaseAuthOption option) async {
   final String customToken = await option.show();
 
   final Progress progress = Progress('Siging in')..show();
-  final AuthResult result = await FirebaseAuth.instance.signInWithCustomToken(token: customToken);
+  final AuthResult result =
+      await FirebaseAuth.instance.signInWithCustomToken(token: customToken);
   await progress.cancel();
   console.clearScreen();
   return result;

@@ -6,7 +6,8 @@ part of firebase_auth_example;
 
 Future<EmailPasswordAuthCredential> _getEmailPasswordAuthCredential() async {
   final EmailAndPassword result = await getEmailAndPassword();
-  return EmailAuthProvider.getCredential(email: result.email, password: result.password);
+  return EmailAuthProvider.getCredential(
+      email: result.email, password: result.password);
 }
 
 Future<PhoneAuthCredential> _getPhoneAuthCredential() async {
@@ -29,7 +30,8 @@ Future<PhoneAuthCredential> _getPhoneAuthCredential() async {
     phoneNumber: phoneNumber,
     presenter: (Uri uri) {
       console
-        ..println('In order to verify the app please complete the recaptcha change by clicking the link below.')
+        ..println(
+            'In order to verify the app please complete the recaptcha change by clicking the link below.')
         ..println(uri.toString().bold.cyan.reset);
     },
   );
@@ -49,7 +51,8 @@ Future<PhoneAuthCredential> _getPhoneAuthCredential() async {
   );
 
   final String code = await option.show();
-  return PhoneAuthProvider.getCredential(verificationId: verificationId, verificationCode: code);
+  return PhoneAuthProvider.getCredential(
+      verificationId: verificationId, verificationCode: code);
 }
 
 Future<GoogleAuthCredential> _getGoogleAuthCredential() async {
@@ -72,7 +75,7 @@ Future<GoogleAuthCredential> _getGoogleAuthCredential() async {
       },
     ),
     providerName: 'Google',
-    codeResponseBuilder:   (Map<String, dynamic> response) {
+    codeResponseBuilder: (Map<String, dynamic> response) {
       return CodeResponse(
         code: response['device_code'],
         userCode: response['user_code'],
@@ -82,7 +85,8 @@ Future<GoogleAuthCredential> _getGoogleAuthCredential() async {
       );
     },
     codePollValidator: (Map<String, dynamic> pollResponse) {
-      if (pollResponse['access_token'] != null && pollResponse['id_token'] != null) {
+      if (pollResponse['access_token'] != null &&
+          pollResponse['id_token'] != null) {
         return null;
       } else if (pollResponse['error'] == 'access_denied') {
         return 'You canceled the authorization.';
@@ -98,7 +102,8 @@ Future<GoogleAuthCredential> _getGoogleAuthCredential() async {
   final String accessToken = credentials['access_token'];
   final String idToken = credentials['id_token'];
 
-  return GoogleAuthProvider.getCredential(idToken: idToken, accessToken: accessToken);
+  return GoogleAuthProvider.getCredential(
+      idToken: idToken, accessToken: accessToken);
 }
 
 Future<FacebookAuthCredential> _getFacebookAuthCredential() async {
@@ -171,7 +176,8 @@ Future<GithubAuthCredential> _getGithubAuthCredential() async {
   final String receivedState = data['state'];
 
   if (request.method != 'GET') {
-    throw Exception('Invalid response from server (expected GET request callback, got: ${request.method}).');
+    throw Exception(
+        'Invalid response from server (expected GET request callback, got: ${request.method}).');
   }
   if (receivedState != state) {
     throw StateError('The requested state doesn\'t match.');
@@ -200,7 +206,8 @@ Future<GithubAuthCredential> _getGithubAuthCredential() async {
   );
   await progress.cancel();
 
-  final Map<String, dynamic> accessTokenResponse = jsonDecode(response.body)['result'];
+  final Map<String, dynamic> accessTokenResponse =
+      jsonDecode(response.body)['result'];
   if (response.statusCode > 200) {
     throw StateError(accessTokenResponse['error']);
   }
@@ -225,7 +232,8 @@ Future<TwitterAuthCredential> _getTwitterAuthCredential() async {
 
   console
     ..println('Visit this link and login with Twitter')
-    ..println('https://api.twitter.com/oauth/authenticate?oauth_token=${requestToken.token}');
+    ..println(
+        'https://api.twitter.com/oauth/authenticate?oauth_token=${requestToken.token}');
 
   final HttpRequest request = await server.first;
   final Map<String, dynamic> data = request.requestedUri.queryParameters;
@@ -233,7 +241,8 @@ Future<TwitterAuthCredential> _getTwitterAuthCredential() async {
   final String oauthVerifier = data['oauth_verifier'];
 
   if (request.method != 'GET') {
-    throw Exception('Invalid response from server (expected GET request callback, got: ${request.method}).');
+    throw Exception(
+        'Invalid response from server (expected GET request callback, got: ${request.method}).');
   }
   if (requestToken.token != oauthToken) {
     throw StateError('The request doesn\'t match.');
@@ -248,7 +257,8 @@ Future<TwitterAuthCredential> _getTwitterAuthCredential() async {
   await server.close();
 
   progress = Progress('Validating credentials')..show();
-  final Response response = await client.post('oauth/access_token', headers: <String, String>{
+  final Response response =
+      await client.post('oauth/access_token', headers: <String, String>{
     'oauth_token': requestToken.token,
     'oauth_verifier': oauthVerifier,
   });
@@ -262,7 +272,8 @@ Future<TwitterAuthCredential> _getTwitterAuthCredential() async {
   final String userAuthToken = queryParameters['oauth_token'];
   final String userAuthTokenSecret = queryParameters['oauth_token_secret'];
 
-  return TwitterAuthProvider.getCredential(authToken: userAuthToken, authTokenSecret: userAuthTokenSecret);
+  return TwitterAuthProvider.getCredential(
+      authToken: userAuthToken, authTokenSecret: userAuthTokenSecret);
 }
 
 Future<OAuthCredential> _getYahooAuthCredential() {
@@ -315,7 +326,8 @@ Future<OAuthCredential> _getOAuthAuthCredential({
   final String receivedState = data['state'];
 
   if (request.method != 'GET') {
-    throw Exception('Invalid response from server (expected GET request callback, got: ${request.method}).');
+    throw Exception(
+        'Invalid response from server (expected GET request callback, got: ${request.method}).');
   }
   if (receivedState != state) {
     throw StateError('The requested state doesn\'t match.');
@@ -345,20 +357,24 @@ Future<OAuthCredential> _getOAuthAuthCredential({
   );
   await progress.cancel();
 
-  final Map<String, dynamic> accessTokenResponse = jsonDecode(response.body)['result'] ?? jsonDecode(response.body);
+  final Map<String, dynamic> accessTokenResponse =
+      jsonDecode(response.body)['result'] ?? jsonDecode(response.body);
   if (response.statusCode > 200 || accessTokenResponse.containsKey('error')) {
     print(response.body);
     throw StateError(accessTokenResponse['error'].toString());
   }
 
   final String accessToken = accessTokenResponse['access_token'];
-  return OAuthProvider.getCredentialWithAccessToken(providerId: providerId, accessToken: accessToken);
+  return OAuthProvider.getCredentialWithAccessToken(
+      providerId: providerId, accessToken: accessToken);
 }
 
-Future<AuthResult> _presentSignInWithCredential(AuthCredential credential) async {
+Future<AuthResult> _presentSignInWithCredential(
+    AuthCredential credential) async {
   console.println();
   final Progress progress = Progress('Siging in')..show();
-  final AuthResult result = await FirebaseAuth.instance.signInWithCredential(credential);
+  final AuthResult result =
+      await FirebaseAuth.instance.signInWithCredential(credential);
   await progress.cancel();
   console.clearScreen();
   return result;

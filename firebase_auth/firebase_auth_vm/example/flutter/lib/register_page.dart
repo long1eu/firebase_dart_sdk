@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:firebase_auth_vm/firebase_auth_vm.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 final FirebaseAuth _auth = FirebaseAuth.instance;
 
 class RegisterPage extends StatefulWidget {
   final String title = 'Registration';
+
   @override
   State<StatefulWidget> createState() => RegisterPageState();
 }
@@ -19,6 +20,34 @@ class RegisterPageState extends State<RegisterPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _success;
   String _userEmail;
+
+  // Example code for registration.
+  Future<void> _register() async {
+    final FirebaseUser user = (await _auth.createUserWithEmailAndPassword(
+      email: _emailController.text,
+      password: _passwordController.text,
+    ))
+        .user;
+
+    print('user: $user');
+    if (user != null) {
+      setState(() {
+        _success = true;
+        _userEmail = user.email;
+      });
+    } else {
+      _success = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    // Clean up the controller when the Widget is disposed
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,7 +83,7 @@ class RegisterPageState extends State<RegisterPage> {
               padding: const EdgeInsets.symmetric(vertical: 16.0),
               alignment: Alignment.center,
               child: RaisedButton(
-                onPressed: () async {
+                onPressed: () {
                   if (_formKey.currentState.validate()) {
                     _register();
                   }
@@ -67,37 +96,12 @@ class RegisterPageState extends State<RegisterPage> {
               child: Text(_success == null
                   ? ''
                   : (_success
-                      ? 'Successfully registered ' + _userEmail
+                      ? 'Successfully registered $_userEmail'
                       : 'Registration failed')),
             )
           ],
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    // Clean up the controller when the Widget is disposed
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  // Example code for registration.
-  void _register() async {
-    final FirebaseUser user = (await _auth.createUserWithEmailAndPassword(
-      email: _emailController.text,
-      password: _passwordController.text,
-    ))
-        .user;
-    if (user != null) {
-      setState(() {
-        _success = true;
-        _userEmail = user.email;
-      });
-    } else {
-      _success = false;
-    }
   }
 }

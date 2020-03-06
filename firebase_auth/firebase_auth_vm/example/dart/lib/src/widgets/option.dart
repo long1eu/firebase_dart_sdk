@@ -5,7 +5,8 @@
 part of firebase_auth_example;
 
 /// Signature for validating a user response for a specific field
-typedef MultipleStringOptionValidator = String Function(int fieldIndex, String response);
+typedef MultipleStringOptionValidator = String Function(
+    int fieldIndex, String response);
 
 /// Signature for building a field for a specific index
 typedef IndexedFieldBuilder = String Function(int index);

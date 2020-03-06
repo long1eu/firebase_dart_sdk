@@ -21,12 +21,15 @@ Future<bool> _createCustomToken(FirebaseAuthOption option) async {
     },
   );
 
-  final Map<String, String> claims = (await option.show()).asMap().map((_, String value) {
+  final Map<String, String> claims =
+      (await option.show()).asMap().map((_, String value) {
     final List<String> values = value.split(':');
     return MapEntry<String, String>(values[0].trim(), values[1].trim());
   });
 
-  final Progress progress = Progress('Creating custom token with claims ${jsonEncode(claims)}')..show();
+  final Progress progress =
+      Progress('Creating custom token with claims ${jsonEncode(claims)}')
+        ..show();
   console.println();
   final GetTokenResult token = await FirebaseAuth.instance.getAccessToken();
   final Response response = await Client().post(
@@ -45,7 +48,8 @@ Future<bool> _createCustomToken(FirebaseAuthOption option) async {
 
   final String customToken = jsonDecode(response.body)['result'];
   console
-    ..println('Here is your custom token. He have signed you out so you can test it. Save it and the hit Enter.')
+    ..println(
+        'Here is your custom token. He have signed you out so you can test it. Save it and the hit Enter.')
     ..println(customToken.bold.cyan.reset);
 
   await FirebaseAuth.instance.signOut();

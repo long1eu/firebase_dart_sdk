@@ -4,7 +4,16 @@
 
 part of firebase_auth_example;
 
-final List<String> progressChars = <String>['⣷', '⣯', '⣟', '⡿', '⢿', '⣻', '⣽', '⣾'];
+final List<String> progressChars = <String>[
+  '⣷',
+  '⣯',
+  '⣟',
+  '⡿',
+  '⢿',
+  '⣻',
+  '⣽',
+  '⣾'
+];
 
 final List<Progress> _currentProgresses = <Progress>[];
 
@@ -15,7 +24,8 @@ Future<void> _stopAllProgress() async {
 }
 
 class Progress {
-  Progress(this.title, [this.rate = const Duration(milliseconds: 96)]) : _completer = Completer<void>() {
+  Progress(this.title, [this.rate = const Duration(milliseconds: 96)])
+      : _completer = Completer<void>() {
     _currentProgresses.add(this);
   }
 

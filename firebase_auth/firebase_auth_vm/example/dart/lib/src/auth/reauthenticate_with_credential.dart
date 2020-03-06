@@ -4,11 +4,14 @@
 
 part of firebase_auth_example;
 
-Future<AuthResult> _reauthenticateWithCredential(FirebaseAuthOption option) async {
+Future<AuthResult> _reauthenticateWithCredential(
+    FirebaseAuthOption option) async {
   final FirebaseUser user = FirebaseAuth.instance.currentUser;
   await user.reload();
 
-  final List<String> providers = user.providerData.map((UserInfo userInfo) => userInfo.providerId).toList();
+  final List<String> providers = user.providerData
+      .map((UserInfo userInfo) => userInfo.providerId)
+      .toList();
   final List<FirebaseAuthOption> options = <FirebaseAuthOption>[];
   for (String provider in providers) {
     switch (provider) {
@@ -79,7 +82,8 @@ Future<AuthResult> _reauthenticateWithCredential(FirebaseAuthOption option) asyn
         break;
     }
 
-    final AuthResult result = await user.reauthenticateWithCredential(credential);
+    final AuthResult result =
+        await user.reauthenticateWithCredential(credential);
 
     console //
       ..clearScreen()

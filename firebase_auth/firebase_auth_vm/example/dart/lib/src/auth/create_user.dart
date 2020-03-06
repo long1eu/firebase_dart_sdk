@@ -33,7 +33,8 @@ Future<AuthResult> _createUser(FirebaseAuthOption option) async {
   final String password = results[1];
 
   final Progress progress = Progress('Creating Account')..show();
-  final AuthResult user = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: password);
+  final AuthResult user = await FirebaseAuth.instance
+      .createUserWithEmailAndPassword(email: email, password: password);
   await progress.cancel();
   console.clearScreen();
   return user;

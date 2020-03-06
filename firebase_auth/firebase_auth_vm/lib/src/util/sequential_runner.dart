@@ -17,7 +17,8 @@ class SequentialRunner {
     final bool listWasEmpty = _tasks.isEmpty;
     _tasks.add(taskEntry);
 
-    if (_recentActiveCompleter == null || _recentActiveCompleter.isCompleted && listWasEmpty) {
+    if (_recentActiveCompleter == null ||
+        _recentActiveCompleter.isCompleted && listWasEmpty) {
       _runNext();
     }
 

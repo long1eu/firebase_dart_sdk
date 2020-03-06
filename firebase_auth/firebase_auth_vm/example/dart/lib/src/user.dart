@@ -52,12 +52,14 @@ Future<void> userOptionsDialog() async {
           break;
         case FirebaseAuthOption.sendEmailVerification:
           if (FirebaseAuth.instance.currentUser.isAnonymous) {
-            throw StateError('Anonymous users don\'t have a email address to verify. :D');
+            throw StateError(
+                'Anonymous users don\'t have a email address to verify. :D');
           }
           signOut = await _sendEmailVerification(option);
           break;
         case FirebaseAuthOption.delete:
-          console.println('Are you sure you want to delete your account? (yes/no)');
+          console.println(
+              'Are you sure you want to delete your account? (yes/no)');
           final String response = await console.nextLine;
           if (response == 'yes') {
             await FirebaseAuth.instance.currentUser.delete();

@@ -7,7 +7,8 @@ import 'dart:io';
 
 Future<void> main() async {
   final StringBuffer buffer = StringBuffer();
-  final List<dynamic> data = jsonDecode(File('./lib/src/util/errors.json').readAsStringSync());
+  final List<dynamic> data =
+      jsonDecode(File('./lib/src/util/errors.json').readAsStringSync());
 
   buffer.writeln(header);
   for (dynamic item in data) {
@@ -26,8 +27,10 @@ Future<void> main() async {
   buffer.writeln('''\n  @override
   String toString() => 'FirebaseAuthError(\$code, \$message)';
 }''');
-  final File file = File('./lib/src/util/errors.dart')..writeAsStringSync(buffer.toString());
-  final ProcessResult result = Process.runSync('dartfmt', <String>[file.absolute.path, '-l', '120']);
+  final File file = File('./lib/src/util/errors.dart')
+    ..writeAsStringSync(buffer.toString());
+  final ProcessResult result =
+      Process.runSync('dartfmt', <String>[file.absolute.path, '-l', '120']);
   file.writeAsStringSync(result.stdout.toString());
 }
 

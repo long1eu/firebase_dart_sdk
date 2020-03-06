@@ -18,7 +18,8 @@ class EmailValidator {
   }
 
   static bool _isLetter(String c) {
-    return (c.codeUnitAt(0) >= 65 && c.codeUnitAt(0) <= 90) || (c.codeUnitAt(0) >= 97 && c.codeUnitAt(0) <= 122);
+    return (c.codeUnitAt(0) >= 65 && c.codeUnitAt(0) <= 90) ||
+        (c.codeUnitAt(0) >= 97 && c.codeUnitAt(0) <= 122);
   }
 
   static bool _isLetterOrDigit(String c) {
@@ -26,7 +27,9 @@ class EmailValidator {
   }
 
   static bool _isAtom(String c, bool allowInternational) {
-    return c.codeUnitAt(0) < 128 ? _isLetterOrDigit(c) || _atomCharacters.contains(c) : allowInternational;
+    return c.codeUnitAt(0) < 128
+        ? _isLetterOrDigit(c) || _atomCharacters.contains(c)
+        : allowInternational;
   }
 
   static bool _isDomain(String c, bool allowInternational) {
@@ -98,14 +101,16 @@ class EmailValidator {
 
     _index++;
 
-    while (_index < text.length && _isDomain(text[_index], allowInternational)) {
+    while (
+        _index < text.length && _isDomain(text[_index], allowInternational)) {
       _index++;
     }
 
     return (_index - startIndex) < 64 && text[_index - 1] != '-';
   }
 
-  static bool _skipDomain(String text, bool allowTopLevelDomains, bool allowInternational) {
+  static bool _skipDomain(
+      String text, bool allowTopLevelDomains, bool allowInternational) {
     if (!_skipSubDomain(text, allowInternational)) {
       return false;
     }
@@ -174,7 +179,9 @@ class EmailValidator {
       final int startIndex = _index;
       int value = 0;
 
-      while (_index < text.length && text[_index].codeUnitAt(0) >= 48 && text[_index].codeUnitAt(0) <= 57) {
+      while (_index < text.length &&
+          text[_index].codeUnitAt(0) >= 48 &&
+          text[_index].codeUnitAt(0) <= 57) {
         value = (value * 10) + (text[_index].codeUnitAt(0) - 48);
         _index++;
       }
@@ -195,7 +202,9 @@ class EmailValidator {
 
   static bool _isHexDigit(String str) {
     final int c = str.codeUnitAt(0);
-    return (c >= 65 && c <= 70) || (c >= 97 && c <= 102) || (c >= 48 && c <= 57);
+    return (c >= 65 && c <= 70) ||
+        (c >= 97 && c <= 102) ||
+        (c >= 48 && c <= 57);
   }
 
   // This needs to handle the following forms:
@@ -279,7 +288,8 @@ class EmailValidator {
 
   /// Validate the specified email address.
   // ignore: avoid_positional_boolean_parameters
-  static bool validate(String email, [bool allowTopLevelDomains = false, bool allowInternational = true]) {
+  static bool validate(String email,
+      [bool allowTopLevelDomains = false, bool allowInternational = true]) {
     _index = 0;
 
     if (email == null) {

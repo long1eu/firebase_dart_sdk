@@ -18,7 +18,8 @@ typedef GetRecaptchaToken = Future<String> Function();
 ///
 /// Once the user successfully verified the app, the HTTP server will redirect the user agent to a URL pointing to a
 /// locally running HTTP server. Which in turn will be able to extract the recaptcha token.
-Future<String> getRecaptchaToken(UrlPresenter urlPresenter, String apiKey, String languageCode) async {
+Future<String> getRecaptchaToken(
+    UrlPresenter urlPresenter, String apiKey, String languageCode) async {
   final HttpServer server = await HttpServer.bind('localhost', 0);
   final Stream<HttpRequest> events = server.asBroadcastStream();
 
@@ -62,7 +63,8 @@ Future<String> getRecaptchaToken(UrlPresenter urlPresenter, String apiKey, Strin
       final String error = uri.queryParameters['error'];
 
       if (request.method != 'GET') {
-        throw Exception('Invalid response from server (expected GET request callback, got: ${request.method}).');
+        throw Exception(
+            'Invalid response from server (expected GET request callback, got: ${request.method}).');
       }
 
       if (state != returnedState) {
@@ -70,7 +72,8 @@ Future<String> getRecaptchaToken(UrlPresenter urlPresenter, String apiKey, Strin
       }
 
       if (error != null) {
-        throw Exception('Error occured while obtaining access credentials: $error');
+        throw Exception(
+            'Error occured while obtaining access credentials: $error');
       }
 
       if (token == null || token == '') {

@@ -21,7 +21,8 @@ class OobCodeType {
   static const OobCodeType emailLinkSignIn = OobCodeType._(2, 'EMAIL_SIGNIN');
 
   /// Requests an verify before update email.
-  static const OobCodeType verifyBeforeUpdateEmail = OobCodeType._(3, 'VERIFY_AND_CHANGE_EMAIL');
+  static const OobCodeType verifyBeforeUpdateEmail =
+      OobCodeType._(3, 'VERIFY_AND_CHANGE_EMAIL');
 
   static const List<OobCodeType> values = <OobCodeType>[
     passwordReset,

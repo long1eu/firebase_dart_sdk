@@ -2,35 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io';
-
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_auth_example/dependencies.dart';
-import 'package:firebase_auth_example/signin_page.dart';
-import 'package:firebase_core/firebase_core_vm.dart';
+import 'package:firebase_auth_vm/firebase_auth_vm.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import './register_page.dart';
+import 'firebase_config.dart';
+import 'platform_dependencies.dart';
+import 'signin_page.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final Directory dir = await getApplicationDocumentsDirectory();
-  Hive.init('${dir.path}/hives');
-
-  final Box<dynamic> firebaseBox = await Hive.openBox<dynamic>('firebase_auth');
-  final Dependencies dependencies = Dependencies(box: firebaseBox);
-  final FirebaseOptions options = FirebaseOptions(
-    apiKey: 'AIzaSyChk3KEG7QYrs4kQPLP1tjJNxBTbfCAdgg',
-    applicationId: '1:159623150305:android:236f9daea101f77e',
-  );
-  FirebaseApp.withOptions(options, dependencies);
+  if (isDesktop) {
+    await GoogleSignInPlatform.register(
+      exchangeEndpoint:
+          'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
+      clientId:
+          '233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com',
+    );
+  }
 
   runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _initFirebase();
+  }
+
+  Future<void> _initFirebase() async {
+    final SharedPreferences preferences = await SharedPreferences.getInstance();
+    FirebaseApp.withOptions(firebaseOptions,
+        dependencies: Dependencies(preferences));
+  }
+
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(

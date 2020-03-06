@@ -1,28 +1,29 @@
-name: firebase_auth_example
-description: Demonstrates how to use the firebase_auth plugin.
-author: Flutter Team <flutter-dev@googlegroups.com>
+name: firebase_auth_vm_example
+description: Demonstrates how to use the firebase_auth_vm package.
+homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
 
 dependencies:
   flutter:
     sdk: flutter
 
-  firebase_auth:
-    git:
-      url: https://github.com/fluttercommunity/firebase_dart_sdk
-      ref: develop
-      path: firebase_auth
   google_sign_in: ^4.1.4
-  uuid: ^2.0.4
-  path_provider: ^1.6.1
+  google_sign_in_dartio: ^0.0.4+1
+  path_provider: ^1.6.5
   path_provider_macos: ^0.0.4
-  oauth2: ^1.5.0
   url_launcher: ^5.4.2
   url_launcher_macos: ^0.0.1+4
+  uuid: ^2.0.4
+  connectivity: ^0.4.8+1
+  shared_preferences: ^0.5.6+2
+  firebase_dynamic_links: ^0.5.0+11
+
+  firebase_auth_vm:
+    path: ../../
 
 dev_dependencies:
   flutter_driver:
     sdk: flutter
-  test: any
+  test: ^1.0.0
 
 flutter:
   uses-material-design: true

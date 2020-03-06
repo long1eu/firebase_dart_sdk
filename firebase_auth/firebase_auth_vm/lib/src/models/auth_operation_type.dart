@@ -12,13 +12,16 @@ class AuthOperationType {
   final int _i;
 
   /// Indicates that the operation type is unspecified.
-  static const AuthOperationType unspecified = AuthOperationType._(0, 'VERIFY_OP_UNSPECIFIED');
+  static const AuthOperationType unspecified =
+      AuthOperationType._(0, 'VERIFY_OP_UNSPECIFIED');
 
   /// Indicates that the operation type is sign in or sign up.
-  static const AuthOperationType signUpOrSignIn = AuthOperationType._(1, 'SIGN_UP_OR_IN');
+  static const AuthOperationType signUpOrSignIn =
+      AuthOperationType._(1, 'SIGN_UP_OR_IN');
 
   /// Indicates that the operation type is reauthentication.
-  static const AuthOperationType reauthenticate = AuthOperationType._(2, 'REAUTH');
+  static const AuthOperationType reauthenticate =
+      AuthOperationType._(2, 'REAUTH');
 
   /// Indicates that the operation type is update.
   static const AuthOperationType update = AuthOperationType._(3, 'UPDATE');

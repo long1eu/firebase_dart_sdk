@@ -9,7 +9,8 @@ const String _securetokenUserAgent = 'dart-api-client securetoken/v1/token';
 class SecureTokenService {
   SecureTokenService(Client client)
       : assert(client != null),
-        _requester = ApiRequester(client, 'https://securetoken.googleapis.com/', '', _securetokenUserAgent);
+        _requester = ApiRequester(client, 'https://securetoken.googleapis.com/',
+            '', _securetokenUserAgent);
 
   final ApiRequester _requester;
 

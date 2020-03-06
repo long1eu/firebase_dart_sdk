@@ -15,13 +15,16 @@ mixin AuthCredential {
   /// Called immediately before a request to the verifyAssertion endpoint is made.
   ///
   /// Implementers should update the passed request instance with their credentials.
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request);
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request);
 }
 
 /// Internal implementation of [AuthCredential] for Email/Password credentials.
 abstract class EmailPasswordAuthCredential with AuthCredential {
-  factory EmailPasswordAuthCredential._({@required String email, String password, String link}) {
-    return _$EmailPasswordAuthCredentialImpl((EmailPasswordAuthCredentialImplBuilder b) {
+  factory EmailPasswordAuthCredential._(
+      {@required String email, String password, String link}) {
+    return _$EmailPasswordAuthCredentialImpl(
+        (EmailPasswordAuthCredentialImplBuilder b) {
       b
         ..providerId = ProviderType.password
         ..email = email
@@ -66,7 +69,8 @@ abstract class GameCenterAuthCredential with AuthCredential {
     @required DateTime timestamp,
     @required String displayName,
   }) {
-    return _$GameCenterAuthCredentialImpl((GameCenterAuthCredentialImplBuilder b) {
+    return _$GameCenterAuthCredentialImpl(
+        (GameCenterAuthCredentialImplBuilder b) {
       b
         ..providerId = ProviderType.gameCenter
         ..playerId = playerId
@@ -113,7 +117,8 @@ abstract class GithubAuthCredential with AuthCredential {
 
 /// Internal implementation of [AuthCredential] for the Google IdP.
 abstract class GoogleAuthCredential with AuthCredential {
-  factory GoogleAuthCredential._({@required String idToken, @required String accessToken}) {
+  factory GoogleAuthCredential._(
+      {@required String idToken, @required String accessToken}) {
     return _$GoogleAuthCredentialImpl((GoogleAuthCredentialImplBuilder b) {
       b
         ..providerId = ProviderType.google
@@ -147,7 +152,9 @@ abstract class OAuthCredential with AuthCredential {
       b
         ..providerId = providerId
         ..scopes = scopes == null ? null : ListBuilder<String>(scopes)
-        ..customParameters = customParameters == null ? null : MapBuilder<String, String>(customParameters)
+        ..customParameters = customParameters == null
+            ? null
+            : MapBuilder<String, String>(customParameters)
         ..sessionId = sessionId
         ..requestUri = requestUri
         ..idToken = idToken
@@ -249,7 +256,8 @@ abstract class PhoneAuthCredential with AuthCredential {
 }
 
 abstract class TwitterAuthCredential with AuthCredential {
-  factory TwitterAuthCredential._({@required String authToken, @required String authTokenSecret}) {
+  factory TwitterAuthCredential._(
+      {@required String authToken, @required String authTokenSecret}) {
     return _$TwitterAuthCredentialImpl((TwitterAuthCredentialImplBuilder b) {
       b
         ..providerId = ProviderType.twitter

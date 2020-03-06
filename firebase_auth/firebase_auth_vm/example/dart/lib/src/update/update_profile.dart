@@ -6,7 +6,8 @@ part of firebase_auth_example;
 
 Future<bool> _updateProfile(FirebaseAuthOption option) async {
   final FirebaseUser user = FirebaseAuth.instance.currentUser;
-  const List<FirebaseAuthOption> options = FirebaseAuthOption.updateAccountValues;
+  const List<FirebaseAuthOption> options =
+      FirebaseAuthOption.updateAccountValues;
   final MultipleOptions multipleOptions = MultipleOptions(
     question: 'What do you want to update?',
     optionsCount: options.length,
@@ -78,7 +79,8 @@ Future<void> _updateEmail(FirebaseAuthOption option) async {
 
   console //
     ..clearScreen()
-    ..println('Email changed to ${email.bold.cyan.reset}. You can now login with the ${'new email'.cyan.reset}.')
+    ..println(
+        'Email changed to ${email.bold.cyan.reset}. You can now login with the ${'new email'.cyan.reset}.')
     ..print('Press Enter to return.');
 
   await console.nextLine;
@@ -106,7 +108,8 @@ Future<void> _updatePassword(FirebaseAuthOption option) async {
 
   console //
     ..clearScreen()
-    ..println('Password changed. You can now login with the ${'new password'.cyan.reset}.')
+    ..println(
+        'Password changed. You can now login with the ${'new password'.cyan.reset}.')
     ..print('Press Enter to return.');
 
   await console.nextLine;

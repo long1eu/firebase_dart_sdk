@@ -14,7 +14,8 @@ class UserUpdateInfo {
 
   bool get hasDisplayName => _updateData.containsKey('displayName');
 
-  set displayName(String displayName) => _updateData['displayName'] = displayName;
+  set displayName(String displayName) =>
+      _updateData['displayName'] = displayName;
 
   String get displayName => _updateData['displayName'];
 

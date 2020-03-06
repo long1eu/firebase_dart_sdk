@@ -31,7 +31,8 @@ class TwitterClient extends BaseClient {
   })  : _client = Client(),
         _consumerKey = consumerKey,
         _accessToken = accessToken,
-        _hasher = Hmac(sha1, utf8.encode('$consumerKeySecret&$accessTokenSecret'));
+        _hasher =
+            Hmac(sha1, utf8.encode('$consumerKeySecret&$accessTokenSecret'));
 
   final Hmac _hasher;
   final Client _client;
@@ -52,13 +53,14 @@ class TwitterClient extends BaseClient {
   Future<TwitterRequestToken> _getRequestToken() async {
     final Uri redirectUrl = Uri.http('localhost:55937', '__/auth/handler');
 
-    final Response response =
-        await this.post('oauth/request_token', headers: <String, String>{'oauth_callback': redirectUrl.toString()});
+    final Response response = await this.post('oauth/request_token',
+        headers: <String, String>{'oauth_callback': redirectUrl.toString()});
 
     final Map<String, String> responseData = response.body.queryParameters;
     final String token = responseData['oauth_token'];
     final String tokenSecret = responseData['oauth_token_secret'];
-    final bool callbackConfirmed = responseData['oauth_callback_confirmed'] == 'true';
+    final bool callbackConfirmed =
+        responseData['oauth_callback_confirmed'] == 'true';
     assert(callbackConfirmed);
 
     return TwitterRequestToken(token: token, tokenSecret: tokenSecret);
@@ -66,15 +68,18 @@ class TwitterClient extends BaseClient {
 
   @override
   Future<StreamedResponse> send(BaseRequest request) async {
-    final Uri url = request.url.replace(scheme: 'https', host: 'api.twitter.com');
-    final RequestImpl modifiedRequest = RequestImpl(request.method, url, request.finalize());
+    final Uri url =
+        request.url.replace(scheme: 'https', host: 'api.twitter.com');
+    final RequestImpl modifiedRequest =
+        RequestImpl(request.method, url, request.finalize());
 
     final String nonce = Uuid().v4();
     // Add all the OAuth headers we'll need to use when constructing the hash.
     final Map<String, String> headers = <String, String>{
       'oauth_consumer_key': _consumerKey,
       'oauth_signature_method': 'HMAC-SHA1',
-      'oauth_timestamp': (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString(),
+      'oauth_timestamp':
+          (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString(),
       'oauth_nonce': nonce,
       'oauth_version': '1.0',
       'oauth_token': _accessToken,
@@ -82,10 +87,12 @@ class TwitterClient extends BaseClient {
     };
 
     // Generate the OAuth signature and add it to our payload.
-    headers['oauth_signature'] = _generateSignature(request.method, url, headers);
+    headers['oauth_signature'] =
+        _generateSignature(request.method, url, headers);
 
     // Build the OAuth HTTP Header from the data.
-    final String value = headers.pairsWhere((String key) => key.startsWith('oauth')).join(', ');
+    final String value =
+        headers.pairsWhere((String key) => key.startsWith('oauth')).join(', ');
     final String oAuthHeader = 'OAuth $value';
 
     modifiedRequest.headers
@@ -96,7 +103,8 @@ class TwitterClient extends BaseClient {
   }
 
   String _generateSignature(String method, Uri url, Map<String, String> data) {
-    return base64.encode(_hash('$method&${_encode(url.toString())}&${_encode(data.pairs.join('&'))}'));
+    return base64.encode(_hash(
+        '$method&${_encode(url.toString())}&${_encode(data.pairs.join('&'))}'));
   }
 
   List<int> _hash(String data) => _hasher.convert(data.codeUnits).bytes;

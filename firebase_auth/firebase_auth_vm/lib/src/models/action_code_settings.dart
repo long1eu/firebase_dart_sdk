@@ -4,7 +4,8 @@
 
 part of firebase_auth_vm;
 
-abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCodeSettingsBuilder> {
+abstract class ActionCodeSettings
+    implements Built<ActionCodeSettings, ActionCodeSettingsBuilder> {
   /// Settings related to handling action codes.
   ///
   /// If [handleCodeInApp] is true you must specify the [iOSBundleId].
@@ -20,7 +21,6 @@ abstract class ActionCodeSettings implements Built<ActionCodeSettings, ActionCod
   }) {
     return _$ActionCodeSettings((ActionCodeSettingsBuilder b) {
       b
-
         ..continueUrl = continueUrl
         ..iOSBundleId = iOSBundleId
         ..androidPackageName = androidPackageName

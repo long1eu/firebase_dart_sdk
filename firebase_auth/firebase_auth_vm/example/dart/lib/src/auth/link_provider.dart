@@ -8,8 +8,11 @@ Future<AuthResult> _linkProvider(FirebaseAuthOption option) async {
   final FirebaseUser user = FirebaseAuth.instance.currentUser;
   await user.reload();
 
-  final List<String> providers = user.providerData.map((UserInfo userInfo) => userInfo.providerId).toList();
-  final List<FirebaseAuthOption> options = FirebaseAuthOption.credentialsValues.toList();
+  final List<String> providers = user.providerData
+      .map((UserInfo userInfo) => userInfo.providerId)
+      .toList();
+  final List<FirebaseAuthOption> options =
+      FirebaseAuthOption.credentialsValues.toList();
   for (String provider in providers) {
     switch (provider) {
       case ProviderType.password:
@@ -90,7 +93,8 @@ Future<AuthResult> _linkProvider(FirebaseAuthOption option) async {
 
     console //
       ..clearScreen()
-      ..println('You\'re account is now linked with ${providerId.bold.yellow.reset}.')
+      ..println(
+          'You\'re account is now linked with ${providerId.bold.yellow.reset}.')
       ..print('Press Enter to return.');
 
     await console.nextLine;

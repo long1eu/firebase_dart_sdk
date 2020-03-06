@@ -5,7 +5,8 @@
 part of firebase_auth_vm;
 
 abstract class SignInWithGameCenterRequest
-    implements Built<SignInWithGameCenterRequest, SignInWithGameCenterRequestBuilder> {
+    implements
+        Built<SignInWithGameCenterRequest, SignInWithGameCenterRequestBuilder> {
   factory SignInWithGameCenterRequest({
     @required String playerId,
     @required String publicKeyUrl,
@@ -16,14 +17,21 @@ abstract class SignInWithGameCenterRequest
     @required String displayName,
   }) {
     final String encodedSignature = signature != null
-        ? base64Encode(signature).replaceAll('/', '_').replaceAll('+', '-').replaceAll('=', '')
+        ? base64Encode(signature)
+            .replaceAll('/', '_')
+            .replaceAll('+', '-')
+            .replaceAll('=', '')
         : null;
 
     final String encodedSalt = signature != null //
-        ? base64Encode(salt).replaceAll('/', '_').replaceAll('+', '-').replaceAll('=', '')
+        ? base64Encode(salt)
+            .replaceAll('/', '_')
+            .replaceAll('+', '-')
+            .replaceAll('=', '')
         : null;
 
-    return _$SignInWithGameCenterRequest((SignInWithGameCenterRequestBuilder b) {
+    return _$SignInWithGameCenterRequest(
+        (SignInWithGameCenterRequestBuilder b) {
       b
         ..playerId = playerId
         ..publicKeyUrl = publicKeyUrl
@@ -68,11 +76,14 @@ abstract class SignInWithGameCenterRequest
 
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<SignInWithGameCenterRequest> get serializer => _$signInWithGameCenterRequestSerializer;
+  static Serializer<SignInWithGameCenterRequest> get serializer =>
+      _$signInWithGameCenterRequestSerializer;
 }
 
 abstract class SignInWithGameCenterResponse
-    implements Built<SignInWithGameCenterResponse, SignInWithGameCenterResponseBuilder> {
+    implements
+        Built<SignInWithGameCenterResponse,
+            SignInWithGameCenterResponseBuilder> {
   factory SignInWithGameCenterResponse() = _$SignInWithGameCenterResponse;
 
   factory SignInWithGameCenterResponse.fromJson(Map<dynamic, dynamic> json) =>
@@ -102,5 +113,6 @@ abstract class SignInWithGameCenterResponse
   /// The user's Game Center display name.
   String get displayName;
 
-  static Serializer<SignInWithGameCenterResponse> get serializer => _$signInWithGameCenterResponseSerializer;
+  static Serializer<SignInWithGameCenterResponse> get serializer =>
+      _$signInWithGameCenterResponseSerializer;
 }

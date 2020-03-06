@@ -39,7 +39,8 @@ class Console {
 
   Future<String> get nextLine {
     print(''.bold.cyan);
-    return Future<String>(() => stdin.readLineSync()).whenComplete(() => print(''.reset));
+    return Future<String>(() => stdin.readLineSync())
+        .whenComplete(() => print(''.reset));
   }
 
   void removeLastLine() {

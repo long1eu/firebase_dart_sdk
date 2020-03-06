@@ -8,7 +8,9 @@ Future<void> _unlinkProvider(FirebaseAuthOption option) async {
   final FirebaseUser user = FirebaseAuth.instance.currentUser;
   await user.reload();
 
-  final List<String> providers = user.providerData.map((UserInfo userInfo) => userInfo.providerId).toList();
+  final List<String> providers = user.providerData
+      .map((UserInfo userInfo) => userInfo.providerId)
+      .toList();
   final List<FirebaseAuthOption> options = <FirebaseAuthOption>[];
   for (String provider in providers) {
     switch (provider) {
@@ -81,7 +83,8 @@ Future<void> _unlinkProvider(FirebaseAuthOption option) async {
     await user.unlinkFromProvider(providerId);
     console //
       ..clearScreen()
-      ..println('You\'ve been unlink succesfuly from ${providerId.bold.yellow.reset}.')
+      ..println(
+          'You\'ve been unlink succesfuly from ${providerId.bold.yellow.reset}.')
       ..print('Press Enter to return.');
 
     await console.nextLine;

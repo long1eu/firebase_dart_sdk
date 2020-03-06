@@ -5,7 +5,8 @@
 part of firebase_auth_vm;
 
 /// Represents the parameters for the token endpoint.
-abstract class SecureTokenRequest implements Built<SecureTokenRequest, SecureTokenRequestBuilder> {
+abstract class SecureTokenRequest
+    implements Built<SecureTokenRequest, SecureTokenRequestBuilder> {
   factory SecureTokenRequest({
     @required SecureTokenGrantType grantType,
     String scope,
@@ -58,18 +59,21 @@ abstract class SecureTokenRequest implements Built<SecureTokenRequest, SecureTok
 
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<SecureTokenRequest> get serializer => _$secureTokenRequestSerializer;
+  static Serializer<SecureTokenRequest> get serializer =>
+      _$secureTokenRequestSerializer;
 }
 
 /// Represents the response from the token endpoint.
-abstract class SecureTokenResponse implements Built<SecureTokenResponse, SecureTokenResponseBuilder> {
+abstract class SecureTokenResponse
+    implements Built<SecureTokenResponse, SecureTokenResponseBuilder> {
   factory SecureTokenResponse() = _$SecureTokenResponse;
 
   factory SecureTokenResponse.fromJson(Map<dynamic, dynamic> json) {
     if (json.containsKey('expires_in')) {
       final int seconds = int.parse(json['expires_in']);
       final Duration duration = Duration(seconds: seconds);
-      json['expires_in'] = DateTime.now().toUtc().add(duration).microsecondsSinceEpoch;
+      json['expires_in'] =
+          DateTime.now().toUtc().add(duration).microsecondsSinceEpoch;
     }
 
     return serializers.deserializeWith(serializer, json);
@@ -97,7 +101,8 @@ abstract class SecureTokenResponse implements Built<SecureTokenResponse, SecureT
   @BuiltValueField(wireName: 'id_token')
   String get idToken;
 
-  static Serializer<SecureTokenResponse> get serializer => _$secureTokenResponseSerializer;
+  static Serializer<SecureTokenResponse> get serializer =>
+      _$secureTokenResponseSerializer;
 }
 
 /// Represents the possible grant types for a token request.
@@ -110,26 +115,37 @@ class SecureTokenGrantType {
   /// Indicates an authorization code request.
   ///
   /// Exchanges a Gitkit "ID Token" for an STS Access Token and Refresh Token.
-  static const SecureTokenGrantType authorizationCode = SecureTokenGrantType._(0, 'authorization_code');
+  static const SecureTokenGrantType authorizationCode =
+      SecureTokenGrantType._(0, 'authorization_code');
 
   /// Indicates an refresh token request.
   ///
   /// Uses an existing Refresh Token to create a new Access Token.
-  static const SecureTokenGrantType refreshToken = SecureTokenGrantType._(1, 'refresh_token');
+  static const SecureTokenGrantType refreshToken =
+      SecureTokenGrantType._(1, 'refresh_token');
 
-  static const List<SecureTokenGrantType> values = <SecureTokenGrantType>[authorizationCode, refreshToken];
+  static const List<SecureTokenGrantType> values = <SecureTokenGrantType>[
+    authorizationCode,
+    refreshToken
+  ];
 
-  static const List<String> _names = <String>['authorizationCode', 'refreshToken'];
+  static const List<String> _names = <String>[
+    'authorizationCode',
+    'refreshToken'
+  ];
 
-  static Serializer<SecureTokenGrantType> get serializer => _$secureTokenGrantTypeSerializer;
+  static Serializer<SecureTokenGrantType> get serializer =>
+      _$secureTokenGrantTypeSerializer;
 
   @override
   String toString() => 'SecureTokenGrantType.${_names[_i]}';
 }
 
-Serializer<SecureTokenGrantType> _$secureTokenGrantTypeSerializer = _SecureTokenGrantTypeSerializer();
+Serializer<SecureTokenGrantType> _$secureTokenGrantTypeSerializer =
+    _SecureTokenGrantTypeSerializer();
 
-class _SecureTokenGrantTypeSerializer extends PrimitiveSerializer<SecureTokenGrantType> {
+class _SecureTokenGrantTypeSerializer
+    extends PrimitiveSerializer<SecureTokenGrantType> {
   @override
   Iterable<Type> get types => BuiltList<Type>(<Type>[SecureTokenGrantType]);
 
@@ -139,7 +155,8 @@ class _SecureTokenGrantTypeSerializer extends PrimitiveSerializer<SecureTokenGra
   @override
   SecureTokenGrantType deserialize(Serializers serializers, Object serialized,
       {FullType specifiedType = FullType.unspecified}) {
-    return SecureTokenGrantType.values.firstWhere((SecureTokenGrantType it) => it._value == serialized);
+    return SecureTokenGrantType.values
+        .firstWhere((SecureTokenGrantType it) => it._value == serialized);
   }
 
   @override

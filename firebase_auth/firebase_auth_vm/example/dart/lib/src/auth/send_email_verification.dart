@@ -11,8 +11,8 @@ Future<bool> _sendEmailVerification(FirebaseAuthOption option) async {
   await user.sendEmailVerification();
   await progress.cancel();
 
-  final String oobCode =
-      await _actionCode('We just sent you an email with a link. Paste the link here to complete the verification.');
+  final String oobCode = await _actionCode(
+      'We just sent you an email with a link. Paste the link here to complete the verification.');
 
   progress = Progress('Validating code')..show();
   await FirebaseAuth.instance.applyActionCode(oobCode);

@@ -36,16 +36,20 @@ class ActionCodeOperation {
   final int _i;
 
   /// The action code type value for resetting password in the check action code response.
-  static const ActionCodeOperation passwordReset = ActionCodeOperation._(0, 'PASSWORD_RESET');
+  static const ActionCodeOperation passwordReset =
+      ActionCodeOperation._(0, 'PASSWORD_RESET');
 
   /// The action code type value for verifying email in the check action code response.
-  static const ActionCodeOperation verifyEmail = ActionCodeOperation._(1, 'VERIFY_EMAIL');
+  static const ActionCodeOperation verifyEmail =
+      ActionCodeOperation._(1, 'VERIFY_EMAIL');
 
   /// The action code type value for recovering email in the check action code response.
-  static const ActionCodeOperation recoverEmail = ActionCodeOperation._(2, 'RECOVER_EMAIL');
+  static const ActionCodeOperation recoverEmail =
+      ActionCodeOperation._(2, 'RECOVER_EMAIL');
 
   /// The action code type value for an email sign-in link in the check action code response.
-  static const ActionCodeOperation emailSignIn = ActionCodeOperation._(3, 'EMAIL_SIGNIN');
+  static const ActionCodeOperation emailSignIn =
+      ActionCodeOperation._(3, 'EMAIL_SIGNIN');
 
   static const List<ActionCodeOperation> values = <ActionCodeOperation>[
     passwordReset,

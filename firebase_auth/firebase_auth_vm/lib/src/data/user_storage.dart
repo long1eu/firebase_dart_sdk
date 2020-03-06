@@ -5,7 +5,8 @@
 part of firebase_auth_vm;
 
 class UserStorage {
-  const UserStorage({@required LocalStorage localStorage, @required String appName})
+  const UserStorage(
+      {@required LocalStorage localStorage, @required String appName})
       : assert(localStorage != null),
         assert(appName != null),
         _localStorage = localStorage,
@@ -16,7 +17,8 @@ class UserStorage {
 
   void save(FirebaseUser user) {
     if (user != null) {
-      final Map<String, dynamic> data = serializers.serializeWith(FirebaseUser.serializer, user);
+      final Map<String, dynamic> data =
+          serializers.serializeWith(FirebaseUser.serializer, user);
       _localStorage.set(_userKey, jsonEncode(data));
     } else {
       _localStorage.set(_userKey, null);
@@ -29,7 +31,10 @@ class UserStorage {
       return null;
     }
 
-    final Map<String, dynamic> data = <String, dynamic>{...jsonDecode(json), 'auth': auth};
+    final Map<String, dynamic> data = <String, dynamic>{
+      ...jsonDecode(json),
+      'auth': auth
+    };
     return serializers.deserializeWith(FirebaseUser.serializer, data);
   }
 

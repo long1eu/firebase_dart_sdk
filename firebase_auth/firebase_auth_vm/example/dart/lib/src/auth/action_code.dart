@@ -13,7 +13,9 @@ Future<String> _actionCodeLink(String question) async {
         return 'You need to peste the link you got in your email';
       } else if (Uri.tryParse(response) == null) {
         return 'This doesn\'t look like a link. You need to peste the link you got in your email';
-      } else if (!Uri.tryParse(response).queryParameters.containsKey('oobCode')) {
+      } else if (!Uri.tryParse(response)
+          .queryParameters
+          .containsKey('oobCode')) {
         return 'This link doesn\'t look right. You need to peste the link you got in your email';
       } else {
         return null;
@@ -24,7 +26,8 @@ Future<String> _actionCodeLink(String question) async {
   final String oobCode = Uri.parse(url).queryParameters['oobCode'];
 
   final Progress progress = Progress('Checking code')..show();
-  final ActionCodeInfo value = await FirebaseAuth.instance.checkActionCode(oobCode);
+  final ActionCodeInfo value =
+      await FirebaseAuth.instance.checkActionCode(oobCode);
   await progress.cancel();
   _printActionCodeInfo(value);
   return url;

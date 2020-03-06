@@ -37,7 +37,8 @@ class MultipleStringOption extends Option<List<String>> {
 
   @override
   void onAnswer(String response) {
-    if (unlimitedFields && response.isNotEmpty || _result.length < _fieldsCount - 1) {
+    if (unlimitedFields && response.isNotEmpty ||
+        _result.length < _fieldsCount - 1) {
       _result.add(response);
       askQuestion();
     } else {

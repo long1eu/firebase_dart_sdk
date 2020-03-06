@@ -20,15 +20,17 @@ Future<AuthResult> _sendSignInWithEmailLink(FirebaseAuthOption option) async {
   final String email = await option.show();
   console.println();
   Progress progress = Progress('Sending email')..show();
-  await FirebaseAuth.instance.sendSignInWithEmailLink(email: email, settings: ActionCodeSettings());
+  await FirebaseAuth.instance
+      .sendSignInWithEmailLink(email: email, settings: ActionCodeSettings());
   await progress.cancel();
 
-  final String link =
-      await _actionCodeLink('We just sent you an email with a link. Paste the link here to complete the verification.');
+  final String link = await _actionCodeLink(
+      'We just sent you an email with a link. Paste the link here to complete the verification.');
 
   console.println();
   progress = Progress('Siging in')..show();
-  final AuthResult result = await FirebaseAuth.instance.signInWithEmailAndLink(email: email, link: link);
+  final AuthResult result = await FirebaseAuth.instance
+      .signInWithEmailAndLink(email: email, link: link);
   await progress.cancel();
   console.clearScreen();
   return result;

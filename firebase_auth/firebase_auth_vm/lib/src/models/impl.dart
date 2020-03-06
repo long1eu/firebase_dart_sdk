@@ -6,31 +6,38 @@ part of firebase_auth_vm;
 
 abstract class EmailPasswordAuthCredentialImpl
     implements
-        Built<EmailPasswordAuthCredentialImpl, EmailPasswordAuthCredentialImplBuilder>,
+        Built<EmailPasswordAuthCredentialImpl,
+            EmailPasswordAuthCredentialImplBuilder>,
         EmailPasswordAuthCredential {
   factory EmailPasswordAuthCredentialImpl() = _$EmailPasswordAuthCredentialImpl;
 
   EmailPasswordAuthCredentialImpl._();
 
   @override
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
-    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a EmailPasswordAuthCredential.');
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    throw FirebaseAuthError('NOT_IMPLEMENTED',
+        'You should not use the postBody of a EmailPasswordAuthCredential.');
   }
 
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<EmailPasswordAuthCredentialImpl> get serializer => _$emailPasswordAuthCredentialImplSerializer;
+  static Serializer<EmailPasswordAuthCredentialImpl> get serializer =>
+      _$emailPasswordAuthCredentialImplSerializer;
 }
 
 abstract class FacebookAuthCredentialImpl
-    implements Built<FacebookAuthCredentialImpl, FacebookAuthCredentialImplBuilder>, FacebookAuthCredential {
+    implements
+        Built<FacebookAuthCredentialImpl, FacebookAuthCredentialImplBuilder>,
+        FacebookAuthCredential {
   factory FacebookAuthCredentialImpl() = _$FacebookAuthCredentialImpl;
 
   FacebookAuthCredentialImpl._();
 
   @override
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
       ..postBody = 'providerId=$providerId&access_token=$accessToken'
       ..requestUri = 'http://localhost';
@@ -39,34 +46,44 @@ abstract class FacebookAuthCredentialImpl
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<FacebookAuthCredentialImpl> get serializer => _$facebookAuthCredentialImplSerializer;
+  static Serializer<FacebookAuthCredentialImpl> get serializer =>
+      _$facebookAuthCredentialImplSerializer;
 }
 
 abstract class GameCenterAuthCredentialImpl
-    implements Built<GameCenterAuthCredentialImpl, GameCenterAuthCredentialImplBuilder>, GameCenterAuthCredential {
+    implements
+        Built<GameCenterAuthCredentialImpl,
+            GameCenterAuthCredentialImplBuilder>,
+        GameCenterAuthCredential {
   factory GameCenterAuthCredentialImpl() = _$GameCenterAuthCredentialImpl;
 
   GameCenterAuthCredentialImpl._();
 
   @override
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
-    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a GameCenterAuthCredential.');
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    throw FirebaseAuthError('NOT_IMPLEMENTED',
+        'You should not use the postBody of a GameCenterAuthCredential.');
   }
 
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<GameCenterAuthCredentialImpl> get serializer => _$gameCenterAuthCredentialImplSerializer;
+  static Serializer<GameCenterAuthCredentialImpl> get serializer =>
+      _$gameCenterAuthCredentialImplSerializer;
 }
 
 abstract class GithubAuthCredentialImpl
-    implements Built<GithubAuthCredentialImpl, GithubAuthCredentialImplBuilder>, GithubAuthCredential {
+    implements
+        Built<GithubAuthCredentialImpl, GithubAuthCredentialImplBuilder>,
+        GithubAuthCredential {
   factory GithubAuthCredentialImpl() = _$GithubAuthCredentialImpl;
 
   GithubAuthCredentialImpl._();
 
   @override
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
       ..postBody = 'providerId=$providerId&access_token=$token'
       ..requestUri = 'http://localhost';
@@ -75,35 +92,45 @@ abstract class GithubAuthCredentialImpl
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<GithubAuthCredentialImpl> get serializer => _$githubAuthCredentialImplSerializer;
+  static Serializer<GithubAuthCredentialImpl> get serializer =>
+      _$githubAuthCredentialImplSerializer;
 }
 
 abstract class GoogleAuthCredentialImpl
-    implements Built<GoogleAuthCredentialImpl, GoogleAuthCredentialImplBuilder>, GoogleAuthCredential {
+    implements
+        Built<GoogleAuthCredentialImpl, GoogleAuthCredentialImplBuilder>,
+        GoogleAuthCredential {
   factory GoogleAuthCredentialImpl() = _$GoogleAuthCredentialImpl;
 
   GoogleAuthCredentialImpl._();
 
   @override
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'providerId=$providerId&id_token=$idToken&access_token=$accessToken'
+      ..postBody =
+          'providerId=$providerId&id_token=$idToken&access_token=$accessToken'
       ..requestUri = 'http://localhost';
   }
 
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<GoogleAuthCredentialImpl> get serializer => _$googleAuthCredentialImplSerializer;
+  static Serializer<GoogleAuthCredentialImpl> get serializer =>
+      _$googleAuthCredentialImplSerializer;
 }
 
-abstract class OAuthCredentialImpl implements Built<OAuthCredentialImpl, OAuthCredentialImplBuilder>, OAuthCredential {
+abstract class OAuthCredentialImpl
+    implements
+        Built<OAuthCredentialImpl, OAuthCredentialImplBuilder>,
+        OAuthCredential {
   factory OAuthCredentialImpl() = _$OAuthCredentialImpl;
 
   OAuthCredentialImpl._();
 
   @override
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     final Map<String, String> fields = <String, String>{
       if (customParameters != null) ...customParameters.asMap(),
       if (scopes != null && scopes.isNotEmpty) 'scope': scopes.join(' '),
@@ -114,7 +141,8 @@ abstract class OAuthCredentialImpl implements Built<OAuthCredentialImpl, OAuthCr
     };
 
     request
-      ..postBody = fields.keys.map((String key) => '$key=${fields[key]}').join('&')
+      ..postBody =
+          fields.keys.map((String key) => '$key=${fields[key]}').join('&')
       ..requestUri = requestUri ?? 'http://localhost'
       ..sessionId = sessionId
       ..pendingIdToken = pendingToken;
@@ -123,17 +151,21 @@ abstract class OAuthCredentialImpl implements Built<OAuthCredentialImpl, OAuthCr
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<OAuthCredentialImpl> get serializer => _$oAuthCredentialImplSerializer;
+  static Serializer<OAuthCredentialImpl> get serializer =>
+      _$oAuthCredentialImplSerializer;
 }
 
 abstract class SamlAuthCredentialImpl
-    implements Built<SamlAuthCredentialImpl, SamlAuthCredentialImplBuilder>, SamlAuthCredential {
+    implements
+        Built<SamlAuthCredentialImpl, SamlAuthCredentialImplBuilder>,
+        SamlAuthCredential {
   factory SamlAuthCredentialImpl() = _$SamlAuthCredentialImpl;
 
   SamlAuthCredentialImpl._();
 
   @override
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
       ..requestUri = 'http://localhost'
       ..pendingIdToken = pendingToken;
@@ -142,47 +174,60 @@ abstract class SamlAuthCredentialImpl
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<SamlAuthCredentialImpl> get serializer => _$samlAuthCredentialImplSerializer;
+  static Serializer<SamlAuthCredentialImpl> get serializer =>
+      _$samlAuthCredentialImplSerializer;
 }
 
 abstract class PhoneAuthCredentialImpl
-    implements Built<PhoneAuthCredentialImpl, PhoneAuthCredentialImplBuilder>, PhoneAuthCredential {
+    implements
+        Built<PhoneAuthCredentialImpl, PhoneAuthCredentialImplBuilder>,
+        PhoneAuthCredential {
   factory PhoneAuthCredentialImpl() = _$PhoneAuthCredentialImpl;
 
   PhoneAuthCredentialImpl._();
 
   @override
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
-    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a PhoneAuthCredential.');
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    throw FirebaseAuthError('NOT_IMPLEMENTED',
+        'You should not use the postBody of a PhoneAuthCredential.');
   }
 
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<PhoneAuthCredentialImpl> get serializer => _$phoneAuthCredentialImplSerializer;
+  static Serializer<PhoneAuthCredentialImpl> get serializer =>
+      _$phoneAuthCredentialImplSerializer;
 }
 
 abstract class TwitterAuthCredentialImpl
-    implements Built<TwitterAuthCredentialImpl, TwitterAuthCredentialImplBuilder>, TwitterAuthCredential {
+    implements
+        Built<TwitterAuthCredentialImpl, TwitterAuthCredentialImplBuilder>,
+        TwitterAuthCredential {
   factory TwitterAuthCredentialImpl() = _$TwitterAuthCredentialImpl;
 
   TwitterAuthCredentialImpl._();
 
   @override
-  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+  void prepareVerifyAssertionRequest(
+      IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
     request
-      ..postBody = 'providerId=$providerId&access_token=$authToken&oauth_token_secret=$authTokenSecret'
+      ..postBody =
+          'providerId=$providerId&access_token=$authToken&oauth_token_secret=$authTokenSecret'
       ..requestUri = 'http://localhost';
   }
 
   @override
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<TwitterAuthCredentialImpl> get serializer => _$twitterAuthCredentialImplSerializer;
+  static Serializer<TwitterAuthCredentialImpl> get serializer =>
+      _$twitterAuthCredentialImplSerializer;
 }
 
 abstract class AdditionalUserInfoImpl
-    implements Built<AdditionalUserInfoImpl, AdditionalUserInfoImplBuilder>, AdditionalUserInfo {
+    implements
+        Built<AdditionalUserInfoImpl, AdditionalUserInfoImplBuilder>,
+        AdditionalUserInfo {
   factory AdditionalUserInfoImpl({
     String providerId,
     Map<String, dynamic> profile,
@@ -210,26 +255,33 @@ abstract class AdditionalUserInfoImpl
   }
 
   factory AdditionalUserInfoImpl.newAnonymous() {
-    return _$AdditionalUserInfoImpl((AdditionalUserInfoImplBuilder b) => b.isNewUser = true);
+    return _$AdditionalUserInfoImpl(
+        (AdditionalUserInfoImplBuilder b) => b.isNewUser = true);
   }
 
-  factory AdditionalUserInfoImpl.fromVerifyAssertionResponse(VerifyAssertionResponse response) {
+  factory AdditionalUserInfoImpl.fromVerifyAssertionResponse(
+      VerifyAssertionResponse response) {
     return AdditionalUserInfoImpl(
       providerId: response.providerId,
-      profile: response.rawUserInfo != null ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo)) : null,
+      profile: response.rawUserInfo != null
+          ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo))
+          : null,
       username: response.screenName,
       isNewUser: response.isNewUser ?? false,
     );
   }
 
-  factory AdditionalUserInfoImpl.fromJson(Map<dynamic, dynamic> json) => serializers.deserializeWith(serializer, json);
+  factory AdditionalUserInfoImpl.fromJson(Map<dynamic, dynamic> json) =>
+      serializers.deserializeWith(serializer, json);
 
   AdditionalUserInfoImpl._();
 
-  static Serializer<AdditionalUserInfoImpl> get serializer => _$additionalUserInfoImplSerializer;
+  static Serializer<AdditionalUserInfoImpl> get serializer =>
+      _$additionalUserInfoImplSerializer;
 }
 
-abstract class UserInfoImpl implements Built<UserInfoImpl, UserInfoImplBuilder>, UserInfo {
+abstract class UserInfoImpl
+    implements Built<UserInfoImpl, UserInfoImplBuilder>, UserInfo {
   factory UserInfoImpl({
     String uid,
     String providerId,
@@ -251,7 +303,8 @@ abstract class UserInfoImpl implements Built<UserInfoImpl, UserInfoImplBuilder>,
     });
   }
 
-  factory UserInfoImpl.fromJson(Map<dynamic, dynamic> json) => serializers.deserializeWith(serializer, json);
+  factory UserInfoImpl.fromJson(Map<dynamic, dynamic> json) =>
+      serializers.deserializeWith(serializer, json);
 
   UserInfoImpl._();
 
@@ -281,7 +334,8 @@ abstract class UserInfoImpl implements Built<UserInfoImpl, UserInfoImplBuilder>,
   static Serializer<UserInfoImpl> get serializer => _$userInfoImplSerializer;
 }
 
-abstract class UserMetadataImpl implements Built<UserMetadataImpl, UserMetadataImplBuilder>, UserMetadata {
+abstract class UserMetadataImpl
+    implements Built<UserMetadataImpl, UserMetadataImplBuilder>, UserMetadata {
   factory UserMetadataImpl({
     @required DateTime lastSignInDate,
     @required DateTime creationDate,
@@ -293,13 +347,15 @@ abstract class UserMetadataImpl implements Built<UserMetadataImpl, UserMetadataI
     });
   }
 
-  factory UserMetadataImpl.fromJson(Map<dynamic, dynamic> json) => serializers.deserializeWith(serializer, json);
+  factory UserMetadataImpl.fromJson(Map<dynamic, dynamic> json) =>
+      serializers.deserializeWith(serializer, json);
 
   UserMetadataImpl._();
 
   Map<String, dynamic> get json => serializers.serializeWith(serializer, this);
 
-  static Serializer<UserMetadataImpl> get serializer => _$userMetadataImplSerializer;
+  static Serializer<UserMetadataImpl> get serializer =>
+      _$userMetadataImplSerializer;
 }
 
 _$FirebaseUserSerializer _$firebaseUserSerializer = _$FirebaseUserSerializer();
@@ -317,9 +373,11 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       'uid',
       serializers.serialize(object.uid, specifiedType: const FullType(String)),
       'isAnonymous',
-      serializers.serialize(object.isAnonymous, specifiedType: const FullType(bool)),
+      serializers.serialize(object.isAnonymous,
+          specifiedType: const FullType(bool)),
       'hasEmailPasswordCredential',
-      serializers.serialize(object._hasEmailPasswordCredential, specifiedType: const FullType(bool)),
+      serializers.serialize(object._hasEmailPasswordCredential,
+          specifiedType: const FullType(bool)),
       'providerData',
       serializers.serialize(
         BuiltMap<String, UserInfoImpl>(object._providerData),
@@ -329,23 +387,32 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
         ),
       ),
       'email',
-      serializers.serialize(object.email, specifiedType: const FullType(String)),
+      serializers.serialize(object.email,
+          specifiedType: const FullType(String)),
       'phoneNumber',
-      serializers.serialize(object.phoneNumber, specifiedType: const FullType(String)),
+      serializers.serialize(object.phoneNumber,
+          specifiedType: const FullType(String)),
       'isEmailVerified',
-      serializers.serialize(object.isEmailVerified, specifiedType: const FullType(bool)),
+      serializers.serialize(object.isEmailVerified,
+          specifiedType: const FullType(bool)),
       'photoUrl',
-      serializers.serialize(object.photoUrl, specifiedType: const FullType(String)),
+      serializers.serialize(object.photoUrl,
+          specifiedType: const FullType(String)),
       'displayName',
-      serializers.serialize(object.displayName, specifiedType: const FullType(String)),
+      serializers.serialize(object.displayName,
+          specifiedType: const FullType(String)),
       'metadata',
-      serializers.serialize(object.metadata, specifiedType: const FullType(UserMetadataImpl)),
+      serializers.serialize(object.metadata,
+          specifiedType: const FullType(UserMetadataImpl)),
       'accessToken',
-      serializers.serialize(object._secureTokenApi._accessToken, specifiedType: const FullType(String)),
+      serializers.serialize(object._secureTokenApi._accessToken,
+          specifiedType: const FullType(String)),
       'accessTokenExpirationDate',
-      serializers.serialize(object._secureTokenApi._accessTokenExpirationDate, specifiedType: const FullType(DateTime)),
+      serializers.serialize(object._secureTokenApi._accessTokenExpirationDate,
+          specifiedType: const FullType(DateTime)),
       'refreshToken',
-      serializers.serialize(object._secureTokenApi._refreshToken, specifiedType: const FullType(String)),
+      serializers.serialize(object._secureTokenApi._refreshToken,
+          specifiedType: const FullType(String)),
     ];
   }
 
@@ -374,48 +441,61 @@ class _$FirebaseUserSerializer implements StructuredSerializer<FirebaseUser> {
       final dynamic value = iterator.current;
       switch (key) {
         case 'uid':
-          uid = serializers.deserialize(value, specifiedType: const FullType(String));
+          uid = serializers.deserialize(value,
+              specifiedType: const FullType(String));
           break;
         case 'isAnonymous':
-          isAnonymous = serializers.deserialize(value, specifiedType: const FullType(bool));
+          isAnonymous = serializers.deserialize(value,
+              specifiedType: const FullType(bool));
           break;
         case 'hasEmailPasswordCredential':
-          hasEmailPasswordCredential = serializers.deserialize(value, specifiedType: const FullType(bool));
+          hasEmailPasswordCredential = serializers.deserialize(value,
+              specifiedType: const FullType(bool));
           break;
         case 'providerData':
-          final BuiltMap<String, UserInfoImpl> _info = serializers.deserialize(value,
-              specifiedType: const FullType(
-                BuiltMap,
-                <FullType>[FullType(String), FullType(UserInfoImpl)],
-              ));
+          final BuiltMap<String, UserInfoImpl> _info =
+              serializers.deserialize(value,
+                  specifiedType: const FullType(
+                    BuiltMap,
+                    <FullType>[FullType(String), FullType(UserInfoImpl)],
+                  ));
           providerUserInfo = _info.asMap();
           break;
         case 'email':
-          email = serializers.deserialize(value, specifiedType: const FullType(String));
+          email = serializers.deserialize(value,
+              specifiedType: const FullType(String));
           break;
         case 'phoneNumber':
-          phoneNumber = serializers.deserialize(value, specifiedType: const FullType(String));
+          phoneNumber = serializers.deserialize(value,
+              specifiedType: const FullType(String));
           break;
         case 'isEmailVerified':
-          isEmailVerified = serializers.deserialize(value, specifiedType: const FullType(bool));
+          isEmailVerified = serializers.deserialize(value,
+              specifiedType: const FullType(bool));
           break;
         case 'photoUrl':
-          photoUrl = serializers.deserialize(value, specifiedType: const FullType(String));
+          photoUrl = serializers.deserialize(value,
+              specifiedType: const FullType(String));
           break;
         case 'displayName':
-          displayName = serializers.deserialize(value, specifiedType: const FullType(String));
+          displayName = serializers.deserialize(value,
+              specifiedType: const FullType(String));
           break;
         case 'metadata':
-          metadata = serializers.deserialize(value, specifiedType: const FullType(UserMetadataImpl));
+          metadata = serializers.deserialize(value,
+              specifiedType: const FullType(UserMetadataImpl));
           break;
         case 'accessToken':
-          accessToken = serializers.deserialize(value, specifiedType: const FullType(String));
+          accessToken = serializers.deserialize(value,
+              specifiedType: const FullType(String));
           break;
         case 'accessTokenExpirationDate':
-          accessTokenExpirationDate = serializers.deserialize(value, specifiedType: const FullType(DateTime));
+          accessTokenExpirationDate = serializers.deserialize(value,
+              specifiedType: const FullType(DateTime));
           break;
         case 'refreshToken':
-          refreshToken = serializers.deserialize(value, specifiedType: const FullType(String));
+          refreshToken = serializers.deserialize(value,
+              specifiedType: const FullType(String));
           break;
         case 'auth':
           auth = value;
