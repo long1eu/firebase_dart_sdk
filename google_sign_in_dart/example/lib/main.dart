@@ -12,7 +12,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
 import 'package:http/http.dart' as http;
 
-export 'platform_js.dart' if (dart.library.io) 'platform_io.dart';
+import 'platform_js.dart' if (dart.library.io) 'platform_io.dart';
 
 GoogleSignIn _googleSignIn = GoogleSignIn(
   scopes: <String>[

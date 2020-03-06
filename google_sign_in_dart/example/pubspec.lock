@@ -59,7 +59,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.0.4"
+    version: "0.0.4+1"
   google_sign_in_platform_interface:
     dependency: transitive
     description:

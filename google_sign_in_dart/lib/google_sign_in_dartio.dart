@@ -125,6 +125,8 @@ class GoogleSignInPlatform extends platform.GoogleSignInPlatform {
 
     if (scopes == null || scopes.isEmpty) {
       _scopes = const <String>['openid', 'email', 'profile'];
+    } else {
+      _scopes = scopes;
     }
     _hostedDomain = hostedDomain;
     _initFromStore();
