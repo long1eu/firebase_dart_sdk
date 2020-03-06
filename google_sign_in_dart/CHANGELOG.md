@@ -1,3 +1,15 @@
+## 0.0.4+1
+
+* fix logic bug 
+
+## 0.0.4
+
+* add default scopes `openid`, `email`, `profile` 
+
+## 0.0.3
+
+* remove `isDesktop` 
+
 ## 0.0.2+1
 
 * update readme 

@@ -17,16 +17,10 @@ import 'package:meta/meta.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-export 'src/platform_js.dart' if (dart.library.io) 'src/platform_io.dart';
-
 part 'src/code_exchange_sing_in.dart';
-
 part 'src/common.dart';
-
 part 'src/crypto.dart';
-
 part 'src/data_storage.dart';
-
 part 'src/token_sign_in.dart';
 
 /// Signature used by the [_codeExchangeSignIn] to allow opening a browser window
@@ -129,7 +123,9 @@ class GoogleSignInPlatform extends platform.GoogleSignInPlatform {
         'Check https://developers.google.com/identity/protocols/googlescopes '
         'for a list of valid OAuth 2.0 scopes.');
 
-    _scopes = scopes;
+    if (scopes == null || scopes.isEmpty) {
+      _scopes = const <String>['openid', 'email', 'profile'];
+    }
     _hostedDomain = hostedDomain;
     _initFromStore();
   }
