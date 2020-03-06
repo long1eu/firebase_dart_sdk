@@ -57,7 +57,7 @@ class DataStorage {
   /// Saves the token that you can use to obtain a new access token.
   ///
   /// Refresh tokens are present if you provided a
-  /// [GoogleSignInPlatform._exchangeEndpoint] value and are valid until the
+  /// [GoogleSignInDart._exchangeEndpoint] value and are valid until the
   /// user revokes access.
   String get refreshToken => _store.get(_getKey(_kRefreshTokenKey));
 

@@ -43,8 +43,8 @@ abstract class Store {
 }
 
 /// Implementation of the google_sign_in plugin in pure dart.
-class GoogleSignInPlatform extends platform.GoogleSignInPlatform {
-  GoogleSignInPlatform._({
+class GoogleSignInDart extends platform.GoogleSignInPlatform {
+  GoogleSignInDart._({
     @required DataStorage storage,
     @required String clientId,
     @required UrlPresenter presenter,
@@ -63,7 +63,7 @@ class GoogleSignInPlatform extends platform.GoogleSignInPlatform {
   /// Your application should provide a [storage] implementation that can store
   /// the tokens is a secure, long-lived location that is accessible between
   /// different invocations of your application.
-  /// see [GoogleSignInPlatform.presenter]
+  /// see [GoogleSignInDart.presenter]
   static Future<void> register({
     @required String clientId,
     String exchangeEndpoint,
@@ -88,7 +88,7 @@ class GoogleSignInPlatform extends platform.GoogleSignInPlatform {
       storage.refreshToken = null;
     }
 
-    platform.GoogleSignInPlatform.instance = GoogleSignInPlatform._(
+    platform.GoogleSignInPlatform.instance = GoogleSignInDart._(
       presenter: presenter,
       storage: storage,
       exchangeEndpoint: exchangeEndpoint,

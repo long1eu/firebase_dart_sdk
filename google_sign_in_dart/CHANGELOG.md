@@ -1,3 +1,7 @@
+## 0.0.6
+
+* changed the name from `GoogleSignInPlatform` to `GoogleSignInDart` to match other packages
+
 ## 0.0.5
 
 * fix passing the scopes when present 
