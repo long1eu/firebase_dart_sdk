@@ -7,6 +7,7 @@
 import 'dart:async';
 import 'dart:convert' show json;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
@@ -126,12 +127,16 @@ class SignInDemoState extends State<SignInDemo> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: <Widget>[
           ListTile(
-            leading: ClipOval(
-              child: Image.network(
-                _currentUser.photoUrl ??
-                    'https://lh3.googleusercontent.com/a/default-user=s160-c',
-              ),
-            ),
+            leading: kIsWeb
+                ? GoogleUserCircleAvatar(
+                    identity: _currentUser,
+                  )
+                : ClipOval(
+                    child: Image.network(
+                      _currentUser.photoUrl ??
+                          'https://lh3.googleusercontent.com/a/default-user=s160-c',
+                    ),
+                  ),
             title: Text(_currentUser.displayName ?? ''),
             subtitle: Text(_currentUser.email ?? ''),
           ),

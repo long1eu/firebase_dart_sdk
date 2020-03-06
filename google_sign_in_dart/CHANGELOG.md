@@ -1,3 +1,7 @@
+## 0.0.5
+
+* fix passing the scopes when present 
+
 ## 0.0.4+1
 
 * fix logic bug 
