@@ -20,7 +20,7 @@ Future<void> createAndroidApp({
   assert(sha1 != null && sha1.isNotEmpty);
   assert(sha256 != null && sha256.isNotEmpty);
 
-  final AndroidAppConfig config = await _addAppToFirebase(
+  final AndroidAppConfig config = await _addAndroidAppToFirebase(
     name: name,
     package: package,
     sha1: sha1,
@@ -37,7 +37,7 @@ Future<void> createAndroidApp({
   _addGoogleServicesPlugin(appDir);
 }
 
-Future<AndroidAppConfig> _addAppToFirebase({
+Future<AndroidAppConfig> _addAndroidAppToFirebase({
   @required String name,
   @required String package,
   @required String sha1,

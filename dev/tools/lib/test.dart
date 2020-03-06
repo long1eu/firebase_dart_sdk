@@ -2,76 +2,84 @@
 // Lung Razvan <long1eu>
 // on 06/03/2020
 
+import 'package:html/dom.dart';
+import 'package:html/parser.dart';
+
 void main() {
-  final String result = test.replaceFirstMapped(
-      RegExp('\nandroid \{\n'),
-      (Match match) =>
-          'apply plugin: \'com.google.gms.google-services\'\n${match.group(0)}');
+  final Document document = HtmlParser(htmlFile).parse();
 
-  print(result);
+  final data = document.head.children.map((e) => e.localName).toList();
+
+  /*
+      <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-analytics.js"></script>
+  * */
+
+  document.head
+    ..append(document.createElement('script')
+      ..attributes['src'] =
+          'https://www.gstatic.com/firebasejs/7.10.0/firebase-app.js')
+    ..append(document.createElement('script')
+      ..attributes['src'] =
+          'https://www.gstatic.com/firebasejs/7.10.0/firebase-auth.js')
+    ..append(document.createElement('script')
+      ..attributes['src'] =
+          'https://www.gstatic.com/firebasejs/7.10.0/firebase-analytics.js')
+    ..append(
+      document.createElement('script')
+        ..innerHtml = '''// Your web app's Firebase configuration
+        firebase.initializeApp({
+            "projectId": "flutter-sdk",
+            "appId": "1:233259864964:web:bd97f4f6e4f7d0ecd583d1",
+            "databaseURL": "https://flutter-sdk.firebaseio.com",
+            "storageBucket": "flutter-sdk.appspot.com",
+            "locationId": "us-central",
+            "apiKey": "AIzaSyDsSL36xeTPP-JdGZBdadhEm2bxNpMqlUQ",
+            "authDomain": "flutter-sdk.firebaseapp.com",
+            "messagingSenderId": "233259864964",
+            "measurementId": "G-H63SWQMHFL"
+        });
+        firebase.analytics();''',
+    );
+
+
+  print(document.outerHtml);
 }
 
-const String test = '''def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
+const String htmlFile = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+    <meta name="description" content="A new Flutter project.">
+
+    <!-- iOS meta tags & icons -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="firebase_auth_dart_example">
+    <link rel="apple-touch-icon" href="/icons/Icon-192.png">
+
+    <!-- Favicon -->
+    <link rel="shortcut icon" type="image/png" href="/favicon.png"/>
+
+    <title>firebase_auth_dart_example</title>
+    <meta name="google-signin-client_id"
+          content="233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com"/>
+    <link rel="manifest" href="/manifest.json">
+</head>
+<body>
+<!-- This script installs service_worker.js to provide PWA functionality to
+     application. For more information, see:
+     https://developers.google.com/web/fundamentals/primers/service-workers -->
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/flutter_service_worker.js');
+        });
     }
-}
-
-def flutterRoot = localProperties.getProperty('flutter.sdk')
-if (flutterRoot == null) {
-    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
-}
-
-def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
-if (flutterVersionCode == null) {
-    flutterVersionCode = '1'
-}
-
-def flutterVersionName = localProperties.getProperty('flutter.versionName')
-if (flutterVersionName == null) {
-    flutterVersionName = '1.0'
-}
-
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "\$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
-
-android {
-    compileSdkVersion 28
-
-    sourceSets {
-        main.java.srcDirs += 'src/main/kotlin'
-    }
-
-    lintOptions {
-        disable 'InvalidPackage'
-    }
-
-    defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId "eu.long1.firebase_auth_dart_example"
-        minSdkVersion 16
-        targetSdkVersion 28
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
-    }
-
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig signingConfigs.debug
-        }
-    }
-}
-
-flutter {
-    source '../..'
-}
-
-dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:\$kotlin_version"
-}
+</script>
+<script src="main.dart.js" type="application/javascript"></script>
+</body>
+</html>
 ''';

@@ -1,13 +1,16 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 06/03/2020
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:googleapis_beta/firebase/v1beta1.dart';
 import 'package:meta/meta.dart';
 import 'package:strings/strings.dart';
-
+import 'package:tools/run_command.dart';
+import 'package:html/parser.dart';
+import 'package:html/dom.dart';
 part 'android.dart';
 
 part 'ios.dart';
@@ -43,15 +46,15 @@ Future<void> addAppToFirebase({
   final String androidPackage = '$org.$exampleAppModule';
   final String iosPackage = '$org.${camelize(exampleAppModule, true)}';
 
-  await createAndroidApp(
+  /*await createAndroidApp(
     path: path,
     name: displayName,
     package: androidPackage,
     sha1: sha1,
     sha256: sha256,
     googleServiceVersion: '4.3.3',
-  );
-  await createIosApp(name: displayName, bundleId: iosPackage);
+  );*/
+  // await createIosApp(path: path, name: displayName, bundleId: iosPackage);
   await createWebApp(displayName: displayName);
 }
 

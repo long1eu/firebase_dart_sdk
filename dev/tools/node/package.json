@@ -4,9 +4,6 @@
     "lint": "tslint --project tsconfig.json",
     "build": "tsc"
   },
-  "engines": {
-    "node": "8"
-  },
   "main": "lib/index.js",
   "dependencies": {
     "xcode": "^2.1.0",

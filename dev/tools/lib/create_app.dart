@@ -27,11 +27,11 @@ Future<void> main(List<String> args) async {
       '0a12de1044e0623060576916742bd8cadb80a9c9be38303cf86c932c865fcb2e';
 
   await createPackage(description, org, name, path);
-  /*await addAppToFirebase(
+  await addAppToFirebase(
     path: path,
     displayName: name,
     org: org,
     sha1: sha1,
     sha256: sha256,
-  );*/
+  );
 }
