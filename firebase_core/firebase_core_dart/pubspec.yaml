@@ -1,7 +1,7 @@
 name: firebase_core_dart
 description: Dart implementation of firebase_core using firebase_core_vm
 version: 0.0.1
-homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
+homepage: https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/firebase_core/firebase_core_dart
 
 environment:
   sdk: ">=2.7.0 <3.0.0"

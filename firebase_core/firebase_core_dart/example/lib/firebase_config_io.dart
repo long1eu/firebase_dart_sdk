@@ -22,16 +22,16 @@ FirebaseOptions get firebaseOptions {
     assert(isMobile);
     return FirebaseOptions(
       apiKey: Platform.isIOS
-          ? 'AIzaSyAA9H5zYPCBfj0xfohHaaKsZg3QM7yNQ3s'
-          : 'AIzaSyAwQpoxEEkD3boOaDjR8BcQbTq5cPIZdM4',
-      bundleID: 'eu.long1.FirebaseCoreDartExample',
+          ? 'AIzaSyBguTk4w2Xk2LD0mSdB2Pi9LTtt5BeAE6U'
+          : 'AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg',
+      bundleID: 'eu.long1.firebaseCoreDartExample',
       androidClientID:
-          '233259864964-dd2qk2ite8qpf8vh8f3v10trocu0nojp.apps.googleusercontent.com',
+          '233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com',
       clientID:
-          '233259864964-ok8fnltaunhabf0jvcbfjk2fhdp7j578.apps.googleusercontent.com',
+          '233259864964-6agjde1utg6tml9bbe3uag4ppq8ogkb1.apps.googleusercontent.com',
       googleAppID: Platform.isIOS
-          ? '1:233259864964:ios:8b858d19153dd6aed583d1'
-          : '1:233259864964:android:5c5f17fc0eb54306d583d1',
+          ? '1:233259864964:ios:875d94c61884160dd583d1'
+          : '1:233259864964:android:87954400984e5506d583d1',
       databaseURL: 'https://flutter-sdk.firebaseio.com',
       projectID: 'flutter-sdk',
       storageBucket: 'flutter-sdk.appspot.com',

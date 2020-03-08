@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Example app for firebase_core_dart">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,25 +15,23 @@
   <link rel="shortcut icon" type="image/png" href="/favicon.png"/>
 
   <title>firebase_core_dart_example</title>
-  <script src="https://www.gstatic.com/firebasejs/7.9.3/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/7.9.3/firebase-analytics.js"></script>
-  <script>
-    // Your web app's Firebase configuration
-    var firebaseConfig = {
-      apiKey: "AIzaSyDsSL36xeTPP-JdGZBdadhEm2bxNpMqlUQ",
-      authDomain: "flutter-sdk.firebaseapp.com",
-      databaseURL: "https://flutter-sdk.firebaseio.com",
-      projectId: "flutter-sdk",
-      storageBucket: "flutter-sdk.appspot.com",
-      messagingSenderId: "233259864964",
-      appId: "1:233259864964:web:149047b5481b5479d583d1",
-      measurementId: "G-KFTS2799LM"
-    };
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    firebase.analytics();
-  </script>
   <link rel="manifest" href="/manifest.json">
+    <meta name="google-signin-client_id" content="233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com">
+    <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-app.js"/>
+    <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-auth.js"/>
+    <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-analytics.js"/>
+    <script>
+        firebase.initializeApp({
+            "projectId": "flutter-sdk",
+            "appId": "1:233259864964:web:95ef638de4a4693dd583d1",
+            "databaseURL": "https://flutter-sdk.firebaseio.com",
+            "storageBucket": "flutter-sdk.appspot.com",
+            "locationId": "us-central",
+            "apiKey": "AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A",
+            "authDomain": "flutter-sdk.firebaseapp.com",
+            "messagingSenderId": "233259864964"
+        });
+    </script>
 </head>
 <body>
   <!-- This script installs service_worker.js to provide PWA functionality to

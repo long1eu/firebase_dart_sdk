@@ -8,7 +8,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:233259864964:android:5c5f17fc0eb54306d583d1",
+        "mobilesdk_app_id": "1:233259864964:android:87954400984e5506d583d1",
         "android_client_info": {
           "package_name": "eu.long1.firebase_core_dart_example"
         }
@@ -21,10 +21,7 @@
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyAwQpoxEEkD3boOaDjR8BcQbTq5cPIZdM4"
-        },
-        {
-          "current_key": "AIzaSyApD5DJ2oSzosgy-pT0HPfqtCNh7st9dwM"
+          "current_key": "AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg"
         }
       ],
       "services": {
@@ -35,10 +32,10 @@
               "client_type": 3
             },
             {
-              "client_id": "233259864964-qdt03kr7897b1f8i9llu93s3j5e0lbt7.apps.googleusercontent.com",
+              "client_id": "233259864964-7rj67lspej6nfjc1msir8ju5ssuejsld.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "sdk.dart.firebase"
+                "bundle_id": "eu.long1.firebaseCoreVmExample"
               }
             }
           ]
@@ -47,20 +44,12 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:233259864964:android:af5a988671793467d583d1",
+        "mobilesdk_app_id": "1:233259864964:android:b2ec71b130a3170cd583d1",
         "android_client_info": {
-          "package_name": "sdk.dart.firebase"
+          "package_name": "eu.long1.firebase_core_vm_example"
         }
       },
       "oauth_client": [
-        {
-          "client_id": "233259864964-dd2qk2ite8qpf8vh8f3v10trocu0nojp.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "sdk.dart.firebase",
-            "certificate_hash": "a7e2d1d3420fbfd211e84e33f35265fc22eeb068"
-          }
-        },
         {
           "client_id": "233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com",
           "client_type": 3
@@ -68,10 +57,7 @@
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyAwQpoxEEkD3boOaDjR8BcQbTq5cPIZdM4"
-        },
-        {
-          "current_key": "AIzaSyApD5DJ2oSzosgy-pT0HPfqtCNh7st9dwM"
+          "current_key": "AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg"
         }
       ],
       "services": {
@@ -82,10 +68,46 @@
               "client_type": 3
             },
             {
-              "client_id": "233259864964-qdt03kr7897b1f8i9llu93s3j5e0lbt7.apps.googleusercontent.com",
+              "client_id": "233259864964-7rj67lspej6nfjc1msir8ju5ssuejsld.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "sdk.dart.firebase"
+                "bundle_id": "eu.long1.firebaseCoreVmExample"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:233259864964:android:56dcd62ad02519f8d583d1",
+        "android_client_info": {
+          "package_name": "eu.long1.google_sign_in_dart_example"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "233259864964-7rj67lspej6nfjc1msir8ju5ssuejsld.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "eu.long1.firebaseCoreVmExample"
               }
             }
           ]

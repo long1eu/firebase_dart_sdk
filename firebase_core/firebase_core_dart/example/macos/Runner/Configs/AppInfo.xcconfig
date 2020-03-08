@@ -8,7 +8,7 @@
 PRODUCT_NAME = firebase_core_dart_example
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = eu.long1.FirebaseCoreDartExample
+PRODUCT_BUNDLE_IDENTIFIER = eu.long1.firebaseCoreDartExample
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2020 eu.long1. All rights reserved.
