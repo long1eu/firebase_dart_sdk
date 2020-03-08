@@ -1,0 +1,83 @@
+{
+  "project_info": {
+    "project_number": "233259864964",
+    "firebase_url": "https://flutter-sdk.firebaseio.com",
+    "project_id": "flutter-sdk",
+    "storage_bucket": "flutter-sdk.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:233259864964:android:b2ec71b130a3170cd583d1",
+        "android_client_info": {
+          "package_name": "eu.long1.firebase_core_vm_example"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "233259864964-kpdksjic56io5sfistphoe5it0ffs5i7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "eu.long1.googleSignInDartExample"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:233259864964:android:56dcd62ad02519f8d583d1",
+        "android_client_info": {
+          "package_name": "eu.long1.google_sign_in_dart_example"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "233259864964-kpdksjic56io5sfistphoe5it0ffs5i7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "eu.long1.googleSignInDartExample"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

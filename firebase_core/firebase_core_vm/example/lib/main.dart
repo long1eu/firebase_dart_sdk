@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:flutter/material.dart';
@@ -14,11 +15,6 @@ void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
   final String name = 'foo';
-  final FirebaseOptions options = FirebaseOptions(
-    applicationId: '1:297855924061:ios:c6de2b69b03a5be8',
-    gcmSenderId: '297855924061',
-    apiKey: 'AIzaSyBq6mcufFXfyqr79uELCiqM_O_1-G72PVU',
-  );
 
   Future<void> _configure() async {
     final SharedPreferences preferences = await SharedPreferences.getInstance();
@@ -74,6 +70,28 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+FirebaseOptions get options {
+  if (Platform.isAndroid) {
+    return const FirebaseOptions(
+      applicationId: '1:233259864964:android:b2ec71b130a3170cd583d1',
+      gcmSenderId: '297855924061',
+      apiKey: 'AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg',
+    );
+  } else if (Platform.isIOS) {
+    return const FirebaseOptions(
+      applicationId: '1:233259864964:ios:fff621fea008bff1d583d1',
+      gcmSenderId: '233259864964',
+      apiKey: 'AIzaSyBguTk4w2Xk2LD0mSdB2Pi9LTtt5BeAE6U',
+    );
+  } else {
+    return const FirebaseOptions(
+      applicationId: '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
+      gcmSenderId: '233259864964',
+      apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
     );
   }
 }

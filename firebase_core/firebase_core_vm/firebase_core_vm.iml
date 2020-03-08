@@ -36,7 +36,6 @@
       <excludeFolder url="file://$MODULE_DIR$/example/ios/.symlinks/plugins/shared_preferences_web/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/ios/.symlinks/plugins/shared_preferences_web/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/ios/.symlinks/plugins/shared_preferences_web/build" />
-      <excludeFolder url="file://$MODULE_DIR$/example/ios/Flutter/App.framework/flutter_assets/packages" />
       <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/connectivity/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/connectivity/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/connectivity/build" />
@@ -64,9 +63,6 @@
       <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/shared_preferences_web/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/shared_preferences_web/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/.symlinks/plugins/shared_preferences_web/build" />
-      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/App.framework/Resources/flutter_assets/packages" />
-      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/App.framework/Versions/A/Resources/flutter_assets/packages" />
-      <excludeFolder url="file://$MODULE_DIR$/example/macos/Flutter/ephemeral/App.framework/Versions/Current/Resources/flutter_assets/packages" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

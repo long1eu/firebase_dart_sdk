@@ -1,5 +1,5 @@
 name: firebase_core_vm_example
-description: A new Flutter project.
+description: Example app for firebase_core_vm
 
 environment:
   sdk: ">=2.7.0 <3.0.0"
