@@ -1,5 +1,5 @@
 name: google_sign_in_dart_example
-description: Example of Google Sign-In plugin.
+description: Example app for google_sign_in_dart
 
 dependencies:
   flutter:
@@ -11,6 +11,8 @@ dependencies:
   url_launcher: ^5.4.2
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   pedantic: ^1.8.0
 
 flutter:
