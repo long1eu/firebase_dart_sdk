@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:io';
-
 import 'package:firebase_auth_vm/firebase_auth_vm.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
@@ -123,6 +121,7 @@ class _EmailPasswordFormState extends State<_EmailPasswordForm> {
           ),
           TextFormField(
             controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(labelText: 'Email'),
             validator: (String value) {
               if (value.isEmpty) {
@@ -254,6 +253,7 @@ class _EmailLinkSignInSectionState extends State<_EmailLinkSignInSection> {
           ),
           TextFormField(
             controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(labelText: 'Email'),
             validator: (String value) {
               if (value.isEmpty) {
@@ -308,18 +308,7 @@ class _AnonymouslySignInSectionState extends State<_AnonymouslySignInSection> {
     assert(user.isAnonymous);
     assert(!user.isEmailVerified);
     assert(await user.getIdToken() != null);
-    if (Platform.isIOS) {
-      // Anonymous auth doesn't show up as a provider on iOS
-      assert(user.providerData.isEmpty);
-    } else if (Platform.isAndroid) {
-      // Anonymous auth does show up as a provider on Android
-      assert(user.providerData.length == 1);
-      assert(user.providerData[0].providerId == 'firebase');
-      assert(user.providerData[0].uid != null);
-      assert(user.providerData[0].displayName == null);
-      assert(user.providerData[0].photoUrl == null);
-      assert(user.providerData[0].email == null);
-    }
+    assert(user.providerData.isEmpty);
 
     final FirebaseUser currentUser = _auth.currentUser;
     assert(user.uid == currentUser.uid);
@@ -466,9 +455,6 @@ class _PhoneSignInSectionState extends State<_PhoneSignInSection> {
         phoneNumber: _phoneNumberController.text,
         presenter: (Uri uri) => launch(uri.toString()),
       );
-      if (Platform.isAndroid || Platform.isIOS) {
-        Navigator.pop(context);
-      }
       widget.scaffold.showSnackBar(const SnackBar(
         content: Text('Please check your phone for the verification code.'),
       ));

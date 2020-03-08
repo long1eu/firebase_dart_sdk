@@ -430,6 +430,7 @@ class FirebaseAuth implements InternalTokenProvider {
   ///   * [FirebaseAuthError.missingPhoneNumber] - Indicates that the phone number provided was not provided.
   Future<String> verifyPhoneNumber(
       {@required String phoneNumber, UrlPresenter presenter}) async {
+    // todo: save the recaptcha token, and use it until it expires
     assert(phoneNumber != null);
     final IdentitytoolkitRelyingpartySendVerificationCodeRequest request =
         IdentitytoolkitRelyingpartySendVerificationCodeRequest()

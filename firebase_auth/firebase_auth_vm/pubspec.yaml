@@ -1,7 +1,7 @@
 name: firebase_auth_vm
-description: Firebase Auth SDK
+description: Dart implementation of Firebase Auth SDK that offers secure End-To-End Authentication
 version: 0.0.2
-homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
+homepage: https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/firebase_auth/firebase_auth_vm
 
 environment:
   sdk: '>=2.7.0 <3.0.0'

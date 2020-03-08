@@ -61,6 +61,7 @@ class RegisterPageState extends State<RegisterPage> {
           children: <Widget>[
             TextFormField(
               controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(labelText: 'Email'),
               validator: (String value) {
                 if (value.isEmpty) {

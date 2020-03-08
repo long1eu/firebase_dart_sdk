@@ -20,80 +20,86 @@ typedef GetRecaptchaToken = Future<String> Function();
 /// locally running HTTP server. Which in turn will be able to extract the recaptcha token.
 Future<String> getRecaptchaToken(
     UrlPresenter urlPresenter, String apiKey, String languageCode) async {
+  final Completer<String> completer = Completer<String>();
   final HttpServer server = await HttpServer.bind('localhost', 0);
   final Stream<HttpRequest> events = server.asBroadcastStream();
 
-  try {
-    final int port = server.port;
-    final String state = randomString(32);
+  final int port = server.port;
+  final String state = randomString(32);
 
-    urlPresenter(Uri.http(
-      'localhost:$port',
-      '__/auth/handler',
-      <String, String>{
-        'state': state,
-        'apiKey': apiKey,
-        if (languageCode != null) 'languageCode': languageCode,
-      },
-    ));
+  urlPresenter(Uri.http(
+    'localhost:$port',
+    '__/auth/handler',
+    <String, String>{
+      'state': state,
+      'apiKey': apiKey,
+      if (languageCode != null) 'languageCode': languageCode,
+    },
+  ));
 
-    // send the initial page
-    HttpRequest request = await events.first;
-    request.response
-      ..statusCode = 200
-      ..headers.set('content-type', 'text/html; charset=UTF-8')
-      ..write(_initialHtml);
-    await request.response.close();
+  // ignore: void_checks
+  events.listen((HttpRequest request) async {
+    switch (request.requestedUri.path) {
+      case '/__/auth/handler':
+        // send the initial page
+        request.response
+          ..statusCode = 200
+          ..headers.set('content-type', 'text/html; charset=UTF-8')
+          ..write(_initialHtml);
+        await request.response.close();
+        break;
+      case '/favicon.ico':
+        // send the favicon
+        request.response
+          ..statusCode = 200
+          ..headers.set('content-type', 'image/png; base64')
+          ..add(base64Decode(
+              'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACY0lEQVR4AcWTA6xcQRhGn20rqm2bMRs3rM2wtm0zqhHUtqI6qm0s3ur+/Wa9/+Ji9qVJTjA652ISiCg2exP6gyZ8PF5oCZgOboHk/xVwEBCYGmGuFehS1wHPvQEW0JDNLQfH4xrABNnACcjLdZDknUsC74ELNKirgE6AGJO8cwODxraIsUgod5qmyASMjBBgAvXB/qAxCygJ23+vSROwXSZgEyCObVPKI8e2ZAsbn8PkzcEn8Eom4EakgN+Lssi0IoOPfwWZXnkb8AUQUOxXWuTqDRDyRPAnwtPT99m59GNOLim7EnnEKAjbgW+AfDivN+9sJKABIM6vhdnuAIFlbVro/KGstxD+BBSM62azoUYCBnF57cZUv1zwc3420R6fHG//TiMhDAM3YZWRgHnBciESQohDEJ8ET87lnNNGAk4GB1jXp4XJBeatRWpywVsjAS99cmVPIv2clxMm/7OhlJTbjYVAFdyEfM0BkBaEPP3atHD5RsjvqMuDbkI3PQG9/U+/O5F+zA19+r+bSonU5fwmjNQTMNEXYFmdHirfUqZX7rsJa/UE7ALk2oWnn5MTkG+F/K52KeO8noAHgMwr0wPybeUycsFHTQEQpwCra2cSfZ/jkZt2yMl9OK60KNIS0AyQaXmGR76rQkbKb0JPLQGDnduT3HLzbkk5w3Wr2RgtAcv/Lssk895KeSlDudtko2qAfUvKbdPe6rjL8fRku9jysmqAaU+N03q2lVgsNsVLTOJM8EU1AIv6gCuAJEK4WHAF9FEJkAzRIeYB0iF6xTzAaIhhMQ8wHKJTLB/AQ5hYN/8Am8FSntayj78AAAAASUVORK5CYII='));
+        await request.response.close();
+        break;
+      case '/__/auth/handler/response':
+        final Uri uri = request.requestedUri;
+        final String returnedState = uri.queryParameters['state'];
+        final String token = uri.queryParameters['token'];
+        final String error = uri.queryParameters['error'];
+        String message;
 
-    // send the favicon
-    request = await events.first;
-    request.response
-      ..statusCode = 200
-      ..headers.set('content-type', 'image/png; base64')
-      ..add(base64Decode(
-          'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACY0lEQVR4AcWTA6xcQRhGn20rqm2bMRs3rM2wtm0zqhHUtqI6qm0s3ur+/Wa9/+Ji9qVJTjA652ISiCg2exP6gyZ8PF5oCZgOboHk/xVwEBCYGmGuFehS1wHPvQEW0JDNLQfH4xrABNnACcjLdZDknUsC74ELNKirgE6AGJO8cwODxraIsUgod5qmyASMjBBgAvXB/qAxCygJ23+vSROwXSZgEyCObVPKI8e2ZAsbn8PkzcEn8Eom4EakgN+Lssi0IoOPfwWZXnkb8AUQUOxXWuTqDRDyRPAnwtPT99m59GNOLim7EnnEKAjbgW+AfDivN+9sJKABIM6vhdnuAIFlbVro/KGstxD+BBSM62azoUYCBnF57cZUv1zwc3420R6fHG//TiMhDAM3YZWRgHnBciESQohDEJ8ET87lnNNGAk4GB1jXp4XJBeatRWpywVsjAS99cmVPIv2clxMm/7OhlJTbjYVAFdyEfM0BkBaEPP3atHD5RsjvqMuDbkI3PQG9/U+/O5F+zA19+r+bSonU5fwmjNQTMNEXYFmdHirfUqZX7rsJa/UE7ALk2oWnn5MTkG+F/K52KeO8noAHgMwr0wPybeUycsFHTQEQpwCra2cSfZ/jkZt2yMl9OK60KNIS0AyQaXmGR76rQkbKb0JPLQGDnduT3HLzbkk5w3Wr2RgtAcv/Lssk895KeSlDudtko2qAfUvKbdPe6rjL8fRku9jysmqAaU+N03q2lVgsNsVLTOJM8EU1AIv6gCuAJEK4WHAF9FEJkAzRIeYB0iF6xTzAaIhhMQ8wHKJTLB/AQ5hYN/8Am8FSntayj78AAAAASUVORK5CYII='));
-    await request.response.close();
+        if (request.method != 'GET') {
+          message =
+              'Invalid response from server (expected GET request callback, got: ${request.method}).';
+        } else if (state != returnedState) {
+          message = 'Invalid response from server (state did not match).';
+        } else if (error != null) {
+          message = 'Error occured while obtaining access credentials: $error';
+        } else if (token == null || token == '') {
+          message = 'Invalid response from server (no token transmitted).';
+        }
 
-    // received the response
-    request = await events.first;
-    try {
-      final Uri uri = request.requestedUri;
-      final String returnedState = uri.queryParameters['state'];
-      final String token = uri.queryParameters['token'];
-      final String error = uri.queryParameters['error'];
+        if (message != null) {
+          request.response
+            ..statusCode = 500
+            ..headers.set('content-type', 'text/plain; charset=UTF-8')
+            ..write(message);
+          await request.response.close();
+          completer.completeError(Exception(message));
+        } else {
+          request.response
+            ..statusCode = 200
+            ..headers.set('content-type', 'text/html; charset=UTF-8')
+            ..write(_successHtml);
+          await request.response.close();
+          completer.complete(token);
+        }
+        break;
 
-      if (request.method != 'GET') {
-        throw Exception(
-            'Invalid response from server (expected GET request callback, got: ${request.method}).');
-      }
-
-      if (state != returnedState) {
-        throw Exception('Invalid response from server (state did not match).');
-      }
-
-      if (error != null) {
-        throw Exception(
-            'Error occured while obtaining access credentials: $error');
-      }
-
-      if (token == null || token == '') {
-        throw Exception('Invalid response from server (no token transmitted).');
-      }
-
-      request.response
-        ..statusCode = 200
-        ..headers.set('content-type', 'text/html; charset=UTF-8')
-        ..write(_successHtml);
-      await request.response.close();
-      return token;
-    } catch (e) {
-      request.response.statusCode = 500;
-      await request.response.close().catchError((dynamic _) {});
-      rethrow;
+      default:
+        print(request.requestedUri);
     }
-  } finally {
-    await server.close();
-  }
+  });
+
+  return completer.future
+      .timeout(const Duration(minutes: 2))
+      .whenComplete(server.close);
 }
 
 const String _initialHtml = '''<!DOCTYPE html>
@@ -101,8 +107,8 @@ const String _initialHtml = '''<!DOCTYPE html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <script src="https://www.gstatic.com/firebasejs/7.5.2/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/7.5.2/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-auth.js"></script>
     <script type="text/javascript">
         var url = new URL(window.location.href);
         var state = url.searchParams.get('state');
@@ -117,7 +123,6 @@ const String _initialHtml = '''<!DOCTYPE html>
                 'size': 'invisible',
                 'callback': function (response) {
                     var redirectURL = 'http://' + url.host + url.pathname + '/response?state=' + state + '&token=' + response;
-                    console.log('callback result ' + redirectURL);
                     try {
                         window.location = redirectURL+"&a=b";
                         window.location = redirectURL;
