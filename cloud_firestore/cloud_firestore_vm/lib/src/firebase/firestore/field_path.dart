@@ -2,9 +2,9 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart' as model;
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart'
+    as model;
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// A [FieldPath] refers to a field in a document. The path may consist of a single field name
 /// (referring to a top level field in the document), or a list of field names (referring to a
@@ -53,7 +53,8 @@ class FieldPath {
 
   final model.FieldPath internalPath;
 
-  static final FieldPath documentIdInstance = FieldPath(model.FieldPath.keyPath);
+  static final FieldPath documentIdInstance =
+      FieldPath(model.FieldPath.keyPath);
 
   /// Returns a special sentinel [FieldPath] to refer to the id of a document. It can be used in
   /// queries to sort or filter by the document id.
@@ -67,7 +68,9 @@ class FieldPath {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FieldPath && runtimeType == other.runtimeType && internalPath == other.internalPath;
+      other is FieldPath &&
+          runtimeType == other.runtimeType &&
+          internalPath == other.internalPath;
 
   @override
   int get hashCode => internalPath.hashCode * 31;

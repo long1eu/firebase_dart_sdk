@@ -4,32 +4,33 @@
 
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/bound.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/order_by.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart' as core;
-import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/relation_filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart' as core;
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/reference_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/server_timestamp_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/source.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/bound.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/event_manager.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/order_by.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart'
+    as core;
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query_stream.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart'
+    as core;
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/reference_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// An enum for the direction of a sort.
@@ -47,9 +48,10 @@ class Query {
 
   final core.Query query;
 
-  final FirebaseFirestore firestore;
+  final Firestore firestore;
 
-  void _validateOrderByFieldMatchesInequality(core.FieldPath orderBy, core.FieldPath inequality) {
+  void _validateOrderByFieldMatchesInequality(
+      core.FieldPath orderBy, core.FieldPath inequality) {
     if (orderBy != inequality) {
       final String inequalityString = inequality.canonicalString;
       throw ArgumentError(
@@ -74,11 +76,13 @@ class Query {
         }
         final core.FieldPath firstOrderByField = query.firstOrderByField;
         if (firstOrderByField != null) {
-          _validateOrderByFieldMatchesInequality(firstOrderByField, newInequality);
+          _validateOrderByFieldMatchesInequality(
+              firstOrderByField, newInequality);
         }
       } else if (relationFilter.operator == FilterOperator.arrayContains) {
         if (query.hasArrayContainsFilter) {
-          throw ArgumentError('Invalid Query. Queries only support having a single array-contains filter.');
+          throw ArgumentError(
+              'Invalid Query. Queries only support having a single array-contains filter.');
         }
       }
     }
@@ -92,7 +96,8 @@ class Query {
   ///
   /// Returns the created [Query].
   Query whereEqualTo(String field, Object value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.equal, value);
+    return _whereHelper(
+        FieldPath.fromDotSeparatedPath(field), FilterOperator.equal, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -114,7 +119,8 @@ class Query {
   ///
   /// Returns the created [Query].
   Query whereLessThan(String field, Object value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.lessThan, value);
+    return _whereHelper(
+        FieldPath.fromDotSeparatedPath(field), FilterOperator.lessThan, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -136,7 +142,8 @@ class Query {
   ///
   /// Returns the created [Query].
   Query whereLessThanOrEqualTo(String field, Object value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.lessThanOrEqual, value);
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
+        FilterOperator.lessThanOrEqual, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -158,7 +165,8 @@ class Query {
   ///
   /// Returns the created [Query].
   Query whereGreaterThan(String field, Object value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.graterThan, value);
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
+        FilterOperator.graterThan, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -180,7 +188,8 @@ class Query {
   ///
   /// Returns the created [Query].
   Query whereGreaterThanOrEqualTo(String field, Object value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.graterThanOrEqual, value);
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
+        FilterOperator.graterThanOrEqual, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -204,7 +213,8 @@ class Query {
   ///
   /// Returns the created [Query].
   Query whereArrayContains(String field, Object value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field), FilterOperator.arrayContains, value);
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
+        FilterOperator.arrayContains, value);
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field, the
@@ -252,8 +262,10 @@ class Query {
               'was an empty string.');
         }
         final ResourcePath path = query.path.appendSegment(documentKey);
-        hardAssert(path.length.remainder(2) == 0, 'Path should be a document key');
-        fieldValue = ReferenceValue.valueOf(firestore.databaseId, DocumentKey.fromPath(path));
+        hardAssert(
+            path.length.remainder(2) == 0, 'Path should be a document key');
+        fieldValue = ReferenceValue.valueOf(
+            firestore.databaseId, DocumentKey.fromPath(path));
       } else if (value is DocumentReference) {
         final DocumentReference ref = value;
         fieldValue = ReferenceValue.valueOf(firestore.databaseId, ref.key);
@@ -295,7 +307,8 @@ class Query {
   /// [direction] the direction to sort.
   ///
   /// Returns the created Query.
-  Query orderByField(FieldPath fieldPath, [Direction direction = Direction.ascending]) {
+  Query orderByField(FieldPath fieldPath,
+      [Direction direction = Direction.ascending]) {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
     return _orderBy(fieldPath.internalPath, direction);
   }
@@ -311,8 +324,9 @@ class Query {
           'Invalid query. You must not call Query.endAt() or Query.endAfter() before calling Query.orderBy().');
     }
     _validateOrderByField(fieldPath);
-    final OrderByDirection dir =
-        direction == Direction.ascending ? OrderByDirection.ascending : OrderByDirection.descending;
+    final OrderByDirection dir = direction == Direction.ascending
+        ? OrderByDirection.ascending
+        : OrderByDirection.descending;
     return Query(query.orderBy(OrderBy.getInstance(dir, fieldPath)), firestore);
   }
 
@@ -324,7 +338,8 @@ class Query {
   /// Returns the created Query.
   Query limit(int limit) {
     if (limit <= 0) {
-      throw ArgumentError('Invalid Query. Query limit ($limit) is invalid. Limit must be positive.');
+      throw ArgumentError(
+          'Invalid Query. Query limit ($limit) is invalid. Limit must be positive.');
     }
     return Query(query.limit(limit), firestore);
   }
@@ -337,7 +352,8 @@ class Query {
   ///
   /// Returns the created Query.
   Query startAtDocument(DocumentSnapshot snapshot) {
-    final Bound bound = _boundFromDocumentSnapshot('startAt', snapshot, /*before:*/ true);
+    final Bound bound =
+        _boundFromDocumentSnapshot('startAt', snapshot, /*before:*/ true);
     return Query(query.startAt(bound), firestore);
   }
 
@@ -348,7 +364,8 @@ class Query {
   ///
   /// Returns the created Query.
   Query startAt(List<Object> fieldValues) {
-    final Bound bound = _boundFromFields('startAt', fieldValues, /*before:*/ true);
+    final Bound bound =
+        _boundFromFields('startAt', fieldValues, /*before:*/ true);
     return Query(query.startAt(bound), firestore);
   }
 
@@ -360,7 +377,8 @@ class Query {
   ///
   /// Returns the created Query.
   Query startAfterDocument(DocumentSnapshot snapshot) {
-    final Bound bound = _boundFromDocumentSnapshot('startAfter', snapshot, /*before:*/ false);
+    final Bound bound =
+        _boundFromDocumentSnapshot('startAfter', snapshot, /*before:*/ false);
     return Query(query.startAt(bound), firestore);
   }
 
@@ -371,7 +389,8 @@ class Query {
   ///
   /// Returns the created Query.
   Query startAfter(List<Object> fieldValues) {
-    final Bound bound = _boundFromFields('startAfter', fieldValues, /*before:*/ false);
+    final Bound bound =
+        _boundFromFields('startAfter', fieldValues, /*before:*/ false);
     return Query(query.startAt(bound), firestore);
   }
 
@@ -382,7 +401,8 @@ class Query {
   ///
   /// Returns the created Query.
   Query endBeforeDocument(DocumentSnapshot snapshot) {
-    final Bound bound = _boundFromDocumentSnapshot('endBefore', snapshot, /*before:*/ true);
+    final Bound bound =
+        _boundFromDocumentSnapshot('endBefore', snapshot, /*before:*/ true);
     return Query(query.endAt(bound), firestore);
   }
 
@@ -393,7 +413,8 @@ class Query {
   ///
   /// Returns the created Query.
   Query endBefore(List<Object> fieldValues) {
-    final Bound bound = _boundFromFields('endBefore', fieldValues, /*before:*/ true);
+    final Bound bound =
+        _boundFromFields('endBefore', fieldValues, /*before:*/ true);
     return Query(query.endAt(bound), firestore);
   }
 
@@ -404,7 +425,8 @@ class Query {
   ///
   /// Returns the created Query.
   Query endAtDocument(DocumentSnapshot snapshot) {
-    final Bound bound = _boundFromDocumentSnapshot('endAt', snapshot, /*before:*/ false);
+    final Bound bound =
+        _boundFromDocumentSnapshot('endAt', snapshot, /*before:*/ false);
     return Query(query.endAt(bound), firestore);
   }
 
@@ -415,7 +437,8 @@ class Query {
   ///
   /// Returns the created Query.
   Query endAt(List<Object> fieldValues) {
-    final Bound bound = _boundFromFields('endAt', fieldValues, /*before:*/ false);
+    final Bound bound =
+        _boundFromFields('endAt', fieldValues, /*before:*/ false);
     return Query(query.endAt(bound), firestore);
   }
 
@@ -426,10 +449,13 @@ class Query {
   ///
   /// Will throw if the document does not contain all fields of the order by of the query or if any of the fields in the
   /// order by are an uncommitted server timestamp.
-  Bound _boundFromDocumentSnapshot(String methodName, DocumentSnapshot snapshot, bool before) {
-    checkNotNull<DocumentSnapshot>(snapshot, 'Provided snapshot must not be null.');
+  Bound _boundFromDocumentSnapshot(
+      String methodName, DocumentSnapshot snapshot, bool before) {
+    checkNotNull<DocumentSnapshot>(
+        snapshot, 'Provided snapshot must not be null.');
     if (!snapshot.exists) {
-      throw ArgumentError('Can\'t use a DocumentSnapshot for a document that doesn\'t exist for $methodName().');
+      throw ArgumentError(
+          'Can\'t use a DocumentSnapshot for a document that doesn\'t exist for $methodName().');
     }
     final Document document = snapshot.document;
     final List<FieldValue> components = <FieldValue>[];
@@ -440,7 +466,8 @@ class Query {
     // using the explicit sort orders), multiple documents could match the position, yielding duplicate results.
     for (OrderBy orderBy in query.orderByConstraints) {
       if (orderBy.field == core.FieldPath.keyPath) {
-        components.add(ReferenceValue.valueOf(firestore.databaseId, document.key));
+        components
+            .add(ReferenceValue.valueOf(firestore.databaseId, document.key));
       } else {
         final FieldValue value = document.getField(orderBy.field);
         if (value is ServerTimestampValue) {
@@ -476,16 +503,20 @@ class Query {
       final OrderBy orderBy = explicitOrderBy[i];
       if (orderBy.field == core.FieldPath.keyPath) {
         if (rawValue is! String) {
-          throw ArgumentError('Invalid query. Expected a string for document ID in $methodName(), but got $rawValue.');
+          throw ArgumentError(
+              'Invalid query. Expected a string for document ID in $methodName(), but got $rawValue.');
         }
         final String documentId = rawValue;
         if (documentId.contains('/')) {
-          throw ArgumentError('Invalid query. Document ID \'$documentId\' contains a slash in $methodName().');
+          throw ArgumentError(
+              'Invalid query. Document ID \'$documentId\' contains a slash in $methodName().');
         }
-        final DocumentKey key = DocumentKey.fromPath(query.path.appendSegment(documentId));
+        final DocumentKey key =
+            DocumentKey.fromPath(query.path.appendSegment(documentId));
         components.add(ReferenceValue.valueOf(firestore.databaseId, key));
       } else {
-        final FieldValue wrapped = firestore.dataConverter.parseQueryValue(rawValue);
+        final FieldValue wrapped =
+            firestore.dataConverter.parseQueryValue(rawValue);
         components.add(wrapped);
       }
     }
@@ -504,7 +535,8 @@ class Query {
   /// Returns a Future that will be resolved with the results of the [Query].
   Future<QuerySnapshot> get([Source source = Source.defaultSource]) async {
     if (source == Source.cache) {
-      final ViewSnapshot viewSnap = await firestore.client.getDocumentsFromLocalCache(query);
+      final ViewSnapshot viewSnap =
+          await firestore.client.getDocumentsFromLocalCache(query);
 
       return QuerySnapshot(Query(query, firestore), viewSnap, firestore);
     } else {
@@ -520,7 +552,7 @@ class Query {
         throw FirebaseFirestoreError(
             'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
             'without setting source to Source.server to retrieve the cached documents.)',
-            FirebaseFirestoreErrorCode.unavailable);
+            FirestoreErrorCode.unavailable);
       } else {
         return snapshot;
       }
@@ -533,20 +565,24 @@ class Query {
   }
 
   Stream<QuerySnapshot> getSnapshots([MetadataChanges changes]) {
-    final ListenOptions options = _internalOptions(changes ?? MetadataChanges.exclude);
+    final ListenOptions options =
+        _internalOptions(changes ?? MetadataChanges.exclude);
     return _getSnapshotsInternal(options);
   }
 
   Stream<QuerySnapshot> _getSnapshotsInternal(ListenOptions options) {
-    return Observable<QueryListener>.fromFuture(firestore.client.listen(query, options))
-        .flatMap((QueryListener it) => it)
-        .map((ViewSnapshot snapshot) => QuerySnapshot(this, snapshot, firestore));
+    return Stream<QueryStream>.fromFuture(
+            firestore.client.listen(query, options))
+        .flatMap((QueryStream it) => it)
+        .map((ViewSnapshot snapshot) =>
+            QuerySnapshot(this, snapshot, firestore));
   }
 
   /// Converts the  API options object to the internal options object.
   static ListenOptions _internalOptions(MetadataChanges metadataChanges) {
     return ListenOptions(
-      includeDocumentMetadataChanges: metadataChanges == MetadataChanges.include,
+      includeDocumentMetadataChanges:
+          metadataChanges == MetadataChanges.include,
       includeQueryMetadataChanges: metadataChanges == MetadataChanges.include,
     );
   }
@@ -554,13 +590,19 @@ class Query {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Query && runtimeType == other.runtimeType && query == other.query && firestore == other.firestore;
+      other is Query &&
+          runtimeType == other.runtimeType &&
+          query == other.query &&
+          firestore == other.firestore;
 
   @override
   int get hashCode => query.hashCode ^ firestore.hashCode;
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)..add('query', query)..add('firestore', firestore)).toString();
+    return (ToStringHelper(runtimeType)
+          ..add('query', query)
+          ..add('firestore', firestore))
+        .toString();
   }
 }

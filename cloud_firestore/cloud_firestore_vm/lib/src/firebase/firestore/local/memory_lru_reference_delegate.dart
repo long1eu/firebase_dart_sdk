@@ -4,26 +4,28 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_mutation_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_remote_document_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
 
 /// Provides LRU garbage collection functionality for [MemoryPersistence].
 class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
-  MemoryLruReferenceDelegate(this.persistence, LruGarbageCollectorParams params, this.serializer)
+  MemoryLruReferenceDelegate(
+      this.persistence, LruGarbageCollectorParams params, this.serializer)
       : orphanedSequenceNumbers = <DocumentKey, int>{},
-        listenSequence = ListenSequence(persistence.queryCache.highestListenSequenceNumber),
+        listenSequence =
+            ListenSequence(persistence.queryCache.highestListenSequenceNumber),
         _currentSequenceNumber = ListenSequence.invalid {
     garbageCollector = LruGarbageCollector(this, params);
   }
@@ -43,14 +45,15 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
-    hardAssert(
-        _currentSequenceNumber == ListenSequence.invalid, 'Starting a transaction without committing the previous one');
+    hardAssert(_currentSequenceNumber == ListenSequence.invalid,
+        'Starting a transaction without committing the previous one');
     _currentSequenceNumber = listenSequence.next;
   }
 
   @override
   Future<void> onTransactionCommitted() async {
-    hardAssert(_currentSequenceNumber != ListenSequence.invalid, 'Committing a transaction without having started one');
+    hardAssert(_currentSequenceNumber != ListenSequence.invalid,
+        'Committing a transaction without having started one');
     _currentSequenceNumber = ListenSequence.invalid;
   }
 
@@ -70,12 +73,14 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   Future<int> getSequenceNumberCount() async {
     final int targetCount = persistence.queryCache.targetCount;
     int orphanedCount = 0;
-    await forEachOrphanedDocumentSequenceNumber((int sequenceNumber) => orphanedCount++);
+    await forEachOrphanedDocumentSequenceNumber(
+        (int sequenceNumber) => orphanedCount++);
     return targetCount + orphanedCount;
   }
 
   @override
-  Future<void> forEachOrphanedDocumentSequenceNumber(Consumer<int> consumer) async {
+  Future<void> forEachOrphanedDocumentSequenceNumber(
+      Consumer<int> consumer) async {
     for (MapEntry<DocumentKey, int> entry in orphanedSequenceNumbers.entries) {
       // Pass in the exact sequence number as the upper bound so we know it won't be pinned by being too recent.
       final bool isPinned = await _isPinned(entry.key, entry.value);

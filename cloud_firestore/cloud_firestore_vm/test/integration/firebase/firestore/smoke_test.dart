@@ -4,18 +4,19 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
+// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/smoke';
 
@@ -27,7 +28,8 @@ void main() {
   });
 
   test('testCanWriteADocument', () async {
-    final Map<String, Object> testData = map(<String>['name', 'Patryk', 'message', 'We are actually writing data!']);
+    final Map<String, Object> testData = map(
+        <String>['name', 'Patryk', 'message', 'We are actually writing data!']);
     final CollectionReference collection = await testCollection();
     await collection.add(testData);
   });
@@ -47,9 +49,11 @@ void main() {
     final DocumentReference writerRef = collection.document();
     final DocumentReference readerRef = collection.document(writerRef.id);
     await writerRef.set(testData);
-    final EventAccumulator<DocumentSnapshot> accumulator = EventAccumulator<DocumentSnapshot>();
-    final StreamSubscription<DocumentSnapshot> listener =
-        readerRef.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
+    final EventAccumulator<DocumentSnapshot> accumulator =
+        EventAccumulator<DocumentSnapshot>();
+    final StreamSubscription<DocumentSnapshot> listener = readerRef
+        .getSnapshots(MetadataChanges.include)
+        .listen(accumulator.onData, onError: accumulator.onError);
     final DocumentSnapshot doc = await accumulator.wait();
     expect(doc.data, testData);
     listener.cancel();
@@ -59,9 +63,11 @@ void main() {
     final CollectionReference collection = await testCollection();
     final DocumentReference writerRef = collection.document();
     final DocumentReference readerRef = collection.document(writerRef.id);
-    final EventAccumulator<DocumentSnapshot> accumulator = EventAccumulator<DocumentSnapshot>();
-    final StreamSubscription<DocumentSnapshot> listener =
-        readerRef.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
+    final EventAccumulator<DocumentSnapshot> accumulator =
+        EventAccumulator<DocumentSnapshot>();
+    final StreamSubscription<DocumentSnapshot> listener = readerRef
+        .getSnapshots(MetadataChanges.include)
+        .listen(accumulator.onData, onError: accumulator.onError);
     DocumentSnapshot doc = await accumulator.wait();
     expect(doc.exists, isFalse);
     final Map<String, Object> testData = map(<String>['foo', 'bar']);
@@ -76,10 +82,13 @@ void main() {
   });
 
   test('testWillFireValueEventsForEmptyCollections', () async {
-    final CollectionReference collection = await testCollection('empty-collection');
-    final EventAccumulator<QuerySnapshot> accumulator = EventAccumulator<QuerySnapshot>();
-    final StreamSubscription<QuerySnapshot> listener =
-        collection.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
+    final CollectionReference collection =
+        await testCollection('empty-collection');
+    final EventAccumulator<QuerySnapshot> accumulator =
+        EventAccumulator<QuerySnapshot>();
+    final StreamSubscription<QuerySnapshot> listener = collection
+        .getSnapshots(MetadataChanges.include)
+        .listen(accumulator.onData, onError: accumulator.onError);
     final QuerySnapshot querySnap = await accumulator.wait();
     expect(querySnap.length, 0);
     expect(querySnap, isEmpty);
@@ -130,7 +139,9 @@ void main() {
         tasks.add(collection.document(entry.key).set(entry.value));
       }
       await Future.wait(tasks);
-      final Query query = collection.whereEqualTo('filter', true).orderBy('sort', Direction.descending);
+      final Query query = collection
+          .whereEqualTo('filter', true)
+          .orderBy('sort', Direction.descending);
 
       final QuerySnapshot set = await query.get();
       final List<DocumentSnapshot> documents = set.documents;

@@ -5,9 +5,8 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:collection/collection.dart';
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 
 class Blob implements Comparable<Blob> {
   Blob(Uint8List bytes) : bytes = Uint8List.fromList(bytes);

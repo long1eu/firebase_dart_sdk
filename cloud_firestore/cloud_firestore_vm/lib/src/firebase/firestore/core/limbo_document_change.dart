@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 
 /// The type of the change.
 enum LimboDocumentChangeType { added, removed }

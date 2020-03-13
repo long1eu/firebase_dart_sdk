@@ -3,12 +3,12 @@
 // on 10/10/2018
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/source.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -51,7 +51,8 @@ void main() {
   test('updateWithNoCachedBaseDoc', () async {
     // Write an initial document in an isolated Firestore instance so it's not
     // stored in our cache.
-    await (await testFirestore(newTestSettings(), 'integration/array_transforms_updateWithNoCachedBaseDoc.db'))
+    await (await testFirestore(newTestSettings(),
+            'integration/array_transforms_updateWithNoCachedBaseDoc.db'))
         .document(docRef.path)
         .set(map(<dynamic>[
           'array',
@@ -67,14 +68,15 @@ void main() {
     try {
       await docRef.get(Source.cache);
     } on FirebaseFirestoreError catch (e) {
-      expect(e.code, FirebaseFirestoreErrorCode.unavailable);
+      expect(e.code, FirestoreErrorCode.unavailable);
     }
   });
 
   test('mergeSetWithNoCachedBaseDoc', () async {
     // Write an initial document in an isolated Firestore instance so it's not
     // stored in our cache.
-    await (await testFirestore(newTestSettings(), 'integration/array_transforms_mergeSetWithNoCachedBaseDoc.db'))
+    await (await testFirestore(newTestSettings(),
+            'integration/array_transforms_mergeSetWithNoCachedBaseDoc.db'))
         .document(docRef.path)
         .set(map(<dynamic>[
           'array',

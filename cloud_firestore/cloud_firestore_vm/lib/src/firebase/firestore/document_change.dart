@@ -2,15 +2,15 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
 enum DocumentChangeType {
@@ -60,8 +60,8 @@ class DocumentChange {
   final int newIndex;
 
   /// Creates the list of DocumentChanges from a ViewSnapshot.
-  static List<DocumentChange> changesFromSnapshot(
-      FirebaseFirestore firestore, MetadataChanges metadataChanges, ViewSnapshot snapshot) {
+  static List<DocumentChange> changesFromSnapshot(Firestore firestore,
+      MetadataChanges metadataChanges, ViewSnapshot snapshot) {
     final List<DocumentChange> documentChanges = <DocumentChange>[];
     if (snapshot.oldDocuments.isEmpty) {
       // Special case the first snapshot because index calculation is easy and fast. Also all
@@ -71,19 +71,21 @@ class DocumentChange {
       Document lastDoc;
       for (DocumentViewChange change in snapshot.changes) {
         final Document document = change.document;
-        final QueryDocumentSnapshot documentSnapshot = QueryDocumentSnapshot.fromDocument(
+        final QueryDocumentSnapshot documentSnapshot =
+            QueryDocumentSnapshot.fromDocument(
           firestore,
           document,
           fromCache: snapshot.isFromCache,
           hasPendingWrites: snapshot.mutatedKeys.contains(document.key),
         );
 
+        hardAssert(change.type == DocumentViewChangeType.added,
+            'Invalid added event for first snapshot');
         hardAssert(
-            change.type == DocumentViewChangeType.added, 'Invalid added event for first snapshot');
-        hardAssert(lastDoc == null || snapshot.query.comparator(lastDoc, document) < 0,
+            lastDoc == null || snapshot.query.comparator(lastDoc, document) < 0,
             'Got added events in wrong order');
-        documentChanges
-            .add(DocumentChange(documentSnapshot, DocumentChangeType.added, -1, index++));
+        documentChanges.add(DocumentChange(
+            documentSnapshot, DocumentChangeType.added, -1, index++));
         lastDoc = document;
       }
     } else {
@@ -96,7 +98,8 @@ class DocumentChange {
           continue;
         }
         final Document document = change.document;
-        final QueryDocumentSnapshot documentSnapshot = QueryDocumentSnapshot.fromDocument(
+        final QueryDocumentSnapshot documentSnapshot =
+            QueryDocumentSnapshot.fromDocument(
           firestore,
           document,
           fromCache: snapshot.isFromCache,
@@ -118,7 +121,8 @@ class DocumentChange {
         } else {
           newIndex = -1;
         }
-        documentChanges.add(DocumentChange(documentSnapshot, type, oldIndex, newIndex));
+        documentChanges
+            .add(DocumentChange(documentSnapshot, type, oldIndex, newIndex));
       }
     }
     return documentChanges;
@@ -148,7 +152,8 @@ class DocumentChange {
           newIndex == other.newIndex;
 
   @override
-  int get hashCode => type.hashCode ^ document.hashCode ^ oldIndex.hashCode ^ newIndex.hashCode;
+  int get hashCode =>
+      type.hashCode ^ document.hashCode ^ oldIndex.hashCode ^ newIndex.hashCode;
 
   @override
   String toString() {

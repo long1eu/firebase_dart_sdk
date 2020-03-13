@@ -26,17 +26,24 @@ void main() {
     });
   });
 
-  test('testPickSequenceNumberPercentile', () => testCase.testPickSequenceNumberPercentile());
-  test('testSequenceNumberNoQueries', () => testCase.testSequenceNumberNoQueries());
-  test('testSequenceNumberForFiftyQueries', () => testCase.testSequenceNumberForFiftyQueries());
+  test('testPickSequenceNumberPercentile',
+      () => testCase.testPickSequenceNumberPercentile());
+  test('testSequenceNumberNoQueries',
+      () => testCase.testSequenceNumberNoQueries());
+  test('testSequenceNumberForFiftyQueries',
+      () => testCase.testSequenceNumberForFiftyQueries());
   test('testSequenceNumberForMultipleQueriesInATransaction',
       () => testCase.testSequenceNumberForMultipleQueriesInATransaction());
-  test('testAllCollectedQueriesInSingleTransaction', () => testCase.testAllCollectedQueriesInSingleTransaction());
+  test('testAllCollectedQueriesInSingleTransaction',
+      () => testCase.testAllCollectedQueriesInSingleTransaction());
   test('testSequenceNumbersWithMutationAndSequentialQueries',
       () => testCase.testSequenceNumbersWithMutationAndSequentialQueries());
-  test('testSequenceNumbersWithMutationsInQueries', () => testCase.testSequenceNumbersWithMutationsInQueries());
-  test('testRemoveQueriesUpThroughSequenceNumber', () => testCase.testRemoveQueriesUpThroughSequenceNumber());
-  test('testRemoveOrphanedDocuments', () => testCase.testRemoveOrphanedDocuments());
+  test('testSequenceNumbersWithMutationsInQueries',
+      () => testCase.testSequenceNumbersWithMutationsInQueries());
+  test('testRemoveQueriesUpThroughSequenceNumber',
+      () => testCase.testRemoveQueriesUpThroughSequenceNumber());
+  test('testRemoveOrphanedDocuments',
+      () => testCase.testRemoveOrphanedDocuments());
   test('testRemoveTargetsThenGC', () => testCase.testRemoveTargetsThenGC());
   test('testGetsSize', () => testCase.testGetsSize());
   test('testDisabled', () => testCase.testDisabled());

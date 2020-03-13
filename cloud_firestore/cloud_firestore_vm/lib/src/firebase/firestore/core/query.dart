@@ -2,16 +2,15 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/bound.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/order_by.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:collection/collection.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/bound.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/order_by.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/relation_filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 /// Represents the internal structure of a Firestore Query
 class Query {
@@ -29,9 +28,11 @@ class Query {
 
   static const int noLimit = -1;
 
-  static final OrderBy keyOrderingAsc = OrderBy.getInstance(OrderByDirection.ascending, FieldPath.keyPath);
+  static final OrderBy keyOrderingAsc =
+      OrderBy.getInstance(OrderByDirection.ascending, FieldPath.keyPath);
 
-  static final OrderBy keyOrderingDesc = OrderBy.getInstance(OrderByDirection.descending, FieldPath.keyPath);
+  static final OrderBy keyOrderingDesc =
+      OrderBy.getInstance(OrderByDirection.descending, FieldPath.keyPath);
 
   /// Returns the list of ordering constraints that were explicitly requested on the query by the user.
   ///
@@ -114,7 +115,8 @@ class Query {
   ///
   /// [filter] is the predicate to filter by.
   Query filter(Filter filter) {
-    hardAssert(!DocumentKey.isDocumentKey(path), 'No filter is allowed for document query');
+    hardAssert(!DocumentKey.isDocumentKey(path),
+        'No filter is allowed for document query');
 
     FieldPath newInequalityField;
     if (filter is RelationFilter && filter.isInequality) {
@@ -122,11 +124,16 @@ class Query {
     }
 
     final FieldPath queryInequalityField = inequalityField;
-    hardAssert(queryInequalityField == null || newInequalityField == null || queryInequalityField == newInequalityField,
+    hardAssert(
+        queryInequalityField == null ||
+            newInequalityField == null ||
+            queryInequalityField == newInequalityField,
         'Query must only have one inequality field');
 
     hardAssert(
-        explicitSortOrder.isEmpty || newInequalityField == null || explicitSortOrder[0].field == newInequalityField,
+        explicitSortOrder.isEmpty ||
+            newInequalityField == null ||
+            explicitSortOrder[0].field == newInequalityField,
         'First orderBy must match inequality field');
 
     final List<Filter> updatedFilter = <Filter>[...filters, filter];
@@ -146,7 +153,10 @@ class Query {
         throw fail('First orderBy must match inequality field');
       }
     }
-    final List<OrderBy> updatedSortOrder = <OrderBy>[...explicitSortOrder, order];
+    final List<OrderBy> updatedSortOrder = <OrderBy>[
+      ...explicitSortOrder,
+      order
+    ];
     return copyWith(explicitSortOrder: updatedSortOrder);
   }
 
@@ -172,7 +182,10 @@ class Query {
       if (inequalityField.isKeyField) {
         return <OrderBy>[keyOrderingAsc];
       } else {
-        return <OrderBy>[OrderBy.getInstance(OrderByDirection.ascending, inequalityField), keyOrderingAsc];
+        return <OrderBy>[
+          OrderBy.getInstance(OrderByDirection.ascending, inequalityField),
+          keyOrderingAsc
+        ];
       }
     } else {
       final List<OrderBy> res = <OrderBy>[];
@@ -189,7 +202,9 @@ class Query {
         final OrderByDirection lastDirection = explicitSortOrder.isNotEmpty
             ? explicitSortOrder[explicitSortOrder.length - 1].direction
             : OrderByDirection.ascending;
-        res.add(lastDirection == OrderByDirection.ascending ? keyOrderingAsc : keyOrderingDesc);
+        res.add(lastDirection == OrderByDirection.ascending
+            ? keyOrderingAsc
+            : keyOrderingDesc);
       }
       return res;
     }
@@ -217,7 +232,8 @@ class Query {
   bool _matchesOrderBy(Document doc) {
     for (OrderBy order in explicitSortOrder) {
       // order by key always matches
-      if (order.field != FieldPath.keyPath && doc.getField(order.field) == null) {
+      if (order.field != FieldPath.keyPath &&
+          doc.getField(order.field) == null) {
         return false;
       }
     }
@@ -226,7 +242,8 @@ class Query {
 
   /// Makes sure a document is within the bounds, if provided.
   bool _matchesBounds(Document doc) {
-    if (_startAt != null && !_startAt.sortsBeforeDocument(orderByConstraints, doc)) {
+    if (_startAt != null &&
+        !_startAt.sortsBeforeDocument(orderByConstraints, doc)) {
       return false;
     }
     if (_endAt != null && _endAt.sortsBeforeDocument(orderByConstraints, doc)) {
@@ -237,14 +254,19 @@ class Query {
 
   /// Returns true if the document matches the constraints of this query.
   bool matches(Document doc) {
-    return _matchesPath(doc) && _matchesOrderBy(doc) && _matchesFilters(doc) && _matchesBounds(doc);
+    return _matchesPath(doc) &&
+        _matchesOrderBy(doc) &&
+        _matchesFilters(doc) &&
+        _matchesBounds(doc);
   }
 
-  /// Returns a comparator that will sort documents according to this Query's sort order.
-  Comparator<Document> get comparator => QueryComparator(orderByConstraints).comparator;
+  /// Returns a comparator that will sort documents according to this Query's
+  /// sort order.
+  Comparator<Document> get comparator =>
+      QueryComparator(orderByConstraints).comparator;
 
-  /// Returns a canonical string representing this query. This should match the iOS and Android
-  /// canonical ids for a query exactly.
+  /// Returns a canonical string representing this query. This should match the
+  /// iOS and Android canonical ids for a query exactly.
   String get canonicalId {
     // TODO(long1eu): Cache the return value.
     final StringBuffer builder = StringBuffer()
@@ -260,7 +282,8 @@ class Query {
     for (OrderBy orderBy in orderByConstraints) {
       builder
         ..write(orderBy.field.canonicalString)
-        ..write(orderBy.direction == OrderByDirection.ascending ? 'asc' : 'desc');
+        ..write(
+            orderBy.direction == OrderByDirection.ascending ? 'asc' : 'desc');
     }
 
     // Add limit.
@@ -308,7 +331,8 @@ class Query {
         other is Query &&
             runtimeType == other.runtimeType &&
             _limit == other._limit &&
-            const ListEquality<OrderBy>().equals(orderByConstraints, other.orderByConstraints) &&
+            const ListEquality<OrderBy>()
+                .equals(orderByConstraints, other.orderByConstraints) &&
             const ListEquality<Filter>().equals(filters, other.filters) &&
             path == other.path &&
             _startAt == other._startAt &&

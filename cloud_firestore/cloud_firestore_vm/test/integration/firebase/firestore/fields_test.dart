@@ -4,13 +4,13 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -44,7 +44,14 @@ void main() {
   /// currently prohibits mixing nested data with special characters so tests
   /// that use this data must be separate.
   Map<String, Object> dottedObject(int number) {
-    return map(<dynamic>['field', 'field $number', 'field.dot', number.toDouble(), 'field\\slash', number.toDouble()]);
+    return map(<dynamic>[
+      'field',
+      'field $number',
+      'field.dot',
+      number.toDouble(),
+      'field\\slash',
+      number.toDouble()
+    ]);
   }
 
   Map<String, Object> objectWithTimestamp(Timestamp timestamp) {
@@ -84,7 +91,8 @@ void main() {
     final Map<String, Object> data = nestedObject(1);
     final DocumentReference docRef = (await testCollection()).document();
     await docRef.set(data);
-    await docRef.updateFromList(<dynamic>['metadata.deep.field', 100.0, 'metadata.added', 200.0]);
+    await docRef.updateFromList(
+        <dynamic>['metadata.deep.field', 100.0, 'metadata.added', 200.0]);
     final DocumentSnapshot result = await docRef.get();
     final Map<String, Object> expectedData = map(<dynamic>[
       'name',
@@ -104,10 +112,19 @@ void main() {
   });
 
   test('testNestedFieldsCanBeUsedInQueryFilters', () async {
-    final Map<String, Map<String, Object>> docs =
-        map(<dynamic>['1', nestedObject(300), '2', nestedObject(100), '3', nestedObject(200)]);
+    final Map<String, Map<String, Object>> docs = map(<dynamic>[
+      '1',
+      nestedObject(300),
+      '2',
+      nestedObject(100),
+      '3',
+      nestedObject(200)
+    ]);
     // inequality adds implicit sort on field
-    final List<Map<String, Object>> expected = <Map<String, dynamic>>[nestedObject(200), nestedObject(300)];
+    final List<Map<String, Object>> expected = <Map<String, dynamic>>[
+      nestedObject(200),
+      nestedObject(300)
+    ];
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
     for (MapEntry<String, Map<String, Object>> entry in docs.entries) {
@@ -115,14 +132,21 @@ void main() {
     }
 
     await Future.wait(tasks);
-    final Query query = collection.whereGreaterThanOrEqualTo('metadata.createdAt', 200);
+    final Query query =
+        collection.whereGreaterThanOrEqualTo('metadata.createdAt', 200);
     final QuerySnapshot res = await query.get();
     expect(querySnapshotToValues(res), expected);
   });
 
   test('testNestedFieldsCanBeUsedInOrderBy', () async {
-    final Map<String, Map<String, Object>> docs =
-        map(<dynamic>['1', nestedObject(300), '2', nestedObject(100), '3', nestedObject(200)]);
+    final Map<String, Map<String, Object>> docs = map(<dynamic>[
+      '1',
+      nestedObject(300),
+      '2',
+      nestedObject(100),
+      '3',
+      nestedObject(200)
+    ]);
     final List<Map<String, Object>> expected = <Map<String, dynamic>>[
       nestedObject(100),
       nestedObject(200),
@@ -154,7 +178,8 @@ void main() {
     await docRef.set(data);
     final DocumentSnapshot doc = await docRef.get();
     expect(doc['field'], data['field']);
-    expect(doc.getField(FieldPath.of(<String>['field.dot'])), data['field.dot']);
+    expect(
+        doc.getField(FieldPath.of(<String>['field.dot'])), data['field.dot']);
     expect(doc['field\\slash'], data['field\\slash']);
   });
 
@@ -170,14 +195,32 @@ void main() {
     ]);
 
     final DocumentSnapshot doc = await docRef.get();
-    expect(doc.data, map<dynamic>(<dynamic>['field', 'field 1', 'field.dot', 100.0, 'field\\slash', 200.0]));
+    expect(
+        doc.data,
+        map<dynamic>(<dynamic>[
+          'field',
+          'field 1',
+          'field.dot',
+          100.0,
+          'field\\slash',
+          200.0
+        ]));
   });
 
   test('testFieldsWithSpecialCharsCanBeUsedInQueryFilters', () async {
-    final Map<String, Map<String, Object>> docs =
-        map(<dynamic>['1', dottedObject(300), '2', dottedObject(100), '3', dottedObject(200)]);
+    final Map<String, Map<String, Object>> docs = map(<dynamic>[
+      '1',
+      dottedObject(300),
+      '2',
+      dottedObject(100),
+      '3',
+      dottedObject(200)
+    ]);
     // inequality adds implicit sort on field
-    final List<Map<String, Object>> expected = <Map<String, dynamic>>[dottedObject(200), dottedObject(300)];
+    final List<Map<String, Object>> expected = <Map<String, dynamic>>[
+      dottedObject(200),
+      dottedObject(300)
+    ];
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
     for (MapEntry<String, Map<String, Object>> entry in docs.entries) {
@@ -186,14 +229,21 @@ void main() {
 
     await Future.wait(tasks);
 
-    final Query query = collection.whereGreaterThanOrEqualToField(FieldPath.of(<String>['field.dot']), 200);
+    final Query query = collection.whereGreaterThanOrEqualToField(
+        FieldPath.of(<String>['field.dot']), 200);
     final QuerySnapshot res = await query.get();
     expect(querySnapshotToValues(res), expected);
   });
 
   test('testFieldsWithSpecialCharsCanBeUsedInOrderBy', () async {
-    final Map<String, Map<String, dynamic>> docs =
-        map(<dynamic>['1', dottedObject(300), '2', dottedObject(100), '3', dottedObject(200)]);
+    final Map<String, Map<String, dynamic>> docs = map(<dynamic>[
+      '1',
+      dottedObject(300),
+      '2',
+      dottedObject(100),
+      '3',
+      dottedObject(200)
+    ]);
     final List<Map<String, Object>> expected = <Map<String, dynamic>>[
       dottedObject(100),
       dottedObject(200),
@@ -221,8 +271,8 @@ void main() {
     final Timestamp originalTimestamp = Timestamp(100, 123456789);
     // Timestamps are currently truncated to microseconds after being written to
     // the database.
-    final Timestamp truncatedTimestamp =
-        Timestamp(originalTimestamp.seconds, originalTimestamp.nanoseconds ~/ 1000 * 1000);
+    final Timestamp truncatedTimestamp = Timestamp(originalTimestamp.seconds,
+        originalTimestamp.nanoseconds ~/ 1000 * 1000);
 
     final DocumentReference docRef = (await testCollection()).document();
     await docRef.set(objectWithTimestamp(originalTimestamp));

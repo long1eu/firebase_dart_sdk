@@ -2,10 +2,10 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/server_timestamp_value.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 class TimestampValue extends FieldValue {
   const TimestampValue(this._value);
@@ -44,7 +44,9 @@ class TimestampValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is TimestampValue && runtimeType == other.runtimeType && _value == other._value;
+      other is TimestampValue &&
+          runtimeType == other.runtimeType &&
+          _value == other._value;
 
   @override
   int get hashCode => _value.hashCode;

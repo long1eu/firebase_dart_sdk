@@ -67,4 +67,3 @@ const BytesValue$json = const {
     const {'1': 'value', '3': 1, '4': 1, '5': 12, '10': 'value'},
   ],
 };
-

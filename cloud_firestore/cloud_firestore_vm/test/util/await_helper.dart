@@ -6,13 +6,13 @@ import 'dart:async';
 import 'dart:collection';
 
 class AwaitHelper<T> {
-  final Queue<Completer<T>> _values = Queue<Completer<T>>();
-
   AwaitHelper([int count = 1]) {
     for (int i = 0; i < count; i++) {
       _values.add(Completer<T>());
     }
   }
+
+  final Queue<Completer<T>> _values = Queue<Completer<T>>();
 
   void add([int count = 1]) {
     for (int i = 0; i < count; i++) {
@@ -47,7 +47,8 @@ class AwaitHelper<T> {
     assert(count != 0);
     assert(_values.length >= count);
 
-    return Future.wait<T>(_values.take(count).map((Completer<T> it) => it.future));
+    return Future.wait<T>(
+        _values.take(count).map((Completer<T> it) => it.future));
   }
 
   bool get isCompleted => _values.every((Completer<T> it) => it.isCompleted);

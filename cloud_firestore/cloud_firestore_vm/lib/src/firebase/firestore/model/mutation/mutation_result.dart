@@ -2,8 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 
 /// The result of applying a mutation to the server. This is a model of the [WriteResult] proto
 /// message.

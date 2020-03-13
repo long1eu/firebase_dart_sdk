@@ -1,7 +1,7 @@
 name: firebase_auth_dart
 description: Dart implementation of firebase_auth using firebase_auth_vm
 version: 0.0.1
-homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
+homepage: https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/firebase_auth/firebase_auth_dart
 
 environment:
   sdk: ">=2.7.0 <3.0.0"

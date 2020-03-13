@@ -13,7 +13,8 @@ typedef OpenDatabase = Future<Database> Function(String path,
     OnVersionChange onDowngrade,
     OnOpen onOpen});
 
-typedef OnVersionChange = Future<void> Function(Database db, int oldVersion, int newVersion);
+typedef OnVersionChange = Future<void> Function(
+    Database db, int oldVersion, int newVersion);
 typedef OnCreate = Future<void> Function(Database db, int version);
 typedef OnOpen = Future<void> Function(Database db);
 typedef OnConfigure = Future<void> Function(Database db);
@@ -25,7 +26,8 @@ abstract class Database {
   Future<void> execute(String statement, [List<dynamic> arguments]);
 
   /// SELECT query
-  Future<List<Map<String, dynamic>>> query(String statement, [List<dynamic> arguments]);
+  Future<List<Map<String, dynamic>>> query(String statement,
+      [List<dynamic> arguments]);
 
   /// DELETE query
   /// Returns the number of changes made

@@ -2,9 +2,9 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/limbo_document_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/limbo_document_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
 
 /// A set of changes to a view
 class ViewChange {

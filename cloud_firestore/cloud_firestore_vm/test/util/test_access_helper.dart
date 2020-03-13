@@ -2,8 +2,8 @@
 // Lung Razvan <long1eu>
 // on 25/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 
 class TestAccessHelper {
   /// Makes the DocumentReference constructor accessible.

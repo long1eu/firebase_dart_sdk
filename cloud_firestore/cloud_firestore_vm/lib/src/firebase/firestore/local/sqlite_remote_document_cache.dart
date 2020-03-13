@@ -6,18 +6,19 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart' as sq;
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/proto/index.dart' as proto;
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart'
+    as sq;
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
 import 'package:protobuf/protobuf.dart';
 
 class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
@@ -30,7 +31,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   @override
   Future<void> add(MaybeDocument maybeDocument) async {
     final String path = _pathForKey(maybeDocument.key);
-    final GeneratedMessage message = serializer.encodeMaybeDocument(maybeDocument);
+    final GeneratedMessage message =
+        serializer.encodeMaybeDocument(maybeDocument);
 
     await db.execute(
         // @formatter:off
@@ -81,23 +83,30 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<Map<DocumentKey, MaybeDocument>> getAll(Iterable<DocumentKey> documentKeys) async {
+  Future<Map<DocumentKey, MaybeDocument>> getAll(
+      Iterable<DocumentKey> documentKeys) async {
     final List<Object> args = <Object>[];
     for (DocumentKey key in documentKeys) {
       args.add(EncodedPath.encode(key.path));
     }
 
-    final Map<DocumentKey, MaybeDocument> results = <DocumentKey, MaybeDocument>{};
+    final Map<DocumentKey, MaybeDocument> results =
+        <DocumentKey, MaybeDocument>{};
     for (DocumentKey key in documentKeys) {
       // Make sure each key has a corresponding entry, which is null in case the document is not found.
       results[key] = null;
     }
 
-    final LongQuery longQuery =
-        LongQuery(db, 'SELECT contents FROM remote_documents WHERE path IN (', null, args, ') ORDER BY path');
+    final LongQuery longQuery = LongQuery(
+        db,
+        'SELECT contents FROM remote_documents WHERE path IN (',
+        null,
+        args,
+        ') ORDER BY path');
 
     while (longQuery.hasMoreSubqueries) {
-      final List<Map<String, dynamic>> rows = await longQuery.performNextSubquery();
+      final List<Map<String, dynamic>> rows =
+          await longQuery.performNextSubquery();
       for (Map<String, dynamic> row in rows) {
         final MaybeDocument decoded = decodeMaybeDocument(row['contents']);
         results[decoded.key] = decoded;
@@ -108,7 +117,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(Query query) async {
+  Future<ImmutableSortedMap<DocumentKey, Document>>
+      getAllDocumentsMatchingQuery(Query query) async {
     // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
     final int immediateChildrenPathLength = prefix.length + 1;
@@ -156,7 +166,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       results[doc.key] = doc;
     }
 
-    return ImmutableSortedMap<DocumentKey, Document>.fromMap(results, DocumentKey.comparator);
+    return ImmutableSortedMap<DocumentKey, Document>.fromMap(
+        results, DocumentKey.comparator);
   }
 
   String _pathForKey(DocumentKey key) {
@@ -165,7 +176,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   MaybeDocument decodeMaybeDocument(Uint8List bytes) {
     try {
-      return serializer.decodeMaybeDocument(proto.MaybeDocument.fromBuffer(bytes));
+      return serializer
+          .decodeMaybeDocument(proto.MaybeDocument.fromBuffer(bytes));
     } on InvalidProtocolBufferException catch (e) {
       throw fail('MaybeDocument failed to parse: $e');
     }

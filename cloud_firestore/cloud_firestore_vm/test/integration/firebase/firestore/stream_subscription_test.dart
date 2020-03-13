@@ -4,16 +4,17 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
 import 'package:test/test.dart';
 
 import '../../../util/await_helper.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
+// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/stream_subscription';
 
@@ -29,14 +30,16 @@ void main() {
     final DocumentReference documentReference = collectionReference.document();
 
     final AwaitHelper<void> events = AwaitHelper<void>(4);
-    final StreamSubscription<QuerySnapshot> one = collectionReference.snapshots.listen(
+    final StreamSubscription<QuerySnapshot> one =
+        collectionReference.snapshots.listen(
       (QuerySnapshot value) => events.completeNext(),
       onError: (dynamic error) {
         assert(false, 'This should not happen.');
       },
     );
 
-    final StreamSubscription<DocumentSnapshot> two = documentReference.snapshots.listen(
+    final StreamSubscription<DocumentSnapshot> two =
+        documentReference.snapshots.listen(
       (DocumentSnapshot value) => events.completeNext(),
       onError: (dynamic error) {
         assert(false, 'This should not happen.');
@@ -64,14 +67,18 @@ void main() {
 
   test('canBeRemovedTwice', () async {
     final CollectionReference reference = await testCollection();
-    final StreamSubscription<QuerySnapshot> one = reference.snapshots.listen((QuerySnapshot value) {});
-    final StreamSubscription<DocumentSnapshot> two = reference.document().snapshots.listen((DocumentSnapshot value) {});
+    final StreamSubscription<QuerySnapshot> one =
+        reference.snapshots.listen((QuerySnapshot value) {});
+    final StreamSubscription<DocumentSnapshot> two =
+        reference.document().snapshots.listen((DocumentSnapshot value) {});
 
-    one.cancel();
-    one.cancel();
+    one //
+      ..cancel()
+      ..cancel();
 
-    two.cancel();
-    two.cancel();
+    two //
+      ..cancel()
+      ..cancel();
   });
 
   test('canBeRemovedIndependently', () async {
@@ -80,14 +87,16 @@ void main() {
     final AwaitHelper<void> eventsOne = AwaitHelper<void>(2);
     final AwaitHelper<void> eventsTwo = AwaitHelper<void>(3);
 
-    final StreamSubscription<QuerySnapshot> one = collectionReference.snapshots.listen(
+    final StreamSubscription<QuerySnapshot> one =
+        collectionReference.snapshots.listen(
       (QuerySnapshot value) => eventsOne.completeNext(),
       onError: (dynamic error) {
         assert(false, 'This should not happen.');
       },
     );
 
-    final StreamSubscription<QuerySnapshot> two = collectionReference.snapshots.listen(
+    final StreamSubscription<QuerySnapshot> two =
+        collectionReference.snapshots.listen(
       (QuerySnapshot value) => eventsTwo.completeNext(),
       onError: (dynamic error) {
         assert(false, 'This should not happen.');

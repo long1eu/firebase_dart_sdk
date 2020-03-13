@@ -2,8 +2,9 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart' as public;
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart'
+    as public;
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 
 /// An immutable value used to keep track of an association between some referencing target or batch
 /// and a document key that the target or batch references.
@@ -27,7 +28,9 @@ class DocumentReference {
   /// Sorts document references by key then ID.
   static int byKey(DocumentReference a, DocumentReference b) {
     final int keyComp = a.key.compareTo(b.key);
-    return keyComp != 0 ? keyComp : a._targetOrBatchId.compareTo(b._targetOrBatchId);
+    return keyComp != 0
+        ? keyComp
+        : a._targetOrBatchId.compareTo(b._targetOrBatchId);
   }
 
   static int byTarget(DocumentReference a, DocumentReference b) {

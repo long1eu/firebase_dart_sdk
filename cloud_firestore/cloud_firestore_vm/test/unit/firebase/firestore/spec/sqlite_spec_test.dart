@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:path/path.dart';
 import 'package:test/test.dart';
 
@@ -21,7 +21,8 @@ void main() {
   setUp(() async {
     testCase = SpecTestCase(
       (_, String name) {
-        return openSQLitePersistence('firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}b',
+        return openSQLitePersistence(
+            'firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}b',
             const LruGarbageCollectorParams());
       },
       (Set<String> tags) => tags.contains(eagerGc),
@@ -37,8 +38,10 @@ void main() {
     bool ranAtLeastOneTest = false;
 
     // Enumerate the .json files containing the spec tests.
-    final List<Pair<String, Map<String, dynamic>>> parsedSpecFiles = <Pair<String, Map<String, dynamic>>>[];
-    final Directory jsonDir = Directory('${Directory.current.path}/test/res/json');
+    final List<Pair<String, Map<String, dynamic>>> parsedSpecFiles =
+        <Pair<String, Map<String, dynamic>>>[];
+    final Directory jsonDir =
+        Directory('${Directory.current.path}/test/res/json');
     final List<File> jsonFiles = jsonDir //
         .listSync()
         .where((FileSystemEntity it) => it is File && it.path.endsWith('.json'))
@@ -50,8 +53,10 @@ void main() {
     for (File f in jsonFiles) {
       final String json = f.readAsStringSync();
       final Map<String, dynamic> fileJSON = jsonDecode(json);
-      exclusiveMode = exclusiveMode || SpecTestCase.anyTestsAreMarkedExclusive(fileJSON);
-      parsedSpecFiles.add(Pair<String, Map<String, dynamic>>(basenameWithoutExtension(f.path), fileJSON));
+      exclusiveMode =
+          exclusiveMode || SpecTestCase.anyTestsAreMarkedExclusive(fileJSON);
+      parsedSpecFiles.add(Pair<String, Map<String, dynamic>>(
+          basenameWithoutExtension(f.path), fileJSON));
     }
 
     for (Pair<String, Map<String, dynamic>> parsedSpecFile in parsedSpecFiles) {
@@ -74,13 +79,15 @@ void main() {
         final List<dynamic> steps = testJSON['steps'];
         final Set<String> tags = SpecTestCase.getTestTags(testJSON);
 
-        final bool runTest =
-            testCase.shouldRunTest(tags) && (!exclusiveMode || tags.contains(SpecTestCase.exclusiveTag));
+        final bool runTest = testCase.shouldRunTest(tags) &&
+            (!exclusiveMode || tags.contains(SpecTestCase.exclusiveTag));
         if (runTest) {
           try {
-            SpecTestCase.info('------------------------------------------------------------------');
+            SpecTestCase.info(
+                '------------------------------------------------------------------');
             SpecTestCase.info('  Spec test: $name');
-            SpecTestCase.info('------------------------------------------------------------------');
+            SpecTestCase.info(
+                '------------------------------------------------------------------');
             testCase.currentName = name;
             await testCase.runSteps(steps, config);
             ranAtLeastOneTest = true;

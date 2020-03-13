@@ -4,20 +4,21 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/server_timestamp_behavior.dart';
-import 'package:firebase_firestore/src/firebase/firestore/transaction.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/transaction.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
+// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/server_timestamp';
 
@@ -53,8 +54,9 @@ void main() {
   setUp(() async {
     docRef = await testDocument();
     accumulator = EventAccumulator<DocumentSnapshot>();
-    listenerRegistration =
-        docRef.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
+    listenerRegistration = docRef
+        .getSnapshots(MetadataChanges.include)
+        .listen(accumulator.onData, onError: accumulator.onError);
 
     // Wait for initial null snapshot to avoid potential races.
     final DocumentSnapshot initialSnapshot = await accumulator.wait();
@@ -106,7 +108,8 @@ void main() {
     const int deltaSec = 48 * 60 * 60;
     final Timestamp now = Timestamp.now();
     expect((when.seconds - now.seconds).abs() < deltaSec, isTrue,
-        reason: 'resolved timestamp ($when) should be within $deltaSec\s of now '
+        reason:
+            'resolved timestamp ($when) should be within $deltaSec\s of now '
             '($now)');
 
     // Validate the rest of the document.
@@ -117,21 +120,26 @@ void main() {
   /// timestamps.
   void verifyTimestampsAreEstimates(DocumentSnapshot snapshot) {
     expect(snapshot.exists, isTrue);
-    final Timestamp when = snapshot.getTimestamp('when', ServerTimestampBehavior.estimate);
+    final Timestamp when =
+        snapshot.getTimestamp('when', ServerTimestampBehavior.estimate);
     expect(when, isNotNull);
-    expect(snapshot.getData(ServerTimestampBehavior.estimate), expectedDataWithTimestamp(when));
+    expect(snapshot.getData(ServerTimestampBehavior.estimate),
+        expectedDataWithTimestamp(when));
   }
 
   /// Verifies a snapshot containing setData but using the previous field value
   /// for the timestamps.
-  void verifyTimestampsUsePreviousValue(DocumentSnapshot current, DocumentSnapshot previous) {
+  void verifyTimestampsUsePreviousValue(
+      DocumentSnapshot current, DocumentSnapshot previous) {
     expect(current.exists, isTrue);
     if (previous != null) {
       final Timestamp when = previous.getTimestamp('when');
       expect(when, isNotNull);
-      expect(current.getData(ServerTimestampBehavior.previous), expectedDataWithTimestamp(when));
+      expect(current.getData(ServerTimestampBehavior.previous),
+          expectedDataWithTimestamp(when));
     } else {
-      expect(current.getData(ServerTimestampBehavior.previous), expectedDataWithTimestamp(null));
+      expect(current.getData(ServerTimestampBehavior.previous),
+          expectedDataWithTimestamp(null));
     }
   }
 
@@ -160,11 +168,13 @@ void main() {
     await docRef.update(updateData);
     verifyTimestampsUsePreviousValue(await accumulator.awaitLocalEvent(), null);
 
-    final DocumentSnapshot previousSnapshot = await accumulator.awaitRemoteEvent();
+    final DocumentSnapshot previousSnapshot =
+        await accumulator.awaitRemoteEvent();
     verifyTimestampsAreResolved(previousSnapshot);
 
     await docRef.update(updateData);
-    verifyTimestampsUsePreviousValue(await accumulator.awaitLocalEvent(), previousSnapshot);
+    verifyTimestampsUsePreviousValue(
+        await accumulator.awaitLocalEvent(), previousSnapshot);
     verifyTimestampsAreResolved(await accumulator.awaitRemoteEvent());
   });
 
@@ -174,16 +184,21 @@ void main() {
 
     final DocumentSnapshot localSnapshot = await accumulator.awaitLocalEvent();
     expect(localSnapshot.get('a'), isNull);
-    expect(localSnapshot.get('a', ServerTimestampBehavior.estimate), const TypeMatcher<Timestamp>());
+    expect(localSnapshot.get('a', ServerTimestampBehavior.estimate),
+        const TypeMatcher<Timestamp>());
     expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
 
-    final DocumentSnapshot remoteSnapshot = await accumulator.awaitRemoteEvent();
+    final DocumentSnapshot remoteSnapshot =
+        await accumulator.awaitRemoteEvent();
     expect(remoteSnapshot.get('a'), const TypeMatcher<Timestamp>());
-    expect(remoteSnapshot.get('a', ServerTimestampBehavior.estimate), const TypeMatcher<Timestamp>());
-    expect(remoteSnapshot.get('a', ServerTimestampBehavior.previous), const TypeMatcher<Timestamp>());
+    expect(remoteSnapshot.get('a', ServerTimestampBehavior.estimate),
+        const TypeMatcher<Timestamp>());
+    expect(remoteSnapshot.get('a', ServerTimestampBehavior.previous),
+        const TypeMatcher<Timestamp>());
   });
 
-  test('testServerTimestampsCanRetainPreviousValueThroughConsecutiveUpdates', () async {
+  test('testServerTimestampsCanRetainPreviousValueThroughConsecutiveUpdates',
+      () async {
     await writeInitialData();
     await docRef.firestore.client.disableNetwork();
     await accumulator.awaitRemoteEvent();
@@ -198,7 +213,8 @@ void main() {
 
     await docRef.firestore.client.enableNetwork();
 
-    final DocumentSnapshot remoteSnapshot = await accumulator.awaitRemoteEvent();
+    final DocumentSnapshot remoteSnapshot =
+        await accumulator.awaitRemoteEvent();
     expect(remoteSnapshot.get('a'), const TypeMatcher<Timestamp>());
   });
 
@@ -220,7 +236,8 @@ void main() {
 
     await docRef.firestore.client.enableNetwork();
 
-    final DocumentSnapshot remoteSnapshot = await accumulator.awaitRemoteEvent();
+    final DocumentSnapshot remoteSnapshot =
+        await accumulator.awaitRemoteEvent();
     expect(remoteSnapshot.get('a'), const TypeMatcher<Timestamp>());
   });
 
@@ -250,14 +267,15 @@ void main() {
     } on FirebaseFirestoreError catch (e) {
       hadError = true;
       expect(e, isNotNull);
-      expect(e.code, FirebaseFirestoreErrorCode.notFound);
+      expect(e.code, FirestoreErrorCode.notFound);
     } catch (e) {
       assert(false, 'This should not happen.');
     }
     expect(hadError, isTrue);
   });
 
-  test('testServerTimestampsFailViaTransactionUpdateOnNonexistentDocument', () async {
+  test('testServerTimestampsFailViaTransactionUpdateOnNonexistentDocument',
+      () async {
     bool hadError = false;
     try {
       await docRef.firestore.runTransaction<void>((Transaction transaction) {
@@ -269,7 +287,7 @@ void main() {
       expect(e, isNotNull);
       // TODO(long1eu): This should be a NOT_FOUND, but right now we retry transactions
       // on any error and so this turns into ABORTED instead.
-      expect(e.code, FirebaseFirestoreErrorCode.aborted);
+      expect(e.code, FirestoreErrorCode.aborted);
     } catch (e) {
       assert(false, 'This should not happen.');
     }

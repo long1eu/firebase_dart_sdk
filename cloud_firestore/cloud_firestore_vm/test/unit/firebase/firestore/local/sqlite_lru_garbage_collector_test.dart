@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -18,7 +18,9 @@ void main() {
     print('setUp');
 
     testCase = LruGarbageCollectorTestCase((LruGarbageCollectorParams param) =>
-        openSQLitePersistence('firebase/firestore/local/sqlite_lru_garbage_collector_test-${Uuid().v4()}.db', param));
+        openSQLitePersistence(
+            'firebase/firestore/local/sqlite_lru_garbage_collector_test-${Uuid().v4()}.db',
+            param));
     await testCase.setUp();
 
     print('setUpDone');
@@ -31,17 +33,24 @@ void main() {
     });
   });
 
-  test('testPickSequenceNumberPercentile', () => testCase.testPickSequenceNumberPercentile());
-  test('testSequenceNumberNoQueries', () => testCase.testSequenceNumberNoQueries());
-  test('testSequenceNumberForFiftyQueries', () => testCase.testSequenceNumberForFiftyQueries());
+  test('testPickSequenceNumberPercentile',
+      () => testCase.testPickSequenceNumberPercentile());
+  test('testSequenceNumberNoQueries',
+      () => testCase.testSequenceNumberNoQueries());
+  test('testSequenceNumberForFiftyQueries',
+      () => testCase.testSequenceNumberForFiftyQueries());
   test('testSequenceNumberForMultipleQueriesInATransaction',
       () => testCase.testSequenceNumberForMultipleQueriesInATransaction());
-  test('testAllCollectedQueriesInSingleTransaction', () => testCase.testAllCollectedQueriesInSingleTransaction());
+  test('testAllCollectedQueriesInSingleTransaction',
+      () => testCase.testAllCollectedQueriesInSingleTransaction());
   test('testSequenceNumbersWithMutationAndSequentialQueries',
       () => testCase.testSequenceNumbersWithMutationAndSequentialQueries());
-  test('testSequenceNumbersWithMutationsInQueries', () => testCase.testSequenceNumbersWithMutationsInQueries());
-  test('testRemoveQueriesUpThroughSequenceNumber', () => testCase.testRemoveQueriesUpThroughSequenceNumber());
-  test('testRemoveOrphanedDocuments', () => testCase.testRemoveOrphanedDocuments());
+  test('testSequenceNumbersWithMutationsInQueries',
+      () => testCase.testSequenceNumbersWithMutationsInQueries());
+  test('testRemoveQueriesUpThroughSequenceNumber',
+      () => testCase.testRemoveQueriesUpThroughSequenceNumber());
+  test('testRemoveOrphanedDocuments',
+      () => testCase.testRemoveOrphanedDocuments());
   test('testRemoveTargetsThenGC', () => testCase.testRemoveTargetsThenGC());
   test('testGetsSize', () => testCase.testGetsSize());
   test('testDisabled', () => testCase.testDisabled());

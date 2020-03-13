@@ -2,9 +2,9 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 
 /// A wrapper for reference values in Firestore.
 class ReferenceValue extends FieldValue {
@@ -36,7 +36,10 @@ class ReferenceValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ReferenceValue && runtimeType == other.runtimeType && databaseId == other.databaseId && key == other.key;
+      other is ReferenceValue &&
+          runtimeType == other.runtimeType &&
+          databaseId == other.databaseId &&
+          key == other.key;
 
   @override
   int get hashCode => databaseId.hashCode ^ key.hashCode;

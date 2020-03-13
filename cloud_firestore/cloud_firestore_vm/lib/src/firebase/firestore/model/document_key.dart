@@ -1,10 +1,10 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 17/09/2018
-import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// DocumentKey represents the location of a document in the Firestore database.
 class DocumentKey implements Comparable<DocumentKey> {
@@ -33,9 +33,11 @@ class DocumentKey implements Comparable<DocumentKey> {
   /// The path to the document.
   final ResourcePath path;
 
-  static int comparator(DocumentKey a, DocumentKey b) => a.path.compareTo(b.path);
+  static int comparator(DocumentKey a, DocumentKey b) =>
+      a.path.compareTo(b.path);
 
-  static final ImmutableSortedSet<DocumentKey> emptyKeySet = ImmutableSortedSet<DocumentKey>();
+  static final ImmutableSortedSet<DocumentKey> emptyKeySet =
+      ImmutableSortedSet<DocumentKey>();
 
   /// Returns true iff the given path is a path to a document.
   static bool isDocumentKey(ResourcePath path) => path.length.remainder(2) == 0;
@@ -52,7 +54,9 @@ class DocumentKey implements Comparable<DocumentKey> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is DocumentKey && runtimeType == other.runtimeType && path == other.path;
+      other is DocumentKey &&
+          runtimeType == other.runtimeType &&
+          path == other.path;
 
   @override
   int get hashCode => path.hashCode;

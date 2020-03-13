@@ -2,18 +2,19 @@
 // Lung Razvan <long1eu>
 // on 25/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart' as core;
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query.dart' as core;
-import 'package:firebase_firestore/src/firebase/firestore/query_document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/snapshot_metadata.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart'
+    as core;
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart' as core;
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/snapshot_metadata.dart';
 
 /// A [QuerySnapshot] contains the results of a query. It can contain zero or more [DocumentSnapshot] objects.
 ///
@@ -24,7 +25,8 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
       : assert(query != null),
         assert(snapshot != null),
         assert(_firestore != null),
-        metadata = SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
+        metadata =
+            SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
 
   final Query query;
 
@@ -32,7 +34,7 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   final SnapshotMetadata metadata;
 
   final ViewSnapshot snapshot;
-  final FirebaseFirestore _firestore;
+  final Firestore _firestore;
 
   List<DocumentChange> _cachedChanges;
   MetadataChanges _cachedChangesMetadataState;
@@ -43,7 +45,8 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Documents with changes only to their metadata will not be included.
   ///
   /// Returns the list of document changes since the last snapshot.
-  List<DocumentChange> get documentChanges => getDocumentChanges(MetadataChanges.exclude);
+  List<DocumentChange> get documentChanges =>
+      getDocumentChanges(MetadataChanges.exclude);
 
   /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
   /// be in the list as added changes.
@@ -52,14 +55,18 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   ///
   /// Returns the list of document changes since the last snapshot.
   List<DocumentChange> getDocumentChanges(MetadataChanges metadataChanges) {
-    if (metadataChanges == MetadataChanges.include && snapshot.excludesMetadataChanges) {
-      throw ArgumentError('To include metadata changes with your document changes, you must also pass '
+    if (metadataChanges == MetadataChanges.include &&
+        snapshot.excludesMetadataChanges) {
+      throw ArgumentError(
+          'To include metadata changes with your document changes, you must also pass '
           'MetadataChanges.include to getSnapshots().');
     }
 
-    if (_cachedChanges == null || _cachedChangesMetadataState != metadataChanges) {
-      _cachedChanges =
-          DocumentChange.changesFromSnapshot(_firestore, metadataChanges, snapshot).toList(growable: false);
+    if (_cachedChanges == null ||
+        _cachedChangesMetadataState != metadataChanges) {
+      _cachedChanges = DocumentChange.changesFromSnapshot(
+              _firestore, metadataChanges, snapshot)
+          .toList(growable: false);
       _cachedChangesMetadataState = metadataChanges;
     }
     return _cachedChanges;
@@ -69,7 +76,8 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   ///
   /// Returns the list of documents.
   List<DocumentSnapshot> get documents {
-    final List<DocumentSnapshot> res = List<DocumentSnapshot>(snapshot.documents.length);
+    final List<DocumentSnapshot> res =
+        List<DocumentSnapshot>(snapshot.documents.length);
     int i = 0;
     for (core.Document doc in snapshot.documents) {
       res[i] = _convertDocument(doc);

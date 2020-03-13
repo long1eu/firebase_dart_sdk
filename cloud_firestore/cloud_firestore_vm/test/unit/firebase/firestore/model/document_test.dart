@@ -2,16 +2,16 @@
 // Lung Razvan <long1eu>
 // on 27/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart';
 
 void main() {
   test('testConstructor', () {
-    final Document document = Document(
-        key('messages/first'), version(1), wrapList(<dynamic>['a', 1]), DocumentState.synced);
+    final Document document = Document(key('messages/first'), version(1),
+        wrapList(<dynamic>['a', 1]), DocumentState.synced);
 
     expect(document.key, key('messages/first'));
     expect(document.version, version(1));
@@ -26,9 +26,11 @@ void main() {
       'owner',
       map<String>(<String>['name', 'Jonny', 'title', 'scallywag'])
     ]);
-    final Document document = Document(key('rooms/eros'), version(1), data, DocumentState.synced);
+    final Document document =
+        Document(key('rooms/eros'), version(1), data, DocumentState.synced);
 
-    expect(document.getFieldValue(field('desc')), 'Discuss all the project related stuff');
+    expect(document.getFieldValue(field('desc')),
+        'Discuss all the project related stuff');
     expect(document.getFieldValue(field('owner.title')), 'scallywag');
   });
 

@@ -5,10 +5,10 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/online_state_tracker.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/online_state.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/online_state_tracker.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
 /// Well-known 'timer' IDs used when scheduling delayed tasks on the AsyncQueue. These IDs can then
@@ -50,7 +50,8 @@ class TimerId implements Comparable<TimerId> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is TimerId && runtimeType == other.runtimeType && _i == other._i;
+      identical(this, other) ||
+      other is TimerId && runtimeType == other.runtimeType && _i == other._i;
 
   @override
   int get hashCode => _i.hashCode;
@@ -107,7 +108,8 @@ class AsyncQueue {
       // might be due to excessive queries in Firestore.
       throw t;
     } else {
-      throw StateError('Internal error in Firestore (${Version.sdkVersion}). $t');
+      throw StateError(
+          'Internal error in Firestore (${Version.sdkVersion}). $t');
     }
   }
 
@@ -123,23 +125,26 @@ class AsyncQueue {
 
     // Only run the just added task in case the queue hasn't been used yet or the last task has been
     // executed
-    if (_recentActiveCompleter == null || _recentActiveCompleter.isCompleted && listWasEmpty) {
+    if (_recentActiveCompleter == null ||
+        _recentActiveCompleter.isCompleted && listWasEmpty) {
       _runNext();
     }
 
     return taskEntry.completer.future;
     //print('----QUEUE => done $caller');
-
   }
 
   /// Queue and run this Runnable task immediately after every other already queued task. Unlike [enqueue], returns void
   /// instead of a Future for use when we have no need to 'wait' on the task completing.
-  void enqueueAndForget<T>(Task<T> task, [String caller = '']) => enqueue<T>(task, '$caller-enqueueAndForget');
+  void enqueueAndForget<T>(Task<T> task, [String caller = '']) =>
+      enqueue<T>(task, '$caller-enqueueAndForget');
 
   /// Schedule a task after the specified delay.
   ///
   /// The returned [DelayedTask] can be used to cancel the task prior to its running.
-  DelayedTask<T> enqueueAfterDelay<T>(TimerId timerId, Duration delay, Task<T> task, [String caller]) {
+  DelayedTask<T> enqueueAfterDelay<T>(
+      TimerId timerId, Duration delay, Task<T> task,
+      [String caller]) {
     // todo since this is a singleton decide if we should keep it this way and removed the assert below or remove the
     //  singleton implementation and uncomment this. Having this as a singleton is not necessary a very good idea in
     //  case of multiple Firestore instances.
@@ -148,7 +153,8 @@ class AsyncQueue {
     // same timer id in the queue, so defensively reject them.
     // hardAssert(!containsDelayedTask(timerId), 'Attempted to schedule multiple operations with timer id $timerId.');
 
-    final DelayedTask<T> delayedTask = _createAndScheduleDelayedTask(timerId, delay, task, caller);
+    final DelayedTask<T> delayedTask =
+        _createAndScheduleDelayedTask(timerId, delay, task, caller);
     _delayedTasks.add(delayedTask);
 
     return delayedTask;
@@ -188,7 +194,8 @@ class AsyncQueue {
       }
     }
 
-    await Future.wait<dynamic>(result.map((DelayedTask<dynamic> it) => enqueue<dynamic>(it.task, it.caller)));
+    await Future.wait<dynamic>(result.map(
+        (DelayedTask<dynamic> it) => enqueue<dynamic>(it.task, it.caller)));
   }
 
   /// Runs the next available [Task] in the queue.
@@ -216,7 +223,8 @@ class AsyncQueue {
 
   /// Creates and returns a DelayedTask that has been scheduled to be executed on the provided queue after the provided
   /// delay.
-  DelayedTask<T> _createAndScheduleDelayedTask<T>(TimerId timerId, Duration delay, Task<T> task, String caller) {
+  DelayedTask<T> _createAndScheduleDelayedTask<T>(
+      TimerId timerId, Duration delay, Task<T> task, String caller) {
     return DelayedTask<T>._(
       caller,
       timerId,
@@ -247,7 +255,8 @@ class DelayedTask<T> implements Comparable<DelayedTask<T>> {
         assert(targetTimeMs != null),
         assert(task != null),
         assert(removeDelayedTask != null) {
-    scheduledFuture = Timer(targetTimeMs.difference(DateTime.now()), _handleDelayElapsed);
+    scheduledFuture =
+        Timer(targetTimeMs.difference(DateTime.now()), _handleDelayElapsed);
   }
 
   final String caller;
@@ -281,7 +290,8 @@ class DelayedTask<T> implements Comparable<DelayedTask<T>> {
 
   /// Marks this delayed task as done, notifying the AsyncQueue that it should be removed.
   void _markDone() {
-    hardAssert(scheduledFuture != null, 'Caller should have verified scheduledFuture is non-null.');
+    hardAssert(scheduledFuture != null,
+        'Caller should have verified scheduledFuture is non-null.');
     scheduledFuture.cancel();
     scheduledFuture = null;
     removeDelayedTask(this);

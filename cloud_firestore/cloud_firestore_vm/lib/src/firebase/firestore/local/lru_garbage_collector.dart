@@ -4,13 +4,13 @@
 
 import 'dart:async';
 
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/cloud_firestore_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:collection/collection.dart';
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
 
 import 'local_store.dart';
 
@@ -22,7 +22,8 @@ class LruGarbageCollector {
   final LruGarbageCollectorParams _params;
 
   /// A helper method to create a new scheduler.
-  LruGarbageCollectorScheduler newScheduler(AsyncQueue asyncQueue, LocalStore localStore) {
+  LruGarbageCollectorScheduler newScheduler(
+      AsyncQueue asyncQueue, LocalStore localStore) {
     return LruGarbageCollectorScheduler(this, asyncQueue, localStore);
   }
 
@@ -37,8 +38,10 @@ class LruGarbageCollector {
     if (count == 0) {
       return ListenSequence.invalid;
     }
-    final _RollingSequenceNumberBuffer buffer = _RollingSequenceNumberBuffer(count);
-    await delegate.forEachTarget((QueryData queryData) => buffer.addElement(queryData.sequenceNumber));
+    final _RollingSequenceNumberBuffer buffer =
+        _RollingSequenceNumberBuffer(count);
+    await delegate.forEachTarget(
+        (QueryData queryData) => buffer.addElement(queryData.sequenceNumber));
     await delegate.forEachOrphanedDocumentSequenceNumber(buffer.addElement);
     return buffer.maxValue;
   }
@@ -55,7 +58,8 @@ class LruGarbageCollector {
   }
 
   Future<LruGarbageCollectorResults> collect(Set<int> activeTargetIds) async {
-    if (_params.minBytesThreshold == LruGarbageCollectorParams._collectionDisabled) {
+    if (_params.minBytesThreshold ==
+        LruGarbageCollectorParams._collectionDisabled) {
       Log.d('LruGarbageCollector', 'Garbage collection skipped; disabled');
       return LruGarbageCollectorResults.didNotRun;
     }
@@ -70,9 +74,11 @@ class LruGarbageCollector {
     }
   }
 
-  Future<LruGarbageCollectorResults> _runGarbageCollection(Set<int> liveTargetIds) async {
+  Future<LruGarbageCollectorResults> _runGarbageCollection(
+      Set<int> liveTargetIds) async {
     final DateTime startTs = DateTime.now();
-    int sequenceNumbers = await calculateQueryCount(_params.percentileToCollect);
+    int sequenceNumbers =
+        await calculateQueryCount(_params.percentileToCollect);
     // Cap at the configured max
     if (sequenceNumbers > _params.maximumSequenceNumbersToCollect) {
       Log.d(
@@ -86,7 +92,8 @@ class LruGarbageCollector {
     final int upperBound = await getNthSequenceNumber(sequenceNumbers);
     final DateTime foundUpperBoundTs = DateTime.now();
 
-    final int numTargetsRemoved = await removeTargets(upperBound, liveTargetIds);
+    final int numTargetsRemoved =
+        await removeTargets(upperBound, liveTargetIds);
     final DateTime removedTargetsTs = DateTime.now();
 
     final int numDocumentsRemoved = await removeOrphanedDocuments(upperBound);
@@ -94,11 +101,15 @@ class LruGarbageCollector {
 
     if (Log.isDebugEnabled) {
       final StringBuffer desc = StringBuffer('LRU Garbage Collection:\n')
-        ..writeln('\tCounted targets in ${countedTargetsTs.difference(startTs)}')
-        ..writeln('\tDetermined least recently used $sequenceNumbers sequence numbers in '
+        ..writeln(
+            '\tCounted targets in ${countedTargetsTs.difference(startTs)}')
+        ..writeln(
+            '\tDetermined least recently used $sequenceNumbers sequence numbers in '
             '${foundUpperBoundTs.difference(countedTargetsTs)}')
-        ..writeln('\tRemoved $numTargetsRemoved targets in ${removedTargetsTs.difference(foundUpperBoundTs)}')
-        ..writeln('\tRemoved $numDocumentsRemoved documents in ${removedDocumentsTs.difference(removedTargetsTs)}')
+        ..writeln(
+            '\tRemoved $numTargetsRemoved targets in ${removedTargetsTs.difference(foundUpperBoundTs)}')
+        ..writeln(
+            '\tRemoved $numDocumentsRemoved documents in ${removedDocumentsTs.difference(removedTargetsTs)}')
         ..writeln('Total Duration: ${removedDocumentsTs.difference(startTs)}');
 
       Log.d('LruGarbageCollector', desc);
@@ -117,7 +128,8 @@ class LruGarbageCollector {
 /// Used to calculate the nth sequence number. Keeps a rolling buffer of the lowest n values passed to [addElement], and
 /// finally reports the largest of them in [maxValue].
 class _RollingSequenceNumberBuffer {
-  _RollingSequenceNumberBuffer(this.maxElements) : queue = PriorityQueue<int>(comparator);
+  _RollingSequenceNumberBuffer(this.maxElements)
+      : queue = PriorityQueue<int>(comparator);
 
   final PriorityQueue<int> queue;
   final int maxElements;
@@ -149,15 +161,20 @@ class LruGarbageCollectorParams {
   });
 
   LruGarbageCollectorParams.disabled()
-      : this(minBytesThreshold: _collectionDisabled, percentileToCollect: 0, maximumSequenceNumbersToCollect: 0);
+      : this(
+            minBytesThreshold: _collectionDisabled,
+            percentileToCollect: 0,
+            maximumSequenceNumbersToCollect: 0);
 
-  LruGarbageCollectorParams.withCacheSizeBytes(int cacheSizeBytes) : this(minBytesThreshold: cacheSizeBytes);
+  LruGarbageCollectorParams.withCacheSizeBytes(int cacheSizeBytes)
+      : this(minBytesThreshold: cacheSizeBytes);
 
   final int minBytesThreshold;
   final int percentileToCollect;
   final int maximumSequenceNumbersToCollect;
 
-  static const int _collectionDisabled = FirebaseFirestoreSettings.cacheSizeUnlimited;
+  static const int _collectionDisabled =
+      FirestoreSettings.cacheSizeUnlimited;
 
   static const int _defaultCacheSizeBytes = 100 * 1024 * 1024; // 100mb
   /// The following two constants are estimates for how we want to tune the garbage collector. If we encounter a large
@@ -178,7 +195,11 @@ class LruGarbageCollectorResults {
   });
 
   static const LruGarbageCollectorResults didNotRun =
-      LruGarbageCollectorResults(hasRun: false, sequenceNumbersCollected: 0, targetsRemoved: 0, documentsRemoved: 0);
+      LruGarbageCollectorResults(
+          hasRun: false,
+          sequenceNumbersCollected: 0,
+          targetsRemoved: 0,
+          documentsRemoved: 0);
 
   final bool hasRun;
   final int sequenceNumbersCollected;
@@ -199,7 +220,8 @@ class LruGarbageCollectorResults {
 /// This class is responsible for the scheduling of LRU garbage collection. It handles checking whether or not GC is
 /// enabled, as well as which delay to use before the next run.
 class LruGarbageCollectorScheduler {
-  LruGarbageCollectorScheduler(this._garbageCollector, this._asyncQueue, this._localStore);
+  LruGarbageCollectorScheduler(
+      this._garbageCollector, this._asyncQueue, this._localStore);
 
   final LruGarbageCollector _garbageCollector;
   final AsyncQueue _asyncQueue;
@@ -215,7 +237,8 @@ class LruGarbageCollectorScheduler {
   static const Duration _regularGcDelay = Duration(minutes: 5);
 
   void start() {
-    if (_garbageCollector._params.minBytesThreshold != LruGarbageCollectorParams._collectionDisabled) {
+    if (_garbageCollector._params.minBytesThreshold !=
+        LruGarbageCollectorParams._collectionDisabled) {
       _scheduleGC();
     }
   }
@@ -228,7 +251,8 @@ class LruGarbageCollectorScheduler {
 
   void _scheduleGC() {
     final Duration delay = _hasRun ? _regularGcDelay : _initialGcDelay;
-    _gcTask = _asyncQueue.enqueueAfterDelay<void>(TimerId.garbageCollection, delay, () async {
+    _gcTask = _asyncQueue
+        .enqueueAfterDelay<void>(TimerId.garbageCollection, delay, () async {
       await _localStore.collectGarbage(_garbageCollector);
       _hasRun = true;
       _scheduleGC();

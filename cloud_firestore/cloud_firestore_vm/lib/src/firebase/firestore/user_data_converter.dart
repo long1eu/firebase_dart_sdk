@@ -2,31 +2,33 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_path.dart' as firestore;
-import 'package:firebase_firestore/src/firebase/firestore/field_value.dart' as firestore;
-import 'package:firebase_firestore/src/firebase/firestore/geo_point.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/array_transform_operation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_mask.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/array_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/blob_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/bool_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/double_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/geo_point_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/integer_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/null_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/reference_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/string_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/timestamp_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/user_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart'
+    as firestore;
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart'
+    as firestore;
+import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/array_transform_operation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/blob_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/bool_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/double_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/geo_point_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/integer_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/null_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/reference_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/string_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/timestamp_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// Helper for parsing raw user input (provided via the API) into internal model classes.
 class UserDataConverter {
@@ -36,21 +38,25 @@ class UserDataConverter {
 
   /// Parse document data from a non-merge set() call.
   UserDataParsedSetData parseSetData(Map<String, Object> input) {
-    final UserDataParseAccumulator accumulator = UserDataParseAccumulator(UserDataSource.set);
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.set);
     final FieldValue updateData = _parseData(input, accumulator.rootContext);
     return accumulator.toSetData(updateData);
   }
 
   /// Parse document data from a set() call with SetOptions.merge() set.
-  UserDataParsedSetData parseMergeData(Map<String, Object> input, FieldMask fieldMask) {
-    final UserDataParseAccumulator accumulator = UserDataParseAccumulator(UserDataSource.mergeSet);
+  UserDataParsedSetData parseMergeData(
+      Map<String, Object> input, FieldMask fieldMask) {
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.mergeSet);
     final ObjectValue updateData = _parseData(input, accumulator.rootContext);
 
     if (fieldMask != null) {
       // Verify that all elements specified in the field mask are part of the parsed context.
       for (FieldPath field in fieldMask.mask) {
         if (!accumulator.contains(field)) {
-          throw ArgumentError('Field \'$field\' is specified in your field mask but not in your input data.');
+          throw ArgumentError(
+              'Field \'$field\' is specified in your field mask but not in your input data.');
         }
       }
 
@@ -63,19 +69,22 @@ class UserDataConverter {
   /// Parse update data from an update() call.
   UserDataParsedUpdateData parseUpdateData(Map<String, Object> data) {
     checkNotNull(data, 'Provided update data must not be null.');
-    final UserDataParseAccumulator accumulator = UserDataParseAccumulator(UserDataSource.update);
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.update);
     final UserDataParseContext context = accumulator.rootContext;
 
     ObjectValue updateData = ObjectValue.empty;
     for (MapEntry<String, Object> entry in data.entries) {
-      final FieldPath fieldPath = firestore.FieldPath.fromDotSeparatedPath(entry.key).internalPath;
+      final FieldPath fieldPath =
+          firestore.FieldPath.fromDotSeparatedPath(entry.key).internalPath;
       final Object fieldValue = entry.value;
 
       if (fieldValue is firestore.FieldValue && fieldValue.isDelete) {
         // Add it to the field mask, but don't add anything to updateData.
         context.addToFieldMask(fieldPath);
       } else {
-        final FieldValue parsedValue = _parseData(fieldValue, context.childContextForField(fieldPath));
+        final FieldValue parsedValue =
+            _parseData(fieldValue, context.childContextForField(fieldPath));
         if (parsedValue != null) {
           context.addToFieldMask(fieldPath);
           updateData = updateData.set(fieldPath, parsedValue);
@@ -88,12 +97,15 @@ class UserDataConverter {
 
   /// Parses the update data from the update(field, value, field, value...) varargs call, accepting both strings and
   /// FieldPaths.
-  UserDataParsedUpdateData parseUpdateDataFromList(List<Object> fieldsAndValues) {
+  UserDataParsedUpdateData parseUpdateDataFromList(
+      List<Object> fieldsAndValues) {
     // fieldsAndValues.length and alternating types should already be validated by collectUpdateArguments().
     final int length = fieldsAndValues.length;
-    hardAssert(length.remainder(2) == 0, 'Expected fieldAndValues to contain an even number of elements');
+    hardAssert(length.remainder(2) == 0,
+        'Expected fieldAndValues to contain an even number of elements');
 
-    final UserDataParseAccumulator accumulator = UserDataParseAccumulator(UserDataSource.update);
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.update);
     final UserDataParseContext context = accumulator.rootContext;
     ObjectValue updateData = ObjectValue.empty;
 
@@ -107,7 +119,8 @@ class UserDataConverter {
       FieldPath parsedField;
 
       if (fieldPath is String) {
-        parsedField = firestore.FieldPath.fromDotSeparatedPath(fieldPath).internalPath;
+        parsedField =
+            firestore.FieldPath.fromDotSeparatedPath(fieldPath).internalPath;
       } else {
         final firestore.FieldPath path = fieldPath;
         parsedField = path.internalPath;
@@ -117,7 +130,8 @@ class UserDataConverter {
         // Add it to the field mask, but don't add anything to updateData.
         context.addToFieldMask(parsedField);
       } else {
-        final FieldValue parsedValue = _parseData(fieldValue, context.childContextForField(parsedField));
+        final FieldValue parsedValue =
+            _parseData(fieldValue, context.childContextForField(parsedField));
         if (parsedValue != null) {
           context.addToFieldMask(parsedField);
           updateData = updateData.set(parsedField, parsedValue);
@@ -130,11 +144,13 @@ class UserDataConverter {
 
   /// Parse a 'query value' (e.g. value in a where filter or a value in a cursor bound).
   FieldValue parseQueryValue(Object input) {
-    final UserDataParseAccumulator accumulator = UserDataParseAccumulator(UserDataSource.argument);
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.argument);
     final FieldValue parsed = _parseData(input, accumulator.rootContext);
 
     hardAssert(parsed != null, 'Parsed data should not be null.');
-    hardAssert(accumulator.fieldTransforms.isEmpty, 'Field transforms should have been disallowed.');
+    hardAssert(accumulator.fieldTransforms.isEmpty,
+        'Field transforms should have been disallowed.');
     return parsed;
   }
 
@@ -183,10 +199,12 @@ class UserDataConverter {
     } else {
       for (MapEntry<String, V> entry in map.entries) {
         if (entry.key is! String) {
-          throw context.createError('Non-String Map key (${entry.value}) is not allowed');
+          throw context.createError(
+              'Non-String Map key (${entry.value}) is not allowed');
         }
         final String key = entry.key;
-        final FieldValue parsedValue = _parseData(entry.value, context.childContextForSegment(key));
+        final FieldValue parsedValue =
+            _parseData(entry.value, context.childContextForSegment(key));
         if (parsedValue != null) {
           result[key] = parsedValue;
         }
@@ -199,7 +217,8 @@ class UserDataConverter {
     final List<FieldValue> result = List<FieldValue>(list.length);
     int entryIndex = 0;
     for (T entry in list) {
-      FieldValue parsedEntry = _parseData(entry, context.childContextForArrayIndex(entryIndex));
+      FieldValue parsedEntry =
+          _parseData(entry, context.childContextForArrayIndex(entryIndex));
       // Just include nulls in the array for fields being replaced with a sentinel.
       parsedEntry ??= NullValue.nullValue();
       result[entryIndex] = parsedEntry;
@@ -209,13 +228,16 @@ class UserDataConverter {
   }
 
   /// 'Parses' the provided FieldValue, adding any necessary transforms to [context._fieldTransforms].
-  void _parseSentinelFieldValue(firestore.FieldValue value, UserDataParseContext context) {
+  void _parseSentinelFieldValue(
+      firestore.FieldValue value, UserDataParseContext context) {
     // Sentinels are only supported with writes, and not within arrays.
     if (!context.isWrite) {
-      throw context.createError('${value.methodName}() can only be used with set() and update()');
+      throw context.createError(
+          '${value.methodName}() can only be used with set() and update()');
     }
     if (context.path == null) {
-      throw context.createError('${value.methodName}() is not currently supported inside arrays');
+      throw context.createError(
+          '${value.methodName}() is not currently supported inside arrays');
     }
 
     if (value.isDelete) {
@@ -224,22 +246,28 @@ class UserDataConverter {
         // fieldMask so it gets deleted.
         context.addToFieldMask(context.path);
       } else if (context.dataSource == UserDataSource.update) {
-        hardAssert(context.path.isNotEmpty, 'FieldValue.delete() at the top level should have already been handled.');
-        throw context.createError('FieldValue.delete() can only appear at the top level of your update data');
+        hardAssert(context.path.isNotEmpty,
+            'FieldValue.delete() at the top level should have already been handled.');
+        throw context.createError(
+            'FieldValue.delete() can only appear at the top level of your update data');
       } else {
         // We shouldn't encounter delete sentinels for queries or non-merge [set()] calls.
-        throw context
-            .createError('FieldValue.delete() can only be used with update() and set() with SetOptions.merge()');
+        throw context.createError(
+            'FieldValue.delete() can only be used with update() and set() with SetOptions.merge()');
       }
     } else if (value.isServerTimestamp) {
       context.addToFieldTransforms(context.path, ServerTimestampOperation());
     } else if (value.isArrayUnion) {
-      final List<FieldValue> parsedElements = _parseArrayTransformElements(value.elements);
-      final ArrayTransformOperation arrayUnion = ArrayTransformOperationUnion(parsedElements);
+      final List<FieldValue> parsedElements =
+          _parseArrayTransformElements(value.elements);
+      final ArrayTransformOperation arrayUnion =
+          ArrayTransformOperationUnion(parsedElements);
       context.addToFieldTransforms(context.path, arrayUnion);
     } else if (value.isArrayRemove) {
-      final List<FieldValue> parsedElements = _parseArrayTransformElements(value.elements);
-      final ArrayTransformOperation arrayRemove = ArrayTransformOperationRemove(parsedElements);
+      final List<FieldValue> parsedElements =
+          _parseArrayTransformElements(value.elements);
+      final ArrayTransformOperation arrayRemove =
+          ArrayTransformOperationRemove(parsedElements);
       context.addToFieldTransforms(context.path, arrayRemove);
     } else {
       throw fail('Unknown FieldValue type: ${value.runtimeType}');
@@ -280,7 +308,8 @@ class UserDataConverter {
       if (ref.firestore != null) {
         final DatabaseId otherDb = ref.firestore.databaseId;
         if (otherDb != databaseId) {
-          throw context.createError('Document reference is for database ${otherDb.projectId}/${otherDb.databaseId} but '
+          throw context.createError(
+              'Document reference is for database ${otherDb.projectId}/${otherDb.databaseId} but '
               'should be for database ${databaseId.projectId}/${databaseId.databaseId}');
         }
       }
@@ -291,7 +320,8 @@ class UserDataConverter {
   }
 
   List<FieldValue> _parseArrayTransformElements(List<Object> elements) {
-    final UserDataParseAccumulator accumulator = UserDataParseAccumulator(UserDataSource.argument);
+    final UserDataParseAccumulator accumulator =
+        UserDataParseAccumulator(UserDataSource.argument);
     final List<FieldValue> result = List<FieldValue>(elements.length);
     for (int i = 0; i < elements.length; i++) {
       final Object element = elements[i];

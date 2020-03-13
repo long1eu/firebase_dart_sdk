@@ -4,24 +4,24 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
+// ignore_for_file: unawaited_futures
 void main() {
-  //FirebaseFirestore firestore;
   IntegrationTestUtil.currentDatabasePath = 'integration/write_batch';
 
   setUp(() => testFirestore());
@@ -37,7 +37,10 @@ void main() {
 
   test('testSetDocuments', () async {
     final DocumentReference doc = await testDocument();
-    await doc.firestore.batch().set(doc, map<String>(<String>['foo', 'bar'])).commit();
+    await doc.firestore
+        .batch()
+        .set(doc, map<String>(<String>['foo', 'bar']))
+        .commit();
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
     expect(snapshot.data, map<String>(<String>['foo', 'bar']));
@@ -141,8 +144,13 @@ void main() {
       map<String>(<String>['d', 'old'])
     ]));
 
-    await doc.firestore.batch().updateFromList(doc, <String>['a.b', 'new']).commit();
-    await doc.firestore.batch().update(doc, map(<String>['c.d', 'new'])).commit();
+    await doc.firestore
+        .batch()
+        .updateFromList(doc, <String>['a.b', 'new']).commit();
+    await doc.firestore
+        .batch()
+        .update(doc, map(<String>['c.d', 'new']))
+        .commit();
 
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
@@ -171,13 +179,20 @@ void main() {
     final CollectionReference collection = await testCollection();
     final DocumentReference docA = collection.document('a');
     final DocumentReference docB = collection.document('b');
-    final EventAccumulator<QuerySnapshot> accumulator = EventAccumulator<QuerySnapshot>();
-    collection.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
+    final EventAccumulator<QuerySnapshot> accumulator =
+        EventAccumulator<QuerySnapshot>();
+    collection
+        .getSnapshots(MetadataChanges.include)
+        .listen(accumulator.onData, onError: accumulator.onError);
     final QuerySnapshot initialSnap = await accumulator.wait();
     expect(initialSnap.length, 0);
 
     // Atomically write two documents.
-    await collection.firestore.batch().set(docA, map(<dynamic>['a', 1])).set(docB, map(<dynamic>['b', 2])).commit();
+    await collection.firestore
+        .batch()
+        .set(docA, map(<dynamic>['a', 1]))
+        .set(docB, map(<dynamic>['b', 2]))
+        .commit();
 
     final QuerySnapshot localSnap = await accumulator.wait();
     expect(localSnap.metadata.hasPendingWrites, isTrue);
@@ -198,8 +213,11 @@ void main() {
     final CollectionReference collection = await testCollection();
     final DocumentReference docA = collection.document('a');
     final DocumentReference docB = collection.document('b');
-    final EventAccumulator<QuerySnapshot> accumulator = EventAccumulator<QuerySnapshot>();
-    collection.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
+    final EventAccumulator<QuerySnapshot> accumulator =
+        EventAccumulator<QuerySnapshot>();
+    collection
+        .getSnapshots(MetadataChanges.include)
+        .listen(accumulator.onData, onError: accumulator.onError);
 
     final QuerySnapshot initialSnap = await accumulator.wait();
     expect(initialSnap.length, 0);
@@ -230,15 +248,18 @@ void main() {
 
     expect(err, isNotNull);
     expect(err, const TypeMatcher<FirebaseFirestoreError>());
-    expect((err as FirebaseFirestoreError).code, FirebaseFirestoreErrorCode.notFound);
+    expect(err.code, FirestoreErrorCode.notFound);
   });
 
   test('testWriteTheSameServerTimestampAcrossWrites', () async {
     final CollectionReference collection = await testCollection();
     final DocumentReference docA = collection.document('a');
     final DocumentReference docB = collection.document('b');
-    final EventAccumulator<QuerySnapshot> accumulator = EventAccumulator<QuerySnapshot>();
-    collection.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
+    final EventAccumulator<QuerySnapshot> accumulator =
+        EventAccumulator<QuerySnapshot>();
+    collection
+        .getSnapshots(MetadataChanges.include)
+        .listen(accumulator.onData, onError: accumulator.onError);
     final QuerySnapshot initialSnap = await accumulator.wait();
     expect(initialSnap.length, 0);
 
@@ -269,8 +290,11 @@ void main() {
 
   test('testCanWriteTheSameDocumentMultipleTimes', () async {
     final DocumentReference doc = await testDocument();
-    final EventAccumulator<DocumentSnapshot> accumulator = EventAccumulator<DocumentSnapshot>();
-    doc.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
+    final EventAccumulator<DocumentSnapshot> accumulator =
+        EventAccumulator<DocumentSnapshot>();
+    doc
+        .getSnapshots(MetadataChanges.include)
+        .listen(accumulator.onData, onError: accumulator.onError);
     final DocumentSnapshot initialSnap = await accumulator.wait();
     expect(initialSnap.exists, isFalse);
 
@@ -278,18 +302,21 @@ void main() {
         .batch()
         .delete(doc)
         .set(doc, map(<dynamic>['a', 1, 'b', 1, 'when', 'when']))
-        .update(doc, map(<dynamic>['b', 2, 'when', FieldValue.serverTimestamp()]))
+        .update(
+            doc, map(<dynamic>['b', 2, 'when', FieldValue.serverTimestamp()]))
         .commit();
 
     final DocumentSnapshot localSnap = await accumulator.wait();
     expect(localSnap.metadata.hasPendingWrites, isTrue);
-    expect(localSnap.data, map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', null]));
+    expect(
+        localSnap.data, map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', null]));
 
     final DocumentSnapshot serverSnap = await accumulator.wait();
     expect(serverSnap.metadata.hasPendingWrites, isFalse);
     final Timestamp when = serverSnap.getTimestamp('when');
     expect(when, isNotNull);
-    expect(serverSnap.data, map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', when]));
+    expect(
+        serverSnap.data, map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', when]));
   });
 }
 

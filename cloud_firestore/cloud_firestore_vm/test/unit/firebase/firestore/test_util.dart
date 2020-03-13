@@ -3,27 +3,27 @@
 // on 28/09/2018
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change_aggregator.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_aggregator.dart';
 import 'package:meta/meta.dart';
 import 'package:mockito/mockito.dart';
 
 import '../../../util/test_util.dart' as util;
 
-final FirebaseFirestore firestore = FirebaseFirestoreMock();
+final Firestore firestore = FirebaseFirestoreMock();
 
 CollectionReference collectionReference(String path) {
   return CollectionReference(ResourcePath.fromString(path), firestore);
@@ -33,7 +33,8 @@ DocumentReference documentReference(String path) {
   return DocumentReference(util.key(path), firestore);
 }
 
-DocumentSnapshot documentSnapshot(String path, Map<String, Object> data, bool isFromCache) {
+DocumentSnapshot documentSnapshot(
+    String path, Map<String, Object> data, bool isFromCache) {
   if (data == null) {
     return DocumentSnapshot.fromNoDocument(
       firestore,
@@ -66,14 +67,23 @@ Query query(String path) {
 /// value being the document contents.
 /// [isFromCache] whether the query snapshot is cache result.
 /// Returns a query snapshot that consists of both sets of documents.
-QuerySnapshot querySnapshot(String path, Map<String, ObjectValue> oldDocs,
-    Map<String, ObjectValue> docsToAdd, bool hasPendingWrites, bool isFromCache) {
+QuerySnapshot querySnapshot(
+    String path,
+    Map<String, ObjectValue> oldDocs,
+    Map<String, ObjectValue> docsToAdd,
+    bool hasPendingWrites,
+    bool isFromCache) {
   DocumentSet oldDocuments = util.docSet(Document.keyComparator);
   ImmutableSortedSet<DocumentKey> mutatedKeys = DocumentKey.emptyKeySet;
   for (MapEntry<String, ObjectValue> pair in oldDocs.entries) {
     final String docKey = '$path/${pair.key}';
-    oldDocuments = oldDocuments.add(util.docForValue(docKey, 1, pair.value,
-        hasPendingWrites ? DocumentState.synced : DocumentState.localMutations));
+    oldDocuments = oldDocuments.add(util.docForValue(
+        docKey,
+        1,
+        pair.value,
+        hasPendingWrites
+            ? DocumentState.synced
+            : DocumentState.localMutations));
 
     if (hasPendingWrites) {
       mutatedKeys = mutatedKeys.insert(util.key(docKey));
@@ -87,7 +97,8 @@ QuerySnapshot querySnapshot(String path, Map<String, ObjectValue> oldDocs,
     final Document docToAdd = util.docForValue(docKey, 1, pair.value,
         hasPendingWrites ? DocumentState.synced : DocumentState.localMutations);
     newDocuments = newDocuments.add(docToAdd);
-    documentChanges.add(DocumentViewChange(DocumentViewChangeType.added, docToAdd));
+    documentChanges
+        .add(DocumentViewChange(DocumentViewChangeType.added, docToAdd));
 
     if (hasPendingWrites) {
       mutatedKeys = mutatedKeys.insert(util.key(docKey));
@@ -110,14 +121,15 @@ QuerySnapshot querySnapshot(String path, Map<String, ObjectValue> oldDocs,
 
 TestTargetMetadataProvider get testTargetMetadataProvider {
   final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys =
-  <int, ImmutableSortedSet<DocumentKey>>{};
+      <int, ImmutableSortedSet<DocumentKey>>{};
   final Map<int, QueryData> queryDataMap = <int, QueryData>{};
 
   return TestTargetMetadataProvider(
     syncedKeys,
     queryDataMap,
     getQueryDataForTarget: (int targetId) => queryDataMap[targetId],
-    getRemoteKeysForTarget: (int targetId) => syncedKeys[targetId] ?? DocumentKey.emptyKeySet,
+    getRemoteKeysForTarget: (int targetId) =>
+        syncedKeys[targetId] ?? DocumentKey.emptyKeySet,
   );
 }
 
@@ -125,23 +137,29 @@ TestTargetMetadataProvider get testTargetMetadataProvider {
 /// access to the [TargetMetadataProvider] callbacks. Any target accessed via
 /// these callbacks must be registered beforehand via [setSyncedKeys].
 class TestTargetMetadataProvider extends TargetMetadataProvider {
-  TestTargetMetadataProvider(this.syncedKeys, this.queryDataMap,
-      {@required ImmutableSortedSet<DocumentKey> Function(int targetId) getRemoteKeysForTarget,
-        @required QueryData Function(int targetId) getQueryDataForTarget})
+  TestTargetMetadataProvider(
+      this.syncedKeys,
+      this.queryDataMap,
+      {@required
+          ImmutableSortedSet<DocumentKey> Function(int targetId)
+              getRemoteKeysForTarget,
+      @required
+          QueryData Function(int targetId) getQueryDataForTarget})
       : super(
-    getRemoteKeysForTarget: getRemoteKeysForTarget,
-    getQueryDataForTarget: getQueryDataForTarget,
-  );
+          getRemoteKeysForTarget: getRemoteKeysForTarget,
+          getQueryDataForTarget: getQueryDataForTarget,
+        );
 
   final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys;
 
   final Map<int, QueryData> queryDataMap;
 
   /// Sets or replaces the local state for the provided query data.
-  void setSyncedKeys(QueryData queryData, ImmutableSortedSet<DocumentKey> keys) {
+  void setSyncedKeys(
+      QueryData queryData, ImmutableSortedSet<DocumentKey> keys) {
     queryDataMap[queryData.targetId] = queryData;
     syncedKeys[queryData.targetId] = keys;
   }
 }
 
-class FirebaseFirestoreMock extends Mock implements FirebaseFirestore {}
+class FirebaseFirestoreMock extends Mock implements Firestore {}

@@ -3,20 +3,20 @@
 // on 24/09/2018
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/target_state.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_state.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
 /// A helper class to accumulate watch changes into a [RemoteEvent] and other target information.
@@ -29,10 +29,12 @@ class WatchChangeAggregator {
   final Map<int, TargetState> _targetStates = <int, TargetState>{};
 
   /// Keeps track of the documents to update since the last raised snapshot.
-  Map<DocumentKey, MaybeDocument> _pendingDocumentUpdates = <DocumentKey, MaybeDocument>{};
+  Map<DocumentKey, MaybeDocument> _pendingDocumentUpdates =
+      <DocumentKey, MaybeDocument>{};
 
   /// A mapping of document keys to their set of target IDs.
-  Map<DocumentKey, Set<int>> _pendingDocumentTargetMapping = <DocumentKey, Set<int>>{};
+  Map<DocumentKey, Set<int>> _pendingDocumentTargetMapping =
+      <DocumentKey, Set<int>>{};
 
   /// A list of targets with existence filter mismatches. These targets are known to be inconsistent
   /// and their listens needs to be re-established by [RemoteStore].
@@ -52,7 +54,8 @@ class WatchChangeAggregator {
     }
 
     for (int targetId in documentChange.removedTargetIds) {
-      _removeDocumentFromTarget(targetId, documentKey, documentChange.newDocument);
+      _removeDocumentFromTarget(
+          targetId, documentKey, documentChange.newDocument);
     }
   }
 
@@ -86,8 +89,8 @@ class WatchChangeAggregator {
           if (!targetState.isPending()) {
             removeTarget(targetId);
           }
-          hardAssert(
-              targetChange.cause == null, 'WatchChangeAggregator does not handle errored targets');
+          hardAssert(targetChange.cause == null,
+              'WatchChangeAggregator does not handle errored targets');
           break;
         case WatchTargetChangeType.current:
           if (_isActiveTarget(targetId)) {
@@ -105,7 +108,8 @@ class WatchChangeAggregator {
           }
           break;
         default:
-          throw fail('Unknown target watch change state: ${targetChange.changeType}');
+          throw fail(
+              'Unknown target watch change state: ${targetChange.changeType}');
       }
     }
   }
@@ -123,7 +127,8 @@ class WatchChangeAggregator {
 
   /// Handles existence filters and synthesizes deletes for filter mismatches. Targets that are
   /// invalidated by filter mismatches are added to [pendingTargetResets].
-  void handleExistenceFilter(WatchChangeExistenceFilterWatchChange watchChange) {
+  void handleExistenceFilter(
+      WatchChangeExistenceFilterWatchChange watchChange) {
     final int targetId = watchChange.targetId;
     final int expectedCount = watchChange.existenceFilter.count;
 
@@ -147,8 +152,8 @@ class WatchChangeAggregator {
             ),
           );
         } else {
-          hardAssert(
-              expectedCount == 1, 'Single document existence filter with count: $expectedCount');
+          hardAssert(expectedCount == 1,
+              'Single document existence filter with count: $expectedCount');
         }
       } else {
         final int currentSize = _getCurrentDocumentCountForTarget(targetId);
@@ -179,7 +184,8 @@ class WatchChangeAggregator {
           // received the document. This resolves the limbo state of the document, removing it from
           // [limboDocumentRefs].
           final DocumentKey key = DocumentKey.fromPath(queryData.query.path);
-          if (_pendingDocumentUpdates[key] == null && !_targetContainsDocument(targetId, key)) {
+          if (_pendingDocumentUpdates[key] == null &&
+              !_targetContainsDocument(targetId, key)) {
             _removeDocumentFromTarget(
               targetId,
               key,
@@ -203,7 +209,8 @@ class WatchChangeAggregator {
 
     // We extract the set of limbo-only document updates as the GC logic special-cases documents
     // that do not appear in the query cache.
-    for (MapEntry<DocumentKey, Set<int>> entry in _pendingDocumentTargetMapping.entries) {
+    for (MapEntry<DocumentKey, Set<int>> entry
+        in _pendingDocumentTargetMapping.entries) {
       final DocumentKey key = entry.key;
       final Set<int> targets = entry.value;
 
@@ -211,7 +218,8 @@ class WatchChangeAggregator {
 
       for (int targetId in targets) {
         final QueryData queryData = _queryDataForActiveTarget(targetId);
-        if (queryData != null && queryData.purpose != QueryPurpose.limboResolution) {
+        if (queryData != null &&
+            queryData.purpose != QueryPurpose.limboResolution) {
           isOnlyLimboTarget = false;
           break;
         }
@@ -245,9 +253,10 @@ class WatchChangeAggregator {
       return;
     }
 
-    final DocumentViewChangeType changeType = _targetContainsDocument(targetId, document.key)
-        ? DocumentViewChangeType.modified
-        : DocumentViewChangeType.added;
+    final DocumentViewChangeType changeType =
+        _targetContainsDocument(targetId, document.key)
+            ? DocumentViewChangeType.modified
+            : DocumentViewChangeType.added;
 
     final TargetState targetState = _ensureTargetState(targetId);
     targetState.addDocumentChange(document.key, changeType);
@@ -261,7 +270,8 @@ class WatchChangeAggregator {
   /// target, but the document's state is still known (e.g. we know that the document was deleted or
   /// we received the change that caused the filter mismatch), the new document can be provided to
   /// update the remote document cache.
-  void _removeDocumentFromTarget(int targetId, DocumentKey key, MaybeDocument updatedDocument) {
+  void _removeDocumentFromTarget(
+      int targetId, DocumentKey key, MaybeDocument updatedDocument) {
     if (!_isActiveTarget(targetId)) {
       return;
     }
@@ -336,7 +346,8 @@ class WatchChangeAggregator {
   /// Resets the state of a [Watch] target to its initial state (e.g. sets [current] to false,
   /// clears the resume token and removes its target mapping from all documents).
   void _resetTarget(int targetId) {
-    hardAssert(_targetStates[targetId] != null && !_targetStates[targetId].isPending(),
+    hardAssert(
+        _targetStates[targetId] != null && !_targetStates[targetId].isPending(),
         'Should only reset active targets');
     _targetStates[targetId] = TargetState();
 
@@ -366,7 +377,8 @@ class TargetMetadataProvider {
 
   /// Returns the set of remote document keys for the given target id as of the last raised snapshot
   /// or an empty set of document keys for unknown targets.
-  final ImmutableSortedSet<DocumentKey> Function(int targetId) getRemoteKeysForTarget;
+  final ImmutableSortedSet<DocumentKey> Function(int targetId)
+      getRemoteKeysForTarget;
 
   /// Returns the [QueryData] for an active target id or 'null' if this query is unknown or has
   /// become inactive.

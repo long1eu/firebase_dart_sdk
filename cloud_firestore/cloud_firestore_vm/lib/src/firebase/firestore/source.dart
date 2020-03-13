@@ -1,9 +1,8 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 26/09/2018
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 
 /// Configures the behavior of [DocumentReference.get] and [Query.get]. By providing a [Source]
 /// value, these methods can be configured to fetch results only from the server, only from the

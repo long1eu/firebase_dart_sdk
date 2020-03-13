@@ -3,8 +3,8 @@
 // on 17/09/2018
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_collections.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_collections.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 
 import 'document.dart';
 
@@ -93,8 +93,10 @@ class DocumentSet extends Iterable<Document> {
     // accumulating values that aren't in the index.
     final DocumentSet removed = remove(document.key);
 
-    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex = removed._keyIndex.insert(document.key, document);
-    final ImmutableSortedSet<Document> newSortedSet = removed.sortedSet.insert(document);
+    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
+        removed._keyIndex.insert(document.key, document);
+    final ImmutableSortedSet<Document> newSortedSet =
+        removed.sortedSet.insert(document);
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
@@ -108,13 +110,15 @@ class DocumentSet extends Iterable<Document> {
     _keyIndex.remove(key);
     sortedSet.remove(document);
 
-    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex = _keyIndex.remove(key);
-    final ImmutableSortedSet<Document> newSortedSet = sortedSet.remove(document);
+    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
+        _keyIndex.remove(key);
+    final ImmutableSortedSet<Document> newSortedSet =
+        sortedSet.remove(document);
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
   /// Returns a copy of the documents in this set as array. This is O(n) in the size of the set.
-  // TODO(long1eu):Consider making this backed by the set instead to achieve O(1)?
+  // TODO(long1eu): Consider making this backed by the set instead to achieve O(1)?
   @override
   List<Document> toList({bool growable = true}) {
     final List<Document> documents = <Document>[];
@@ -134,7 +138,8 @@ class DocumentSet extends Iterable<Document> {
 
     if (other is DocumentSet) {
       final Iterator<Document> thisList = toList(growable: false).iterator;
-      final Iterator<Document> otherList = other.toList(growable: false).iterator;
+      final Iterator<Document> otherList =
+          other.toList(growable: false).iterator;
 
       while (thisList.moveNext()) {
         final Document thisDoc = thisList.current;

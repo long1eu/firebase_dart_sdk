@@ -4,15 +4,15 @@
 
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart' as core;
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart'
+    as core;
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 
 /// A [CollectionReference] can be used for adding documents, getting document references, and
 /// querying for documents (using the methods inherited from [Query]).
@@ -21,7 +21,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class CollectionReference extends Query {
-  CollectionReference(ResourcePath path, FirebaseFirestore firestore)
+  CollectionReference(ResourcePath path, Firestore firestore)
       : assert(
             path.length.remainder(2) == 1,
             'Invalid collection reference. Collection references must have an odd number of '
@@ -61,7 +61,8 @@ class CollectionReference extends Query {
     documentPath ??= autoId();
     checkNotNull(documentPath, 'Provided document path must not be null.');
     return DocumentReference.forPath(
-        query.path.appendField(ResourcePath.fromString(documentPath)), firestore);
+        query.path.appendField(ResourcePath.fromString(documentPath)),
+        firestore);
   }
 
   /// Adds a new document to this collection with the specified data, assigning it a document ID

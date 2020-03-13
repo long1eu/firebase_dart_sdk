@@ -3,7 +3,7 @@
 // on 17/09/2018
 
 import 'package:collection/collection.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// BasePath represents a path sequence in the Firestore database. It is composed of an ordered
 /// sequence of string segments.
@@ -28,7 +28,8 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   ///
   /// Returns a new path with this segments path plus the new one
   B appendField(B path) {
-    final List<String> newPath = List<String>.from(segments)..addAll(path.segments);
+    final List<String> newPath = List<String>.from(segments)
+      ..addAll(path.segments);
     return createPathWithSegments(newPath);
   }
 
@@ -36,7 +37,8 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   /// Otherwise will return a new path with the current path's first [count] segments removed.
   B popFirst([int count = 1]) {
     final int length = this.length;
-    hardAssert(length >= count, 'Can\'t call popFirst with count > length() ($count > $length)');
+    hardAssert(length >= count,
+        'Can\'t call popFirst with count > length() ($count > $length)');
     return createPathWithSegments(segments.sublist(count, length));
   }
 

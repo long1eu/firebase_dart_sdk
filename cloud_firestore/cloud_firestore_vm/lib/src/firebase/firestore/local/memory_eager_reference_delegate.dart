@@ -4,15 +4,15 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_mutation_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_query_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_remote_document_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 
 /// Provides eager garbage collection for [MemoryPersistence].
 class MemoryEagerReferenceDelegate implements ReferenceDelegate {
@@ -46,7 +46,8 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   @override
   Future<void> removeTarget(QueryData queryData) async {
     final MemoryQueryCache queryCache = persistence.queryCache;
-    (await queryCache.getMatchingKeysForTargetId(queryData.targetId)).forEach(orphanedDocuments.add);
+    (await queryCache.getMatchingKeysForTargetId(queryData.targetId))
+        .forEach(orphanedDocuments.add);
 
     await queryCache.removeQueryData(queryData);
   }
@@ -59,7 +60,8 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   /// In eager garbage collection, collection is run on transaction commit.
   @override
   Future<void> onTransactionCommitted() async {
-    final MemoryRemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
+    final MemoryRemoteDocumentCache remoteDocuments =
+        persistence.remoteDocumentCache;
 
     for (DocumentKey key in orphanedDocuments) {
       final bool isReferenced = await _isReferenced(key);

@@ -4,22 +4,25 @@
 
 part of 'firebase.dart';
 
-ProjectsWebAppsResourceApi get webApps => _firebaseApi.projects.webApps;
+ProjectsWebAppsResourceApi get webApps => firebaseApi.projects.webApps;
 
-Future<void> createWebApp(
-    {@required String path, @required String displayName}) async {
+Future<void> createWebApp({
+  @required String path,
+  @required String clientId,
+  @required String displayName,
+  String webPackagesVersion = '7.10.0',
+}) async {
   assert(displayName != null && displayName.isNotEmpty);
 
   final WebAppConfig config = await _addWebAppToFirebase(displayName);
-  print(jsonEncode(config.toJson()));
-
-  final Directory webDir = Directory('$path/example/web');
-
   final File htmlFile = File('$path/example/web/index.html');
   final String data = htmlFile.readAsStringSync();
 
-  final Document document = HtmlParser(data).parse();
-  print(document.head);
+  final String result = data.replaceAll(
+      '<link rel="manifest" href="/manifest.json">',
+      '''<link rel="manifest" href="/manifest.json">\n${getConfiguration(clientId, webPackagesVersion, config)}''');
+
+  htmlFile.writeAsStringSync(result);
 }
 
 Future<WebAppConfig> _addWebAppToFirebase(String displayName) async {
@@ -32,4 +35,24 @@ Future<WebAppConfig> _addWebAppToFirebase(String displayName) async {
   );
 
   return webApps.getConfig('${app.name}/config');
+}
+
+String getConfiguration(String clientId, String version, WebAppConfig config) {
+  return '''
+  <meta name="google-signin-client_id" content="$clientId">
+  <script src="https://www.gstatic.com/firebasejs/$version/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/$version/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/$version/firebase-analytics.js"></script>
+  <script>
+      firebase.initializeApp({
+          "projectId": "${config.projectId}",
+          "appId": "${config.appId}",
+          "databaseURL": "${config.databaseURL}",
+          "storageBucket": "${config.storageBucket}",
+          "locationId": "${config.locationId}",
+          "apiKey": "${config.apiKey}",
+          "authDomain": "${config.authDomain}",
+          "messagingSenderId": "${config.messagingSenderId}"
+      });
+  </script>''';
 }

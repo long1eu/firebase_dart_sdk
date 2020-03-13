@@ -4,24 +4,24 @@
 
 import 'dart:collection';
 
-import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/geo_point.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/array_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/blob_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/bool_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/double_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/geo_point_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/integer_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/null_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/reference_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/server_timestamp_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/string_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/timestamp_value.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/blob_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/bool_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/double_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/geo_point_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/integer_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/null_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/reference_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/string_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/timestamp_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/comparator_test.dart';
@@ -46,7 +46,13 @@ void main() {
   }
 
   test('testIntegerValueConversion', () {
-    final List<int> testCases = <int>[IntegerValue.max, -1, 0, 1, IntegerValue.max];
+    final List<int> testCases = <int>[
+      IntegerValue.max,
+      -1,
+      0,
+      1,
+      IntegerValue.max
+    ];
     for (int i in testCases) {
       final FieldValue value = wrap(i);
       expect(value is IntegerValue, isTrue);
@@ -111,7 +117,10 @@ void main() {
   });
 
   test('testTimestampValueConversion', () {
-    final List<Timestamp> testCases = <Timestamp>[Timestamp(0, 0), Timestamp(1356048000, 0)];
+    final List<Timestamp> testCases = <Timestamp>[
+      Timestamp(0, 0),
+      Timestamp(1356048000, 0)
+    ];
     for (Timestamp d in testCases) {
       final FieldValue value = wrap(d);
       expect(value is TimestampValue, isTrue);
@@ -121,7 +130,10 @@ void main() {
   });
 
   test('testGeoPointValueConversion', () {
-    final List<GeoPoint> testCases = <GeoPoint>[GeoPoint(1.24, 4.56), GeoPoint(-20.0, 100.0)];
+    final List<GeoPoint> testCases = <GeoPoint>[
+      GeoPoint(1.24, 4.56),
+      GeoPoint(-20.0, 100.0)
+    ];
     for (GeoPoint p in testCases) {
       final FieldValue value = wrap(p);
       expect(value is GeoPointValue, isTrue);
@@ -143,7 +155,10 @@ void main() {
 
   test('testResourceNameConversion', () {
     final DatabaseId id = DatabaseId.forProject('project');
-    final List<DocumentReference> testCases = <DocumentReference>[ref('foo/bar'), ref('foo/baz')];
+    final List<DocumentReference> testCases = <DocumentReference>[
+      ref('foo/bar'),
+      ref('foo/baz')
+    ];
     for (DocumentReference docRef in testCases) {
       final FieldValue value = wrap(docRef);
       expect(value is ReferenceValue, isTrue);
@@ -158,7 +173,8 @@ void main() {
   });
 
   test('testWrapsSimpleObjects', () {
-    final Map<String, Object> actual = map(<dynamic>['a', 'foo', 'b', 1, 'c', true, 'd', null]);
+    final Map<String, Object> actual =
+        map(<dynamic>['a', 'foo', 'b', 1, 'c', true, 'd', null]);
 
     final Map<String, FieldValue> expected = map(<dynamic>[
       'a',
@@ -391,8 +407,8 @@ void main() {
   });
 
   test('testArrays', () {
-    final ArrayValue expected =
-        ArrayValue.fromList(<FieldValue>[StringValue.valueOf('value'), BoolValue.valueOf(true)]);
+    final ArrayValue expected = ArrayValue.fromList(
+        <FieldValue>[StringValue.valueOf('value'), BoolValue.valueOf(true)]);
     final FieldValue actual = wrap(<dynamic>['value', true]);
     expect(actual, expected);
   });
@@ -416,14 +432,17 @@ void main() {
           BlobValue.valueOf(blob(<int>[0, 1, 2]))
         ])
         .addItem(wrap(blob(<int>[0, 1])))
-        .addEqualityGroup(<FieldValue>[wrap('string'), StringValue.valueOf('string')])
+        .addEqualityGroup(
+            <FieldValue>[wrap('string'), StringValue.valueOf('string')])
         .addItem(StringValue.valueOf('strin'))
         // latin small letter e + combining acute accent
         .addItem(StringValue.valueOf('e\u0301b'))
         // latin small letter e with acute accent
         .addItem(StringValue.valueOf('\u00e9a'))
-        .addEqualityGroup(
-            <FieldValue>[wrap(date1), TimestampValue.valueOf(Timestamp.fromDate(date1))])
+        .addEqualityGroup(<FieldValue>[
+          wrap(date1),
+          TimestampValue.valueOf(Timestamp.fromDate(date1))
+        ])
         .addItem(TimestampValue.valueOf(Timestamp.fromDate(date2)))
         // NOTE: ServerTimestampValues can't be parsed via wrap().
         .addEqualityGroup(<ServerTimestampValue>[
@@ -431,15 +450,19 @@ void main() {
           ServerTimestampValue(Timestamp.fromDate(date1), null)
         ])
         .addItem(ServerTimestampValue(Timestamp.fromDate(date2), null))
-        .addEqualityGroup(
-            <FieldValue>[wrap(GeoPoint(0.0, 1.0)), GeoPointValue.valueOf(GeoPoint(0.0, 1.0))])
+        .addEqualityGroup(<FieldValue>[
+          wrap(GeoPoint(0.0, 1.0)),
+          GeoPointValue.valueOf(GeoPoint(0.0, 1.0))
+        ])
         .addItem(GeoPointValue.valueOf(GeoPoint(1.0, 0.0)))
         .addEqualityGroup(<FieldValue>[
           wrap(ref('coll/doc1')),
           ReferenceValue.valueOf(dbId('project'), key('coll/doc1'))
         ])
-        .addItem(ReferenceValue.valueOf(dbId('project', 'bar'), key('coll/doc2')))
-        .addItem(ReferenceValue.valueOf(dbId('project', 'baz'), key('coll/doc2')))
+        .addItem(
+            ReferenceValue.valueOf(dbId('project', 'bar'), key('coll/doc2')))
+        .addItem(
+            ReferenceValue.valueOf(dbId('project', 'baz'), key('coll/doc2')))
         .addEqualityGroup(<FieldValue>[
           wrap(<String>['foo', 'bar']),
           wrap(<String>['foo', 'bar'])

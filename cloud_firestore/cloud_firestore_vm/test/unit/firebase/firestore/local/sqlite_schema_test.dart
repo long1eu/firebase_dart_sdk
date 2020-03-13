@@ -5,13 +5,13 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_schema.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
-import 'package:firebase_firestore/src/proto/index.dart' as proto;
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_schema.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
 import 'package:test/test.dart';
 
 import 'mock/database_mock.dart';
@@ -49,14 +49,17 @@ void main() {
     Map<String, Set<String>> tables = <String, Set<String>>{};
     for (int toVersion = 1; toVersion <= SQLiteSchema.version; toVersion++) {
       await schema.runMigrations(toVersion - 1, toVersion);
-      final Map<String, Set<String>> newTables = await _getCurrentSchema(schema, db);
+      final Map<String, Set<String>> newTables =
+          await _getCurrentSchema(schema, db);
       _assertNoRemovals(tables, newTables, toVersion);
       tables = newTables;
     }
   });
 
   test('canRecoverFromDowngrades', () async {
-    for (int downgradeVersion = 0; downgradeVersion < SQLiteSchema.version; downgradeVersion++) {
+    for (int downgradeVersion = 0;
+        downgradeVersion < SQLiteSchema.version;
+        downgradeVersion++) {
       // Upgrade schema to current, then upgrade from `downgradeVersion` to current
       await schema.runMigrations();
       await schema.runMigrations(downgradeVersion, SQLiteSchema.version);
@@ -68,7 +71,8 @@ void main() {
     await _assertNoResultsForQuery(db, 'SELECT uid, batch_id FROM mutations');
     await db.execute("INSERT INTO mutations (uid, batch_id) VALUES ('foo', 1)");
 
-    final List<Map<String, dynamic>> result = await db.query('SELECT uid, batch_id FROM mutations');
+    final List<Map<String, dynamic>> result =
+        await db.query('SELECT uid, batch_id FROM mutations');
 
     expect(result, isNotEmpty);
     expect(result.first['uid'], 'foo');
@@ -79,12 +83,17 @@ void main() {
   test('deletesAllTargets', () async {
     await schema.runMigrations(0, 2);
 
-    await db.execute('INSERT INTO targets (canonical_id, target_id) VALUES (\'foo1\', 1)');
-    await db.execute('INSERT INTO targets (canonical_id, target_id) VALUES (\'foo2\', 2)');
-    await db.execute('INSERT INTO target_globals (highest_target_id) VALUES (2)');
+    await db.execute(
+        'INSERT INTO targets (canonical_id, target_id) VALUES (\'foo1\', 1)');
+    await db.execute(
+        'INSERT INTO targets (canonical_id, target_id) VALUES (\'foo2\', 2)');
+    await db
+        .execute('INSERT INTO target_globals (highest_target_id) VALUES (2)');
 
-    await db.execute('INSERT INTO target_documents (target_id, path) VALUES (1, \'foo/bar\')');
-    await db.execute('INSERT INTO target_documents (target_id, path) VALUES (2, \'foo/baz\')');
+    await db.execute(
+        'INSERT INTO target_documents (target_id, path) VALUES (1, \'foo/bar\')');
+    await db.execute(
+        'INSERT INTO target_documents (target_id, path) VALUES (2, \'foo/baz\')');
 
     await schema.runMigrations(2, 3);
 
@@ -97,11 +106,14 @@ void main() {
     await schema.runMigrations(0, 3);
     const int expected = 50;
     for (int i = 0; i < expected; i++) {
-      await db.execute('INSERT INTO targets (canonical_id, target_id) VALUES (?, ?)', <dynamic>['foo$i', i]);
+      await db.execute(
+          'INSERT INTO targets (canonical_id, target_id) VALUES (?, ?)',
+          <dynamic>['foo$i', i]);
     }
     await schema.runMigrations(3, 5);
 
-    final List<Map<String, dynamic>> data = await db.query('SELECT target_count FROM target_globals LIMIT 1');
+    final List<Map<String, dynamic>> data =
+        await db.query('SELECT target_count FROM target_globals LIMIT 1');
     expect(data, isNotEmpty);
 
     final int targetCount = data.first['target_count'];
@@ -109,9 +121,13 @@ void main() {
   });
 
   test('testDatabaseName', () async {
-    expect(SQLitePersistence.sDatabaseName('[DEFAULT]', DatabaseId.forProject('my-project')),
+    expect(
+        SQLitePersistence.sDatabaseName(
+            '[DEFAULT]', DatabaseId.forProject('my-project')),
         'firestore.%5BDEFAULT%5D.my-project.%28default%29');
-    expect(SQLitePersistence.sDatabaseName('[DEFAULT]', DatabaseId.forDatabase('my-project', 'my-database')),
+    expect(
+        SQLitePersistence.sDatabaseName(
+            '[DEFAULT]', DatabaseId.forDatabase('my-project', 'my-database')),
         'firestore.%5BDEFAULT%5D.my-project.my-database');
   });
 
@@ -130,21 +146,33 @@ void main() {
     await _addMutationBatch(db, 5, 'userA', <String>['docs/pending']);
 
     // Populate the mutation queues' metadata
-    await db
-        .execute('INSERT INTO mutation_queues (uid, last_acknowledged_batch_id) VALUES (?, ?)', <dynamic>['userA', 2]);
-    await db
-        .execute('INSERT INTO mutation_queues (uid, last_acknowledged_batch_id) VALUES (?, ?)', <dynamic>['userB', 3]);
-    await db
-        .execute('INSERT INTO mutation_queues (uid, last_acknowledged_batch_id) VALUES (?, ?)', <dynamic>['userC', -1]);
+    await db.execute(
+        'INSERT INTO mutation_queues (uid, last_acknowledged_batch_id) VALUES (?, ?)',
+        <dynamic>['userA', 2]);
+    await db.execute(
+        'INSERT INTO mutation_queues (uid, last_acknowledged_batch_id) VALUES (?, ?)',
+        <dynamic>['userB', 3]);
+    await db.execute(
+        'INSERT INTO mutation_queues (uid, last_acknowledged_batch_id) VALUES (?, ?)',
+        <dynamic>['userC', -1]);
 
     await schema.runMigrations(5, 6);
 
     // Verify that all but the two pending mutations have been cleared by the migration.
-    expect((await db.query('SELECT COUNT(*) as count FROM mutations')).first['count'], 2);
+    expect(
+        (await db.query('SELECT COUNT(*) as count FROM mutations'))
+            .first['count'],
+        2);
     // Verify that we still have two index entries for the pending documents
-    expect((await db.query('SELECT COUNT(*) as count FROM document_mutations')).first['count'], 2);
+    expect(
+        (await db.query('SELECT COUNT(*) as count FROM document_mutations'))
+            .first['count'],
+        2);
     // Verify that we still have one metadata entry for each existing queue
-    expect((await db.query('SELECT COUNT(*) as count FROM mutation_queues')).first['count'], 3);
+    expect(
+        (await db.query('SELECT COUNT(*) as count FROM mutation_queues'))
+            .first['count'],
+        3);
   });
 
   test('addsSentinelRows', () async {
@@ -163,7 +191,8 @@ void main() {
     // For the odd ones, add sentinel rows.
     for (int i = 0; i < 10; i++) {
       final String path = 'docs/doc_$i';
-      await db.execute('INSERT INTO remote_documents (path) VALUES (?)', <String>[path]);
+      await db.execute(
+          'INSERT INTO remote_documents (path) VALUES (?)', <String>[path]);
       if (i % 2 == 1) {
         await db.execute(
           '''INSERT INTO target_documents (target_id, path, sequence_number)
@@ -175,7 +204,8 @@ void main() {
 
     await schema.runMigrations(6, 7);
 
-    final List<Map<String, dynamic>> result = await db.query('''SELECT path, sequence_number
+    final List<Map<String, dynamic>> result =
+        await db.query('''SELECT path, sequence_number
            FROM target_documents
            WHERE target_id = 0;''');
 
@@ -186,23 +216,29 @@ void main() {
       final int docNum = int.parse(path.split('_')[1]);
       // The even documents were missing sequence numbers, they should now be filled in to have the new sequence number.
       // The odd documents should have their sequence number unchanged, and so be the old value.
-      final int expected = docNum % 2 == 1 ? oldSequenceNumber : newSequenceNumber;
+      final int expected =
+          docNum % 2 == 1 ? oldSequenceNumber : newSequenceNumber;
       expect(sequenceNumber, expected);
     }
   });
 }
 
-Future<void> _assertNoResultsForQuery(Database db, String query, [List<String> args]) async {
+Future<void> _assertNoResultsForQuery(Database db, String query,
+    [List<String> args]) async {
   final List<Map<String, dynamic>> result = await db.query(query, args);
   expect(result, isEmpty);
 }
 
-Future<Map<String, Set<String>>> _getCurrentSchema(SQLiteSchema schema, Database db) async {
+Future<Map<String, Set<String>>> _getCurrentSchema(
+    SQLiteSchema schema, Database db) async {
   final Map<String, Set<String>> tables = <String, Set<String>>{};
-  final List<Map<String, dynamic>> data = await db.query('SELECT tbl_name FROM sqlite_master WHERE type = \"table\"');
+  final List<Map<String, dynamic>> data = await db
+      .query('SELECT tbl_name FROM sqlite_master WHERE type = \"table\"');
   for (Map<String, dynamic> row in data) {
     final String table = row['tbl_name'];
-    final Set<String> columns = <String>{...await schema.getTableColumns(table)};
+    final Set<String> columns = <String>{
+      ...await schema.getTableColumns(table)
+    };
 
     tables[table] = columns;
   }
@@ -210,31 +246,42 @@ Future<Map<String, Set<String>>> _getCurrentSchema(SQLiteSchema schema, Database
   return tables;
 }
 
-void _assertNoRemovals(Map<String, Set<String>> oldSchema, Map<String, Set<String>> newSchema, int newVersion) {
+void _assertNoRemovals(Map<String, Set<String>> oldSchema,
+    Map<String, Set<String>> newSchema, int newVersion) {
   for (MapEntry<String, Set<String>> entry in oldSchema.entries) {
     final String table = entry.key;
     final Set<String> newColumns = newSchema[table];
-    expect(newColumns, isNotNull, reason: 'Table $table was deleted at version $newVersion');
+    expect(newColumns, isNotNull,
+        reason: 'Table $table was deleted at version $newVersion');
     final Set<String> oldColumns = entry.value;
     for (String column in oldColumns) {
       expect(newColumns.contains(column), isTrue,
-          reason: 'Column $column was deleted from table $table at version $newVersion');
+          reason:
+              'Column $column was deleted from table $table at version $newVersion');
     }
   }
 }
 
-Future<void> _addMutationBatch(Database db, int batchId, String uid, List<String> docs) async {
+Future<void> _addMutationBatch(
+    Database db, int batchId, String uid, List<String> docs) async {
   final proto.WriteBatch batch = proto.WriteBatch()..batchId = batchId;
 
   for (String doc in docs) {
-    await db.execute('INSERT INTO document_mutations (uid, path, batch_id) VALUES (?, ?, ?)',
-        <dynamic>[uid, EncodedPath.encode(ResourcePath.fromString(doc)), batchId]);
+    await db.execute(
+        'INSERT INTO document_mutations (uid, path, batch_id) VALUES (?, ?, ?)',
+        <dynamic>[
+          uid,
+          EncodedPath.encode(ResourcePath.fromString(doc)),
+          batchId
+        ]);
 
-    final proto.Document document = proto.Document()..name = 'projects/projectId/databases/(default)/documents/$doc';
+    final proto.Document document = proto.Document()
+      ..name = 'projects/projectId/databases/(default)/documents/$doc';
     final proto.Write write = proto.Write()..update = document;
     batch.writes.add(write);
   }
 
-  return db.execute('INSERT INTO mutations (uid, batch_id, mutations) VALUES (?,?,?)',
+  return db.execute(
+      'INSERT INTO mutations (uid, batch_id, mutations) VALUES (?,?,?)',
       <dynamic>[uid, batchId, batch.writeToBuffer()]);
 }

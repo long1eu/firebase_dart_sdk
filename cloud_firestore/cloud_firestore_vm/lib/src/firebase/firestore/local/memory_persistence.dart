@@ -3,20 +3,20 @@
 // on 20/09/2018
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_eager_reference_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_lru_reference_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_mutation_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_query_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_remote_document_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_eager_reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_lru_reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
 
 class MemoryPersistence extends Persistence {
   /// Use factory constructors to instantiate
@@ -32,9 +32,11 @@ class MemoryPersistence extends Persistence {
     return persistence;
   }
 
-  factory MemoryPersistence.createLruGcMemoryPersistence(LruGarbageCollectorParams params, LocalSerializer serializer) {
+  factory MemoryPersistence.createLruGcMemoryPersistence(
+      LruGarbageCollectorParams params, LocalSerializer serializer) {
     final MemoryPersistence persistence = MemoryPersistence._();
-    persistence.referenceDelegate = MemoryLruReferenceDelegate(persistence, params, serializer);
+    persistence.referenceDelegate =
+        MemoryLruReferenceDelegate(persistence, params, serializer);
     return persistence;
   }
 
@@ -84,7 +86,8 @@ class MemoryPersistence extends Persistence {
   Iterable<MemoryMutationQueue> getMutationQueues() => mutationQueues.values;
 
   @override
-  Future<void> runTransaction(String action, Transaction<void> operation) async {
+  Future<void> runTransaction(
+      String action, Transaction<void> operation) async {
     Log.d(tag, 'Starting transaction: $action');
 
     referenceDelegate.onTransactionStarted();
@@ -93,7 +96,8 @@ class MemoryPersistence extends Persistence {
   }
 
   @override
-  Future<T> runTransactionAndReturn<T>(String action, Transaction<T> operation) async {
+  Future<T> runTransactionAndReturn<T>(
+      String action, Transaction<T> operation) async {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
     final T result = await operation();

@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -26,7 +26,8 @@ void main() {
   /// resolves the Future if the completedSteps match the expectedSteps.
   Future<int> Function() runnableForStep(int n) {
     return () async {
-      if (expectedSteps != null && completedSteps.length >= expectedSteps.length) {
+      if (expectedSteps != null &&
+          completedSteps.length >= expectedSteps.length) {
         expect(completedSteps, containsAllInOrder(expectedSteps));
       }
 
@@ -41,9 +42,11 @@ void main() {
 
     queue
       ..enqueueAndForget(runnableForStep(1))
-      ..enqueueAfterDelay(timerId1, const Duration(milliseconds: 5), runnableForStep(4))
+      ..enqueueAfterDelay(
+          timerId1, const Duration(milliseconds: 5), runnableForStep(4))
       ..enqueueAndForget(runnableForStep(2))
-      ..enqueueAfterDelay(timerId2, const Duration(milliseconds: 1), runnableForStep(3));
+      ..enqueueAfterDelay(
+          timerId2, const Duration(milliseconds: 1), runnableForStep(3));
 
     await Future<void>.delayed(const Duration(seconds: 5));
   });
@@ -55,10 +58,11 @@ void main() {
     queue.enqueueAndForget(() async {
       queue.enqueueAndForget(runnableForStep(1));
 
-      final DelayedTask<void> step2Timer =
-          queue.enqueueAfterDelay<void>(timerId1, const Duration(milliseconds: 1), runnableForStep(2));
+      final DelayedTask<void> step2Timer = queue.enqueueAfterDelay<void>(
+          timerId1, const Duration(milliseconds: 1), runnableForStep(2));
 
-      queue.enqueueAfterDelay(timerId3, const Duration(milliseconds: 3), runnableForStep(3));
+      queue.enqueueAfterDelay(
+          timerId3, const Duration(milliseconds: 3), runnableForStep(3));
 
       expect(queue.containsDelayedTask(timerId1), isTrue);
       step2Timer.cancel();
@@ -72,24 +76,33 @@ void main() {
   test('canManuallyDrainAllDelayedTasksForTesting', () async {
     queue
       ..enqueueAndForget(runnableForStep(1))
-      ..enqueueAfterDelay(timerId1, const Duration(milliseconds: 20), runnableForStep(4))
-      ..enqueueAfterDelay(timerId2, const Duration(milliseconds: 10), runnableForStep(3))
+      ..enqueueAfterDelay(
+          timerId1, const Duration(milliseconds: 20), runnableForStep(4))
+      ..enqueueAfterDelay(
+          timerId2, const Duration(milliseconds: 10), runnableForStep(3))
       ..enqueueAndForget(runnableForStep(2));
 
     await queue.runDelayedTasksUntil(TimerId.all);
     expect(completedSteps, <int>[1, 2, 3, 4]);
-  }, skip: 'Works individually but not in grup since AsyncQueue is a singleton');
+  },
+      skip:
+          'Works individually but not in grup since AsyncQueue is a singleton');
 
   // todo(long1eu): passes when alone, but fails in group test
   test('canManuallyDrainSpecificDelayedTasksForTesting', () async {
     queue
       ..enqueueAndForget(runnableForStep(1))
-      ..enqueueAfterDelay(timerId1, const Duration(milliseconds: 20), runnableForStep(5))
-      ..enqueueAfterDelay(timerId2, const Duration(milliseconds: 10), runnableForStep(3))
-      ..enqueueAfterDelay(timerId3, const Duration(milliseconds: 15), runnableForStep(4))
+      ..enqueueAfterDelay(
+          timerId1, const Duration(milliseconds: 20), runnableForStep(5))
+      ..enqueueAfterDelay(
+          timerId2, const Duration(milliseconds: 10), runnableForStep(3))
+      ..enqueueAfterDelay(
+          timerId3, const Duration(milliseconds: 15), runnableForStep(4))
       ..enqueueAndForget(runnableForStep(2));
 
     await queue.runDelayedTasksUntil(timerId3);
     expect(completedSteps, <int>[1, 2, 3, 4]);
-  }, skip: 'Works individually but not in grup since AsyncQueue is a singleton');
+  },
+      skip:
+          'Works individually but not in grup since AsyncQueue is a singleton');
 }

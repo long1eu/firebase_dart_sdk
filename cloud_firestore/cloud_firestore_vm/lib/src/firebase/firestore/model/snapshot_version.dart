@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// A version of a document in Firestore. This corresponds to the version timestamp, such as
 /// update_time or read_time.
@@ -21,7 +21,9 @@ class SnapshotVersion implements Comparable<SnapshotVersion> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is SnapshotVersion && runtimeType == other.runtimeType && timestamp == other.timestamp;
+      other is SnapshotVersion &&
+          runtimeType == other.runtimeType &&
+          timestamp == other.timestamp;
 
   @override
   int get hashCode => timestamp.hashCode;

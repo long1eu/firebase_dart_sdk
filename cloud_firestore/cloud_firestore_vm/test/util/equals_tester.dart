@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 28/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 import 'relationship_tester.dart';
 
@@ -48,8 +48,8 @@ class EqualsTester {
 
   /// Run tests on equals method, throwing a failure on an invalid test
   EqualsTester testEquals() {
-    final RelationshipTester<Object> delegate =
-        RelationshipTester<Object>(RelationshipAssertion<Object>((Object item, Object related) {
+    final RelationshipTester<Object> delegate = RelationshipTester<Object>(
+        RelationshipAssertion<Object>((Object item, Object related) {
       assert(
           related == item || identical(related, item),
           '${RelationshipTester.itemPlaceholder} must be equal to '
@@ -82,7 +82,8 @@ class EqualsTester {
       assert(item != _NotAnInstance.equalToNothing,
           '$item must be unequal to an arbitrary object of another class');
       assert(item == item, '$item must be equal to itself');
-      assert(item.hashCode == item.hashCode, 'the hash of $item must be consistent');
+      assert(item.hashCode == item.hashCode,
+          'the hash of $item must be consistent');
     }
   }
 }

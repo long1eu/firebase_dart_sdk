@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 
 /// Simple wrapper around a nullable UID. Mostly exists to make code more
 /// readable and for use as a key in maps (since keys cannot be null).
@@ -20,7 +20,7 @@ class User {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is User && runtimeType == other.runtimeType && uid == other.uid;
+      other is User && runtimeType == other.runtimeType && uid == other.uid;
 
   @override
   int get hashCode => uid.hashCode;

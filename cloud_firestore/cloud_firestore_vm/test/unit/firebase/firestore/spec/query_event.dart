@@ -2,15 +2,16 @@
 // Lung Razvan <long1eu>
 // on 04/10/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:meta/meta.dart';
 
-/// Object that contains exactly one of either a view snapshot or an error for the given query.
+/// Object that contains exactly one of either a view snapshot or an error for
+/// the given query.
 class QueryEvent {
-  QueryEvent({@required this.query, this.view, this.error});
+  const QueryEvent({@required this.query, this.view, this.error});
 
   final Query query;
   final ViewSnapshot view;

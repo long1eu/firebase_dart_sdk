@@ -3,11 +3,11 @@
 // on 17/09/2018
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 
 class ObjectValue extends FieldValue {
   const ObjectValue(this._value);
@@ -17,7 +17,8 @@ class ObjectValue extends FieldValue {
         ImmutableSortedMap<String, FieldValue>.fromMap(value, comparator()));
   }
 
-  factory ObjectValue.fromImmutableMap(ImmutableSortedMap<String, FieldValue> value) {
+  factory ObjectValue.fromImmutableMap(
+      ImmutableSortedMap<String, FieldValue> value) {
     if (value.isEmpty) {
       return empty;
     } else {
@@ -25,8 +26,8 @@ class ObjectValue extends FieldValue {
     }
   }
 
-  static final ObjectValue empty =
-      ObjectValue(ImmutableSortedMap<String, FieldValue>.emptyMap(comparator()));
+  static final ObjectValue empty = ObjectValue(
+      ImmutableSortedMap<String, FieldValue>.emptyMap(comparator()));
 
   final ImmutableSortedMap<String, FieldValue> _value;
 
@@ -80,7 +81,8 @@ class ObjectValue extends FieldValue {
 
   /// Returns a new ObjectValue with the field at the named path set to value.
   ObjectValue set(FieldPath path, FieldValue value) {
-    hardAssert(path.isNotEmpty, 'Cannot set field for empty path on ObjectValue');
+    hardAssert(
+        path.isNotEmpty, 'Cannot set field for empty path on ObjectValue');
 
     final String childName = path.first;
     if (path.length == 1) {
@@ -102,7 +104,8 @@ class ObjectValue extends FieldValue {
   /// Returns an ObjectValue with the field path deleted. If there is no field at the specified path
   /// nothing is changed.
   ObjectValue delete(FieldPath path) {
-    hardAssert(path.isNotEmpty, 'Cannot delete field for empty path on ObjectValue');
+    hardAssert(
+        path.isNotEmpty, 'Cannot delete field for empty path on ObjectValue');
 
     final String childName = path.first;
     if (path.length == 1) {
@@ -145,7 +148,9 @@ class ObjectValue extends FieldValue {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ObjectValue && runtimeType == other.runtimeType && _value == other._value;
+      other is ObjectValue &&
+          runtimeType == other.runtimeType &&
+          _value == other._value;
 
   @override
   int get hashCode => _value.hashCode;

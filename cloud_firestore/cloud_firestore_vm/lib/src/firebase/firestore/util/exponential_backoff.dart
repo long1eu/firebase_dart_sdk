@@ -4,8 +4,8 @@
 
 import 'dart:math';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 
 /// Helper for running delayed tasks following an exponential backoff curve between attempts using the [backoffFactor]
 /// to determine the extended base delay after each attempt.
@@ -69,11 +69,13 @@ class ExponentialBackoff {
 
     // Guard against lastAttemptTime being in the future due to a clock change.
     final Duration difference = DateTime.now().difference(_lastAttemptTime);
-    final Duration delaySoFar = difference < Duration.zero ? Duration.zero : difference;
+    final Duration delaySoFar =
+        difference < Duration.zero ? Duration.zero : difference;
 
     // Guard against the backoff delay already being past.
     final Duration remaining = desiredDelayWithJitter - delaySoFar;
-    final Duration remainingDelay = remaining < Duration.zero ? Duration.zero : remaining;
+    final Duration remainingDelay =
+        remaining < Duration.zero ? Duration.zero : remaining;
 
     if (_currentBase > Duration.zero) {
       Log.d(
@@ -82,7 +84,8 @@ class ExponentialBackoff {
           'last attempt: $delaySoFar ago)');
     }
 
-    _timerTask = _queue.enqueueAfterDelay<void>(_timerId, remainingDelay, () async {
+    _timerTask =
+        _queue.enqueueAfterDelay<void>(_timerId, remainingDelay, () async {
       _lastAttemptTime = DateTime.now();
       task();
     }, 'ExponentialBackoff backoffAndRun');
@@ -106,6 +109,7 @@ class ExponentialBackoff {
   /// Returns a random value in the range [-currentBaseMs/2, currentBaseMs/2]
   Duration _jitterDelay() {
     final double value = Random().nextDouble() - 0.5;
-    return Duration(milliseconds: (value * _currentBase.inMilliseconds).toInt());
+    return Duration(
+        milliseconds: (value * _currentBase.inMilliseconds).toInt());
   }
 }

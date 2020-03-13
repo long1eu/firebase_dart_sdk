@@ -2,8 +2,8 @@
 // Lung Razvan <long1eu>
 // on 29/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart';

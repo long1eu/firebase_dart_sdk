@@ -2,23 +2,25 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:collection/collection.dart';
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
 
 import 'order_by.dart';
 
 /// Represents a bound of a query.
 ///
-/// The bound is specified with the given components representing a position and whether it's just before or just after
-/// the position (relative to whatever the query order is). The position represents a logical index position for a
-/// query. It's a prefix of values for the (potentially implicit) order by clauses of a query. Bound provides a function
-/// to determine whether a document comes before or after a bound. This is influenced by whether the position is just
-/// before or just after the provided values.
+/// The bound is specified with the given components representing a position and
+/// whether it's just before or just after the position (relative to whatever
+/// the query order is). The position represents a logical index position for a
+/// query. It's a prefix of values for the (potentially implicit) order by
+/// clauses of a query. Bound provides a function to determine whether a
+/// document comes before or after a bound. This is influenced by whether the
+/// position is just before or just after the provided values.
 class Bound {
   const Bound({this.position, this.before});
 
@@ -40,22 +42,26 @@ class Bound {
     return builder.toString();
   }
 
-  /// Returns true if a document sorts before a bound using the provided sort order.
+  /// Returns true if a document sorts before a bound using the provided sort
+  /// order.
   bool sortsBeforeDocument(List<OrderBy> orderBy, Document document) {
-    hardAssert(position.length <= orderBy.length, 'Bound has more components than query\'s orderBy');
+    hardAssert(position.length <= orderBy.length,
+        'Bound has more components than query\'s orderBy');
     int comparison = 0;
     for (int i = 0; i < position.length; i++) {
       final OrderBy orderByComponent = orderBy[i];
       final FieldValue component = position[i];
       if (orderByComponent.field == FieldPath.keyPath) {
         final Object refValue = component.value;
-        hardAssert(refValue is DocumentKey, 'Bound has a non-key value where the key path is being used $component');
+        hardAssert(refValue is DocumentKey,
+            'Bound has a non-key value where the key path is being used $component');
 
         final DocumentKey documentKey = refValue;
         comparison = documentKey.compareTo(document.key);
       } else {
         final FieldValue docValue = document.getField(orderByComponent.field);
-        hardAssert(docValue != null, 'Field should exist since document matched the orderBy already.');
+        hardAssert(docValue != null,
+            'Field should exist since document matched the orderBy already.');
         comparison = component.compareTo(docValue);
       }
 
@@ -80,7 +86,8 @@ class Bound {
           const ListEquality<FieldValue>().equals(position, other.position);
 
   @override
-  int get hashCode => before.hashCode ^ const ListEquality<FieldValue>().hash(position);
+  int get hashCode =>
+      before.hashCode ^ const ListEquality<FieldValue>().hash(position);
 
   @override
   String toString() {

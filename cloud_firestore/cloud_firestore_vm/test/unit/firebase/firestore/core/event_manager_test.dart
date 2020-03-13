@@ -1,39 +1,40 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 26/09/2018
-import 'package:firebase_firestore/src/firebase/firestore/core/event_manager.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query_listener.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/sync_engine.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/event_manager.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/online_state.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query_stream.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/sync_engine.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:mockito/mockito.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart';
 
-class QueryListenerMock extends Mock implements QueryListener {}
+class QueryListenerMock extends Mock implements QueryStream {}
 
 class SyncEngineMock extends Mock implements SyncEngine {}
 
 class ViewSnapshotMock extends Mock implements ViewSnapshot {}
 
+// ignore_for_file: unawaited_futures, avoid_implementing_value_types
 void main() {
-  QueryListener queryListener(Query query) {
-    return QueryListener(query)..listen(null);
+  QueryStream queryListener(Query query) {
+    return QueryStream(query)..listen(null);
   }
 
   test('testMultipleListenersPerQuery', () async {
     final Query query = Query(path('foo/bar'));
 
-    final QueryListener listener1 = queryListener(query);
-    final QueryListener listener2 = queryListener(query);
+    final QueryStream listener1 = queryListener(query);
+    final QueryStream listener2 = queryListener(query);
 
     final SyncEngine syncSpy = SyncEngineMock();
 
-    final EventManager manager = EventManager(syncSpy);
-    manager.addQueryListener(listener1);
-    manager.addQueryListener(listener2);
+    final EventManager manager = EventManager(syncSpy)
+      ..addQueryListener(listener1)
+      ..addQueryListener(listener2);
 
     await manager.removeQueryListener(listener1);
     await manager.removeQueryListener(listener2);
@@ -58,15 +59,16 @@ void main() {
     final SyncEngine syncSpy = SyncEngineMock();
     final EventManager eventManager = EventManager(syncSpy);
 
-    final QueryListener spy1 = QueryListenerMock();
+    final QueryStream spy1 = QueryListenerMock();
     when(spy1.query).thenReturn(query1);
-    final QueryListener spy2 = QueryListenerMock();
+    final QueryStream spy2 = QueryListenerMock();
     when(spy2.query).thenReturn(query2);
-    final QueryListener spy3 = QueryListenerMock();
+    final QueryStream spy3 = QueryListenerMock();
     when(spy3.query).thenReturn(query1);
-    eventManager.addQueryListener(spy1);
-    eventManager.addQueryListener(spy2);
-    eventManager.addQueryListener(spy3);
+    eventManager
+      ..addQueryListener(spy1)
+      ..addQueryListener(spy2)
+      ..addQueryListener(spy3);
 
     verify(syncSpy.listen(query1)).called(1);
     verify(syncSpy.listen(query2)).called(1);
@@ -94,11 +96,11 @@ void main() {
 
     final List<Object> events = <Object>[];
 
-    final QueryListener spy = QueryListenerMock();
+    final QueryStream spy = QueryListenerMock();
     when(spy.query).thenReturn(query1);
 
-    when(spy.onOnlineStateChanged(any))
-        .thenAnswer((Invocation invocation) => events.add(invocation.positionalArguments[0]));
+    when(spy.onOnlineStateChanged(any)).thenAnswer((Invocation invocation) =>
+        events.add(invocation.positionalArguments[0]));
 
     eventManager.addQueryListener(spy);
     expect(events, <OnlineState>[OnlineState.unknown]);

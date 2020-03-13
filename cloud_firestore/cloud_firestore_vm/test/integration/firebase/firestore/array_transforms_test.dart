@@ -4,11 +4,11 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
@@ -35,8 +35,9 @@ void main() {
   setUp(() async {
     docRef = await testDocument();
     accumulator = EventAccumulator<DocumentSnapshot>();
-    listenerRegistration =
-        docRef.getSnapshots(MetadataChanges.include).listen(accumulator.onData, onError: accumulator.onError);
+    listenerRegistration = docRef
+        .getSnapshots(MetadataChanges.include)
+        .listen(accumulator.onData, onError: accumulator.onError);
 
     // Wait for initial null snapshot to avoid potential races.
     final DocumentSnapshot initialSnapshot = await accumulator.wait();
@@ -49,7 +50,8 @@ void main() {
     await IntegrationTestUtil.tearDown();
   });
 
-  Future<void> expectLocalAndRemoteEvent(Map<String, Object> expectedData) async {
+  Future<void> expectLocalAndRemoteEvent(
+      Map<String, Object> expectedData) async {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
     expect(snap.data, expectedData);
     snap = await accumulator.awaitRemoteEvent();

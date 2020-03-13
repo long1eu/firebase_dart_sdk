@@ -4,20 +4,20 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/auth/empty_credentials_provider.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/database_info.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/datastore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/watch_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/empty_credentials_provider.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/database_info.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 import 'package:grpc/src/shared/status.dart';
 
@@ -29,15 +29,23 @@ class MockDatastore extends Datastore {
   factory MockDatastore(AsyncQueue workerQueue) {
     final DatabaseId databaseId = DatabaseId.forDatabase('project', 'database');
     final RemoteSerializer serializer = RemoteSerializer(databaseId);
-    final DatabaseInfo databaseInfo = DatabaseInfo(databaseId, 'persistenceKey', 'host', sslEnabled: false);
+    final DatabaseInfo databaseInfo =
+        DatabaseInfo(databaseId, 'persistenceKey', 'host', sslEnabled: false);
 
-    final ClientChannel clientChannel =
-        ClientChannel(databaseInfo.host, options: const ChannelOptions(credentials: ChannelCredentials.insecure()));
+    final ClientChannel clientChannel = ClientChannel(databaseInfo.host,
+        options:
+            const ChannelOptions(credentials: ChannelCredentials.insecure()));
 
     final ChannelOptionsProvider channelOptionsProvider =
-        ChannelOptionsProvider(databaseId: databaseId, credentialsProvider: EmptyCredentialsProvider());
-    return MockDatastore._(databaseInfo, workerQueue, serializer,
-        FirestoreClient(clientChannel, channelOptionsProvider), channelOptionsProvider);
+        ChannelOptionsProvider(
+            databaseId: databaseId,
+            credentialsProvider: EmptyCredentialsProvider());
+    return MockDatastore._(
+      databaseInfo,
+      workerQueue,
+      serializer,
+      FirestoreClient(clientChannel, channelOptionsProvider),
+    );
   }
 
   MockDatastore._(
@@ -45,10 +53,9 @@ class MockDatastore extends Datastore {
     AsyncQueue workerQueue,
     RemoteSerializer serializer,
     FirestoreClient client,
-    ChannelOptionsProvider optionsProvider,
   )   : _serializer = serializer,
         _client = client,
-        super.test(databaseInfo, workerQueue, serializer, client, optionsProvider);
+        super.test(databaseInfo, workerQueue, serializer, client);
 
   final RemoteSerializer _serializer;
   final FirestoreClient _client;
@@ -61,10 +68,12 @@ class MockDatastore extends Datastore {
   int _watchStreamRequestCount = 0;
 
   @override
-  WatchStream get watchStream => _watchStream = _MockWatchStream(this, _serializer, workerQueue);
+  WatchStream get watchStream =>
+      _watchStream = _MockWatchStream(this, _serializer, workerQueue);
 
   @override
-  WriteStream get writeStream => _writeStream = _MockWriteStream(this, _serializer, workerQueue);
+  WriteStream get writeStream =>
+      _writeStream = _MockWriteStream(this, _serializer, workerQueue);
 
   int get writeStreamRequestCount => _writeStreamRequestCount;
 
@@ -79,7 +88,8 @@ class MockDatastore extends Datastore {
 
   /// Injects a write ack as though it had come from the backend in response to
   /// a write.
-  Future<void> ackWrite(SnapshotVersion commitVersion, List<MutationResult> results) async {
+  Future<void> ackWrite(
+      SnapshotVersion commitVersion, List<MutationResult> results) async {
     await _writeStream.ackWrite(commitVersion, results);
   }
 
@@ -89,7 +99,8 @@ class MockDatastore extends Datastore {
   }
 
   /// Injects a watch change as though it had come from the backend.
-  Future<void> writeWatchChange(WatchChange change, SnapshotVersion snapshotVersion) async {
+  Future<void> writeWatchChange(
+      WatchChange change, SnapshotVersion snapshotVersion) async {
     await _watchStream.writeWatchChange(change, snapshotVersion);
   }
 
@@ -110,8 +121,10 @@ class MockDatastore extends Datastore {
 }
 
 class _MockWatchStream extends WatchStream {
-  _MockWatchStream(this._datastore, RemoteSerializer serializer, AsyncQueue workerQueue)
-      : super.test(_datastore._client, serializer, StreamController<StreamEvent>.broadcast(), workerQueue);
+  _MockWatchStream(
+      this._datastore, RemoteSerializer serializer, AsyncQueue workerQueue)
+      : super.test(_datastore._client, serializer,
+            StreamController<StreamEvent>.broadcast(), workerQueue);
 
   final MockDatastore _datastore;
 
@@ -149,7 +162,8 @@ class _MockWatchStream extends WatchStream {
   @override
   void watchQuery(QueryData queryData) {
     final String resumeToken = toDebugString(queryData.resumeToken);
-    SpecTestCase.log('      watchQuery(${queryData.query}, ${queryData.targetId}, $resumeToken)');
+    SpecTestCase.log(
+        '      watchQuery(${queryData.query}, ${queryData.targetId}, $resumeToken)');
     // Snapshot version is ignored on the wire
     final QueryData sentQueryData = queryData.copyWith(
         snapshotVersion: SnapshotVersion.none,
@@ -172,7 +186,8 @@ class _MockWatchStream extends WatchStream {
   }
 
   /// Injects a watch change as though it had come from the backend.
-  Future<void> writeWatchChange(WatchChange change, SnapshotVersion snapshotVersion) async {
+  Future<void> writeWatchChange(
+      WatchChange change, SnapshotVersion snapshotVersion) async {
     SnapshotVersion _snapshotVersion = snapshotVersion;
     if (change is WatchChangeWatchTargetChange) {
       if (change.cause != null && change.cause.code != StatusCode.ok) {
@@ -201,9 +216,11 @@ class _MockWatchStream extends WatchStream {
 }
 
 class _MockWriteStream extends WriteStream {
-  _MockWriteStream(this._datastore, RemoteSerializer serializer, AsyncQueue workerQueue)
+  _MockWriteStream(
+      this._datastore, RemoteSerializer serializer, AsyncQueue workerQueue)
       : _sentWrites = <List<Mutation>>[],
-        super.test(_datastore._client, serializer, StreamController<StreamEvent>.broadcast(), workerQueue);
+        super.test(_datastore._client, serializer,
+            StreamController<StreamEvent>.broadcast(), workerQueue);
 
   final MockDatastore _datastore;
 
@@ -257,7 +274,8 @@ class _MockWriteStream extends WriteStream {
 
   /// Injects a write ack as though it had come from the backend in response to
   /// a write.
-  Future<void> ackWrite(SnapshotVersion commitVersion, List<MutationResult> results) async {
+  Future<void> ackWrite(
+      SnapshotVersion commitVersion, List<MutationResult> results) async {
     addEvent(OnWriteResponse(commitVersion, results));
   }
 
@@ -271,7 +289,8 @@ class _MockWriteStream extends WriteStream {
 
   /// Returns a previous write that had been 'sent to the backend'.
   List<Mutation> waitForWriteSend() {
-    hardAssert(_sentWrites.isNotEmpty, 'Writes need to happen before you can wait on them.');
+    hardAssert(_sentWrites.isNotEmpty,
+        'Writes need to happen before you can wait on them.');
     return _sentWrites.removeAt(0);
   }
 

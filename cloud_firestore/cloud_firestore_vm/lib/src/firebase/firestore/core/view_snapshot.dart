@@ -2,14 +2,14 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:collection/collection.dart';
-import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_set.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_set.dart';
+import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 
 /// The possibly states a document can be in w.r.t syncing from local storage to the backend.
@@ -84,7 +84,8 @@ class ViewSnapshot {
       mutatedKeys ?? this.mutatedKeys,
       isFromCache: isFromCache ?? this.isFromCache,
       didSyncStateChange: didSyncStateChange ?? this.didSyncStateChange,
-      excludesMetadataChanges: excludesMetadataChanges ?? this.excludesMetadataChanges,
+      excludesMetadataChanges:
+          excludesMetadataChanges ?? this.excludesMetadataChanges,
     );
   }
 

@@ -6,19 +6,19 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/index.dart' as proto;
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
 
 /// Cached Queries backed by SQLite.
 class SQLiteQueryCache implements QueryCache {
@@ -88,7 +88,8 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> setLastRemoteSnapshotVersion(SnapshotVersion snapshotVersion) async {
+  Future<void> setLastRemoteSnapshotVersion(
+      SnapshotVersion snapshotVersion) async {
     lastRemoteSnapshotVersion = snapshotVersion;
     await _writeMetadata();
   }
@@ -98,7 +99,8 @@ class SQLiteQueryCache implements QueryCache {
     final String canonicalId = queryData.query.canonicalId;
     final Timestamp version = queryData.snapshotVersion.timestamp;
 
-    final proto.Target targetProto = _localSerializer.encodeQueryData(queryData);
+    final proto.Target targetProto =
+        _localSerializer.encodeQueryData(queryData);
 
     await _db.execute(
         // @formatter:off
@@ -270,7 +272,8 @@ class SQLiteQueryCache implements QueryCache {
   // Matching key tracking
 
   @override
-  Future<void> addMatchingKeys(ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+  Future<void> addMatchingKeys(
+      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     // PORTING NOTE: The reverse index (document_targets) is maintained by SQLite.
     //
     // When updates come in we treat those as added keys, which means these inserts won't necessarily be unique between
@@ -296,7 +299,8 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   @override
-  Future<void> removeMatchingKeys(ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+  Future<void> removeMatchingKeys(
+      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
     // PORTING NOTE: The reverse index (document_targets) is maintained by SQLite.
     const String statement =
         // @formatter:off
@@ -329,7 +333,8 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   @override
-  Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(int targetId) async {
+  Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
+      int targetId) async {
     ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet;
 
     final List<Map<String, dynamic>> result = await _db.query(
@@ -344,7 +349,8 @@ class SQLiteQueryCache implements QueryCache {
 
     for (Map<String, dynamic> row in result) {
       final String path = row['path'];
-      final DocumentKey key = DocumentKey.fromPath(EncodedPath.decodeResourcePath(path));
+      final DocumentKey key =
+          DocumentKey.fromPath(EncodedPath.decodeResourcePath(path));
       keys = keys.insert(key);
     }
 

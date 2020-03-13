@@ -2,25 +2,26 @@
 // Lung Razvan <long1eu>
 // on 26/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/geo_point.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart' as model;
-import 'package:firebase_firestore/src/firebase/firestore/model/value/array_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/reference_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/server_timestamp_behavior.dart';
-import 'package:firebase_firestore/src/firebase/firestore/snapshot_metadata.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart'
+    as model;
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/reference_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/snapshot_metadata.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:meta/meta.dart';
 
 /// A [DocumentSnapshot] contains data read from a document in your [Firestore] database. The data can be extracted with
@@ -42,17 +43,21 @@ class DocumentSnapshot {
         assert(_firestore != null),
         assert(_key != null);
 
-  factory DocumentSnapshot.fromDocument(FirebaseFirestore firestore, Document doc,
+  factory DocumentSnapshot.fromDocument(
+      Firestore firestore, Document doc,
       {@required bool isFromCache, @required bool hasPendingWrites}) {
-    return DocumentSnapshot(firestore, doc.key, doc, isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
+    return DocumentSnapshot(firestore, doc.key, doc,
+        isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
   }
 
-  factory DocumentSnapshot.fromNoDocument(FirebaseFirestore firestore, DocumentKey key,
+  factory DocumentSnapshot.fromNoDocument(
+      Firestore firestore, DocumentKey key,
       {@required bool isFromCache, @required bool hasPendingWrites}) {
-    return DocumentSnapshot(firestore, key, null, isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
+    return DocumentSnapshot(firestore, key, null,
+        isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
   }
 
-  final FirebaseFirestore _firestore;
+  final Firestore _firestore;
 
   final DocumentKey _key;
 
@@ -82,8 +87,12 @@ class DocumentSnapshot {
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
   Map<String, Object> getData(ServerTimestampBehavior serverTimestampBehavior) {
-    checkNotNull(serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
-    return document == null ? null : _convertObject(document.data, FieldValueOptions(serverTimestampBehavior));
+    checkNotNull(serverTimestampBehavior,
+        'Provided serverTimestampBehavior value must not be null.');
+    return document == null
+        ? null
+        : _convertObject(
+            document.data, FieldValueOptions(serverTimestampBehavior));
   }
 
   /// Returns whether or not the field exists in the document. Returns false if the document does not exist.
@@ -102,7 +111,8 @@ class DocumentSnapshot {
   /// Returns true if the field exists.
   bool containsPath(FieldPath fieldPath) {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
-    return (document != null) && (document.getField(fieldPath.internalPath) != null);
+    return (document != null) &&
+        (document.getField(fieldPath.internalPath) != null);
   }
 
   Object operator [](String field) => get(field);
@@ -115,7 +125,8 @@ class DocumentSnapshot {
   ///
   /// Returns the value at the given field or null.
   Object get(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
-    return getField(FieldPath.fromDotSeparatedPath(field), serverTimestampBehavior ?? ServerTimestampBehavior.none);
+    return getField(FieldPath.fromDotSeparatedPath(field),
+        serverTimestampBehavior ?? ServerTimestampBehavior.none);
   }
 
   /// Returns the value at the field or null if the field or document doesn't exist.
@@ -125,11 +136,14 @@ class DocumentSnapshot {
   /// value.
   ///
   /// Returns the value at the given field or null.
-  Object getField(FieldPath fieldPath, [ServerTimestampBehavior serverTimestampBehavior]) {
+  Object getField(FieldPath fieldPath,
+      [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     checkNotNull(fieldPath, 'Provided field path must not be null.');
-    checkNotNull(serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
-    return _getInternal(fieldPath.internalPath, FieldValueOptions(serverTimestampBehavior));
+    checkNotNull(serverTimestampBehavior,
+        'Provided serverTimestampBehavior value must not be null.');
+    return _getInternal(
+        fieldPath.internalPath, FieldValueOptions(serverTimestampBehavior));
   }
 
   /// Returns the value of the field as a bool. If the value is not a bool this will throw a state error.
@@ -177,12 +191,16 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a Date.
   /// Returns the value of the field
-  DateTime getDate(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
+  DateTime getDate(String field,
+      [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     checkNotNull(field, 'Provided field path must not be null.');
-    checkNotNull(serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
-    final Object maybeDate = _getInternal(FieldPath.fromDotSeparatedPath(field).internalPath,
-        FieldValueOptions(serverTimestampBehavior, timestampsInSnapshotsEnabled: false));
+    checkNotNull(serverTimestampBehavior,
+        'Provided serverTimestampBehavior value must not be null.');
+    final Object maybeDate = _getInternal(
+        FieldPath.fromDotSeparatedPath(field).internalPath,
+        FieldValueOptions(serverTimestampBehavior,
+            timestampsInSnapshotsEnabled: false));
     return _castTypedValue(maybeDate, field);
   }
 
@@ -194,12 +212,15 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a timestamp field.
   /// Returns the value of the field
-  Timestamp getTimestamp(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
+  Timestamp getTimestamp(String field,
+      [ServerTimestampBehavior serverTimestampBehavior]) {
     serverTimestampBehavior ??= ServerTimestampBehavior.none;
     checkNotNull(field, 'Provided field path must not be null.');
-    checkNotNull(serverTimestampBehavior, 'Provided serverTimestampBehavior value must not be null.');
-    final Object maybeTimestamp =
-        _getInternal(FieldPath.fromDotSeparatedPath(field).internalPath, FieldValueOptions(serverTimestampBehavior));
+    checkNotNull(serverTimestampBehavior,
+        'Provided serverTimestampBehavior value must not be null.');
+    final Object maybeTimestamp = _getInternal(
+        FieldPath.fromDotSeparatedPath(field).internalPath,
+        FieldValueOptions(serverTimestampBehavior));
     return _castTypedValue(maybeTimestamp, field);
   }
 
@@ -247,7 +268,8 @@ class DocumentSnapshot {
       final T result = value;
       return result;
     } on CastError catch (_) {
-      throw StateError('Field \'$field\' is not a $T, but it is ${value.runtimeType}');
+      throw StateError(
+          'Field \'$field\' is not a $T, but it is ${value.runtimeType}');
     }
   }
 
@@ -275,7 +297,8 @@ class DocumentSnapshot {
     }
   }
 
-  Map<String, Object> _convertObject(ObjectValue objectValue, FieldValueOptions options) {
+  Map<String, Object> _convertObject(
+      ObjectValue objectValue, FieldValueOptions options) {
     final Map<String, Object> result = <String, Object>{};
     for (MapEntry<String, FieldValue> entry in objectValue.internalValue) {
       result[entry.key] = _convertValue(entry.value, options);
@@ -310,7 +333,9 @@ class DocumentSnapshot {
           runtimeType == other.runtimeType &&
           _firestore == other._firestore &&
           _key == other._key &&
-          (document == null ? other.document == null : document == other.document) &&
+          (document == null
+              ? other.document == null
+              : document == other.document) &&
           metadata == other.metadata;
 
   @override

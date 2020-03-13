@@ -13,7 +13,7 @@ import '../local/persistence_test_helpers.dart';
 import 'spec_test_case.dart';
 
 void main() {
-  const String durablePersistance = 'durable-persistence';
+  const String durablePersistence = 'durable-persistence';
 
   SpecTestCase testCase;
 
@@ -26,7 +26,7 @@ void main() {
           return createLRUMemoryPersistence();
         }
       },
-      (Set<String> tags) => tags.contains(durablePersistance),
+      (Set<String> tags) => tags.contains(durablePersistence),
     );
     await testCase.specSetUp(<String, dynamic>{});
   });
@@ -39,8 +39,10 @@ void main() {
     bool ranAtLeastOneTest = false;
 
     // Enumerate the .json files containing the spec tests.
-    final List<Pair<String, Map<String, dynamic>>> parsedSpecFiles = <Pair<String, Map<String, dynamic>>>[];
-    final Directory jsonDir = Directory('${Directory.current.path}/test/res/json');
+    final List<Pair<String, Map<String, dynamic>>> parsedSpecFiles =
+        <Pair<String, Map<String, dynamic>>>[];
+    final Directory jsonDir =
+        Directory('${Directory.current.path}/test/res/json');
     final List<File> jsonFiles = jsonDir
         .listSync()
         .where((FileSystemEntity it) => it is File && it.path.endsWith('.json'))
@@ -52,8 +54,10 @@ void main() {
     for (File f in jsonFiles) {
       final String json = f.readAsStringSync();
       final Map<String, dynamic> fileJSON = jsonDecode(json);
-      exclusiveMode = exclusiveMode || SpecTestCase.anyTestsAreMarkedExclusive(fileJSON);
-      parsedSpecFiles.add(Pair<String, Map<String, dynamic>>(basenameWithoutExtension(f.path), fileJSON));
+      exclusiveMode =
+          exclusiveMode || SpecTestCase.anyTestsAreMarkedExclusive(fileJSON);
+      parsedSpecFiles.add(Pair<String, Map<String, dynamic>>(
+          basenameWithoutExtension(f.path), fileJSON));
     }
 
     for (Pair<String, Map<String, dynamic>> parsedSpecFile in parsedSpecFiles) {
@@ -76,13 +80,15 @@ void main() {
         final List<dynamic> steps = testJSON['steps'];
         final Set<String> tags = SpecTestCase.getTestTags(testJSON);
 
-        final bool runTest =
-            testCase.shouldRunTest(tags) && (!exclusiveMode || tags.contains(SpecTestCase.exclusiveTag));
+        final bool runTest = testCase.shouldRunTest(tags) &&
+            (!exclusiveMode || tags.contains(SpecTestCase.exclusiveTag));
         if (runTest) {
           try {
-            SpecTestCase.info('------------------------------------------------------------------');
+            SpecTestCase.info(
+                '------------------------------------------------------------------');
             SpecTestCase.info('  Spec test: $name');
-            SpecTestCase.info('------------------------------------------------------------------');
+            SpecTestCase.info(
+                '------------------------------------------------------------------');
             testCase.currentName = name;
             await testCase.runSteps(steps, config);
             ranAtLeastOneTest = true;

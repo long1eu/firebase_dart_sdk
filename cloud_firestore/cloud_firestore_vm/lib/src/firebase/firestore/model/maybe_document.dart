@@ -2,8 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 
 /// The result of a lookup for a given path may be an existing document or a marker that this
 /// document does not exist at a given version.

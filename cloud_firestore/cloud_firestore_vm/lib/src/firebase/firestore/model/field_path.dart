@@ -2,8 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/base_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/base_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 
 /// A dot separated path for navigating sub-objects with in a document
 class FieldPath extends BasePath<FieldPath> {
@@ -40,7 +40,8 @@ class FieldPath extends BasePath<FieldPath> {
         if (!inBackticks) {
           final String elem = buffer.toString();
           if (elem.isEmpty) {
-            throw ArgumentError('Invalid field path ($path). Paths must not be empty, begin '
+            throw ArgumentError(
+                'Invalid field path ($path). Paths must not be empty, begin '
                 'with \'.\', end with \'.\', or contain \'..\'');
           }
           buffer = StringBuffer();
@@ -60,7 +61,8 @@ class FieldPath extends BasePath<FieldPath> {
     }
     final String lastElem = buffer.toString();
     if (lastElem.isEmpty) {
-      throw ArgumentError('Invalid field path ($path). Paths must not be empty, begin with \'.\', '
+      throw ArgumentError(
+          'Invalid field path ($path). Paths must not be empty, begin with \'.\', '
           'end with \'.\', or contain \'..\'');
     }
     res.add(lastElem);
@@ -72,7 +74,8 @@ class FieldPath extends BasePath<FieldPath> {
     return segments.isEmpty ? FieldPath.emptyPath : FieldPath._(segments);
   }
 
-  static final FieldPath keyPath = FieldPath.fromSingleSegment(DocumentKey.keyFieldName);
+  static final FieldPath keyPath =
+      FieldPath.fromSingleSegment(DocumentKey.keyFieldName);
 
   static const FieldPath emptyPath = FieldPath._(<String>[]);
 

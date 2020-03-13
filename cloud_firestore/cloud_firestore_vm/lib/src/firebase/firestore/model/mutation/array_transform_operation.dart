@@ -2,12 +2,12 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:collection/collection.dart';
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_operation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/array_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
 abstract class ArrayTransformOperation implements TransformOperation {
   const ArrayTransformOperation(this.elements);
@@ -15,12 +15,14 @@ abstract class ArrayTransformOperation implements TransformOperation {
   final List<FieldValue> elements;
 
   @override
-  FieldValue applyToLocalView(FieldValue previousValue, Timestamp localWriteTime) {
+  FieldValue applyToLocalView(
+      FieldValue previousValue, Timestamp localWriteTime) {
     return apply(previousValue);
   }
 
   @override
-  FieldValue applyToRemoteDocument(FieldValue previousValue, FieldValue transformResult) {
+  FieldValue applyToRemoteDocument(
+      FieldValue previousValue, FieldValue transformResult) {
     // The server just sends null as the transform result for array operations, so we have to
     // calculate a result the same as we do for local applications.
     return apply(previousValue);
@@ -62,7 +64,8 @@ class ArrayTransformOperationUnion extends ArrayTransformOperation {
 
   @override
   ArrayValue apply(FieldValue previousValue) {
-    final List<FieldValue> result = ArrayTransformOperation.coercedFieldValuesArray(previousValue);
+    final List<FieldValue> result =
+        ArrayTransformOperation.coercedFieldValuesArray(previousValue);
     for (FieldValue element in elements) {
       if (!result.contains(element)) {
         result.add(element);
@@ -78,7 +81,8 @@ class ArrayTransformOperationRemove extends ArrayTransformOperation {
 
   @override
   ArrayValue apply(FieldValue previousValue) {
-    final List<FieldValue> result = ArrayTransformOperation.coercedFieldValuesArray(previousValue);
+    final List<FieldValue> result =
+        ArrayTransformOperation.coercedFieldValuesArray(previousValue);
     result.removeWhere((FieldValue it) => elements.contains(it));
     return ArrayValue.fromList(result);
   }

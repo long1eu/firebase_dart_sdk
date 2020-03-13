@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 
 /// A Timestamp represents a point in time independent of any time zone or calendar, represented as
 /// seconds and fractions of seconds at nanosecond resolution in UTC Epoch time. It is encoded using
@@ -41,7 +41,8 @@ class Timestamp implements Comparable<Timestamp> {
   final int nanoseconds;
 
   DateTime toDate() {
-    return DateTime.fromMillisecondsSinceEpoch((seconds * 1000 + (nanoseconds ~/ 1000000)).toInt());
+    return DateTime.fromMillisecondsSinceEpoch(
+        (seconds * 1000 + (nanoseconds ~/ 1000000)).toInt());
   }
 
   @override
@@ -62,12 +63,15 @@ class Timestamp implements Comparable<Timestamp> {
     Preconditions.checkArgument(
         seconds >= -62135596800, 'Timestamp seconds out of range: $seconds');
     // This will break in the year 10,000.
-    Preconditions.checkArgument(seconds < 253402300800, 'Timestamp seconds out of range: $seconds');
+    Preconditions.checkArgument(
+        seconds < 253402300800, 'Timestamp seconds out of range: $seconds');
   }
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)..add('seconds', seconds)..add('nanoseconds', nanoseconds))
+    return (ToStringHelper(runtimeType)
+          ..add('seconds', seconds)
+          ..add('nanoseconds', nanoseconds))
         .toString();
   }
 

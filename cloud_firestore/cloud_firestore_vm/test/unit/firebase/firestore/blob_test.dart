@@ -4,7 +4,7 @@
 
 import 'dart:typed_data';
 
-import 'package:firebase_firestore/src/firebase/firestore/blob.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
 import 'package:test/test.dart';
 
 import '../../../util/comparator_test.dart';

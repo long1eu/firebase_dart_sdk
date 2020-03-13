@@ -4,13 +4,13 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/transaction.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/transaction.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -18,7 +18,7 @@ import '../../../util/test_util.dart';
 
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/transaction';
-  FirebaseFirestore firestore;
+  Firestore firestore;
 
   setUp(() async {
     firestore = await testFirestore();
@@ -31,16 +31,19 @@ void main() {
 
   test('testGetDocuments', () async {
     final DocumentReference doc = firestore.collection('spaces').document();
-    final Map<String, Object> value = map(<dynamic>['foo', 1, 'desc', 'Stuff', 'owner', 'Jonny']);
+    final Map<String, Object> value =
+        map(<dynamic>['foo', 1, 'desc', 'Stuff', 'owner', 'Jonny']);
     await doc.set(value);
 
     try {
-      await firestore.runTransaction((Transaction transaction) => transaction.get(doc));
+      await firestore
+          .runTransaction((Transaction transaction) => transaction.get(doc));
     } catch (e) {
       // We currently require every document read to also be written.
       // TODO(long1eu): Fix this check once we drop that requirement.
       expect(e.message, 'Transaction failed all retries.');
-      expect(e.cause.message, 'Every document read in a transaction must also be written.');
+      expect(e.cause.message,
+          'Every document read in a transaction must also be written.');
     }
   });
 
@@ -72,7 +75,9 @@ void main() {
   test('testWriteDocumentTwice', () async {
     final DocumentReference doc = firestore.collection('towns').document();
     await firestore.runTransaction<void>((Transaction transaction) {
-      transaction.set(doc, map(<String>['a', 'b'])).set(doc, map(<String>['c', 'd']));
+      transaction
+          .set(doc, map(<String>['a', 'b']))
+          .set(doc, map(<String>['c', 'd']));
       return null;
     });
     final DocumentSnapshot snapshot = await doc.get();
@@ -130,7 +135,8 @@ void main() {
     for (int i = 0; i < 3; i++) {
       final Completer<void> resolveRead = Completer<void>();
       readTasks.add(resolveRead.future);
-      transactionTasks.add(firestore.runTransaction<void>((Transaction transaction) async {
+      transactionTasks
+          .add(firestore.runTransaction<void>((Transaction transaction) async {
         final DocumentSnapshot snapshot = await transaction.get(doc);
         expect(snapshot, isNotNull);
         started++;
@@ -140,7 +146,8 @@ void main() {
         }
 
         await barrier.future;
-        transaction.set(doc, map(<dynamic>['count', snapshot.getDouble('count') + 1.0]));
+        transaction.set(
+            doc, map(<dynamic>['count', snapshot.getDouble('count') + 1.0]));
         return null;
       }));
     }
@@ -158,9 +165,11 @@ void main() {
 
   test('testTransactionRejectsUpdatesForNonexistentDocuments', () async {
     // Make a transaction that will fail
-    final Future<void> transactionTask = firestore.runTransaction<void>((Transaction transaction) async {
+    final Future<void> transactionTask =
+        firestore.runTransaction<void>((Transaction transaction) async {
       // Get and update a document that doesn't exist so that the transaction fails
-      final DocumentSnapshot doc = await transaction.get(firestore.collection('nonexistent').document());
+      final DocumentSnapshot doc =
+          await transaction.get(firestore.collection('nonexistent').document());
       transaction.updateFromList(doc.reference, <String>['foo', 'bar']);
       return null;
     });
@@ -180,7 +189,8 @@ void main() {
     await docRef.set(map(<String>['foo', 'bar']));
 
     // Make a transaction that will fail
-    final Future<void> transactionTask = firestore.runTransaction<void>((Transaction transaction) async {
+    final Future<void> transactionTask =
+        firestore.runTransaction<void>((Transaction transaction) async {
       final DocumentSnapshot doc = await transaction.get(docRef);
       expect(doc.exists, isTrue);
       transaction
@@ -205,7 +215,8 @@ void main() {
     await docRef.set(map(<String>['foo', 'bar']));
 
     // Make a transaction that will fail
-    final Future<void> transactionTask = firestore.runTransaction<void>((Transaction transaction) async {
+    final Future<void> transactionTask =
+        firestore.runTransaction<void>((Transaction transaction) async {
       final DocumentSnapshot doc = await transaction.get(docRef);
       expect(doc.exists, isTrue);
       transaction
@@ -223,15 +234,17 @@ void main() {
       expect(e, const TypeMatcher<FirebaseFirestoreError>());
 
       final FirebaseFirestoreError error = e;
-      expect(error.code, FirebaseFirestoreErrorCode.aborted);
+      expect(error.code, FirestoreErrorCode.aborted);
     }
   });
 
   test('testTransactionRaisesErrorsForInvalidUpdates', () async {
     // Make a transaction that will fail server-side.
-    final Future<void> transactionTask = firestore.runTransaction<void>((Transaction transaction) async {
+    final Future<void> transactionTask =
+        firestore.runTransaction<void>((Transaction transaction) async {
       // Try to read / write a document with an invalid path.
-      final DocumentSnapshot doc = await transaction.get(firestore.collection('nonexistent').document('__badpath__'));
+      final DocumentSnapshot doc = await transaction
+          .get(firestore.collection('nonexistent').document('__badpath__'));
       transaction.set(doc.reference, map(<String>['foo', 'value']));
       return null;
     });
@@ -244,7 +257,7 @@ void main() {
       print(e);
 
       final FirebaseFirestoreError error = e;
-      expect(error.code, FirebaseFirestoreErrorCode.invalidArgument);
+      expect(error.code, FirestoreErrorCode.invalidArgument);
     }
   });
 
@@ -263,7 +276,8 @@ void main() {
     for (int i = 0; i < 3; i++) {
       final Completer<void> resolveRead = Completer<void>();
       readTasks.add(resolveRead.future);
-      transactionTasks.add(firestore.runTransaction<void>((Transaction transaction) async {
+      transactionTasks
+          .add(firestore.runTransaction<void>((Transaction transaction) async {
         final DocumentSnapshot snapshot = await transaction.get(doc);
         expect(snapshot, isNotNull);
         started++;
@@ -272,7 +286,8 @@ void main() {
         }
         await barrier.future;
 
-        transaction.update(doc, map(<dynamic>['count', snapshot.getDouble('count') + 1.0]));
+        transaction.update(
+            doc, map(<dynamic>['count', snapshot.getDouble('count') + 1.0]));
         return null;
       }));
     }
@@ -365,7 +380,8 @@ void main() {
       // snapshot = await doc2.get();
       // expect(snapshot.getDouble('count'), 16);
       expect(e.message, 'Transaction failed all retries.');
-      expect(e.cause.message, 'Every document read in a transaction must also be written.');
+      expect(e.cause.message,
+          'Every document read in a transaction must also be written.');
     }
   });
 
@@ -409,13 +425,15 @@ void main() {
     await doc.set(map(<String>['foo', 'bar']));
 
     try {
-      await firestore.runTransaction<void>((Transaction transaction) => transaction.get(doc));
+      await firestore.runTransaction<void>(
+          (Transaction transaction) => transaction.get(doc));
     } catch (e) {
       // We currently require every document read to also be written.
       // TODO(long1eu): Add this check back once we drop that.
       // expect(snapshot.getString('foo'), 'bar');
       expect(e.message, 'Transaction failed all retries.');
-      expect(e.cause.message, 'Every document read in a transaction must also be written.');
+      expect(e.cause.message,
+          'Every document read in a transaction must also be written.');
     }
   });
 

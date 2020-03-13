@@ -4,18 +4,18 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/core/listent_sequence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
 
 class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   SQLiteLruReferenceDelegate(this.persistence, LruGarbageCollectorParams params)
@@ -39,14 +39,15 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
-    hardAssert(
-        _currentSequenceNumber == ListenSequence.invalid, 'Starting a transaction without committing the previous one');
+    hardAssert(_currentSequenceNumber == ListenSequence.invalid,
+        'Starting a transaction without committing the previous one');
     _currentSequenceNumber = listenSequence.next;
   }
 
   @override
   Future<void> onTransactionCommitted() async {
-    hardAssert(_currentSequenceNumber != ListenSequence.invalid, 'Committing a transaction without having started one');
+    hardAssert(_currentSequenceNumber != ListenSequence.invalid,
+        'Committing a transaction without having started one');
     _currentSequenceNumber = ListenSequence.invalid;
   }
 
@@ -81,7 +82,8 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<void> forEachOrphanedDocumentSequenceNumber(Consumer<int> consumer) async {
+  Future<void> forEachOrphanedDocumentSequenceNumber(
+      Consumer<int> consumer) async {
     final List<Map<String, dynamic>> result = await persistence.query(
         // @formatter:off
         '''

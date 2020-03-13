@@ -5,28 +5,25 @@
 import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/index_range.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/nan_filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/null_filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/relation_filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/index_cursor.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_documents_view.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_engine.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_collection_index.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_collections.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/array_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/bool_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/double_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/null_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/index_range.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/index_cursor.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_documents_view.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_engine.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_collection_index.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_collections.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/bool_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/double_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/null_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
 /// An indexed implementation of [QueryEngine] which performs fairly efficient queries.
@@ -64,19 +61,28 @@ class IndexedQueryEngine implements QueryEngine {
   static const double lowSelectivity = 0.5;
 
   // [ArrayValue] and [ObjectValue] are currently considered low cardinality because we don't index them uniquely.
-  static final List<Type> lowCardinalityTypes = <Type>[BoolValue, ArrayValue, ObjectValue];
+  static final List<Type> lowCardinalityTypes = <Type>[
+    BoolValue,
+    ArrayValue,
+    ObjectValue
+  ];
 
   final LocalDocumentsView localDocuments;
   final SQLiteCollectionIndex collectionIndex;
 
   @override
-  Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(Query query) {
-    return query.isDocumentQuery ? localDocuments.getDocumentsMatchingQuery(query) : performCollectionQuery(query);
+  Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
+      Query query) {
+    return query.isDocumentQuery
+        ? localDocuments.getDocumentsMatchingQuery(query)
+        : performCollectionQuery(query);
   }
 
   /// Executes the query using both indexes and post-filtering.
-  Future<ImmutableSortedMap<DocumentKey, Document>> performCollectionQuery(Query query) async {
-    hardAssert(!query.isDocumentQuery, 'matchesCollectionQuery called with document query.');
+  Future<ImmutableSortedMap<DocumentKey, Document>> performCollectionQuery(
+      Query query) async {
+    hardAssert(!query.isDocumentQuery,
+        'matchesCollectionQuery called with document query.');
 
     final IndexRange indexRange = extractBestIndexRange(query);
     ImmutableSortedMap<DocumentKey, Document> filteredResults;
@@ -84,7 +90,8 @@ class IndexedQueryEngine implements QueryEngine {
     if (indexRange != null) {
       filteredResults = await _performQueryUsingIndex(query, indexRange);
     } else {
-      hardAssert(query.filters.isEmpty, 'If there are any filters, we should be able to use an index.');
+      hardAssert(query.filters.isEmpty,
+          'If there are any filters, we should be able to use an index.');
       // TODO(long1eu): Call overlay.getCollectionDocuments(query.path) and filter the results (there may still be
       //  startAt/endAt bounds that apply).
       filteredResults = await localDocuments.getDocumentsMatchingQuery(query);
@@ -95,12 +102,16 @@ class IndexedQueryEngine implements QueryEngine {
 
   /// Applies 'filter' to the index cursor, looks up the relevant documents from the local documents view and returns
   /// all matches.
-  Future<ImmutableSortedMap<DocumentKey, Document>> _performQueryUsingIndex(Query query, IndexRange indexRange) async {
-    ImmutableSortedMap<DocumentKey, Document> results = DocumentCollections.emptyDocumentMap();
-    final IndexCursor cursor = collectionIndex.getCursor(query.path, indexRange);
+  Future<ImmutableSortedMap<DocumentKey, Document>> _performQueryUsingIndex(
+      Query query, IndexRange indexRange) async {
+    ImmutableSortedMap<DocumentKey, Document> results =
+        DocumentCollections.emptyDocumentMap();
+    final IndexCursor cursor =
+        collectionIndex.getCursor(query.path, indexRange);
     try {
       while (cursor.next) {
-        final Document document = await localDocuments.getDocument(cursor.documentKey);
+        final Document document =
+            await localDocuments.getDocument(cursor.documentKey);
         if (query.matches(document)) {
           results = results.insert(cursor.documentKey, document);
         }
@@ -122,13 +133,18 @@ class IndexedQueryEngine implements QueryEngine {
     } else if (filter is NaNFilter) {
       return highSelectivity;
     } else {
-      hardAssert(filter is RelationFilter, 'Filter type expected to be RelationFilter');
+      hardAssert(filter is RelationFilter,
+          'Filter type expected to be RelationFilter');
       final RelationFilter relationFilter = filter;
 
       final double operatorSelectivity =
-          relationFilter.operator == FilterOperator.equal ? highSelectivity : lowSelectivity;
+          relationFilter.operator == FilterOperator.equal
+              ? highSelectivity
+              : lowSelectivity;
       final double typeSelectivity =
-          lowCardinalityTypes.contains(relationFilter.value.runtimeType) ? lowSelectivity : highSelectivity;
+          lowCardinalityTypes.contains(relationFilter.value.runtimeType)
+              ? lowSelectivity
+              : highSelectivity;
 
       return typeSelectivity * operatorSelectivity;
     }
@@ -145,7 +161,8 @@ class IndexedQueryEngine implements QueryEngine {
     if (query.filters.isNotEmpty) {
       Filter selectedFilter;
       for (Filter currentFilter in query.filters) {
-        final double estimatedSelectivity = _estimateFilterSelectivity(currentFilter);
+        final double estimatedSelectivity =
+            _estimateFilterSelectivity(currentFilter);
         if (estimatedSelectivity > currentSelectivity) {
           selectedFilter = currentFilter;
           currentSelectivity = estimatedSelectivity;
@@ -211,7 +228,8 @@ class IndexedQueryEngine implements QueryEngine {
   }
 
   @override
-  void handleDocumentChange(MaybeDocument oldDocument, MaybeDocument newDocument) {
+  void handleDocumentChange(
+      MaybeDocument oldDocument, MaybeDocument newDocument) {
     // TODO(long1eu): Determine changed fields and make appropriate addEntry() / removeEntry() on
     //  [SQLiteCollectionIndex].
     throw StateError('Not yet implemented.');

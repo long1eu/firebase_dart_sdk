@@ -4,21 +4,23 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/memory_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/remote_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:uuid/uuid.dart';
 
 import 'mock/database_mock.dart';
 
 Future<SQLitePersistence> openSQLitePersistence(String name,
-    [LruGarbageCollectorParams params = const LruGarbageCollectorParams()]) async {
+    [LruGarbageCollectorParams params =
+        const LruGarbageCollectorParams()]) async {
   final DatabaseId databaseId = DatabaseId.forProject('projectId');
-  final LocalSerializer serializer = LocalSerializer(RemoteSerializer(databaseId));
+  final LocalSerializer serializer =
+      LocalSerializer(RemoteSerializer(databaseId));
 
   final SQLitePersistence persistence = await SQLitePersistence.create(
     name,
@@ -54,16 +56,20 @@ Future<SQLitePersistence> createSQLitePersistence(
 
 /// Creates and starts a new [MemoryPersistence] instance for testing.
 Future<MemoryPersistence> createEagerGCMemoryPersistence() async {
-  final MemoryPersistence persistence = MemoryPersistence.createEagerGcMemoryPersistence();
+  final MemoryPersistence persistence =
+      MemoryPersistence.createEagerGcMemoryPersistence();
   await persistence.start();
   return persistence;
 }
 
 Future<MemoryPersistence> createLRUMemoryPersistence(
-    [LruGarbageCollectorParams params = const LruGarbageCollectorParams()]) async {
+    [LruGarbageCollectorParams params =
+        const LruGarbageCollectorParams()]) async {
   final DatabaseId databaseId = DatabaseId.forProject('projectId');
-  final LocalSerializer serializer = LocalSerializer(RemoteSerializer(databaseId));
-  final MemoryPersistence persistence = MemoryPersistence.createLruGcMemoryPersistence(params, serializer);
+  final LocalSerializer serializer =
+      LocalSerializer(RemoteSerializer(databaseId));
+  final MemoryPersistence persistence =
+      MemoryPersistence.createLruGcMemoryPersistence(params, serializer);
   await persistence.start();
   return persistence;
 }

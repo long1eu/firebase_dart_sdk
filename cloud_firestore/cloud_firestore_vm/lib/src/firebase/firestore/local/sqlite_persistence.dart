@@ -4,21 +4,21 @@
 
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_lru_reference_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_mutation_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_query_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_remote_document_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_schema.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_lru_reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_schema.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
 import 'package:meta/meta.dart';
 
 /// A SQLite-backed instance of Persistence.
@@ -50,15 +50,23 @@ class SQLitePersistence extends Persistence {
 
   int get byteSize => _db.file.lengthSync();
 
-  static Future<SQLitePersistence> create(String persistenceKey, DatabaseId databaseId, LocalSerializer serializer,
-      OpenDatabase openDatabase, LruGarbageCollectorParams params) async {
+  static Future<SQLitePersistence> create(
+      String persistenceKey,
+      DatabaseId databaseId,
+      LocalSerializer serializer,
+      OpenDatabase openDatabase,
+      LruGarbageCollectorParams params) async {
     final String databaseName = sDatabaseName(persistenceKey, databaseId);
 
-    final SQLitePersistence persistence = SQLitePersistence._(serializer, openDatabase, databaseName);
+    final SQLitePersistence persistence =
+        SQLitePersistence._(serializer, openDatabase, databaseName);
 
-    final SQLiteQueryCache queryCache = SQLiteQueryCache(persistence, serializer);
-    final SQLiteRemoteDocumentCache remoteDocumentCache = SQLiteRemoteDocumentCache(persistence, serializer);
-    final SQLiteLruReferenceDelegate referenceDelegate = SQLiteLruReferenceDelegate(persistence, params);
+    final SQLiteQueryCache queryCache =
+        SQLiteQueryCache(persistence, serializer);
+    final SQLiteRemoteDocumentCache remoteDocumentCache =
+        SQLiteRemoteDocumentCache(persistence, serializer);
+    final SQLiteLruReferenceDelegate referenceDelegate =
+        SQLiteLruReferenceDelegate(persistence, params);
 
     return persistence
       ..queryCache = queryCache
@@ -108,7 +116,8 @@ class SQLitePersistence extends Persistence {
   }
 
   @override
-  Future<void> runTransaction(String action, Transaction<void> operation) async {
+  Future<void> runTransaction(
+      String action, Transaction<void> operation) async {
     Log.d(tag, 'Starting transaction: $action');
     try {
       referenceDelegate.onTransactionStarted();
@@ -123,7 +132,8 @@ class SQLitePersistence extends Persistence {
   }
 
   @override
-  Future<T> runTransactionAndReturn<T>(String action, Transaction<T> operation) async {
+  Future<T> runTransactionAndReturn<T>(
+      String action, Transaction<T> operation) async {
     Log.d(tag, 'Starting transaction: $action');
 
     try {
@@ -144,7 +154,8 @@ class SQLitePersistence extends Persistence {
     return _db.execute(statement, args);
   }
 
-  Future<List<Map<String, dynamic>>> query(String statement, [List<dynamic> args]) {
+  Future<List<Map<String, dynamic>>> query(String statement,
+      [List<dynamic> args]) {
     return _db.query(statement, args);
   }
 
@@ -162,7 +173,8 @@ class SQLitePersistence extends Persistence {
   ///   * onOpen
   ///
   /// This attempts to obtain exclusive access to the database and attempts to do so as early as possible.
-  static Future<Database> _openDb(String databaseName, OpenDatabase openDatabase) async {
+  static Future<Database> _openDb(
+      String databaseName, OpenDatabase openDatabase) async {
     bool configured;
 
     /// Ensures that onConfigure has been called. This should be called first from all methods.
@@ -253,7 +265,8 @@ class LongQuery {
   /// subqueries take the form:
   ///
   /// [_head][_argsHead][an auto-generated comma-separated list of '?' placeholders][_tail]
-  LongQuery(this._db, this._head, List<dynamic> argsHead, List<dynamic> argsIter, this._tail)
+  LongQuery(this._db, this._head, List<dynamic> argsHead,
+      List<dynamic> argsIter, this._tail)
       : _argsIter = argsIter,
         _argsHead = argsHead ?? <dynamic>[],
         _subqueriesPerformed = 0;
@@ -291,7 +304,9 @@ class LongQuery {
     final List<Object> subqueryArgs = List<Object>.from(_argsHead);
     final StringBuffer placeholdersBuilder = StringBuffer();
 
-    for (int i = 0; j < _argsIter.length && i < _limit - _argsHead.length; i++) {
+    for (int i = 0;
+        j < _argsIter.length && i < _limit - _argsHead.length;
+        i++) {
       if (i > 0) {
         placeholdersBuilder.write(', ');
       }

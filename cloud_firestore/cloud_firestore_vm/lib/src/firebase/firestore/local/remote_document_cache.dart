@@ -5,10 +5,10 @@
 import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 
 /// Represents cached documents received from the remote backend.
 ///
@@ -35,7 +35,8 @@ abstract class RemoteDocumentCache {
   ///
   /// Returns the cached Document or NoDocument entries indexed by key. If an entry is not cached,
   /// the corresponding key will be mapped to a null value.
-  Future<Map<DocumentKey, MaybeDocument>> getAll(Iterable<DocumentKey> documentKeys);
+  Future<Map<DocumentKey, MaybeDocument>> getAll(
+      Iterable<DocumentKey> documentKeys);
 
   /// Executes a query against the cached Document entries
   ///
@@ -43,5 +44,6 @@ abstract class RemoteDocumentCache {
   /// the consumer before presenting them to the user.
   ///
   /// Cached [NoDocument] entries have no bearing on query results.
-  Future<ImmutableSortedMap<DocumentKey, Document>> getAllDocumentsMatchingQuery(Query query);
+  Future<ImmutableSortedMap<DocumentKey, Document>>
+      getAllDocumentsMatchingQuery(Query query);
 }

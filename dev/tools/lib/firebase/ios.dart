@@ -4,9 +4,9 @@
 
 part of 'firebase.dart';
 
-ProjectsIosAppsResourceApi get iosApps => _firebaseApi.projects.iosApps;
+ProjectsIosAppsResourceApi get iosApps => firebaseApi.projects.iosApps;
 
-Future<IosAppConfig> createIosApp({
+Future<void> createIosApp({
   @required String path,
   @required String name,
   @required String bundleId,

@@ -6,20 +6,21 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_serializer.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart' as sq;
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
-import 'package:firebase_firestore/src/proto/index.dart' as proto;
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart'
+    as sq;
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
 import 'package:protobuf/protobuf.dart';
 
 /// A mutation queue for a specific user, backed by SQLite.
@@ -122,7 +123,8 @@ class SQLiteMutationQueue implements MutationQueue {
 
       for (Map<String, dynamic> row in result) {
         final int batchId = row['MAX(batch_id)'];
-        _nextBatchId = batchId == null ? _nextBatchId : max(_nextBatchId, batchId);
+        _nextBatchId =
+            batchId == null ? _nextBatchId : max(_nextBatchId, batchId);
       }
     }
 
@@ -144,7 +146,8 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken) async {
+  Future<void> acknowledgeBatch(
+      MutationBatch batch, Uint8List streamToken) async {
     _lastStreamToken = checkNotNull(streamToken);
     await _writeMutationQueueMetadata();
   }
@@ -171,11 +174,13 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<MutationBatch> addMutationBatch(Timestamp localWriteTime, List<Mutation> mutations) async {
+  Future<MutationBatch> addMutationBatch(
+      Timestamp localWriteTime, List<Mutation> mutations) async {
     final int batchId = _nextBatchId;
     _nextBatchId += 1;
 
-    final MutationBatch batch = MutationBatch(batchId, localWriteTime, mutations);
+    final MutationBatch batch =
+        MutationBatch(batchId, localWriteTime, mutations);
     final GeneratedMessage proto = serializer.encodeMutationBatch(batch);
 
     await db.execute(
@@ -278,7 +283,8 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(DocumentKey documentKey) async {
+  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
+      DocumentKey documentKey) async {
     final String path = EncodedPath.encode(documentKey.path);
 
     final List<MutationBatch> result = <MutationBatch>[];
@@ -305,7 +311,8 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(Iterable<DocumentKey> documentKeys) async {
+  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
+      Iterable<DocumentKey> documentKeys) async {
     final List<Object> args = <Object>[];
     for (DocumentKey key in documentKeys) {
       args.add(EncodedPath.encode(key.path));
@@ -321,7 +328,8 @@ class SQLiteMutationQueue implements MutationQueue {
     final List<MutationBatch> result = <MutationBatch>[];
     final Set<int> uniqueBatchIds = <int>{};
     while (longQuery.hasMoreSubqueries) {
-      final List<Map<String, dynamic>> rows = await longQuery.performNextSubquery();
+      final List<Map<String, dynamic>> rows =
+          await longQuery.performNextSubquery();
       for (Map<String, dynamic> row in rows) {
         final int batchId = row['batch_id'];
         if (!uniqueBatchIds.contains(batchId)) {
@@ -334,13 +342,15 @@ class SQLiteMutationQueue implements MutationQueue {
     // If more than one query was issued, batches might be in an unsorted order (batches are ordered within one query's
     // results, but not across queries). It's likely to be rare, so don't impose performance penalty on the normal case.
     if (longQuery.subqueriesPerformed > 1) {
-      result.sort((MutationBatch lhs, MutationBatch rhs) => lhs.batchId.compareTo(rhs.batchId));
+      result.sort((MutationBatch lhs, MutationBatch rhs) =>
+          lhs.batchId.compareTo(rhs.batchId));
     }
     return result;
   }
 
   @override
-  Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(Query query) async {
+  Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(
+      Query query) async {
     // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
     final int immediateChildrenPathLength = prefix.length + 1;
@@ -424,9 +434,11 @@ class SQLiteMutationQueue implements MutationQueue {
     // @formatter:on
 
     final int batchId = batch.batchId;
-    final int deleted = await db.delete(mutationDeleter, <dynamic>[uid, batchId]);
+    final int deleted =
+        await db.delete(mutationDeleter, <dynamic>[uid, batchId]);
 
-    hardAssert(deleted != 0, 'Mutation batch ($uid, ${batch.batchId}) did not exist');
+    hardAssert(
+        deleted != 0, 'Mutation batch ($uid, ${batch.batchId}) did not exist');
 
     for (Mutation mutation in batch.mutations) {
       final DocumentKey key = mutation.key;

@@ -5,8 +5,8 @@
 import 'dart:math';
 
 import 'package:collection/collection.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
 
 /// A wrapper for Array values in Firestore
 class ArrayValue extends FieldValue {
@@ -28,7 +28,9 @@ class ArrayValue extends FieldValue {
 
   @override
   Object valueWith(FieldValueOptions options) {
-    return _value.map((FieldValue it) => it.valueWith(options)).toList(growable: false);
+    return _value
+        .map((FieldValue it) => it.valueWith(options))
+        .toList(growable: false);
   }
 
   @override

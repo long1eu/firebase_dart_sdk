@@ -1,7 +1,7 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 28/09/2018
-import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
 import 'package:test/test.dart';
 
 void main() {

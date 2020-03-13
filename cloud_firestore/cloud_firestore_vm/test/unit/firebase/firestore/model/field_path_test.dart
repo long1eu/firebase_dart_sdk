@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 27/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/comparator_test.dart';

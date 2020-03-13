@@ -5,9 +5,9 @@
 import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
-import 'package:firebase_core/firebase_core_vm.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:meta/meta.dart';
 
 /// A [TargetChange] specifies the set of changes for a specific target as part of a [RemoteEvent].
@@ -49,7 +49,8 @@ class TargetChange {
       identical(this, other) ||
       other is TargetChange &&
           runtimeType == other.runtimeType &&
-          const DeepCollectionEquality().equals(resumeToken, other.resumeToken) &&
+          const DeepCollectionEquality()
+              .equals(resumeToken, other.resumeToken) &&
           current == other.current &&
           addedDocuments == other.addedDocuments &&
           modifiedDocuments == other.modifiedDocuments &&

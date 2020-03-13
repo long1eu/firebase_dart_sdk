@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 
 /// A wrapper for string values in Firestore.
 // TODO(long1eu): Add truncation support
@@ -33,7 +33,9 @@ class StringValue extends FieldValue {
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is StringValue && runtimeType == other.runtimeType && _value == other._value;
+        other is StringValue &&
+            runtimeType == other.runtimeType &&
+            _value == other._value;
   }
 
   @override

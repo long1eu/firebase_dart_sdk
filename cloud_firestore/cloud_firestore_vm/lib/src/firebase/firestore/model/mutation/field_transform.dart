@@ -2,9 +2,9 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_operation.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
 
 /// A field path and the operation to perform upon it.
 class FieldTransform {
@@ -26,7 +26,9 @@ class FieldTransform {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)..add('fieldPath', fieldPath)..add('operation', operation))
+    return (ToStringHelper(runtimeType)
+          ..add('fieldPath', fieldPath)
+          ..add('operation', operation))
         .toString();
   }
 }

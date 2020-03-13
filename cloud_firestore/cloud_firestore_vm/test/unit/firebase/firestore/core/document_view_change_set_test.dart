@@ -2,9 +2,9 @@
 // Lung Razvan <long1eu>
 // on 25/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change_set.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart';
@@ -35,16 +35,26 @@ void main() async {
       ..addChange(DocumentViewChange(DocumentViewChangeType.added, added))
       ..addChange(DocumentViewChange(DocumentViewChangeType.removed, removed))
       ..addChange(DocumentViewChange(DocumentViewChangeType.modified, modified))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.added, addedThenModified))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.modified, addedThenModified))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.added, addedThenRemoved))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.removed, addedThenRemoved))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.removed, removedThenAdded))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.added, removedThenAdded))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.modified, modifiedThenRemoved))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.removed, modifiedThenRemoved))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.modified, modifiedThenModified))
-      ..addChange(DocumentViewChange(DocumentViewChangeType.modified, modifiedThenModified));
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.added, addedThenModified))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.modified, addedThenModified))
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.added, addedThenRemoved))
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.removed, addedThenRemoved))
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.removed, removedThenAdded))
+      ..addChange(
+          DocumentViewChange(DocumentViewChangeType.added, removedThenAdded))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.modified, modifiedThenRemoved))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.removed, modifiedThenRemoved))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.modified, modifiedThenModified))
+      ..addChange(DocumentViewChange(
+          DocumentViewChangeType.modified, modifiedThenModified));
 
     final List<DocumentViewChange> changes = set.getChanges();
 

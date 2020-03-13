@@ -5,6 +5,8 @@
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +16,7 @@ final FirebaseAuth _auth = FirebaseAuth.instance;
 final GoogleSignIn _googleSignIn = GoogleSignIn();
 
 class SignInPage extends StatefulWidget {
-  final String title = 'Registration';
+  final String title = 'Sign in';
 
   @override
   State<StatefulWidget> createState() => SignInPageState();
@@ -28,6 +30,8 @@ class SignInPageState extends State<SignInPage> {
 
   @override
   Widget build(BuildContext context) {
+    print('_auth: ${FirebaseAuthPlatform.instance}');
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
@@ -55,19 +59,21 @@ class SignInPageState extends State<SignInPage> {
           })
         ],
       ),
-      body: Builder(builder: (BuildContext context) {
-        return ListView(
-          scrollDirection: Axis.vertical,
-          children: <Widget>[
-            const _EmailPasswordForm(),
-            if (isMobile) const _EmailLinkSignInSection(),
-            const _AnonymouslySignInSection(),
-            const _GoogleSignInSection(),
-            _PhoneSignInSection(scaffold: Scaffold.of(context)),
-            const _OtherProvidersSignInSection(),
-          ],
-        );
-      }),
+      body: Builder(
+        builder: (BuildContext context) {
+          return ListView(
+            scrollDirection: Axis.vertical,
+            children: <Widget>[
+              const _EmailPasswordForm(),
+              if (isMobile) const _EmailLinkSignInSection(),
+              const _AnonymouslySignInSection(),
+              const _GoogleSignInSection(),
+              _PhoneSignInSection(scaffold: Scaffold.of(context)),
+              const _OtherProvidersSignInSection(),
+            ],
+          );
+        },
+      ),
     );
   }
 }

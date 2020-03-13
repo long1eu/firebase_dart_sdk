@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -16,57 +16,82 @@ void main() {
 
   setUp(() async {
     print('setUp');
-    final SQLitePersistence persistence =
-        await openSQLitePersistence('firebase/firestore/local/local_store_test-${Uuid().v4()}.db');
+    final SQLitePersistence persistence = await openSQLitePersistence(
+        'firebase/firestore/local/local_store_test-${Uuid().v4()}.db');
 
     testCase = LocalStoreTestCase(persistence, garbageCollectorIsEager: false);
     await testCase.setUp();
     print('setUpDone');
   });
 
-  tearDown(() => Future<void>.delayed(const Duration(milliseconds: 250), () => testCase?.tearDown()));
+  tearDown(() => Future<void>.delayed(
+      const Duration(milliseconds: 250), () => testCase?.tearDown()));
 
   test('testMutationBatchKeys', () => testCase.testMutationBatchKeys());
   test('testHandlesSetMutation', () => testCase.testHandlesSetMutation());
-  test('testHandlesSetMutationThenDocument', () => testCase.testHandlesSetMutationThenDocument());
-  test('testHandlesSetMutationThenAckThenRelease', () => testCase.testHandlesSetMutationThenAckThenRelease());
-  test('testHandlesAckThenRejectThenRemoteEvent', () => testCase.testHandlesAckThenRejectThenRemoteEvent());
+  test('testHandlesSetMutationThenDocument',
+      () => testCase.testHandlesSetMutationThenDocument());
+  test('testHandlesSetMutationThenAckThenRelease',
+      () => testCase.testHandlesSetMutationThenAckThenRelease());
+  test('testHandlesAckThenRejectThenRemoteEvent',
+      () => testCase.testHandlesAckThenRejectThenRemoteEvent());
   test('testHandlesDeletedDocumentThenSetMutationThenAck',
       () => testCase.testHandlesDeletedDocumentThenSetMutationThenAck());
-  test('testHandlesSetMutationThenDeletedDocument', () => testCase.testHandlesSetMutationThenDeletedDocument());
+  test('testHandlesSetMutationThenDeletedDocument',
+      () => testCase.testHandlesSetMutationThenDeletedDocument());
   test('testHandlesDocumentThenSetMutationThenAckThenDocument',
       () => testCase.testHandlesDocumentThenSetMutationThenAckThenDocument());
-  test('testHandlesPatchWithoutPriorDocument', () => testCase.testHandlesPatchWithoutPriorDocument());
-  test('testHandlesPatchMutationThenDocumentThenAck', () => testCase.testHandlesPatchMutationThenDocumentThenAck());
-  test('testHandlesPatchMutationThenAckThenDocument', () => testCase.testHandlesPatchMutationThenAckThenDocument());
-  test('testHandlesDeleteMutationThenAck', () => testCase.testHandlesDeleteMutationThenAck());
-  test('testHandlesDocumentThenDeleteMutationThenAck', () => testCase.testHandlesDocumentThenDeleteMutationThenAck());
-  test('testHandlesDeleteMutationThenDocumentThenAck', () => testCase.testHandlesDeleteMutationThenDocumentThenAck());
+  test('testHandlesPatchWithoutPriorDocument',
+      () => testCase.testHandlesPatchWithoutPriorDocument());
+  test('testHandlesPatchMutationThenDocumentThenAck',
+      () => testCase.testHandlesPatchMutationThenDocumentThenAck());
+  test('testHandlesPatchMutationThenAckThenDocument',
+      () => testCase.testHandlesPatchMutationThenAckThenDocument());
+  test('testHandlesDeleteMutationThenAck',
+      () => testCase.testHandlesDeleteMutationThenAck());
+  test('testHandlesDocumentThenDeleteMutationThenAck',
+      () => testCase.testHandlesDocumentThenDeleteMutationThenAck());
+  test('testHandlesDeleteMutationThenDocumentThenAck',
+      () => testCase.testHandlesDeleteMutationThenDocumentThenAck());
   test('testHandlesDocumentThenDeletedDocumentThenDocument',
       () => testCase.testHandlesDocumentThenDeletedDocumentThenDocument());
-  test('testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck',
-      () => testCase.testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck());
+  test(
+      'testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck',
+      () => testCase
+          .testHandlesSetMutationThenPatchMutationThenDocumentThenAckThenAck());
   test('testHandlesSetMutationAndPatchMutationTogether',
       () => testCase.testHandlesSetMutationAndPatchMutationTogether());
   test('testHandlesSetMutationThenPatchMutationThenReject',
       () => testCase.testHandlesSetMutationThenPatchMutationThenReject());
-  test('testHandlesSetMutationsAndPatchMutationOfJustOneTogether',
-      () => testCase.testHandlesSetMutationsAndPatchMutationOfJustOneTogether());
-  test('testHandlesDeleteMutationThenPatchMutationThenAckThenAck',
-      () => testCase.testHandlesDeleteMutationThenPatchMutationThenAckThenAck());
+  test(
+      'testHandlesSetMutationsAndPatchMutationOfJustOneTogether',
+      () =>
+          testCase.testHandlesSetMutationsAndPatchMutationOfJustOneTogether());
+  test(
+      'testHandlesDeleteMutationThenPatchMutationThenAckThenAck',
+      () =>
+          testCase.testHandlesDeleteMutationThenPatchMutationThenAckThenAck());
   test('testCollectsGarbageAfterChangeBatchWithNoTargetIDs',
       () => testCase.testCollectsGarbageAfterChangeBatchWithNoTargetIDs());
-  test('testCollectsGarbageAfterChangeBatch', () => testCase.testCollectsGarbageAfterChangeBatch());
-  test('testCollectsGarbageAfterAcknowledgedMutation', () => testCase.testCollectsGarbageAfterAcknowledgedMutation());
-  test('testCollectsGarbageAfterRejectedMutation', () => testCase.testCollectsGarbageAfterRejectedMutation());
-  test('testPinsDocumentsInTheLocalView', () => testCase.testPinsDocumentsInTheLocalView());
+  test('testCollectsGarbageAfterChangeBatch',
+      () => testCase.testCollectsGarbageAfterChangeBatch());
+  test('testCollectsGarbageAfterAcknowledgedMutation',
+      () => testCase.testCollectsGarbageAfterAcknowledgedMutation());
+  test('testCollectsGarbageAfterRejectedMutation',
+      () => testCase.testCollectsGarbageAfterRejectedMutation());
+  test('testPinsDocumentsInTheLocalView',
+      () => testCase.testPinsDocumentsInTheLocalView());
   test('testThrowsAwayDocumentsWithUnknownTargetIDsImmediately',
       () => testCase.testThrowsAwayDocumentsWithUnknownTargetIDsImmediately());
-  test('testCanExecuteDocumentQueries', () => testCase.testCanExecuteDocumentQueries());
-  test('testCanExecuteCollectionQueries', () => testCase.testCanExecuteCollectionQueries());
-  test('testCanExecuteMixedCollectionQueries', () => testCase.testCanExecuteMixedCollectionQueries());
+  test('testCanExecuteDocumentQueries',
+      () => testCase.testCanExecuteDocumentQueries());
+  test('testCanExecuteCollectionQueries',
+      () => testCase.testCanExecuteCollectionQueries());
+  test('testCanExecuteMixedCollectionQueries',
+      () => testCase.testCanExecuteMixedCollectionQueries());
   test('testPersistsResumeTokens', () => testCase.testPersistsResumeTokens());
   test('testDoesNotReplaceResumeTokenWithEmptyByteString',
       () => testCase.testDoesNotReplaceResumeTokenWithEmptyByteString());
-  test('testRemoteDocumentKeysForTarget', () => testCase.testRemoteDocumentKeysForTarget());
+  test('testRemoteDocumentKeysForTarget',
+      () => testCase.testRemoteDocumentKeysForTarget());
 }

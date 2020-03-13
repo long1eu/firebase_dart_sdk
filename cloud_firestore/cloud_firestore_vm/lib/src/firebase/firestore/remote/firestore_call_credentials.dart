@@ -3,9 +3,11 @@
 // on 24/09/2018
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
-import 'package:firebase_internal/_firebase_internal_vm.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/credentials_provider.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:grpc/grpc.dart';
 
 class FirestoreCallCredentials {
@@ -17,7 +19,8 @@ class FirestoreCallCredentials {
 
   final CredentialsProvider credentialsProvider;
 
-  Future<void> getRequestMetadata(Map<String, String> metadata, String uri) async {
+  Future<void> getRequestMetadata(
+      Map<String, String> metadata, String uri) async {
     try {
       final String token = await credentialsProvider.token;
       Log.d(tag, 'Successfully fetched token.');
@@ -29,7 +32,7 @@ class FirestoreCallCredentials {
     } on FirebaseNoSignedInUserError catch (_) {
       Log.d(tag, 'No user signed in, not using authentication.');
     } catch (e) {
-      Log.w(tag, 'Failed to get token: $e.');
+      Log.w(tag, 'Failed to get token: $e. ${e.stackTrace}');
       throw GrpcError.unauthenticated(e.toString());
     }
   }

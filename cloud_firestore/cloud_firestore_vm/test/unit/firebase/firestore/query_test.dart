@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 28/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:test/test.dart';
 
 import 'test_util.dart';

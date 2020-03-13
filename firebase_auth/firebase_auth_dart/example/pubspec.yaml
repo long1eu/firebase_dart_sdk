@@ -1,5 +1,5 @@
 name: firebase_auth_dart_example
-description: Exacmple app for firebase_auth_dart
+description: Example app for firebase_auth_dart
 
 environment:
   sdk: ">=2.7.0 <3.0.0"

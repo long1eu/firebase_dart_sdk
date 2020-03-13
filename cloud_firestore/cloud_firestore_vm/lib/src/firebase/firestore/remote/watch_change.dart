@@ -5,11 +5,11 @@
 import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/existence_filter.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/existence_filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:grpc/grpc.dart';
 
 /// The kind of change that happened to the watch target.
@@ -25,7 +25,9 @@ abstract class WatchChange {
 /// An [WatchChangeExistenceFilterWatchChange] applies to the targets and is required to verify the current client state
 /// against expected state sent from the server.
 class WatchChangeExistenceFilterWatchChange extends WatchChange {
-  const WatchChangeExistenceFilterWatchChange(this.targetId, this.existenceFilter) : super._();
+  const WatchChangeExistenceFilterWatchChange(
+      this.targetId, this.existenceFilter)
+      : super._();
 
   final int targetId;
 
@@ -35,7 +37,8 @@ class WatchChangeExistenceFilterWatchChange extends WatchChange {
 /// A document change represents a change document and a list of target ids to which this change applies. If the
 /// document has been deleted, the deleted document will be provided.
 class WatchChangeDocumentChange extends WatchChange {
-  const WatchChangeDocumentChange(this.updatedTargetIds, this.removedTargetIds, this.documentKey, this.newDocument)
+  const WatchChangeDocumentChange(this.updatedTargetIds, this.removedTargetIds,
+      this.documentKey, this.newDocument)
       : super._();
 
   /// The target IDs for which this document should be updated/added. The new document applies to all of these targets.
@@ -58,8 +61,10 @@ class WatchChangeDocumentChange extends WatchChange {
       identical(this, other) ||
       other is WatchChangeDocumentChange &&
           runtimeType == other.runtimeType &&
-          const ListEquality<int>().equals(updatedTargetIds, other.updatedTargetIds) &&
-          const ListEquality<int>().equals(removedTargetIds, other.removedTargetIds) &&
+          const ListEquality<int>()
+              .equals(updatedTargetIds, other.updatedTargetIds) &&
+          const ListEquality<int>()
+              .equals(removedTargetIds, other.removedTargetIds) &&
           documentKey == other.documentKey &&
           newDocument == other.newDocument;
 

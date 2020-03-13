@@ -4,11 +4,11 @@
 
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/online_state.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/online_state.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
 
 /// Called whenever the online state of the client changes. This is based on the watch stream for
@@ -75,7 +75,8 @@ class OnlineStateTracker {
     if (_watchStreamFailures == 0) {
       await _setAndBroadcastState(OnlineState.unknown);
 
-      hardAssert(_onlineStateTimer == null, 'onlineStateTimer shouldn\'t be started yet');
+      hardAssert(_onlineStateTimer == null,
+          'onlineStateTimer shouldn\'t be started yet');
       _onlineStateTimer = _workerQueue.enqueueAfterDelay<void>(
         TimerId.onlineStateTimeout,
         const Duration(milliseconds: _onlineStateTimeoutMs),
@@ -144,7 +145,8 @@ class OnlineStateTracker {
   }
 
   void _logClientOfflineWarningIfNecessary(String reason) {
-    final String message = 'Could not reach Cloud Firestore backend. $reason\nThis typically '
+    final String message =
+        'Could not reach Cloud Firestore backend. $reason\nThis typically '
         'indicates that your device does not have a healthy Internet connection at the moment. The '
         'client will operate in offline mode until it is able to successfully connect to the '
         'backend.';

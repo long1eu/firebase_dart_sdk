@@ -2,14 +2,14 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// Represents a [Mutation] of a document. Different subclasses of Mutation will
 /// perform different kinds of changes to a base document. For example, a
@@ -68,7 +68,8 @@ abstract class Mutation {
   ///
   /// Returns the mutated document. The returned document may be an [UnknownDocument], if the
   /// mutation could not be applied to the locally cached base document.
-  MaybeDocument applyToRemoteDocument(MaybeDocument maybeDoc, MutationResult mutationResult);
+  MaybeDocument applyToRemoteDocument(
+      MaybeDocument maybeDoc, MutationResult mutationResult);
 
   /// Applies this mutation to [maybeDoc] for the purposes of computing the new local view of a
   /// document. Both the input and returned documents can be null.
@@ -99,7 +100,8 @@ abstract class Mutation {
 
   void verifyKeyMatches(MaybeDocument maybeDoc) {
     if (maybeDoc != null) {
-      hardAssert(maybeDoc.key == key, 'Can only apply a mutation to a document with the same key');
+      hardAssert(maybeDoc.key == key,
+          'Can only apply a mutation to a document with the same key');
     }
   }
 

@@ -5,13 +5,13 @@
 import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/types.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
 
 /// Represents cached queries received from the remote backend. This contains both a mapping between
 /// queries and the documents that matched them according to the server, but also metadata about the
@@ -69,12 +69,15 @@ abstract class QueryCache {
   Future<QueryData> getQueryData(Query query);
 
   /// Adds the given document [keys] to cached query results of the given [targetId].
-  Future<void> addMatchingKeys(ImmutableSortedSet<DocumentKey> keys, int targetId);
+  Future<void> addMatchingKeys(
+      ImmutableSortedSet<DocumentKey> keys, int targetId);
 
   /// Removes the given document [keys] from the cached query results of the given [targetId].
-  Future<void> removeMatchingKeys(ImmutableSortedSet<DocumentKey> keys, int targetId);
+  Future<void> removeMatchingKeys(
+      ImmutableSortedSet<DocumentKey> keys, int targetId);
 
-  Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(int targetId);
+  Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
+      int targetId);
 
   /// Returns true if the document is part of any target
   Future<bool> containsKey(DocumentKey key);

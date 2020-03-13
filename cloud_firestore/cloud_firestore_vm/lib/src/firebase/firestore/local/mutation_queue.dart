@@ -5,12 +5,12 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/patch_mutation.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// A queue of mutations to apply to the remote store.
 abstract class MutationQueue {
@@ -30,7 +30,8 @@ abstract class MutationQueue {
   Future<void> setLastStreamToken(Uint8List streamToken);
 
   /// Creates a new mutation batch and adds it to this mutation queue.
-  Future<MutationBatch> addMutationBatch(Timestamp localWriteTime, List<Mutation> mutations);
+  Future<MutationBatch> addMutationBatch(
+      Timestamp localWriteTime, List<Mutation> mutations);
 
   /// Loads the mutation batch with the given [batchId].
   Future<MutationBatch> lookupMutationBatch(int batchId);
@@ -56,7 +57,8 @@ abstract class MutationQueue {
   /// document key at all if it's convenient.
   ///
   /// Batches are guaranteed to be sorted by batch ID.
-  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(DocumentKey documentKey);
+  Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
+      DocumentKey documentKey);
 
   /// Finds all mutation batches that could <b>possibly<b> affect the given set of document keys. Not all mutations in a
   /// batch will necessarily affect each key, so when looping through the batch you'll need to check that the mutation

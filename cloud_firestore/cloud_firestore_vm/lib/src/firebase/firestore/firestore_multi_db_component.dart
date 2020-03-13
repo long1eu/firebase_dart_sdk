@@ -4,28 +4,33 @@
 
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_settings.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
-import 'package:firebase_internal/_firebase_internal_vm.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_settings.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
 
 /// Multi-resource container for Firestore.
 class FirestoreMultiDbComponent {
   FirestoreMultiDbComponent(this.app, this.authProvider, this.settings);
 
-  /// A static map from instance key to [FirebaseFirestore] instances. Instance keys are database names.
-  static final Map<String, FirebaseFirestore> instances = <String, FirebaseFirestore>{};
+  /// A static map from instance key to [Firestore] instances. Instance keys are database names.
+  static final Map<String, Firestore> instances = <String, Firestore>{};
 
   final FirebaseApp app;
 
   final InternalTokenProvider authProvider;
 
-  final FirebaseFirestoreSettings settings;
+  final FirestoreSettings settings;
 
   /// Provides instances of Firestore for given database names.
-  Future<FirebaseFirestore> get(String databaseName, OpenDatabase openDatabase) async {
-    return instances[databaseName] ??= await FirebaseFirestore.newInstance(app, databaseName,
-        authProvider: authProvider, openDatabase: openDatabase, settings: settings);
+  Future<Firestore> get(String databaseName, OpenDatabase openDatabase) async {
+    return instances[databaseName] ??= await Firestore.newInstance(
+      app,
+      databaseName,
+      authProvider: authProvider,
+      openDatabase: openDatabase,
+      settings: settings,
+    );
   }
 }

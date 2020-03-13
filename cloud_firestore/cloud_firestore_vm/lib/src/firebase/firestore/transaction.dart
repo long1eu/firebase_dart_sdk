@@ -4,19 +4,19 @@
 
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/transaction.dart' as core;
-import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/transaction.dart'
+    as core;
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/user_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 
 /// The signature for providing code to be executed within a transaction context.
 typedef TransactionCallback<TResult> = Future<TResult> Function(Transaction);
@@ -34,7 +34,7 @@ class Transaction {
 
   final core.Transaction _transaction;
 
-  final FirebaseFirestore _firestore;
+  final Firestore _firestore;
 
   /// Writes to the document referred to by the provided [DocumentReference]. If the document does
   /// not yet exist, it will be created. If you pass [SetOptions], the provided data can be merged
@@ -45,7 +45,8 @@ class Transaction {
   /// [options] An object to configure the set behavior.
   ///
   /// Returns this Transaction instance. Used for chaining method calls.
-  Transaction set(DocumentReference documentRef, Map<String, Object> data, [SetOptions options]) {
+  Transaction set(DocumentReference documentRef, Map<String, Object> data,
+      [SetOptions options]) {
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
     checkNotNull(data, 'Provided data must not be null.');
@@ -66,8 +67,8 @@ class Transaction {
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
   Transaction updateFromList(DocumentReference documentRef, List<Object> data) {
-    final UserDataParsedUpdateData parsedData =
-        _firestore.dataConverter.parseUpdateDataFromList(collectUpdateArguments(1, data));
+    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
+        .parseUpdateDataFromList(collectUpdateArguments(1, data));
     return _update(documentRef, parsedData);
   }
 
@@ -80,11 +81,13 @@ class Transaction {
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
   Transaction update(DocumentReference documentRef, Map<String, Object> data) {
-    final UserDataParsedUpdateData parsedData = _firestore.dataConverter.parseUpdateData(data);
+    final UserDataParsedUpdateData parsedData =
+        _firestore.dataConverter.parseUpdateData(data);
     return _update(documentRef, parsedData);
   }
 
-  Transaction _update(DocumentReference documentRef, UserDataParsedUpdateData updateData) {
+  Transaction _update(
+      DocumentReference documentRef, UserDataParsedUpdateData updateData) {
     _firestore.validateReference(documentRef);
     _transaction.update(documentRef.key, updateData);
     return this;
@@ -109,7 +112,8 @@ class Transaction {
   /// [DocumentReference].
   Future<DocumentSnapshot> get(DocumentReference documentRef) async {
     _firestore.validateReference(documentRef);
-    final List<MaybeDocument> result = await _transaction.lookup(<DocumentKey>[documentRef.key]);
+    final List<MaybeDocument> result =
+        await _transaction.lookup(<DocumentKey>[documentRef.key]);
 
     if (result.length != 1) {
       throw fail('Mismatch in docs returned from document lookup.');

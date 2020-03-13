@@ -5,14 +5,14 @@
 import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:test/test.dart';
 
 import '../../../../../util/test_util.dart';
@@ -194,12 +194,16 @@ class QueryCacheTestCase {
     await _addMatchingKey(key2, 1);
     await _addMatchingKey(key3, 2);
 
-    expect(await _queryCache.getMatchingKeysForTargetId(1), <DocumentKey>[key1, key2]);
-    expect(await _queryCache.getMatchingKeysForTargetId(2), <DocumentKey>[key3]);
+    expect(await _queryCache.getMatchingKeysForTargetId(1),
+        <DocumentKey>[key1, key2]);
+    expect(
+        await _queryCache.getMatchingKeysForTargetId(2), <DocumentKey>[key3]);
 
     await _addMatchingKey(key1, 2);
-    expect(await _queryCache.getMatchingKeysForTargetId(1), <DocumentKey>[key1, key2]);
-    expect(await _queryCache.getMatchingKeysForTargetId(2), <DocumentKey>[key1, key3]);
+    expect(await _queryCache.getMatchingKeysForTargetId(1),
+        <DocumentKey>[key1, key2]);
+    expect(await _queryCache.getMatchingKeysForTargetId(2),
+        <DocumentKey>[key1, key3]);
   }
 
   @testMethod
@@ -208,9 +212,9 @@ class QueryCacheTestCase {
     final Query halls = query('halls');
     final Query garages = query('garages');
 
-    final QueryData query1 = QueryData.init(rooms, 1, 10, QueryPurpose.listen);
+    final QueryData query1 = QueryData(rooms, 1, 10, QueryPurpose.listen);
     await _addQueryData(query1);
-    final QueryData query2 = QueryData.init(halls, 2, 20, QueryPurpose.listen);
+    final QueryData query2 = QueryData(halls, 2, 20, QueryPurpose.listen);
     await _addQueryData(query2);
     expect(_queryCache.highestListenSequenceNumber, 20);
 
@@ -218,7 +222,8 @@ class QueryCacheTestCase {
     await _removeQueryData(query2);
     expect(_queryCache.highestListenSequenceNumber, 20);
 
-    final QueryData query3 = QueryData.init(garages, 42, 100, QueryPurpose.listen);
+    final QueryData query3 =
+        QueryData(garages, 42, 100, QueryPurpose.listen);
     await _addQueryData(query3);
     expect(_queryCache.highestListenSequenceNumber, 100);
 
@@ -232,7 +237,8 @@ class QueryCacheTestCase {
   Future<void> testHighestTargetId() async {
     expect(_queryCache.highestTargetId, 0);
 
-    final QueryData query1 = QueryData.init(query('rooms'), 1, 10, QueryPurpose.listen);
+    final QueryData query1 =
+        QueryData(query('rooms'), 1, 10, QueryPurpose.listen);
     await _addQueryData(query1);
 
     final DocumentKey key1 = key('rooms/bar');
@@ -240,7 +246,8 @@ class QueryCacheTestCase {
     await _addMatchingKey(key1, 1);
     await _addMatchingKey(key2, 1);
 
-    final QueryData query2 = QueryData.init(query('halls'), 2, 20, QueryPurpose.listen);
+    final QueryData query2 =
+        QueryData(query('halls'), 2, 20, QueryPurpose.listen);
     await _addQueryData(query2);
     final DocumentKey key3 = key('halls/foo');
     await _addMatchingKey(key3, 2);
@@ -251,7 +258,8 @@ class QueryCacheTestCase {
     expect(_queryCache.highestTargetId, 2);
 
     // A query with an empty result set still counts.
-    final QueryData query3 = QueryData.init(query('garages'), 42, 100, QueryPurpose.listen);
+    final QueryData query3 =
+        QueryData(query('garages'), 42, 100, QueryPurpose.listen);
     await _addQueryData(query3);
     expect(_queryCache.highestTargetId, 42);
 
@@ -311,35 +319,43 @@ class QueryCacheTestCase {
   /// version.
   QueryData _newQueryData(Query query, int targetId, int theVersion) {
     final int sequenceNumber = ++_previousSequenceNumber;
-    return QueryData(
-        query, targetId, sequenceNumber, QueryPurpose.listen, version(theVersion), resumeToken(theVersion));
+    return QueryData(query, targetId, sequenceNumber, QueryPurpose.listen,
+        version(theVersion), resumeToken(theVersion));
   }
 
   /// Adds the given query data to the [_queryCache] under test, committing immediately.
   Future<QueryData> _addQueryData(QueryData queryData) async {
-    await _persistence.runTransaction('addQueryData', () => _queryCache.addQueryData(queryData));
+    await _persistence.runTransaction(
+        'addQueryData', () => _queryCache.addQueryData(queryData));
     return queryData;
   }
 
   /// Removes the given query data from the queryCache under test, committing immediately.
   Future<void> _removeQueryData(QueryData queryData) async {
-    await _persistence.runTransaction('removeQueryData', () => _queryCache.removeQueryData(queryData));
+    await _persistence.runTransaction(
+        'removeQueryData', () => _queryCache.removeQueryData(queryData));
   }
 
   Future<void> _addMatchingKey(DocumentKey key, int targetId) async {
-    final ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet.insert(key);
+    final ImmutableSortedSet<DocumentKey> keys =
+        DocumentKey.emptyKeySet.insert(key);
 
-    await _persistence.runTransaction('addMatchingKeys', () => _queryCache.addMatchingKeys(keys, targetId));
+    await _persistence.runTransaction(
+        'addMatchingKeys', () => _queryCache.addMatchingKeys(keys, targetId));
   }
 
   Future<void> _removeMatchingKey(DocumentKey key, int targetId) async {
-    final ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet.insert(key);
+    final ImmutableSortedSet<DocumentKey> keys =
+        DocumentKey.emptyKeySet.insert(key);
 
-    await _persistence.runTransaction('removeMatchingKeys', () => _queryCache.removeMatchingKeys(keys, targetId));
+    await _persistence.runTransaction('removeMatchingKeys',
+        () => _queryCache.removeMatchingKeys(keys, targetId));
   }
 
   Future<void> _removeMatchingKeysForTargetId(int targetId) async {
-    await _persistence.runTransaction('removeReferencesForTargetId',
-        () async => _queryCache.removeMatchingKeys(await _queryCache.getMatchingKeysForTargetId(targetId), targetId));
+    await _persistence.runTransaction(
+        'removeReferencesForTargetId',
+        () async => _queryCache.removeMatchingKeys(
+            await _queryCache.getMatchingKeysForTargetId(targetId), targetId));
   }
 }

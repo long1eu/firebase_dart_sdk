@@ -3,9 +3,9 @@
 // on 29/09/2018
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/local/encoded_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/resource_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:test/test.dart';
 
 import 'mock/database_mock.dart';
@@ -17,7 +17,8 @@ void main() {
   Database db;
 
   setUp(() async {
-    db = await DatabaseMock.create('firebase/firestore/local/encoded_path_test.db');
+    db = await DatabaseMock.create(
+        'firebase/firestore/local/encoded_path_test.db');
     await db.execute('CREATE TABLE keys (key TEXT PRIMARY KEY)');
   });
 
@@ -101,17 +102,27 @@ void main() {
     await _assertEncoded('\u0001\u0011' + _sep, _path(<String>['\u0001']));
     await _assertEncoded('\u0002' + _sep, _path(<String>['\u0002']));
 
-    await _assertEncoded('foo\u0001\u0010' + _sep, _path(<String>['foo\u0000']));
-    await _assertEncoded('\u0001\u0010foo' + _sep, _path(<String>['\u0000foo']));
+    await _assertEncoded(
+        'foo\u0001\u0010' + _sep, _path(<String>['foo\u0000']));
+    await _assertEncoded(
+        '\u0001\u0010foo' + _sep, _path(<String>['\u0000foo']));
 
     // Server specials that we don't care about here.
     await _assertEncoded('.' + _sep, _path(<String>['.']));
     await _assertEncoded('..' + _sep, _path(<String>['..']));
     await _assertEncoded('/' + _sep, _path(<String>['/']));
 
-    await _assertEncoded('a' + _sep + 'b' + _sep + 'c' + _sep, _path(<String>['a', 'b', 'c']));
     await _assertEncoded(
-        'a/b' + _sep + 'b.c' + _sep + 'c\u0001\u0010d' + _sep + 'd\u0001\u0011e' + _sep,
+        'a' + _sep + 'b' + _sep + 'c' + _sep, _path(<String>['a', 'b', 'c']));
+    await _assertEncoded(
+        'a/b' +
+            _sep +
+            'b.c' +
+            _sep +
+            'c\u0001\u0010d' +
+            _sep +
+            'd\u0001\u0011e' +
+            _sep,
         _path(<String>['a/b', 'b.c', 'c\u0000d', 'd\u0001e']));
   });
 
@@ -145,6 +156,7 @@ void main() {
 
   test('testPrefixSuccessor', () {
     _assertPrefixSuccessorEquals('\u0001\u0002', _path());
-    _assertPrefixSuccessorEquals('foo${_sep}bar\u0001\u0002', _path(<String>['foo', 'bar']));
+    _assertPrefixSuccessorEquals(
+        'foo${_sep}bar\u0001\u0002', _path(<String>['foo', 'bar']));
   });
 }

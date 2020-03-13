@@ -4,10 +4,10 @@
 
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// Event accumulator for integration test
 class EventAccumulator<T> {
@@ -31,7 +31,8 @@ class EventAccumulator<T> {
   }
 
   Future<List<T>> waitFor([int numEvents = 1]) async {
-    hardAssert(_completion == null, 'calling await while another await is running');
+    hardAssert(
+        _completion == null, 'calling await while another await is running');
     _completion = Completer<void>();
     _maxEvents = _maxEvents + numEvents;
     _checkFulfilled();
@@ -68,7 +69,8 @@ class EventAccumulator<T> {
     if (event is DocumentSnapshot) {
       return event.metadata.hasPendingWrites;
     } else {
-      hardAssert(event is QuerySnapshot, 'hasPendingWrites called on unknown event: $event');
+      hardAssert(event is QuerySnapshot,
+          'hasPendingWrites called on unknown event: $event');
       return (event as QuerySnapshot).metadata.hasPendingWrites;
     }
   }

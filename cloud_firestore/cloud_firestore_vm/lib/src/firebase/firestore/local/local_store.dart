@@ -5,35 +5,35 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:firebase_core/firebase_core_vm.dart';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/auth/user.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/target_id_generator.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_documents_view.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_view_changes.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/local_write_result.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_engine.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/query_purpose.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/simple_query_engine.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/remote_event.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/remote_store.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target_id_generator.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_documents_view.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_view_changes.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_write_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_engine.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/simple_query_engine.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 import 'lru_garbage_collector.dart';
 
@@ -70,13 +70,17 @@ import 'lru_garbage_collector.dart';
 /// the initial set of results before any remote changes have been received.
 class LocalStore {
   factory LocalStore(Persistence persistence, User initialUser) {
-    hardAssert(persistence.started, 'LocalStore was passed an unstarted persistence implementation');
+    hardAssert(persistence.started,
+        'LocalStore was passed an unstarted persistence implementation');
 
     final QueryCache queryCache = persistence.queryCache;
-    final TargetIdGenerator targetIdGenerator = TargetIdGenerator.forQueryCache(queryCache.highestTargetId);
-    final MutationQueue mutationQueue = persistence.getMutationQueue(initialUser);
+    final TargetIdGenerator targetIdGenerator =
+        TargetIdGenerator.forQueryCache(queryCache.highestTargetId);
+    final MutationQueue mutationQueue =
+        persistence.getMutationQueue(initialUser);
     final RemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
-    final LocalDocumentsView localDocuments = LocalDocumentsView(remoteDocuments, mutationQueue);
+    final LocalDocumentsView localDocuments =
+        LocalDocumentsView(remoteDocuments, mutationQueue);
     // TODO(long1eu): Use IndexedQueryEngine as appropriate.
     final SimpleQueryEngine queryEngine = SimpleQueryEngine(localDocuments);
 
@@ -113,7 +117,8 @@ class LocalStore {
   /// This value is arbitrary: it's long enough to avoid several writes (possibly indefinitely if updates come more
   /// frequently than this) but short enough that restarting after crashing will still have a pretty recent resume
   /// token.
-  static final int _resultTokenMaxAgeSeconds = const Duration(minutes: 5).inSeconds;
+  static final int _resultTokenMaxAgeSeconds =
+      const Duration(minutes: 5).inSeconds;
 
   /// Manages our in-memory or durable persistence.
   final Persistence _persistence;
@@ -147,18 +152,22 @@ class LocalStore {
   }
 
   Future<void> startMutationQueue() {
-    return _persistence.runTransaction('Start MutationQueue', _mutationQueue.start);
+    return _persistence.runTransaction(
+        'Start MutationQueue', _mutationQueue.start);
   }
 
   // PORTING NOTE: no shutdown for [LocalStore] or persistence components on Android.
-  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> handleUserChange(User user) async {
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> handleUserChange(
+      User user) async {
     // Swap out the mutation queue, grabbing the pending mutation batches before and after.
-    final List<MutationBatch> oldBatches = await _mutationQueue.getAllMutationBatches();
+    final List<MutationBatch> oldBatches =
+        await _mutationQueue.getAllMutationBatches();
 
     _mutationQueue = _persistence.getMutationQueue(user);
     await startMutationQueue();
 
-    final List<MutationBatch> newBatches = await _mutationQueue.getAllMutationBatches();
+    final List<MutationBatch> newBatches =
+        await _mutationQueue.getAllMutationBatches();
 
     // Recreate our LocalDocumentsView using the new MutationQueue.
     _localDocuments = LocalDocumentsView(_remoteDocuments, _mutationQueue);
@@ -167,7 +176,10 @@ class LocalStore {
 
     // Union the old/new changed keys.
     ImmutableSortedSet<DocumentKey> changedKeys = DocumentKey.emptyKeySet;
-    for (List<MutationBatch> batches in <List<MutationBatch>>[oldBatches, newBatches]) {
+    for (List<MutationBatch> batches in <List<MutationBatch>>[
+      oldBatches,
+      newBatches
+    ]) {
       for (MutationBatch batch in batches) {
         for (Mutation mutation in batch.mutations) {
           changedKeys = changedKeys.insert(mutation.key);
@@ -185,10 +197,12 @@ class LocalStore {
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
 
     final MutationBatch batch = await _persistence.runTransactionAndReturn(
-        'Locally write mutations', () => _mutationQueue.addMutationBatch(localWriteTime, mutations));
+        'Locally write mutations',
+        () => _mutationQueue.addMutationBatch(localWriteTime, mutations));
 
     final Set<DocumentKey> keys = batch.keys;
-    final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments = await _localDocuments.getDocuments(keys);
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
+        await _localDocuments.getDocuments(keys);
 
     return LocalWriteResult(batch.batchId, changedDocuments);
   }
@@ -201,8 +215,10 @@ class LocalStore {
   ///   * recalculate the latency compensated view implied by those changes (there may be mutations in the queue that
   ///   affect the documents but haven't been acknowledged yet); and
   ///   * give the changed documents back the sync engine
-  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> acknowledgeBatch(MutationBatchResult batchResult) {
-    return _persistence.runTransactionAndReturn<ImmutableSortedMap<DocumentKey, MaybeDocument>>('Acknowledge batch',
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> acknowledgeBatch(
+      MutationBatchResult batchResult) {
+    return _persistence.runTransactionAndReturn<
+            ImmutableSortedMap<DocumentKey, MaybeDocument>>('Acknowledge batch',
         () async {
       final MutationBatch batch = batchResult.batch;
       await _mutationQueue.acknowledgeBatch(batch, batchResult.streamToken);
@@ -213,11 +229,14 @@ class LocalStore {
   }
 
   /// Removes mutations from the [MutationQueue] for the specified batch. LocalDocuments will be recalculated.
-  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> rejectBatch(int batchId) {
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> rejectBatch(
+      int batchId) {
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
-    return _persistence.runTransactionAndReturn<ImmutableSortedMap<DocumentKey, MaybeDocument>>('Reject batch',
+    return _persistence.runTransactionAndReturn<
+            ImmutableSortedMap<DocumentKey, MaybeDocument>>('Reject batch',
         () async {
-      final MutationBatch toReject = await _mutationQueue.lookupMutationBatch(batchId);
+      final MutationBatch toReject =
+          await _mutationQueue.lookupMutationBatch(batchId);
       hardAssert(toReject != null, 'Attempt to reject nonexistent batch!');
 
       await _mutationQueue.removeMutationBatch(toReject);
@@ -234,7 +253,8 @@ class LocalStore {
   ///
   /// Use [WriteStream.emptyStreamToken] to clear the current value.
   Future<void> setLastStreamToken(Uint8List streamToken) async {
-    await _persistence.runTransaction('Set stream token', () => _mutationQueue.setLastStreamToken(streamToken));
+    await _persistence.runTransaction('Set stream token',
+        () => _mutationQueue.setLastStreamToken(streamToken));
   }
 
   /// Returns the last consistent snapshot processed (used by the [RemoteStore] to determine whether to buffer incoming
@@ -247,11 +267,14 @@ class LocalStore {
   /// have been acknowledged or rejected (i.e. we do not re-apply local mutations to updates from this event).
   ///
   /// [LocalDocuments] are re-calculated if there are remaining mutations in the queue.
-  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyRemoteEvent(RemoteEvent remoteEvent) {
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyRemoteEvent(
+      RemoteEvent remoteEvent) {
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
-    return _persistence.runTransactionAndReturn<ImmutableSortedMap<DocumentKey, MaybeDocument>>('Apply remote event',
-        () async {
-      final int sequenceNumber = _persistence.referenceDelegate.currentSequenceNumber;
+    return _persistence.runTransactionAndReturn<
+            ImmutableSortedMap<DocumentKey, MaybeDocument>>(
+        'Apply remote event', () async {
+      final int sequenceNumber =
+          _persistence.referenceDelegate.currentSequenceNumber;
       final Set<DocumentKey> authoritativeUpdates = <DocumentKey>{};
 
       final Map<int, TargetChange> targetChanges = remoteEvent.targetChanges;
@@ -294,13 +317,18 @@ class LocalStore {
         }
       }
 
-      final Map<DocumentKey, MaybeDocument> changedDocs = <DocumentKey, MaybeDocument>{};
-      final Map<DocumentKey, MaybeDocument> documentUpdates = remoteEvent.documentUpdates;
-      final Set<DocumentKey> limboDocuments = remoteEvent.resolvedLimboDocuments;
+      final Map<DocumentKey, MaybeDocument> changedDocs =
+          <DocumentKey, MaybeDocument>{};
+      final Map<DocumentKey, MaybeDocument> documentUpdates =
+          remoteEvent.documentUpdates;
+      final Set<DocumentKey> limboDocuments =
+          remoteEvent.resolvedLimboDocuments;
       // Each loop iteration only affects its "own" doc, so it's safe to get all the remote documents in advance in a
       // single call.
-      final Map<DocumentKey, MaybeDocument> existingDocs = await _remoteDocuments.getAll(documentUpdates.keys);
-      for (MapEntry<DocumentKey, MaybeDocument> entry in documentUpdates.entries) {
+      final Map<DocumentKey, MaybeDocument> existingDocs =
+          await _remoteDocuments.getAll(documentUpdates.keys);
+      for (MapEntry<DocumentKey, MaybeDocument> entry
+          in documentUpdates.entries) {
         final DocumentKey key = entry.key;
         final MaybeDocument doc = entry.value;
         final MaybeDocument existingDoc = existingDocs[key];
@@ -310,7 +338,8 @@ class LocalStore {
         // case of a limbo document resolution failing).
         if (existingDoc == null ||
             doc.version == SnapshotVersion.none ||
-            (authoritativeUpdates.contains(doc.key) && !existingDoc.hasPendingWrites) ||
+            (authoritativeUpdates.contains(doc.key) &&
+                !existingDoc.hasPendingWrites) ||
             doc.version.compareTo(existingDoc.version) >= 0) {
           await _remoteDocuments.add(doc);
           changedDocs[key] = doc;
@@ -328,7 +357,8 @@ class LocalStore {
 
       // HACK: The only reason we allow snapshot version none is so that we can synthesize remote events when we get
       // permission denied errors while trying to resolve the state of a locally cached document that is in limbo.
-      final SnapshotVersion lastRemoteVersion = _queryCache.lastRemoteSnapshotVersion;
+      final SnapshotVersion lastRemoteVersion =
+          _queryCache.lastRemoteSnapshotVersion;
       final SnapshotVersion remoteVersion = remoteEvent.snapshotVersion;
       if (remoteVersion != SnapshotVersion.none) {
         hardAssert(remoteVersion.compareTo(lastRemoteVersion) >= 0,
@@ -346,7 +376,8 @@ class LocalStore {
   /// While the target is active, [QueryData] updates can be omitted when nothing about the target has changed except
   /// metadata like the resume token or snapshot version. Occasionally it's worth the extra write to prevent these
   /// values from getting too stale after a crash, but this doesn't have to be too frequent.
-  static bool _shouldPersistQueryData(QueryData oldQueryData, QueryData newQueryData, TargetChange change) {
+  static bool _shouldPersistQueryData(
+      QueryData oldQueryData, QueryData newQueryData, TargetChange change) {
     // Avoid clearing any existing value
     if (newQueryData.resumeToken.isEmpty) {
       return false;
@@ -370,15 +401,19 @@ class LocalStore {
     // Otherwise if the only thing that has changed about a target is its resume token it's not worth persisting. Note
     // that the [RemoteStore] keeps an in-memory view of the currently active targets which includes the current resume
     // token, so stream failure or user changes will still use an up-to-date resume token regardless of what we do here.
-    final int changes = change.addedDocuments.length + change.modifiedDocuments.length + change.removedDocuments.length;
+    final int changes = change.addedDocuments.length +
+        change.modifiedDocuments.length +
+        change.removedDocuments.length;
     return changes > 0;
   }
 
   /// Notify the local store of the changed views to locally pin / unpin documents.
-  Future<void> notifyLocalViewChanges(List<LocalViewChanges> viewChanges) async {
+  Future<void> notifyLocalViewChanges(
+      List<LocalViewChanges> viewChanges) async {
     await _persistence.runTransaction('notifyLocalViewChanges', () async {
       for (LocalViewChanges viewChange in viewChanges) {
-        _localViewReferences.addReferences(viewChange.added, viewChange.targetId);
+        _localViewReferences.addReferences(
+            viewChange.added, viewChange.targetId);
         final ImmutableSortedSet<DocumentKey> removed = viewChange.removed;
         for (DocumentKey key in removed) {
           await _persistence.referenceDelegate.removeReference(key);
@@ -415,7 +450,7 @@ class LocalStore {
     } else {
       await _persistence.runTransaction('Allocate query', () async {
         targetId = _targetIdGenerator.nextId;
-        cached = QueryData.init(
+        cached = QueryData(
           query,
           targetId,
           _persistence.referenceDelegate.currentSequenceNumber,
@@ -427,7 +462,8 @@ class LocalStore {
     }
 
     // Sanity check to ensure that even when resuming a query it's not currently active.
-    hardAssert(_targetIds[targetId] == null, 'Tried to allocate an already allocated query: $query');
+    hardAssert(_targetIds[targetId] == null,
+        'Tried to allocate an already allocated query: $query');
     _targetIds[targetId] = cached;
     return cached;
   }
@@ -436,11 +472,13 @@ class LocalStore {
   Future<void> releaseQuery(Query query) async {
     await _persistence.runTransaction('Release query', () async {
       QueryData queryData = await _queryCache.getQueryData(query);
-      hardAssert(queryData != null, 'Tried to release nonexistent query: $query');
+      hardAssert(
+          queryData != null, 'Tried to release nonexistent query: $query');
 
       final int targetId = queryData.targetId;
       final QueryData cachedQueryData = _targetIds[targetId];
-      if (cachedQueryData.snapshotVersion.compareTo(queryData.snapshotVersion) > 0) {
+      if (cachedQueryData.snapshotVersion.compareTo(queryData.snapshotVersion) >
+          0) {
         // If we've been avoiding persisting the [resumeToken] (see [shouldPersistQueryData] for conditions and
         // rationale) we need to persist the token now because there will no longer be an in-memory version to fall back
         // on.
@@ -471,19 +509,22 @@ class LocalStore {
     return _queryCache.getMatchingKeysForTargetId(targetId);
   }
 
-  Future<void> _applyWriteToRemoteDocuments(MutationBatchResult batchResult) async {
+  Future<void> _applyWriteToRemoteDocuments(
+      MutationBatchResult batchResult) async {
     final MutationBatch batch = batchResult.batch;
     final Set<DocumentKey> docKeys = batch.keys;
     for (DocumentKey docKey in docKeys) {
       final MaybeDocument remoteDoc = await _remoteDocuments.get(docKey);
       MaybeDocument doc = remoteDoc;
       final SnapshotVersion ackVersion = batchResult.docVersions[docKey];
-      hardAssert(ackVersion != null, 'docVersions should contain every doc in the write.');
+      hardAssert(ackVersion != null,
+          'docVersions should contain every doc in the write.');
 
       if (doc == null || doc.version.compareTo(ackVersion) < 0) {
         doc = batch.applyToRemoteDocument(docKey, doc, batchResult);
         if (doc == null) {
-          hardAssert(remoteDoc == null, 'Mutation batch $batch applied to document $remoteDoc resulted in null.');
+          hardAssert(remoteDoc == null,
+              'Mutation batch $batch applied to document $remoteDoc resulted in null.');
         } else {
           await _remoteDocuments.add(doc);
         }
@@ -493,7 +534,9 @@ class LocalStore {
     await _mutationQueue.removeMutationBatch(batch);
   }
 
-  Future<LruGarbageCollectorResults> collectGarbage(LruGarbageCollector garbageCollector) {
-    return _persistence.runTransaction('Collect garbage', () => garbageCollector.collect(_targetIds.keys.toSet()));
+  Future<LruGarbageCollectorResults> collectGarbage(
+      LruGarbageCollector garbageCollector) {
+    return _persistence.runTransaction('Collect garbage',
+        () => garbageCollector.collect(_targetIds.keys.toSet()));
   }
 }

@@ -5,13 +5,13 @@
 import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/query.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/remote_document_cache.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:test/test.dart';
 
 import '../../../../../util/test_util.dart';
@@ -48,9 +48,11 @@ class RemoteDocumentCacheTestCase {
   Future<void> testSetAndReadSeveralDocuments() async {
     final List<String> paths = <String>['a/b', 'a/b/c/d/e/f'];
 
-    final Map<DocumentKey, MaybeDocument> written = <DocumentKey, MaybeDocument>{};
+    final Map<DocumentKey, MaybeDocument> written =
+        <DocumentKey, MaybeDocument>{};
     for (String path in paths) {
-      written[DocumentKey.fromPathString(path)] = await _addTestDocumentAtPath(path);
+      written[DocumentKey.fromPathString(path)] =
+          await _addTestDocumentAtPath(path);
     }
 
     final Map<DocumentKey, MaybeDocument> read = await _getAll(paths);
@@ -60,9 +62,11 @@ class RemoteDocumentCacheTestCase {
   @testMethod
   Future<void> testReadSeveralDocumentsIncludingMissingDocument() async {
     final List<String> paths = <String>['foo/1', 'foo/2'];
-    final Map<DocumentKey, MaybeDocument> written = <DocumentKey, MaybeDocument>{};
+    final Map<DocumentKey, MaybeDocument> written =
+        <DocumentKey, MaybeDocument>{};
     for (String path in paths) {
-      written[DocumentKey.fromPathString(path)] = await _addTestDocumentAtPath(path);
+      written[DocumentKey.fromPathString(path)] =
+          await _addTestDocumentAtPath(path);
     }
     written[DocumentKey.fromPathString('foo/nonexistent')] = null;
 
@@ -77,11 +81,13 @@ class RemoteDocumentCacheTestCase {
     // Make sure to force SQLite implementation to split the large query into several smaller ones.
     const int lotsOfDocuments = 2000;
     final List<String> paths = <String>[];
-    final Map<DocumentKey, MaybeDocument> expected = <DocumentKey, MaybeDocument>{};
+    final Map<DocumentKey, MaybeDocument> expected =
+        <DocumentKey, MaybeDocument>{};
     for (int i = 0; i < lotsOfDocuments; i++) {
       final String path = 'foo/$i';
       paths.add(path);
-      expected[DocumentKey.fromPathString(path)] = await _addTestDocumentAtPath(path);
+      expected[DocumentKey.fromPathString(path)] =
+          await _addTestDocumentAtPath(path);
     }
 
     final Map<DocumentKey, MaybeDocument> read = await _getAll(paths);
@@ -139,7 +145,10 @@ class RemoteDocumentCacheTestCase {
     final Query query = Query(path('b'));
     final ImmutableSortedMap<DocumentKey, Document> results =
         await _remoteDocumentCache.getAllDocumentsMatchingQuery(query);
-    final List<Document> expected = <Document>[doc('b/1', 42, docData), doc('b/2', 42, docData)];
+    final List<Document> expected = <Document>[
+      doc('b/1', 42, docData),
+      doc('b/2', 42, docData)
+    ];
 
     expect(values(results), expected);
   }
@@ -151,7 +160,8 @@ class RemoteDocumentCacheTestCase {
   }
 
   Future<void> _add(MaybeDocument doc) async {
-    await _persistence.runTransaction('add entry', () => _remoteDocumentCache.add(doc));
+    await _persistence.runTransaction(
+        'add entry', () => _remoteDocumentCache.add(doc));
   }
 
   Future<MaybeDocument> _get(String path) {
@@ -169,6 +179,7 @@ class RemoteDocumentCacheTestCase {
   }
 
   Future<void> _remove(String path) async {
-    await _persistence.runTransaction('remove entry', () => _remoteDocumentCache.remove(key(path)));
+    await _persistence.runTransaction(
+        'remove entry', () => _remoteDocumentCache.remove(key(path)));
   }
 }

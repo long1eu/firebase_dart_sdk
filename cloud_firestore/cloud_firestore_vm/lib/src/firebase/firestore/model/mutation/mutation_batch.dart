@@ -2,15 +2,15 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:collection/collection.dart';
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
 
 /// A batch of mutations that will be sent as one unit to the backend. Batches can be marked as a
 /// tombstone if the mutation queue does not remove them immediately. When a batch is a tombstone it
@@ -39,8 +39,8 @@ class MutationBatch {
   /// [documentKey] is the key of the document to apply mutations to, [maybeDoc] is the document to
   /// apply mutations to and [batchResult] is the result of applying the [MutationBatch] to the
   /// backend.
-  MaybeDocument applyToRemoteDocument(
-      DocumentKey documentKey, MaybeDocument maybeDoc, MutationBatchResult batchResult) {
+  MaybeDocument applyToRemoteDocument(DocumentKey documentKey,
+      MaybeDocument maybeDoc, MutationBatchResult batchResult) {
     if (maybeDoc != null) {
       hardAssert(maybeDoc.key == documentKey,
           'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
@@ -62,7 +62,8 @@ class MutationBatch {
   }
 
   /// Computes the local view of a document given all the mutations in this batch.
-  MaybeDocument applyToLocalView(DocumentKey documentKey, MaybeDocument maybeDoc) {
+  MaybeDocument applyToLocalView(
+      DocumentKey documentKey, MaybeDocument maybeDoc) {
     if (maybeDoc != null) {
       hardAssert(maybeDoc.key == documentKey,
           'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
@@ -99,7 +100,9 @@ class MutationBatch {
 
   @override
   int get hashCode =>
-      batchId.hashCode ^ localWriteTime.hashCode ^ const DeepCollectionEquality().hash(mutations);
+      batchId.hashCode ^
+      localWriteTime.hashCode ^
+      const DeepCollectionEquality().hash(mutations);
 
   @override
   String toString() {

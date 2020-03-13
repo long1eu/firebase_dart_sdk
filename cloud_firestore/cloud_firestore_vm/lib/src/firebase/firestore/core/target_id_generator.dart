@@ -2,15 +2,17 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-/// Generates monotonically increasing target IDs for sending targets to the watch stream.
+/// Generates monotonically increasing target IDs for sending targets to the
+/// watch stream.
 ///
-/// The client constructs two generators, one for the query cache [TargetIdGenerator.forQueryCache],
-/// and one for limbo documents [TargetIdGenerator.forSyncEngine]. These two generators produce
+/// The client constructs two generators, one for the query cache
+/// [TargetIdGenerator.forQueryCache], and one for limbo documents
+/// [TargetIdGenerator.forSyncEngine]. These two generators produce
 /// non-overlapping IDs (by using even and odd IDs respectively).
 ///
-/// By separating the target ID space, the query cache can generate target IDs that persist across
-/// client restarts, while sync engine can independently generate in-memory target IDs that are
-/// transient and can be reused after a restart.
+/// By separating the target ID space, the query cache can generate target IDs
+/// that persist across client restarts, while sync engine can independently
+/// generate in-memory target IDs that are transient and can be reused after a restart.
 
 // TODO(mrschmidt): Explore removing this class in favor of generating these IDs
 //  directly in SyncEngine and LocalStore.

@@ -2,8 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:meta/meta.dart';
 
 /// Contains info about host, project id and database
@@ -19,14 +19,6 @@ class DatabaseInfo {
   final String persistenceKey;
   final String host;
   final bool sslEnabled;
-
-  /// Constructs a new DatabaseInfo.
-  ///
-  /// [databaseId] The Google Cloud Project ID and database naming the Firestore
-  /// instance. [persistenceKey] is a unique identifier for this Firestore's
-  /// local storage. Usually derived from [FirebaseApp.name]. [host] is the
-  /// hostname of the backend and [sslEnabled] is used to tell whether to use
-  /// SSL when connecting.
 
   @override
   String toString() {

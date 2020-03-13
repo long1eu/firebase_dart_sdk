@@ -1,7 +1,7 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 17/09/2018
-import 'package:firebase_core/firebase_core_vm.dart';
+
 
 /// Controls the return value for server timestamps that have not yet been set to their final value.
 enum ServerTimestampBehavior {

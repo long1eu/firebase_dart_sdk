@@ -1,11 +1,11 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 20/09/2018
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 
-/// A range of index field values over which a cursor should iterate. If [start] and [end] are both
-/// null, any field value will be considered within range.
+/// A range of index field values over which a cursor should iterate. If [start]
+/// and [end] are both null, any field value will be considered within range.
 class IndexRange {
   const IndexRange({this.fieldPath, this.start, this.end});
 

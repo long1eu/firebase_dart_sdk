@@ -4,20 +4,19 @@
 
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/delete_mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
-import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/user_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/delete_mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 
 /// A write batch, used to perform multiple writes as a single atomic unit.
 ///
-/// A Batch object can be acquired by calling [FirebaseFirestore.batch]. It provides methods for
+/// A Batch object can be acquired by calling [Firestore.batch]. It provides methods for
 /// adding writes to the write batch. None of the writes will be committed (or visible locally)
 /// until [commit] is called.
 ///
@@ -30,7 +29,7 @@ import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
 class WriteBatch {
   WriteBatch(this._firestore) : assert(_firestore != null);
 
-  final FirebaseFirestore _firestore;
+  final Firestore _firestore;
   final List<Mutation> _mutations = <Mutation>[];
 
   bool _committed = false;
@@ -43,7 +42,8 @@ class WriteBatch {
   /// [options] is an object to configure the set behavior.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch set(DocumentReference documentRef, Map<String, Object> data, [SetOptions options]) {
+  WriteBatch set(DocumentReference documentRef, Map<String, Object> data,
+      [SetOptions options]) {
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
     checkNotNull(data, 'Provided data must not be null.');
@@ -51,7 +51,8 @@ class WriteBatch {
     final UserDataParsedSetData parsed = options.merge
         ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
         : _firestore.dataConverter.parseSetData(data);
-    _mutations.addAll(parsed.toMutationList(documentRef.key, Precondition.none));
+    _mutations
+        .addAll(parsed.toMutationList(documentRef.key, Precondition.none));
     return this;
   }
 
@@ -65,12 +66,13 @@ class WriteBatch {
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
   WriteBatch updateFromList(DocumentReference documentRef, List<Object> data) {
-    final UserDataParsedUpdateData parsedData =
-        _firestore.dataConverter.parseUpdateDataFromList(collectUpdateArguments(1, data));
+    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
+        .parseUpdateDataFromList(collectUpdateArguments(1, data));
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
-    _mutations.addAll(parsedData.toMutationList(documentRef.key, Precondition(exists: true)));
+    _mutations.addAll(
+        parsedData.toMutationList(documentRef.key, Precondition(exists: true)));
     return this;
   }
 
@@ -83,11 +85,13 @@ class WriteBatch {
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
   WriteBatch update(DocumentReference documentRef, Map<String, Object> data) {
-    final UserDataParsedUpdateData parsedData = _firestore.dataConverter.parseUpdateData(data);
+    final UserDataParsedUpdateData parsedData =
+        _firestore.dataConverter.parseUpdateData(data);
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
-    _mutations.addAll(parsedData.toMutationList(documentRef.key, Precondition(exists: true)));
+    _mutations.addAll(
+        parsedData.toMutationList(documentRef.key, Precondition(exists: true)));
     return this;
   }
 
@@ -114,7 +118,8 @@ class WriteBatch {
 
   void _verifyNotCommitted() {
     if (_committed) {
-      throw StateError('A write batch can no longer be used after commit() has been called.');
+      throw StateError(
+          'A write batch can no longer be used after commit() has been called.');
     }
   }
 }

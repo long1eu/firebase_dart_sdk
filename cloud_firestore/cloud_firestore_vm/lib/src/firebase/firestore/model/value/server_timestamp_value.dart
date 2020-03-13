@@ -2,13 +2,13 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/transform_mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/timestamp_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/server_timestamp_behavior.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/timestamp_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// Represents a locally-applied Server Timestamp.
 ///

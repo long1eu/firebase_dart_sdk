@@ -2,10 +2,10 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// The direction of the ordering
 class OrderByDirection {
@@ -44,15 +44,16 @@ class OrderBy {
     } else {
       final FieldValue v1 = d1.getField(field);
       final FieldValue v2 = d2.getField(field);
-      hardAssert(
-          v1 != null && v2 != null, 'Trying to compare documents on fields that don\'t exist.');
+      hardAssert(v1 != null && v2 != null,
+          'Trying to compare documents on fields that don\'t exist.');
       return direction._comparisonModifier * v1.compareTo(v2);
     }
   }
 
   @override
   String toString() {
-    return (direction == OrderByDirection.ascending ? '' : '-') + field.canonicalString;
+    return (direction == OrderByDirection.ascending ? '' : '-') +
+        field.canonicalString;
   }
 
   @override
@@ -64,5 +65,5 @@ class OrderBy {
           field == other.field;
 
   @override
-  int get hashCode => direction.hashCode * 31 + field.hashCode * 31;
+  int get hashCode => direction.hashCode ^ field.hashCode;
 }

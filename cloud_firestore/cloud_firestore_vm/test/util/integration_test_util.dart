@@ -5,23 +5,23 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/auth/credentials_provider.dart';
-import 'package:firebase_firestore/src/firebase/firestore/auth/empty_credentials_provider.dart';
-import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/database_info.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/firestore_client.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_settings.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/persistence.dart';
-import 'package:firebase_firestore/src/firebase/firestore/metadata_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/database_id.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/async_queue.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/util.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/credentials_provider.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/empty_credentials_provider.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/database_info.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/firestore_client.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_settings.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 
 import '../unit/firebase/firestore/local/mock/database_mock.dart';
 import 'prod_provider/firestore_provider.dart';
@@ -36,7 +36,8 @@ class IntegrationTestUtil {
   static const String badProjectId = 'test-project-2';
 
   /// Online status of all active Firestore clients.
-  static final Map<FirebaseFirestore, bool> firestoreStatus = <FirebaseFirestore, bool>{};
+  static final Map<Firestore, bool> firestoreStatus =
+      <Firestore, bool>{};
 
   static final FirestoreProvider provider = FirestoreProvider();
 
@@ -53,13 +54,14 @@ class IntegrationTestUtil {
     );
   }
 
-  static FirebaseFirestoreSettings newTestSettings() {
-    return FirebaseFirestoreSettings();
+  static FirestoreSettings newTestSettings() {
+    return FirestoreSettings();
   }
 
   /// Initializes a new Firestore instance that uses the default project, customized with the provided settings if
   /// provided.
-  static Future<FirebaseFirestore> testFirestore([FirebaseFirestoreSettings settings, String dbPath]) async {
+  static Future<Firestore> testFirestore(
+      [FirestoreSettings settings, String dbPath]) async {
     settings ??= newTestSettings();
     return testFirestoreInstance(
       provider.projectId,
@@ -70,7 +72,7 @@ class IntegrationTestUtil {
   }
 
   /// Initializes a new Firestore instance that uses a non-existing default project.
-  static Future<FirebaseFirestore> testAlternateFirestore() async {
+  static Future<Firestore> testAlternateFirestore() async {
     return testFirestoreInstance(
       badProjectId,
       LogLevel.d,
@@ -94,37 +96,48 @@ class IntegrationTestUtil {
     }
   }
 
-  static Future<FirebaseFirestore> forTests(DatabaseId databaseId, String persistenceKey, CredentialsProvider provider,
-      AsyncQueue queue, OpenDatabase openDatabase, FirebaseFirestoreSettings settings) async {
-    final DatabaseInfo databaseInfo =
-        DatabaseInfo(databaseId, persistenceKey, settings.host, sslEnabled: settings.sslEnabled);
-    final FirestoreClient client =
-        await FirestoreClient.initialize(databaseInfo, settings, provider, queue, openDatabase);
+  static Future<Firestore> forTests(
+      DatabaseId databaseId,
+      String persistenceKey,
+      CredentialsProvider provider,
+      AsyncQueue queue,
+      OpenDatabase openDatabase,
+      FirestoreSettings settings) async {
+    final DatabaseInfo databaseInfo = DatabaseInfo(
+        databaseId, persistenceKey, settings.host,
+        sslEnabled: settings.sslEnabled);
+    final FirestoreClient client = await FirestoreClient.initialize(
+        databaseInfo, settings, provider, queue, openDatabase);
 
-    return FirebaseFirestore(databaseId, queue, null, client);
+    return Firestore(databaseId, queue, null, client);
   }
 
   /// Initializes a new Firestore instance that can be used in testing. It is guaranteed to not share state with other
   /// instances returned from this call.
-  static Future<FirebaseFirestore> testFirestoreInstance(
-      String projectId, LogLevel logLevel, FirebaseFirestoreSettings settings, String dbPath) async {
+  static Future<Firestore> testFirestoreInstance(
+      String projectId,
+      LogLevel logLevel,
+      FirestoreSettings settings,
+      String dbPath) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.level = logLevel;
 
     // TODO(long1eu): Remove this once this is ready to ship.
     Persistence.indexingSupportEnabled = true;
 
-    final DatabaseId databaseId = DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
+    final DatabaseId databaseId =
+        DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
     final String persistenceKey = 'db${firestoreStatus.length}';
 
     print('index: $dbIndex');
-    final String dbFullPath = '${Directory.current.path}/build/test/$dbPath\_${dbIndex++}.db';
+    final String dbFullPath =
+        '${Directory.current.path}/build/test/$dbPath\_${dbIndex++}.db';
 
     _clearPersistence(dbFullPath);
 
     final AsyncQueue asyncQueue = AsyncQueue();
 
-    final FirebaseFirestore firestore = await forTests(
+    final Firestore firestore = await forTests(
       databaseId,
       persistenceKey,
       EmptyCredentialsProvider(),
@@ -154,7 +167,7 @@ class IntegrationTestUtil {
   }
 
   static Future<void> tearDown() async {
-    for (FirebaseFirestore firestore in firestoreStatus.keys) {
+    for (Firestore firestore in firestoreStatus.keys) {
       await firestore.shutdown();
     }
     firestoreStatus.clear();
@@ -164,25 +177,30 @@ class IntegrationTestUtil {
     return (await testCollection('test-collection')).document();
   }
 
-  static Future<DocumentReference> testDocumentWithData(Map<String, Object> data) async {
+  static Future<DocumentReference> testDocumentWithData(
+      Map<String, Object> data) async {
     final DocumentReference docRef = await testDocument();
     await docRef.set(data);
     return docRef;
   }
 
   static Future<CollectionReference> testCollection([String name]) async {
-    return (await testFirestore()).collection(name == null ? autoId() : '$name${autoId()}');
+    return (await testFirestore())
+        .collection(name == null ? autoId() : '$name${autoId()}');
   }
 
-  static Future<CollectionReference> testCollectionWithDocs(Map<String, Map<String, Object>> docs) async {
+  static Future<CollectionReference> testCollectionWithDocs(
+      Map<String, Map<String, Object>> docs) async {
     final CollectionReference collection = await testCollection();
-    final CollectionReference writer = (await testFirestore()).collection(collection.id);
+    final CollectionReference writer =
+        (await testFirestore()).collection(collection.id);
 
     await writeAllDocs(writer, docs);
     return collection;
   }
 
-  static Future<void> writeAllDocs(CollectionReference collection, Map<String, Map<String, Object>> docs) async {
+  static Future<void> writeAllDocs(CollectionReference collection,
+      Map<String, Map<String, Object>> docs) async {
     for (MapEntry<String, Map<String, Object>> doc in docs.entries) {
       await collection.document(doc.key).set(doc.value);
     }
@@ -195,7 +213,8 @@ class IntegrationTestUtil {
         .first;
   }
 
-  static List<Map<String, Object>> querySnapshotToValues(QuerySnapshot querySnapshot) {
+  static List<Map<String, Object>> querySnapshotToValues(
+      QuerySnapshot querySnapshot) {
     final List<Map<String, Object>> res = <Map<String, Object>>[];
     for (DocumentSnapshot doc in querySnapshot) {
       res.add(doc.data);
@@ -211,14 +230,14 @@ class IntegrationTestUtil {
     return res;
   }
 
-  static Future<void> disableNetwork(FirebaseFirestore firestore) async {
+  static Future<void> disableNetwork(Firestore firestore) async {
     if (firestoreStatus[firestore]) {
       await firestore.disableNetwork();
       firestoreStatus[firestore] = false;
     }
   }
 
-  static Future<void> enableNetwork(FirebaseFirestore firestore) async {
+  static Future<void> enableNetwork(Firestore firestore) async {
     if (!firestoreStatus[firestore]) {
       await firestore.enableNetwork();
       // Wait for the client to connect.
@@ -227,7 +246,7 @@ class IntegrationTestUtil {
     }
   }
 
-  static bool isNetworkEnabled(FirebaseFirestore firestore) {
+  static bool isNetworkEnabled(Firestore firestore) {
     return firestoreStatus[firestore];
   }
 

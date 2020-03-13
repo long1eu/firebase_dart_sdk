@@ -5,7 +5,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:firebase_firestore/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:moor_ffi/database.dart' as sql;
 
 class DatabaseMock extends Database {
@@ -73,7 +73,8 @@ class DatabaseMock extends Database {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> query(String statement, [List<void> arguments]) async {
+  Future<List<Map<String, dynamic>>> query(String statement,
+      [List<void> arguments]) async {
     final sql.PreparedStatement prep = database.prepare(statement);
     final sql.Result result = prep.select(arguments);
     prep.close();

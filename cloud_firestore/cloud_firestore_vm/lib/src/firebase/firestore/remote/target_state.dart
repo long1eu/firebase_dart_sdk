@@ -5,10 +5,10 @@
 import 'dart:typed_data';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/target_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// Tracks the internal state of a [Watch] target.
 class TargetState {
@@ -64,7 +64,8 @@ class TargetState {
     ImmutableSortedSet<DocumentKey> modifiedDocuments = DocumentKey.emptyKeySet;
     ImmutableSortedSet<DocumentKey> removedDocuments = DocumentKey.emptyKeySet;
 
-    for (MapEntry<DocumentKey, DocumentViewChangeType> entry in _documentChanges.entries) {
+    for (MapEntry<DocumentKey, DocumentViewChangeType> entry
+        in _documentChanges.entries) {
       final DocumentKey key = entry.key;
       final DocumentViewChangeType changeType = entry.value;
 

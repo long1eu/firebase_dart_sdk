@@ -2,21 +2,21 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/field_mask.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation_result.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/unknown_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/field_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/value/object_value.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/unknown_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// A mutation that modifies fields of the document at the given key with the given values. The
 /// values are applied through a field mask:
@@ -25,7 +25,8 @@ import 'package:firebase_firestore/src/firebase/timestamp.dart';
 ///   * When a field is in the mask but not in the values, the corresponding field is deleted.
 ///   * When a field is not in the mask but is in the values, the values map is ignored.
 class PatchMutation extends Mutation {
-  const PatchMutation(DocumentKey key, this.value, this.mask, Precondition precondition)
+  const PatchMutation(
+      DocumentKey key, this.value, this.mask, Precondition precondition)
       : super(key, precondition);
 
   /// Returns the fields and associated values to use when patching the document.
@@ -36,11 +37,12 @@ class PatchMutation extends Mutation {
   final FieldMask mask;
 
   @override
-  MaybeDocument applyToRemoteDocument(MaybeDocument maybeDoc, MutationResult mutationResult) {
+  MaybeDocument applyToRemoteDocument(
+      MaybeDocument maybeDoc, MutationResult mutationResult) {
     verifyKeyMatches(maybeDoc);
 
-    hardAssert(
-        mutationResult.transformResults == null, 'Transform results received by PatchMutation.');
+    hardAssert(mutationResult.transformResults == null,
+        'Transform results received by PatchMutation.');
 
     if (!precondition.isValidFor(maybeDoc)) {
       // Since the mutation was not rejected, we know that the precondition matched on the backend.
@@ -104,7 +106,8 @@ class PatchMutation extends Mutation {
           mask == other.mask;
 
   @override
-  int get hashCode => value.hashCode ^ mask.hashCode ^ keyAndPreconditionHashCode();
+  int get hashCode =>
+      value.hashCode ^ mask.hashCode ^ keyAndPreconditionHashCode();
 
   @override
   String toString() {

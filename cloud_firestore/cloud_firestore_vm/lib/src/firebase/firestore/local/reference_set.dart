@@ -3,8 +3,8 @@
 // on 19/09/2018
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 
 /// A collection of references to a document from some kind of numbered entity (either a target id
 /// or batch id). As references are added to or removed from the set corresponding events are
@@ -19,8 +19,8 @@ import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dar
 /// used to efficiently implement removal of all references by some target id.
 class ReferenceSet {
   ReferenceSet()
-      : referencesByKey =
-            ImmutableSortedSet<DocumentReference>(<DocumentReference>[], DocumentReference.byKey),
+      : referencesByKey = ImmutableSortedSet<DocumentReference>(
+            <DocumentReference>[], DocumentReference.byKey),
         referencesByTarget = ImmutableSortedSet<DocumentReference>(
             <DocumentReference>[], DocumentReference.byTarget);
 
@@ -43,7 +43,8 @@ class ReferenceSet {
   }
 
   /// Add references to the given document keys for the given id.
-  void addReferences(ImmutableSortedSet<DocumentKey> keys, int targetOrBatchId) {
+  void addReferences(
+      ImmutableSortedSet<DocumentKey> keys, int targetOrBatchId) {
     for (DocumentKey key in keys) {
       addReference(key, targetOrBatchId);
     }
@@ -55,7 +56,8 @@ class ReferenceSet {
   }
 
   /// Removes references to the given document keys for the given ID.
-  void removeReferences(ImmutableSortedSet<DocumentKey> keys, int targetOrBatchId) {
+  void removeReferences(
+      ImmutableSortedSet<DocumentKey> keys, int targetOrBatchId) {
     for (DocumentKey key in keys) {
       removeReference(key, targetOrBatchId);
     }
@@ -67,7 +69,8 @@ class ReferenceSet {
   ImmutableSortedSet<DocumentKey> removeReferencesForId(int targetId) {
     final DocumentKey emptyKey = DocumentKey.empty();
     final DocumentReference startRef = DocumentReference(emptyKey, targetId);
-    final Iterator<DocumentReference> it = referencesByTarget.iteratorFrom(startRef);
+    final Iterator<DocumentReference> it =
+        referencesByTarget.iteratorFrom(startRef);
     ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet;
     while (it.moveNext()) {
       final DocumentReference ref = it.current;
@@ -95,7 +98,8 @@ class ReferenceSet {
     final DocumentKey emptyKey = DocumentKey.empty();
     final DocumentReference startRef = DocumentReference(emptyKey, target);
 
-    final Iterator<DocumentReference> iterator = referencesByTarget.iteratorFrom(startRef);
+    final Iterator<DocumentReference> iterator =
+        referencesByTarget.iteratorFrom(startRef);
     ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet;
     while (iterator.moveNext()) {
       final DocumentReference reference = iterator.current;
@@ -111,7 +115,8 @@ class ReferenceSet {
   bool containsKey(DocumentKey key) {
     final DocumentReference ref = DocumentReference(key, 0);
 
-    final Iterator<DocumentReference> iterator = referencesByKey.iteratorFrom(ref);
+    final Iterator<DocumentReference> iterator =
+        referencesByKey.iteratorFrom(ref);
 
     if (!iterator.moveNext()) {
       return false;

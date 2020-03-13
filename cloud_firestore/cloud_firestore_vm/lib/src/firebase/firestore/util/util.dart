@@ -5,13 +5,14 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:firebase_firestore/src/firebase/firestore/field_path.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:grpc/grpc.dart';
 
 const int _autoIdLength = 20;
 
-const String _autoIdAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const String _autoIdAlphabet =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 final Random rand = Random();
 
@@ -41,7 +42,7 @@ int compareBools(bool b1, bool b2) {
 FirebaseFirestoreError exceptionFromStatus(GrpcError error) {
   return FirebaseFirestoreError(
     error.message,
-    FirebaseFirestoreErrorCode.values[error.code],
+    FirestoreErrorCode.values[error.code],
   );
 }
 
@@ -70,7 +71,7 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
     if (e is FirebaseFirestoreError) {
       rethrow;
     } else {
-      throw FirebaseFirestoreError('$e', FirebaseFirestoreErrorCode.unknown);
+      throw FirebaseFirestoreError('$e', FirestoreErrorCode.unknown);
     }
   }
 }
@@ -80,16 +81,19 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
 ///
 /// [fieldPathOffset] is the offset of the first field path in the original update API (used as the
 /// index in error messages)
-List<Object> collectUpdateArguments(int fieldPathOffset, List<Object> fieldsAndValues) {
+List<Object> collectUpdateArguments(
+    int fieldPathOffset, List<Object> fieldsAndValues) {
   if (fieldsAndValues.length % 2 == 1) {
-    throw ArgumentError('Missing value in call to update().  There must be an even number of '
+    throw ArgumentError(
+        'Missing value in call to update().  There must be an even number of '
         'arguments that alternate between field names and values');
   }
   final List<Object> argumentList = fieldsAndValues.toList(growable: false);
   for (int i = 0; i < argumentList.length; i += 2) {
     final Object fieldPath = argumentList[i];
     if (fieldPath is! String && fieldPath is! FieldPath) {
-      throw ArgumentError('Excepted field name at argument position ${i + fieldPathOffset + 1} but '
+      throw ArgumentError(
+          'Excepted field name at argument position ${i + fieldPathOffset + 1} but '
           'got $fieldPath in call to update. The arguments to update should alternate between '
           'field names and values');
     }

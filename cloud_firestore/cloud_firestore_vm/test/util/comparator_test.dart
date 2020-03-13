@@ -2,13 +2,20 @@
 // Lung Razvan <long1eu>
 // on 27/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 
 /// Tests that a given [Comparator] (or the implementation of [Comparable]) is
 /// correct. To use, repeatedly call [addEqualityGroup] with sets of objects
 /// that should be equal. The calls to [addEqualityGroup] must be made in sorted
 /// order. Then call [testCompare] to test the comparison.
 class ComparatorTester<T> {
+  /// Creates a new instance that tests the order of objects using the given
+  /// comparator. Or, if the comparator is null, the natural ordering (as
+  /// defined by [Comparable])
+  ComparatorTester([this._comparator])
+      : _equalityGroups = <List<Object>>[],
+        _testForEqualsCompatibility = _comparator == null;
+
   final Comparator<T> _comparator;
 
   /// The items that we are checking, stored as a sorted set of equivalence
@@ -17,13 +24,6 @@ class ComparatorTester<T> {
 
   /// Whether to enforce a.equals(b) == (a.compareTo(b) == 0)
   bool _testForEqualsCompatibility;
-
-  /// Creates a new instance that tests the order of objects using the given
-  /// comparator. Or, if the comparator is null, the natural ordering (as
-  /// defined by [Comparable])
-  ComparatorTester([this._comparator])
-      : _equalityGroups = <List<Object>>[],
-        _testForEqualsCompatibility = _comparator == null;
 
   /// Activates enforcement of [a.equals(b) == (a.compareTo(b) == 0)]. This is
   /// off by default when testing [Comparator]s, but can be turned on if
@@ -78,13 +78,16 @@ class ComparatorTester<T> {
   }
 
   void _doTestEquivalanceGroupOrdering() {
-    for (int referenceIndex = 0; referenceIndex < _equalityGroups.length; referenceIndex++) {
+    for (int referenceIndex = 0;
+        referenceIndex < _equalityGroups.length;
+        referenceIndex++) {
       for (T reference in _equalityGroups[referenceIndex]) {
-        for (int otherIndex = 0; otherIndex < _equalityGroups.length; otherIndex++) {
+        for (int otherIndex = 0;
+            otherIndex < _equalityGroups.length;
+            otherIndex++) {
           for (T other in _equalityGroups[otherIndex]) {
-            assert(_compare(reference, other).sign == referenceIndex
-                .compareTo(otherIndex)
-                .sign);
+            assert(_compare(reference, other).sign ==
+                referenceIndex.compareTo(otherIndex).sign);
           }
         }
       }
@@ -97,8 +100,8 @@ class ComparatorTester<T> {
         for (List<Object> otherGroup in _equalityGroups) {
           for (T other in otherGroup) {
             assert(
-            reference == other && _compare(reference, other) == 0,
-            'Testing equals() for compatibility with '
+                reference == other && _compare(reference, other) == 0,
+                'Testing equals() for compatibility with '
                 'compare()/compareTo(), add a call to '
                 'doNotRequireEqualsCompatibility() if this is not required');
           }

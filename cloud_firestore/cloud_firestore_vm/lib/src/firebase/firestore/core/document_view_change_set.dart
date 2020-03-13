@@ -4,14 +4,15 @@
 
 import 'dart:collection';
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/core/document_view_change.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// A set of changes to documents with respect to a view. This set is mutable.
 class DocumentViewChangeSet {
-  DocumentViewChangeSet() : changes = SplayTreeMap<DocumentKey, DocumentViewChange>();
+  DocumentViewChangeSet()
+      : changes = SplayTreeMap<DocumentKey, DocumentViewChange>();
 
   // This map is sorted to make the unit tests simpler.
   final SplayTreeMap<DocumentKey, DocumentViewChange> changes;
@@ -26,11 +27,13 @@ class DocumentViewChangeSet {
 
     final DocumentViewChangeType oldType = old.type;
     final DocumentViewChangeType newType = change.type;
-    if (newType != DocumentViewChangeType.added && oldType == DocumentViewChangeType.metadata) {
+    if (newType != DocumentViewChangeType.added &&
+        oldType == DocumentViewChangeType.metadata) {
       changes[key] = change;
     } else if (newType == DocumentViewChangeType.metadata &&
         oldType != DocumentViewChangeType.removed) {
-      final DocumentViewChange newChange = DocumentViewChange(oldType, change.document);
+      final DocumentViewChange newChange =
+          DocumentViewChange(oldType, change.document);
       changes[key] = newChange;
     } else if (newType == DocumentViewChangeType.modified &&
         oldType == DocumentViewChangeType.modified) {
@@ -72,6 +75,8 @@ class DocumentViewChangeSet {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)..add('changes', changes)).toString();
+    return (ToStringHelper(runtimeType) //
+          ..add('changes', changes))
+        .toString();
   }
 }

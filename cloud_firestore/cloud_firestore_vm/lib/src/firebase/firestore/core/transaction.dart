@@ -4,21 +4,21 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/core/user_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/firebase_firestore_error.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/maybe_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/delete_mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/mutation/precondition.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/no_document.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:firebase_firestore/src/firebase/firestore/remote/datastore/datastore.dart';
-import 'package:firebase_firestore/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/user_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/delete_mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
-/// Internal transaction object responsible for accumulating the mutations to perform and the base
-/// versions for any documents read.
+/// Internal transaction object responsible for accumulating the mutations to
+/// perform and the base versions for any documents read.
 class Transaction {
   Transaction(this._transactionClient)
       : readVersions = <DocumentKey, SnapshotVersion>{},
@@ -35,7 +35,8 @@ class Transaction {
     if (doc is Document) {
       docVersion = doc.version;
     } else if (doc is NoDocument) {
-      // For nonexistent docs, we must use precondition with version 0 when we overwrite them.
+      // For nonexistent docs, we must use precondition with version 0 when we
+      // overwrite them.
       docVersion = SnapshotVersion.none;
     } else {
       throw fail('Unexpected document type in transaction: ${doc.runtimeType}');
@@ -46,23 +47,26 @@ class Transaction {
       if (existingVersion != doc.version) {
         // This transaction will fail no matter what.
         throw FirebaseFirestoreError(
-            'Document version changed between two reads.', FirebaseFirestoreErrorCode.failedPrecondition);
+            'Document version changed between two reads.',
+            FirestoreErrorCode.failedPrecondition);
       }
     } else {
       readVersions[doc.key] = docVersion;
     }
   }
 
-  /// Takes a set of keys and asynchronously attempts to fetch all the documents from the backend,
-  /// ignoring any local changes.
+  /// Takes a set of keys and asynchronously attempts to fetch all the documents
+  /// from the backend, ignoring any local changes.
   Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
     if (committed) {
-      return Future<List<MaybeDocument>>.error(
-          FirebaseFirestoreError('Transaction has already completed.', FirebaseFirestoreErrorCode.failedPrecondition));
+      return Future<List<MaybeDocument>>.error(FirebaseFirestoreError(
+          'Transaction has already completed.',
+          FirestoreErrorCode.failedPrecondition));
     }
     if (mutations.isNotEmpty) {
       return Future<List<MaybeDocument>>.error(FirebaseFirestoreError(
-          'Transactions lookups are invalid after writes.', FirebaseFirestoreErrorCode.failedPrecondition));
+          'Transactions lookups are invalid after writes.',
+          FirestoreErrorCode.failedPrecondition));
     }
 
     final List<MaybeDocument> result = await _transactionClient.lookup(keys);
@@ -77,8 +81,8 @@ class Transaction {
     this.mutations.addAll(mutations);
   }
 
-  /// Returns version of this doc when it was read in this transaction as a precondition, or no
-  /// precondition if it was not read.
+  /// Returns version of this doc when it was read in this transaction as a
+  /// precondition, or no precondition if it was not read.
   Precondition _precondition(DocumentKey key) {
     final SnapshotVersion version = readVersions[key];
     if (version != null) {
@@ -88,8 +92,8 @@ class Transaction {
     }
   }
 
-  /// Returns the precondition for a document if the operation is an update, based on the provided
-  /// [UpdateOptions].
+  /// Returns the precondition for a document if the operation is an update,
+  /// based on the provided [UpdateOptions].
   Precondition _preconditionForUpdate(DocumentKey key) {
     final SnapshotVersion version = readVersions[key];
     if (version != null && version == SnapshotVersion.none) {
@@ -104,28 +108,30 @@ class Transaction {
     }
   }
 
-  /// Stores a set mutation for the given key and value, to be committed when [commit] is called.
+  /// Stores a set mutation for the given key and value, to be committed when
+  /// [commit] is called.
   void set(DocumentKey key, UserDataParsedSetData data) {
     _write(data.toMutationList(key, _precondition(key)));
   }
 
-  /// Stores an update mutation for the given key and values, to be committed when [commit] is
-  /// called.
+  /// Stores an update mutation for the given key and values, to be committed
+  /// when [commit] is called.
   void update(DocumentKey key, UserDataParsedUpdateData data) {
     _write(data.toMutationList(key, _preconditionForUpdate(key)));
   }
 
   void delete(DocumentKey key) {
     _write(<DeleteMutation>[DeleteMutation(key, _precondition(key))]);
-    // Since the delete will be applied before all following writes, we need to ensure that the
-    // precondition for the next write will be exists: false.
+    // Since the delete will be applied before all following writes, we need to
+    // ensure that the precondition for the next write will be exists: false.
     readVersions[key] = SnapshotVersion.none;
   }
 
   Future<void> commit() {
     if (committed) {
-      return Future<void>.error(
-          FirebaseFirestoreError('Transaction has already completed.', FirebaseFirestoreErrorCode.failedPrecondition));
+      return Future<void>.error(FirebaseFirestoreError(
+          'Transaction has already completed.',
+          FirestoreErrorCode.failedPrecondition));
     }
     final Set<DocumentKey> unwritten = Set<DocumentKey>.from(readVersions.keys);
     // For each mutation, note that the doc was written.
@@ -134,7 +140,8 @@ class Transaction {
     }
     if (unwritten.isNotEmpty) {
       return Future<void>.error(FirebaseFirestoreError(
-          'Every document read in a transaction must also be written.', FirebaseFirestoreErrorCode.failedPrecondition));
+          'Every document read in a transaction must also be written.',
+          FirestoreErrorCode.failedPrecondition));
     }
     committed = true;
 

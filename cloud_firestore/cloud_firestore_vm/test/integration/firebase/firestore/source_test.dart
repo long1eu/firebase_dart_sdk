@@ -4,17 +4,18 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/collection_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_reference.dart';
-import 'package:firebase_firestore/src/firebase/firestore/document_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/query_snapshot.dart';
-import 'package:firebase_firestore/src/firebase/firestore/set_options.dart';
-import 'package:firebase_firestore/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/source.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
+// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/source_test';
 
@@ -46,7 +47,8 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef =
+        await testCollectionWithDocs(initialDocs);
 
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -79,13 +81,16 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef =
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
 
     // Since we're offline, the returned promises won't complete
-    colRef.document('doc2').set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
+    colRef
+        .document('doc2')
+        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
     colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
     colRef.document('doc4').set(map(<String>['key4', 'value4']));
 
@@ -130,7 +135,8 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef =
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
 
@@ -164,13 +170,16 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef =
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
 
     // Since we're offline, the returned promises won't complete
-    colRef.document('doc2').set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
+    colRef
+        .document('doc2')
+        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
     colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
     colRef.document('doc4').set(map(<String>['key4', 'value4']));
 
@@ -213,7 +222,8 @@ void main() {
       map<String>(<String>['key3', 'value3'])
     ]);
 
-    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef =
+        await testCollectionWithDocs(initialDocs);
 
     final QuerySnapshot qrySnap = await colRef.get(Source.server);
     expect(qrySnap.metadata.isFromCache, isFalse);
@@ -241,7 +251,8 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef =
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
@@ -264,9 +275,7 @@ void main() {
       (DocumentSnapshot docSnap) {
         source.complete(null);
       },
-      onError: (dynamic error) {
-        source.completeError(error);
-      },
+      onError: source.completeError,
     );
     await source.future;
 
@@ -294,13 +303,16 @@ void main() {
       'doc3',
       map<String>(<String>['key3', 'value3'])
     ]);
-    final CollectionReference colRef = await testCollectionWithDocs(initialDocs);
+    final CollectionReference colRef =
+        await testCollectionWithDocs(initialDocs);
 
     await colRef.get();
     await colRef.firestore.disableNetwork();
 
     // since we're offline, the returned promises won't complete
-    colRef.document('doc2').set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
+    colRef
+        .document('doc2')
+        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
     colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
     colRef.document('doc4').set(map(<String>['key4', 'value4']));
 
@@ -376,10 +388,9 @@ void main() {
     final DocumentReference docRef = await testDocument();
 
     await docRef.firestore.disableNetwork();
-    expect(() => docRef.get(), throwsA(anything));
+    expect(docRef.get, throwsA(anything));
   });
 
-  // TODO(b/112267729)
   test(
     'getDeletedDocWhileOfflineWithDefaultGetOptions',
     () async {

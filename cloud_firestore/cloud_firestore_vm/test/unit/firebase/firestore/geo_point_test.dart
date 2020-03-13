@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 28/09/2018
 
-import 'package:firebase_firestore/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
 import 'package:test/test.dart';
 
 import '../../../util/comparator_test.dart';
@@ -31,28 +31,19 @@ void main() {
   test('testComparison', () {
     ComparatorTester<GeoPoint>()
         .permitInconsistencyWithEquals()
-        .addEqualityGroup(<GeoPoint>[gp(-90.0, -180.0), gp(-90.0, -180.0)])
-        .addEqualityGroup(<GeoPoint>[gp(-90.0, 0.0), gp(-90.0, 0.0)])
-        .addEqualityGroup(<GeoPoint>[gp(-90.0, 180.0), gp(-90.0, 180.0)])
-        .addEqualityGroup(<GeoPoint>[gp(-89.0, -180.0), gp(-89.0, -180.0)])
-        .addEqualityGroup(<GeoPoint>[gp(-89.0, 0.0), gp(-89.0, 0.0)])
-        .addEqualityGroup(<GeoPoint>[gp(-89.0, 180.0), gp(-89.0, 180.0)])
-        .addEqualityGroup(<GeoPoint>[gp(0.0, -180.0), gp(0.0, -180.0)])
-        .addEqualityGroup(<GeoPoint>[gp(0.0, 0.0), gp(0.0, 0.0)])
-        .addEqualityGroup(<GeoPoint>[gp(0.0, 180.0), gp(0.0, 180.0)])
-        .addEqualityGroup(<GeoPoint>[gp(89.0, -180.0), gp(89.0, -180.0)])
-        .addEqualityGroup(<GeoPoint>[gp(89.0, 0.0), gp(89.0, 0.0)])
-        .addEqualityGroup(<GeoPoint>[gp(89.0, 180.0), gp(89.0, 180.0)])
-        .addEqualityGroup(<GeoPoint>[gp(90.0, -180.0), gp(90.0, -180.0)])
-        .addEqualityGroup(<GeoPoint>[gp(90.0, 0.0), gp(90.0, 0.0)])
-        .addEqualityGroup(<GeoPoint>[gp(90.0, 180.0), gp(90.0, 180.0)])
-        .testCompare();
+        .addEqualityGroup(<GeoPoint>[gp(-90.0, -180.0), gp(-90.0, -180.0)]).addEqualityGroup(<GeoPoint>[gp(-90.0, 0.0), gp(-90.0, 0.0)]).addEqualityGroup(<GeoPoint>[gp(-90.0, 180.0), gp(-90.0, 180.0)]).addEqualityGroup(<GeoPoint>[
+      gp(-89.0, -180.0),
+      gp(-89.0, -180.0)
+    ]).addEqualityGroup(<GeoPoint>[gp(-89.0, 0.0), gp(-89.0, 0.0)]).addEqualityGroup(<GeoPoint>[gp(-89.0, 180.0), gp(-89.0, 180.0)]).addEqualityGroup(<GeoPoint>[gp(0.0, -180.0), gp(0.0, -180.0)]).addEqualityGroup(<GeoPoint>[gp(0.0, 0.0), gp(0.0, 0.0)]).addEqualityGroup(<GeoPoint>[gp(0.0, 180.0), gp(0.0, 180.0)]).addEqualityGroup(<GeoPoint>[gp(89.0, -180.0), gp(89.0, -180.0)]).addEqualityGroup(<GeoPoint>[gp(89.0, 0.0), gp(89.0, 0.0)]).addEqualityGroup(
+            <GeoPoint>[gp(89.0, 180.0), gp(89.0, 180.0)]).addEqualityGroup(<GeoPoint>[
+      gp(90.0, -180.0),
+      gp(90.0, -180.0)
+    ]).addEqualityGroup(<GeoPoint>[gp(90.0, 0.0), gp(90.0, 0.0)]).addEqualityGroup(<GeoPoint>[gp(90.0, 180.0), gp(90.0, 180.0)]).testCompare();
   });
 
-
   test('testThrows', () {
-    final Matcher throwsAssertionError = throwsA(
-        const TypeMatcher<AssertionError>());
+    final Matcher throwsAssertionError =
+        throwsA(const TypeMatcher<AssertionError>());
     expect(() => GeoPoint(double.nan, 0.0), throwsAssertionError);
     expect(() => GeoPoint(double.negativeInfinity, 0.0), throwsAssertionError);
     expect(() => GeoPoint(double.infinity, 0.0), throwsAssertionError);

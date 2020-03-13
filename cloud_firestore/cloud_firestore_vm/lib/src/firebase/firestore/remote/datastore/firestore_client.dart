@@ -27,23 +27,32 @@ class FirestoreClient extends Client {
   /// Gets multiple documents.
   ///
   /// Documents returned by this method are not guaranteed to be returned in the same order that they were requested.
-  ResponseStream<proto.BatchGetDocumentsResponse> batchGetDocuments(proto.BatchGetDocumentsRequest request,
+  ResponseStream<proto.BatchGetDocumentsResponse> batchGetDocuments(
+      proto.BatchGetDocumentsRequest request,
       {CallOptions options}) {
-    final ClientCall<proto.BatchGetDocumentsRequest, proto.BatchGetDocumentsResponse> call =
-        $createCall(_batchGetDocuments, Stream<proto.BatchGetDocumentsRequest>.value(request), options: options);
-    return ResponseStream<proto.BatchGetDocumentsResponse>(call, _buildStream(call));
+    final ClientCall<proto.BatchGetDocumentsRequest,
+            proto.BatchGetDocumentsResponse> call =
+        $createCall(_batchGetDocuments,
+            Stream<proto.BatchGetDocumentsRequest>.value(request),
+            options: options);
+    return ResponseStream<proto.BatchGetDocumentsResponse>(
+        call, _buildStream(call));
   }
 
   /// Commits a transaction, while optionally updating documents.
-  ResponseFuture<proto.CommitResponse> commit(proto.CommitRequest request, {CallOptions options}) {
+  ResponseFuture<proto.CommitResponse> commit(proto.CommitRequest request,
+      {CallOptions options}) {
     final ClientCall<proto.CommitRequest, proto.CommitResponse> call =
-        $createCall(_commit, Stream<proto.CommitRequest>.value(request), options: options);
+        $createCall(_commit, Stream<proto.CommitRequest>.value(request),
+            options: options);
     return _buildFuture<proto.CommitResponse>(call);
   }
 
   /// Listens to changes.
-  Future<ResponseStream<proto.ListenResponse>> listen(Stream<proto.ListenRequest> request) async {
-    final ClientCall<proto.ListenRequest, proto.ListenResponse> call = $createCall(_listen, request);
+  Future<ResponseStream<proto.ListenResponse>> listen(
+      Stream<proto.ListenRequest> request) async {
+    final ClientCall<proto.ListenRequest, proto.ListenResponse> call =
+        $createCall(_listen, request);
 
     if (_state.value == ConnectionState.ready) {
       return ResponseStream<proto.ListenResponse>(call, _buildStream(call));
@@ -56,8 +65,10 @@ class FirestoreClient extends Client {
   }
 
   /// Streams batches of document updates and deletes, in order.
-  Future<ResponseStream<proto.WriteResponse>> write(Stream<proto.WriteRequest> request) async {
-    final ClientCall<proto.WriteRequest, proto.WriteResponse> call = $createCall(_write, request);
+  Future<ResponseStream<proto.WriteResponse>> write(
+      Stream<proto.WriteRequest> request) async {
+    final ClientCall<proto.WriteRequest, proto.WriteResponse> call =
+        $createCall(_write, request);
 
     if (_state.value == ConnectionState.ready) {
       return ResponseStream<proto.WriteResponse>(call, _buildStream(call));
@@ -78,17 +89,21 @@ class FirestoreClient extends Client {
     return call.response.transform(DoStreamTransformer<R>(
       onError: (dynamic error, [StackTrace stackTrace]) {
         if (error is GrpcError && error.code == StatusCode.unauthenticated) {
-          Log.d('FirestoreClient', 'Received status ${error.code}. Invalidating the token.');
+          Log.d('FirestoreClient',
+              'Received status ${error.code}. Invalidating the token.');
           _optionsProvider.invalidateToken();
         }
       },
     ))
         // TODO(long1eu): OnErrorResumeStreamTransformer doesn't provide the stacktrace
-        .transform(OnErrorResumeStreamTransformer<R>((dynamic error, [StackTrace stackTrace]) => Stream<R>.error(
-            error is GrpcError
-                ? FirebaseFirestoreError(error.message, FirebaseFirestoreErrorCode.values[error.code])
-                : FirebaseFirestoreError(error.toString(), FirebaseFirestoreErrorCode.unknown),
-            stackTrace)));
+        .transform(OnErrorResumeStreamTransformer<R>(
+            (dynamic error, [StackTrace stackTrace]) => Stream<R>.error(
+                error is GrpcError
+                    ? FirebaseFirestoreError(error.message,
+                        FirestoreErrorCode.values[error.code])
+                    : FirebaseFirestoreError(
+                        error.toString(), FirestoreErrorCode.unknown),
+                stackTrace)));
   }
 
   Future<R> _buildFuture<R>(ClientCall<dynamic, R> call) {
@@ -113,8 +128,10 @@ class FirestoreClient extends Client {
     return value;
   }
 
-  static final ClientMethod<proto.BatchGetDocumentsRequest, proto.BatchGetDocumentsResponse> _batchGetDocuments =
-      ClientMethod<proto.BatchGetDocumentsRequest, proto.BatchGetDocumentsResponse>(
+  static final ClientMethod<proto.BatchGetDocumentsRequest,
+          proto.BatchGetDocumentsResponse> _batchGetDocuments =
+      ClientMethod<proto.BatchGetDocumentsRequest,
+          proto.BatchGetDocumentsResponse>(
     '/google.firestore.v1.Firestore/BatchGetDocuments',
     (proto.BatchGetDocumentsRequest value) => value.writeToBuffer(),
     (List<int> value) => proto.BatchGetDocumentsResponse.fromBuffer(value),
@@ -143,7 +160,8 @@ class FirestoreClient extends Client {
 }
 
 /// A gRPC response producing a stream of values.
-class ResponseStream<R> extends DelegatingStream<R> with _ResponseMixin<dynamic, R> {
+class ResponseStream<R> extends DelegatingStream<R>
+    with _ResponseMixin<dynamic, R> {
   ResponseStream(this._call, Stream<R> response) : super(response);
 
   @override
@@ -160,7 +178,8 @@ class ResponseStream<R> extends DelegatingStream<R> with _ResponseMixin<dynamic,
 }
 
 /// A gRPC response producing a single value.
-class ResponseFuture<R> extends DelegatingFuture<R> with _ResponseMixin<dynamic, R> {
+class ResponseFuture<R> extends DelegatingFuture<R>
+    with _ResponseMixin<dynamic, R> {
   ResponseFuture(this._call, Future<R> future) : super(future);
 
   @override

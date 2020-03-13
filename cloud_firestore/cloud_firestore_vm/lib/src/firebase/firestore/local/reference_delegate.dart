@@ -4,9 +4,9 @@
 
 import 'dart:async';
 
-import 'package:firebase_firestore/src/firebase/firestore/local/query_data.dart';
-import 'package:firebase_firestore/src/firebase/firestore/local/reference_set.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 
 /// A [ReferenceDelegate] instance handles all of the hooks into the document-reference lifecycle.
 /// This includes being added to a target, being removed from a target, being subject to mutation,

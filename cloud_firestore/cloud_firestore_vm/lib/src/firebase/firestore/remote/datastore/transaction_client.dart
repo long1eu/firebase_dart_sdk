@@ -11,22 +11,27 @@ class TransactionClient {
   final FirestoreClient _client;
   final RemoteSerializer _serializer;
 
+  String get _databaseName => _serializer.databaseName;
+
   Future<List<MutationResult>> commit(List<Mutation> mutations) async {
     final proto.CommitRequest builder = proto.CommitRequest() //
       ..database = _databaseName
       ..writes.addAll(mutations.map(_serializer.encodeMutation));
 
     final proto.CommitResponse response = await _client.commit(builder);
-    final SnapshotVersion commitVersion = _serializer.decodeVersion(response.commitTime);
+    final SnapshotVersion commitVersion =
+        _serializer.decodeVersion(response.commitTime);
     return response.writeResults
-        .map((proto.WriteResult result) => _serializer.decodeMutationResult(result, commitVersion))
+        .map((proto.WriteResult result) =>
+            _serializer.decodeMutationResult(result, commitVersion))
         .toList();
   }
 
   Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
-    final proto.BatchGetDocumentsRequest builder = proto.BatchGetDocumentsRequest() //
-      ..database = _databaseName
-      ..documents.addAll(keys.map(_serializer.encodeKey));
+    final proto.BatchGetDocumentsRequest builder =
+        proto.BatchGetDocumentsRequest() //
+          ..database = _databaseName
+          ..documents.addAll(keys.map(_serializer.encodeKey));
 
     return _client
         .batchGetDocuments(builder)
@@ -34,6 +39,4 @@ class TransactionClient {
         .where((MaybeDocument doc) => keys.contains(doc.key))
         .toList();
   }
-
-  String get _databaseName => _serializer.databaseName;
 }

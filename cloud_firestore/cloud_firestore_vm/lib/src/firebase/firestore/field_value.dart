@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
+
 
 /// Sentinel values that can be used when writing document fields with [set] or [update].
 abstract class FieldValue {
@@ -52,7 +52,8 @@ abstract class FieldValue {
 
   static const _DeleteFieldValue _deleteInstance = _DeleteFieldValue._();
 
-  static const _ServerTimestampFieldValue _serverTimestampInstance = _ServerTimestampFieldValue._();
+  static const _ServerTimestampFieldValue _serverTimestampInstance =
+      _ServerTimestampFieldValue._();
 }
 
 /// FieldValue class for field deletes.

@@ -2,12 +2,10 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:firebase_core/firebase_core_vm.dart';
-import 'package:firebase_firestore/src/firebase/firestore/model/document.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 
 /// The types of changes that can happen to a document with respect to a view.
-///
-/// NOTE: We sort document changes by their type, so the ordering of this 'enum' is significant.
 class DocumentViewChangeType implements Comparable<DocumentViewChangeType> {
   const DocumentViewChangeType._(this._i);
 
@@ -41,7 +39,9 @@ class DocumentViewChangeType implements Comparable<DocumentViewChangeType> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is DocumentViewChangeType && runtimeType == other.runtimeType && _i == other._i;
+      other is DocumentViewChangeType &&
+          runtimeType == other.runtimeType &&
+          _i == other._i;
 
   @override
   int get hashCode => _i.hashCode;

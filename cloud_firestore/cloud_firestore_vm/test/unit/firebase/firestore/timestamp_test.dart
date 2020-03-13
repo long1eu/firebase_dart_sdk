@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 26/09/2018
 
-import 'package:firebase_firestore/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:test/test.dart';
 
