@@ -40,6 +40,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:grpc/grpc.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// [FirestoreClient] is a top-level class that constructs and owns all of the pieces of the client SDK architecture.
 class FirestoreClient implements RemoteStoreCallback {
@@ -70,6 +71,7 @@ class FirestoreClient implements RemoteStoreCallback {
     CredentialsProvider credentialsProvider,
     AsyncQueue asyncQueue,
     OpenDatabase openDatabase,
+    BehaviorSubject<bool> onNetworkConnected,
   ) async {
     final FirestoreClient client =
         FirestoreClient._(databaseInfo, credentialsProvider, asyncQueue);
@@ -103,6 +105,7 @@ class FirestoreClient implements RemoteStoreCallback {
       settings.persistenceEnabled && openDatabase != null,
       settings.cacheSizeBytes,
       openDatabase,
+      onNetworkConnected,
     );
     return client;
   }
@@ -196,8 +199,13 @@ class FirestoreClient implements RemoteStoreCallback {
     return syncEngine.transaction(asyncQueue, updateFunction, retries);
   }
 
-  Future<void> _initialize(User user, bool usePersistence, int cacheSizeBytes,
-      OpenDatabase openDatabase) async {
+  Future<void> _initialize(
+    User user,
+    bool usePersistence,
+    int cacheSizeBytes,
+    OpenDatabase openDatabase,
+    BehaviorSubject<bool> onNetworkConnected,
+  ) async {
     // Note: The initialization work must all be synchronous (we can't dispatch more work) since external write/listen
     // operations could get queued to run before that subsequent work completes.
     Log.d(logTag, 'Initializing. user=${user.uid}');
@@ -233,7 +241,13 @@ class FirestoreClient implements RemoteStoreCallback {
 
     final Datastore datastore =
         Datastore(databaseInfo, asyncQueue, credentialsProvider);
-    remoteStore = RemoteStore(this, localStore, datastore, asyncQueue);
+    remoteStore = RemoteStore(
+      this,
+      localStore,
+      datastore,
+      onNetworkConnected,
+      asyncQueue,
+    );
 
     syncEngine = SyncEngine(localStore, remoteStore, user);
     eventManager = EventManager(syncEngine);

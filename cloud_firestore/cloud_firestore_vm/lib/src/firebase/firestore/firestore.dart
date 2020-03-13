@@ -116,6 +116,7 @@ class Firestore {
         provider,
         queue,
         openDatabase,
+        app.onNetworkConnected,
       ),
     );
   }

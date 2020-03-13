@@ -28,6 +28,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
+import 'package:meta/meta.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// [RemoteStore] handles all interaction with the backend through a simple,
 /// clean interface. This class is not thread safe and should be only called
@@ -37,6 +39,7 @@ class RemoteStore implements TargetMetadataProvider {
     this._remoteStoreCallback,
     this._localStore,
     this._datastore,
+    this._onNetworkConnected,
     AsyncQueue workerQueue,
   )   : _listenTargets = <int, QueryData>{},
         _writePipeline = Queue<MutationBatch>(),
@@ -44,8 +47,9 @@ class RemoteStore implements TargetMetadataProvider {
             workerQueue, _remoteStoreCallback.handleOnlineStateChange),
         _watchStream = _datastore.watchStream,
         _writeStream = _datastore.writeStream {
-    _watchStream.listen(_watchEvents);
-    _writeStream.listen(_writeEvents);
+    _watchStreamSub = _watchStream.listen(_watchEvents);
+    _writeStreamSub = _writeStream.listen(_writeEvents);
+    _onNetworkConnectedSub = _onNetworkConnected.listen(_networkEvents);
   }
 
   final RemoteStoreCallback _remoteStoreCallback;
@@ -61,11 +65,15 @@ class RemoteStore implements TargetMetadataProvider {
   /// without waiting for confirmation from the listen stream.
   final Map<int, QueryData> _listenTargets;
   final OnlineStateTracker _onlineStateTracker;
+  final BehaviorSubject<bool> _onNetworkConnected;
   final WatchStream _watchStream;
   final WriteStream _writeStream;
 
-  bool _networkEnabled = false;
+  StreamSubscription<StreamEvent> _watchStreamSub;
+  StreamSubscription<StreamEvent> _writeStreamSub;
+  StreamSubscription<bool> _onNetworkConnectedSub;
 
+  bool _networkEnabled = false;
   WatchChangeAggregator _watchChangeAggregator;
 
   /// The maximum number of pending writes to allow.
@@ -145,6 +153,9 @@ class RemoteStore implements TargetMetadataProvider {
     // Set the OnlineState to UNKNOWN (rather than OFFLINE) to avoid potentially triggering spurious listener events
     // with cached data, etc.
     await _onlineStateTracker.updateState(OnlineState.unknown);
+    await _watchStreamSub.cancel();
+    await _writeStreamSub.cancel();
+    await _onNetworkConnectedSub.cancel();
   }
 
   /// Tells the [RemoteStore] that the currently authenticated user has changed.
@@ -161,6 +172,33 @@ class RemoteStore implements TargetMetadataProvider {
       await _disableNetworkInternal();
       await _onlineStateTracker.updateState(OnlineState.unknown);
       await enableNetwork();
+    }
+  }
+
+  /// Re-enables the network, and forces the state to ONLINE. Without this, the
+  /// state will be [OnlineState.unknown]. If the [OnlineStateTracker] updates
+  /// the state from [OnlineState.unknown] to [OnlineState.unknown], then it
+  /// doesn't trigger the callback.
+  @visibleForTesting
+  void forceEnableNetwork() {
+    enableNetwork();
+    _onlineStateTracker.updateState(OnlineState.online);
+  }
+
+  void _restartNetwork() {
+    _networkEnabled = false;
+    _disableNetworkInternal();
+    _onlineStateTracker.updateState(OnlineState.unknown);
+    enableNetwork();
+  }
+
+  void _networkEvents(bool isConnected) {
+    if (isConnected) {
+      // Tear down and re-create our network streams. This will ensure the
+      // backoffs are reset.
+      Log.d('$runtimeType',
+          'Restarting streams for network reachability change.');
+      _restartNetwork();
     }
   }
 

@@ -38,6 +38,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart'
     as asserts;
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:grpc/grpc.dart';
+import 'package:rxdart/subjects.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart';
@@ -191,8 +192,10 @@ class SpecTestCase implements RemoteStoreCallback {
 
     // Set up the sync engine and various stores.
     _datastore = MockDatastore(_queue);
-
-    _remoteStore = RemoteStore(this, localStore, _datastore, _queue);
+    final BehaviorSubject<bool> onNetworkConnected =
+        BehaviorSubject<bool>.seeded(true);
+    _remoteStore =
+        RemoteStore(this, localStore, _datastore, onNetworkConnected, _queue);
     _syncEngine = SyncEngine(localStore, _remoteStore, _currentUser);
     _eventManager = EventManager(_syncEngine);
     await localStore.start();

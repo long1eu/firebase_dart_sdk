@@ -22,6 +22,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:rxdart/subjects.dart';
 
 import '../unit/firebase/firestore/local/mock/database_mock.dart';
 import 'prod_provider/firestore_provider.dart';
@@ -36,8 +37,7 @@ class IntegrationTestUtil {
   static const String badProjectId = 'test-project-2';
 
   /// Online status of all active Firestore clients.
-  static final Map<Firestore, bool> firestoreStatus =
-      <Firestore, bool>{};
+  static final Map<Firestore, bool> firestoreStatus = <Firestore, bool>{};
 
   static final FirestoreProvider provider = FirestoreProvider();
 
@@ -106,19 +106,25 @@ class IntegrationTestUtil {
     final DatabaseInfo databaseInfo = DatabaseInfo(
         databaseId, persistenceKey, settings.host,
         sslEnabled: settings.sslEnabled);
+
+    final BehaviorSubject<bool> onNetworkConnected =
+        BehaviorSubject<bool>.seeded(true);
     final FirestoreClient client = await FirestoreClient.initialize(
-        databaseInfo, settings, provider, queue, openDatabase);
+      databaseInfo,
+      settings,
+      provider,
+      queue,
+      openDatabase,
+      onNetworkConnected,
+    );
 
     return Firestore(databaseId, queue, null, client);
   }
 
   /// Initializes a new Firestore instance that can be used in testing. It is guaranteed to not share state with other
   /// instances returned from this call.
-  static Future<Firestore> testFirestoreInstance(
-      String projectId,
-      LogLevel logLevel,
-      FirestoreSettings settings,
-      String dbPath) async {
+  static Future<Firestore> testFirestoreInstance(String projectId,
+      LogLevel logLevel, FirestoreSettings settings, String dbPath) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.level = logLevel;
 
