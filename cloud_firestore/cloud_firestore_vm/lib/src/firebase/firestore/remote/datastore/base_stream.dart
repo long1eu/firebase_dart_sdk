@@ -76,28 +76,31 @@ abstract class BaseStream<Req extends GeneratedMessage,
   }
 
   void writeRequest(Req request) {
-    Log.d(runtimeType.toString(),
+    Log.d('$runtimeType',
         '($hashCode) Stream sending: ${request.writeToJsonMap()}');
     _cancelIdleCheck();
-    // _workerQueue.enqueue(() async => _requestsController.add(request));
     _requestsController.add(request);
   }
 
-  /// Marks this stream as idle. If no further actions are performed on the stream for one minute, the stream will
-  /// automatically close itself and notify the stream's [onClose] handler with [GrpcError.ok]. The stream will then be
-  /// in a ![isStarted] state, requiring the caller to start the stream again before further use.
+  /// Marks this stream as idle. If no further actions are performed on the
+  /// stream for one minute, the stream will automatically close itself and
+  /// emit a [CloseEvent] with [GrpcError.ok]. The stream will then be in a
+  /// ![isStarted] state, requiring the caller to start the stream again before
+  /// further use.
   ///
-  /// Only streams that are in state [State.open] can be marked idle, as all other states imply pending network
-  /// operations.
+  /// Only streams that are in state [State.open] can be marked idle, as all
+  /// other states imply pending network operations.
   void markIdle() {
-    // Starts the idle timer if we are in state [State.open] and are not yet already running a timer (in which case the
-    // previous idle timeout still applies).
+    // Starts the idle timer if we are in state [State.open] and are not yet
+    // already running a timer (in which case the previous idle timeout still
+    // applies).
     if (isOpen && _idleTimer == null) {
       _idleTimer = _workerQueue.enqueueAfterDelay(
-          _idleTimerId,
-          const Duration(seconds: 10),
-          _handleIdleCloseTimer,
-          'AbstractStream markIdle');
+        _idleTimerId,
+        const Duration(seconds: 10),
+        _handleIdleCloseTimer,
+        '$runtimeType markIdle',
+      );
     }
   }
 
@@ -114,7 +117,6 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
   @visibleForTesting
   void addEvent(StreamEvent event) {
-    // _workerQueue.enqueue(() async => _eventsController.add(event));
     _eventsController.add(event);
   }
 
@@ -124,7 +126,7 @@ abstract class BaseStream<Req extends GeneratedMessage,
   void _onData(Res response) {
     if (_state != State.closing) {
       if (Log.isDebugEnabled) {
-        Log.d('AbstractStream',
+        Log.d('$runtimeType',
             '($hashCode) Stream received: ${response.writeToJsonMap()}');
       }
     }
@@ -139,7 +141,7 @@ abstract class BaseStream<Req extends GeneratedMessage,
       final Map<String, String> values =
           Map<String, String>.fromEntries(entries);
       if (values.isNotEmpty) {
-        Log.d('AbstractStream', '($hashCode) Stream received headers: $values');
+        Log.d('$runtimeType', '($hashCode) Stream received headers: $values');
       }
     }
   }
@@ -148,15 +150,15 @@ abstract class BaseStream<Req extends GeneratedMessage,
     if (_state != State.closing) {
       if (error is GrpcError) {
         if (error.code == StatusCode.ok) {
-          Log.d('AbstractStream', '($hashCode) Stream closed.');
+          Log.d('$runtimeType', '($hashCode) Stream closed.');
         } else {
-          Log.d('AbstractStream',
-              '($hashCode) Stream closed with status: $error.');
+          Log.d(
+              '$runtimeType', '($hashCode) Stream closed with status: $error.');
         }
 
         handleServerClose(error);
       } else {
-        Log.d('AbstractStream',
+        Log.d('$runtimeType',
             '($hashCode) Stream closed with status: ${StatusCode.unknown} $error.');
         handleServerClose(GrpcError.unknown(error.toString()));
       }
@@ -186,6 +188,11 @@ abstract class BaseStream<Req extends GeneratedMessage,
     assert(state == State.error || grpcError.code == StatusCode.ok,
         'Can\'t provide an error when not in an error state.');
 
+    if (state != State.error) {
+      Log.d('$runtimeType', '($hashCode) Performing stream teardown');
+      tearDown();
+    }
+
     _changeState(State.closing);
 
     // Cancel any outstanding timers (they're guaranteed not to execute).
@@ -198,18 +205,18 @@ abstract class BaseStream<Req extends GeneratedMessage,
       // connection attempt.
       _backoff.reset();
     } else if (code == StatusCode.resourceExhausted) {
-      Log.d(runtimeType.toString(),
+      Log.d('$runtimeType',
           '($hashCode) Using maximum backoff delay to prevent overloading the backend.');
       _backoff.resetToMax();
     } else if (code == StatusCode.unauthenticated) {
       // 'unauthenticated' error means the token was rejected. Force refreshing
       // was done by the FirestoreClient
-      Log.d(runtimeType.toString(),
+      Log.d('$runtimeType',
           '($hashCode) Unauthenticated trying to refresh the token.');
     }
 
     if (grpcError.code == StatusCode.ok) {
-      Log.d(runtimeType.toString(), '($hashCode) Closing stream client-side');
+      Log.d('$runtimeType', '($hashCode) Closing stream client-side');
     }
 
     // this are null only when called from tests

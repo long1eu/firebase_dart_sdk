@@ -6,19 +6,14 @@ import 'dart:async';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
-import 'package:grpc/grpc.dart';
-import 'package:meta/meta.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/integration_test_util.dart';
 import '../../../../util/test_util.dart';
 
-// ignore_for_file: unawaited_futures, unused_import
+// ignore_for_file: unawaited_futures
 class MockCredentialsProvider extends EmptyCredentialsProvider {
   final List<String> states = <String>[];
 
@@ -39,31 +34,30 @@ void main() {
   /// Single mutation to send to the write stream.
   final List<Mutation> mutations = <Mutation>[setMutation('foo/bar', map())];
 
-  /*
   /// Waits for a WriteStream to get into a state that accepts mutations.
-  Future<void> waitForWriteStreamOpen(AsyncQueue testQueue,
-      WriteStream writeStream, _StreamStatusCallback callback,
-      [int i]) async {
+  Future<void> waitForWriteStreamOpen(
+      AsyncQueue testQueue, WriteStream writeStream) async {
     testQueue.enqueueAndForget(writeStream.start);
-    await callback.openCompleter.future;
-    testQueue.enqueueAndForget<void>(writeStream.writeHandshake);
-    await callback.handshakeCompleter.future;
+    await writeStream.where((StreamEvent event) => event is OpenEvent).first;
+
+    testQueue.enqueueAndForget<void>(() async => writeStream.writeHandshake());
+    await writeStream
+        .where((StreamEvent event) => event is HandshakeCompleteEvent)
+        .first;
   }
 
   /// Creates a WriteStream and gets it in a state that accepts mutations.
-  Future<WriteStream> createAndOpenWriteStream(
-      AsyncQueue testQueue, _StreamStatusCallback callback) async {
+  Future<WriteStream> createAndOpenWriteStream(AsyncQueue testQueue) async {
     final Datastore datastore = Datastore(
       IntegrationTestUtil.testEnvDatabaseInfo(),
       testQueue,
       EmptyCredentialsProvider(),
     );
 
-    final WriteStream writeStream = datastore.createWriteStream(callback);
-    await waitForWriteStreamOpen(testQueue, writeStream, callback);
+    final WriteStream writeStream = datastore.writeStream;
+    await waitForWriteStreamOpen(testQueue, writeStream);
     return writeStream;
   }
-  */
 
   test('testWatchStreamStopBeforeHandshake', () async {
     final AsyncQueue testQueue = AsyncQueue();
@@ -129,8 +123,6 @@ void main() {
       } else if (event is OnWriteResponse) {
         expect(event.results.length, 1);
         expect(writeStream.lastStreamToken, isNotEmpty);
-
-        // writeStream.tearDown();
         await testQueue.enqueue(writeStream.stop);
       } else if (event is CloseEvent) {
         completer.complete();
@@ -142,44 +134,53 @@ void main() {
 
     await completer.future;
   });
-  /*
 
-  /// Verifies that the stream issues an [onClose] callback after a call to
-  /// [stop].
+  /// Verifies that the stream issues an [CloseEvent] after a call to
+  /// [WriteStream.stop].
   test('testWriteStreamStopPartial', () async {
     final AsyncQueue testQueue = AsyncQueue();
     final Datastore datastore = Datastore(
         IntegrationTestUtil.testEnvDatabaseInfo(),
         testQueue,
         EmptyCredentialsProvider());
-    final _StreamStatusCallback streamCallback = _StreamStatusCallback();
+
     final WriteStream writeStream = datastore.writeStream;
-
     testQueue.enqueueAndForget(writeStream.start);
-    await streamCallback.openCompleter.future;
 
-    // Don't start the handshake
-    await testQueue.enqueue(writeStream.stop);
-    expect(streamCallback.closeCompleter.isCompleted, isTrue);
+    final Completer<void> completer = Completer<void>();
+    final List<StreamEvent> events = <StreamEvent>[];
+    StreamSubscription<StreamEvent> sub;
+    sub = writeStream.listen((StreamEvent value) async {
+      events.add(value);
+
+      if (value is OpenEvent) {
+        expect(events.length, 1);
+
+        await testQueue.enqueue(writeStream.stop);
+      } else if (value is CloseEvent) {
+        expect(events.length, 2);
+
+        completer.complete();
+        sub.cancel();
+      } else {
+        fail('We should not received any other events.');
+      }
+    });
+
+    await completer.future;
   });
-
 
   test('testWriteStreamStop', () async {
     final AsyncQueue testQueue = AsyncQueue();
-    final _StreamStatusCallback streamCallback = _StreamStatusCallback();
-    final WriteStream writeStream =
-        await createAndOpenWriteStream(testQueue, streamCallback);
+    final WriteStream writeStream = await createAndOpenWriteStream(testQueue);
 
-    // Stop should call watchStreamStreamDidClose.
-    await testQueue.enqueue(writeStream.stop);
-    expect(streamCallback.closeCompleter.isCompleted, isTrue);
+    testQueue.enqueue(writeStream.stop);
+    expectLater(writeStream, emits(isA<CloseEvent>()));
   });
 
   test('testStreamClosesWhenIdle', () async {
     final AsyncQueue testQueue = AsyncQueue();
-    final _StreamStatusCallback callback = _StreamStatusCallback();
-    final WriteStream writeStream =
-        await createAndOpenWriteStream(testQueue, callback);
+    final WriteStream writeStream = await createAndOpenWriteStream(testQueue);
 
     await testQueue.enqueue(() async {
       writeStream.markIdle();
@@ -187,14 +188,13 @@ void main() {
     });
 
     testQueue.runDelayedTasksUntil(TimerId.writeStreamIdle);
-    await callback.closeCompleter.future;
+    await writeStream.where((StreamEvent event) => event is CloseEvent).first;
     await testQueue.enqueue(() async => expect(writeStream.isOpen, isFalse));
   });
 
   test('testStreamCancelsIdleOnWrite', () async {
     final AsyncQueue testQueue = AsyncQueue();
-    final WriteStream writeStream =
-        await createAndOpenWriteStream(testQueue, _StreamStatusCallback());
+    final WriteStream writeStream = await createAndOpenWriteStream(testQueue);
 
     await testQueue.enqueue(() async {
       writeStream
@@ -207,8 +207,7 @@ void main() {
 
   test('testStreamStaysIdle', () async {
     final AsyncQueue testQueue = AsyncQueue();
-    final WriteStream writeStream =
-        await createAndOpenWriteStream(testQueue, _StreamStatusCallback());
+    final WriteStream writeStream = await createAndOpenWriteStream(testQueue);
 
     await testQueue.enqueue(() async {
       writeStream //
@@ -218,145 +217,7 @@ void main() {
 
     expect(testQueue.containsDelayedTask(TimerId.writeStreamIdle), isTrue);
   });
-
-  //todo
-  // This behaviour is hard to replicate right now, I will get back on this.
-  test('testStreamRefreshesTokenUponExpiration', () async {
-    final AsyncQueue testQueue = AsyncQueue();
-    final MockCredentialsProvider mockCredentialsProvider =
-        MockCredentialsProvider();
-    final Datastore datastore = Datastore(
-        IntegrationTestUtil.testEnvDatabaseInfo(),
-        testQueue,
-        mockCredentialsProvider);
-    final _StreamStatusCallback callback = _StreamStatusCallback();
-    final WriteStream writeStream = datastore.createWriteStream(callback);
-    await waitForWriteStreamOpen(testQueue, writeStream, callback, 1);
-
-    // Simulate callback from GRPC with an unauthenticated error -- this should
-    // invalidate the token.
-    await testQueue.enqueue(
-        () async => writeStream.handleServerClose(GrpcError.unauthenticated()));
-    await waitForWriteStreamOpen(testQueue, writeStream, callback, 2);
-    await Future<void>.delayed(const Duration(seconds: 1));
-
-    // Simulate a different error -- token should not be invalidated this time.
-
-    await testQueue.enqueue(
-        () async => writeStream.handleServerClose(GrpcError.unavailable()));
-    await Future<void>.delayed(const Duration(seconds: 1));
-    await waitForWriteStreamOpen(testQueue, writeStream, callback, 3);
-
-    expect(
-        mockCredentialsProvider.states,
-        orderedEquals(
-            <String>['getToken', 'invalidateToken', 'getToken', 'getToken']));
-  }, skip: true);
-  */
 }
-
-/*
-/// Callback class that invokes a Completer for each callback.
-class _StreamStatusCallback
-    implements WatchStreamCallback, WriteStreamCallback {
-  final Completer<void> openCompleter;
-
-  final Completer<void> closeCompleter;
-
-  final Completer<void> watchChangeCompleter;
-
-  final Completer<void> handshakeCompleter;
-
-  final Completer<void> responseReceivedCompleter;
-
-  /// The stream is now open and is accepting messages
-  @override
-  final Task<void> onOpen;
-
-  /// The stream has closed. If there was an error, the status will be != OK.
-  @override
-  final OnClose onClose;
-
-  /// The handshake for this write stream has completed
-  @override
-  final Task<void> onHandshakeComplete;
-
-  /// Response for the last write.
-  @override
-  final OnWriteResponse onWriteResponse;
-
-  /// A new change from the watch stream. Snapshot version will ne non-null if
-  /// it was set
-  @override
-  final OnWatchChange onWatchChange;
-
-  factory _StreamStatusCallback() {
-    final Completer<void> openCompleter = Completer<void>();
-    final Completer<void> closeCompleter = Completer<void>();
-    final Completer<void> watchChangeCompleter = Completer<void>();
-    final Completer<void> handshakeCompleter = Completer<void>();
-    final Completer<void> responseReceivedCompleter = Completer<void>();
-
-    return _StreamStatusCallback._(
-      openCompleter: openCompleter,
-      closeCompleter: closeCompleter,
-      watchChangeCompleter: watchChangeCompleter,
-      handshakeCompleter: handshakeCompleter,
-      responseReceivedCompleter: responseReceivedCompleter,
-      onWatchChange:
-          (SnapshotVersion snapshotVersion, WatchChange watchChange) async =>
-              watchChangeCompleter.complete(),
-      onClose: (GrpcError error) async => closeCompleter.complete(),
-      onWriteResponse: (SnapshotVersion commitVersion,
-              List<MutationResult> mutationResults) async =>
-          responseReceivedCompleter.complete(),
-      onHandshakeComplete: () async => handshakeCompleter.complete(),
-      onOpen: () async {
-        openCompleter.complete();
-      },
-    );
-  }
-
-  _StreamStatusCallback._({
-    @required this.openCompleter,
-    @required this.closeCompleter,
-    @required this.watchChangeCompleter,
-    @required this.handshakeCompleter,
-    @required this.responseReceivedCompleter,
-    @required this.onOpen,
-    @required this.onClose,
-    @required this.onHandshakeComplete,
-    @required this.onWriteResponse,
-    @required this.onWatchChange,
-  });
-
-  _StreamStatusCallback copyWith({
-    Completer<void> openCompleter,
-    Completer<void> closeCompleter,
-    Completer<void> watchChangeCompleter,
-    Completer<void> handshakeCompleter,
-    Completer<void> responseReceivedCompleter,
-    Task<void> onOpen,
-    OnClose onClose,
-    Task<void> onHandshakeComplete,
-    OnWriteResponse onWriteResponse,
-    OnWatchChange onWatchChange,
-  }) {
-    return _StreamStatusCallback._(
-      openCompleter: openCompleter ?? this.openCompleter,
-      closeCompleter: closeCompleter ?? this.closeCompleter,
-      watchChangeCompleter: watchChangeCompleter ?? this.watchChangeCompleter,
-      handshakeCompleter: handshakeCompleter ?? this.handshakeCompleter,
-      responseReceivedCompleter:
-          responseReceivedCompleter ?? this.responseReceivedCompleter,
-      onOpen: onOpen ?? this.onOpen,
-      onClose: onClose ?? this.onClose,
-      onHandshakeComplete: onHandshakeComplete ?? this.onHandshakeComplete,
-      onWriteResponse: onWriteResponse ?? this.onWriteResponse,
-      onWatchChange: onWatchChange ?? this.onWatchChange,
-    );
-  }
-}*/
 
 // ignore: always_specify_types, type_annotate_public_apis
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;

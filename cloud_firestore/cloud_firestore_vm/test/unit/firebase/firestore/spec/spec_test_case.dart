@@ -519,13 +519,14 @@ class SpecTestCase implements RemoteStoreCallback {
     final Map<String, dynamic> error = spec['error'];
 
     final bool runBackoffTimer = spec['runBackoffTimer'];
-    // TODO(long1eu): Incorporate backoff in Android Spec Tests.
     expect(runBackoffTimer, isTrue);
 
     final GrpcError status = GrpcError.custom(error['code'], error['message']);
     print('_datastore.isWatchStreamOpen: ${_datastore.isWatchStreamOpen}');
     _datastore.failWatchStream(status);
-    // Unlike web, stream should re-open synchronously (if we have active listeners).
+    print('_datastore.isWatchStreamOpen: ${_datastore.isWatchStreamOpen}');
+    // Unlike web, stream should re-open synchronously (if we have active
+    // listeners).
     if (_queryListeners.isNotEmpty) {
       assert(_datastore.isWatchStreamOpen, 'Watch stream is open');
     }

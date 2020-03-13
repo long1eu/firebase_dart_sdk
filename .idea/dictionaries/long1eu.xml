@@ -4,6 +4,7 @@
       <w>backends</w>
       <w>dartio</w>
       <w>datastore</w>
+      <w>grpc</w>
       <w>unawaited</w>
       <w>unstarted</w>
     </words>

@@ -70,8 +70,9 @@ class Datastore {
     );
 
     final ChannelOptionsProvider optionsProvider = ChannelOptionsProvider(
-        databaseId: databaseInfo.databaseId,
-        credentialsProvider: credentialsProvider);
+      databaseId: databaseInfo.databaseId,
+      credentialsProvider: credentialsProvider,
+    );
     final FirestoreClient client =
         FirestoreClient(clientChannel, optionsProvider);
     final RemoteSerializer serializer =

@@ -26,10 +26,12 @@ class FirestoreClient extends Client {
 
   /// Gets multiple documents.
   ///
-  /// Documents returned by this method are not guaranteed to be returned in the same order that they were requested.
+  /// Documents returned by this method are not guaranteed to be returned in the
+  /// same order that they were requested.
   ResponseStream<proto.BatchGetDocumentsResponse> batchGetDocuments(
-      proto.BatchGetDocumentsRequest request,
-      {CallOptions options}) {
+    proto.BatchGetDocumentsRequest request, {
+    CallOptions options,
+  }) {
     final ClientCall<proto.BatchGetDocumentsRequest,
             proto.BatchGetDocumentsResponse> call =
         $createCall(_batchGetDocuments,
@@ -99,8 +101,8 @@ class FirestoreClient extends Client {
         .transform(OnErrorResumeStreamTransformer<R>(
             (dynamic error, [StackTrace stackTrace]) => Stream<R>.error(
                 error is GrpcError
-                    ? FirebaseFirestoreError(error.message,
-                        FirestoreErrorCode.values[error.code])
+                    ? FirebaseFirestoreError(
+                        error.message, FirestoreErrorCode.values[error.code])
                     : FirebaseFirestoreError(
                         error.toString(), FirestoreErrorCode.unknown),
                 stackTrace)));
