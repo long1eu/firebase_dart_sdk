@@ -36,7 +36,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
@@ -197,7 +196,7 @@ class SyncEngine implements RemoteStoreCallback {
   /// be performed while online.
   ///
   /// The Future returned is resolved when the transaction is fully committed.
-  Future<TResult> transaction<TResult>(AsyncQueue asyncQueue,
+  Future<TResult> transaction<TResult>(
       Future<TResult> Function(Transaction) updateFunction, int retries) async {
     hardAssert(retries >= 0, 'Got negative number of retries for transaction.');
     final Transaction transaction = _remoteStore.createTransaction();
@@ -213,7 +212,7 @@ class SyncEngine implements RemoteStoreCallback {
             'Transaction failed all retries.', FirestoreErrorCode.aborted, e);
         return Future<TResult>.error(error);
       }
-      return this.transaction(asyncQueue, updateFunction, retries - 1);
+      return this.transaction(updateFunction, retries - 1);
     }
   }
 

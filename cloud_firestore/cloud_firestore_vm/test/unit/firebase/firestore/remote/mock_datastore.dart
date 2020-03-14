@@ -16,7 +16,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datas
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 import 'package:grpc/src/shared/status.dart';
@@ -26,7 +26,7 @@ import '../spec/spec_test_case.dart';
 /// A mock version of [Datastore] for SpecTest that allows the test to control
 /// the parts that would normally be sent from the backend.
 class MockDatastore extends Datastore {
-  factory MockDatastore(AsyncQueue workerQueue) {
+  factory MockDatastore(TaskScheduler scheduler) {
     final DatabaseId databaseId = DatabaseId.forDatabase('project', 'database');
     final RemoteSerializer serializer = RemoteSerializer(databaseId);
     final DatabaseInfo databaseInfo =
@@ -42,7 +42,7 @@ class MockDatastore extends Datastore {
             credentialsProvider: EmptyCredentialsProvider());
     return MockDatastore._(
       databaseInfo,
-      workerQueue,
+      scheduler,
       serializer,
       FirestoreClient(clientChannel, channelOptionsProvider),
     );
@@ -50,15 +50,17 @@ class MockDatastore extends Datastore {
 
   MockDatastore._(
     DatabaseInfo databaseInfo,
-    AsyncQueue workerQueue,
+    TaskScheduler scheduler,
     RemoteSerializer serializer,
     FirestoreClient client,
   )   : _serializer = serializer,
+        _scheduler = scheduler,
         _client = client,
-        super.test(databaseInfo, workerQueue, serializer, client);
+        super.test(scheduler, databaseInfo, serializer, client);
 
-  final RemoteSerializer _serializer;
   final FirestoreClient _client;
+  final TaskScheduler _scheduler;
+  final RemoteSerializer _serializer;
   _MockWatchStream _watchStream;
 
   _MockWriteStream _writeStream;
@@ -69,11 +71,11 @@ class MockDatastore extends Datastore {
 
   @override
   WatchStream get watchStream =>
-      _watchStream = _MockWatchStream(this, _serializer, workerQueue);
+      _watchStream = _MockWatchStream(this, _serializer, _scheduler);
 
   @override
   WriteStream get writeStream =>
-      _writeStream = _MockWriteStream(this, _serializer, workerQueue);
+      _writeStream = _MockWriteStream(this, _serializer, _scheduler);
 
   int get writeStreamRequestCount => _writeStreamRequestCount;
 
@@ -122,9 +124,15 @@ class MockDatastore extends Datastore {
 
 class _MockWatchStream extends WatchStream {
   _MockWatchStream(
-      this._datastore, RemoteSerializer serializer, AsyncQueue workerQueue)
-      : super.test(_datastore._client, serializer,
-            StreamController<StreamEvent>.broadcast(), workerQueue);
+    this._datastore,
+    RemoteSerializer serializer,
+    TaskScheduler scheduler,
+  ) : super.test(
+          _datastore._client,
+          scheduler,
+          serializer,
+          StreamController<StreamEvent>.broadcast(),
+        );
 
   final MockDatastore _datastore;
 
@@ -217,10 +225,14 @@ class _MockWatchStream extends WatchStream {
 
 class _MockWriteStream extends WriteStream {
   _MockWriteStream(
-      this._datastore, RemoteSerializer serializer, AsyncQueue workerQueue)
+      this._datastore, RemoteSerializer serializer, TaskScheduler scheduler)
       : _sentWrites = <List<Mutation>>[],
-        super.test(_datastore._client, serializer,
-            StreamController<StreamEvent>.broadcast(), workerQueue);
+        super.test(
+          _datastore._client,
+          scheduler,
+          serializer,
+          StreamController<StreamEvent>.broadcast(),
+        );
 
   final MockDatastore _datastore;
 

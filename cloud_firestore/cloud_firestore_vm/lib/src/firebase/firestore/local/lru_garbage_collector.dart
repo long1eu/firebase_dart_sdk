@@ -9,7 +9,7 @@ import 'package:cloud_firestore_vm/cloud_firestore_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:collection/collection.dart';
 
 import 'local_store.dart';
@@ -23,8 +23,8 @@ class LruGarbageCollector {
 
   /// A helper method to create a new scheduler.
   LruGarbageCollectorScheduler newScheduler(
-      AsyncQueue asyncQueue, LocalStore localStore) {
-    return LruGarbageCollectorScheduler(this, asyncQueue, localStore);
+      TaskScheduler scheduler, LocalStore localStore) {
+    return LruGarbageCollectorScheduler(this, localStore, scheduler);
   }
 
   /// Given a percentile of target to collect, returns the number of targets to collect.
@@ -220,14 +220,17 @@ class LruGarbageCollectorResults {
 /// enabled, as well as which delay to use before the next run.
 class LruGarbageCollectorScheduler {
   LruGarbageCollectorScheduler(
-      this._garbageCollector, this._asyncQueue, this._localStore);
+    this._garbageCollector,
+    this._localStore,
+    this._scheduler,
+  );
 
   final LruGarbageCollector _garbageCollector;
-  final AsyncQueue _asyncQueue;
   final LocalStore _localStore;
+  final TaskScheduler _scheduler;
 
   bool _hasRun = false;
-  DelayedTask<void> _gcTask;
+  TimerTask _gcTask;
 
   /// How long we wait to try running LRU GC after SDK initialization.
   static const Duration _initialGcDelay = Duration(minutes: 1);
@@ -250,11 +253,15 @@ class LruGarbageCollectorScheduler {
 
   void _scheduleGC() {
     final Duration delay = _hasRun ? _regularGcDelay : _initialGcDelay;
-    _gcTask = _asyncQueue
-        .enqueueAfterDelay<void>(TimerId.garbageCollection, delay, () async {
-      await _localStore.collectGarbage(_garbageCollector);
-      _hasRun = true;
-      _scheduleGC();
-    });
+
+    _gcTask = _scheduler.add(
+      TaskId.garbageCollection,
+      delay,
+      () async {
+        await _localStore.collectGarbage(_garbageCollector);
+        _hasRun = true;
+        _scheduleGC();
+      },
+    );
   }
 }

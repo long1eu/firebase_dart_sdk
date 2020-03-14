@@ -25,7 +25,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.d
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_aggregator.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
@@ -40,11 +40,11 @@ class RemoteStore implements TargetMetadataProvider {
     this._localStore,
     this._datastore,
     this._onNetworkConnected,
-    AsyncQueue workerQueue,
+    TaskScheduler scheduler,
   )   : _listenTargets = <int, QueryData>{},
         _writePipeline = Queue<MutationBatch>(),
         _onlineStateTracker = OnlineStateTracker(
-            workerQueue, _remoteStoreCallback.handleOnlineStateChange),
+            scheduler, _remoteStoreCallback.handleOnlineStateChange),
         _watchStream = _datastore.watchStream,
         _writeStream = _datastore.writeStream {
     _watchStreamSub = _watchStream.listen(_watchEvents);

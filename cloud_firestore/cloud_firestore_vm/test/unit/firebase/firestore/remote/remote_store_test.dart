@@ -9,19 +9,20 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_persisten
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:mockito/mockito.dart';
 import 'package:rxdart/subjects.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/integration_test_util.dart';
 
+// ignore_for_file: cascade_invocations
 void main() {
   test('testRemoteStoreStreamStopsWhenNetworkUnreachable', () async {
-    final AsyncQueue testQueue = AsyncQueue();
+    final TaskScheduler scheduler = TaskScheduler('');
     final Datastore datastore = Datastore(
+      scheduler,
       IntegrationTestUtil.testEnvDatabaseInfo(),
-      testQueue,
       EmptyCredentialsProvider(),
     );
 
@@ -36,17 +37,12 @@ void main() {
     when(callback.handleOnlineStateChange(any)).thenAnswer((_) async => null);
 
     final RemoteStore remoteStore = RemoteStore(
-        callback, localStore, datastore, onNetworkConnected, testQueue);
+        callback, localStore, datastore, onNetworkConnected, scheduler);
 
-    await testQueue.enqueue(() async => remoteStore.forceEnableNetwork());
-    // drain?
-    await testQueue.enqueue(() async {});
+    remoteStore.forceEnableNetwork();
     onNetworkConnected.add(false);
-    await testQueue.enqueue(() async {});
-
-    await testQueue.enqueue(() async => remoteStore.forceEnableNetwork());
+    remoteStore.forceEnableNetwork();
     onNetworkConnected.add(true);
-    await testQueue.enqueue(() async {});
     await onNetworkConnected.close();
   });
 }

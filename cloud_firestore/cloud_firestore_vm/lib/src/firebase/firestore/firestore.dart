@@ -21,8 +21,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/write_batch.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:meta/meta.dart';
@@ -33,17 +33,16 @@ import 'package:meta/meta.dart';
 /// not supported in production code and new SDK releases may break code that does so.
 class Firestore {
   @visibleForTesting
-  Firestore(this.databaseId, this._asyncQueue, this.firebaseApp, this.client)
+  Firestore(this.databaseId, this.firebaseApp, this.client, this._scheduler)
       : dataConverter = UserDataConverter(databaseId);
 
   static const String _tag = 'FirebaseFirestore';
-
-  final AsyncQueue _asyncQueue;
 
   final DatabaseId databaseId;
   final FirebaseApp firebaseApp;
   final UserDataConverter dataConverter;
   final FirestoreClient client;
+  final TaskScheduler _scheduler;
 
   static Firestore get instance {
     final FirebaseApp app = FirebaseApp.instance;
@@ -52,6 +51,9 @@ class Firestore {
     }
     return FirestoreMultiDbComponent.instances[DatabaseId.defaultDatabaseId];
   }
+
+  @visibleForTesting
+  TaskScheduler get scheduler => _scheduler;
 
   static Future<Firestore> getInstance(
     FirebaseApp app, {
@@ -82,8 +84,6 @@ class Firestore {
     }
     final DatabaseId databaseId = DatabaseId.forDatabase(projectId, database);
 
-    final AsyncQueue queue = AsyncQueue();
-
     CredentialsProvider provider;
     if (authProvider == null) {
       Log.d(_tag,
@@ -93,9 +93,11 @@ class Firestore {
       provider = FirebaseAuthCredentialsProvider(authProvider);
     }
 
-    // Firestore uses a different database for each app name. Note that we don't use app.getPersistenceKey() here
-    // because it includes the application ID which is related to the project ID. We already include the project ID when
-    // resolving the database, so there is no need to include it in the persistence key.
+    // Firestore uses a different database for each app name. Note that we
+    // don't use app.getPersistenceKey() here because it includes the
+    // application ID which is related to the project ID. We already include the
+    // project ID when resolving the database, so there is no need to include it
+    // in the persistence key.
     final String persistenceKey = app.name;
 
     settings ??= FirestoreSettings();
@@ -106,18 +108,19 @@ class Firestore {
       sslEnabled: settings.sslEnabled,
     );
 
+    final TaskScheduler scheduler = TaskScheduler(app.persistenceKey);
     return Firestore(
       databaseId,
-      queue,
       app,
       await FirestoreClient.initialize(
         databaseInfo,
         settings,
         provider,
-        queue,
         openDatabase,
         app.onNetworkConnected,
+        scheduler,
       ),
+      scheduler,
     );
   }
 
@@ -182,9 +185,6 @@ class Firestore {
       await client.shutdown();
     }
   }
-
-  @visibleForTesting
-  AsyncQueue getAsyncQueue() => _asyncQueue;
 
   /// Re-enables network usage for this instance after a prior call to [disableNetwork].
   ///

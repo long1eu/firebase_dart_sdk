@@ -8,7 +8,7 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/online_state.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:grpc/grpc.dart';
 
 /// Called whenever the online state of the client changes. This is based on the watch stream for
@@ -25,25 +25,9 @@ typedef OnlineStateCallback = Future<void> Function(OnlineState onlineState);
 /// [OnlineState.offline], and the client will behave as if it is offline (get() calls will return
 /// cached data, etc.).
 class OnlineStateTracker {
-  OnlineStateTracker(this._workerQueue, this._onlineStateCallback)
+  OnlineStateTracker(this._scheduler, this._onlineStateCallback)
       : _state = OnlineState.unknown,
         _shouldWarnClientIsOffline = false;
-
-  /// To deal with transient failures, we allow multiple stream attempts before giving up and
-  /// transitioning from [OnlineState.unknown] to [OnlineState.offline].
-  ///
-  // TODO(mikelehen): This used to be set to 2 as a mitigation for b/66228394. @jdimond thinks that
-  //  bug is sufficiently fixed so that we can set this back to 1. If that works okay, we could
-  //  potentially remove this logic entirely.
-  static const int _maxWatchStreamFailures = 1;
-
-  /// To deal with stream attempts that don't succeed or fail in a timely manner, we have a timeout
-  /// for [OnlineState] to reach [OnlineState.online] or [OnlineState.offline]. If the timeout is
-  /// reached, we transition to [OnlineState.offline] rather than waiting indefinitely.
-  static const int _onlineStateTimeoutMs = 10 * 1000;
-
-  /// The log tag to use for this class.
-  static const String _tag = 'OnlineStateTracker';
 
   /// The current OnlineState.
   OnlineState _state;
@@ -55,17 +39,15 @@ class OnlineStateTracker {
   /// A timer that elapses after [_onlineStateTimeoutMs], at which point we transition from
   /// [OnlineState.unknown] to [OnlineState.offline] without waiting for the stream to actually fail
   /// ([_maxWatchStreamFailures] times).
-  DelayedTask<void> _onlineStateTimer;
+  TimerTask _onlineStateTimer;
 
   /// Whether the client should log a warning message if it fails to connect to the backend
   /// (initially true, cleared after a successful stream, or if we've logged the message already).
   bool _shouldWarnClientIsOffline;
 
-  /// The AsyncQueue to use for running timers (and calling [OnlineStateCallback] methods).
-  final AsyncQueue _workerQueue;
-
   /// The callback to notify on OnlineState changes.
   final OnlineStateCallback _onlineStateCallback;
+  final TaskScheduler _scheduler;
 
   /// Called by [RemoteStore] when a watch stream is started (including on each backoff attempt).
   ///
@@ -77,8 +59,9 @@ class OnlineStateTracker {
 
       hardAssert(_onlineStateTimer == null,
           'onlineStateTimer shouldn\'t be started yet');
-      _onlineStateTimer = _workerQueue.enqueueAfterDelay<void>(
-        TimerId.onlineStateTimeout,
+
+      _onlineStateTimer = _scheduler.add(
+        TaskId.onlineStateTimeout,
         const Duration(milliseconds: _onlineStateTimeoutMs),
         () async {
           _onlineStateTimer = null;
@@ -91,7 +74,6 @@ class OnlineStateTracker {
           // NOTE: [handleWatchStreamFailure] will continue to increment [watchStreamFailures] even
           // though we are already marked [OnlineState.offline] but this is non-harmful.
         },
-        'OnlineStateTracker handleWatchStreamStart',
       );
     }
   }
@@ -165,4 +147,20 @@ class OnlineStateTracker {
       _onlineStateTimer = null;
     }
   }
+
+  /// To deal with transient failures, we allow multiple stream attempts before giving up and
+  /// transitioning from [OnlineState.unknown] to [OnlineState.offline].
+  ///
+  // TODO(mikelehen): This used to be set to 2 as a mitigation for b/66228394. @jdimond thinks that
+  //  bug is sufficiently fixed so that we can set this back to 1. If that works okay, we could
+  //  potentially remove this logic entirely.
+  static const int _maxWatchStreamFailures = 1;
+
+  /// To deal with stream attempts that don't succeed or fail in a timely manner, we have a timeout
+  /// for [OnlineState] to reach [OnlineState.online] or [OnlineState.offline]. If the timeout is
+  /// reached, we transition to [OnlineState.offline] rather than waiting indefinitely.
+  static const int _onlineStateTimeoutMs = 10 * 1000;
+
+  /// The log tag to use for this class.
+  static const String _tag = 'OnlineStateTracker';
 }

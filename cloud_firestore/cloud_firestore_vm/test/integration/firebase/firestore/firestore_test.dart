@@ -16,7 +16,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/source.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
@@ -1067,22 +1067,23 @@ void main() {
   test('testWriteStreamReconnectsAfterIdle', () async {
     final DocumentReference doc = await testDocument();
     final Firestore firestore = doc.firestore;
+    final TaskScheduler scheduler = firestore.scheduler;
 
     await doc.set(map(<String>['foo', 'bar']));
     await Future<void>.delayed(const Duration(milliseconds: 250));
-    await firestore
-        .getAsyncQueue()
-        .runDelayedTasksUntil(TimerId.writeStreamIdle);
+
+    scheduler.runUntil(TaskId.writeStreamIdle);
     await doc.set(map(<String>['foo', 'bar']));
   });
 
   test('testWatchStreamReconnectsAfterIdle', () async {
     final DocumentReference doc = await testDocument();
     final Firestore firestore = doc.firestore;
+    final TaskScheduler scheduler = firestore.scheduler;
 
     await waitForOnlineSnapshot(doc);
     await Future<void>.delayed(const Duration(milliseconds: 250));
-    firestore.getAsyncQueue().runDelayedTasksUntil(TimerId.listenStreamIdle);
+    scheduler.runUntil(TaskId.listenStreamIdle);
     await waitForOnlineSnapshot(doc);
   });
 

@@ -7,30 +7,30 @@ part of datastore;
 class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
   factory WriteStream({
     @required FirestoreClient client,
-    @required AsyncQueue workerQueue,
+    @required TaskScheduler scheduler,
     @required RemoteSerializer serializer,
   }) {
     // ignore: close_sinks
     final StreamController<StreamEvent> controller =
         StreamController<StreamEvent>.broadcast();
-    return WriteStream.test(client, serializer, controller, workerQueue);
+    return WriteStream.test(client, scheduler, serializer, controller);
   }
 
   @visibleForTesting
   WriteStream.test(
     FirestoreClient client,
+    TaskScheduler scheduler,
     RemoteSerializer serializer,
     StreamController<StreamEvent> eventsController,
-    AsyncQueue workerQueue,
   )   : assert(client != null),
         assert(serializer != null),
         _client = client,
         _serializer = serializer,
         super(
           eventsController,
-          workerQueue,
-          TimerId.writeStreamIdle,
-          TimerId.writeStreamConnectionBackoff,
+          scheduler,
+          TaskId.writeStreamIdle,
+          TaskId.writeStreamConnectionBackoff,
         );
 
   final FirestoreClient _client;

@@ -36,7 +36,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart'
     as asserts;
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:grpc/grpc.dart';
 import 'package:rxdart/subjects.dart';
 import 'package:test/test.dart';
@@ -77,7 +77,7 @@ class SpecTestCase implements RemoteStoreCallback {
   // Parts of the Firestore system that the spec tests need to control.
 
   Persistence _localPersistence;
-  AsyncQueue _queue;
+  TaskScheduler _queue;
   MockDatastore _datastore;
   RemoteStore _remoteStore;
   SyncEngine _syncEngine;
@@ -188,7 +188,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
     final LocalStore localStore = LocalStore(_localPersistence, _currentUser);
 
-    _queue = AsyncQueue();
+    _queue = TaskScheduler('');
 
     // Set up the sync engine and various stores.
     _datastore = MockDatastore(_queue);
@@ -568,33 +568,33 @@ class SpecTestCase implements RemoteStoreCallback {
     await _datastore.failWrite(error);
   }
 
-  Future<void> _doRunTimer(String timer) async {
-    TimerId timerId;
+  void _doRunTimer(String timer) {
+    TaskId taskId;
     switch (timer) {
       case 'all':
-        timerId = TimerId.all;
+        taskId = TaskId.all;
         break;
       case 'listen_stream_idle':
-        timerId = TimerId.listenStreamIdle;
+        taskId = TaskId.listenStreamIdle;
         break;
       case 'listen_stream_connection_backoff':
-        timerId = TimerId.listenStreamConnectionBackoff;
+        taskId = TaskId.listenStreamConnectionBackoff;
         break;
       case 'write_stream_idle':
-        timerId = TimerId.writeStreamIdle;
+        taskId = TaskId.writeStreamIdle;
         break;
       case 'write_stream_connection_backoff':
-        timerId = TimerId.writeStreamConnectionBackoff;
+        taskId = TaskId.writeStreamConnectionBackoff;
         break;
       case 'online_state_timeout':
-        timerId = TimerId.onlineStateTimeout;
+        taskId = TaskId.onlineStateTimeout;
         break;
       default:
         throw asserts
             .fail('runTimer spec step specified unknown timer: $timer');
     }
 
-    await _queue.runDelayedTasksUntil(timerId);
+    _queue.runUntil(taskId);
   }
 
   Future<void> _doDisableNetwork() async {
@@ -680,7 +680,7 @@ class SpecTestCase implements RemoteStoreCallback {
     } else if (step.containsKey('failWrite')) {
       await _doFailWrite(step['failWrite']);
     } else if (step.containsKey('runTimer')) {
-      await _doRunTimer(step['runTimer']);
+      _doRunTimer(step['runTimer']);
     } else if (step.containsKey('enableNetwork')) {
       if (step['enableNetwork']) {
         await _doEnableNetwork();

@@ -22,9 +22,9 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/chann
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/exponential_backoff.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/on_error_resume.dart.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
@@ -35,13 +35,9 @@ import 'package:rxdart/rxdart.dart' hide OnErrorResumeStreamTransformer;
 import 'channel_options_provider.dart';
 
 part 'base_stream.dart';
-
 part 'firestore_client.dart';
-
 part 'transaction_client.dart';
-
 part 'watch_stream.dart';
-
 part 'write_stream.dart';
 
 /// Datastore represents a proxy for the remote server, hiding details of the
@@ -55,8 +51,8 @@ part 'write_stream.dart';
 /// and is otherwise stateless.
 class Datastore {
   factory Datastore(
+    TaskScheduler scheduler,
     DatabaseInfo databaseInfo,
-    AsyncQueue workerQueue,
     CredentialsProvider credentialsProvider, {
     ClientChannel clientChannel,
   }) {
@@ -81,13 +77,13 @@ class Datastore {
         .getConnection() //
         .then<void>((dynamic connection) => connection.onStateChanged =
             (dynamic c) => client.onStateChanged(c.state));
-    return Datastore.test(databaseInfo, workerQueue, serializer, client);
+    return Datastore.test(scheduler, databaseInfo, serializer, client);
   }
 
   @visibleForTesting
   Datastore.test(
+    this._scheduler,
     this._databaseInfo,
-    this._workerQueue,
     this._serializer,
     this._client,
   );
@@ -101,19 +97,17 @@ class Datastore {
     'x-google-gfe-request-trace'
   };
 
+  final TaskScheduler _scheduler;
   final DatabaseInfo _databaseInfo;
-  final AsyncQueue _workerQueue;
   final RemoteSerializer _serializer;
   final FirestoreClient _client;
-
-  AsyncQueue get workerQueue => _workerQueue;
 
   /// Creates a new [WatchStream] that is still unstarted but uses a common
   /// shared channel
   WatchStream get watchStream {
     return WatchStream(
       client: _client,
-      workerQueue: workerQueue,
+      scheduler: _scheduler,
       serializer: _serializer,
     );
   }
@@ -122,7 +116,10 @@ class Datastore {
   /// shared channel
   WriteStream get writeStream {
     return WriteStream(
-        client: _client, workerQueue: workerQueue, serializer: _serializer);
+      client: _client,
+      scheduler: _scheduler,
+      serializer: _serializer,
+    );
   }
 
   /// Creates a new [TransactionClient] that uses a common shared channel
@@ -189,7 +186,6 @@ class Datastore {
   String toString() {
     return (ToStringHelper(Datastore)
           ..add('databaseInfo', _databaseInfo)
-          ..add('workerQueue', _workerQueue)
           ..add('serializer', _serializer)
           ..add('client', _client))
         .toString();

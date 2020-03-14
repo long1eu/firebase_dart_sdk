@@ -5,7 +5,7 @@
 import 'dart:math';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 
 /// Helper for running delayed tasks following an exponential backoff curve between attempts using the [backoffFactor]
 /// to determine the extended base delay after each attempt.
@@ -20,33 +20,33 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart'
 class ExponentialBackoff {
   // Initial backoff set to 1s according to https://cloud.google.com/apis/design/errors.
   ExponentialBackoff(
-    AsyncQueue queue,
-    TimerId timerId, {
+    TaskScheduler scheduler,
+    TaskId taskId, {
     Duration initialDelay = const Duration(seconds: 1),
     double backoffFactor = 1.5,
     Duration maxDelay = const Duration(minutes: 1),
-  })  : assert(queue != null),
-        assert(timerId != null),
+  })  : assert(scheduler != null),
+        assert(taskId != null),
         assert(initialDelay != null),
         assert(backoffFactor != null),
         assert(maxDelay != null),
-        _queue = queue,
-        _timerId = timerId,
+        _scheduler = scheduler,
+        _taskId = taskId,
         _initialDelay = initialDelay,
         _backoffFactor = backoffFactor,
         _maxDelay = maxDelay,
         _lastAttemptTime = DateTime.now(),
         _currentBase = Duration.zero;
 
-  final AsyncQueue _queue;
-  final TimerId _timerId;
+  final TaskScheduler _scheduler;
+  final TaskId _taskId;
   final Duration _initialDelay;
   final double _backoffFactor;
   final Duration _maxDelay;
 
   Duration _currentBase;
   DateTime _lastAttemptTime;
-  DelayedTask<void> _timerTask;
+  TimerTask _timerTask;
 
   /// Resets the backoff delay.
   ///
@@ -84,11 +84,14 @@ class ExponentialBackoff {
           'last attempt: $delaySoFar ago)');
     }
 
-    _timerTask =
-        _queue.enqueueAfterDelay<void>(_timerId, remainingDelay, () async {
-      _lastAttemptTime = DateTime.now();
-      task();
-    }, 'ExponentialBackoff backoffAndRun');
+    _timerTask = _scheduler.add(
+      _taskId,
+      remainingDelay,
+      () {
+        _lastAttemptTime = DateTime.now();
+        task();
+      },
+    );
 
     // Apply backoff factor to determine next delay and ensure it is within bounds.
     _currentBase = _currentBase * _backoffFactor;

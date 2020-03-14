@@ -19,8 +19,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:rxdart/subjects.dart';
 import 'package:test/test.dart';
@@ -100,7 +100,7 @@ class IntegrationTestUtil {
       DatabaseId databaseId,
       String persistenceKey,
       CredentialsProvider provider,
-      AsyncQueue queue,
+      TaskScheduler scheduler,
       OpenDatabase openDatabase,
       FirestoreSettings settings) async {
     final DatabaseInfo databaseInfo = DatabaseInfo(
@@ -113,12 +113,12 @@ class IntegrationTestUtil {
       databaseInfo,
       settings,
       provider,
-      queue,
       openDatabase,
       onNetworkConnected,
+      scheduler,
     );
 
-    return Firestore(databaseId, queue, null, client);
+    return Firestore(databaseId, null, client, scheduler);
   }
 
   /// Initializes a new Firestore instance that can be used in testing. It is guaranteed to not share state with other
@@ -141,13 +141,12 @@ class IntegrationTestUtil {
 
     _clearPersistence(dbFullPath);
 
-    final AsyncQueue asyncQueue = AsyncQueue();
-
+    final TaskScheduler scheduler = TaskScheduler('');
     final Firestore firestore = await forTests(
       databaseId,
       persistenceKey,
       EmptyCredentialsProvider(),
-      asyncQueue,
+      scheduler,
       /*(String path,
           {int version,
           OnConfigure onConfigure,

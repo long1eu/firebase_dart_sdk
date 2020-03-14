@@ -8,27 +8,31 @@ class WatchStream
     extends BaseStream<proto.ListenRequest, proto.ListenResponse> {
   factory WatchStream({
     @required FirestoreClient client,
-    @required AsyncQueue workerQueue,
+    @required TaskScheduler scheduler,
     @required RemoteSerializer serializer,
   }) {
     // ignore: close_sinks
     final StreamController<StreamEvent> controller =
         StreamController<StreamEvent>.broadcast();
-    return WatchStream.test(client, serializer, controller, workerQueue);
+    return WatchStream.test(client, scheduler, serializer, controller);
   }
 
   @visibleForTesting
   WatchStream.test(
     FirestoreClient client,
+    TaskScheduler scheduler,
     RemoteSerializer serializer,
     StreamController<StreamEvent> eventsController,
-    AsyncQueue workerQueue,
   )   : assert(client != null),
         assert(serializer != null),
         _client = client,
         _serializer = serializer,
-        super(eventsController, workerQueue, TimerId.listenStreamIdle,
-            TimerId.listenStreamConnectionBackoff);
+        super(
+          eventsController,
+          scheduler,
+          TaskId.listenStreamIdle,
+          TaskId.listenStreamConnectionBackoff,
+        );
 
   final FirestoreClient _client;
   final RemoteSerializer _serializer;

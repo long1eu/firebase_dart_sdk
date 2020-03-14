@@ -8,25 +8,25 @@ abstract class BaseStream<Req extends GeneratedMessage,
     Res extends GeneratedMessage> extends DelegatingStream<StreamEvent> {
   BaseStream(
     StreamController<StreamEvent> eventsController,
-    AsyncQueue workerQueue,
-    TimerId idleTimerId,
-    TimerId connectionTimerId,
+    TaskScheduler scheduler,
+    TaskId idleTaskId,
+    TaskId connectionTaskId,
   )   : assert(eventsController != null),
-        assert(workerQueue != null),
-        assert(idleTimerId != null),
-        _backoff = ExponentialBackoff(workerQueue, connectionTimerId),
+        assert(scheduler != null),
+        assert(idleTaskId != null),
+        _backoff = ExponentialBackoff(scheduler, connectionTaskId),
         _eventsController = eventsController,
-        _workerQueue = workerQueue,
-        _idleTimerId = idleTimerId,
+        _scheduler = scheduler,
+        _idleTimerId = idleTaskId,
         super(eventsController.stream);
 
   final ExponentialBackoff _backoff;
   final StreamController<StreamEvent> _eventsController;
-  final AsyncQueue _workerQueue;
-  final TimerId _idleTimerId;
+  final TaskScheduler _scheduler;
+  final TaskId _idleTimerId;
 
   State _state = State.initial;
-  DelayedTask<void> _idleTimer;
+  TimerTask _idleTimer;
 
   ResponseStream<Res> _writeResponse;
   StreamSubscription<Res> _responseSub;
@@ -79,8 +79,7 @@ abstract class BaseStream<Req extends GeneratedMessage,
     Log.d('$runtimeType',
         '($hashCode) Stream sending: ${request.writeToJsonMap()}');
     _cancelIdleCheck();
-    _workerQueue.enqueue(() async => _requestsController.add(request));
-    // _requestsController.add(request);
+    _requestsController.add(request);
   }
 
   /// Marks this stream as idle. If no further actions are performed on the
@@ -96,12 +95,8 @@ abstract class BaseStream<Req extends GeneratedMessage,
     // already running a timer (in which case the previous idle timeout still
     // applies).
     if (isOpen && _idleTimer == null) {
-      _idleTimer = _workerQueue.enqueueAfterDelay(
-        _idleTimerId,
-        const Duration(seconds: 10),
-        _handleIdleCloseTimer,
-        '$runtimeType markIdle',
-      );
+      _idleTimer = _scheduler.add(
+          _idleTimerId, const Duration(seconds: 10), _handleIdleCloseTimer);
     }
   }
 
@@ -118,8 +113,7 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
   @visibleForTesting
   void addEvent(StreamEvent event) {
-    _workerQueue.enqueue(() async => _eventsController.add(event));
-    // _eventsController.add(event);
+    _eventsController.add(event);
   }
 
   Future<ResponseStream<Res>> _buildCall(Stream<Req> requests);

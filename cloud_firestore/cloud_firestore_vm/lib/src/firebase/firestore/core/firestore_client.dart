@@ -37,24 +37,19 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:grpc/grpc.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// [FirestoreClient] is a top-level class that constructs and owns all of the pieces of the client SDK architecture.
 class FirestoreClient implements RemoteStoreCallback {
-  FirestoreClient._(
-    this.databaseInfo,
-    this.credentialsProvider,
-    this.asyncQueue,
-  );
+  FirestoreClient._(this.databaseInfo, this.credentialsProvider);
 
   static const String logTag = 'FirestoreClient';
 
   final DatabaseInfo databaseInfo;
   final CredentialsProvider credentialsProvider;
-  final AsyncQueue asyncQueue;
 
   StreamSubscription<User> onCredentialChangeSubscription;
   Persistence persistence;
@@ -69,12 +64,12 @@ class FirestoreClient implements RemoteStoreCallback {
     DatabaseInfo databaseInfo,
     FirestoreSettings settings,
     CredentialsProvider credentialsProvider,
-    AsyncQueue asyncQueue,
     OpenDatabase openDatabase,
     BehaviorSubject<bool> onNetworkConnected,
+    TaskScheduler scheduler,
   ) async {
     final FirestoreClient client =
-        FirestoreClient._(databaseInfo, credentialsProvider, asyncQueue);
+        FirestoreClient._(databaseInfo, credentialsProvider);
 
     final Completer<User> firstUser = Completer<User>();
     bool initialized = false;
@@ -86,18 +81,12 @@ class FirestoreClient implements RemoteStoreCallback {
         hardAssert(!firstUser.isCompleted, 'Already fulfilled first user task');
         firstUser.complete(user);
       } else {
-        asyncQueue.enqueueAndForget(
-          () async {
-            Log.d(logTag, 'Credential changed. Current user: ${user.uid}');
-            await client.syncEngine.handleCredentialChange(user);
-          },
-          'FirestoreClinet initialize',
-        );
+        Log.d(logTag, 'Credential changed. Current user: ${user.uid}');
+        client.syncEngine.handleCredentialChange(user);
       }
     });
 
-    final User user = await asyncQueue.enqueue(
-        () => firstUser.future, 'FirestoreClinet initialize get user');
+    final User user = await firstUser.future;
     await client._initialize(
       user,
       // TODO(long1eu): Make sure you remove the openDatabase != null once we
@@ -106,97 +95,76 @@ class FirestoreClient implements RemoteStoreCallback {
       settings.cacheSizeBytes,
       openDatabase,
       onNetworkConnected,
+      scheduler,
     );
     return client;
   }
 
   Future<void> disableNetwork() {
-    return asyncQueue.enqueue(
-        () => remoteStore.disableNetwork(), 'FirestoreClinet disableNetwork');
+    return remoteStore.disableNetwork();
   }
 
   Future<void> enableNetwork() {
-    return asyncQueue.enqueue(
-        () => remoteStore.enableNetwork(), 'FirestoreClinet enableNetwork');
+    return remoteStore.enableNetwork();
   }
 
   /// Shuts down this client, cancels all writes / listeners, and releases all resources.
   Future<void> shutdown() async {
     await onCredentialChangeSubscription.cancel();
-    return asyncQueue.enqueue(
-      () async {
-        await remoteStore.shutdown();
-        await persistence.shutdown();
-        _lruScheduler?.stop();
-      },
-      'FirestoreClient shutdown',
-    );
+    await remoteStore.shutdown();
+    await persistence.shutdown();
+    _lruScheduler?.stop();
   }
 
   /// Starts listening to a query. */
   Future<QueryStream> listen(Query query, ListenOptions options) async {
     final QueryStream queryListener =
         QueryStream(query, options, stopListening);
-    await asyncQueue.enqueue(() => eventManager.addQueryListener(queryListener),
-        'FirestoreClinet listen');
+    await eventManager.addQueryListener(queryListener);
     return queryListener;
   }
 
   /// Stops listening to a query previously listened to.
-  void stopListening(QueryStream listener) {
-    asyncQueue.enqueueAndForget(
-        () => eventManager.removeQueryListener(listener),
-        'FirestoreClinet stopListening');
+  Future<void> stopListening(QueryStream listener) {
+    return eventManager.removeQueryListener(listener);
   }
 
-  Future<Document> getDocumentFromLocalCache(DocumentKey docKey) {
-    return asyncQueue
-        .enqueue(() => localStore.readDocument(docKey),
-            'FirestoreClient getDocumentFromLocalCache')
-        .then((MaybeDocument result) {
-      final MaybeDocument maybeDoc = result;
+  Future<Document> getDocumentFromLocalCache(DocumentKey docKey) async {
+    final MaybeDocument maybeDoc = await localStore.readDocument(docKey);
 
-      if (maybeDoc is Document) {
-        return maybeDoc;
-      } else if (maybeDoc is NoDocument) {
-        return null;
-      } else {
-        throw FirebaseFirestoreError(
-          'Failed to get document from cache. (However, this document may exist on the server. Run again without '
-          'setting source to CACHE to attempt to retrieve the document from the server.)',
-          FirestoreErrorCode.unavailable,
-        );
-      }
-    });
+    if (maybeDoc is Document) {
+      return maybeDoc;
+    } else if (maybeDoc is NoDocument) {
+      return null;
+    } else {
+      throw FirebaseFirestoreError(
+        'Failed to get document from cache. (However, this document may exist on the server. Run again without '
+        'setting source to CACHE to attempt to retrieve the document from the server.)',
+        FirestoreErrorCode.unavailable,
+      );
+    }
   }
 
-  Future<ViewSnapshot> getDocumentsFromLocalCache(Query query) {
-    return asyncQueue.enqueue(
-      () async {
-        final ImmutableSortedMap<DocumentKey, Document> docs =
-            await localStore.executeQuery(query);
+  Future<ViewSnapshot> getDocumentsFromLocalCache(Query query) async {
+    final ImmutableSortedMap<DocumentKey, Document> docs =
+        await localStore.executeQuery(query);
 
-        final View view = View(query, ImmutableSortedSet<DocumentKey>());
-        final ViewDocumentChanges viewDocChanges = view.computeDocChanges(docs);
-        return view.applyChanges(viewDocChanges).snapshot;
-      },
-      'FirestoreClient getDocumentsFromLocalCache',
-    );
+    final View view = View(query, ImmutableSortedSet<DocumentKey>());
+    final ViewDocumentChanges viewDocChanges = view.computeDocChanges(docs);
+    return view.applyChanges(viewDocChanges).snapshot;
   }
 
   /// Writes mutations. The returned Future will be notified when it's written to the backend.
   Future<void> write(final List<Mutation> mutations) async {
     final Completer<void> source = Completer<void>();
-    asyncQueue.enqueueAndForget(
-        () => syncEngine.writeMutations(mutations, source),
-        'FirestoreClient write');
+    await syncEngine.writeMutations(mutations, source);
     await source.future;
   }
 
   /// Tries to execute the transaction in updateFunction up to retries times.
   Future<TResult> transaction<TResult>(
       Future<TResult> Function(Transaction) updateFunction, int retries) {
-    return syncEngine.transaction(asyncQueue, updateFunction, retries);
+    return syncEngine.transaction(updateFunction, retries);
   }
 
   Future<void> _initialize(
@@ -205,6 +173,7 @@ class FirestoreClient implements RemoteStoreCallback {
     int cacheSizeBytes,
     OpenDatabase openDatabase,
     BehaviorSubject<bool> onNetworkConnected,
+    TaskScheduler scheduler,
   ) async {
     // Note: The initialization work must all be synchronous (we can't dispatch more work) since external write/listen
     // operations could get queued to run before that subsequent work completes.
@@ -235,25 +204,20 @@ class FirestoreClient implements RemoteStoreCallback {
     await persistence.start();
     localStore = LocalStore(persistence, user);
     if (gc != null) {
-      _lruScheduler = gc.newScheduler(asyncQueue, localStore) //
+      _lruScheduler = gc.newScheduler(scheduler, localStore) //
         ..start();
     }
 
     final Datastore datastore =
-        Datastore(databaseInfo, asyncQueue, credentialsProvider);
-    remoteStore = RemoteStore(
-      this,
-      localStore,
-      datastore,
-      onNetworkConnected,
-      asyncQueue,
-    );
+        Datastore(scheduler, databaseInfo, credentialsProvider);
+    remoteStore =
+        RemoteStore(this, localStore, datastore, onNetworkConnected, scheduler);
 
     syncEngine = SyncEngine(localStore, remoteStore, user);
     eventManager = EventManager(syncEngine);
 
-    // NOTE: RemoteStore depends on LocalStore (for persisting stream tokens, refilling mutation queue, etc.) so must be
-    // started after LocalStore.
+    // NOTE: RemoteStore depends on LocalStore (for persisting stream tokens,
+    // refilling mutation queue, etc.) so must be started after LocalStore.
     await localStore.start();
     await remoteStore.start();
   }
