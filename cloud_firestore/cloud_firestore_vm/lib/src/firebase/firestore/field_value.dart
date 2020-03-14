@@ -2,8 +2,6 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-
-
 /// Sentinel values that can be used when writing document fields with [set] or [update].
 abstract class FieldValue {
   const FieldValue._(this.elements);
@@ -36,6 +34,17 @@ abstract class FieldValue {
     return _ArrayRemoveFieldValue._(elements);
   }
 
+  /// Returns a special value that can be used with set() or update() that tells
+  /// the server to increment the field's current value by the given value.
+  ///
+  /// If the current value is an integer or a double, both the current and the
+  /// given value will be interpreted as doubles and all arithmetic will follow
+  /// IEEE 754 semantics. Otherwise, the transformation will set the field to
+  /// the given value.
+  factory FieldValue.increment(num l) {
+    return _NumericIncrementFieldValue(l);
+  }
+
   final List<Object> elements;
 
   /// Returns the method name (e.g. 'FieldValue.delete') that was used to create this FieldValue
@@ -49,6 +58,8 @@ abstract class FieldValue {
   bool get isArrayUnion => this is _ArrayUnionFieldValue;
 
   bool get isArrayRemove => this is _ArrayRemoveFieldValue;
+
+  bool get isIncrement => this is _NumericIncrementFieldValue;
 
   static const _DeleteFieldValue _deleteInstance = _DeleteFieldValue._();
 
@@ -86,4 +97,15 @@ class _ArrayRemoveFieldValue extends FieldValue {
 
   @override
   String get methodName => 'FieldValue.arrayRemove';
+}
+
+/* FieldValue class for increment() transforms. */
+class _NumericIncrementFieldValue extends FieldValue {
+  _NumericIncrementFieldValue(this.operand) : super._(<Object>[operand]);
+  final num operand;
+
+  @override
+  String get methodName => 'FieldValue.increment';
+
+  num getOperand() => operand;
 }

@@ -217,5 +217,5 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  int get byteSize => persistence.byteSize;
+  Future<int> get byteSize => persistence.byteSize;
 }

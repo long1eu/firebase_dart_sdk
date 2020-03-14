@@ -35,5 +35,5 @@ abstract class LruDelegate {
   LruGarbageCollector get garbageCollector;
 
   /// Return the size of the cache in bytes.
-  int get byteSize;
+  Future<int> get byteSize;
 }

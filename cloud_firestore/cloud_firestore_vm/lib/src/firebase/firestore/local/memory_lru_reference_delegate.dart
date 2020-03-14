@@ -169,7 +169,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  int get byteSize {
+  Future<int> get byteSize async {
     // Note that this method is only used for testing because this delegate is only used for testing. The algorithm here
     // (loop through everything, serialize it and count bytes) is inefficient and inexact, but won't run in production.
     int count = 0;

@@ -424,7 +424,8 @@ class SyncEngine implements RemoteStoreCallback {
   /// Computes a new snapshot from the changes and calls the registered callback with the new snapshot.
   Future<void> _emitNewSnapsAndNotifyLocalStore(
       ImmutableSortedMap<DocumentKey, MaybeDocument> changes,
-      RemoteEvent remoteEvent) async {
+      RemoteEvent remoteEvent,
+      [String caller]) async {
     final List<ViewSnapshot> newSnapshots = <ViewSnapshot>[];
     final List<LocalViewChanges> documentChangesInAllViews =
         <LocalViewChanges>[];

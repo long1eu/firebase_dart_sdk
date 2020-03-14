@@ -64,7 +64,7 @@ class LruGarbageCollector {
       return LruGarbageCollectorResults.didNotRun;
     }
 
-    final int cacheSize = byteSize;
+    final int cacheSize = await byteSize;
     if (cacheSize < _params.minBytesThreshold) {
       Log.d('LruGarbageCollector',
           'Garbage collection skipped; Cache size $cacheSize is lower than threshold ${_params.minBytesThreshold}');
@@ -122,7 +122,7 @@ class LruGarbageCollector {
     );
   }
 
-  int get byteSize => delegate.byteSize;
+  Future<int> get byteSize => delegate.byteSize;
 }
 
 /// Used to calculate the nth sequence number. Keeps a rolling buffer of the lowest n values passed to [addElement], and
@@ -173,8 +173,7 @@ class LruGarbageCollectorParams {
   final int percentileToCollect;
   final int maximumSequenceNumbersToCollect;
 
-  static const int _collectionDisabled =
-      FirestoreSettings.cacheSizeUnlimited;
+  static const int _collectionDisabled = FirestoreSettings.cacheSizeUnlimited;
 
   static const int _defaultCacheSizeBytes = 100 * 1024 * 1024; // 100mb
   /// The following two constants are estimates for how we want to tune the garbage collector. If we encounter a large

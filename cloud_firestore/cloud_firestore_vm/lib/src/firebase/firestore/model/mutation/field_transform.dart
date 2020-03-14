@@ -13,6 +13,8 @@ class FieldTransform {
   final FieldPath fieldPath;
   final TransformOperation operation;
 
+  bool get isIdempotent => operation.isIdempotent;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

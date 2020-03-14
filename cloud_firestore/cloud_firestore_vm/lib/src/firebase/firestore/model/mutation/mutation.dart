@@ -5,6 +5,7 @@
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
@@ -115,4 +116,12 @@ abstract class Mutation {
       return SnapshotVersion.none;
     }
   }
+
+  /// If applicable, returns the field mask for this mutation. Fields that are
+  /// not included in this field mask are not modified when this mutation is
+  /// applied. Mutations that replace all document values return 'null'.
+  FieldMask get fieldMask;
+
+  /// Returns whether all operations in the mutation are idempotent.
+  bool get isIdempotent;
 }

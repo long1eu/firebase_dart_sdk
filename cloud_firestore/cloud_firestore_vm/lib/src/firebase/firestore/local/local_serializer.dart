@@ -136,6 +136,9 @@ class LocalSerializer {
     final proto.WriteBatch result = proto.WriteBatch.create()
       ..batchId = batch.batchId
       ..localWriteTime = rpcSerializer.encodeTimestamp(batch.localWriteTime);
+    for (Mutation mutation in batch.baseMutations) {
+      result.baseWrites.add(rpcSerializer.encodeMutation(mutation));
+    }
     for (Mutation mutation in batch.mutations) {
       result.writes.add(rpcSerializer.encodeMutation(mutation));
     }
@@ -148,13 +151,22 @@ class LocalSerializer {
     final Timestamp localWriteTime =
         rpcSerializer.decodeTimestamp(batch.localWriteTime);
 
-    final int count = batch.writes.length;
-    final List<Mutation> mutations = List<Mutation>(count);
-    for (int i = 0; i < count; i++) {
+    final int baseMutationsCount = batch.baseWrites.length;
+    final List<Mutation> baseMutations = List<Mutation>(baseMutationsCount);
+    for (int i = 0; i < baseMutationsCount; i++) {
+      baseMutations[i] = rpcSerializer.decodeMutation(batch.baseWrites[i]);
+    }
+    final int mutationsCount = batch.writes.length;
+    final List<Mutation> mutations = List<Mutation>(mutationsCount);
+    for (int i = 0; i < mutationsCount; i++) {
       mutations[i] = rpcSerializer.decodeMutation(batch.writes[i]);
     }
-
-    return MutationBatch(batchId, localWriteTime, mutations);
+    return MutationBatch(
+      batchId: batchId,
+      localWriteTime: localWriteTime,
+      baseMutations: baseMutations,
+      mutations: mutations,
+    );
   }
 
   proto.Target encodeQueryData(QueryData queryData) {

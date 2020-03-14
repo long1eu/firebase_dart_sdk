@@ -93,6 +93,7 @@ class MemoryPersistence extends Persistence {
     referenceDelegate.onTransactionStarted();
     await operation();
     await referenceDelegate.onTransactionCommitted();
+    Log.d(tag, 'Commit transaction: $action');
   }
 
   @override
@@ -101,6 +102,7 @@ class MemoryPersistence extends Persistence {
     Log.d(tag, 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
     final T result = await operation();
+    Log.d(tag, 'Commit transaction: $action');
     await referenceDelegate.onTransactionCommitted();
     return result;
   }

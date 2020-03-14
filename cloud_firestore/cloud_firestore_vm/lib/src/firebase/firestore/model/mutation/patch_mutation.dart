@@ -97,6 +97,12 @@ class PatchMutation extends Mutation {
   }
 
   @override
+  FieldMask get fieldMask => mask;
+
+  @override
+  bool get isIdempotent => true;
+
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is PatchMutation &&

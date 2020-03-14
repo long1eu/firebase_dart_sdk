@@ -30,8 +30,14 @@ abstract class MutationQueue {
   Future<void> setLastStreamToken(Uint8List streamToken);
 
   /// Creates a new mutation batch and adds it to this mutation queue.
-  Future<MutationBatch> addMutationBatch(
-      Timestamp localWriteTime, List<Mutation> mutations);
+  ///
+  /// [localWriteTime] The original write time of this mutation. [baseMutations]
+  /// contains the mutations that are used to populate the base values when this
+  /// mutation is applied locally. These mutations are used to locally overwrite
+  /// values that are persisted in the remote document cache. [mutations] The
+  /// user-provided mutations in this mutation batch.
+  Future<MutationBatch> addMutationBatch(Timestamp localWriteTime,
+      List<Mutation> baseMutations, List<Mutation> mutations);
 
   /// Loads the mutation batch with the given [batchId].
   Future<MutationBatch> lookupMutationBatch(int batchId);

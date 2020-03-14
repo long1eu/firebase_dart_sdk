@@ -142,8 +142,8 @@ class MutationQueueTestCase {
     final List<MutationBatch> batches = <MutationBatch>[];
     await _persistence.runTransaction('New mutation batch', () async {
       for (Mutation mutation in mutations) {
-        batches.add(await _mutationQueue
-            .addMutationBatch(Timestamp.now(), <Mutation>[mutation]));
+        batches.add(await _mutationQueue.addMutationBatch(
+            Timestamp.now(), <Mutation>[], <Mutation>[mutation]));
       }
     });
 
@@ -172,8 +172,8 @@ class MutationQueueTestCase {
     final List<MutationBatch> batches = <MutationBatch>[];
     await _persistence.runTransaction('New mutation batch', () async {
       for (Mutation mutation in mutations) {
-        batches.add(await _mutationQueue
-            .addMutationBatch(Timestamp.now(), <Mutation>[mutation]));
+        batches.add(await _mutationQueue.addMutationBatch(
+            Timestamp.now(), <Mutation>[], <Mutation>[mutation]));
       }
     });
 
@@ -204,8 +204,8 @@ class MutationQueueTestCase {
     final List<MutationBatch> batches = <MutationBatch>[];
     await _persistence.runTransaction('New mutation batch', () async {
       for (Mutation mutation in mutations) {
-        batches.add(await _mutationQueue
-            .addMutationBatch(Timestamp.now(), <Mutation>[mutation]));
+        batches.add(await _mutationQueue.addMutationBatch(
+            Timestamp.now(), <Mutation>[], <Mutation>[mutation]));
       }
     });
 
@@ -239,8 +239,8 @@ class MutationQueueTestCase {
     final List<MutationBatch> batches = <MutationBatch>[];
     await _persistence.runTransaction('New mutation batch', () async {
       for (Mutation mutation in mutations) {
-        batches.add(await _mutationQueue
-            .addMutationBatch(Timestamp.now(), <Mutation>[mutation]));
+        batches.add(await _mutationQueue.addMutationBatch(
+            Timestamp.now(), <Mutation>[], <Mutation>[mutation]));
       }
     });
 
@@ -266,12 +266,12 @@ class MutationQueueTestCase {
     await _persistence.runTransaction('New mutation batch', () async {
       batches
         ..add(await _mutationQueue.addMutationBatch(
-            Timestamp.now(), <SetMutation>[
+            Timestamp.now(), <Mutation>[], <SetMutation>[
           setMutation('foo/bar', value),
           setMutation('foo/bar/baz/quux', value)
         ]))
         ..add(await _mutationQueue.addMutationBatch(
-            Timestamp.now(), <SetMutation>[
+            Timestamp.now(), <Mutation>[], <SetMutation>[
           setMutation('foo/bar', value),
           setMutation('foo/baz', value)
         ]));
@@ -364,8 +364,8 @@ class MutationQueueTestCase {
 
     return _persistence.runTransactionAndReturn(
         'New mutation batch',
-        () => _mutationQueue
-            .addMutationBatch(Timestamp.now(), <SetMutation>[mutation]));
+        () => _mutationQueue.addMutationBatch(
+            Timestamp.now(), <Mutation>[], <SetMutation>[mutation]));
   }
 
   /// Creates a list of batches containing [number] dummy [MutationBatches]. Each has a different batchId.

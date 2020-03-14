@@ -93,4 +93,24 @@ void main() {
       () => testCase.testDoesNotReplaceResumeTokenWithEmptyByteString());
   test('testRemoteDocumentKeysForTarget',
       () => testCase.testRemoteDocumentKeysForTarget());
+  test('testRemoteDocumentKeysForTarget',
+      () => testCase.testRemoteDocumentKeysForTarget());
+  test(
+      'testHandlesSetMutationThenTransformMutationThenTransformMutation',
+      () => testCase
+          .testHandlesSetMutationThenTransformMutationThenTransformMutation());
+  test(
+      'testHandlesSetMutationThenAckThenTransformMutationThenAckThenTransformMutation',
+      () => testCase
+          .testHandlesSetMutationThenAckThenTransformMutationThenAckThenTransformMutation());
+  test(
+      'testHandlesSetMutationThenTransformMutationThenRemoteEventThenTransformMutation',
+      () => testCase
+          .testHandlesSetMutationThenTransformMutationThenRemoteEventThenTransformMutation());
+  test('testHoldsBackOnlyNonIdempotentTransforms',
+      () => testCase.testHoldsBackOnlyNonIdempotentTransforms());
+  test('testHandlesMergeMutationWithTransformThenRemoteEvent',
+      () => testCase.testHandlesMergeMutationWithTransformThenRemoteEvent());
+  test('testHandlesPatchMutationWithTransformThenRemoteEvent',
+      () => testCase.testHandlesPatchMutationWithTransformThenRemoteEvent());
 }

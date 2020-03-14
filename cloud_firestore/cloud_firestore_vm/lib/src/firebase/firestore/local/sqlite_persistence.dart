@@ -48,7 +48,27 @@ class SQLitePersistence extends Persistence {
   @override
   SQLiteLruReferenceDelegate referenceDelegate;
 
-  int get byteSize => _db.file.lengthSync();
+  Future<int> get byteSize async {
+    final int pageSize = await getPageSize();
+    final int pageCount = await getPageCount();
+    return pageCount * pageSize;
+  }
+
+  /// Gets the page size of the database. Typically 4096.
+  ///
+  /// @see https://www.sqlite.org/pragma.html#pragma_page_size
+  Future<int> getPageSize() async {
+    return (await _db.query('PRAGMA page_size'))[0].values.first;
+  }
+
+  /// Gets the number of pages in the database file. Multiplying this with the
+  /// page size yields the approximate size of the database on disk (including
+  /// the WAL, if relevant).
+  ///
+  /// @see https://www.sqlite.org/pragma.html#pragma_page_count.
+  Future<int> getPageCount() async {
+    return (await _db.query('PRAGMA page_count'))[0].values.first;
+  }
 
   static Future<SQLitePersistence> create(
       String persistenceKey,

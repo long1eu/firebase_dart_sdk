@@ -175,12 +175,19 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch> addMutationBatch(
-      Timestamp localWriteTime, List<Mutation> mutations) async {
+    Timestamp localWriteTime,
+    List<Mutation> baseMutations,
+    List<Mutation> mutations,
+  ) async {
     final int batchId = _nextBatchId;
     _nextBatchId += 1;
 
-    final MutationBatch batch =
-        MutationBatch(batchId, localWriteTime, mutations);
+    final MutationBatch batch = MutationBatch(
+      batchId: batchId,
+      localWriteTime: localWriteTime,
+      baseMutations: baseMutations,
+      mutations: mutations,
+    );
     final GeneratedMessage proto = serializer.encodeMutationBatch(batch);
 
     await db.execute(

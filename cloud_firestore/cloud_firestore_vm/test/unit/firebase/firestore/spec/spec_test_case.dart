@@ -525,9 +525,7 @@ class SpecTestCase implements RemoteStoreCallback {
     expect(runBackoffTimer, isTrue);
 
     final GrpcError status = GrpcError.custom(error['code'], error['message']);
-    print('_datastore.isWatchStreamOpen: ${_datastore.isWatchStreamOpen}');
     _datastore.failWatchStream(status);
-    print('_datastore.isWatchStreamOpen: ${_datastore.isWatchStreamOpen}');
     // Unlike web, stream should re-open synchronously (if we have active
     // listeners).
     if (_queryListeners.isNotEmpty) {

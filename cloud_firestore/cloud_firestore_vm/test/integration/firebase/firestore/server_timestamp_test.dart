@@ -65,7 +65,7 @@ void main() {
 
   tearDown(() async {
     await Future<void>.delayed(const Duration(milliseconds: 100));
-    listenerRegistration.cancel();
+    await listenerRegistration.cancel();
     await IntegrationTestUtil.tearDown();
   });
 
@@ -207,7 +207,8 @@ void main() {
     DocumentSnapshot localSnapshot = await accumulator.awaitLocalEvent();
     expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
 
-    docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]);
+    // include b=1 to ensure there's a change resulting in a new snapshot.
+    docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp(), 'b', 1]);
     localSnapshot = await accumulator.awaitLocalEvent();
     expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
 

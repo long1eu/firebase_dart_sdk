@@ -6,6 +6,7 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
@@ -49,6 +50,12 @@ class SetMutation extends Mutation {
     final SnapshotVersion version = Mutation.getPostMutationVersion(maybeDoc);
     return Document(key, version, value, DocumentState.localMutations);
   }
+
+  @override
+  FieldMask get fieldMask => null;
+
+  @override
+  bool get isIdempotent => true;
 
   @override
   bool operator ==(Object other) =>

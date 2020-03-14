@@ -12,3 +12,4 @@ const LatLng$json = const {
     const {'1': 'longitude', '3': 2, '4': 1, '5': 1, '10': 'longitude'},
   ],
 };
+

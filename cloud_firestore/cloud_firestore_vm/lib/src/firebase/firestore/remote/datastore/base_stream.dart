@@ -79,7 +79,8 @@ abstract class BaseStream<Req extends GeneratedMessage,
     Log.d('$runtimeType',
         '($hashCode) Stream sending: ${request.writeToJsonMap()}');
     _cancelIdleCheck();
-    _requestsController.add(request);
+    _workerQueue.enqueue(() async => _requestsController.add(request));
+    // _requestsController.add(request);
   }
 
   /// Marks this stream as idle. If no further actions are performed on the
@@ -117,7 +118,8 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
   @visibleForTesting
   void addEvent(StreamEvent event) {
-    _eventsController.add(event);
+    _workerQueue.enqueue(() async => _eventsController.add(event));
+    // _eventsController.add(event);
   }
 
   Future<ResponseStream<Res>> _buildCall(Stream<Req> requests);

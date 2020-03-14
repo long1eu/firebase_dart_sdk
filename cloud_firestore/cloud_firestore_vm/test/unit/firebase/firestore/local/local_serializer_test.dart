@@ -10,7 +10,9 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
@@ -39,6 +41,11 @@ void main() {
   });
 
   test('testEncodesMutationBatch', () {
+    final Mutation baseWrite = PatchMutation(
+        key('foo/bar'),
+        wrapMap(map(<String>['a', 'b'])),
+        FieldMask(<FieldPath>{field('a')}),
+        Precondition.none);
     final Mutation set =
         setMutation('foo/bar', map(<dynamic>['a', 'b', 'num', 1]));
     final Mutation patch = PatchMutation(
@@ -49,8 +56,17 @@ void main() {
 
     final Mutation del = deleteMutation('baz/quux');
     final Timestamp writeTime = Timestamp.now();
-    final MutationBatch model =
-        MutationBatch(42, writeTime, <Mutation>[set, patch, del]);
+    final MutationBatch model = MutationBatch(
+        batchId: 42,
+        localWriteTime: writeTime,
+        baseMutations: <Mutation>[baseWrite],
+        mutations: <Mutation>[set, patch, del]);
+
+    final proto.Write baseWriteProto = proto.Write()
+      ..update = (proto.Document()
+        ..name = 'projects/p/databases/d/documents/foo/bar'
+        ..fields['a'] = (proto_.Value()..stringValue = 'b'))
+      ..updateMask = (proto.DocumentMask()..fieldPaths.add('a'));
 
     final proto.Write setProto = (proto.Write.create()
           ..update = (proto.Document.create()
@@ -79,6 +95,7 @@ void main() {
 
     final proto.WriteBatch batchProto = (proto.WriteBatch.create()
           ..batchId = 42
+          ..baseWrites.add(baseWriteProto)
           ..writes.addAll(<proto.Write>[setProto, patchProto, delProto])
           ..localWriteTime = writeTimeProto)
         .freeze();
@@ -88,6 +105,7 @@ void main() {
     expect(decoded.batchId, model.batchId);
     expect(decoded.localWriteTime, model.localWriteTime);
     expect(decoded.mutations, model.mutations);
+    expect(decoded.baseMutations, model.baseMutations);
     expect(decoded.keys, model.keys);
   });
 

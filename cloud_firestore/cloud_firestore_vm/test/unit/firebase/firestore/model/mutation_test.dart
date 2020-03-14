@@ -19,6 +19,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transfo
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/unknown_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/integer_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/string_value.dart';
@@ -29,17 +30,32 @@ import 'package:test/test.dart';
 import '../../../../util/test_util.dart';
 
 void main() {
-  void _verifyTransform(Map<String, Object> baseData,
-      Map<String, Object> transformData, Map<String, Object> expectedData) {
-    final Document baseDoc = doc('collection/key', 0, baseData);
-    final TransformMutation transform =
-        transformMutation('collection/key', transformData);
-    final MaybeDocument transformedDoc =
-        transform.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
+  void _verifyTransformAsList(
+    Map<String, Object> baseData,
+    List<Map<String, Object>> transforms,
+    Map<String, Object> expectedData,
+  ) {
+    MaybeDocument currentDoc = doc('collection/key', 0, baseData);
+
+    for (Map<String, Object> transformData in transforms) {
+      final TransformMutation transform =
+          transformMutation('collection/key', transformData);
+      currentDoc =
+          transform.applyToLocalView(currentDoc, currentDoc, Timestamp.now());
+    }
 
     final Document expectedDoc =
         doc('collection/key', 0, expectedData, DocumentState.localMutations);
-    expect(expectedDoc, transformedDoc);
+    expect(currentDoc, expectedDoc);
+  }
+
+  void _verifyTransform(
+    Map<String, Object> baseData,
+    Map<String, Object> transformData,
+    Map<String, Object> expectedData,
+  ) {
+    _verifyTransformAsList(
+        baseData, <Map<String, Object>>[transformData], expectedData);
   }
 
   test('testAppliesSetsToDocuments', () {
@@ -192,6 +208,162 @@ void main() {
     final Document expectedDoc = Document(key('collection/key'), version(0),
         expectedData, DocumentState.localMutations);
     expect(transformedDoc, expectedDoc);
+  });
+
+  test('testAppliesIncrementTransformToDocument', () async {
+    final Map<String, Object> baseDoc = map(<dynamic>[
+      'longPlusLong',
+      1,
+      'longPlusDouble',
+      2,
+      'doublePlusLong',
+      3.3,
+      'doublePlusDouble',
+      4.0,
+      'longPlusNan',
+      5,
+      'doublePlusNan',
+      6.6,
+      'longPlusInfinity',
+      7,
+      'doublePlusInfinity',
+      8.8
+    ]);
+    final Map<String, Object> transform = map(<dynamic>[
+      'longPlusLong',
+      firestore.FieldValue.increment(1),
+      'longPlusDouble',
+      firestore.FieldValue.increment(2.2),
+      'doublePlusLong',
+      firestore.FieldValue.increment(3),
+      'doublePlusDouble',
+      firestore.FieldValue.increment(4.4),
+      'longPlusNan',
+      firestore.FieldValue.increment(double.nan),
+      'doublePlusNan',
+      firestore.FieldValue.increment(double.nan),
+      'longPlusInfinity',
+      firestore.FieldValue.increment(double.infinity),
+      'doublePlusInfinity',
+      firestore.FieldValue.increment(double.infinity)
+    ]);
+    final Map<String, Object> expected = map(<dynamic>[
+      'longPlusLong',
+      2,
+      'longPlusDouble',
+      4.2,
+      'doublePlusLong',
+      6.3,
+      'doublePlusDouble',
+      8.4,
+      'longPlusNan',
+      double.nan,
+      'doublePlusNan',
+      double.nan,
+      'longPlusInfinity',
+      double.infinity,
+      'doublePlusInfinity',
+      double.infinity
+    ]);
+
+    _verifyTransform(baseDoc, transform, expected);
+  });
+
+  test('testAppliesIncrementTransformToUnexpectedType', () async {
+    final Map<String, Object> baseDoc = map(<dynamic>['string', 'zero']);
+    final Map<String, Object> transform =
+        map(<dynamic>['string', firestore.FieldValue.increment(1)]);
+    final Map<String, Object> expected = map(<dynamic>['string', 1]);
+    _verifyTransform(baseDoc, transform, expected);
+  });
+
+  test('testAppliesIncrementTransformToMissingField', () async {
+    final Map<String, Object> baseDoc = map();
+    final Map<String, Object> transform =
+        map(<dynamic>['missing', firestore.FieldValue.increment(1)]);
+    final Map<String, Object> expected = map(<dynamic>['missing', 1]);
+    _verifyTransform(baseDoc, transform, expected);
+  });
+
+  test('testAppliesIncrementTransformsConsecutively', () async {
+    final Map<String, Object> baseDoc = map(<dynamic>['number', 1]);
+    final Map<String, Object> transform1 =
+        map(<dynamic>['number', firestore.FieldValue.increment(2)]);
+    final Map<String, Object> transform2 =
+        map(<dynamic>['number', firestore.FieldValue.increment(3)]);
+    final Map<String, Object> transform3 =
+        map(<dynamic>['number', firestore.FieldValue.increment(4)]);
+    final Map<String, Object> expected = map(<dynamic>['number', 10]);
+    _verifyTransformAsList(baseDoc,
+        <Map<String, Object>>[transform1, transform2, transform3], expected);
+  });
+
+  test('testAppliesIncrementWithoutOverflow', () async {
+    final Map<String, Object> baseDoc = map(<dynamic>[
+      'a',
+      IntegerValue.max - 1,
+      'b',
+      IntegerValue.max - 1,
+      'c',
+      IntegerValue.max,
+      'd',
+      IntegerValue.max
+    ]);
+    final Map<String, Object> transform = map(<dynamic>[
+      'a',
+      firestore.FieldValue.increment(1),
+      'b',
+      firestore.FieldValue.increment(IntegerValue.max),
+      'c',
+      firestore.FieldValue.increment(1),
+      'd',
+      firestore.FieldValue.increment(IntegerValue.max)
+    ]);
+    final Map<String, Object> expected = map(<dynamic>[
+      'a',
+      IntegerValue.max,
+      'b',
+      IntegerValue.max,
+      'c',
+      IntegerValue.max,
+      'd',
+      IntegerValue.max
+    ]);
+    _verifyTransform(baseDoc, transform, expected);
+  });
+
+  test('testAppliesIncrementWithoutUnderflow', () async {
+    final Map<String, Object> baseDoc = map(<dynamic>[
+      'a',
+      IntegerValue.min + 1,
+      'b',
+      IntegerValue.min + 1,
+      'c',
+      IntegerValue.min,
+      'd',
+      IntegerValue.min
+    ]);
+    final Map<String, Object> transform = map(<dynamic>[
+      'a',
+      firestore.FieldValue.increment(-1),
+      'b',
+      firestore.FieldValue.increment(IntegerValue.min),
+      'c',
+      firestore.FieldValue.increment(-1),
+      'd',
+      firestore.FieldValue.increment(IntegerValue.min)
+    ]);
+    final Map<String, Object> expected = map(<dynamic>[
+      'a',
+      IntegerValue.min,
+      'b',
+      IntegerValue.min,
+      'c',
+      IntegerValue.min,
+      'd',
+      IntegerValue.min
+    ]);
+    _verifyTransform(baseDoc, transform, expected);
   });
 
   // NOTE: This is more a test of UserDataConverter code than Mutation code but we don't have unit tests for it
@@ -473,6 +645,25 @@ void main() {
       <int>[1]
     ]);
     _verifyTransform(baseDoc, transform, expected);
+  });
+
+  test('testAppliesServerAckedIncrementTransformToDocuments', () async {
+    final Map<String, Object> data = map(<dynamic>['sum', 1]);
+    final Document baseDoc = doc('collection/key', 0, data);
+
+    final Mutation transform = transformMutation('collection/key',
+        map(<dynamic>['sum', firestore.FieldValue.increment(2)]));
+    final MutationResult mutationResult =
+        MutationResult(version(1), <IntegerValue>[IntegerValue.valueOf(3)]);
+
+    final MaybeDocument transformedDoc =
+        transform.applyToRemoteDocument(baseDoc, mutationResult);
+
+    final Map<String, Object> expectedData = map(<dynamic>['sum', 3]);
+    expect(
+        transformedDoc,
+        doc('collection/key', 1, expectedData,
+            DocumentState.committedMutations));
   });
 
   test('testAppliesServerAckedServerTimestampTransformsToDocuments', () {

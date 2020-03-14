@@ -43,6 +43,9 @@ abstract class ArrayTransformOperation implements TransformOperation {
   }
 
   @override
+  bool get isIdempotent => true;
+
+  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is ArrayTransformOperation &&
@@ -82,8 +85,8 @@ class ArrayTransformOperationRemove extends ArrayTransformOperation {
   @override
   ArrayValue apply(FieldValue previousValue) {
     final List<FieldValue> result =
-        ArrayTransformOperation.coercedFieldValuesArray(previousValue);
-    result.removeWhere((FieldValue it) => elements.contains(it));
+        ArrayTransformOperation.coercedFieldValuesArray(previousValue)
+          ..removeWhere(elements.contains);
     return ArrayValue.fromList(result);
   }
 }

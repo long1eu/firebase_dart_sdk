@@ -14,6 +14,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/array_transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/numeric_increment_transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/blob_value.dart';
@@ -269,6 +270,11 @@ class UserDataConverter {
       final ArrayTransformOperation arrayRemove =
           ArrayTransformOperationRemove(parsedElements);
       context.addToFieldTransforms(context.path, arrayRemove);
+    } else if (value.isIncrement) {
+      final FieldValue operand = parseQueryValue(value.elements[0]);
+      final NumericIncrementTransformOperation incrementOperation =
+          NumericIncrementTransformOperation(operand);
+      context.addToFieldTransforms(context.path, incrementOperation);
     } else {
       throw fail('Unknown FieldValue type: ${value.runtimeType}');
     }

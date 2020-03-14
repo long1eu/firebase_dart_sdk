@@ -245,7 +245,7 @@ class LruGarbageCollectorTestCase {
     await _persistence.runTransaction('actually register the mutations',
         () async {
       final Timestamp writeTime = Timestamp.now();
-      await _mutationQueue.addMutationBatch(writeTime, mutations);
+      await _mutationQueue.addMutationBatch(writeTime, <Mutation>[], mutations);
     });
 
     // Mark 5 documents eligible for GC. This simulates documents that were mutated then ack'd. Since they were ack'd,
@@ -452,7 +452,7 @@ class LruGarbageCollectorTestCase {
 
   Future<void> testGetsSize() async {
     final LruGarbageCollector garbageCollector = _garbageCollector;
-    final int initialSize = garbageCollector.byteSize;
+    final int initialSize = await garbageCollector.byteSize;
 
     await _persistence.runTransaction('fill cache', () async {
       // Simulate a bunch of ack'd mutations
@@ -462,7 +462,7 @@ class LruGarbageCollectorTestCase {
       }
     });
 
-    final int finalSize = garbageCollector.byteSize;
+    final int finalSize = await garbageCollector.byteSize;
     expect(finalSize, greaterThan(initialSize));
   }
 
@@ -501,7 +501,7 @@ class LruGarbageCollectorTestCase {
     });
 
     // Make sure we're under the target size
-    final int cacheSize = _garbageCollector.byteSize;
+    final int cacheSize = await _garbageCollector.byteSize;
     expect(cacheSize, lessThan(_lruParams.minBytesThreshold));
 
     final LruGarbageCollectorResults results =
@@ -569,8 +569,7 @@ class LruGarbageCollectorTestCase {
     final int sequenceNumber =
         _persistence.referenceDelegate.currentSequenceNumber;
     final Query _query = query('path$targetId');
-    return QueryData(
-        _query, targetId, sequenceNumber, QueryPurpose.listen);
+    return QueryData(_query, targetId, sequenceNumber, QueryPurpose.listen);
   }
 
   Future<void> _updateTargetInTransaction(QueryData queryData) async {

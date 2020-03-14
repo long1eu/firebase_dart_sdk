@@ -7,6 +7,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
@@ -75,6 +76,25 @@ class TransformMutation extends Mutation {
         _localTransformResults(localWriteTime, baseDoc);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
     return Document(key, doc.version, newData, DocumentState.localMutations);
+  }
+
+  @override
+  FieldMask get fieldMask {
+    final Set<FieldPath> fieldMask = <FieldPath>{};
+    for (FieldTransform transform in fieldTransforms) {
+      fieldMask.add(transform.fieldPath);
+    }
+    return FieldMask(fieldMask);
+  }
+
+  @override
+  bool get isIdempotent {
+    for (FieldTransform transform in fieldTransforms) {
+      if (!transform.isIdempotent) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// Asserts that the given [MaybeDocument] is actually a [Document] and verifies that it matches

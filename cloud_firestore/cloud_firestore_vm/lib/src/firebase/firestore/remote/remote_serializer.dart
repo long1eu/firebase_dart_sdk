@@ -23,6 +23,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_m
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/numeric_increment_transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
@@ -481,6 +482,11 @@ class RemoteSerializer {
         ..fieldPath = fieldTransform.fieldPath.canonicalString
         ..removeAllFromArray = _encodeArrayTransformElements(transform.elements)
         ..freeze();
+    } else if (transform is NumericIncrementTransformOperation) {
+      return proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = fieldTransform.fieldPath.canonicalString
+        ..increment = encodeValue(transform.operand)
+        ..freeze();
     } else {
       throw fail('Unknown transform: $transform');
     }
@@ -514,6 +520,11 @@ class RemoteSerializer {
           FieldPath.fromServerFormat(fieldTransform.fieldPath),
           ArrayTransformOperationRemove(_decodeArrayTransformElements(
               fieldTransform.removeAllFromArray)));
+    } else if (fieldTransform.hasIncrement()) {
+      return FieldTransform(
+          FieldPath.fromServerFormat(fieldTransform.fieldPath),
+          NumericIncrementTransformOperation(
+              decodeValue(fieldTransform.increment)));
     } else {
       throw fail(
         'Unknown FieldTransform proto: $fieldTransform',

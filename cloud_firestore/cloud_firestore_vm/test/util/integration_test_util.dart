@@ -23,8 +23,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_queue.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:rxdart/subjects.dart';
+import 'package:test/test.dart';
 
-import '../unit/firebase/firestore/local/mock/database_mock.dart';
 import 'prod_provider/firestore_provider.dart';
 
 // ignore: avoid_classes_with_only_static_members
@@ -148,7 +148,7 @@ class IntegrationTestUtil {
       persistenceKey,
       EmptyCredentialsProvider(),
       asyncQueue,
-      (String path,
+      /*(String path,
           {int version,
           OnConfigure onConfigure,
           OnCreate onCreate,
@@ -164,7 +164,8 @@ class IntegrationTestUtil {
             onOpen: onOpen);
         db.renamePath = false;
         return db;
-      },
+      }*/
+      null,
       settings,
     );
 
@@ -262,5 +263,62 @@ class IntegrationTestUtil {
       result[docSnap.id] = docSnap.data;
     }
     return result;
+  }
+}
+
+const double precisionErrorTolerance = 1e-10;
+
+/// Asserts that two [double]s are equal, within some tolerated error.
+///
+/// {@template flutter.flutter_test.moreOrLessEquals.epsilon}
+/// Two values are considered equal if the difference between them is within
+/// [precisionErrorTolerance] of the larger one. This is an arbitrary value
+/// which can be adjusted using the `epsilon` argument. This matcher is intended
+/// to compare floating point numbers that are the result of different sequences
+/// of operations, such that they may have accumulated slightly different
+/// errors.
+/// {@endtemplate}
+///
+/// See also:
+///
+///  * [closeTo], which is identical except that the epsilon argument is
+///    required and not named.
+///  * [inInclusiveRange], which matches if the argument is in a specified
+///    range.
+///  * [rectMoreOrLessEquals] and [offsetMoreOrLessEquals], which do something
+///    similar but for [Rect]s and [Offset]s respectively.
+Matcher moreOrLessEquals(double value,
+    {double epsilon = precisionErrorTolerance}) {
+  return _MoreOrLessEquals(value, epsilon);
+}
+
+class _MoreOrLessEquals extends Matcher {
+  const _MoreOrLessEquals(this.value, this.epsilon) : assert(epsilon >= 0);
+
+  final double value;
+  final double epsilon;
+
+  @override
+  bool matches(Object object, Map<dynamic, dynamic> matchState) {
+    if (object is! double) {
+      return false;
+    }
+    if (object == value) {
+      return true;
+    }
+    final double test = object;
+    return (test - value).abs() <= epsilon;
+  }
+
+  @override
+  Description describe(Description description) =>
+      description.add('$value (±$epsilon)');
+
+  @override
+  Description describeMismatch(Object item, Description mismatchDescription,
+      Map<dynamic, dynamic> matchState, bool verbose) {
+    return super
+        .describeMismatch(item, mismatchDescription, matchState, verbose)
+          ..add('$item is not in the range of $value (±$epsilon).');
   }
 }

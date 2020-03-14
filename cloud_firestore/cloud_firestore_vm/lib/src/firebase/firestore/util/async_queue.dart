@@ -210,12 +210,13 @@ class AsyncQueue {
           _runNext();
         });
         taskEntry.completer.complete(value);
-      }).catchError((dynamic error) {
+      }).catchError((dynamic error, StackTrace s) {
         Future<void>(() {
           _tasks.removeFirst();
           _runNext();
         });
-        taskEntry.completer.completeError(error);
+
+        taskEntry.completer.completeError(error, s);
         //panic(error);
       });
     }

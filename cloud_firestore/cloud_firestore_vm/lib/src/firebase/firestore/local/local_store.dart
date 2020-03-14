@@ -25,10 +25,14 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/simple_query_eng
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
@@ -196,15 +200,50 @@ class LocalStore {
     final Timestamp localWriteTime = Timestamp.now();
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
 
-    final MutationBatch batch = await _persistence.runTransactionAndReturn(
-        'Locally write mutations',
-        () => _mutationQueue.addMutationBatch(localWriteTime, mutations));
+    final Set<DocumentKey> keys = mutations.map((Mutation e) => e.key).toSet();
+    return _persistence.runTransactionAndReturn(
+      'Locally write mutations',
+      () async {
+        // Load and apply all existing mutations. This lets us compute the
+        // current base state for all non-idempotent transforms before applying
+        // any additional user-provided writes.
+        final ImmutableSortedMap<DocumentKey, MaybeDocument> existingDocuments =
+            await _localDocuments.getDocuments(keys);
 
-    final Set<DocumentKey> keys = batch.keys;
-    final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
-        await _localDocuments.getDocuments(keys);
+        // For non-idempotent mutations (such as `FieldValue.increment()`), we
+        // record the base state in a separate patch mutation. This is later
+        // used to guarantee consistent values and prevents flicker even if the
+        // backend sends us an update that already includes our transform.
+        final List<Mutation> baseMutations = <Mutation>[];
+        for (Mutation mutation in mutations) {
+          final MaybeDocument maybeDocument = existingDocuments[mutation.key];
+          if (!mutation.isIdempotent) {
+            // Theoretically, we should only include non-idempotent fields in
+            // this field mask as this mask is used to populate the base state
+            // for all DocumentTransforms. By including all fields, we
+            // incorrectly prevent rebasing of idempotent transforms (such as
+            // `arrayUnion()`) when any non-idempotent transforms are present.
+            final FieldMask fieldMask = mutation.fieldMask;
+            if (fieldMask != null) {
+              final ObjectValue baseValues = (maybeDocument is Document)
+                  ? fieldMask.applyTo(maybeDocument.data)
+                  : ObjectValue.empty;
+              // NOTE: The base state should only be applied if there's some
+              // existing document to override, so use a Precondition of
+              // exists=true
+              baseMutations.add(PatchMutation(mutation.key, baseValues,
+                  fieldMask, Precondition(exists: true)));
+            }
+          }
+        }
 
-    return LocalWriteResult(batch.batchId, changedDocuments);
+        final MutationBatch batch = await _mutationQueue.addMutationBatch(
+            localWriteTime, baseMutations, mutations);
+        final ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
+            batch.applyToLocalDocumentSet(existingDocuments);
+        return LocalWriteResult(batch.batchId, changedDocuments);
+      },
+    );
   }
 
   /// Acknowledges the given batch.

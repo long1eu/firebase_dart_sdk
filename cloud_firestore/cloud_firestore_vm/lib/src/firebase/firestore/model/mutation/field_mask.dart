@@ -4,6 +4,8 @@
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
 import 'package:collection/collection.dart';
 
 /// Provides a set of fields that can be used to partially patch a document. The [FieldMask] is used in conjunction
@@ -30,6 +32,24 @@ class FieldMask {
     }
 
     return false;
+  }
+
+  /// Applies this field mask to the provided object value and returns an object
+  /// that only contains fields that are specified in both the input object and
+  /// this field mask.
+  ObjectValue applyTo(ObjectValue data) {
+    ObjectValue filteredObject = ObjectValue.empty;
+    for (FieldPath path in mask) {
+      if (path.isEmpty) {
+        return data;
+      } else {
+        final FieldValue newValue = data.get(path);
+        if (newValue != null) {
+          filteredObject = filteredObject.set(path, newValue);
+        }
+      }
+    }
+    return filteredObject;
   }
 
   @override

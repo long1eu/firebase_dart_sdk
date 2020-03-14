@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_write_result.dart';
@@ -15,6 +16,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
@@ -24,6 +26,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/set_mut
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart'
+    as model;
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_aggregator.dart';
@@ -62,8 +66,11 @@ class LocalStoreTestCase {
         setMutation('foo/bar', map(<String>['foo', 'bar']));
     final SetMutation set2 =
         setMutation('foo/baz', map(<String>['foo', 'baz']));
-    final MutationBatch batch =
-        MutationBatch(1, Timestamp.now(), <SetMutation>[set1, set2]);
+    final MutationBatch batch = MutationBatch(
+        batchId: 1,
+        localWriteTime: Timestamp.now(),
+        baseMutations: <Mutation>[],
+        mutations: <SetMutation>[set1, set2]);
     final Set<DocumentKey> keys = batch.keys;
     expect(keys.length, 2);
   }
@@ -965,13 +972,295 @@ class LocalStoreTestCase {
     expect(keys, <DocumentKey>[key('foo/bar'), key('foo/baz')]);
   }
 
+  // TODO(mrschmidt): The FieldValue.increment() field transform tests below
+  //  would probably be better implemented as spec tests but currently they
+  //  don't support transforms.
+  @testMethod
+  Future<void>
+      testHandlesSetMutationThenTransformMutationThenTransformMutation() async {
+    await _writeMutation(setMutation('foo/bar', map(<dynamic>['sum', 0])));
+    await _expectContains(doc(
+        'foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations));
+
+    _expectChanged(<Document>[
+      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations)
+    ]);
+
+    await _writeMutation(transformMutation(
+        'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)])));
+    await _expectContains(doc(
+        'foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+    _expectChanged(<Document>[
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+    ]);
+
+    await _writeMutation(transformMutation(
+        'foo/bar', map(<dynamic>['sum', FieldValue.increment(2)])));
+    await _expectContains(doc(
+        'foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations));
+    _expectChanged(<Document>[
+      doc('foo/bar', 0, map(<dynamic>['sum', 3]), DocumentState.localMutations)
+    ]);
+  }
+
+  @testMethod
+  Future<void>
+      testHandlesSetMutationThenAckThenTransformMutationThenAckThenTransformMutation() async {
+    if (_garbageCollectorIsEager) {
+      // Since this test doesn't start a listen, Eager GC removes the documents from the cache as
+      // soon as the mutation is applied. This creates a lot of special casing in this unit test but
+      // does not expand its test coverage.
+      return;
+    }
+
+    await _writeMutation(setMutation('foo/bar', map(<dynamic>['sum', 0])));
+    await _expectContains(doc(
+        'foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations));
+    _expectChanged(<Document>[
+      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations)
+    ]);
+
+    await _acknowledgeMutation(1);
+    _expectChanged(<Document>[
+      doc('foo/bar', 1, map(<dynamic>['sum', 0]),
+          DocumentState.committedMutations)
+    ]);
+    await _expectContains(doc('foo/bar', 1, map(<dynamic>['sum', 0]),
+        DocumentState.committedMutations));
+
+    await _writeMutation(transformMutation(
+        'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)])));
+    await _expectContains(doc(
+        'foo/bar', 1, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+    _expectChanged(<Document>[
+      doc('foo/bar', 1, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+    ]);
+
+    await _acknowledgeMutation(2, 1);
+    _expectChanged(<Document>[
+      doc('foo/bar', 2, map(<dynamic>['sum', 1]),
+          DocumentState.committedMutations)
+    ]);
+    await _expectContains(doc('foo/bar', 2, map(<dynamic>['sum', 1]),
+        DocumentState.committedMutations));
+
+    await _writeMutation(transformMutation(
+        'foo/bar', map(<dynamic>['sum', FieldValue.increment(2)])));
+    await _expectContains(doc(
+        'foo/bar', 2, map(<dynamic>['sum', 3]), DocumentState.localMutations));
+    _expectChanged(<Document>[
+      doc('foo/bar', 2, map(<dynamic>['sum', 3]), DocumentState.localMutations)
+    ]);
+  }
+
+  @testMethod
+  Future<void>
+      testHandlesSetMutationThenTransformMutationThenRemoteEventThenTransformMutation() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    await _allocateQuery(query);
+    _expectTargetId(2);
+
+    await _writeMutation(setMutation('foo/bar', map(<dynamic>['sum', 0])));
+    _expectChanged(<Document>[
+      doc('foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations)
+    ]);
+    await _expectContains(doc(
+        'foo/bar', 0, map(<dynamic>['sum', 0]), DocumentState.localMutations));
+
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('foo/bar', 1, map(<dynamic>['sum', 0])), <int>[2], <int>[]));
+    await _acknowledgeMutation(1);
+    _expectChanged(<Document>[
+      doc('foo/bar', 1, map(<dynamic>['sum', 0]), DocumentState.synced)
+    ]);
+    await _expectContains(
+        doc('foo/bar', 1, map(<dynamic>['sum', 0]), DocumentState.synced));
+
+    await _writeMutation(transformMutation(
+        'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)])));
+    _expectChanged(<Document>[
+      doc('foo/bar', 1, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+    ]);
+    await _expectContains(doc(
+        'foo/bar', 1, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+
+    // The value in this remote event gets ignored since we still have a pending transform mutation.
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('foo/bar', 2, map(<dynamic>['sum', 1337])), <int>[2], <int>[]));
+    _expectChanged(<Document>[
+      doc('foo/bar', 2, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+    ]);
+    await _expectContains(doc(
+        'foo/bar', 2, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+
+    // Add another increment. Note that we still compute the increment based on the local value.
+    await _writeMutation(transformMutation(
+        'foo/bar', map(<dynamic>['sum', FieldValue.increment(2)])));
+    _expectChanged(<Document>[
+      doc('foo/bar', 2, map(<dynamic>['sum', 3]), DocumentState.localMutations)
+    ]);
+    await _expectContains(doc(
+        'foo/bar', 2, map(<dynamic>['sum', 3]), DocumentState.localMutations));
+
+    await _acknowledgeMutation(3, 1);
+    _expectChanged(<Document>[
+      doc('foo/bar', 3, map(<dynamic>['sum', 3]), DocumentState.localMutations)
+    ]);
+    await _expectContains(doc(
+        'foo/bar', 3, map(<dynamic>['sum', 3]), DocumentState.localMutations));
+
+    await _acknowledgeMutation(4, 1339);
+    _expectChanged(<Document>[
+      doc('foo/bar', 4, map(<dynamic>['sum', 1339]),
+          DocumentState.committedMutations)
+    ]);
+    await _expectContains(doc('foo/bar', 4, map(<dynamic>['sum', 1339]),
+        DocumentState.committedMutations));
+  }
+
+  @testMethod
+  Future<void> testHoldsBackOnlyNonIdempotentTransforms() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    await _allocateQuery(query);
+    _expectTargetId(2);
+
+    await _writeMutation(setMutation(
+        'foo/bar', map(<dynamic>['sum', 0, 'array_union', <dynamic>[]])));
+    _expectChanged(<Document>[
+      doc('foo/bar', 0, map(<dynamic>['sum', 0, 'array_union', <dynamic>[]]),
+          DocumentState.localMutations)
+    ]);
+
+    await _acknowledgeMutation(1);
+    _expectChanged(<Document>[
+      doc('foo/bar', 1, map(<dynamic>['sum', 0, 'array_union', <dynamic>[]]),
+          DocumentState.committedMutations)
+    ]);
+
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('foo/bar', 1, map(<dynamic>['sum', 0, 'array_union', <dynamic>[]])),
+        <int>[2],
+        <int>[]));
+    _expectChanged(<Document>[
+      doc('foo/bar', 1, map(<dynamic>['sum', 0, 'array_union', <dynamic>[]]),
+          DocumentState.synced)
+    ]);
+
+    await _writeMutations(<Mutation>[
+      transformMutation(
+          'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)])),
+      transformMutation(
+          'foo/bar',
+          map(<dynamic>[
+            'array_union',
+            FieldValue.arrayUnion(<String>['foo'])
+          ]))
+    ]);
+    _expectChanged(<Document>[
+      doc(
+          'foo/bar',
+          1,
+          map(<dynamic>[
+            'sum',
+            1,
+            'array_union',
+            <String>['foo']
+          ]),
+          DocumentState.localMutations)
+    ]);
+
+    // The sum transform is not idempotent and the backend's updated value is ignored. The
+    // ArrayUnion transform is recomputed and includes the backend value.
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc(
+            'foo/bar',
+            2,
+            map(<dynamic>[
+              'sum',
+              1337,
+              'array_union',
+              <String>['bar']
+            ])),
+        <int>[2],
+        <int>[]));
+    _expectChanged(<Document>[
+      doc(
+          'foo/bar',
+          2,
+          map(<dynamic>[
+            'sum',
+            1,
+            'array_union',
+            <String>['bar', 'foo']
+          ]),
+          DocumentState.localMutations)
+    ]);
+  }
+
+  @testMethod
+  Future<void> testHandlesMergeMutationWithTransformThenRemoteEvent() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    await _allocateQuery(query);
+    _expectTargetId(2);
+
+    await _writeMutations(<Mutation>[
+      patchMutation('foo/bar', map(), <FieldPath>[]),
+      transformMutation(
+          'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)]))
+    ]);
+    _expectChanged(<Document>[
+      doc('foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+    ]);
+    await _expectContains(doc(
+        'foo/bar', 0, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('foo/bar', 1, map(<dynamic>['sum', 1337])), <int>[2], <int>[]));
+    _expectChanged(<Document>[
+      doc('foo/bar', 1, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+    ]);
+    await _expectContains(doc(
+        'foo/bar', 1, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+  }
+
+  @testMethod
+  Future<void> testHandlesPatchMutationWithTransformThenRemoteEvent() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    await _allocateQuery(query);
+    _expectTargetId(2);
+
+    await _writeMutations(<Mutation>[
+      patchMutation('foo/bar', map()),
+      transformMutation(
+          'foo/bar', map(<dynamic>['sum', FieldValue.increment(1)]))
+    ]);
+    _expectChanged(<NoDocument>[deletedDoc('foo/bar', 0)]);
+    await _expectNotContains('foo/bar');
+
+    // Note: This test reflects the current behavior, but it may be preferable to replay the
+    // mutation once we receive the first value from the remote event.
+
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('foo/bar', 1, map(<dynamic>['sum', 1337])), <int>[2], <int>[]));
+    _expectChanged(<Document>[
+      doc('foo/bar', 1, map(<dynamic>['sum', 1]), DocumentState.localMutations)
+    ]);
+    await _expectContains(doc(
+        'foo/bar', 1, map(<dynamic>['sum', 1]), DocumentState.localMutations));
+  }
+
   Future<void> _writeMutation(Mutation mutation) async {
     await _writeMutations(<Mutation>[mutation]);
   }
 
   Future<void> _writeMutations(List<Mutation> mutations) async {
     final LocalWriteResult result = await _localStore.writeLocally(mutations);
-    _batches.add(MutationBatch(result.batchId, Timestamp.now(), mutations));
+    _batches.add(MutationBatch(
+      batchId: result.batchId,
+      localWriteTime: Timestamp.now(),
+      baseMutations: <Mutation>[],
+      mutations: mutations,
+    ));
     _lastChanges = result.changes;
   }
 
@@ -983,11 +1272,15 @@ class LocalStoreTestCase {
     await _localStore.notifyLocalViewChanges(<LocalViewChanges>[changes]);
   }
 
-  Future<void> _acknowledgeMutation(int documentVersion) async {
+  Future<void> _acknowledgeMutation(int documentVersion,
+      [Object transformResult]) async {
     final MutationBatch batch = _batches.removeAt(0);
     final SnapshotVersion _version = version(documentVersion);
-    final MutationResult mutationResult =
-        MutationResult(_version, /*transformResults:*/ null);
+    final MutationResult mutationResult = MutationResult(
+        _version,
+        transformResult != null
+            ? <model.FieldValue>[wrap(transformResult)]
+            : null);
     final MutationBatchResult result = MutationBatchResult.create(
         batch, _version, <MutationResult>[mutationResult], Uint8List(0));
     _lastChanges = await _localStore.acknowledgeBatch(result);

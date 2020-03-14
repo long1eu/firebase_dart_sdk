@@ -12,10 +12,9 @@ import 'package:protobuf/protobuf.dart' as $pb;
 import 'http.pb.dart' as $3;
 
 class Annotations {
-  static final $pb.Extension http = $pb.Extension<$3.HttpRule>(
-      'google.protobuf.MethodOptions', 'http', 72295728, $pb.PbFieldType.OM,
-      defaultOrMaker: $3.HttpRule.getDefault, subBuilder: $3.HttpRule.create);
+  static final $pb.Extension http = $pb.Extension<$3.HttpRule>('google.protobuf.MethodOptions', 'http', 72295728, $pb.PbFieldType.OM, defaultOrMaker: $3.HttpRule.getDefault, subBuilder: $3.HttpRule.create);
   static void registerAllExtensions($pb.ExtensionRegistry registry) {
     registry.add(http);
   }
 }
+
