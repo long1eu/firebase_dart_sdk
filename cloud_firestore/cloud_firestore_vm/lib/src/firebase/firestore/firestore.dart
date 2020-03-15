@@ -153,15 +153,13 @@ class Firestore {
         ResourcePath.fromString(documentPath), this);
   }
 
-  // TODO(long1eu): Expose API publicly once backend support is ready (and add
-  //  to CHANGELOG.md).
   /// Creates and returns a new [Query] that includes all documents in the
   /// database that are contained in a collection or subcollection with the
   /// given [collectionId].
   ///
   /// Every collection or subcollection with this [collectionId] as the last
   /// segment of its path will be included. Cannot contain a slash.
-  Query _collectionGroup(String collectionId) {
+  Query collectionGroup(String collectionId) {
     checkNotNull(collectionId, 'Provided collection ID must not be null.');
     if (collectionId.contains('/')) {
       throw ArgumentError(
