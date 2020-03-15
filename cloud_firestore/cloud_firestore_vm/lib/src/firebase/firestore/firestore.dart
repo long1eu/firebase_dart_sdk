@@ -214,9 +214,10 @@ class Firestore {
 
   @visibleForTesting
   Future<void> shutdown() async {
-    if (client != null) {
-      await client.shutdown();
-    }
+    // The client must be initialized to ensure that all subsequent API usage
+    // throws an exception.
+    _ensureClientConfigured();
+    return client.shutdown();
   }
 
   /// Re-enables network usage for this instance after a prior call to [disableNetwork].

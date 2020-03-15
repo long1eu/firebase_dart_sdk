@@ -56,6 +56,7 @@ class FirestoreClient implements RemoteStoreCallback {
   RemoteStore remoteStore;
   SyncEngine syncEngine;
   EventManager eventManager;
+  bool _isShutdown = false;
 
   LruGarbageCollectorScheduler _lruScheduler;
 
@@ -100,23 +101,32 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   Future<void> disableNetwork() {
+    _verifyNotShutdown();
     return remoteStore.disableNetwork();
   }
 
   Future<void> enableNetwork() {
+    _verifyNotShutdown();
     return remoteStore.enableNetwork();
   }
 
   /// Shuts down this client, cancels all writes / listeners, and releases all resources.
   Future<void> shutdown() async {
+    if (_isShutdown) {
+      return;
+    }
+
     await onCredentialChangeSubscription.cancel();
     await remoteStore.shutdown();
     await persistence.shutdown();
     _lruScheduler?.stop();
+    _isShutdown = true;
   }
 
   /// Starts listening to a query. */
   Future<QueryStream> listen(Query query, ListenOptions options) async {
+    _verifyNotShutdown();
+
     final QueryStream queryListener =
         QueryStream(query, options, stopListening);
     await eventManager.addQueryListener(queryListener);
@@ -125,10 +135,14 @@ class FirestoreClient implements RemoteStoreCallback {
 
   /// Stops listening to a query previously listened to.
   Future<void> stopListening(QueryStream listener) {
+    _verifyNotShutdown();
+
     return eventManager.removeQueryListener(listener);
   }
 
   Future<Document> getDocumentFromLocalCache(DocumentKey docKey) async {
+    _verifyNotShutdown();
+
     final MaybeDocument maybeDoc = await localStore.readDocument(docKey);
 
     if (maybeDoc is Document) {
@@ -145,6 +159,8 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   Future<ViewSnapshot> getDocumentsFromLocalCache(Query query) async {
+    _verifyNotShutdown();
+
     final ImmutableSortedMap<DocumentKey, Document> docs =
         await localStore.executeQuery(query);
 
@@ -155,6 +171,8 @@ class FirestoreClient implements RemoteStoreCallback {
 
   /// Writes mutations. The returned Future will be notified when it's written to the backend.
   Future<void> write(final List<Mutation> mutations) async {
+    _verifyNotShutdown();
+
     final Completer<void> source = Completer<void>();
     await syncEngine.writeMutations(mutations, source);
     await source.future;
@@ -163,6 +181,8 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Tries to execute the transaction in updateFunction up to retries times.
   Future<TResult> transaction<TResult>(
       Future<TResult> Function(Transaction) updateFunction, int retries) {
+    _verifyNotShutdown();
+
     return syncEngine.transaction(updateFunction, retries);
   }
 
@@ -219,6 +239,12 @@ class FirestoreClient implements RemoteStoreCallback {
     // refilling mutation queue, etc.) so must be started after LocalStore.
     await localStore.start();
     await remoteStore.start();
+  }
+
+  void _verifyNotShutdown() {
+    if (_isShutdown) {
+      throw ArgumentError('The client has already been shutdown');
+    }
   }
 
   @override

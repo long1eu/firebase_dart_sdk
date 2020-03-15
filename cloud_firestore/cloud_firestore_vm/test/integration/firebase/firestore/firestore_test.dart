@@ -1097,6 +1097,13 @@ void main() {
     await firestore.disableNetwork();
     await firestore.enableNetwork();
   });
+
+  test('testClientCallsAfterShutdownFails', () async {
+    final Firestore firestore = await testFirestore();
+    await firestore.shutdown();
+    expectError(
+        firestore.disableNetwork, 'The client has already been shutdown');
+  });
 }
 
 // ignore: always_specify_types, type_annotate_public_apis

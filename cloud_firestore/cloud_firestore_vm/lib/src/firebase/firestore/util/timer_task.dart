@@ -44,7 +44,10 @@ class TaskScheduler {
     (_tasks.values.toList()..sort())
         .takeWhile((TimerTask value) => value._id == id)
         .toList()
-        .forEach((TimerTask element) => element._execute());
+        .forEach((TimerTask element) {
+      element._timer.cancel();
+      element._execute();
+    });
   }
 
   void clearAll() {
