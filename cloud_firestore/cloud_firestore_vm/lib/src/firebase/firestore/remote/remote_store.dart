@@ -49,7 +49,8 @@ class RemoteStore implements TargetMetadataProvider {
         _writeStream = _datastore.writeStream {
     _watchStreamSub = _watchStream.listen(_watchEvents);
     _writeStreamSub = _writeStream.listen(_writeEvents);
-    _onNetworkConnectedSub = _onNetworkConnected.listen(_networkEvents);
+    // we skip the seed value
+    _onNetworkConnectedSub = _onNetworkConnected.skip(1).listen(_networkEvents);
   }
 
   final RemoteStoreCallback _remoteStoreCallback;
@@ -111,7 +112,8 @@ class RemoteStore implements TargetMetadataProvider {
     }
   }
 
-  /// Temporarily disables the network. The network can be re-enabled using [enableNetwork].
+  /// Temporarily disables the network. The network can be re-enabled using
+  /// [enableNetwork].
   Future<void> disableNetwork() async {
     _networkEnabled = false;
     await _disableNetworkInternal();
@@ -123,7 +125,6 @@ class RemoteStore implements TargetMetadataProvider {
   Future<void> _disableNetworkInternal() async {
     Log.d('RemoteStore', 'Performing write stream teardown');
 
-    _writeStream.tearDown();
     await _watchStream.stop();
     await _writeStream.stop();
 
@@ -453,8 +454,8 @@ class RemoteStore implements TargetMetadataProvider {
 
   /// Attempts to fill our write pipeline with writes from the [LocalStore].
   ///
-  /// Called internally to bootstrap or refill the write pipeline by [SyncEngine] whenever there are new mutations to
-  /// process.
+  /// Called internally to bootstrap or refill the write pipeline by
+  /// [SyncEngine] whenever there are new mutations to process.
   ///
   /// Starts the write stream if necessary.
   Future<void> fillWritePipeline() async {
@@ -481,7 +482,8 @@ class RemoteStore implements TargetMetadataProvider {
     }
   }
 
-  /// Returns true if we can add to the write pipeline (i.e. it is not full and the network is enabled).
+  /// Returns true if we can add to the write pipeline (i.e. it is not full and
+  /// the network is enabled).
   bool _canAddToWritePipeline() {
     return _canUseNetwork && _writePipeline.length < _maxPendingWrites;
   }

@@ -17,12 +17,14 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
+import 'package:semaphore/semaphore.dart';
 
 class MemoryPersistence extends Persistence {
   /// Use factory constructors to instantiate
   MemoryPersistence._()
       : mutationQueues = <User, MemoryMutationQueue>{},
-        remoteDocumentCache = MemoryRemoteDocumentCache() {
+        remoteDocumentCache = MemoryRemoteDocumentCache(),
+        _semaphore = GlobalSemaphore() {
     queryCache = MemoryQueryCache(this);
   }
 
@@ -40,11 +42,13 @@ class MemoryPersistence extends Persistence {
     return persistence;
   }
 
-  static const String tag = 'MemoryPersistence';
+  final Semaphore _semaphore;
 
-  // The persistence objects backing MemoryPersistence are retained here to make it easier to write tests affecting both
-  // the in-memory and SQLite-backed persistence layers. Tests can create a new LocalStore wrapping this Persistence
-  // instance and this will make the in-memory persistence layer behave as if it were actually persisting values.
+  // The persistence objects backing MemoryPersistence are retained here to make
+  // it easier to write tests affecting both the in-memory and SQLite-backed
+  // persistence layers. Tests can create a new LocalStore wrapping this
+  // Persistence instance and this will make the in-memory persistence layer
+  // behave as if it were actually persisting values.
   Map<User, MemoryMutationQueue> mutationQueues;
 
   @override
@@ -61,16 +65,20 @@ class MemoryPersistence extends Persistence {
 
   @override
   Future<void> start() async {
+    await _semaphore.acquire();
     hardAssert(!started, 'MemoryPersistence double-started!');
     started = true;
+    _semaphore.release();
   }
 
   @override
   Future<void> shutdown() async {
-    // TODO(long1eu): This assertion seems problematic, since we may attempt shutdown in the finally block after failing
-    //  to initialize.
+    await _semaphore.acquire();
+    // TODO(long1eu): This assertion seems problematic, since we may attempt
+    //  shutdown in the finally block after failing to initialize.
     hardAssert(started, 'MemoryPersistence shutdown without start');
     started = false;
+    _semaphore.release();
   }
 
   @override
@@ -88,22 +96,21 @@ class MemoryPersistence extends Persistence {
   @override
   Future<void> runTransaction(
       String action, Transaction<void> operation) async {
-    Log.d(tag, 'Starting transaction: $action');
-
-    referenceDelegate.onTransactionStarted();
-    await operation();
-    await referenceDelegate.onTransactionCommitted();
-    Log.d(tag, 'Commit transaction: $action');
+    return runTransactionAndReturn(action, operation);
   }
 
   @override
   Future<T> runTransactionAndReturn<T>(
       String action, Transaction<T> operation) async {
-    Log.d(tag, 'Starting transaction: $action');
+    await _semaphore.acquire();
+
+    Log.d('$runtimeType', 'Starting transaction: $action');
     referenceDelegate.onTransactionStarted();
     final T result = await operation();
-    Log.d(tag, 'Commit transaction: $action');
+    Log.d('$runtimeType', 'Commit transaction: $action');
     await referenceDelegate.onTransactionCommitted();
+
+    _semaphore.release();
     return result;
   }
 }

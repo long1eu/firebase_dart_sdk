@@ -82,7 +82,7 @@ class EventManager implements SyncEngineCallback {
       final Query query = viewSnapshot.query;
       final _QueryListenersInfo info = _queries[query];
       if (info != null) {
-        for (QueryStream listener in info.listeners) {
+        for (QueryStream listener in info.listeners.toList()) {
           await listener.onViewSnapshot(viewSnapshot);
         }
         info.viewSnapshot = viewSnapshot;
@@ -94,7 +94,7 @@ class EventManager implements SyncEngineCallback {
   void onError(Query query, GrpcError error) {
     final _QueryListenersInfo info = _queries[query];
     if (info != null) {
-      for (QueryStream listener in info.listeners) {
+      for (QueryStream listener in info.listeners.toList()) {
         listener.onError(exceptionFromStatus(error));
       }
     }
@@ -105,7 +105,7 @@ class EventManager implements SyncEngineCallback {
   void handleOnlineStateChange(OnlineState onlineState) {
     _onlineState = onlineState;
     for (_QueryListenersInfo info in _queries.values) {
-      for (QueryStream listener in info.listeners) {
+      for (QueryStream listener in info.listeners.toList()) {
         listener.onOnlineStateChanged(onlineState);
       }
     }

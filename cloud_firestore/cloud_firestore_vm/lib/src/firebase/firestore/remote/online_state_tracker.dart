@@ -49,10 +49,11 @@ class OnlineStateTracker {
   final OnlineStateCallback _onlineStateCallback;
   final TaskScheduler _scheduler;
 
-  /// Called by [RemoteStore] when a watch stream is started (including on each backoff attempt).
+  /// Called by [RemoteStore] when a watch stream is started (including on each
+  /// backoff attempt).
   ///
-  /// If this is the first attempt, it sets the [OnlineState] to [OnlineState.unknown] and starts
-  /// the [_onlineStateTimer].
+  /// If this is the first attempt, it sets the [OnlineState] to
+  /// [OnlineState.unknown] and starts the [_onlineStateTimer].
   Future<void> handleWatchStreamStart() async {
     if (_watchStreamFailures == 0) {
       await _setAndBroadcastState(OnlineState.unknown);
@@ -104,8 +105,9 @@ class OnlineStateTracker {
 
   /// Explicitly sets the [OnlineState] to the specified state.
   ///
-  /// Note that this resets the timers / failure counters, etc. used by our offline heuristics, so
-  /// it must not be used in place of [handleWatchStreamStart] and [handleWatchStreamFailure].
+  /// Note that this resets the timers / failure counters, etc. used by our
+  /// offline heuristics, so it must not be used in place of
+  /// [handleWatchStreamStart] and [handleWatchStreamFailure].
   Future<void> updateState(OnlineState newState) async {
     _clearOnlineStateTimer();
     _watchStreamFailures = 0;

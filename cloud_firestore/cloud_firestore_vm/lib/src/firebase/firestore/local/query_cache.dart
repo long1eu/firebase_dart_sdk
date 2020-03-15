@@ -13,11 +13,12 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
 
-/// Represents cached queries received from the remote backend. This contains both a mapping between
-/// queries and the documents that matched them according to the server, but also metadata about the
-/// queries.
+/// Represents cached queries received from the remote backend. This contains
+/// both a mapping between queries and the documents that matched them according
+/// to the server, but also metadata about the queries.
 ///
-/// The cache is keyed by [Query] and entries in the cache are [QueryData] instances.
+/// The cache is keyed by [Query] and entries in the cache are [QueryData]
+/// instances.
 abstract class QueryCache {
   /// Returns the highest target id of any query in the cache. Typically called during startup to
   /// seed a target id generator and avoid collisions with existing queries. If there are no queries

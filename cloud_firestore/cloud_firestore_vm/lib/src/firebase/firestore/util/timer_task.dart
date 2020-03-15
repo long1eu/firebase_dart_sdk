@@ -58,7 +58,7 @@ class TaskScheduler {
   }
 
   void _log(String s) {
-    Log.d('$runtimeType-$_name', s);
+    Log.d('$runtimeType${_name == null || _name.isEmpty ? '' : '-$_name'}', s);
   }
 }
 

@@ -147,6 +147,7 @@ class IntegrationTestUtil {
       persistenceKey,
       EmptyCredentialsProvider(),
       scheduler,
+      null,
       /*(String path,
           {int version,
           OnConfigure onConfigure,
@@ -163,8 +164,7 @@ class IntegrationTestUtil {
             onOpen: onOpen);
         db.renamePath = false;
         return db;
-      }*/
-      null,
+      },*/
       settings,
     );
 

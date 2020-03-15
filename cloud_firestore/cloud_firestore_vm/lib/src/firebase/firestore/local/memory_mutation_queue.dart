@@ -304,28 +304,33 @@ class MemoryMutationQueue implements MutationQueue {
 
   // Helpers
 
-  /// Finds the index of the given batchId in the mutation queue. This operation is O(1).
+  /// Finds the index of the given batchId in the mutation queue. This operation
+  /// is O(1).
   ///
-  /// Returns the computed index of the batch with the given [batchId], based on the state of the queue. Note this index
-  /// can be negative if the requested [batchId] has already been removed from the queue or past the end of the queue if
-  /// the [batchId] is larger than the last added batch.
+  /// Returns the computed index of the batch with the given [batchId], based on
+  /// the state of the queue. Note this index can be negative if the requested
+  /// [batchId] has already been removed from the queue or past the end of the
+  /// queue if the [batchId] is larger than the last added batch.
   int _indexOfBatchId(int batchId) {
     if (_queue.isEmpty) {
       // As an index this is past the end of the queue
       return 0;
     }
 
-    // Examine the front of the queue to figure out the difference between the [batchId] and indexes in the array. Note
-    // that since the queue is ordered by [batchId], if the first batch has a larger [batchId] then the requested
-    // [batchId] doesn't exist in the queue.
+    // Examine the front of the queue to figure out the difference between the
+    // [batchId] and indexes in the array. Note that since the queue is ordered
+    // by [batchId], if the first batch has a larger [batchId] then the
+    // requested [batchId] doesn't exist in the queue.
     final MutationBatch firstBatch = _queue[0];
     final int firstBatchId = firstBatch.batchId;
     return batchId - firstBatchId;
   }
 
-  /// Finds the index of the given [batchId] in the mutation queue and asserts that the resulting index is within the
-  /// bounds of the queue. The [batchId] to search for [action] is description of what the caller is doing, phrased in
-  /// passive form (e.g. 'acknowledged' in a routine that acknowledges batches).
+  /// Finds the index of the given [batchId] in the mutation queue and asserts
+  /// that the resulting index is within the bounds of the queue. The [batchId]
+  /// to search for [action] is description of what the caller is doing, phrased
+  /// in passive form (e.g. 'acknowledged' in a routine that acknowledges
+  /// batches).
   int _indexOfExistingBatchId(int batchId, String action) {
     final int index = _indexOfBatchId(batchId);
     hardAssert(index >= 0 && index < _queue.length,

@@ -20,19 +20,22 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
 import 'package:meta/meta.dart';
+import 'package:semaphore/semaphore.dart';
 
 /// A SQLite-backed instance of Persistence.
 ///
 /// In addition to implementations of the methods in the Persistence interface, also contains helper
 /// routines that make dealing with SQLite much more pleasant.
 class SQLitePersistence extends Persistence {
-  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName);
+  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName)
+      : _semaphore = GlobalSemaphore();
 
   static const String tag = 'SQLitePersistence';
 
   final OpenDatabase openDatabase;
   final String databaseName;
   final LocalSerializer serializer;
+  final Semaphore _semaphore;
 
   Database _db;
 
@@ -109,22 +112,26 @@ class SQLitePersistence extends Persistence {
 
   @override
   Future<void> start() async {
+    await _semaphore.acquire();
     Log.d(tag, 'Starting SQLite persistance');
     hardAssert(!started, 'SQLitePersistence double-started!');
     _db = await _openDb(databaseName, openDatabase);
     await queryCache.start();
     started = true;
     referenceDelegate.start(queryCache.highestListenSequenceNumber);
+    _semaphore.release();
   }
 
   @override
   Future<void> shutdown() async {
+    await _semaphore.acquire();
     Log.d(tag, 'Shutingdown SQLite persistance');
     hardAssert(started, 'SQLitePersistence shutdown without start!');
 
     started = false;
     _db.close();
     _db = null;
+    _semaphore.release();
   }
 
   @visibleForTesting
@@ -138,22 +145,13 @@ class SQLitePersistence extends Persistence {
   @override
   Future<void> runTransaction(
       String action, Transaction<void> operation) async {
-    Log.d(tag, 'Starting transaction: $action');
-    try {
-      referenceDelegate.onTransactionStarted();
-      await _db.execute('BEGIN;');
-      await operation();
-      await _db.execute('COMMIT;');
-      await referenceDelegate.onTransactionCommitted();
-    } catch (e) {
-      await _db.execute('ROLLBACK;');
-      rethrow;
-    }
+    return runTransactionAndReturn(action, operation);
   }
 
   @override
   Future<T> runTransactionAndReturn<T>(
       String action, Transaction<T> operation) async {
+    await _semaphore.acquire();
     Log.d(tag, 'Starting transaction: $action');
 
     try {
@@ -162,9 +160,11 @@ class SQLitePersistence extends Persistence {
       final T result = await operation();
       await _db.execute('COMMIT;');
       await referenceDelegate.onTransactionCommitted();
+      _semaphore.release();
       return result;
     } catch (e) {
       await _db.execute('ROLLBACK;');
+      _semaphore.release();
       rethrow;
     }
   }

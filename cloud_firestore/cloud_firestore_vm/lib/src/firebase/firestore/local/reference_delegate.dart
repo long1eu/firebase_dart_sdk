@@ -8,18 +8,19 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 
-/// A [ReferenceDelegate] instance handles all of the hooks into the document-reference lifecycle.
-/// This includes being added to a target, being removed from a target, being subject to mutation,
-/// and being mutated by the user.
+/// A [ReferenceDelegate] instance handles all of the hooks into the
+/// document-reference lifecycle. This includes being added to a target, being
+/// removed from a target, being subject to mutation, and being mutated by the
+/// user.
 ///
-/// Different implementations may do different things with each of these events. Not every
-/// implementation needs to do something with every lifecycle hook.
+/// Different implementations may do different things with each of these events.
+/// Not every implementation needs to do something with every lifecycle hook.
 ///
-/// Implementations that care about sequence numbers are responsible for generating them and
-/// making them available.
+/// Implementations that care about sequence numbers are responsible for
+/// generating them and making them available.
 abstract class ReferenceDelegate {
-  /// Registers a [ReferenceSet] of documents that should be considered 'referenced' and not
-  /// eligible for removal during garbage collection.
+  /// Registers a [ReferenceSet] of documents that should be considered
+  /// 'referenced' and not eligible for removal during garbage collection.
   set inMemoryPins(ReferenceSet inMemoryPins);
 
   /// Notify the delegate that the given document was added to a target.
@@ -31,8 +32,8 @@ abstract class ReferenceDelegate {
   /// Notify the delegate that a document is no longer being mutated by the user.
   Future<void> removeMutationReference(DocumentKey key);
 
-  /// Notify the delegate that a target was removed. The delegate may, but is not obligated to,
-  /// actually delete the target and associated data.
+  /// Notify the delegate that a target was removed. The delegate may, but is
+  /// not obligated to, actually delete the target and associated data.
   Future<void> removeTarget(QueryData queryData);
 
   /// Notify the delegate that a limbo document was updated.

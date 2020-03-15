@@ -251,8 +251,9 @@ class LocalStore {
   /// On the happy path when a batch is acknowledged, the local store will
   ///   * remove the batch from the mutation queue;
   ///   * apply the changes to the remote document cache;
-  ///   * recalculate the latency compensated view implied by those changes (there may be mutations in the queue that
-  ///   affect the documents but haven't been acknowledged yet); and
+  ///   * recalculate the latency compensated view implied by those changes
+  ///     (there may be mutations in the queue that affect the documents but
+  ///     haven't been acknowledged yet); and
   ///   * give the changed documents back the sync engine
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> acknowledgeBatch(
       MutationBatchResult batchResult) {
@@ -508,8 +509,8 @@ class LocalStore {
   }
 
   /// Unpin all the documents associated with the given query.
-  Future<void> releaseQuery(Query query) async {
-    await _persistence.runTransaction('Release query', () async {
+  Future<void> releaseQuery(Query query) {
+    return _persistence.runTransaction('Release query', () async {
       QueryData queryData = await _queryCache.getQueryData(query);
       hardAssert(
           queryData != null, 'Tried to release nonexistent query: $query');

@@ -77,7 +77,7 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
   void writeRequest(Req request) {
     Log.d('$runtimeType',
-        '($hashCode) Stream sending: ${request.writeToJsonMap()}');
+        '($hashCode) Stream sending: ${request.toProto3Json()}');
     _cancelIdleCheck();
     _requestsController.add(request);
   }
@@ -123,7 +123,7 @@ abstract class BaseStream<Req extends GeneratedMessage,
     if (_state != State.closing) {
       if (Log.isDebugEnabled) {
         Log.d('$runtimeType',
-            '($hashCode) Stream received: ${response.writeToJsonMap()}');
+            '($hashCode) Stream received: ${response.toProto3Json()}');
       }
     }
   }

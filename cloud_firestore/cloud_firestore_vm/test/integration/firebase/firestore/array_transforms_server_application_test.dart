@@ -127,6 +127,7 @@ void main() {
       'array',
       FieldValue.arrayRemove(<int>[1, 2])
     ]));
+
     final DocumentSnapshot snapshot = await docRef.get(Source.cache);
     expect(
         snapshot.data,

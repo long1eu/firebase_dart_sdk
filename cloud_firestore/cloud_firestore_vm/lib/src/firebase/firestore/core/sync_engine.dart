@@ -256,7 +256,8 @@ class SyncEngine implements RemoteStoreCallback {
     await _emitNewSnapsAndNotifyLocalStore(changes, event);
   }
 
-  /// Applies an [OnlineState] change to the sync engine and notifies any views of the change.
+  /// Applies an [OnlineState] change to the sync engine and notifies any views
+  /// of the change.
   @override
   Future<void> handleOnlineStateChange(OnlineState onlineState) async {
     final List<ViewSnapshot> newViewSnapshots = <ViewSnapshot>[];
@@ -378,8 +379,8 @@ class SyncEngine implements RemoteStoreCallback {
     final Map<int, Completer<void>> userTasks =
         _mutationUserCallbacks[_currentUser];
 
-    // NOTE: Mutations restored from persistence won't have task completion sources, so it's okay for this (or the task
-    // below) to be null.
+    // NOTE: Mutations restored from persistence won't have task completion
+    // sources, so it's okay for this (or the task below) to be null.
     if (userTasks != null) {
       final int boxedBatchId = batchId;
       final Completer<void> userTask = userTasks[boxedBatchId];
@@ -422,9 +423,10 @@ class SyncEngine implements RemoteStoreCallback {
 
   /// Computes a new snapshot from the changes and calls the registered callback with the new snapshot.
   Future<void> _emitNewSnapsAndNotifyLocalStore(
-      ImmutableSortedMap<DocumentKey, MaybeDocument> changes,
-      RemoteEvent remoteEvent,
-      [String caller]) async {
+    ImmutableSortedMap<DocumentKey, MaybeDocument> changes,
+    RemoteEvent remoteEvent, [
+    String caller,
+  ]) async {
     final List<ViewSnapshot> newSnapshots = <ViewSnapshot>[];
     final List<LocalViewChanges> documentChangesInAllViews =
         <LocalViewChanges>[];

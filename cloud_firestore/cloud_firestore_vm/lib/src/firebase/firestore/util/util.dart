@@ -67,11 +67,12 @@ String autoId() {
 Future<void> voidErrorTransformer(Future<void> Function() operation) async {
   try {
     await operation();
-  } catch (e) {
+  } catch (e, s) {
     if (e is FirebaseFirestoreError) {
       rethrow;
     } else {
-      throw FirebaseFirestoreError('$e', FirestoreErrorCode.unknown);
+      return Future<void>.error(
+          FirebaseFirestoreError('$e', FirestoreErrorCode.unknown), s);
     }
   }
 }

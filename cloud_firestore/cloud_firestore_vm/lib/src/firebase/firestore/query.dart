@@ -56,8 +56,8 @@ class Query {
       final String inequalityString = inequality.canonicalString;
       throw ArgumentError(
           'Invalid query. You have an inequality where filter (whereLessThan(), whereGreaterThan(), etc.) on field '
-          '"$inequalityString" and so you must also have "$inequalityString" as your first orderBy() field, but '
-          'your first orderBy() is currently on field "${orderBy.canonicalString}" instead.');
+          '\'$inequalityString\' and so you must also have \'$inequalityString\' as your first orderBy() field, but '
+          'your first orderBy() is currently on field \'${orderBy.canonicalString}\' instead.');
     }
   }
 
@@ -71,7 +71,7 @@ class Query {
         if (existingInequality != null && existingInequality != newInequality) {
           throw ArgumentError(
             'All where filters other than whereEqualTo() must be on the same field. But you have filters on '
-            '"${existingInequality.canonicalString}" and "${newInequality.canonicalString}"',
+            '\'${existingInequality.canonicalString}\' and \'${newInequality.canonicalString}\'',
           );
         }
         final core.FieldPath firstOrderByField = query.firstOrderByField;
@@ -255,7 +255,7 @@ class Query {
           // TODO(long1eu): Allow slashes once ancestor queries are supported
           throw ArgumentError(
               'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but '
-              '"$documentKey" contains a "/" character.');
+              '\'$documentKey\' contains a \'/\' character.');
         } else if (documentKey.isEmpty) {
           throw ArgumentError(
               'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it '
@@ -473,14 +473,14 @@ class Query {
         if (value is ServerTimestampValue) {
           throw ArgumentError(
               'Invalid query. You are trying to start or end a query using a document for which the field '
-              '"${orderBy.field}" is an uncommitted server timestamp. (Since the value of this field is unknown, you '
+              '\'${orderBy.field}\' is an uncommitted server timestamp. (Since the value of this field is unknown, you '
               'cannot start/end a query with it.)');
         } else if (value != null) {
           components.add(value);
         } else {
           throw ArgumentError(
               'Invalid query. You are trying to start or end a query using a document for which the field '
-              '"${orderBy.field}" (used as the orderBy) does not exist.');
+              '\'${orderBy.field}\' (used as the orderBy) does not exist.');
         }
       }
     }

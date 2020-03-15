@@ -309,6 +309,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "0.23.1"
+  semaphore:
+    dependency: "direct main"
+    description:
+      name: semaphore
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "0.1.4"
   shelf:
     dependency: transitive
     description:

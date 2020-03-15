@@ -17,9 +17,11 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 
-/// A readonly view of the local state of all documents we're tracking (i.e. we have a cached version in
-/// [remoteDocumentCache] or local mutations for the document). The view is computed by applying the mutations in the
+/// A readonly view of the local state of all documents we're tracking (i.e. we
+/// have a cached version in [remoteDocumentCache] or local mutations for the
+/// document). The view is computed by applying the mutations in the
 /// [MutationQueue] to the [RemoteDocumentCache].
+///
 // TODO(long1eu): Turn this into the UnifiedDocumentCache / whatever.
 class LocalDocumentsView {
   const LocalDocumentsView(this.remoteDocumentCache, this.mutationQueue);
@@ -27,7 +29,8 @@ class LocalDocumentsView {
   final RemoteDocumentCache remoteDocumentCache;
   final MutationQueue mutationQueue;
 
-  /// Returns the the local view of the document identified by [key]. If we don't have any cached state it returns null
+  /// Returns the the local view of the document identified by [key]. If we
+  /// don't have any cached state it returns null
   Future<MaybeDocument> getDocument(DocumentKey key) async {
     final List<MutationBatch> batches =
         await mutationQueue.getAllMutationBatchesAffectingDocumentKey(key);
