@@ -14,6 +14,10 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 
+/// The signature for providing code to be executed within a [WriteBatch]
+/// context.
+typedef BatchCallback = Future<void> Function(WriteBatch);
+
 /// A write batch, used to perform multiple writes as a single atomic unit.
 ///
 /// A Batch object can be acquired by calling [Firestore.batch]. It provides methods for

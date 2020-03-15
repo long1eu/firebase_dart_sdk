@@ -183,16 +183,14 @@ class Firestore {
   /// after 5 attempts, the transaction will fail.
   ///
   /// [updateFunction] the function to execute within the transaction context.
-  Future<TResult> runTransaction<TResult>(
-      TransactionCallback<TResult> updateFunction) {
+  Future<T> runTransaction<T>(TransactionCallback<T> updateFunction) {
     _ensureClientConfigured();
 
     // We wrap the function they provide in order to
     // 1. Use internal implementation classes for Transaction,
     // 2. Convert exceptions they throw into Futures, and
     // 3. Run the user callback on the user queue.
-    Future<TResult> wrappedUpdateFunction(
-        core.Transaction internalTransaction) {
+    Future<T> wrappedUpdateFunction(core.Transaction internalTransaction) {
       return updateFunction(Transaction(internalTransaction, this));
     }
 
@@ -205,6 +203,15 @@ class Firestore {
   WriteBatch batch() {
     _ensureClientConfigured();
     return WriteBatch(this);
+  }
+
+  /// Executes a [batchFunction] on a newly created [WriteBatch] and then
+  /// commits all of the writes made by the batchFunction as a single atomic
+  /// unit.
+  Future<void> runBatch(BatchCallback batchFunction) async {
+    final WriteBatch batch = this.batch();
+    await batchFunction(batch);
+    return batch.commit();
   }
 
   @visibleForTesting

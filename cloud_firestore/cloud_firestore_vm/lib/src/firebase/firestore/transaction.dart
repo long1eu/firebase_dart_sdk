@@ -19,7 +19,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 
 /// The signature for providing code to be executed within a transaction context.
-typedef TransactionCallback<TResult> = Future<TResult> Function(Transaction);
+typedef TransactionCallback<T> = Future<T> Function(Transaction);
 
 /// A [Transaction] is passed to a [Function] to provide the methods to read and write data within
 /// the transaction context.
