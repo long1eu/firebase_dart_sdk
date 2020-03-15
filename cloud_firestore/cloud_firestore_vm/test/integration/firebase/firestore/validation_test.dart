@@ -631,7 +631,7 @@ void main() {
     await expectError(() => query.startAt(<int>[1]).orderBy('bar'), reason);
     await expectError(() => query.startAfter(<int>[1]).orderBy('bar'), reason);
     reason =
-        'Invalid query. You must not call Query.endAt() or Query.endAfter() '
+        'Invalid query. You must not call Query.endAt() or Query.endBefore() '
         'before calling Query.orderBy().';
     await expectError(() => query.endAt(<int>[1]).orderBy('bar'), reason);
     await expectError(() => query.endBefore(<int>[1]).orderBy('bar'), reason);

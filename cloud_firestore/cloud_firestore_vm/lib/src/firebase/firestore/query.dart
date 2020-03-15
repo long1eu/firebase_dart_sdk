@@ -323,7 +323,7 @@ class Query {
     }
     if (query.getEndAt() != null) {
       throw ArgumentError(
-          'Invalid query. You must not call Query.endAt() or Query.endAfter() before calling Query.orderBy().');
+          'Invalid query. You must not call Query.endAt() or Query.endBefore() before calling Query.orderBy().');
     }
     _validateOrderByField(fieldPath);
     final OrderByDirection dir = direction == Direction.ascending
