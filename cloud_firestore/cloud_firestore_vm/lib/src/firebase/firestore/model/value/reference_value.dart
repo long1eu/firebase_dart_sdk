@@ -2,9 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+part of field_value;
 
 /// A wrapper for reference values in Firestore.
 class ReferenceValue extends FieldValue {

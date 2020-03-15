@@ -18,11 +18,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/double_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/integer_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/null_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/reference_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
@@ -898,12 +894,13 @@ void main() {
         key('coll/1'),
         doc('coll/1', 5, map(<String>['foo', 'bar'])));
 
-    final WatchChangeDocumentChange actual =
-        serializer.decodeWatchChange(proto.ListenResponse()
+    final WatchChangeDocumentChange actual = serializer.decodeWatchChange(
+        proto.ListenResponse()
           ..documentChange = (proto.DocumentChange.create()
             ..document = (proto.Document.create()
               ..name = serializer.encodeKey(key('coll/1'))
-              ..updateTime = serializer.encodeTimestamp(Timestamp(0, 5000))
+              ..updateTime =
+                  serializer.encodeTimestamp(const Timestamp(0, 5000))
               ..fields['foo'] = (proto_.Value()..stringValue = 'bar'))
             ..targetIds.add(1)
             ..targetIds.add(2))
@@ -919,12 +916,13 @@ void main() {
         key('coll/1'),
         doc('coll/1', 5, map(<String>['foo', 'bar'])));
 
-    final WatchChangeDocumentChange actual =
-        serializer.decodeWatchChange(proto.ListenResponse()
+    final WatchChangeDocumentChange actual = serializer.decodeWatchChange(
+        proto.ListenResponse()
           ..documentChange = (proto.DocumentChange()
             ..document = (proto.Document()
               ..name = serializer.encodeKey(key('coll/1'))
-              ..updateTime = serializer.encodeTimestamp(Timestamp(0, 5000))
+              ..updateTime =
+                  serializer.encodeTimestamp(const Timestamp(0, 5000))
               ..fields['foo'] = (proto_.Value()..stringValue = 'bar'))
             ..targetIds.add(2)
             ..removedTargetIds.add(1))
@@ -941,7 +939,7 @@ void main() {
         serializer.decodeWatchChange(proto.ListenResponse()
           ..documentDelete = (proto.DocumentDelete()
             ..document = serializer.encodeKey(key('coll/1'))
-            ..readTime = serializer.encodeTimestamp(Timestamp(0, 5000))
+            ..readTime = serializer.encodeTimestamp(const Timestamp(0, 5000))
             ..removedTargetIds.add(1)
             ..removedTargetIds.add(2))
           ..freeze());

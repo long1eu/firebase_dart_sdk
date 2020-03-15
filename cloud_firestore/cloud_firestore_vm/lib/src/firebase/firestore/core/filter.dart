@@ -5,10 +5,7 @@
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/double_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/null_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// Interface used for all query filters.

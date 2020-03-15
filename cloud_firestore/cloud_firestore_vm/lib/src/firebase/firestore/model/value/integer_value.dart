@@ -2,8 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/number_value.dart';
+part of field_value;
 
 /// A wrapper for integer/long values in Firestore.
 class IntegerValue extends NumberValue {

@@ -2,8 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+part of field_value;
 
 /// A wrapper for blob values in Firestore.
 class BlobValue extends FieldValue {

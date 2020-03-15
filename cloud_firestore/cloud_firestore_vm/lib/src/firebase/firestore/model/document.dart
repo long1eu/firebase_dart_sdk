@@ -8,7 +8,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
 import 'package:cloud_firestore_vm/src/proto/index.dart' as pb;
 
 /// Describes the hasPendingWrites state of a document.

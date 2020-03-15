@@ -4,7 +4,6 @@
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// Transforms a value into a server-generated timestamp.

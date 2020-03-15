@@ -17,8 +17,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transfo
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/unknown_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:collection/collection.dart';

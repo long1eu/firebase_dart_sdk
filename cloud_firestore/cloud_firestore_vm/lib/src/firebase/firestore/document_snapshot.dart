@@ -13,12 +13,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart'
     as model;
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/reference_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/timestamp_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/snapshot_metadata.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';

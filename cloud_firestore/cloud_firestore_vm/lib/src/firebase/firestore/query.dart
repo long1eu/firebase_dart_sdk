@@ -25,8 +25,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart'
     as core;
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/reference_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';

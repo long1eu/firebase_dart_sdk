@@ -12,7 +12,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precond
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 

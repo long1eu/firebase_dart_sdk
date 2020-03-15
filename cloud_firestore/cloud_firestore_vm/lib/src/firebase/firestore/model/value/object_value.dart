@@ -2,11 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+part of field_value;
 
 class ObjectValue extends FieldValue {
   const ObjectValue(this._value);

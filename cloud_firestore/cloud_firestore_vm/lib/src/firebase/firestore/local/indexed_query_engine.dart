@@ -17,18 +17,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_collect
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/blob_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/bool_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/double_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/geo_point_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/null_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/number_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/reference_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/string_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/timestamp_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 const double _kHighSelectivity = 1.0;

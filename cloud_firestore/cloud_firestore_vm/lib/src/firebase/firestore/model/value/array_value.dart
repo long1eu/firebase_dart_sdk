@@ -2,11 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'dart:math';
-
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:collection/collection.dart';
-
+part of field_value;
 /// A wrapper for Array values in Firestore
 class ArrayValue extends FieldValue {
   const ArrayValue(this._value);

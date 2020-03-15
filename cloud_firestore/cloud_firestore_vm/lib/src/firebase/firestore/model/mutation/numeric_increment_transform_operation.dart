@@ -3,10 +3,7 @@
 // on 13/03/2020
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/double_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/integer_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/number_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 

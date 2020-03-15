@@ -3,7 +3,7 @@
 // on 27/09/2018
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart';

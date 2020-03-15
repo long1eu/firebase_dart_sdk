@@ -4,6 +4,7 @@
       <w>backends</w>
       <w>dartio</w>
       <w>datastore</w>
+      <w>geopoint</w>
       <w>grpc</w>
       <w>mutators</w>
       <w>overselective</w>
