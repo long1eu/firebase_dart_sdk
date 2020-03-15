@@ -14,7 +14,7 @@ class FirestoreSettings {
     this.cacheSizeBytes = _defaultCacheSizeBytes,
   })  : assert(host != null, 'Provided host must not be null.'),
         assert(!(!sslEnabled && host == _defaultHost),
-            'You can"t set the "sslEnabled" setting unless you also set a non-default "host".'),
+            "You can't set the 'sslEnabled' setting unless you also set a non-default 'host'."),
         assert(
             !persistenceEnabled ||
                 cacheSizeBytes == cacheSizeUnlimited ||
@@ -27,13 +27,7 @@ class FirestoreSettings {
   static const int cacheSizeUnlimited = -1;
 
   static const int _minimumCacheBytes = 1 * 1024 * 1024; // 1 MB
-
-  // TODO(long1eu): Set this to be the default value after SDK is past version 1.0
-  //  static const long _defaultCacheSizeBytes = 100 * 1024 * 1024; // 100 MB
-  //
-  //  For now, we are rolling this out with collection disabled. Once the SDK has hit version 1.0, we will switch the
-  //  default to the above value, 100 MB.
-  static const int _defaultCacheSizeBytes = cacheSizeUnlimited;
+  static const int _defaultCacheSizeBytes = 100 * 1024 * 1024; // 100 MB
 
   /// The host of the Firestore backend.
   final String host;
@@ -41,15 +35,18 @@ class FirestoreSettings {
   /// Enables or disables SSL for communication. The default is to use SSL.
   final bool sslEnabled;
 
-  /// Enables or disables local persistent storage. The default is to use local persistent storage.
+  /// Enables or disables local persistent storage. The default is to use local
+  /// persistent storage.
   final bool persistenceEnabled;
 
-  /// Sets an approximate cache size threshold for the on-disk data. If the cache grows beyond this size, Firestore will
-  /// start removing data that hasn't been recently used. The size is not a guarantee that the cache will stay below
-  /// that size, only that if the cache exceeds the given size, cleanup will be attempted.
+  /// Sets an approximate cache size threshold for the on-disk data. If the
+  /// cache grows beyond this size, Firestore will start removing data that
+  /// hasn't been recently used. The size is not a guarantee that the cache will
+  /// stay below that size, only that if the cache exceeds the given size,
+  /// cleanup will be attempted.
   ///
-  /// By default, collection is disabled (the value is set to [cacheSizeUnlimited]). In a future release, collection
-  /// will be enabled by default, with a default cache size of 100 MB. The minimum value is 1 MB.
+  /// By default, collection is enabled with a cache size of 100 MB. The minimum
+  /// value is 1 MB.
   final int cacheSizeBytes;
 
   FirestoreSettings copyWith({
