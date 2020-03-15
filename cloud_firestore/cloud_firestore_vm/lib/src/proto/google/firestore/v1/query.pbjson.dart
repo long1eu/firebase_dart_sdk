@@ -78,6 +78,8 @@ const StructuredQuery_FieldFilter_Operator$json = const {
     const {'1': 'GREATER_THAN_OR_EQUAL', '2': 4},
     const {'1': 'EQUAL', '2': 5},
     const {'1': 'ARRAY_CONTAINS', '2': 7},
+    const {'1': 'IN', '2': 8},
+    const {'1': 'ARRAY_CONTAINS_ANY', '2': 9},
   ],
 };
 

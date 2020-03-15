@@ -49,6 +49,8 @@ class StructuredQuery_FieldFilter_Operator extends $pb.ProtobufEnum {
   static const StructuredQuery_FieldFilter_Operator GREATER_THAN_OR_EQUAL = StructuredQuery_FieldFilter_Operator._(4, 'GREATER_THAN_OR_EQUAL');
   static const StructuredQuery_FieldFilter_Operator EQUAL = StructuredQuery_FieldFilter_Operator._(5, 'EQUAL');
   static const StructuredQuery_FieldFilter_Operator ARRAY_CONTAINS = StructuredQuery_FieldFilter_Operator._(7, 'ARRAY_CONTAINS');
+  static const StructuredQuery_FieldFilter_Operator IN = StructuredQuery_FieldFilter_Operator._(8, 'IN');
+  static const StructuredQuery_FieldFilter_Operator ARRAY_CONTAINS_ANY = StructuredQuery_FieldFilter_Operator._(9, 'ARRAY_CONTAINS_ANY');
 
   static const $core.List<StructuredQuery_FieldFilter_Operator> values = <StructuredQuery_FieldFilter_Operator> [
     OPERATOR_UNSPECIFIED,
@@ -58,6 +60,8 @@ class StructuredQuery_FieldFilter_Operator extends $pb.ProtobufEnum {
     GREATER_THAN_OR_EQUAL,
     EQUAL,
     ARRAY_CONTAINS,
+    IN,
+    ARRAY_CONTAINS_ANY,
   ];
 
   static final $core.Map<$core.int, StructuredQuery_FieldFilter_Operator> _byValue = $pb.ProtobufEnum.initByValue(values);
