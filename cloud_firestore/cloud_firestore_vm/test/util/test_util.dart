@@ -54,7 +54,7 @@ const String deleteSentinel = '<DELETE>';
 
 const int arbitrarySequenceNumber = 2;
 
-Map<String, T> map<T>([List<Object> entries = const <Object>[]]) {
+Map<String, T> map<T>([List<dynamic> entries = const <dynamic>[]]) {
   final Map<String, T> res = <String, T>{};
   for (int i = 0; i < entries.length; i += 2) {
     final String key = entries[i];

@@ -4,10 +4,7 @@
 
 import 'dart:collection';
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/blob_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/bool_value.dart';
@@ -26,7 +23,6 @@ import 'package:test/test.dart';
 
 import '../../../../util/comparator_test.dart';
 import '../../../../util/equals_tester.dart';
-import '../../../../util/test_access_helper.dart';
 import '../../../../util/test_util.dart';
 
 // ignore_for_file: prefer_const_constructors
@@ -34,185 +30,6 @@ import '../../../../util/test_util.dart';
 void main() {
   final DateTime date1 = DateTime(2016, 5, 20, 10, 20);
   final DateTime date2 = DateTime(2016, 10, 21, 15, 32);
-
-  ObjectValue fromMap(List<Object> entries) {
-    final Map<String, FieldValue> res = <String, FieldValue>{};
-    for (int i = 0; i < entries.length; i += 2) {
-      final String key = entries[i];
-      final FieldValue value = entries[i + 1];
-      res[key] = value;
-    }
-    return ObjectValue.fromMap(res);
-  }
-
-  test('testIntegerValueConversion', () {
-    final List<int> testCases = <int>[
-      IntegerValue.max,
-      -1,
-      0,
-      1,
-      IntegerValue.max
-    ];
-    for (int i in testCases) {
-      final FieldValue value = wrap(i);
-      expect(value is IntegerValue, isTrue);
-      expect(value.value, i);
-    }
-  });
-
-  test('testDoubleValueConversion', () {
-    final List<double> testCases = <double>[
-      double.infinity,
-      -double.maxFinite,
-      IntegerValue.max * 1.0,
-      -1.1,
-      -double.minPositive,
-      -0.0,
-      0.0,
-      double.minPositive,
-      2.2250738585072014E-308,
-      IntegerValue.max * 1.0,
-      double.maxFinite,
-      double.infinity,
-      double.nan
-    ];
-    for (double d in testCases) {
-      final FieldValue value = wrap(d);
-      expect(value is DoubleValue, isTrue);
-
-      if (d.isNaN) {
-        expect(value.value, isNaN);
-      } else {
-        expect(value.value, d);
-      }
-    }
-  });
-
-  test('testNullValueConversion', () {
-    final FieldValue value = wrap(null);
-    expect(value is NullValue, isTrue);
-    expect(null, value.value);
-  });
-
-  test('testBoolValueConversion', () {
-    final List<bool> testCases = <bool>[true, false];
-    for (bool b in testCases) {
-      final FieldValue value = wrap(b);
-      expect(value is BoolValue, isTrue);
-      expect(value.value, b);
-    }
-  });
-
-  test('testDateValueConversion', () {
-    final List<DateTime> testCases = <DateTime>[
-      DateTime.fromMillisecondsSinceEpoch(0),
-      DateTime.fromMillisecondsSinceEpoch(1356048000000)
-    ];
-    for (DateTime d in testCases) {
-      final FieldValue value = wrap(d);
-      expect(value is TimestampValue, isTrue);
-      final Timestamp timestamp = value.value;
-      expect(timestamp.toDate(), d);
-    }
-  });
-
-  test('testTimestampValueConversion', () {
-    final List<Timestamp> testCases = <Timestamp>[
-      Timestamp(0, 0),
-      Timestamp(1356048000, 0)
-    ];
-    for (Timestamp d in testCases) {
-      final FieldValue value = wrap(d);
-      expect(value is TimestampValue, isTrue);
-      expect(value.value is Timestamp, isTrue);
-      expect(value.value, d);
-    }
-  });
-
-  test('testGeoPointValueConversion', () {
-    final List<GeoPoint> testCases = <GeoPoint>[
-      GeoPoint(1.24, 4.56),
-      GeoPoint(-20.0, 100.0)
-    ];
-    for (GeoPoint p in testCases) {
-      final FieldValue value = wrap(p);
-      expect(value is GeoPointValue, isTrue);
-      expect(value.value, p);
-    }
-  });
-
-  test('testBlobValueConversion', () {
-    final List<Blob> testCases = <Blob>[
-      blob(<int>[1, 2, 3]),
-      blob(<int>[1, 2])
-    ];
-    for (Blob b in testCases) {
-      final FieldValue value = wrap(b);
-      expect(value is BlobValue, isTrue);
-      expect(value.value, b);
-    }
-  });
-
-  test('testResourceNameConversion', () {
-    final DatabaseId id = DatabaseId.forProject('project');
-    final List<DocumentReference> testCases = <DocumentReference>[
-      ref('foo/bar'),
-      ref('foo/baz')
-    ];
-    for (DocumentReference docRef in testCases) {
-      final FieldValue value = wrap(docRef);
-      expect(value is ReferenceValue, isTrue);
-      final ReferenceValue ref = value;
-      expect(ref.value, TestAccessHelper.referenceKey(docRef));
-      expect(ref.databaseId, id);
-    }
-  });
-
-  test('testWrapsEmptyObjects', () {
-    expect(ObjectValue.empty, wrap(SplayTreeMap<String, FieldValue>()));
-  });
-
-  test('testWrapsSimpleObjects', () {
-    final Map<String, Object> actual =
-        map(<dynamic>['a', 'foo', 'b', 1, 'c', true, 'd', null]);
-
-    final Map<String, FieldValue> expected = map(<dynamic>[
-      'a',
-      StringValue.valueOf('foo'),
-      'b',
-      IntegerValue.valueOf(1),
-      'c',
-      BoolValue.valueOf(true),
-      'd',
-      NullValue.nullValue()
-    ]);
-
-    final FieldValue wrappedActual = wrapMap(actual);
-    final ObjectValue wrappedExpected = ObjectValue.fromMap(expected);
-    expect(wrappedExpected, wrappedActual);
-  });
-
-  test('testWrapsNestedObjects', () {
-    final FieldValue actual = wrapList(<dynamic>[
-      'a',
-      map<dynamic>(<dynamic>[
-        'b',
-        map<String>(<String>['c', 'foo']),
-        'd',
-        true
-      ])
-    ]);
-    final ObjectValue expected = fromMap(<dynamic>[
-      'a',
-      fromMap(<dynamic>[
-        'b',
-        fromMap(<dynamic>['c', StringValue.valueOf('foo')]),
-        'd',
-        BoolValue.valueOf(true)
-      ])
-    ]);
-    expect(actual, expected);
-  });
 
   test('testExtractsFields', () {
     final FieldValue val = wrapList(<dynamic>[
