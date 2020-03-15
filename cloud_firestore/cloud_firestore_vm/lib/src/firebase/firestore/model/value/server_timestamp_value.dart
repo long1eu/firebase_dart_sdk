@@ -2,12 +2,11 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/timestamp_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// Represents a locally-applied Server Timestamp.
@@ -20,10 +19,10 @@ import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 ///   - They sort after all [TimestampValue]s. With respect to other [ServerTimestampValue]s, they
 ///   sort by their [localWriteTime].
 class ServerTimestampValue extends FieldValue {
-  const ServerTimestampValue(this.localWriteTime, this.previousValue);
+  const ServerTimestampValue(this.localWriteTime, this._previousValue);
 
   final Timestamp localWriteTime;
-  final FieldValue previousValue;
+  final FieldValue _previousValue;
 
   @override
   int get typeOrder => FieldValue.typeOrderTimestamp;
@@ -31,20 +30,18 @@ class ServerTimestampValue extends FieldValue {
   @override
   Object get value => null;
 
-  @override
-  Object valueWith(FieldValueOptions options) {
-    switch (options.serverTimestampBehavior) {
-      case ServerTimestampBehavior.previous:
-        return previousValue != null ? previousValue.valueWith(options) : null;
-      case ServerTimestampBehavior.estimate:
-        return TimestampValue(localWriteTime).valueWith(options);
-      case ServerTimestampBehavior.none:
-        return null;
-
-      default:
-        throw fail('Unexpected case for ServerTimestampBehavior: '
-            '${options.serverTimestampBehavior}');
+  /// Returns the value of the field before this ServerTimestamp was set.
+  ///
+  /// Preserving the previous values allows the user to display the last resoled
+  /// value until the backend responds with the timestamp
+  /// [ServerTimestampBehavior].
+  Object get previousValue {
+    if (_previousValue is ServerTimestampValue) {
+      final ServerTimestampValue value = _previousValue;
+      return value._previousValue;
     }
+
+    return _previousValue != null ? _previousValue.value : null;
   }
 
   @override
@@ -60,7 +57,12 @@ class ServerTimestampValue extends FieldValue {
   }
 
   @override
-  String toString() => '<ServerTimestamp localTime=$localWriteTime>';
+  String toString() {
+    return (ToStringHelper(ServerTimestampValue)
+          ..add('localWriteTime', localWriteTime)
+          ..add('previousValue', previousValue))
+        .toString();
+  }
 
   @override
   bool operator ==(Object other) =>

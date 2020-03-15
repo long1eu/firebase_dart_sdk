@@ -3,7 +3,6 @@
 // on 17/09/2018
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
@@ -19,15 +18,6 @@ class TimestampValue extends FieldValue {
 
   @override
   Timestamp get value => _value;
-
-  @override
-  Object valueWith(FieldValueOptions options) {
-    if (options.timestampsInSnapshotsEnabled) {
-      return _value;
-    } else {
-      return _value.toDate();
-    }
-  }
 
   @override
   int compareTo(FieldValue other) {

@@ -2,7 +2,6 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// A field value represents a data type as stored by Firestore.
@@ -38,10 +37,6 @@ abstract class FieldValue implements Comparable<FieldValue> {
   /// Converts a [FieldValue] into the value that users will see in document snapshots using the
   /// default deserialization options.
   Object get value;
-
-  /// Converts a [FieldValue] into the value that users will see in document snapshots using the
-  /// provided deserialization options.
-  Object valueWith(FieldValueOptions options) => value;
 
   @override
   bool operator ==(Object other);

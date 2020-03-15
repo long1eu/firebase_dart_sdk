@@ -15,9 +15,10 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart'
     as model;
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/array_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/object_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/reference_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/server_timestamp_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/timestamp_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/snapshot_metadata.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
@@ -44,15 +45,21 @@ class DocumentSnapshot {
         assert(_key != null);
 
   factory DocumentSnapshot.fromDocument(
-      Firestore firestore, Document doc,
-      {@required bool isFromCache, @required bool hasPendingWrites}) {
+    Firestore firestore,
+    Document doc, {
+    @required bool isFromCache,
+    @required bool hasPendingWrites,
+  }) {
     return DocumentSnapshot(firestore, doc.key, doc,
         isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
   }
 
   factory DocumentSnapshot.fromNoDocument(
-      Firestore firestore, DocumentKey key,
-      {@required bool isFromCache, @required bool hasPendingWrites}) {
+    Firestore firestore,
+    DocumentKey key, {
+    @required bool isFromCache,
+    @required bool hasPendingWrites,
+  }) {
     return DocumentSnapshot(firestore, key, null,
         isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
   }
@@ -89,10 +96,13 @@ class DocumentSnapshot {
   Map<String, Object> getData(ServerTimestampBehavior serverTimestampBehavior) {
     checkNotNull(serverTimestampBehavior,
         'Provided serverTimestampBehavior value must not be null.');
-    return document == null
-        ? null
-        : _convertObject(
-            document.data, FieldValueOptions(serverTimestampBehavior));
+    if (document == null) {
+      return null;
+    } else {
+      final _FieldValueOptions fieldValueOptions =
+          _FieldValueOptions(serverTimestampBehavior: serverTimestampBehavior);
+      return _convertObject(document.data, fieldValueOptions);
+    }
   }
 
   /// Returns whether or not the field exists in the document. Returns false if the document does not exist.
@@ -142,8 +152,10 @@ class DocumentSnapshot {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
     checkNotNull(serverTimestampBehavior,
         'Provided serverTimestampBehavior value must not be null.');
-    return _getInternal(
-        fieldPath.internalPath, FieldValueOptions(serverTimestampBehavior));
+
+    final _FieldValueOptions fieldValueOptions =
+        _FieldValueOptions(serverTimestampBehavior: serverTimestampBehavior);
+    return _getInternal(fieldPath.internalPath, fieldValueOptions);
   }
 
   /// Returns the value of the field as a bool. If the value is not a bool this will throw a state error.
@@ -198,9 +210,12 @@ class DocumentSnapshot {
     checkNotNull(serverTimestampBehavior,
         'Provided serverTimestampBehavior value must not be null.');
     final Object maybeDate = _getInternal(
-        FieldPath.fromDotSeparatedPath(field).internalPath,
-        FieldValueOptions(serverTimestampBehavior,
-            timestampsInSnapshotsEnabled: false));
+      FieldPath.fromDotSeparatedPath(field).internalPath,
+      _FieldValueOptions(
+        serverTimestampBehavior: serverTimestampBehavior,
+        timestampsInSnapshotsEnabled: false,
+      ),
+    );
     return _castTypedValue(maybeDate, field);
   }
 
@@ -219,8 +234,9 @@ class DocumentSnapshot {
     checkNotNull(serverTimestampBehavior,
         'Provided serverTimestampBehavior value must not be null.');
     final Object maybeTimestamp = _getInternal(
-        FieldPath.fromDotSeparatedPath(field).internalPath,
-        FieldValueOptions(serverTimestampBehavior));
+      FieldPath.fromDotSeparatedPath(field).internalPath,
+      _FieldValueOptions(serverTimestampBehavior: serverTimestampBehavior),
+    );
     return _castTypedValue(maybeTimestamp, field);
   }
 
@@ -273,32 +289,57 @@ class DocumentSnapshot {
     }
   }
 
-  Object _convertValue(FieldValue value, FieldValueOptions options) {
+  Object _convertValue(FieldValue value, _FieldValueOptions options) {
     if (value is ObjectValue) {
       return _convertObject(value, options);
     } else if (value is ArrayValue) {
       return _convertArray(value, options);
     } else if (value is ReferenceValue) {
-      final ReferenceValue referenceValue = value;
-      final DocumentKey key = referenceValue.valueWith(options);
-      final DatabaseId refDatabase = value.databaseId;
-      final DatabaseId database = _firestore.databaseId;
-      if (refDatabase != database) {
-        // TODO(long1eu): Somehow support foreign references.
-        Log.w(
-            'DocumentSnapshot',
-            'Document ${key.path} contains a document reference within a different database '
-                '(${refDatabase.projectId}/${refDatabase.databaseId}) which is not supported. It will be treated as a '
-                'reference in the current database (${database.projectId}/${database.databaseId}) instead.');
-      }
-      return DocumentReference(key, _firestore);
+      return _convertReference(value);
+    } else if (value is TimestampValue) {
+      return _convertTimestamp(value, options);
+    } else if (value is ServerTimestampValue) {
+      return _convertServerTimestamp(value, options);
     } else {
-      return value.valueWith(options);
+      return value.value;
     }
   }
 
+  Object _convertServerTimestamp(
+      ServerTimestampValue value, _FieldValueOptions options) {
+    switch (options.serverTimestampBehavior) {
+      case ServerTimestampBehavior.previous:
+        return value.previousValue;
+      case ServerTimestampBehavior.estimate:
+        return value.localWriteTime;
+      default:
+        return value.value;
+    }
+  }
+
+  Object _convertTimestamp(TimestampValue value, _FieldValueOptions options) {
+    final Timestamp timestamp = value.value;
+    if (options.timestampsInSnapshotsEnabled) {
+      return timestamp;
+    } else {
+      return timestamp.toDate();
+    }
+  }
+
+  Object _convertReference(ReferenceValue value) {
+    final DocumentKey key = value.value;
+    final DatabaseId refDatabase = value.databaseId;
+    final DatabaseId database = _firestore.databaseId;
+    if (refDatabase != database) {
+      // TODO(long1eu): Somehow support foreign references.
+      Log.w('$DocumentSnapshot',
+          'Document ${key.path} contains a document reference within a different database (${refDatabase.projectId}/${refDatabase.databaseId}) which is not supported. It will be treated as a reference in the current database (${database.projectId}/${database.databaseId}) instead.');
+    }
+    return DocumentReference(key, _firestore);
+  }
+
   Map<String, Object> _convertObject(
-      ObjectValue objectValue, FieldValueOptions options) {
+      ObjectValue objectValue, _FieldValueOptions options) {
     final Map<String, Object> result = <String, Object>{};
     for (MapEntry<String, FieldValue> entry in objectValue.internalValue) {
       result[entry.key] = _convertValue(entry.value, options);
@@ -306,7 +347,8 @@ class DocumentSnapshot {
     return result;
   }
 
-  List<Object> _convertArray(ArrayValue arrayValue, FieldValueOptions options) {
+  List<Object> _convertArray(
+      ArrayValue arrayValue, _FieldValueOptions options) {
     final List<Object> result = List<Object>(arrayValue.internalValue.length);
     int i = 0;
     for (FieldValue v in arrayValue.internalValue) {
@@ -316,7 +358,7 @@ class DocumentSnapshot {
     return result;
   }
 
-  Object _getInternal(model.FieldPath fieldPath, FieldValueOptions options) {
+  Object _getInternal(model.FieldPath fieldPath, _FieldValueOptions options) {
     if (document != null) {
       final FieldValue val = document.getField(fieldPath);
       if (val != null) {
@@ -354,4 +396,15 @@ class DocumentSnapshot {
           ..add('document', document))
         .toString();
   }
+}
+
+/// Holds settings that define field value deserialization options.
+class _FieldValueOptions {
+  _FieldValueOptions({
+    this.serverTimestampBehavior,
+    this.timestampsInSnapshotsEnabled = false,
+  });
+
+  final ServerTimestampBehavior serverTimestampBehavior;
+  final bool timestampsInSnapshotsEnabled;
 }

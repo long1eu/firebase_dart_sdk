@@ -5,7 +5,6 @@
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 
@@ -44,15 +43,6 @@ class ObjectValue extends FieldValue {
   }
 
   ImmutableSortedMap<String, FieldValue> get internalValue => _value;
-
-  @override
-  Map<String, Object> valueWith(FieldValueOptions options) {
-    final Map<String, Object> res = <String, Object>{};
-    for (MapEntry<String, FieldValue> entry in _value) {
-      res[entry.key] = entry.value.valueWith(options);
-    }
-    return res;
-  }
 
   @override
   int compareTo(FieldValue other) {
