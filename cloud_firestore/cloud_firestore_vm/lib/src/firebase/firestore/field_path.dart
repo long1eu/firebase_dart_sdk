@@ -38,7 +38,7 @@ class FieldPath {
   factory FieldPath.fromDotSeparatedPath(String path) {
     checkNotNull(path, 'Provided field path must not be null.');
     checkArgument(!reserved.hasMatch(path),
-        'Invalid field path ($path). Paths must not contain \'~\', \'*\', \'/\', \'[\', or \']\'');
+        "Use FieldPath.of() for field names containing '~*/[]'.");
     try {
       return FieldPath.of(path.split('.'));
     } on ArgumentError catch (_) {

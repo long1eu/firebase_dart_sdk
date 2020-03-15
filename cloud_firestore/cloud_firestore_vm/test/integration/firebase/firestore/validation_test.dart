@@ -95,8 +95,8 @@ void main() {
   }
 
   test('firestoreSettingsNullHostFails', () async {
-    await expectError(() => FirestoreSettings(host: null),
-        'Provided host must not be null.');
+    await expectError(
+        () => FirestoreSettings(host: null), 'Provided host must not be null.');
   });
 
   test('disableSslWithoutSettingHostFails', () async {
@@ -130,8 +130,7 @@ void main() {
     withApp(
         'firestoreTestApp',
         (FirebaseApp app) => expect(
-            Firestore.getInstance(app,
-                openDatabase: DatabaseMock.create),
+            Firestore.getInstance(app, openDatabase: DatabaseMock.create),
             isNotNull));
   });
 
@@ -362,7 +361,7 @@ void main() {
     ];
     for (String fieldPath in badFieldPaths) {
       final String reason =
-          'Invalid field path ($fieldPath). Paths must not contain \'~\', \'*\', \'/\', \'[\', or \']\'';
+          "Use FieldPath.of() for field names containing '~*/[]'.";
       await verifyFieldPathThrows(fieldPath, reason);
     }
   });
