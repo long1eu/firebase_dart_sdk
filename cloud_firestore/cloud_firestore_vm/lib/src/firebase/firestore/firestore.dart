@@ -16,6 +16,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/transaction.dart'
     as core;
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_multi_db_component.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
@@ -176,9 +177,15 @@ class Firestore {
     );
   }
 
-  /// Executes the given [updateFunction] and then attempts to commit the changes applied within the transaction. If any
-  /// document read within the transaction has changed, the [updateFunction] will be retried. If it fails to commit
-  /// after 5 attempts, the transaction will fail.
+  /// Executes the given [updateFunction] and then attempts to commit the
+  /// changes applied within the transaction. If any document read within the
+  /// transaction has changed, the [updateFunction] will be retried. If it fails
+  /// to commit after 5 attempts, the transaction will fail.
+  ///
+  /// The maximum number of writes allowed in a single transaction is 500, but
+  /// note that each usage of [FieldValue.serverTimestamp],
+  /// [FieldValue.arrayUnion], [FieldValue.arrayRemove], or
+  /// [FieldValue.increment] inside a transaction counts as an additional write.
   ///
   /// [updateFunction] the function to execute within the transaction context.
   Future<T> runTransaction<T>(TransactionCallback<T> updateFunction) {
@@ -195,7 +202,13 @@ class Firestore {
     return client.transaction(wrappedUpdateFunction, 5);
   }
 
-  /// Creates a write batch, used for performing multiple writes as a single atomic operation.
+  /// Creates a write batch, used for performing multiple writes as a single
+  /// atomic operation.
+  ///
+  /// The maximum number of writes allowed in a single batch is 500, but note
+  /// that each usage of [FieldValue.serverTimestamp], [FieldValue.arrayUnion],
+  /// [FieldValue.arrayRemove], or [FieldValue.increment] inside a transaction
+  /// counts as an additional write.
   ///
   /// Returns the created [WriteBatch] object.
   WriteBatch batch() {
