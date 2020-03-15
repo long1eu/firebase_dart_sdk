@@ -2,22 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'dart:async';
-
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_remote_document_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
+part of memory_persistence;
 
 /// Provides LRU garbage collection functionality for [MemoryPersistence].
 class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {

@@ -6,8 +6,8 @@ import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';

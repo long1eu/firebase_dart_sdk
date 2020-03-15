@@ -11,6 +11,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/auth/firebase_auth_cre
 import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/database_info.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/firestore_client.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart'
+    as core;
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/transaction.dart'
     as core;
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
@@ -18,6 +20,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_multi_db_com
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
@@ -148,6 +151,31 @@ class Firestore {
     _ensureClientConfigured();
     return DocumentReference.forPath(
         ResourcePath.fromString(documentPath), this);
+  }
+
+  // TODO(long1eu): Expose API publicly once backend support is ready (and add
+  //  to CHANGELOG.md).
+  /// Creates and returns a new [Query] that includes all documents in the
+  /// database that are contained in a collection or subcollection with the
+  /// given [collectionId].
+  ///
+  /// Every collection or subcollection with this [collectionId] as the last
+  /// segment of its path will be included. Cannot contain a slash.
+  Query _collectionGroup(String collectionId) {
+    checkNotNull(collectionId, 'Provided collection ID must not be null.');
+    if (collectionId.contains('/')) {
+      throw ArgumentError(
+          'Invalid collectionId \'$collectionId\'. Collection IDs must not contain \'/\'.');
+    }
+
+    _ensureClientConfigured();
+    return Query(
+      core.Query(
+        ResourcePath.empty,
+        collectionGroup: collectionId,
+      ),
+      this,
+    );
   }
 
   /// Executes the given [updateFunction] and then attempts to commit the changes applied within the transaction. If any

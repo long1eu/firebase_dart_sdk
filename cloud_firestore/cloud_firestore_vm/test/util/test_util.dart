@@ -6,7 +6,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:collection/collection.dart';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter.dart';
@@ -43,6 +42,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_aggregator.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 import 'package:test/test.dart';
 
@@ -297,10 +297,10 @@ TargetChange targetChange<T extends MaybeDocument>(
   }
 
   return TargetChange(
-    resumeToken,
-    addedDocumentKeys,
-    modifiedDocumentKeys,
-    removedDocumentKeys,
+    resumeToken: resumeToken,
+    addedDocuments: addedDocumentKeys,
+    modifiedDocuments: modifiedDocumentKeys,
+    removedDocuments: removedDocumentKeys,
     current: current,
   );
 }

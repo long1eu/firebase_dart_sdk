@@ -2,19 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'dart:async';
-
-import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
+part of memory_persistence;
 
 /// An implementation of the [QueryCache] protocol that merely keeps queries in memory, suitable for online only clients
 /// with persistence disabled.

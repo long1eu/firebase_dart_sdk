@@ -81,10 +81,10 @@ class TargetState {
     }
 
     return TargetChange(
-      _resumeToken,
-      addedDocuments,
-      modifiedDocuments,
-      removedDocuments,
+      resumeToken: _resumeToken,
+      addedDocuments: addedDocuments,
+      modifiedDocuments: modifiedDocuments,
+      removedDocuments: removedDocuments,
       current: _current,
     );
   }

@@ -10,13 +10,13 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';

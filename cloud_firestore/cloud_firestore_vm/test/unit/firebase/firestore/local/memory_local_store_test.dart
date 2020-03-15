@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory/memory_persistence.dart';
 import 'package:test/test.dart';
 
 import 'cases/local_store_test_case.dart';

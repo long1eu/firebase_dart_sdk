@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 

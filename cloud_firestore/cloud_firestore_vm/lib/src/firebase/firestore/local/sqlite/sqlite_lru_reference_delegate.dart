@@ -2,20 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'dart:async';
-
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
+part of sqlite_persistence;
 
 class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   SQLiteLruReferenceDelegate(this.persistence, LruGarbageCollectorParams params)

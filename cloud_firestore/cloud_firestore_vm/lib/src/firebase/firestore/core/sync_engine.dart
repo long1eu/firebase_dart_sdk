@@ -321,11 +321,8 @@ class SyncEngine implements RemoteStoreCallback {
       };
       final Set<DocumentKey> limboDocuments = <DocumentKey>{limboKey};
       final RemoteEvent event = RemoteEvent(
-        SnapshotVersion.none,
-        /* targetChanges: */ <int, TargetChange>{},
-        /* targetMismatches: */ <int>{},
-        documentUpdates,
-        limboDocuments,
+        documentUpdates: documentUpdates,
+        resolvedLimboDocuments: limboDocuments,
       );
       await handleRemoteEvent(event);
     } else {

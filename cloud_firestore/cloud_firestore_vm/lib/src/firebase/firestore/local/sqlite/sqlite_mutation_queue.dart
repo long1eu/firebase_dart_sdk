@@ -2,26 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'dart:async';
-import 'dart:math';
-import 'dart:typed_data';
-
-import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart'
-    as sq;
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
-import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
-import 'package:protobuf/protobuf.dart';
+part of sqlite_persistence;
 
 /// A mutation queue for a specific user, backed by SQLite.
 class SQLiteMutationQueue implements MutationQueue {
@@ -30,7 +11,7 @@ class SQLiteMutationQueue implements MutationQueue {
       : uid = user.isAuthenticated ? user.uid : '',
         _lastStreamToken = Uint8List(0);
 
-  final sq.SQLitePersistence db;
+  final SQLitePersistence db;
   final LocalSerializer serializer;
 
   /// The normalized uid (e.g. null => '') used in the uid column.
@@ -199,8 +180,9 @@ class SQLiteMutationQueue implements MutationQueue {
         // @formatter:on
         <dynamic>[uid, batchId, proto.writeToBuffer()]);
 
-    // PORTING NOTE: Unlike LevelDB, these entries must be unique. Since [user] and [batchId] are fixed within this
-    // function body, it's enough to track unique keys added in this batch.
+    // PORTING NOTE: Unlike LevelDB, these entries must be unique. Since [user]
+    // and [batchId] are fixed within this function body, it's enough to track
+    // unique keys added in this batch.
     final Set<DocumentKey> inserted = <DocumentKey>{};
 
     const String statement =
@@ -219,6 +201,7 @@ class SQLiteMutationQueue implements MutationQueue {
 
       final String path = EncodedPath.encode(key.path);
       await db.execute(statement, <dynamic>[uid, path, batchId]);
+      await db.indexManager.addToCollectionParentIndex(key.path.popLast());
     }
 
     return batch;
@@ -358,6 +341,8 @@ class SQLiteMutationQueue implements MutationQueue {
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(
       Query query) async {
+    hardAssert(!query.isCollectionGroupQuery,
+        'CollectionGroup queries should be handled in LocalDocumentsView');
     // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
     final int immediateChildrenPathLength = prefix.length + 1;

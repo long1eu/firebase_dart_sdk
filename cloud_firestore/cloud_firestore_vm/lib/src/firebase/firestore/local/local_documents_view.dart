@@ -5,8 +5,9 @@ import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/index_manager.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_collections.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
@@ -16,6 +17,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:meta/meta.dart';
 
 /// A readonly view of the local state of all documents we're tracking (i.e. we
 /// have a cached version in [remoteDocumentCache] or local mutations for the
@@ -24,10 +27,15 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version
 ///
 // TODO(long1eu): Turn this into the UnifiedDocumentCache / whatever.
 class LocalDocumentsView {
-  const LocalDocumentsView(this.remoteDocumentCache, this.mutationQueue);
+  const LocalDocumentsView({
+    @required this.remoteDocumentCache,
+    @required this.mutationQueue,
+    @required this.indexManager,
+  });
 
   final RemoteDocumentCache remoteDocumentCache;
   final MutationQueue mutationQueue;
+  final IndexManager indexManager;
 
   /// Returns the the local view of the document identified by [key]. If we
   /// don't have any cached state it returns null
@@ -99,15 +107,18 @@ class LocalDocumentsView {
   }
 
   /// Performs a query against the local view of all documents.
-  // TODO(long1eu): The Querying implementation here should move 100% to [SimpleQueryEngine]. Instead, we should just
-  //  provide a [getCollectionDocuments] method here that return all the documents in a given collection so that
-  //  [SimpleQueryEngine] can do that and then filter in memory.
+  // TODO(long1eu): The Querying implementation here should move 100% to
+  //  [SimpleQueryEngine]. Instead, we should just provide a
+  //  getCollectionDocuments method here that return all the documents in a
+  //  given collection so that SimpleQueryEngine] can do that and then filter in
+  //  memory.
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
       Query query) async {
     final ResourcePath path = query.path;
-    final bool isDocumentKey = DocumentKey.isDocumentKey(path);
-    if (isDocumentKey) {
+    if (query.isDocumentQuery) {
       return _getDocumentsMatchingDocumentQuery(path);
+    } else if (query.isCollectionGroupQuery) {
+      return _getDocumentsMatchingCollectionGroupQuery(query);
     } else {
       return _getDocumentsMatchingCollectionQuery(query);
     }
@@ -124,6 +135,30 @@ class LocalDocumentsView {
       result = result.insert(doc.key, doc);
     }
     return result;
+  }
+
+  Future<ImmutableSortedMap<DocumentKey, Document>>
+      _getDocumentsMatchingCollectionGroupQuery(Query query) async {
+    hardAssert(query.path.isEmpty,
+        'Currently we only support collection group queries at the root.');
+    final String collectionId = query.collectionGroup;
+    ImmutableSortedMap<DocumentKey, Document> results =
+        DocumentCollections.emptyDocumentMap();
+    final List<ResourcePath> parents =
+        await indexManager.getCollectionParents(collectionId);
+
+    // Perform a collection query against each parent that contains the
+    // collectionId and aggregate the results.
+    for (ResourcePath parent in parents) {
+      final Query collectionQuery =
+          query.asCollectionQueryAtPath(parent.appendSegment(collectionId));
+      final ImmutableSortedMap<DocumentKey, Document> collectionResults =
+          await _getDocumentsMatchingCollectionQuery(collectionQuery);
+      for (MapEntry<DocumentKey, Document> docEntry in collectionResults) {
+        results = results.insert(docEntry.key, docEntry.value);
+      }
+    }
+    return results;
   }
 
   /// Queries the remote documents and overlays mutations.

@@ -2,29 +2,12 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'dart:async';
-import 'dart:typed_data';
-
-import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/remote_document_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart'
-    as sq;
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
-import 'package:protobuf/protobuf.dart';
+part of sqlite_persistence;
 
 class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   SQLiteRemoteDocumentCache(this.db, this.serializer);
 
-  final sq.SQLitePersistence db;
+  final SQLitePersistence db;
 
   final LocalSerializer serializer;
 
@@ -43,6 +26,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         ''',
         // @formatter:on
         <dynamic>[path, message.writeToBuffer()]);
+
+    await db.indexManager
+        .addToCollectionParentIndex(maybeDocument.key.path.popLast());
   }
 
   @override
@@ -119,6 +105,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
       getAllDocumentsMatchingQuery(Query query) async {
+    hardAssert(!query.isCollectionGroupQuery,
+        'CollectionGroup queries should be handled in LocalDocumentsView');
+
     // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
     final int immediateChildrenPathLength = prefix.length + 1;

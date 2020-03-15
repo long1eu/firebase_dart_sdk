@@ -33,6 +33,11 @@ class DocumentKey implements Comparable<DocumentKey> {
   /// The path to the document.
   final ResourcePath path;
 
+  /// Returns true if the document is in the specified collectionId.
+  bool hasCollectionId(String collectionId) {
+    return path.length >= 2 && path.segments[path.length - 2] == collectionId;
+  }
+
   static int comparator(DocumentKey a, DocumentKey b) =>
       a.path.compareTo(b.path);
 

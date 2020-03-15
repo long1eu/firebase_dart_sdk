@@ -2,21 +2,7 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-import 'dart:async';
-import 'dart:typed_data';
-
-import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/document_reference.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+part of memory_persistence;
 
 class MemoryMutationQueue implements MutationQueue {
   MemoryMutationQueue(this.persistence)
@@ -121,10 +107,13 @@ class MemoryMutationQueue implements MutationQueue {
     );
     _queue.add(batch);
 
-    // Track references by document key.
+    // Track references by document key and index collection parents.
     for (Mutation mutation in mutations) {
       _batchesByDocumentKey = _batchesByDocumentKey
           .insert(DocumentReference(mutation.key, batchId));
+
+      await persistence.indexManager
+          .addToCollectionParentIndex(mutation.key.path.popLast());
     }
 
     return batch;
@@ -205,6 +194,9 @@ class MemoryMutationQueue implements MutationQueue {
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(
       Query query) async {
+    hardAssert(!query.isCollectionGroupQuery,
+        'CollectionGroup queries should be handled in LocalDocumentsView');
+
     // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
     final int immediateChildrenPathLength = prefix.length + 1;

@@ -624,10 +624,16 @@ class RemoteSerializer {
     final proto.Target_QueryTarget builder = proto.Target_QueryTarget.create();
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create();
-    if (query.path.isEmpty) {
-      builder.parent = _encodeQueryPath(ResourcePath.empty);
+    final ResourcePath path = query.path;
+    if (query.collectionGroup != null) {
+      hardAssert(path.length % 2 == 0,
+          'Collection Group queries should be within a document path or root.');
+      builder.parent = _encodeQueryPath(path);
+
+      structuredQueryBuilder.from.add(proto.StructuredQuery_CollectionSelector()
+        ..collectionId = query.collectionGroup
+        ..allDescendants = true);
     } else {
-      final ResourcePath path = query.path;
       hardAssert(path.length.remainder(2) != 0,
           'Document queries with filters are not supported.');
       builder.parent = _encodeQueryPath(path.popLast());

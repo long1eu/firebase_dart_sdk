@@ -17,12 +17,14 @@ class Query {
   /// Initializes a Query with all of its components directly.
   const Query(
     this.path, {
+    String collectionGroup,
     this.filters = const <Filter>[],
     this.explicitSortOrder = const <OrderBy>[],
     int limit = noLimit,
     Bound startAt,
     Bound endAt,
-  })  : _limit = limit,
+  })  : collectionGroup = collectionGroup,
+        _limit = limit,
         _startAt = startAt,
         _endAt = endAt;
 
@@ -45,6 +47,8 @@ class Query {
   /// The base path of the query.
   final ResourcePath path;
 
+  final String collectionGroup;
+
   final int _limit;
 
   /// An optional bound to start the query at.
@@ -55,10 +59,16 @@ class Query {
 
   /// Returns true if this Query is for a specific document.
   bool get isDocumentQuery {
-    return DocumentKey.isDocumentKey(path) && filters.isEmpty;
+    return DocumentKey.isDocumentKey(path) &&
+        collectionGroup == null &&
+        filters.isEmpty;
   }
 
-  /// The maximum number of results to return. If there is no limit on the query, then this will cause an assertion failure.
+  /// Returns true if this is a collection group query.
+  bool get isCollectionGroupQuery => collectionGroup != null;
+
+  /// The maximum number of results to return. If there is no limit on the
+  /// query, then this will cause an assertion failure.
   int getLimit() {
     hardAssert(hasLimit, 'Called getLimit when no limit was set');
     return _limit;
@@ -66,10 +76,12 @@ class Query {
 
   bool get hasLimit => _limit != noLimit;
 
-  /// Returns a new [Query] with the given limit on how many results can be returned.
+  /// Returns a new [Query] with the given limit on how many results can be
+  /// returned.
   ///
-  /// [limit] represents the maximum number of results to return. If `limit == noLimit`, then no limit is applied.
-  /// Otherwise, if `limit <= 0`, behavior is unspecified.
+  /// [limit] represents the maximum number of results to return. If
+  /// `limit == noLimit`, then no limit is applied. Otherwise, if `limit <= 0`,
+  /// behavior is unspecified.
   Query limit(int limit) => copyWith(limit: limit);
 
   /// An optional bound to start the query at.
@@ -115,8 +127,7 @@ class Query {
   ///
   /// [filter] is the predicate to filter by.
   Query filter(Filter filter) {
-    hardAssert(!DocumentKey.isDocumentKey(path),
-        'No filter is allowed for document query');
+    hardAssert(!isDocumentQuery, 'No filter is allowed for document query');
 
     FieldPath newInequalityField;
     if (filter is RelationFilter && filter.isInequality) {
@@ -144,9 +155,8 @@ class Query {
   ///
   /// [order] is the key and direction to order by.
   Query orderBy(OrderBy order) {
-    if (DocumentKey.isDocumentKey(path)) {
-      throw fail('No ordering is allowed for document query');
-    }
+    hardAssert(!isDocumentQuery, 'No ordering is allowed for document query');
+
     if (explicitSortOrder.isEmpty) {
       final FieldPath inequality = inequalityField;
       if (inequality != null && inequality != order.field) {
@@ -168,6 +178,21 @@ class Query {
   ///
   /// The [bound] to end this query at.
   Query endAt(Bound bound) => copyWith(endAt: bound);
+
+  /// Helper to convert a collection group query into a collection query at a
+  /// specific path. This is used when executing collection group queries, since
+  /// we have to split the query into a set of collection queries at multiple
+  /// paths.
+  Query asCollectionQueryAtPath(ResourcePath path) {
+    return Query(
+      path,
+      filters: filters,
+      explicitSortOrder: explicitSortOrder,
+      limit: _limit,
+      startAt: _startAt,
+      endAt: _endAt,
+    );
+  }
 
   /// Returns the full list of ordering constraints on the query.
   ///
@@ -210,9 +235,14 @@ class Query {
     }
   }
 
-  bool _matchesPath(Document doc) {
+  bool _matchesPathAndCollectionGroup(Document doc) {
     final ResourcePath docPath = doc.key.path;
-    if (DocumentKey.isDocumentKey(path)) {
+    if (collectionGroup != null) {
+      // NOTE: this.path is currently always empty since we don't expose
+      // Collection Group queries rooted at a document path yet.
+      return doc.key.hasCollectionId(collectionGroup) &&
+          path.isPrefixOf(docPath);
+    } else if (DocumentKey.isDocumentKey(path)) {
       return path == docPath;
     } else {
       return path.isPrefixOf(docPath) && path.length == docPath.length - 1;
@@ -254,7 +284,7 @@ class Query {
 
   /// Returns true if the document matches the constraints of this query.
   bool matches(Document doc) {
-    return _matchesPath(doc) &&
+    return _matchesPathAndCollectionGroup(doc) &&
         _matchesOrderBy(doc) &&
         _matchesFilters(doc) &&
         _matchesBounds(doc);
@@ -269,10 +299,16 @@ class Query {
   /// iOS and Android canonical ids for a query exactly.
   String get canonicalId {
     // TODO(long1eu): Cache the return value.
-    final StringBuffer builder = StringBuffer()
-      ..write(path.canonicalString)
-      // Add filters.
-      ..write('|f:');
+    final StringBuffer builder = StringBuffer(path.canonicalString);
+
+    if (collectionGroup != null) {
+      builder //
+        ..write('|cg:')
+        ..write(collectionGroup);
+    }
+
+    // Add filters.
+    builder.write('|f:');
     for (Filter filter in filters) {
       builder.write(filter.canonicalId);
     }
@@ -310,6 +346,7 @@ class Query {
 
   Query copyWith({
     List<Filter> filters,
+    String collectionGroup,
     List<OrderBy> explicitSortOrder,
     int limit,
     Bound startAt,
@@ -317,6 +354,7 @@ class Query {
   }) {
     return Query(
       path,
+      collectionGroup: collectionGroup ?? this.collectionGroup,
       filters: filters ?? this.filters,
       explicitSortOrder: explicitSortOrder ?? this.explicitSortOrder,
       limit: limit ?? _limit,
@@ -335,6 +373,7 @@ class Query {
                 .equals(orderByConstraints, other.orderByConstraints) &&
             const ListEquality<Filter>().equals(filters, other.filters) &&
             path == other.path &&
+            collectionGroup == other.collectionGroup &&
             _startAt == other._startAt &&
             _endAt == other._endAt;
   }
@@ -343,6 +382,7 @@ class Query {
   int get hashCode =>
       const ListEquality<Filter>().hash(filters) ^
       path.hashCode ^
+      collectionGroup.hashCode ^
       _limit.hashCode ^
       _startAt.hashCode ^
       _endAt.hashCode ^
@@ -353,6 +393,11 @@ class Query {
     final StringBuffer builder = StringBuffer() //
       ..write('Query(')
       ..write(path.canonicalString);
+    if (collectionGroup != null) {
+      builder //
+        ..write(' collectionGroup=')
+        ..write(collectionGroup);
+    }
     if (filters.isNotEmpty) {
       builder.write(' where ');
       for (int i = 0; i < filters.length; i++) {

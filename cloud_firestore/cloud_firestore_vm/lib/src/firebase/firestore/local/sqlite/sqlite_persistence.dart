@@ -2,25 +2,57 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'dart:async';
+library sqlite_persistence;
 
+import 'dart:async';
+import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/index_range.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/index_cursor.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_lru_reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_query_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_remote_document_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_schema.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/index_manager.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
 import 'package:meta/meta.dart';
+import 'package:protobuf/protobuf.dart';
 import 'package:semaphore/semaphore.dart';
+
+part 'sqlite_collection_index.dart';
+part 'sqlite_index_manager.dart';
+part 'sqlite_lru_reference_delegate.dart';
+part 'sqlite_mutation_queue.dart';
+part 'sqlite_query_cache.dart';
+part 'sqlite_remote_document_cache.dart';
+part 'sqlite_schema.dart';
 
 /// A SQLite-backed instance of Persistence.
 ///
@@ -28,7 +60,9 @@ import 'package:semaphore/semaphore.dart';
 /// routines that make dealing with SQLite much more pleasant.
 class SQLitePersistence extends Persistence {
   SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName)
-      : _semaphore = GlobalSemaphore();
+      : _semaphore = GlobalSemaphore() {
+    indexManager = SqliteIndexManager(this);
+  }
 
   static const String tag = 'SQLitePersistence';
 
@@ -44,6 +78,9 @@ class SQLitePersistence extends Persistence {
 
   @override
   SQLiteQueryCache queryCache;
+
+  @override
+  SqliteIndexManager indexManager;
 
   @override
   SQLiteRemoteDocumentCache remoteDocumentCache;

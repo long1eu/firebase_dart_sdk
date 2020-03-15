@@ -2,29 +2,24 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'dart:async';
-
-import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/remote_document_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_collections.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+part of memory_persistence;
 
 /// In-memory cache of remote documents.
 class MemoryRemoteDocumentCache implements RemoteDocumentCache {
-  MemoryRemoteDocumentCache()
-      : documents = DocumentCollections.emptyMaybeDocumentMap();
+  MemoryRemoteDocumentCache(MemoryPersistence persistence)
+      : documents = DocumentCollections.emptyMaybeDocumentMap(),
+        _persistence = persistence;
 
   /// Underlying cache of documents.
   ImmutableSortedMap<DocumentKey, MaybeDocument> documents;
 
+  final MemoryPersistence _persistence;
+
   @override
   Future<void> add(MaybeDocument document) async {
     documents = documents.insert(document.key, document);
+    await _persistence.indexManager
+        .addToCollectionParentIndex(document.key.path.popLast());
   }
 
   @override
@@ -48,6 +43,8 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
       getAllDocumentsMatchingQuery(Query query) async {
+    hardAssert(!query.isCollectionGroupQuery,
+        'CollectionGroup queries should be handled in LocalDocumentsView');
     ImmutableSortedMap<DocumentKey, Document> result =
         DocumentCollections.emptyDocumentMap();
 

@@ -18,10 +18,10 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/sync_engine.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
@@ -192,6 +192,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
     // Set up the sync engine and various stores.
     _datastore = MockDatastore(_queue);
+    // ignore: close_sinks
     final BehaviorSubject<bool> onNetworkConnected =
         BehaviorSubject<bool>.seeded(true);
     _remoteStore =
@@ -241,7 +242,11 @@ class SpecTestCase implements RemoteStoreCallback {
     } else if (querySpec is Map<String, dynamic>) {
       final Map<String, dynamic> queryDict = querySpec;
       final String path = queryDict['path'];
-      Query query = Query(ResourcePath.fromString(path));
+      final String collectionGroup = queryDict.containsKey('collectionGroup')
+          ? queryDict['collectionGroup']
+          : null;
+      Query query = Query(ResourcePath.fromString(path),
+          collectionGroup: collectionGroup);
       if (queryDict.containsKey('limit')) {
         query = query.limit(queryDict['limit']);
       }

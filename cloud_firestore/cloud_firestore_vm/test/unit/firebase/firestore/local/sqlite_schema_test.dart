@@ -6,14 +6,14 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_schema.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
 import 'package:test/test.dart';
 
+import '../../../../util/test_util.dart';
 import 'mock/database_mock.dart';
 
 void main() {
@@ -214,12 +214,78 @@ void main() {
       final int sequenceNumber = row['sequence_number'];
 
       final int docNum = int.parse(path.split('_')[1]);
-      // The even documents were missing sequence numbers, they should now be filled in to have the new sequence number.
-      // The odd documents should have their sequence number unchanged, and so be the old value.
+      // The even documents were missing sequence numbers, they should now be
+      // filled in to have the new sequence number. The odd documents should
+      // have their sequence number unchanged, and so be the old value.
       final int expected =
           docNum % 2 == 1 ? oldSequenceNumber : newSequenceNumber;
       expect(sequenceNumber, expected);
     }
+  });
+
+  test('canCreateCollectionParentsIndex', () async {
+    // This test creates a database with schema version 7 that has a few
+    // mutations and a few remote documents and then ensures that appropriate
+    // entries are written to the collectionParentIndex.
+    final List<String> writePaths = <String>[
+      'cg1/x',
+      'cg1/y',
+      'cg1/x/cg1/x',
+      'cg2/x',
+      'cg1/x/cg2/x',
+    ];
+    final List<String> remoteDocPaths = <String>[
+      'cg1/z',
+      'cg1/y/cg1/x',
+      'cg2/x/cg3/x',
+      'blah/x/blah/x/cg3/x',
+    ];
+    final Map<String, List<String>> expectedParents = map(<dynamic>[
+      'cg1',
+      <String>['', 'cg1/x', 'cg1/y'],
+      'cg2',
+      <String>['', 'cg1/x'],
+      'cg3',
+      <String>['blah/x/blah/x', 'cg2/x'],
+    ]);
+
+    await schema.runMigrations(0, 7);
+    // Write mutations.
+    int batchId = 1;
+    for (String writePath in writePaths) {
+      await _addMutationBatch(db, batchId++, 'user', <String>[writePath]);
+    }
+    // Write remote document entries.
+    for (String remoteDocPath in remoteDocPaths) {
+      await db.execute('INSERT INTO remote_documents (path) VALUES (?)',
+          <String>[EncodedPath.encode(path(remoteDocPath))]);
+    }
+
+    // Migrate to v8 and verify index entries.
+    await schema.runMigrations(7, 8);
+    final Map<String, List<String>> actualParents = <String, List<String>>{};
+
+    final List<Map<String, dynamic>> result =
+        await db.query('SELECT collection_id, parent FROM collection_parents');
+
+    for (Map<String, dynamic> row in result) {
+      final String collectionId = row['collection_id'];
+      final String parent =
+          EncodedPath.decodeResourcePath(row['parent']).toString();
+      List<String> parents = actualParents[collectionId];
+      if (parents == null) {
+        parents = <String>[];
+        actualParents[collectionId] = parents;
+      }
+      parents.add(parent);
+    }
+
+    // Sort results.
+    for (List<String> parents in actualParents.values) {
+      parents.sort();
+    }
+
+    expect(actualParents, expectedParents);
   });
 }
 

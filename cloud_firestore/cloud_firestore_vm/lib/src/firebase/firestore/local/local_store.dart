@@ -13,14 +13,14 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/target_id_generat
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_documents_view.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_write_result.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_engine.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/remote_document_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/simple_query_engine.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
@@ -83,8 +83,11 @@ class LocalStore {
     final MutationQueue mutationQueue =
         persistence.getMutationQueue(initialUser);
     final RemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
-    final LocalDocumentsView localDocuments =
-        LocalDocumentsView(remoteDocuments, mutationQueue);
+    final LocalDocumentsView localDocuments = LocalDocumentsView(
+      remoteDocumentCache: remoteDocuments,
+      mutationQueue: mutationQueue,
+      indexManager: persistence.indexManager,
+    );
     // TODO(long1eu): Use IndexedQueryEngine as appropriate.
     final SimpleQueryEngine queryEngine = SimpleQueryEngine(localDocuments);
 
@@ -136,7 +139,8 @@ class LocalStore {
   /// The current state of all referenced documents, reflecting local changes.
   LocalDocumentsView _localDocuments;
 
-  /// Performs queries over the [_localDocuments] (and potentially maintains indexes).
+  /// Performs queries over the [_localDocuments] (and potentially maintains
+  /// indexes).
   QueryEngine _queryEngine;
 
   /// The set of document references maintained by any local views.
@@ -174,7 +178,11 @@ class LocalStore {
         await _mutationQueue.getAllMutationBatches();
 
     // Recreate our LocalDocumentsView using the new MutationQueue.
-    _localDocuments = LocalDocumentsView(_remoteDocuments, _mutationQueue);
+    _localDocuments = LocalDocumentsView(
+      remoteDocumentCache: _remoteDocuments,
+      mutationQueue: _mutationQueue,
+      indexManager: _persistence.indexManager,
+    );
     // TODO(long1eu): Use IndexedQueryEngine as appropriate.
     _queryEngine = SimpleQueryEngine(_localDocuments);
 

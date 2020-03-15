@@ -6,11 +6,11 @@ import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:test/test.dart';
@@ -222,8 +222,7 @@ class QueryCacheTestCase {
     await _removeQueryData(query2);
     expect(_queryCache.highestListenSequenceNumber, 20);
 
-    final QueryData query3 =
-        QueryData(garages, 42, 100, QueryPurpose.listen);
+    final QueryData query3 = QueryData(garages, 42, 100, QueryPurpose.listen);
     await _addQueryData(query3);
     expect(_queryCache.highestListenSequenceNumber, 100);
 

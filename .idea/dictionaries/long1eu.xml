@@ -5,6 +5,9 @@
       <w>dartio</w>
       <w>datastore</w>
       <w>grpc</w>
+      <w>mutators</w>
+      <w>overselective</w>
+      <w>subcollection</w>
       <w>unawaited</w>
       <w>unstarted</w>
     </words>

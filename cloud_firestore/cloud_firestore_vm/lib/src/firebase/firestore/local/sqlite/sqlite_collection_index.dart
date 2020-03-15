@@ -2,17 +2,10 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/index_range.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/index_cursor.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+part of sqlite_persistence;
 
-/// A persisted 'collection index' of all documents in the local cache (with mutations overlaid on
-/// top of remote documents).
+/// A persisted 'collection index' of all documents in the local cache (with
+/// mutations overlaid on top of remote documents).
 ///
 /// NOTE: There is no in-memory implementation at this time.
 class SQLiteCollectionIndex {

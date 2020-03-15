@@ -29,7 +29,8 @@ abstract class ReferenceDelegate {
   /// Notify the delegate that the given document was removed from a target.
   Future<void> removeReference(DocumentKey key);
 
-  /// Notify the delegate that a document is no longer being mutated by the user.
+  /// Notify the delegate that a document is no longer being mutated by the
+  /// user.
   Future<void> removeMutationReference(DocumentKey key);
 
   /// Notify the delegate that a target was removed. The delegate may, but is
@@ -39,7 +40,8 @@ abstract class ReferenceDelegate {
   /// Notify the delegate that a limbo document was updated.
   Future<void> updateLimboDocument(DocumentKey key);
 
-  /// Returns the sequence number of the current transaction. Only valid during a transaction.
+  /// Returns the sequence number of the current transaction. Only valid during
+  /// a transaction.
   int get currentSequenceNumber;
 
   /// Lifecycle hook to notify the delegate that a transaction has started.

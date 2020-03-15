@@ -2,23 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'dart:async';
-import 'dart:typed_data';
-
-import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
-import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
-import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
+part of sqlite_persistence;
 
 /// Cached Queries backed by SQLite.
 class SQLiteQueryCache implements QueryCache {

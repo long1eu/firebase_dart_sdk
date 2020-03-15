@@ -2,17 +2,7 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-import 'dart:async';
-
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_query_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_remote_document_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+part of memory_persistence;
 
 /// Provides eager garbage collection for [MemoryPersistence].
 class MemoryEagerReferenceDelegate implements ReferenceDelegate {

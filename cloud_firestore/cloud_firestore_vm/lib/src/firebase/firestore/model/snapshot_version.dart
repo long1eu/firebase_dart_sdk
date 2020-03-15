@@ -13,7 +13,7 @@ class SnapshotVersion implements Comparable<SnapshotVersion> {
   final Timestamp timestamp;
 
   /// A version that is smaller than all other versions.
-  static final SnapshotVersion none = SnapshotVersion(Timestamp(0, 0));
+  static const SnapshotVersion none = SnapshotVersion(Timestamp(0, 0));
 
   @override
   int compareTo(SnapshotVersion other) => timestamp.compareTo(other.timestamp);

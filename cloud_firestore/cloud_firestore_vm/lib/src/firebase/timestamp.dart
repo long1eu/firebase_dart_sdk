@@ -14,9 +14,17 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 ///
 /// see [The reference timestamp definition](https://github.com/google/protobuf/blob/master/src/google/protobuf/timestamp.proto)
 class Timestamp implements Comparable<Timestamp> {
-  Timestamp(this.seconds, this.nanoseconds) {
-    validateRange(seconds, nanoseconds);
-  }
+  const Timestamp(this.seconds, this.nanoseconds)
+      : assert(nanoseconds >= 0,
+            'Timestamp nanoseconds out of range: $nanoseconds'),
+        assert(nanoseconds < 1e9,
+            'Timestamp nanoseconds out of range: $nanoseconds'),
+        // Midnight at the beginning of 1/1/1 is the earliest supported timestamp.
+        assert(seconds >= -62135596800,
+            'Timestamp seconds out of range: $seconds'),
+        // This will break in the year 10,000.
+        assert(
+            seconds < 253402300800, 'Timestamp seconds out of range: $seconds');
 
   factory Timestamp.fromDate(DateTime date) {
     final int millis = date.millisecondsSinceEpoch;

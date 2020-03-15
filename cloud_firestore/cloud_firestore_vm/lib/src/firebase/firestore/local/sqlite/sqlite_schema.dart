@@ -2,13 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-import 'dart:async';
-
-import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
-import 'package:meta/meta.dart';
+part of sqlite_persistence;
 
 /// Migrates schemas from version 0 (empty) to whatever the current version is.
 ///
@@ -22,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 7;
+  static const int version = 8;
 
   // Remove this constant and increment version to enable indexing support
   static const int indexingSupportVersion = version + 1;
@@ -66,6 +60,10 @@ class SQLiteSchema {
 
     if (fromVersion < 7 && toVersion >= 7) {
       await _ensureSequenceNumbers();
+    }
+
+    if (fromVersion < 8 && toVersion >= 8) {
+      await _createV8CollectionParentsIndex();
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -407,6 +405,82 @@ class SQLiteSchema {
         // @formatter:on
         <dynamic>[row.values.first, sequenceNumber],
       );
+    }
+  }
+
+  Future<void> _createV8CollectionParentsIndex() async {
+    await _ifTablesDontExist(
+      <String>['collection_parents'],
+      () async {
+        // A table storing associations between a Collection ID (e.g.
+        // 'messages') to a parent path (e.g. '/chats/123') that contains it as
+        // a (sub)collection. This is used to efficiently find all collections
+        // to query when performing a Collection Group query. Note that the
+        // parent path will be an empty path in the case of root-level
+        // collections.
+        await db.execute(
+            // @formatter:off
+            '''
+              CREATE TABLE collection_parents(
+                  collection_id TEXT,
+                  parent        TEXT,
+                  PRIMARY KEY (collection_id, parent)
+              );
+            '''
+            // @formatter:on
+            );
+      },
+    );
+
+    // Helper to add an index entry if we haven't already written it.
+    final MemoryCollectionParentIndex cache = MemoryCollectionParentIndex();
+
+    Future<void> addEntry(ResourcePath collectionPath) async {
+      if (cache.add(collectionPath)) {
+        final String collectionId = collectionPath.getLastSegment();
+        final ResourcePath parentPath = collectionPath.popLast();
+
+        await db.execute(
+          // @formatter:off
+          '''
+            INSERT OR REPLACE INTO collection_parents (collection_id,
+                                                       parent)
+            VALUES (?, ?);
+          ''',
+          // @formatter:on
+          <dynamic>[collectionId, EncodedPath.encode(parentPath)],
+        );
+      }
+    }
+
+    // Index existing remote documents.
+    final List<Map<String, dynamic>> remoteDocumentsQuery = await db.query(
+        // @formatter:off
+        '''
+          SELECT path
+          FROM remote_documents;
+        '''
+        // @formatter:on
+        );
+
+    for (Map<String, dynamic> row in remoteDocumentsQuery) {
+      final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
+      await addEntry(path.popLast());
+    }
+
+    // Index existing mutations.
+    final List<Map<String, dynamic>> documentMutationsQuery = await db.query(
+        // @formatter:off
+        '''
+          SELECT path
+          FROM document_mutations;
+        '''
+        // @formatter:on
+        );
+
+    for (Map<String, dynamic> row in documentMutationsQuery) {
+      final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
+      await addEntry(path.popLast());
     }
   }
 

@@ -231,11 +231,12 @@ class WatchChangeAggregator {
     }
 
     final RemoteEvent remoteEvent = RemoteEvent(
-      snapshotVersion,
-      Map<int, TargetChange>.from(targetChanges),
-      Set<int>.from(_pendingTargetResets),
-      Map<DocumentKey, MaybeDocument>.from(_pendingDocumentUpdates),
-      Set<DocumentKey>.from(resolvedLimboDocuments),
+      snapshotVersion: snapshotVersion,
+      targetChanges: Map<int, TargetChange>.from(targetChanges),
+      targetMismatches: Set<int>.from(_pendingTargetResets),
+      documentUpdates:
+          Map<DocumentKey, MaybeDocument>.from(_pendingDocumentUpdates),
+      resolvedLimboDocuments: Set<DocumentKey>.from(resolvedLimboDocuments),
     );
 
     // Re-initialize the current state to ensure that we do not modify the generated [RemoteEvent].

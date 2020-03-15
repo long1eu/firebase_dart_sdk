@@ -1,31 +1,57 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 20/09/2018
-import 'dart:async';
 
+library memory_persistence;
+
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_eager_reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_lru_reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_query_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory_remote_document_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/index_manager.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_collections.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:semaphore/semaphore.dart';
+
+part 'memory_eager_reference_delegate.dart';
+part 'memory_index_manager.dart';
+part 'memory_lru_reference_delegate.dart';
+part 'memory_mutation_queue.dart';
+part 'memory_query_cache.dart';
+part 'memory_remote_document_cache.dart';
 
 class MemoryPersistence extends Persistence {
   /// Use factory constructors to instantiate
   MemoryPersistence._()
       : mutationQueues = <User, MemoryMutationQueue>{},
-        remoteDocumentCache = MemoryRemoteDocumentCache(),
-        _semaphore = GlobalSemaphore() {
+        _semaphore = GlobalSemaphore(),
+        indexManager = MemoryIndexManager() {
     queryCache = MemoryQueryCache(this);
+    remoteDocumentCache = MemoryRemoteDocumentCache(this);
   }
 
   factory MemoryPersistence.createEagerGcMemoryPersistence() {
@@ -43,6 +69,8 @@ class MemoryPersistence extends Persistence {
   }
 
   final Semaphore _semaphore;
+  @override
+  final MemoryIndexManager indexManager;
 
   // The persistence objects backing MemoryPersistence are retained here to make
   // it easier to write tests affecting both the in-memory and SQLite-backed
