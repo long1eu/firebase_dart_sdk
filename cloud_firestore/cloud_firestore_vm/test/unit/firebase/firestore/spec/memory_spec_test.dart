@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:path/path.dart';
@@ -82,11 +83,13 @@ void main() {
 
         final bool runTest = testCase.shouldRunTest(tags) &&
             (!exclusiveMode || tags.contains(SpecTestCase.exclusiveTag));
+        final bool measureRuntime = tags.contains('performance');
         if (runTest) {
+          Timeline.startSync(name);
           try {
             SpecTestCase.info(
                 '------------------------------------------------------------------');
-            SpecTestCase.info('  Spec test: $name');
+            SpecTestCase.info('Spec test: $name');
             SpecTestCase.info(
                 '------------------------------------------------------------------');
             testCase.currentName = name;
@@ -97,6 +100,7 @@ void main() {
 
             rethrow;
           }
+          Timeline.finishSync();
         } else {
           SpecTestCase.info('  [SKIPPED] Spec test: $name');
         }
