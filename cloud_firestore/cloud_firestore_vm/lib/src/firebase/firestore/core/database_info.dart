@@ -13,11 +13,13 @@ class DatabaseInfo {
     this.persistenceKey,
     this.host, {
     @required this.sslEnabled,
-  });
+    this.port = 443,
+  }) : assert(port != null);
 
   final DatabaseId databaseId;
   final String persistenceKey;
   final String host;
+  final int port;
   final bool sslEnabled;
 
   @override
@@ -26,6 +28,7 @@ class DatabaseInfo {
           ..add('databaseId', databaseId)
           ..add('persistenceKey', persistenceKey)
           ..add('host', host)
+          ..add('port', port)
           ..add('sslEnabled', sslEnabled))
         .toString();
   }

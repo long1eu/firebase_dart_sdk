@@ -58,6 +58,7 @@ class Datastore {
   }) {
     clientChannel ??= ClientChannel(
       databaseInfo.host,
+      port: databaseInfo.port,
       options: ChannelOptions(
         credentials: databaseInfo.sslEnabled //
             ? const ChannelCredentials.secure()

@@ -25,6 +25,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:rxdart/subjects.dart';
 import 'package:test/test.dart';
 
+import '../unit/firebase/firestore/local/mock/database_mock.dart';
 import 'prod_provider/firestore_provider.dart';
 
 // ignore: avoid_classes_with_only_static_members
@@ -49,8 +50,9 @@ class IntegrationTestUtil {
     return DatabaseInfo(
       DatabaseId.forProject(provider.projectId),
       'test-persistenceKey',
-      provider.firestoreHost,
-      sslEnabled: true,
+      '127.0.0.1',
+      port: 8080,
+      sslEnabled: false,
     );
   }
 
@@ -147,8 +149,7 @@ class IntegrationTestUtil {
       persistenceKey,
       EmptyCredentialsProvider(),
       scheduler,
-      null,
-      /*(String path,
+      (String path,
           {int version,
           OnConfigure onConfigure,
           OnCreate onCreate,
@@ -164,7 +165,7 @@ class IntegrationTestUtil {
             onOpen: onOpen);
         db.renamePath = false;
         return db;
-      },*/
+      },
       settings,
     );
 
