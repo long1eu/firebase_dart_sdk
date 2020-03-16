@@ -8,7 +8,7 @@ import 'dart:typed_data';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/user_data.dart';
@@ -201,7 +201,7 @@ ImmutableSortedSet<DocumentKey> keySet(
 }
 
 Filter filter(String key, String operator, Object value) {
-  return Filter.create(field(key), operatorFromString(operator), wrap(value));
+  return FieldFilter(field(key), operatorFromString(operator), wrap(value));
 }
 
 FilterOperator operatorFromString(String s) {

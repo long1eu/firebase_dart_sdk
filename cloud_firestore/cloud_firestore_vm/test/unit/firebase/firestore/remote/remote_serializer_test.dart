@@ -5,6 +5,7 @@
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/bound.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart'
@@ -666,8 +667,9 @@ void main() {
   });
 
   test('testInSerialization', () {
-    final proto.StructuredQuery_Filter _filter =
-        serializer.encodeRelationFilter(filter('field', 'in', <int>[42]));
+    final Filter inputFilter = filter('field', 'in', <int>[42]);
+    final proto.StructuredQuery_Filter apiFilter =
+        serializer.encodeUnaryOrFieldFilter(inputFilter);
 
     final proto.ArrayValue inFilterValue = proto.ArrayValue()
       ..values.add(valueBuilder()..integerValue = Int64(42));
@@ -680,12 +682,17 @@ void main() {
             ..op = proto.StructuredQuery_FieldFilter_Operator.IN
             ..value = (valueBuilder()..arrayValue = inFilterValue));
 
-    expect(expectedFilter, _filter);
+    expect(expectedFilter, apiFilter);
+    final FieldFilter roundTripped =
+        serializer.decodeFieldFilter(apiFilter.fieldFilter);
+    expect(inputFilter, roundTripped);
+    expect(roundTripped, isA<InFilter>());
   });
 
   test('testArrayContainsAnySerialization', () {
-    final proto.StructuredQuery_Filter _filter = serializer
-        .encodeRelationFilter(filter('field', 'array-contains-any', <int>[42]));
+    final Filter inputFilter = filter('field', 'array-contains-any', <int>[42]);
+    final proto.StructuredQuery_Filter apiFilter =
+        serializer.encodeUnaryOrFieldFilter(inputFilter);
 
     final proto.ArrayValue arrayContainsAnyFilterValue = proto.ArrayValue()
       ..values.add(valueBuilder()..integerValue = Int64(42));
@@ -699,7 +706,35 @@ void main() {
             ..value =
                 (valueBuilder()..arrayValue = arrayContainsAnyFilterValue));
 
-    expect(expectedFilter, _filter);
+    expect(expectedFilter, apiFilter);
+    final FieldFilter roundTripped =
+        serializer.decodeFieldFilter(apiFilter.fieldFilter);
+    expect(inputFilter, roundTripped);
+    expect(roundTripped, isA<ArrayContainsAnyFilter>());
+  });
+
+  test('testKeyFieldSerializationEncoding', () {
+    final FieldFilter inputFilter =
+        filter('__name__', '==', ref('project/database'));
+    final proto.StructuredQuery_Filter apiFilter =
+        serializer.encodeUnaryOrFieldFilter(inputFilter);
+
+    final proto
+        .StructuredQuery_Filter expectedFilter = proto.StructuredQuery_Filter()
+      ..fieldFilter = (proto.StructuredQuery_FieldFilter()
+        ..field_1 =
+            (proto.StructuredQuery_FieldReference()..fieldPath = '__name__')
+        ..op = proto.StructuredQuery_FieldFilter_Operator.EQUAL
+        ..value = (valueBuilder()
+          ..referenceValue =
+              'projects/project/databases/(default)/documents/project/database'))
+      ..freeze();
+
+    expect(expectedFilter, apiFilter);
+    final FieldFilter roundTripped =
+        serializer.decodeFieldFilter(apiFilter.fieldFilter);
+    expect(inputFilter, roundTripped);
+    expect(roundTripped, isA<KeyFieldFilter>());
   });
 
   // TODO(PORTING-NOTE): Android currently tests most filter serialization (for

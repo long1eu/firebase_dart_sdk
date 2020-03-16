@@ -3,7 +3,7 @@
 // on 17/09/2018
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/bound.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
@@ -100,8 +100,8 @@ class Query {
   /// Returns the field of the first filter on this Query that's an inequality, or null if none.
   FieldPath get inequalityField {
     for (Filter filter in filters) {
-      if (filter is RelationFilter) {
-        final RelationFilter relationFilter = filter;
+      if (filter is FieldFilter) {
+        final FieldFilter relationFilter = filter;
         if (relationFilter.isInequality) {
           return relationFilter.field;
         }
@@ -112,9 +112,9 @@ class Query {
 
   /// Checks if any of the provided filter operators are included in the query
   /// and returns the first one that is, or null if none are.
-  FilterOperator findOperatorFilter(List<FilterOperator> filterOps) {
+  FilterOperator findFilterOperator(List<FilterOperator> filterOps) {
     for (Filter filter in filters) {
-      if (filter is RelationFilter) {
+      if (filter is FieldFilter) {
         final FilterOperator queryOp = filter.operator;
 
         if (filterOps.contains(queryOp)) {
@@ -132,7 +132,7 @@ class Query {
     hardAssert(!isDocumentQuery, 'No filter is allowed for document query');
 
     FieldPath newInequalityField;
-    if (filter is RelationFilter && filter.isInequality) {
+    if (filter is FieldFilter && filter.isInequality) {
       newInequalityField = filter.field;
     }
 

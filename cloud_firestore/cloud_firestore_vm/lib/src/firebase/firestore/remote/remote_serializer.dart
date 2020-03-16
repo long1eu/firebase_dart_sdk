@@ -6,7 +6,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/bound.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
@@ -726,10 +726,8 @@ class RemoteSerializer {
         List<proto.StructuredQuery_Filter>(filters.length);
     int i = 0;
     for (Filter filter in filters) {
-      if (filter is RelationFilter) {
-        protos[i] = encodeRelationFilter(filter);
-      } else {
-        protos[i] = _encodeUnaryFilter(filter);
+      if (filter is FieldFilter) {
+        protos[i] = encodeUnaryOrFieldFilter(filter);
       }
       i++;
     }
@@ -765,7 +763,7 @@ class RemoteSerializer {
       if (filter.hasCompositeFilter()) {
         throw fail('Nested composite filters are not supported.');
       } else if (filter.hasFieldFilter()) {
-        result[i] = _decodeRelationFilter(filter.fieldFilter);
+        result[i] = decodeFieldFilter(filter.fieldFilter);
       } else if (filter.hasUnaryFilter()) {
         result[i] = _decodeUnaryFilter(filter.unaryFilter);
       } else {
@@ -778,11 +776,28 @@ class RemoteSerializer {
   }
 
   @visibleForTesting
-  proto.StructuredQuery_Filter encodeRelationFilter(RelationFilter filter) {
+  proto.StructuredQuery_Filter encodeUnaryOrFieldFilter(FieldFilter filter) {
+    if (filter.operator == FilterOperator.equal) {
+      final proto.StructuredQuery_UnaryFilter unaryProto =
+          proto.StructuredQuery_UnaryFilter()
+            ..field_2 = _encodeFieldPath(filter.field);
+
+      if (filter.value == DoubleValue.nan) {
+        unaryProto.op = proto_v1.StructuredQuery_UnaryFilter_Operator.IS_NAN;
+        return proto.StructuredQuery_Filter()
+          ..unaryFilter = unaryProto
+          ..freeze();
+      } else if (filter.value == NullValue.nullValue()) {
+        unaryProto.op = proto_v1.StructuredQuery_UnaryFilter_Operator.IS_NULL;
+        return proto.StructuredQuery_Filter()
+          ..unaryFilter = unaryProto
+          ..freeze();
+      }
+    }
     final proto.StructuredQuery_FieldFilter builder =
-        proto.StructuredQuery_FieldFilter.create()
+        proto.StructuredQuery_FieldFilter()
           ..field_1 = _encodeFieldPath(filter.field)
-          ..op = _encodeRelationFilterOperator(filter.operator)
+          ..op = _encodeFieldFilterOperator(filter.operator)
           ..value = encodeValue(filter.value);
 
     return proto.StructuredQuery_Filter.create()
@@ -790,31 +805,15 @@ class RemoteSerializer {
       ..freeze();
   }
 
-  Filter _decodeRelationFilter(proto.StructuredQuery_FieldFilter builder) {
+  @visibleForTesting
+  Filter decodeFieldFilter(proto.StructuredQuery_FieldFilter builder) {
     final FieldPath fieldPath =
         FieldPath.fromServerFormat(builder.field_1.fieldPath);
 
     final FilterOperator filterOperator =
-        _decodeRelationFilterOperator(builder.op);
+        _decodeFieldFilterOperator(builder.op);
     final FieldValue value = decodeValue(builder.value);
-    return Filter.create(fieldPath, filterOperator, value);
-  }
-
-  proto.StructuredQuery_Filter _encodeUnaryFilter(Filter filter) {
-    final proto.StructuredQuery_UnaryFilter builder =
-        proto.StructuredQuery_UnaryFilter.create()
-          ..field_2 = _encodeFieldPath(filter.field);
-
-    if (filter is NaNFilter) {
-      builder.op = proto.StructuredQuery_UnaryFilter_Operator.IS_NAN;
-    } else if (filter is NullFilter) {
-      builder.op = proto.StructuredQuery_UnaryFilter_Operator.IS_NULL;
-    } else {
-      throw fail('Unrecognized filter: ${filter.canonicalId}');
-    }
-    return proto.StructuredQuery_Filter.create()
-      ..unaryFilter = builder
-      ..freeze();
+    return FieldFilter(fieldPath, filterOperator, value);
   }
 
   Filter _decodeUnaryFilter(proto.StructuredQuery_UnaryFilter value) {
@@ -822,9 +821,10 @@ class RemoteSerializer {
         FieldPath.fromServerFormat(value.field_2.fieldPath);
     switch (value.op) {
       case proto.StructuredQuery_UnaryFilter_Operator.IS_NAN:
-        return NaNFilter(fieldPath);
+        return FieldFilter(fieldPath, FilterOperator.equal, DoubleValue.nan);
       case proto.StructuredQuery_UnaryFilter_Operator.IS_NULL:
-        return NullFilter(fieldPath);
+        return FieldFilter(
+            fieldPath, FilterOperator.equal, NullValue.nullValue());
       default:
         throw fail('Unrecognized UnaryFilter.operator ${value.op}');
     }
@@ -836,7 +836,7 @@ class RemoteSerializer {
       ..freeze();
   }
 
-  proto.StructuredQuery_FieldFilter_Operator _encodeRelationFilterOperator(
+  proto.StructuredQuery_FieldFilter_Operator _encodeFieldFilterOperator(
       FilterOperator operator) {
     switch (operator) {
       case FilterOperator.lessThan:
@@ -860,7 +860,7 @@ class RemoteSerializer {
     }
   }
 
-  FilterOperator _decodeRelationFilterOperator(
+  FilterOperator _decodeFieldFilterOperator(
       proto.StructuredQuery_FieldFilter_Operator operator) {
     switch (operator) {
       case proto.StructuredQuery_FieldFilter_Operator.LESS_THAN:

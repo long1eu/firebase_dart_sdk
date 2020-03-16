@@ -112,7 +112,7 @@ class Firestore {
       sslEnabled: settings.sslEnabled,
     );
 
-    final TaskScheduler scheduler = TaskScheduler(app.persistenceKey);
+    final TaskScheduler scheduler = TaskScheduler(app.name);
     return Firestore(
       databaseId,
       app,

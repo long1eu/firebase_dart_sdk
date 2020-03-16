@@ -597,7 +597,6 @@ void main() {
     final Completer<void> barrier = Completer<void>();
 
     StreamSubscription<DocumentSnapshot> listenerRegistration;
-
     try {
       listenerRegistration = documentReference.snapshots.listen(
         (DocumentSnapshot value) {

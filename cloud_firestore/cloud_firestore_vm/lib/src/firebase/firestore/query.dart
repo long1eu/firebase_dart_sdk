@@ -7,7 +7,7 @@ import 'dart:async';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/bound.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/event_manager.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart'
     as core;
@@ -266,7 +266,7 @@ class Query {
       }
       fieldValue = firestore.dataConverter.parseQueryValue(value);
     }
-    final Filter filter = Filter.create(fieldPath.internalPath, op, fieldValue);
+    final Filter filter = FieldFilter(fieldPath.internalPath, op, fieldValue);
     _validateNewFilter(filter);
     return Query(query.filter(filter), firestore);
   }
@@ -347,7 +347,7 @@ class Query {
   }
 
   void _validateNewFilter(Filter filter) {
-    if (filter is RelationFilter) {
+    if (filter is FieldFilter) {
       final FilterOperator filterOp = filter.operator;
       final bool isArrayOperator =
           FilterOperator.arrayOperators.contains(filterOp);
@@ -375,11 +375,11 @@ class Query {
         FilterOperator conflictingOperator;
         if (isDisjunctiveOperator) {
           conflictingOperator =
-              query.findOperatorFilter(FilterOperator.disjunctiveOperators);
+              query.findFilterOperator(FilterOperator.disjunctiveOperators);
         }
         if (conflictingOperator == null && isArrayOperator) {
           conflictingOperator =
-              query.findOperatorFilter(FilterOperator.arrayOperators);
+              query.findFilterOperator(FilterOperator.arrayOperators);
         }
         if (conflictingOperator != null) {
           // We special case when it's a duplicate op to give a slightly clearer

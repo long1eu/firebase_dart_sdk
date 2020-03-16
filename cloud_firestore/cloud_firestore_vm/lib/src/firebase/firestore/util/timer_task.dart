@@ -50,12 +50,6 @@ class TaskScheduler {
     });
   }
 
-  void clearAll() {
-    _log('Clear all tasks');
-    _tasks.values.toList().forEach((TimerTask element) => element.cancel());
-    _tasks.clear();
-  }
-
   void _remove(TaskId id) {
     _tasks.remove(id);
   }

@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/index_range.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/index_cursor.dart';
@@ -143,21 +143,18 @@ class IndexedQueryEngine implements QueryEngine {
   /// Returns a number from 0.0 to 1.0 (inclusive), where higher numbers
   /// indicate higher selectivity
   static double _estimateFilterSelectivity(Filter filter) {
-    if (filter is NullFilter) {
-      return _kHighSelectivity;
-    } else if (filter is NaNFilter) {
+    hardAssert(filter is FieldFilter, 'Filter type expected to be FieldFilter');
+
+    final FieldFilter fieldFilter = filter;
+    if (fieldFilter.value == null || fieldFilter.value == DoubleValue.nan) {
       return _kHighSelectivity;
     } else {
-      hardAssert(filter is RelationFilter,
-          'Filter type expected to be RelationFilter');
-      final RelationFilter relationFilter = filter;
-
       final double operatorSelectivity =
-          relationFilter.operator == FilterOperator.equal
+          fieldFilter.operator == FilterOperator.equal
               ? _kHighSelectivity
               : _kLowSelectivity;
       final double typeSelectivity =
-          _kLowCardinalityTypes.contains(relationFilter.value.runtimeType)
+          _kLowCardinalityTypes.contains(fieldFilter.value.runtimeType)
               ? _kLowSelectivity
               : _kHighSelectivity;
 
@@ -203,8 +200,8 @@ class IndexedQueryEngine implements QueryEngine {
   /// match the given filter. The determined [IndexRange] is likely
   /// overselective and requires post-filtering.
   static IndexRange _convertFilterToIndexRange(Filter filter) {
-    if (filter is RelationFilter) {
-      final RelationFilter relationFilter = filter;
+    if (filter is FieldFilter) {
+      final FieldFilter relationFilter = filter;
       final FieldValue filterValue = relationFilter.value;
       switch (relationFilter.operator) {
         case FilterOperator.equal:
@@ -229,18 +226,6 @@ class IndexedQueryEngine implements QueryEngine {
           // TODO(long1eu): Add support for ARRAY_CONTAINS.
           throw fail('Unexpected operator in query filter');
       }
-    } else if (filter is NaNFilter) {
-      return IndexRange(
-        fieldPath: filter.field,
-        start: DoubleValue.nan,
-        end: DoubleValue.nan,
-      );
-    } else if (filter is NullFilter) {
-      return IndexRange(
-        fieldPath: filter.field,
-        start: NullValue.nullValue(),
-        end: NullValue.nullValue(),
-      );
     }
     return IndexRange(fieldPath: filter.field);
   }
