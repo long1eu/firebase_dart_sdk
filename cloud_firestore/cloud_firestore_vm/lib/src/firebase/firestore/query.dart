@@ -45,69 +45,7 @@ class Query {
         assert(firestore != null);
 
   final core.Query query;
-
   final Firestore firestore;
-
-  void _validateOrderByFieldMatchesInequality(
-      core.FieldPath orderBy, core.FieldPath inequality) {
-    if (orderBy != inequality) {
-      final String inequalityString = inequality.canonicalString;
-      throw ArgumentError(
-          'Invalid query. You have an inequality where filter (whereLessThan(), whereGreaterThan(), etc.) on field '
-          '\'$inequalityString\' and so you must also have \'$inequalityString\' as your first orderBy() field, but '
-          'your first orderBy() is currently on field \'${orderBy.canonicalString}\' instead.');
-    }
-  }
-
-  void _validateNewFilter(Filter filter) {
-    if (filter is RelationFilter) {
-      final FilterOperator filterOp = filter.operator;
-      final bool isArrayOperator =
-          FilterOperator.arrayOperators.contains(filterOp);
-      final bool isDisjunctiveOperator =
-          FilterOperator.disjunctiveOperators.contains(filterOp);
-
-      if (filter.isInequality) {
-        final core.FieldPath existingInequality = query.inequalityField;
-        final core.FieldPath newInequality = filter.field;
-
-        if (existingInequality != null && existingInequality != newInequality) {
-          throw ArgumentError(
-            'All where filters other than whereEqualTo() must be on the same field. But you have filters on '
-            '\'${existingInequality.canonicalString}\' and \'${newInequality.canonicalString}\'',
-          );
-        }
-        final core.FieldPath firstOrderByField = query.firstOrderByField;
-        if (firstOrderByField != null) {
-          _validateOrderByFieldMatchesInequality(
-              firstOrderByField, newInequality);
-        }
-      } else if (isDisjunctiveOperator || isArrayOperator) {
-        // You can have at most 1 disjunctive filter and 1 array filter. Check
-        // if the new filter conflicts with an existing one.
-        FilterOperator conflictingOperator;
-        if (isDisjunctiveOperator) {
-          conflictingOperator =
-              query.findOperatorFilter(FilterOperator.disjunctiveOperators);
-        }
-        if (conflictingOperator == null && isArrayOperator) {
-          conflictingOperator =
-              query.findOperatorFilter(FilterOperator.arrayOperators);
-        }
-        if (conflictingOperator != null) {
-          // We special case when it's a duplicate op to give a slightly clearer
-          // error message.
-          if (conflictingOperator == filterOp) {
-            throw ArgumentError(
-                'Invalid Query. You cannot use more than one "$filterOp" filter.');
-          } else {
-            throw ArgumentError(
-                'Invalid Query. You cannot use "$filterOp" filters with "$conflictingOperator" filters.');
-          }
-        }
-      }
-    }
-  }
 
   /// Creates and returns a new Query with the additional filter that documents must contain the specified field and the
   /// value should be equal to the specified value.
@@ -312,57 +250,19 @@ class Query {
           op == FilterOperator.arrayContainsAny) {
         throw ArgumentError(
             'Invalid query. You can\'t perform "$op" queries on FieldPath.documentId().');
-      }
-      if (value is String) {
-        final String documentKey = value;
-        if (documentKey.isEmpty) {
-          throw ArgumentError(
-              'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.');
+      } else if (op == FilterOperator.IN) {
+        _validateDisjunctiveFilterElements(value, op);
+        final List<FieldValue> referenceList = <FieldValue>[];
+        for (Object arrayValue in value) {
+          referenceList.add(_parseDocumentIdValue(arrayValue));
         }
-
-        if (!query.isCollectionGroupQuery && documentKey.contains('/')) {
-          throw ArgumentError(
-              "Invalid query. When querying with FieldPath.documentId() you must provide a plain document ID, but '$documentKey' contains a '/' character.");
-        }
-
-        final ResourcePath path =
-            query.path.appendField(ResourcePath.fromString(documentKey));
-        if (!DocumentKey.isDocumentKey(path)) {
-          throw ArgumentError(
-              'Invalid query. When querying a collection group by FieldPath.documentId(), the value provided must result in a valid document path, but "$path" is not because it has an odd number of segments (${path.length}).');
-        }
-        fieldValue = ReferenceValue.valueOf(
-            firestore.databaseId, DocumentKey.fromPath(path));
-      } else if (value is DocumentReference) {
-        final DocumentReference ref = value;
-        fieldValue = ReferenceValue.valueOf(firestore.databaseId, ref.key);
+        fieldValue = ArrayValue.fromList(referenceList);
       } else {
-        throw ArgumentError(
-            'Invalid query. When querying with FieldPath.documentId() you must provide a valid String or '
-            'DocumentReference, but it was of type: ${typeName(value)}');
+        fieldValue = _parseDocumentIdValue(value);
       }
     } else {
       if (op == FilterOperator.IN || op == FilterOperator.arrayContainsAny) {
-        if (value is! List) {
-          throw ArgumentError(
-              'Invalid Query. A non-empty array is required for "$op" filters.');
-        }
-
-        final List<dynamic> _value = value;
-        if (_value.isEmpty) {
-          throw ArgumentError(
-              'Invalid Query. A non-empty array is required for "$op" filters.');
-        } else if (_value.length > 10) {
-          throw ArgumentError(
-              'Invalid Query. "$op" filters support a maximum of 10 elements in the value array.');
-        } else if (_value.contains(null)) {
-          throw ArgumentError(
-              'Invalid Query. "$op" filters cannot contain "null" in the value array.');
-        } else if (_value
-            .any((dynamic element) => element is double && element.isNaN)) {
-          throw ArgumentError(
-              'Invalid Query. "$op" filters cannot contain "NaN" in the value array.');
-        }
+        _validateDisjunctiveFilterElements(value, op);
       }
       fieldValue = firestore.dataConverter.parseQueryValue(value);
     }
@@ -375,6 +275,124 @@ class Query {
     final core.FieldPath inequalityField = query.inequalityField;
     if (query.firstOrderByField == null && inequalityField != null) {
       _validateOrderByFieldMatchesInequality(field, inequalityField);
+    }
+  }
+
+  /// Parses the given documentIdValue into a ReferenceValue, throwing
+  /// appropriate errors if the value is anything other than a DocumentReference
+  /// or String, or if the string is malformed.
+  FieldValue _parseDocumentIdValue(Object value) {
+    if (value is String) {
+      if (value.isEmpty) {
+        throw ArgumentError(
+            'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.');
+      }
+
+      if (!query.isCollectionGroupQuery && value.contains('/')) {
+        throw ArgumentError(
+            'Invalid query. When querying a collection by FieldPath.documentId() you must provide a plain document ID, but "$value" contains a "/" character.');
+      }
+
+      final ResourcePath path =
+          query.path.appendField(ResourcePath.fromString(value));
+      if (!DocumentKey.isDocumentKey(path)) {
+        throw ArgumentError(
+            'Invalid query. When querying a collection group by FieldPath.documentId(), the value provided must result in a valid document path, but "$path" is not because it has an odd number of segments (${path.length}).');
+      }
+      return ReferenceValue.valueOf(
+          firestore.databaseId, DocumentKey.fromPath(path));
+    } else if (value is DocumentReference) {
+      return ReferenceValue.valueOf(firestore.databaseId, value.key);
+    } else {
+      throw ArgumentError(
+          'Invalid query. When querying with FieldPath.documentId() you must provide a valid String or '
+          'DocumentReference, but it was of type: ${typeName(value)}');
+    }
+  }
+
+  /// Validates that the value passed into a disjunctive filter satisfies all
+  /// array requirements.
+  void _validateDisjunctiveFilterElements(Object value, FilterOperator op) {
+    if (value is List) {
+      if (value.isEmpty) {
+        throw ArgumentError(
+            'Invalid Query. A non-empty array is required for "$op" filters.');
+      } else if (value.length > 10) {
+        throw ArgumentError(
+            'Invalid Query. "$op" filters support a maximum of 10 elements in the value array.');
+      } else if (value.contains(null)) {
+        throw ArgumentError(
+            'Invalid Query. "$op" filters cannot contain "null" in the value array.');
+      } else if (value
+          .any((dynamic element) => element is double && element.isNaN)) {
+        throw ArgumentError(
+            'Invalid Query. "$op" filters cannot contain "NaN" in the value array.');
+      }
+    } else {
+      throw ArgumentError(
+          'Invalid Query. A non-empty array is required for "$op" filters.');
+    }
+  }
+
+  void _validateOrderByFieldMatchesInequality(
+      core.FieldPath orderBy, core.FieldPath inequality) {
+    if (orderBy != inequality) {
+      final String inequalityString = inequality.canonicalString;
+      throw ArgumentError('Invalid query. You have an inequality where filter '
+          '(whereLessThan(), whereGreaterThan(), etc.) on field '
+          '"$inequalityString" and so you must also have "$inequalityString" '
+          'as your first orderBy() field, but your first orderBy() is '
+          'currently on field "${orderBy.canonicalString}" instead.');
+    }
+  }
+
+  void _validateNewFilter(Filter filter) {
+    if (filter is RelationFilter) {
+      final FilterOperator filterOp = filter.operator;
+      final bool isArrayOperator =
+          FilterOperator.arrayOperators.contains(filterOp);
+      final bool isDisjunctiveOperator =
+          FilterOperator.disjunctiveOperators.contains(filterOp);
+
+      if (filter.isInequality) {
+        final core.FieldPath existingInequality = query.inequalityField;
+        final core.FieldPath newInequality = filter.field;
+
+        if (existingInequality != null && existingInequality != newInequality) {
+          throw ArgumentError(
+            'All where filters other than whereEqualTo() must be on the same field. But you have filters on '
+            '\'${existingInequality.canonicalString}\' and \'${newInequality.canonicalString}\'',
+          );
+        }
+        final core.FieldPath firstOrderByField = query.firstOrderByField;
+        if (firstOrderByField != null) {
+          _validateOrderByFieldMatchesInequality(
+              firstOrderByField, newInequality);
+        }
+      } else if (isDisjunctiveOperator || isArrayOperator) {
+        // You can have at most 1 disjunctive filter and 1 array filter. Check
+        // if the new filter conflicts with an existing one.
+        FilterOperator conflictingOperator;
+        if (isDisjunctiveOperator) {
+          conflictingOperator =
+              query.findOperatorFilter(FilterOperator.disjunctiveOperators);
+        }
+        if (conflictingOperator == null && isArrayOperator) {
+          conflictingOperator =
+              query.findOperatorFilter(FilterOperator.arrayOperators);
+        }
+        if (conflictingOperator != null) {
+          // We special case when it's a duplicate op to give a slightly clearer
+          // error message.
+          if (conflictingOperator == filterOp) {
+            throw ArgumentError(
+                'Invalid Query. You cannot use more than one "$filterOp" filter.');
+          } else {
+            throw ArgumentError(
+                'Invalid Query. You cannot use "$filterOp" filters with "$conflictingOperator" filters.');
+          }
+        }
+      }
     }
   }
 

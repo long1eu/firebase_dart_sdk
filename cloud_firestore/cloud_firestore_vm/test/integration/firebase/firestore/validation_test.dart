@@ -612,9 +612,9 @@ void main() {
     final CollectionReference collection = await testCollection();
     const String reason =
         'Invalid query. You have an inequality where filter (whereLessThan(), '
-        'whereGreaterThan(), etc.) on field \'x\' and so you must also have '
-        '\'x\' as your first orderBy() field, but your first orderBy() is '
-        'currently on field \'y\' instead.';
+        'whereGreaterThan(), etc.) on field "x" and so you must also have '
+        '"x" as your first orderBy() field, but your first orderBy() is '
+        'currently on field "y" instead.';
 
     await expectError(
         () => collection.whereGreaterThan('x', 32).orderBy('y'), reason);
@@ -774,9 +774,9 @@ void main() {
         reason);
 
     reason =
-        'Invalid query. When querying with FieldPath.documentId() you must '
-        'provide a plain document ID, but \'foo/bar/baz\' contains a \'/\' '
-        'character.';
+        'Invalid query. When querying a collection by FieldPath.documentId() '
+        'you must provide a plain document ID, but "foo/bar/baz" contains a '
+        '"/" character.';
     await expectError(
         () => collection.whereGreaterThanOrEqualToField(
             FieldPath.documentId(), 'foo/bar/baz'),
@@ -788,13 +788,6 @@ void main() {
     await expectError(
         () => collection.whereGreaterThanOrEqualToField(
             FieldPath.documentId(), 1),
-        reason);
-
-    reason =
-        'Invalid query. When querying with FieldPath.documentId() you must provide '
-        'a valid String or DocumentReference, but it was of type: List<int>';
-    await expectError(
-        () => collection.whereInField(FieldPath.documentId(), <int>[1, 2]),
         reason);
 
     reason =
@@ -818,6 +811,41 @@ void main() {
     await expectError(
         () => collection
             .whereArrayContainsAnyField(FieldPath.documentId(), <int>[1, 2]),
+        reason);
+  });
+
+  test('queriesUsingInAndDocumentIdMustHaveProperDocumentReferencesInArray',
+      () async {
+    final CollectionReference collection = await testCollection();
+    collection.whereInField(FieldPath.documentId(), <String>[collection.path]);
+
+    String reason =
+        'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.';
+    await expectError(
+        () async =>
+            collection.whereInField(FieldPath.documentId(), <String>['']),
+        reason);
+
+    reason =
+        'Invalid query. When querying a collection by FieldPath.documentId() you must provide a plain document ID, but "foo/bar/baz" contains a "/" character.';
+    await expectError(
+        () async => collection
+            .whereInField(FieldPath.documentId(), <String>['foo/bar/baz']),
+        reason);
+
+    reason =
+        'Invalid query. When querying with FieldPath.documentId() you must provide a valid String or DocumentReference, but it was of type: int';
+    await expectError(
+        () async =>
+            collection.whereInField(FieldPath.documentId(), <int>[1, 2]),
+        reason);
+
+    reason =
+        'Invalid query. When querying a collection group by FieldPath.documentId(), the value provided must result in a valid document path, but "foo" is not because it has an odd number of segments (1).';
+    await expectError(
+        () async => (await testFirestore())
+            .collectionGroup('collection')
+            .whereInField(FieldPath.documentId(), <String>['foo']),
         reason);
   });
 }
