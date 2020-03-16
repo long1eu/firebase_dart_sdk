@@ -61,8 +61,13 @@ class Query {
 
   void _validateNewFilter(Filter filter) {
     if (filter is RelationFilter) {
-      final RelationFilter relationFilter = filter;
-      if (relationFilter.isInequality) {
+      final FilterOperator filterOp = filter.operator;
+      final bool isArrayOperator =
+          FilterOperator.arrayOperators.contains(filterOp);
+      final bool isDisjunctiveOperator =
+          FilterOperator.disjunctiveOperators.contains(filterOp);
+
+      if (filter.isInequality) {
         final core.FieldPath existingInequality = query.inequalityField;
         final core.FieldPath newInequality = filter.field;
 
@@ -77,10 +82,28 @@ class Query {
           _validateOrderByFieldMatchesInequality(
               firstOrderByField, newInequality);
         }
-      } else if (relationFilter.operator == FilterOperator.arrayContains) {
-        if (query.hasArrayContainsFilter) {
-          throw ArgumentError(
-              'Invalid Query. Queries only support having a single array-contains filter.');
+      } else if (isDisjunctiveOperator || isArrayOperator) {
+        // You can have at most 1 disjunctive filter and 1 array filter. Check
+        // if the new filter conflicts with an existing one.
+        FilterOperator conflictingOperator;
+        if (isDisjunctiveOperator) {
+          conflictingOperator =
+              query.findOperatorFilter(FilterOperator.disjunctiveOperators);
+        }
+        if (conflictingOperator == null && isArrayOperator) {
+          conflictingOperator =
+              query.findOperatorFilter(FilterOperator.arrayOperators);
+        }
+        if (conflictingOperator != null) {
+          // We special case when it's a duplicate op to give a slightly clearer
+          // error message.
+          if (conflictingOperator == filterOp) {
+            throw ArgumentError(
+                'Invalid Query. You cannot use more than one "$filterOp" filter.');
+          } else {
+            throw ArgumentError(
+                'Invalid Query. You cannot use "$filterOp" filters with "$conflictingOperator" filters.');
+          }
         }
       }
     }
@@ -204,7 +227,8 @@ class Query {
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field, the
   /// value must be an array, and that the array must contain the provided value.
   ///
-  /// A Query can have only one [whereArrayContains] filter.
+  /// A Query can have only one [whereArrayContains] filter and it cannot be
+  /// combined with [whereArrayContainsAny].
   ///
   /// [field] The name of the field containing an array to search
   /// [value] The value that must be contained in the array
@@ -218,7 +242,8 @@ class Query {
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field, the
   /// value must be an array, and that the array must contain the provided value.
   ///
-  /// A Query can have only one [whereArrayContains] filter.
+  /// A Query can have only one [whereArrayContains] filter and it cannot be
+  /// combined with [whereArrayContainsAny].
   ///
   /// [fieldPath] The path of the field containing an array to search
   /// [value] The value that must be contained in the array
@@ -228,29 +253,71 @@ class Query {
     return _whereHelper(fieldPath, FilterOperator.arrayContains, value);
   }
 
-  /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
-  /// the value should satisfy the relation constraint provided.
+  /// Creates and returns a new Query with the additional filter that documents
+  /// must contain the specified field, the value must be a list, and that the
+  /// list must contain at least one value from the provided array.
   ///
-  /// [fieldPath] The field to compare
-  /// [op] The operator
-  /// [value] The value for comparison
+  /// A Query can have only one [whereArrayContainsAny] filter and it cannot be
+  /// combined with [whereArrayContains] or [whereIn].
+  // TODO(in-queries): Expose to public once backend is ready.
+  Query whereArrayContainsAny(String field, List<Object> value) {
+    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
+        FilterOperator.arrayContainsAny, value);
+  }
+
+  /// Creates and returns a new Query with the additional filter that documents
+  /// must contain the specified field, the value must be an array, and that the
+  /// array must contain at least one value from the provided array.
   ///
-  /// Returns the created Query.
+  /// A Query can have only one [whereArrayContainsAny] filter and it cannot be
+  /// combined with [whereArrayContains] or [whereIn].
+  // TODO(in-queries): Expose to public once backend is ready.
+  Query whereArrayContainsAnyField(FieldPath fieldPath, List<Object> value) {
+    return _whereHelper(fieldPath, FilterOperator.arrayContainsAny, value);
+  }
+
+  /// Creates and returns a new Query with the additional filter that documents
+  /// must contain the specified field and the value must equal one of the
+  /// values from the provided array.
+  ///
+  /// A Query can have only one [whereIn] filter, and it cannot be combined with
+  /// [whereArrayContainsAny].
+  // TODO(in-queries): Expose to public once backend is ready.
+  Query whereIn(String field, List<Object> value) {
+    return _whereHelper(
+        FieldPath.fromDotSeparatedPath(field), FilterOperator.IN, value);
+  }
+
+  /// Creates and returns a new Query with the additional filter that documents
+  /// must contain the specified field and the value must equal one of the
+  /// values from the provided array.
+  ///
+  /// A Query can have only one [whereIn] filter, and it cannot be combined with
+  /// [whereArrayContainsAny].
+  // TODO(in-queries): Expose to public once backend is ready.
+  Query whereInField(FieldPath fieldPath, List<Object> value) {
+    return _whereHelper(fieldPath, FilterOperator.IN, value);
+  }
+
+  /// Creates and returns a new [Query] with the additional filter that
+  /// documents must contain the specified field and the value should satisfy
+  /// the relation constraint provided.
   Query _whereHelper(FieldPath fieldPath, FilterOperator op, Object value) {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
     checkNotNull(op, 'Provided op must not be null.');
     FieldValue fieldValue;
     final core.FieldPath internalPath = fieldPath.internalPath;
     if (internalPath.isKeyField) {
-      if (op == FilterOperator.arrayContains) {
+      if (op == FilterOperator.arrayContains ||
+          op == FilterOperator.arrayContainsAny) {
         throw ArgumentError(
-            "Invalid query. You can't perform array-contains queries on FieldPath.documentId() since document IDs are not arrays.");
+            'Invalid query. You can\'t perform "$op" queries on FieldPath.documentId().');
       }
       if (value is String) {
         final String documentKey = value;
         if (documentKey.isEmpty) {
           throw ArgumentError(
-              'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but but it was an empty string.');
+              'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.');
         }
 
         if (!query.isCollectionGroupQuery && documentKey.contains('/')) {
@@ -262,7 +329,7 @@ class Query {
             query.path.appendField(ResourcePath.fromString(documentKey));
         if (!DocumentKey.isDocumentKey(path)) {
           throw ArgumentError(
-              "Invalid query. When querying a collection group by FieldPath.documentId(), the value provided must result in a valid document path, but '$path' is not because it has an odd number of segments (${path.length}).");
+              'Invalid query. When querying a collection group by FieldPath.documentId(), the value provided must result in a valid document path, but "$path" is not because it has an odd number of segments (${path.length}).');
         }
         fieldValue = ReferenceValue.valueOf(
             firestore.databaseId, DocumentKey.fromPath(path));
@@ -275,6 +342,28 @@ class Query {
             'DocumentReference, but it was of type: ${typeName(value)}');
       }
     } else {
+      if (op == FilterOperator.IN || op == FilterOperator.arrayContainsAny) {
+        if (value is! List) {
+          throw ArgumentError(
+              'Invalid Query. A non-empty array is required for "$op" filters.');
+        }
+
+        final List<dynamic> _value = value;
+        if (_value.isEmpty) {
+          throw ArgumentError(
+              'Invalid Query. A non-empty array is required for "$op" filters.');
+        } else if (_value.length > 10) {
+          throw ArgumentError(
+              'Invalid Query. "$op" filters support a maximum of 10 elements in the value array.');
+        } else if (_value.contains(null)) {
+          throw ArgumentError(
+              'Invalid Query. "$op" filters cannot contain "null" in the value array.');
+        } else if (_value
+            .any((dynamic element) => element is double && element.isNaN)) {
+          throw ArgumentError(
+              'Invalid Query. "$op" filters cannot contain "NaN" in the value array.');
+        }
+      }
       fieldValue = firestore.dataConverter.parseQueryValue(value);
     }
     final Filter filter = Filter.create(fieldPath.internalPath, op, fieldValue);
@@ -510,13 +599,13 @@ class Query {
 
         if (!query.isCollectionGroupQuery && documentId.contains('/')) {
           throw ArgumentError(
-              "Invalid query. When querying a collection and ordering by FieldPath.documentId(), the value passed to $methodName() must be a plain document ID, but '$documentId' contains a slash.");
+              'Invalid query. When querying a collection and ordering by FieldPath.documentId(), the value passed to $methodName() must be a plain document ID, but "$documentId" contains a slash.');
         }
         final ResourcePath path =
             query.path.appendField(ResourcePath.fromString(documentId));
         if (!DocumentKey.isDocumentKey(path)) {
           throw ArgumentError(
-              "Invalid query. When querying a collection group and ordering by FieldPath.documentId(), the value passed to $methodName() must result in a valid document path, but '$path' is not because it contains an odd number of segments.");
+              'Invalid query. When querying a collection group and ordering by FieldPath.documentId(), the value passed to $methodName() must result in a valid document path, but "$path" is not because it contains an odd number of segments.');
         }
         final DocumentKey key = DocumentKey.fromPath(path);
         components.add(ReferenceValue.valueOf(firestore.databaseId, key));

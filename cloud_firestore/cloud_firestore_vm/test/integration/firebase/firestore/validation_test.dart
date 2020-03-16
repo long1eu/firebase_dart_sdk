@@ -360,7 +360,7 @@ void main() {
       'foo[1]'
     ];
     for (String fieldPath in badFieldPaths) {
-      final String reason =
+      const String reason =
           "Use FieldPath.of() for field names containing '~*/[]'.";
       await verifyFieldPathThrows(fieldPath, reason);
     }
@@ -473,6 +473,10 @@ void main() {
         () => collection.whereArrayContains('a', null),
         'Invalid Query. You can only perform equality comparisons on null '
         '(via whereEqualTo()).');
+    await expectError(() => collection.whereArrayContainsAny('a', null),
+        'Invalid Query. A non-empty array is required for "array_contains_any" filters.');
+    await expectError(() => collection.whereIn('a', null),
+        'Invalid Query. A non-empty array is required for "in" filters.');
 
     await expectError(
         () => collection.whereGreaterThan('a', double.nan),
@@ -574,14 +578,25 @@ void main() {
   });
 
   test('queryOrderByKeyBoundsMustBeStringsWithoutSlashes', () async {
-    final CollectionReference collection = await testCollection();
-    final Query query = collection.orderByField(FieldPath.documentId());
+    final Query query = (await testFirestore())
+        .collection('collection')
+        .orderByField(FieldPath.documentId());
+    final Query cgQuery = (await testFirestore())
+        .collectionGroup('collection')
+        .orderByField(FieldPath.documentId());
+
     await expectError(
         () => query.startAt(<int>[1]),
-        'Invalid query. Expected a string for document ID in startAt(), but'
-        ' got 1.');
+        'Invalid query. Expected a string for document ID in startAt(), but '
+        'got 1.');
     await expectError(() => query.startAt(<String>['foo/bar']),
-        'Invalid query. Document ID \'foo/bar\' contains a slash in startAt().');
+        'Invalid query. When querying a collection and ordering by FieldPath.documentId(), the value passed to startAt() must be a plain document ID, but "foo/bar" contains a slash.');
+    await expectError(
+        () async => cgQuery.startAt(<String>['foo']),
+        'Invalid query. When querying a collection group and ordering by '
+        'FieldPath.documentId(), the value passed to startAt() must result in '
+        'a valid document path, but "foo" is not because it contains an odd '
+        'number of segments.');
   });
 
   test('queriesWithDifferentInequalityFieldsFail', () async {
@@ -613,13 +628,124 @@ void main() {
         reason);
   });
 
-  test('queriesWithMultipleArrayContainsFiltersFail', () async {
+  test('queriesWithMultipleArrayFiltersFail', () async {
     await expectError(
         () async => (await testCollection())
             .whereArrayContains('foo', 1)
             .whereArrayContains('foo', 2),
-        'Invalid Query. Queries only support having a single array-contains'
-        ' filter.');
+        'Invalid Query. You cannot use more than one "array_contains" filter.');
+
+    await expectError(
+        () async => (await testCollection())
+            .whereArrayContains('foo', 1)
+            .whereArrayContainsAny('foo', <int>[1, 2]),
+        'Invalid Query. You cannot use "array_contains_any" filters with "array_contains" filters.');
+
+    await expectError(
+        () async => (await testCollection()).whereArrayContainsAny(
+            'foo', <int>[1, 2]).whereArrayContains('foo', 1),
+        'Invalid Query. You cannot use "array_contains" filters with "array_contains_any" filters.');
+  });
+
+  test('queriesWithMultipleDisjunctiveFiltersFail', () async {
+    await expectError(
+        () async => (await testCollection())
+            .whereIn('foo', <int>[1, 2]).whereIn('bar', <int>[1, 2]),
+        'Invalid Query. You cannot use more than one "in" filter.');
+
+    await expectError(
+        () async => (await testCollection()).whereArrayContainsAny(
+            'foo', <int>[1, 2]).whereArrayContainsAny('bar', <int>[1, 2]),
+        'Invalid Query. You cannot use more than one "array_contains_any" filter.');
+
+    await expectError(
+        () async => (await testCollection()).whereArrayContainsAny(
+            'foo', <int>[1, 2]).whereIn('bar', <int>[1, 2]),
+        'Invalid Query. You cannot use "in" filters with "array_contains_any" filters.');
+
+    await expectError(
+        () async => (await testCollection()).whereIn(
+            'bar', <int>[1, 2]).whereArrayContainsAny('foo', <int>[1, 2]),
+        'Invalid Query. You cannot use "array_contains_any" filters with "in" filters.');
+
+    // This is redundant with the above tests, but makes sure our validation doesn't get confused.
+    await expectError(
+        () async => (await testCollection())
+            .whereIn('bar', <int>[1, 2])
+            .whereArrayContains('foo', 1)
+            .whereArrayContainsAny('foo', <int>[1, 2]),
+        'Invalid Query. You cannot use "array_contains_any" filters with "in" filters.');
+
+    await expectError(
+        () async => (await testCollection())
+            .whereArrayContains('foo', 1)
+            .whereIn('bar', <int>[1, 2]).whereArrayContainsAny(
+                'foo', <int>[1, 2]),
+        'Invalid Query. You cannot use "array_contains_any" filters with "in" filters.');
+  });
+
+  test('queriesCanUseInWithArrayContains', () async {
+    (await testCollection())
+        .whereArrayContains('foo', 1)
+        .whereIn('bar', <int>[1, 2]);
+    (await testCollection())
+        .whereIn('bar', <int>[1, 2]).whereArrayContains('foo', 1);
+
+    await expectError(
+        () async => (await testCollection())
+            .whereIn('bar', <int>[1, 2])
+            .whereArrayContains('foo', 1)
+            .whereArrayContains('foo', 1),
+        'Invalid Query. You cannot use more than one "array_contains" filter.');
+
+    await expectError(
+        () async => (await testCollection())
+            .whereArrayContains('foo', 1)
+            .whereIn('bar', <int>[1, 2]).whereIn('bar', <int>[1, 2]),
+        'Invalid Query. You cannot use more than one "in" filter.');
+  });
+
+  test('queriesInAndArrayContainsAnyArrayRules', () async {
+    await expectError(
+        () async => (await testCollection()).whereIn('bar', <dynamic>[]),
+        'Invalid Query. A non-empty array is required for "in" filters.');
+
+    await expectError(
+        () async =>
+            (await testCollection()).whereArrayContainsAny('bar', <dynamic>[]),
+        'Invalid Query. A non-empty array is required for "array_contains_any" filters.');
+
+    await expectError(
+        // The 10 element max includes duplicates.
+        () async => (await testCollection())
+            .whereIn('bar', <int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9]),
+        'Invalid Query. "in" filters support a maximum of 10 elements in the value array.');
+
+    await expectError(
+        // The 10 element max includes duplicates.
+        () async => (await testCollection()).whereArrayContainsAny(
+            'bar', <int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9]),
+        'Invalid Query. "array_contains_any" filters support a maximum of 10 elements in the value array.');
+
+    await expectError(
+        () async =>
+            (await testCollection()).whereIn('bar', <dynamic>['foo', null]),
+        'Invalid Query. "in" filters cannot contain "null" in the value array.');
+
+    await expectError(
+        () async => (await testCollection())
+            .whereArrayContainsAny('bar', <dynamic>['foo', null]),
+        'Invalid Query. "array_contains_any" filters cannot contain "null" in the value array.');
+
+    await expectError(
+        () async => (await testCollection())
+            .whereIn('bar', <dynamic>['foo', double.nan]),
+        'Invalid Query. "in" filters cannot contain "NaN" in the value array.');
+
+    await expectError(
+        () async => (await testCollection())
+            .whereArrayContainsAny('bar', <dynamic>['foo', double.nan]),
+        'Invalid Query. "array_contains_any" filters cannot contain "NaN" in the value array.');
   });
 
   test('queriesMustNotSpecifyStartingOrEndingPointAfterOrderBy', () async {
@@ -649,7 +775,7 @@ void main() {
 
     reason =
         'Invalid query. When querying with FieldPath.documentId() you must '
-        'provide a valid document ID, but \'foo/bar/baz\' contains a \'/\' '
+        'provide a plain document ID, but \'foo/bar/baz\' contains a \'/\' '
         'character.';
     await expectError(
         () => collection.whereGreaterThanOrEqualToField(
@@ -664,10 +790,34 @@ void main() {
             FieldPath.documentId(), 1),
         reason);
 
-    reason = 'Invalid query. You can\'t perform array-contains queries on '
-        'FieldPath.documentId() since document IDs are not arrays.';
+    reason =
+        'Invalid query. When querying with FieldPath.documentId() you must provide '
+        'a valid String or DocumentReference, but it was of type: List<int>';
+    await expectError(
+        () => collection.whereInField(FieldPath.documentId(), <int>[1, 2]),
+        reason);
+
+    reason =
+        'Invalid query. When querying a collection group by FieldPath.documentId(), the value '
+        'provided must result in a valid document path, but "foo" is not because it has '
+        'an odd number of segments (1).';
+    await expectError(
+        () async => (await testFirestore())
+            .collectionGroup('collection')
+            .whereGreaterThanOrEqualToField(FieldPath.documentId(), 'foo'),
+        reason);
+
+    reason =
+        "Invalid query. You can't perform \"array_contains\" queries on FieldPath.documentId().";
     await expectError(
         () => collection.whereArrayContainsField(FieldPath.documentId(), 1),
+        reason);
+
+    reason =
+        "Invalid query. You can't perform \"array_contains_any\" queries on FieldPath.documentId().";
+    await expectError(
+        () => collection
+            .whereArrayContainsAnyField(FieldPath.documentId(), <int>[1, 2]),
         reason);
   });
 }

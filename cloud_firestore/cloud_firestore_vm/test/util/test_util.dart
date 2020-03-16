@@ -217,6 +217,10 @@ FilterOperator operatorFromString(String s) {
     return FilterOperator.graterThanOrEqual;
   } else if (s == 'array-contains') {
     return FilterOperator.arrayContains;
+  } else if (s == 'in') {
+    return FilterOperator.IN;
+  } else if (s == 'array-contains-any') {
+    return FilterOperator.arrayContainsAny;
   } else {
     throw StateError('Unknown operator: $s');
   }
@@ -488,7 +492,7 @@ Future<void> expectError(
   bool exceptionThrown = false;
   try {
     await runnable.call();
-  } catch (error) {
+  } catch (error, s) {
     exceptionThrown = true;
     final StringBuffer contextMessage =
         StringBuffer('Expected exception message was incorrect');

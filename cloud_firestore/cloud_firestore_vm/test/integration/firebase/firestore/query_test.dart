@@ -520,6 +520,119 @@ void main() {
     // NOTE: The backend doesn't currently support null, NaN, objects, or
     // arrays, so there isn't much of anything else interesting to test.
   });
+
+  test('testQueriesCanUseInFilters', () async {
+    final Map<String, Object> docA = map(<dynamic>['zip', 98101]);
+    final Map<String, Object> docB = map(<dynamic>['zip', 91102]);
+    final Map<String, Object> docC = map(<dynamic>['zip', 98103]);
+    final Map<String, Object> docD = map(<dynamic>[
+      'zip',
+      <int>[98101]
+    ]);
+    final Map<String, Object> docE = map(<dynamic>[
+      'zip',
+      <dynamic>[
+        '98101',
+        map<dynamic>(<dynamic>['zip', 98101])
+      ]
+    ]);
+    final Map<String, Object> docF = map(<dynamic>[
+      'zip',
+      map<dynamic>(<dynamic>['code', 500])
+    ]);
+    final CollectionReference collection = await testCollectionWithDocs(
+        map(<dynamic>[
+      'a',
+      docA,
+      'b',
+      docB,
+      'c',
+      docC,
+      'd',
+      docD,
+      'e',
+      docE,
+      'f',
+      docF
+    ]));
+
+    // Search for zips matching [98101, 98103].
+    QuerySnapshot snapshot =
+        await collection.whereIn('zip', <int>[98101, 98103]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docA, docC]);
+
+    // With objects.
+    snapshot = await collection.whereIn('zip', <dynamic>[
+      map<dynamic>(<dynamic>['code', 500])
+    ]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docF]);
+  });
+
+  test('testQueriesCanUseArrayContainsAnyFilters', () async {
+    final Map<String, Object> docA = map(<dynamic>[
+      'array',
+      <dynamic>[42]
+    ]);
+    final Map<String, Object> docB = map(<dynamic>[
+      'array',
+      <dynamic>['a', 42, 'c']
+    ]);
+    final Map<String, Object> docC = map(<dynamic>[
+      'array',
+      <dynamic>[
+        41.999,
+        '42',
+        map<dynamic>(<dynamic>[
+          'a',
+          <int>[42]
+        ])
+      ]
+    ]);
+    final Map<String, Object> docD = map(<dynamic>[
+      'array',
+      <dynamic>[42],
+      'array2',
+      <dynamic>['bingo']
+    ]);
+    final Map<String, Object> docE = map(<dynamic>[
+      'array',
+      <dynamic>[43]
+    ]);
+    final Map<String, Object> docF = map(<dynamic>[
+      'array',
+      <dynamic>[
+        map<dynamic>(<dynamic>['a', 42])
+      ]
+    ]);
+    final Map<String, Object> docG = map(<dynamic>['array', 42]);
+
+    final CollectionReference collection = await testCollectionWithDocs(
+        map(<dynamic>[
+      'a',
+      docA,
+      'b',
+      docB,
+      'c',
+      docC,
+      'd',
+      docD,
+      'e',
+      docE,
+      'f',
+      docF
+    ]));
+
+    // Search for 'array' to contain [42, 43].
+    QuerySnapshot snapshot = await collection
+        .whereArrayContainsAny('array', <dynamic>[42, 43]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docA, docB, docD, docE]);
+
+    // With objects.
+    snapshot = await collection.whereArrayContainsAny('array', <dynamic>[
+      map<dynamic>(<dynamic>['a', 42])
+    ]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docF]);
+  });
 }
 
 // ignore: always_specify_types, type_annotate_public_apis

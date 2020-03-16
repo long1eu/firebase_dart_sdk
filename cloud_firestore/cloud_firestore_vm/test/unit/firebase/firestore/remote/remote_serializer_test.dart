@@ -665,12 +665,47 @@ void main() {
     expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
   });
 
-  // PORTING NOTE: Isolated array-contains filter test omitted since we seem to
-  // have omitted isolated filter tests on Android
-  // (and the encodeRelationFilter() / decodeRelationFilter() serializer methods
-  // are private) in favor of relying on the larger tests. array-contains
-  // encoding / decoding is covered by
-  // [testEncodesMultipleFiltersOnDeeperCollections].
+  test('testInSerialization', () {
+    final proto.StructuredQuery_Filter _filter =
+        serializer.encodeRelationFilter(filter('field', 'in', <int>[42]));
+
+    final proto.ArrayValue inFilterValue = proto.ArrayValue()
+      ..values.add(valueBuilder()..integerValue = Int64(42));
+
+    final proto.StructuredQuery_Filter expectedFilter =
+        proto.StructuredQuery_Filter()
+          ..fieldFilter = (proto.StructuredQuery_FieldFilter()
+            ..field_1 =
+                (proto.StructuredQuery_FieldReference()..fieldPath = 'field')
+            ..op = proto.StructuredQuery_FieldFilter_Operator.IN
+            ..value = (valueBuilder()..arrayValue = inFilterValue));
+
+    expect(expectedFilter, _filter);
+  });
+
+  test('testArrayContainsAnySerialization', () {
+    final proto.StructuredQuery_Filter _filter = serializer
+        .encodeRelationFilter(filter('field', 'array-contains-any', <int>[42]));
+
+    final proto.ArrayValue arrayContainsAnyFilterValue = proto.ArrayValue()
+      ..values.add(valueBuilder()..integerValue = Int64(42));
+
+    final proto.StructuredQuery_Filter expectedFilter =
+        proto.StructuredQuery_Filter()
+          ..fieldFilter = (proto.StructuredQuery_FieldFilter()
+            ..field_1 =
+                (proto.StructuredQuery_FieldReference()..fieldPath = 'field')
+            ..op = proto.StructuredQuery_FieldFilter_Operator.ARRAY_CONTAINS_ANY
+            ..value =
+                (valueBuilder()..arrayValue = arrayContainsAnyFilterValue));
+
+    expect(expectedFilter, _filter);
+  });
+
+  // TODO(PORTING-NOTE): Android currently tests most filter serialization (for
+  //  equals, greater than, array-contains, etc.) only in
+  //  testEncodesMultipleFiltersOnDeeperCollections and lacks isolated filter
+  //  tests like the other platforms have. We should fix this.
 
   test('testEncodesNullFilter', () {
     unaryFilterTest(null, proto.StructuredQuery_UnaryFilter_Operator.IS_NULL);

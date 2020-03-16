@@ -61,6 +61,28 @@ class FilterOperator {
   static const FilterOperator graterThanOrEqual = FilterOperator._('>=');
   static const FilterOperator arrayContains =
       FilterOperator._('array_contains');
+  static const FilterOperator arrayContainsAny =
+      FilterOperator._('array_contains_any');
+
+  // ignore: constant_identifier_names
+  static const FilterOperator IN = FilterOperator._('in');
+
+  static const List<FilterOperator> arrayOperators = <FilterOperator>[
+    arrayContains,
+    arrayContainsAny
+  ];
+
+  static const List<FilterOperator> disjunctiveOperators = <FilterOperator>[
+    arrayContainsAny,
+    IN
+  ];
+
+  static const List<FilterOperator> inequalityOperators = <FilterOperator>[
+    lessThan,
+    lessThanOrEqual,
+    graterThan,
+    graterThanOrEqual
+  ];
 
   @override
   String toString() => _value;
@@ -147,8 +169,11 @@ class RelationFilter extends Filter {
       final DocumentKey refValue = value.value;
       hardAssert(refValue is DocumentKey,
           'Comparing on key, but filter value not a DocumentKey');
-      hardAssert(operator != FilterOperator.arrayContains,
-          'ARRAY_CONTAINS queries don\'t make sense on document keys.');
+      hardAssert(
+          operator != FilterOperator.arrayContains &&
+              operator != FilterOperator.arrayContainsAny &&
+              operator != FilterOperator.IN,
+          '$operator queries don\'t make sense on document keys.');
       final int comparison = doc.key.compareTo(refValue);
       return _matchesComparison(comparison);
     } else {
@@ -160,8 +185,26 @@ class RelationFilter extends Filter {
   bool _matchesValue(FieldValue other) {
     if (operator == FilterOperator.arrayContains) {
       return other is ArrayValue && other.internalValue.contains(value);
+    } else if (operator == FilterOperator.IN) {
+      hardAssert(value is ArrayValue, '"in" filter has invalid value: $value');
+      final ArrayValue _value = value;
+      return _value.internalValue.contains(other);
+    } else if (operator == FilterOperator.arrayContainsAny) {
+      hardAssert(value is ArrayValue,
+          '"array_contains_any" filter has invalid value: $value');
+      final ArrayValue _value = value;
+
+      if (other is ArrayValue) {
+        for (FieldValue val in other.internalValue) {
+          if (_value.internalValue.contains(val)) {
+            return true;
+          }
+        }
+      }
+      return false;
     } else {
-      // Only compare types with matching backend order (such as double and int).
+      // Only compare types with matching backend order (such as double and
+      // int).
       return value.typeOrder == other.typeOrder &&
           _matchesComparison(other.compareTo(value));
     }
@@ -185,8 +228,7 @@ class RelationFilter extends Filter {
   }
 
   bool get isInequality =>
-      operator != FilterOperator.equal &&
-      operator != FilterOperator.arrayContains;
+      FilterOperator.inequalityOperators.contains(operator);
 
   // TODO(long1eu): Technically, this won't be unique if two values have the
   //  same description, such as the int 3 and the string '3'. So we should add

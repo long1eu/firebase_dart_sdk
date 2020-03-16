@@ -69,12 +69,14 @@ void main() {
     DocumentSnapshot writerSnap = await writerRef.get(Source.cache);
     expect(writerSnap.exists, isTrue);
 
-    try {
+    await expectLater(() => readerRef.get(Source.cache),
+        throwsA(isA<FirebaseFirestoreError>()));
+    /*try {
       await readerRef.get(Source.cache);
       fail('Should have thrown exception');
     } on FirebaseFirestoreError catch (e) {
       expect(e.code, FirestoreErrorCode.unavailable);
-    }
+    }*/
 
     writerSnap = await writerRef.get();
     expect(writerSnap.data, map<String>(<String>['a', 'a', 'b', 'b']));
@@ -272,9 +274,9 @@ void main() {
 
     final DocumentSnapshot doc = await documentReference.get();
     expect(doc.exists, isTrue);
-    expect(doc.get('foo') is Timestamp, isTrue);
-    expect(doc.get('inner.foo') is Timestamp, isTrue);
-    expect(doc.get('nested.foo') is Timestamp, isTrue);
+    expect(doc.get('foo'), isA<Timestamp>());
+    expect(doc.get('inner.foo'), isA<Timestamp>());
+    expect(doc.get('nested.foo'), isA<Timestamp>());
   });
 
   test('testMergeReplacesArrays', () async {
@@ -626,26 +628,33 @@ void main() {
     // NOTE: Failure cases are validated in ValidationTest.
     final CollectionReference collection = await testCollection();
     final Query query = collection.whereGreaterThanOrEqualTo('x', 32)
-      // Same inequality field works;
+      // Same inequality field works.
       ..whereLessThanOrEqualTo('x', 'cat')
-      // Equality on different field works;
+      // Equality on different field works.
       ..whereEqualTo('y', 'cat')
-      // Array contains on different field works;
+      // Array contains on different field works.
       ..whereArrayContains('y', 'cat')
-
+      // Array contains any on different field works.
+      ..whereArrayContainsAny('y', <String>['cat'])
+      // In on different field works.
+      ..whereIn('y', <String>['cat'])
       // Ordering by inequality field succeeds.
       ..orderBy('x');
     collection.orderBy('x').whereGreaterThanOrEqualTo('x', 32);
 
-    // inequality same as first order by works
+    // Inequality same as first order by works
     query.orderBy('x').orderBy('y');
     collection.orderBy('x').orderBy('y').whereGreaterThanOrEqualTo('x', 32);
     collection.orderBy('x', Direction.descending).whereEqualTo('y', 'true');
 
-    // Equality different than orderBy works
+    // Equality different than orderBy works.
     collection.orderBy('x').whereEqualTo('y', 'cat');
-    // Array contains different than orderBy works
+    // Array contains different than orderBy works.
     collection.orderBy('x').whereArrayContains('y', 'cat');
+    // Array contains any different than orderBy works.
+    collection.orderBy('x').whereArrayContainsAny('y', <String>['cat']);
+    // In different than orderBy works.
+    collection.orderBy('x').whereIn('y', <String>['cat']);
   });
 
   test('testDocumentSnapshotEventsNonExistent', () async {

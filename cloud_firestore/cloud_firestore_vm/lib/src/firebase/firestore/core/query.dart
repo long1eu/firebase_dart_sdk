@@ -17,14 +17,13 @@ class Query {
   /// Initializes a Query with all of its components directly.
   const Query(
     this.path, {
-    String collectionGroup,
+    this.collectionGroup,
     this.filters = const <Filter>[],
     this.explicitSortOrder = const <OrderBy>[],
     int limit = noLimit,
     Bound startAt,
     Bound endAt,
-  })  : collectionGroup = collectionGroup,
-        _limit = limit,
+  })  : _limit = limit,
         _startAt = startAt,
         _endAt = endAt;
 
@@ -111,16 +110,19 @@ class Query {
     return null;
   }
 
-  bool get hasArrayContainsFilter {
+  /// Checks if any of the provided filter operators are included in the query
+  /// and returns the first one that is, or null if none are.
+  FilterOperator findOperatorFilter(List<FilterOperator> filterOps) {
     for (Filter filter in filters) {
       if (filter is RelationFilter) {
-        final RelationFilter relationFilter = filter;
-        if (relationFilter.operator == FilterOperator.arrayContains) {
-          return true;
+        final FilterOperator queryOp = filter.operator;
+
+        if (filterOps.contains(queryOp)) {
+          return queryOp;
         }
       }
     }
-    return false;
+    return null;
   }
 
   /// Creates a new Query with an additional filter.
@@ -147,8 +149,7 @@ class Query {
             explicitSortOrder[0].field == newInequalityField,
         'First orderBy must match inequality field');
 
-    final List<Filter> updatedFilter = <Filter>[...filters, filter];
-    return copyWith(filters: updatedFilter);
+    return copyWith(filters: <Filter>[...filters, filter]);
   }
 
   /// Creates a new Query with an additional ordering constraint.

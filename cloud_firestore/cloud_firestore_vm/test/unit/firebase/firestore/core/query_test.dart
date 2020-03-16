@@ -194,6 +194,161 @@ void main() {
     expect(query.matches(document), isTrue);
   });
 
+  test('testInFilters', () {
+    final Query query = Query(ResourcePath.fromString('collection'))
+        .filter(filter('zip', 'in', <dynamic>[12345]));
+
+    Document document = doc('collection/1', 0, map(<dynamic>['zip', 12345]));
+    expect(query.matches(document), isTrue);
+
+    // Value matches in array.
+    document = doc(
+        'collection/1',
+        0,
+        map(<dynamic>[
+          'zip',
+          <dynamic>[12345]
+        ]));
+    expect(query.matches(document), isFalse);
+
+    // Non-type match.
+    document = doc('collection/1', 0, map(<dynamic>['zip', '12345']));
+    expect(query.matches(document), isFalse);
+
+    // Nested match.
+    document = doc(
+        'collection/1',
+        0,
+        map(<dynamic>[
+          'zip',
+          <dynamic>[
+            '12345',
+            map<dynamic>(<dynamic>['zip', 12345])
+          ]
+        ]));
+    expect(query.matches(document), isFalse);
+  });
+
+  test('testInFiltersWithObjectValues', () {
+    final Query query = Query(ResourcePath.fromString('collection'))
+        .filter(filter('zip', 'in', <dynamic>[
+      map<dynamic>(<dynamic>[
+        'a',
+        <dynamic>[42]
+      ])
+    ]));
+
+    // Containing object in array.
+    Document document = doc(
+        'collection/1',
+        0,
+        map(<dynamic>[
+          'zip',
+          <dynamic>[
+            map<dynamic>(<dynamic>[
+              'a',
+              <dynamic>[42]
+            ])
+          ]
+        ]));
+    expect(query.matches(document), isFalse);
+
+    // Containing object.
+    document = doc(
+        'collection/1',
+        0,
+        map(<dynamic>[
+          'zip',
+          map<dynamic>(<dynamic>[
+            'a',
+            <dynamic>[42]
+          ])
+        ]));
+    expect(query.matches(document), isTrue);
+  });
+
+  test('testArrayContainsAnyFilters', () {
+    final Query query = Query(ResourcePath.fromString('collection'))
+        .filter(filter('zip', 'array-contains-any', <dynamic>[12345]));
+
+    Document document = doc(
+        'collection/1',
+        0,
+        map(<dynamic>[
+          'zip',
+          <dynamic>[12345]
+        ]));
+    expect(query.matches(document), isTrue);
+
+    // Value matches in non-array.
+    document = doc('collection/1', 0, map(<dynamic>['zip', 12345]));
+    expect(query.matches(document), isFalse);
+
+    // Non-type match.
+    document = doc(
+        'collection/1',
+        0,
+        map(<dynamic>[
+          'zip',
+          <dynamic>['12345']
+        ]));
+    expect(query.matches(document), isFalse);
+
+    // Nested match.
+    document = doc(
+        'collection/1',
+        0,
+        map(<dynamic>[
+          'zip',
+          <dynamic>[
+            '12345',
+            map<dynamic>(<dynamic>[
+              'zip',
+              <dynamic>[12345]
+            ])
+          ]
+        ]));
+    expect(query.matches(document), isFalse);
+  });
+
+  test('testArrayContainsAnyFiltersWithObjectValues', () {
+    final Query query = Query(ResourcePath.fromString('collection'))
+        .filter(filter('zip', 'array-contains-any', <dynamic>[
+      map<dynamic>(<dynamic>[
+        'a',
+        <dynamic>[42]
+      ])
+    ]));
+
+    // Containing object in array.
+    Document document = doc(
+        'collection/1',
+        0,
+        map(<dynamic>[
+          'zip',
+          <dynamic>[
+            map<dynamic>(<dynamic>[
+              'a',
+              <dynamic>[42]
+            ])
+          ]
+        ]));
+    expect(query.matches(document), isTrue);
+
+    // Containing object.
+    document = doc(
+        'collection/1',
+        0,
+        map(<dynamic>[
+          'zip',
+          map<dynamic>(<dynamic>[
+            'a',
+            <dynamic>[42]
+          ])
+        ]));
+    expect(query.matches(document), isFalse);
+  });
+
   test('testNaNFilter', () {
     final Query query = Query(ResourcePath.fromString('collection'))
         .filter(filter('sort', '==', double.nan));

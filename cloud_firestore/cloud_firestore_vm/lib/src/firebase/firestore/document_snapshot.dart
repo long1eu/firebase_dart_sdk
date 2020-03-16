@@ -397,7 +397,7 @@ class DocumentSnapshot {
 class _FieldValueOptions {
   _FieldValueOptions({
     this.serverTimestampBehavior,
-    this.timestampsInSnapshotsEnabled = false,
+    this.timestampsInSnapshotsEnabled = true,
   });
 
   final ServerTimestampBehavior serverTimestampBehavior;

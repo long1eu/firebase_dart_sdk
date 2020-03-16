@@ -43,6 +43,7 @@ import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart'
 import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
 import 'package:fixnum/fixnum.dart';
 import 'package:grpc/grpc.dart';
+import 'package:meta/meta.dart';
 
 /// Serializer that converts to and from Firestore API protos.
 class RemoteSerializer {
@@ -726,7 +727,7 @@ class RemoteSerializer {
     int i = 0;
     for (Filter filter in filters) {
       if (filter is RelationFilter) {
-        protos[i] = _encodeRelationFilter(filter);
+        protos[i] = encodeRelationFilter(filter);
       } else {
         protos[i] = _encodeUnaryFilter(filter);
       }
@@ -776,7 +777,8 @@ class RemoteSerializer {
     return result;
   }
 
-  proto.StructuredQuery_Filter _encodeRelationFilter(RelationFilter filter) {
+  @visibleForTesting
+  proto.StructuredQuery_Filter encodeRelationFilter(RelationFilter filter) {
     final proto.StructuredQuery_FieldFilter builder =
         proto.StructuredQuery_FieldFilter.create()
           ..field_1 = _encodeFieldPath(filter.field)
@@ -849,6 +851,10 @@ class RemoteSerializer {
         return proto.StructuredQuery_FieldFilter_Operator.GREATER_THAN_OR_EQUAL;
       case FilterOperator.arrayContains:
         return proto.StructuredQuery_FieldFilter_Operator.ARRAY_CONTAINS;
+      case FilterOperator.arrayContainsAny:
+        return proto.StructuredQuery_FieldFilter_Operator.ARRAY_CONTAINS_ANY;
+      case FilterOperator.IN:
+        return proto.StructuredQuery_FieldFilter_Operator.IN;
       default:
         throw fail('Unknown operator $operator');
     }
@@ -869,6 +875,10 @@ class RemoteSerializer {
         return FilterOperator.graterThan;
       case proto.StructuredQuery_FieldFilter_Operator.ARRAY_CONTAINS:
         return FilterOperator.arrayContains;
+      case proto.StructuredQuery_FieldFilter_Operator.ARRAY_CONTAINS_ANY:
+        return FilterOperator.arrayContainsAny;
+      case proto.StructuredQuery_FieldFilter_Operator.IN:
+        return FilterOperator.IN;
       default:
         throw fail('Unhandled FieldFilter.operator $operator');
     }
