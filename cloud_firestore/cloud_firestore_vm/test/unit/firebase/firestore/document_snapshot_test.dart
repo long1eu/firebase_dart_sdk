@@ -33,12 +33,14 @@ void main() {
     expect(differentData, notBase);
     expect(fromCache, notBase);
 
+    // The assertions below that hash codes of different values are not equal is
+    // not something that we guarantee. In particular [base] and [differentData]
+    // have a hash collision because we don't use data in the hashCode.
     expect(baseDup.hashCode, base.hashCode);
     expect(noDataDup.hashCode, noData.hashCode);
     expect(noData.hashCode, isNot(base.hashCode));
     expect(base.hashCode, isNot(noData.hashCode));
     expect(differentPath.hashCode == base.hashCode, isFalse);
-    expect(differentData.hashCode, isNot(base.hashCode));
     expect(fromCache.hashCode, isNot(base.hashCode));
   });
 }

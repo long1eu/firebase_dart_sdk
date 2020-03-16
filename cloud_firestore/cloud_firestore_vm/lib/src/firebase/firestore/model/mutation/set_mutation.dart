@@ -35,7 +35,7 @@ class SetMutation extends Mutation {
     // Unlike applyToLocalView, if we're applying a mutation to a remote document the server has
     // accepted the mutation so the precondition must have held.
     final SnapshotVersion version = mutationResult.version;
-    return Document(key, version, value, DocumentState.committedMutations);
+    return Document(key, version, DocumentState.committedMutations, value);
   }
 
   @override
@@ -48,7 +48,7 @@ class SetMutation extends Mutation {
     }
 
     final SnapshotVersion version = Mutation.getPostMutationVersion(maybeDoc);
-    return Document(key, version, value, DocumentState.localMutations);
+    return Document(key, version, DocumentState.localMutations, value);
   }
 
   @override

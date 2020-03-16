@@ -52,7 +52,7 @@ class PatchMutation extends Mutation {
 
     final SnapshotVersion version = mutationResult.version;
     final ObjectValue newData = patchDocument(maybeDoc);
-    return Document(key, version, newData, DocumentState.committedMutations);
+    return Document(key, version, DocumentState.committedMutations, newData);
   }
 
   @override
@@ -66,7 +66,7 @@ class PatchMutation extends Mutation {
 
     final SnapshotVersion version = Mutation.getPostMutationVersion(maybeDoc);
     final ObjectValue newData = patchDocument(maybeDoc);
-    return Document(key, version, newData, DocumentState.localMutations);
+    return Document(key, version, DocumentState.localMutations, newData);
   }
 
   /// Patches the data of document if available or creates a new document. Note that this does not

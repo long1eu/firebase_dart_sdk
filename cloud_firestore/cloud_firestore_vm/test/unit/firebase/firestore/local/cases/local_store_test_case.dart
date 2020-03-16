@@ -86,10 +86,10 @@ class LocalStoreTestCase {
     await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
         DocumentState.localMutations));
 
-    await _acknowledgeMutation(0);
+    await _acknowledgeMutation(1);
 
     _expectChanged(<Document>[
-      doc('foo/bar', 0, map(<String>['foo', 'bar']),
+      doc('foo/bar', 1, map(<String>['foo', 'bar']),
           DocumentState.committedMutations)
     ]);
 
@@ -97,7 +97,7 @@ class LocalStoreTestCase {
       // Nothing is pinning this anymore, as it has been acknowledged and there are no targets active.
       await _expectNotContains('foo/bar');
     } else {
-      await _expectContains(doc('foo/bar', 0, map(<String>['foo', 'bar']),
+      await _expectContains(doc('foo/bar', 1, map(<String>['foo', 'bar']),
           DocumentState.committedMutations));
     }
   }

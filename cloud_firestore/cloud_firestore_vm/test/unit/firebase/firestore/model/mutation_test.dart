@@ -201,7 +201,7 @@ void main() {
         ServerTimestampValue(timestamp, StringValue.valueOf('bar-value')));
 
     final Document expectedDoc = Document(key('collection/key'), version(0),
-        expectedData, DocumentState.localMutations);
+        DocumentState.localMutations, expectedData);
     expect(transformedDoc, expectedDoc);
   });
 

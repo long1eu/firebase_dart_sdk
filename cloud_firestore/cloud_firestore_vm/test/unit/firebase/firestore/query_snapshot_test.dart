@@ -43,9 +43,10 @@ void main() {
     expect(noPendingWrites, isNot(foo));
     expect(fromCache, isNot(foo));
 
+    // Note: `foo` and `differentDoc` have the same hash code since we no longer
+    // take document contents into account.
     expect(fooDup.hashCode, foo.hashCode);
     expect(differentPath.hashCode, isNot(foo.hashCode));
-    expect(differentDoc.hashCode, isNot(foo.hashCode));
     expect(noPendingWrites.hashCode, isNot(foo.hashCode));
     expect(fromCache.hashCode, isNot(foo.hashCode));
   });

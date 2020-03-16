@@ -15,7 +15,7 @@ void main() {
     expect(actual.seconds, Int64(22));
     expect(actual.nanoseconds, 501000000);
 
-    Timestamp expected = Timestamp(22, 501000000);
+    Timestamp expected = const Timestamp(22, 501000000);
     expect(actual, expected);
 
     // And with a negative millis.
@@ -25,12 +25,12 @@ void main() {
     expect(actual.seconds, -2);
     expect(actual.nanoseconds, 750000000);
 
-    expected = Timestamp(-2, 750000000);
+    expected = const Timestamp(-2, 750000000);
     expect(actual, expected);
   });
 
   test('testCompare', () {
-    final List<Timestamp> timestamps = <Timestamp>[
+    const List<Timestamp> timestamps = <Timestamp>[
       Timestamp(12344, 999999999),
       Timestamp(12345, 0),
       Timestamp(12345, 1),
@@ -50,14 +50,14 @@ void main() {
     expect(() {
       return Timestamp.fromDate(
           DateTime.fromMillisecondsSinceEpoch(-70000000000000));
-    }, throwsArgumentError);
+    }, throwsA(isA<AssertionError>()));
 
     expect(() {
       return Timestamp.fromDate(
           DateTime.fromMillisecondsSinceEpoch(300000000000000));
-    }, throwsArgumentError);
+    }, throwsA(isA<AssertionError>()));
 
-    expect(() => Timestamp(0, -1), throwsArgumentError);
-    expect(() => Timestamp(0, 1000000000), throwsArgumentError);
+    expect(() => Timestamp(0, -1), throwsA(isA<AssertionError>()));
+    expect(() => Timestamp(0, 1000000000), throwsA(isA<AssertionError>()));
   });
 }

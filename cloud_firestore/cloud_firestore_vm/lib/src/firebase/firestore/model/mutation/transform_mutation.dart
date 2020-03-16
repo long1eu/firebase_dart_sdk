@@ -57,7 +57,7 @@ class TransformMutation extends Mutation {
         _serverTransformResults(doc, mutationResult.transformResults);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
     return Document(
-        key, mutationResult.version, newData, DocumentState.committedMutations);
+        key, mutationResult.version, DocumentState.committedMutations, newData);
   }
 
   @override
@@ -73,7 +73,7 @@ class TransformMutation extends Mutation {
     final List<FieldValue> transformResults =
         _localTransformResults(localWriteTime, baseDoc);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
-    return Document(key, doc.version, newData, DocumentState.localMutations);
+    return Document(key, doc.version, DocumentState.localMutations, newData);
   }
 
   @override

@@ -9,9 +9,9 @@ import 'package:test/test.dart';
 import '../../../../util/test_util.dart';
 
 void main() {
-  test('testConstructor', () {
+  test('testInstantiation', () {
     final Document document = Document(key('messages/first'), version(1),
-        wrapList(<dynamic>['a', 1]), DocumentState.synced);
+        DocumentState.synced, wrapList(<dynamic>['a', 1]));
 
     expect(document.key, key('messages/first'));
     expect(document.version, version(1));
@@ -27,7 +27,7 @@ void main() {
       map<String>(<String>['name', 'Jonny', 'title', 'scallywag'])
     ]);
     final Document document =
-        Document(key('rooms/eros'), version(1), data, DocumentState.synced);
+        Document(key('rooms/eros'), version(1), DocumentState.synced, data);
 
     expect(document.getFieldValue(field('desc')),
         'Discuss all the project related stuff');

@@ -83,17 +83,17 @@ class LocalSerializer {
   Document _decodeDocument(
       proto.Document document, bool hasCommittedMutations) {
     final DocumentKey key = rpcSerializer.decodeKey(document.name);
-    final ObjectValue value =
-        rpcSerializer.decodeDocumentFields(document.fields);
+
     final SnapshotVersion version =
         rpcSerializer.decodeVersion(document.updateTime);
-    return Document(
+    return Document.fromProto(
       key,
       version,
-      value,
       hasCommittedMutations
           ? DocumentState.committedMutations
           : DocumentState.synced,
+      document,
+      rpcSerializer.decodeValue,
     );
   }
 

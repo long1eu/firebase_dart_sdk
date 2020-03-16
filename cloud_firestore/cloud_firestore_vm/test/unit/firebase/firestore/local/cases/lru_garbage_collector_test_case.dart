@@ -411,7 +411,7 @@ class LruGarbageCollectorTestCase {
         () async {
       final SnapshotVersion newVersion = version(3);
       final Document doc = Document(
-          middleDocToUpdate, newVersion, _testValue, DocumentState.synced);
+          middleDocToUpdate, newVersion, DocumentState.synced, _testValue);
       await _documentCache.add(doc);
       await _updateTargetInTransaction(middleTarget);
     });

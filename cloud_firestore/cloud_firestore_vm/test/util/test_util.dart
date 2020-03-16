@@ -131,15 +131,15 @@ Document docForValue(
     return Document(
       key(theKey),
       version(theVersion),
-      data,
       documentState,
+      data,
     );
   } else if (theKey is DocumentKey) {
     return Document(
       theKey,
       version(theVersion),
-      data,
       documentState,
+      data,
     );
   } else {
     throw StateError('key should be a String or a DocumentKey but it\'s'
@@ -156,15 +156,15 @@ Document doc(/*String|DocumentKey*/ dynamic theKey, int theVersion,
     return Document(
       key(theKey),
       version(theVersion),
-      wrapMap(data),
       documentState,
+      wrapMap(data),
     );
   } else if (theKey is DocumentKey) {
     return Document(
       theKey,
       version(theVersion),
-      wrapMap(data),
       documentState,
+      wrapMap(data),
     );
   } else {
     throw StateError('key should be a String or a DocumentKey but it\'s '
@@ -492,7 +492,7 @@ Future<void> expectError(
   bool exceptionThrown = false;
   try {
     await runnable.call();
-  } catch (error, s) {
+  } catch (error) {
     exceptionThrown = true;
     final StringBuffer contextMessage =
         StringBuffer('Expected exception message was incorrect');
