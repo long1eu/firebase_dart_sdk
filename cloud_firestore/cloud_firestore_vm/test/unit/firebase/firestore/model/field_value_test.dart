@@ -5,6 +5,7 @@
 import 'dart:collection';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
@@ -24,7 +25,7 @@ void main() {
       'foo',
       map<dynamic>(<dynamic>['a', 1, 'b', true, 'c', 'string'])
     ]);
-    expect(val is ObjectValue, isTrue);
+    expect(val is ObjectValue, isA<ObjectValue>());
     final ObjectValue obj = val;
     expect(obj.get(field('foo')) is ObjectValue, isTrue);
     expect(obj.get(field('foo.a')), wrap(1));
@@ -34,6 +35,40 @@ void main() {
     expect(obj.get(field('foo.a.b')), isNull);
     expect(obj.get(field('bar')), isNull);
     expect(obj.get(field('bar.a')), isNull);
+  });
+
+  test('testExtractsFieldMask', () {
+    final FieldValue val = wrapList(<dynamic>[
+      'a',
+      'b',
+      'map',
+      map<dynamic>(<dynamic>[
+        'a',
+        1,
+        'b',
+        true,
+        'c',
+        'string',
+        'nested',
+        map<dynamic>(<dynamic>['d', 'e'])
+      ]),
+      'emptymap',
+      map<dynamic>(<dynamic>[])
+    ]);
+
+    expect(val, isA<ObjectValue>());
+    final ObjectValue obj = val;
+    final FieldMask mask = obj.fieldMask;
+    expect(
+        mask,
+        fieldMask(<String>[
+          'a',
+          'map.a',
+          'map.b',
+          'map.c',
+          'map.nested.d',
+          'emptymap'
+        ]));
   });
 
   test('testOverwritesExistingFields', () {

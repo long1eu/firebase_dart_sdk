@@ -33,24 +33,6 @@ class FieldMask {
     return false;
   }
 
-  /// Applies this field mask to the provided object value and returns an object
-  /// that only contains fields that are specified in both the input object and
-  /// this field mask.
-  ObjectValue applyTo(ObjectValue data) {
-    ObjectValue filteredObject = ObjectValue.empty;
-    for (FieldPath path in mask) {
-      if (path.isEmpty) {
-        return data;
-      } else {
-        final FieldValue newValue = data.get(path);
-        if (newValue != null) {
-          filteredObject = filteredObject.set(path, newValue);
-        }
-      }
-    }
-    return filteredObject;
-  }
-
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||

@@ -22,9 +22,16 @@ abstract class ArrayTransformOperation implements TransformOperation {
   @override
   FieldValue applyToRemoteDocument(
       FieldValue previousValue, FieldValue transformResult) {
-    // The server just sends null as the transform result for array operations, so we have to
-    // calculate a result the same as we do for local applications.
+    // The server just sends null as the transform result for array operations,
+    // so we have to calculate a result the same as we do for local
+    // applications.
     return apply(previousValue);
+  }
+
+  @override
+  FieldValue computeBaseValue(FieldValue currentValue) {
+    // Array transforms are idempotent and don't require a base value.
+    return null;
   }
 
   /// Applies this ArrayTransformOperation against the specified previousValue.
@@ -40,9 +47,6 @@ abstract class ArrayTransformOperation implements TransformOperation {
       return <FieldValue>[];
     }
   }
-
-  @override
-  bool get isIdempotent => true;
 
   @override
   bool operator ==(Object other) =>

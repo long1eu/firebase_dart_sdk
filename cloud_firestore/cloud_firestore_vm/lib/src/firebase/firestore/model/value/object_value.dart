@@ -29,6 +29,32 @@ class ObjectValue extends FieldValue {
   @override
   int get typeOrder => FieldValue.typeOrderObject;
 
+  /// Recursively extracts the FieldPaths that are set in this ObjectValue.
+  FieldMask get fieldMask {
+    final Set<FieldPath> fields = <FieldPath>{};
+    for (MapEntry<String, FieldValue> entry in internalValue) {
+      final FieldPath currentPath = FieldPath.fromSingleSegment(entry.key);
+      final FieldValue value = entry.value;
+      if (value is ObjectValue) {
+        final FieldMask nestedMask = value.fieldMask;
+        final Set<FieldPath> nestedFields = nestedMask.mask;
+        if (nestedFields.isEmpty) {
+          // Preserve the empty map by adding it to the FieldMask.
+          fields.add(currentPath);
+        } else {
+          // For nested and non-empty ObjectValues, add the FieldPath of the
+          // leaf nodes.
+          for (FieldPath nestedPath in nestedFields) {
+            fields.add(currentPath.appendField(nestedPath));
+          }
+        }
+      } else {
+        fields.add(currentPath);
+      }
+    }
+    return FieldMask(fields);
+  }
+
   @override
   Map<String, Object> get value {
     final Map<String, Object> res = <String, Object>{};

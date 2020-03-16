@@ -5,12 +5,12 @@
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
@@ -53,10 +53,7 @@ class DeleteMutation extends Mutation {
   }
 
   @override
-  FieldMask get fieldMask => null;
-
-  @override
-  bool get isIdempotent => true;
+  ObjectValue extractBaseValue(MaybeDocument maybeDoc) => null;
 
   @override
   bool operator ==(Object other) =>

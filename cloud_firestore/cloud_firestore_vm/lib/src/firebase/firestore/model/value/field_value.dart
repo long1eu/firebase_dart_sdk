@@ -13,6 +13,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';

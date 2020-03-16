@@ -18,22 +18,41 @@ class NumericIncrementTransformOperation implements TransformOperation {
   @override
   FieldValue applyToLocalView(
       FieldValue previousValue, Timestamp localWriteTime) {
+    final NumberValue baseValue = computeBaseValue(previousValue);
+
     // Return an integer value only if the previous value and the operand is an
     // integer.
-    if (previousValue is IntegerValue && operand is IntegerValue) {
-      final int sum = _safeIncrement(previousValue.value, _operandAsInt());
+    if (baseValue is IntegerValue && operand is IntegerValue) {
+      final int sum = _safeIncrement(baseValue.value, _operandAsInt());
       return IntegerValue.valueOf(sum);
-    } else if (previousValue is IntegerValue) {
-      final double sum = previousValue.value + _operandAsDouble();
+    } else if (baseValue is IntegerValue) {
+      final double sum = baseValue.value + _operandAsDouble();
       return DoubleValue.valueOf(sum);
-    } else if (previousValue is DoubleValue) {
-      final double sum = previousValue.value + _operandAsDouble();
+    } else if (baseValue is DoubleValue) {
+      final double sum = baseValue.value + _operandAsDouble();
+      return DoubleValue.valueOf(sum);
+    } else {
+      hardAssert(baseValue is DoubleValue,
+          'Expected NumberValue to be of type DoubleValue, but was $previousValue');
+
+      final double sum = baseValue.value + _operandAsDouble();
       return DoubleValue.valueOf(sum);
     }
+  }
 
-    // If the existing value is not a number, use the value of the transform as
-    // the new base value.
-    return operand;
+  @override
+  FieldValue applyToRemoteDocument(
+      FieldValue previousValue, FieldValue transformResult) {
+    return transformResult;
+  }
+
+  /// Inspects the provided value, returning the provided value if it is already
+  /// a [NumberValue], otherwise returning a coerced [IntegerValue] of 0.
+  @override
+  NumberValue computeBaseValue(FieldValue previousValue) {
+    return previousValue is NumberValue
+        ? previousValue
+        : IntegerValue.valueOf(0);
   }
 
   int _safeIncrement(int x, int y) {
@@ -73,13 +92,4 @@ class NumericIncrementTransformOperation implements TransformOperation {
           "Expected 'operand' to be of Number type, but was ${operand.runtimeType}");
     }
   }
-
-  @override
-  FieldValue applyToRemoteDocument(
-      FieldValue previousValue, FieldValue transformResult) {
-    return transformResult;
-  }
-
-  @override
-  bool get isIdempotent => false;
 }

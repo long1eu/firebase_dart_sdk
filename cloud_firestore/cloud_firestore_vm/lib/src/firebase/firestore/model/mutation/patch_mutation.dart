@@ -96,10 +96,7 @@ class PatchMutation extends Mutation {
   }
 
   @override
-  FieldMask get fieldMask => mask;
-
-  @override
-  bool get isIdempotent => true;
+  ObjectValue extractBaseValue(MaybeDocument maybeDoc) => null;
 
   @override
   bool operator ==(Object other) =>

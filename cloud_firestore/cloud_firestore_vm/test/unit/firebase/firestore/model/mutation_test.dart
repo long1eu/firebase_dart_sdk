@@ -673,7 +673,7 @@ void main() {
     final Mutation transform = transformMutation('collection/key',
         map(<dynamic>['foo.bar', firestore.FieldValue.serverTimestamp()]));
 
-    final Timestamp serverTimestamp = Timestamp(2, 0);
+    const Timestamp serverTimestamp = Timestamp(2, 0);
 
     final MutationResult mutationResult = MutationResult(
         version(1), <TimestampValue>[TimestampValue.valueOf(serverTimestamp)]);
@@ -812,5 +812,103 @@ void main() {
     _assertVersionTransitions(delete, docV3, mutationResult, docV7Deleted);
     _assertVersionTransitions(delete, deletedV3, mutationResult, docV7Deleted);
     _assertVersionTransitions(delete, null, mutationResult, docV7Deleted);
+  });
+
+  test('testServerTimestampBaseValue', () {
+    final Map<String, Object> allValues = map(<dynamic>['time', 'foo']);
+    final Document baseDoc =
+        doc('collection/key', 0, <String, Object>{'nested': allValues});
+
+    final Map<String, Object> allTransforms =
+        map(<dynamic>['time', firestore.FieldValue.serverTimestamp()]);
+
+    // Server timestamps are idempotent and don't have base values.
+    final Mutation _transformMutation = transformMutation(
+        'collection/key', <String, Object>{'nested': allTransforms});
+    expect(_transformMutation.extractBaseValue(baseDoc), isNull);
+  });
+
+  test('testNumericIncrementBaseValue', () {
+    final Document baseDoc = doc(
+      'collection/key',
+      0,
+      <String, Object>{
+        'nested': map<dynamic>(<dynamic>[
+          'ignore',
+          'foo',
+          'double',
+          42.0,
+          'long',
+          42,
+          'string',
+          'foo',
+          'map',
+          map<dynamic>(<dynamic>[])
+        ]),
+      },
+    );
+
+    final ObjectValue baseValue = transformMutation(
+      'collection/key',
+      <String, Object>{
+        'nested': map<dynamic>(<dynamic>[
+          'double',
+          firestore.FieldValue.increment(1),
+          'long',
+          firestore.FieldValue.increment(1),
+          'string',
+          firestore.FieldValue.increment(1),
+          'map',
+          firestore.FieldValue.increment(1),
+          'missing',
+          firestore.FieldValue.increment(1)
+        ]),
+      },
+    ).extractBaseValue(baseDoc);
+
+    final FieldValue expected = wrapMap(map<dynamic>(<dynamic>[
+      'double',
+      42.0,
+      'long',
+      42,
+      'string',
+      0,
+      'map',
+      0,
+      'missing',
+      0,
+      'nested',
+      map<dynamic>(<dynamic>[
+        'double',
+        42.0,
+        'long',
+        42,
+        'string',
+        0,
+        'map',
+        0,
+        'missing',
+        0
+      ])
+    ]));
+    expect(baseValue, expected);
+  });
+
+  test('testIncrementTwice', () {
+    final Document baseDoc =
+        doc('collection/key', 0, map(<dynamic>['sum', '0']));
+
+    final Map<String, Object> increment =
+        map(<dynamic>['sum', firestore.FieldValue.increment(1)]);
+    final Mutation _transformMutation =
+        transformMutation('collection/key', increment);
+
+    MaybeDocument mutatedDoc =
+        _transformMutation.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
+    mutatedDoc = _transformMutation.applyToLocalView(
+        mutatedDoc, baseDoc, Timestamp.now());
+
+    final Document _mutatedDoc = mutatedDoc;
+    expect(_mutatedDoc.getField(field('sum')), wrap(2));
   });
 }

@@ -7,7 +7,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
@@ -21,17 +20,18 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:collection/collection.dart';
 
-/// A mutation that modifies specific fields of the document with transform operations. Currently
-/// the only supported transform is a server timestamp, but IP Address, increment(n), etc. could be
-/// supported in the future.
+/// A mutation that modifies specific fields of the document with transform
+/// operations. Currently the only supported transform is a server timestamp,
+/// but IP Address, increment(n), etc. could be supported in the future.
 ///
-/// It is somewhat similar to a [PatchMutation] in that it patches specific fields and has no effect
-/// when applied to null or a [NoDocument] (see comment on [Mutation.applyToRemoteDocument] and
-/// [Mutation.applyToLocalView] for rationale).
+/// It is somewhat similar to a [PatchMutation] in that it patches specific
+/// fields and has no effect when applied to null or a [NoDocument] (see comment
+/// on [Mutation.applyToRemoteDocument] and [Mutation.applyToLocalView] for
+/// rationale).
 class TransformMutation extends Mutation {
-  // NOTE: We set a precondition of exists: true as a safety-check, since we always combine
-  // TransformMutations with a SetMutation or PatchMutation which (if successful) should end up with
-  // an existing document.
+  // NOTE: We set a precondition of exists: true as a safety-check, since we
+  // always combine TransformMutations with a SetMutation or PatchMutation which (
+  // if successful) should end up with an existing document.
   TransformMutation(DocumentKey key, this.fieldTransforms)
       : super(key, Precondition(exists: true));
 
@@ -46,9 +46,10 @@ class TransformMutation extends Mutation {
         'Transform results missing for TransformMutation.');
 
     if (!precondition.isValidFor(maybeDoc)) {
-      // Since the mutation was not rejected, we know that the precondition matched on the backend.
-      // We therefore must not have the expected version of the document in our cache and return an
-      // [UnknownDocument] with the known [updateTime].
+      // Since the mutation was not rejected, we know that the precondition
+      // matched on the backend. We therefore must not have the expected version
+      // of the document in our cache and return an [UnknownDocument] with the
+      // known [updateTime].
       return UnknownDocument(key, mutationResult.version);
     }
 
@@ -71,28 +72,33 @@ class TransformMutation extends Mutation {
 
     final Document doc = _requireDocument(maybeDoc);
     final List<FieldValue> transformResults =
-        _localTransformResults(localWriteTime, baseDoc);
+        _localTransformResults(localWriteTime, maybeDoc, baseDoc);
     final ObjectValue newData = _transformObject(doc.data, transformResults);
     return Document(key, doc.version, DocumentState.localMutations, newData);
   }
 
   @override
-  FieldMask get fieldMask {
-    final Set<FieldPath> fieldMask = <FieldPath>{};
-    for (FieldTransform transform in fieldTransforms) {
-      fieldMask.add(transform.fieldPath);
-    }
-    return FieldMask(fieldMask);
-  }
+  ObjectValue extractBaseValue(MaybeDocument maybeDoc) {
+    ObjectValue baseObject;
 
-  @override
-  bool get isIdempotent {
     for (FieldTransform transform in fieldTransforms) {
-      if (!transform.isIdempotent) {
-        return false;
+      FieldValue existingValue;
+      if (maybeDoc is Document) {
+        existingValue = maybeDoc.getField(transform.fieldPath);
+      }
+
+      final FieldValue coercedValue =
+          transform.operation.computeBaseValue(existingValue);
+      if (coercedValue != null) {
+        if (baseObject == null) {
+          baseObject = ObjectValue.empty.set(transform.fieldPath, coercedValue);
+        } else {
+          baseObject = baseObject.set(transform.fieldPath, coercedValue);
+        }
       }
     }
-    return true;
+
+    return baseObject;
   }
 
   /// Asserts that the given [MaybeDocument] is actually a [Document] and verifies that it matches
@@ -138,16 +144,22 @@ class TransformMutation extends Mutation {
     return transformResults;
   }
 
-  /// Creates a list of 'transform results' (a transform result is a field value representing the
-  /// result of applying a transform) for use when applying a [TransformMutation] locally.
+  /// Creates a list of 'transform results' (a transform result is a field value
+  /// representing the result of applying a transform) for use when applying a
+  /// [TransformMutation] locally.
   ///
   /// [localWriteTime] the local time of the transform mutation (used to generate
   /// [ServerTimestampValue]s).
+  /// [maybeDoc] The current state of the document after applying all previous
+  /// mutations.
   /// [baseDoc] is the document prior to applying this mutation batch.
   ///
   /// Returns the transform results list.
   List<FieldValue> _localTransformResults(
-      Timestamp localWriteTime, MaybeDocument baseDoc) {
+    Timestamp localWriteTime,
+    MaybeDocument maybeDoc,
+    MaybeDocument baseDoc,
+  ) {
     final List<FieldValue> transformResults =
         List<FieldValue>(fieldTransforms.length);
     int i = 0;
@@ -155,7 +167,15 @@ class TransformMutation extends Mutation {
       final TransformOperation transform = fieldTransform.operation;
 
       FieldValue previousValue;
-      if (baseDoc is Document) {
+      if (maybeDoc is Document) {
+        previousValue = maybeDoc.getField(fieldTransform.fieldPath);
+      }
+
+      if (previousValue == null && baseDoc is Document) {
+        // If the current document does not contain a value for the mutated
+        // field, use the value that existed before applying this mutation
+        // batch. This solves an edge case where a PatchMutation clears the
+        // values in a nested map before the TransformMutation is applied.
         previousValue = baseDoc.getField(fieldTransform.fieldPath);
       }
 

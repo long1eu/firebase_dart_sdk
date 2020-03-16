@@ -5,10 +5,10 @@
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
@@ -89,6 +89,22 @@ abstract class Mutation {
   MaybeDocument applyToLocalView(
       MaybeDocument maybeDoc, MaybeDocument baseDoc, Timestamp localWriteTime);
 
+  /// If applicable, returns the base value to persist with this mutation. If a
+  /// base value is provided, the mutation is always applied to this base value,
+  /// even if document has already been updated.
+  ///
+  /// The base value is a sparse object that consists of only the document
+  /// fields for which this mutation contains a non-idempotent transformation
+  /// (e.g. a numeric increment). The provided value guarantees consistent
+  /// behavior for non-idempotent transforms and allow us to return the same
+  /// latency-compensated value even if the backend has already applied the
+  /// mutation. The base value is null for idempotent mutations, as they can be
+  /// re-played even if the backend has already applied them.
+  ///
+  /// Returns a base value to store along with the mutation, or null for
+  /// idempotent mutations.
+  ObjectValue extractBaseValue(MaybeDocument maybeDoc);
+
   /// Helper for derived classes to implement .equals.
   bool hasSameKeyAndPrecondition(Mutation other) {
     return key == other.key && precondition == other.precondition;
@@ -116,12 +132,4 @@ abstract class Mutation {
       return SnapshotVersion.none;
     }
   }
-
-  /// If applicable, returns the field mask for this mutation. Fields that are
-  /// not included in this field mask are not modified when this mutation is
-  /// applied. Mutations that replace all document values return 'null'.
-  FieldMask get fieldMask;
-
-  /// Returns whether all operations in the mutation are idempotent.
-  bool get isIdempotent;
 }

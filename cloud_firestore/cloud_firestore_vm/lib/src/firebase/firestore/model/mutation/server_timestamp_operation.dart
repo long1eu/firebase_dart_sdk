@@ -28,7 +28,10 @@ class ServerTimestampOperation implements TransformOperation {
   }
 
   @override
-  bool get isIdempotent => true;
+  FieldValue computeBaseValue(FieldValue currentValue) {
+    // Server timestamps are idempotent and don't require a base value.
+    return null;
+  }
 
 // NOTE: Since we've guaranteed a singleton instance, we can rely on Object's
 // default implementation of equals() / hashCode().
