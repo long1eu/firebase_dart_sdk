@@ -14,6 +14,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dar
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
@@ -169,6 +170,7 @@ class LocalDocumentsView {
 
     final List<MutationBatch> matchingBatches =
         await mutationQueue.getAllMutationBatchesAffectingQuery(query);
+    results = await _addMissingBaseDocuments(matchingBatches, results);
     for (MutationBatch batch in matchingBatches) {
       for (Mutation mutation in batch.mutations) {
         // Only process documents belonging to the collection.
@@ -196,5 +198,38 @@ class LocalDocumentsView {
     }
 
     return results;
+  }
+
+  /// It is possible that a [PatchMutation] can make a document match a query,
+  /// even if the version in the [RemoteDocumentCache] is not a match yet
+  /// (waiting for server to ack). To handle this, we find all document keys
+  /// affected by the [PatchMutation]s that are not in [existingDocs]} yet, and
+  /// back fill them via [remoteDocumentCache.getAll], otherwise those
+  /// [PatchMutation]s will be ignored because no base document can be found,
+  /// and lead to missing results for the query.
+  Future<ImmutableSortedMap<DocumentKey, Document>> _addMissingBaseDocuments(
+    List<MutationBatch> matchingBatches,
+    ImmutableSortedMap<DocumentKey, Document> existingDocs,
+  ) async {
+    final Set<DocumentKey> missingDocKeys = <DocumentKey>{};
+    for (MutationBatch batch in matchingBatches) {
+      for (Mutation mutation in batch.mutations) {
+        if (mutation is PatchMutation &&
+            !existingDocs.containsKey(mutation.key)) {
+          missingDocKeys.add(mutation.key);
+        }
+      }
+    }
+
+    ImmutableSortedMap<DocumentKey, Document> mergedDocs = existingDocs;
+    final Map<DocumentKey, MaybeDocument> missingDocs =
+        await remoteDocumentCache.getAll(missingDocKeys);
+    for (MapEntry<DocumentKey, MaybeDocument> entry in missingDocs.entries) {
+      if (entry.value != null && (entry.value is Document)) {
+        mergedDocs = mergedDocs.insert(entry.key, entry.value);
+      }
+    }
+
+    return mergedDocs;
   }
 }
