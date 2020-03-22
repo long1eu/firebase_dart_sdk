@@ -119,47 +119,4 @@ QuerySnapshot querySnapshot(
   return QuerySnapshot(query(path), viewSnapshot, firestore);
 }
 
-TestTargetMetadataProvider get testTargetMetadataProvider {
-  final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys =
-      <int, ImmutableSortedSet<DocumentKey>>{};
-  final Map<int, QueryData> queryDataMap = <int, QueryData>{};
-
-  return TestTargetMetadataProvider(
-    syncedKeys,
-    queryDataMap,
-    getQueryDataForTarget: (int targetId) => queryDataMap[targetId],
-    getRemoteKeysForTarget: (int targetId) =>
-        syncedKeys[targetId] ?? DocumentKey.emptyKeySet,
-  );
-}
-
-/// An implementation of [TargetMetadataProvider] that provides controlled
-/// access to the [TargetMetadataProvider] callbacks. Any target accessed via
-/// these callbacks must be registered beforehand via [setSyncedKeys].
-class TestTargetMetadataProvider extends TargetMetadataProvider {
-  TestTargetMetadataProvider(
-      this.syncedKeys,
-      this.queryDataMap,
-      {@required
-          ImmutableSortedSet<DocumentKey> Function(int targetId)
-              getRemoteKeysForTarget,
-      @required
-          QueryData Function(int targetId) getQueryDataForTarget})
-      : super(
-          getRemoteKeysForTarget: getRemoteKeysForTarget,
-          getQueryDataForTarget: getQueryDataForTarget,
-        );
-
-  final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys;
-
-  final Map<int, QueryData> queryDataMap;
-
-  /// Sets or replaces the local state for the provided query data.
-  void setSyncedKeys(
-      QueryData queryData, ImmutableSortedSet<DocumentKey> keys) {
-    queryDataMap[queryData.targetId] = queryData;
-    syncedKeys[queryData.targetId] = keys;
-  }
-}
-
 class FirebaseFirestoreMock extends Mock implements Firestore {}

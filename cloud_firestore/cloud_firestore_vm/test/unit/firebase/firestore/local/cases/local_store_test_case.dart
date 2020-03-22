@@ -37,7 +37,7 @@ import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
 import '../../../../../util/test_util.dart';
-import '../../../firestore/test_util.dart' as t;
+import '../../util/test_target_metadata_provider.dart' as t;
 import '../accumulating_stats_collector.dart';
 
 class LocalStoreTestCase {

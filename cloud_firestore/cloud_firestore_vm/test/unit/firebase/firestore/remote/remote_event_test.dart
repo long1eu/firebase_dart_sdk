@@ -20,7 +20,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart'
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart' as util;
-import '../test_util.dart';
+import '../util/test_target_metadata_provider.dart';
 
 void main() {
   TestTargetMetadataProvider targetMetadataProvider;
