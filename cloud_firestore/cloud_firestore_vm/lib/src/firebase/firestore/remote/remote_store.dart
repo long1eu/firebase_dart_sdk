@@ -566,7 +566,7 @@ class RemoteStore implements TargetMetadataProvider {
         status.code != StatusCode.ok, 'Handling write error with status OK.');
     // Reset the token if it's a permanent error, signaling the write stream is no longer valid.
     // Note that the handshake does not count as a write: see comments on isPermanentWriteError for details.
-    if (Datastore.isPermanentError(status)) {
+    if (Datastore.isPermanentGrpcError(status)) {
       final String token = toDebugString(_writeStream.lastStreamToken);
       Log.d('RemoteStore',
           'RemoteStore error before completed handshake; resetting stream token $token: $status');

@@ -4,6 +4,7 @@
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
+import 'package:grpc/grpc.dart';
 
 class FirestoreErrorCode {
   const FirestoreErrorCode._(this.value);
@@ -11,14 +12,14 @@ class FirestoreErrorCode {
   final int value;
 
   static const FirestoreErrorCode ok = FirestoreErrorCode._(0);
-  static const FirestoreErrorCode canceled = FirestoreErrorCode._(1);
+  static const FirestoreErrorCode cancelled = FirestoreErrorCode._(1);
   static const FirestoreErrorCode unknown = FirestoreErrorCode._(2);
   static const FirestoreErrorCode invalidArgument = FirestoreErrorCode._(3);
   static const FirestoreErrorCode deadlineExceeded = FirestoreErrorCode._(4);
   static const FirestoreErrorCode notFound = FirestoreErrorCode._(5);
   static const FirestoreErrorCode alreadyExists = FirestoreErrorCode._(6);
   static const FirestoreErrorCode permissionDenied = FirestoreErrorCode._(7);
-  static const FirestoreErrorCode resourcesExhausted = FirestoreErrorCode._(8);
+  static const FirestoreErrorCode resourceExhausted = FirestoreErrorCode._(8);
   static const FirestoreErrorCode failedPrecondition = FirestoreErrorCode._(9);
   static const FirestoreErrorCode aborted = FirestoreErrorCode._(10);
   static const FirestoreErrorCode outOfRange = FirestoreErrorCode._(11);
@@ -28,16 +29,20 @@ class FirestoreErrorCode {
   static const FirestoreErrorCode dataLoss = FirestoreErrorCode._(15);
   static const FirestoreErrorCode unauthenticated = FirestoreErrorCode._(16);
 
+  static FirestoreErrorCode fromValue(GrpcError error) {
+    return values[error.code];
+  }
+
   static const List<FirestoreErrorCode> values = <FirestoreErrorCode>[
     ok,
-    canceled,
+    cancelled,
     unknown,
     invalidArgument,
     deadlineExceeded,
     notFound,
     alreadyExists,
     permissionDenied,
-    resourcesExhausted,
+    resourceExhausted,
     failedPrecondition,
     aborted,
     outOfRange,

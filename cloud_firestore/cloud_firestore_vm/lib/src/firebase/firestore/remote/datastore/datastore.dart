@@ -135,36 +135,44 @@ class Datastore {
   /// permanent error when received in response to a non-write operation.
   ///
   /// See [isPermanentWriteError] for classifying write errors.
-  static bool isPermanentError(GrpcError status) {
+  static bool isPermanentGrpcError(GrpcError status) {
+    return isPermanentError(FirestoreErrorCode.fromValue(status));
+  }
+
+  /// Determines whether the given error code represents a permanent error when
+  /// received in response to a non-write operation.
+  ///
+  /// See [isPermanentWriteError] for classifying write errors.
+  static bool isPermanentError(FirestoreErrorCode code) {
     // See go/firestore-client-errors
-    switch (status.code) {
-      case StatusCode.ok:
+    switch (code) {
+      case FirestoreErrorCode.ok:
         throw ArgumentError('Treated status OK as error');
-      case StatusCode.cancelled:
-      case StatusCode.unknown:
-      case StatusCode.deadlineExceeded:
-      case StatusCode.resourceExhausted:
-      case StatusCode.internal:
-      case StatusCode.unavailable:
-      case StatusCode.unauthenticated:
+      case FirestoreErrorCode.cancelled:
+      case FirestoreErrorCode.unknown:
+      case FirestoreErrorCode.deadlineExceeded:
+      case FirestoreErrorCode.resourceExhausted:
+      case FirestoreErrorCode.internal:
+      case FirestoreErrorCode.unavailable:
+      case FirestoreErrorCode.unauthenticated:
         // Unauthenticated means something went wrong with our token and we need
         // to retry with new credentials which will happen automatically.
         return false;
-      case StatusCode.invalidArgument:
-      case StatusCode.notFound:
-      case StatusCode.alreadyExists:
-      case StatusCode.permissionDenied:
-      case StatusCode.failedPrecondition:
-      case StatusCode.aborted:
+      case FirestoreErrorCode.invalidArgument:
+      case FirestoreErrorCode.notFound:
+      case FirestoreErrorCode.alreadyExists:
+      case FirestoreErrorCode.permissionDenied:
+      case FirestoreErrorCode.failedPrecondition:
+      case FirestoreErrorCode.aborted:
       // Aborted might be retried in some scenarios, but that is dependant on
       // the context and should handled individually by the calling code.
       // See https://cloud.google.com/apis/design/errors.
-      case StatusCode.outOfRange:
-      case StatusCode.unimplemented:
-      case StatusCode.dataLoss:
+      case FirestoreErrorCode.outOfRange:
+      case FirestoreErrorCode.unimplemented:
+      case FirestoreErrorCode.dataLoss:
         return true;
       default:
-        throw ArgumentError('Unknown gRPC status code: $status');
+        throw ArgumentError('Unknown gRPC status code: $code');
     }
   }
 
@@ -180,7 +188,7 @@ class Datastore {
   /// permanent). This means a handshake error should be classified with
   /// [isPermanentError], above.
   static bool isPermanentWriteError(GrpcError status) {
-    return isPermanentError(status) && status.code != StatusCode.aborted;
+    return isPermanentGrpcError(status) && status.code != StatusCode.aborted;
   }
 
   @override

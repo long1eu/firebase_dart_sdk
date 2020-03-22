@@ -18,6 +18,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/transaction.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_write_result.dart';
@@ -31,6 +32,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart'
+    show Datastore;
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
@@ -198,18 +201,17 @@ class SyncEngine implements RemoteStoreCallback {
   Future<TResult> transaction<TResult>(
       Future<TResult> Function(Transaction) updateFunction, int retries) async {
     hardAssert(retries >= 0, 'Got negative number of retries for transaction.');
-    final Transaction transaction = _remoteStore.createTransaction();
-    final TResult result = await updateFunction(transaction);
-
     try {
+      final Transaction transaction = _remoteStore.createTransaction();
+      final TResult result = await updateFunction(transaction);
       await transaction.commit();
       return result;
     } catch (e) {
-      // TODO(long1eu): Only retry on real transaction failures.
-      if (retries == 0) {
-        return Future<TResult>.error(e);
+      if (retries > 0 && _isRetryableTransactionError(e)) {
+        return transaction(updateFunction, retries - 1);
       }
-      return this.transaction(updateFunction, retries - 1);
+
+      return Future<TResult>.error(e);
     }
   }
 
@@ -328,7 +330,7 @@ class SyncEngine implements RemoteStoreCallback {
       final Query query = queryView.query;
       await _localStore.releaseQuery(query);
       await _removeAndCleanupQuery(queryView);
-      logErrorIfInteresting(error, 'Listen for $query failed');
+      _logErrorIfInteresting(error, 'Listen for $query failed');
       _syncEngineListener.onError(query, error);
     }
   }
@@ -357,7 +359,7 @@ class SyncEngine implements RemoteStoreCallback {
         await _localStore.rejectBatch(batchId);
 
     if (changes.isNotEmpty) {
-      logErrorIfInteresting(status, 'Write failed at ${changes.minKey.path}');
+      _logErrorIfInteresting(status, 'Write failed at ${changes.minKey.path}');
     }
 
     // The local store may or may not be able to apply the write result and raise events immediately (depending on
@@ -523,13 +525,13 @@ class SyncEngine implements RemoteStoreCallback {
 
   /// Logs the error as a warnings if it likely represents a developer mistake such as forgetting to create an index or
   /// permission denied.
-  void logErrorIfInteresting(GrpcError error, String contextString) {
-    if (errorIsInteresting(error)) {
+  void _logErrorIfInteresting(GrpcError error, String contextString) {
+    if (_errorIsInteresting(error)) {
       Log.w('Firestore', '$contextString: $error');
     }
   }
 
-  bool errorIsInteresting(GrpcError error) {
+  bool _errorIsInteresting(GrpcError error) {
     final int code = error.code;
     final String description = error.message ?? '';
 
@@ -540,6 +542,18 @@ class SyncEngine implements RemoteStoreCallback {
       return true;
     }
 
+    return false;
+  }
+
+  bool _isRetryableTransactionError(dynamic e) {
+    if (e is FirestoreError) {
+      // In transactions, the backend will fail outdated reads with FAILED_PRECONDITION and
+      // non-matching document versions with ABORTED. These errors should be retried.
+      final FirestoreErrorCode code = e.code;
+      return code == FirestoreErrorCode.aborted ||
+          code == FirestoreErrorCode.failedPrecondition ||
+          !Datastore.isPermanentError(e.code);
+    }
     return false;
   }
 }

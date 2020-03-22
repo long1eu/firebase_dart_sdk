@@ -349,7 +349,7 @@ void main() {
     final List<Future<void>> readTasks = <Future<void>>[];
     // A barrier to make sure every transaction reaches the same spot.
     final Completer<void> barrier = Completer<void>();
-    int started = 0;
+    int counter = 0;
 
     final DocumentReference doc = firestore.collection('counters').document();
     await doc.set(map(<dynamic>['count', 5.0, 'other', 'yes']));
@@ -360,9 +360,9 @@ void main() {
       readTasks.add(resolveRead.future);
       transactionTasks
           .add(firestore.runTransaction<void>((Transaction transaction) async {
+        counter++;
         final DocumentSnapshot snapshot = await transaction.get(doc);
         expect(snapshot, isNotNull);
-        started++;
         if (!resolveRead.isCompleted) {
           resolveRead.complete();
         }
@@ -376,10 +376,13 @@ void main() {
 
     // Let all of the transactions fetch the old value and stop once.
     await Future.wait(readTasks);
-    expect(started, 3);
-    // Let all of the transactions continue and wait for them to finish.
+    // There should be 3 initial transaction runs
+    expect(counter, 3);
     barrier.complete();
     await Future.wait(transactionTasks);
+    // There should be a maximum of 3 retries: once for the 2nd update, and
+    // twice for the 3rd update
+    expect(counter, lessThanOrEqualTo(6));
     // Now all transaction should be completed, so check the result.
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.getDouble('count').toInt(), 8);
@@ -470,23 +473,24 @@ void main() {
   test('testReadingADocTwiceWithDifferentVersions', () async {
     final DocumentReference doc = firestore.collection('counters').document();
     await doc.set(map(<dynamic>['count', 15.0]));
+    int counter = 0;
 
     try {
       await firestore.runTransaction<void>((Transaction transaction) async {
+        counter++;
         // Get the doc once.
-        final DocumentSnapshot snapshot1 = await transaction.get(doc);
-        expect(snapshot1.getDouble('count').toInt(), 15);
-        // Do a write outside of the transaction.
-        await doc.set(map(<dynamic>['count', 1234.0]));
+        await transaction.get(doc);
+        // Do a write outside of the transaction. Because the transaction will
+        // retry, set the document to a different value each time.
+        await doc.set(map(<dynamic>['count', 1234.0 + counter]));
         // Get the doc again in the transaction with the new version.
         final DocumentSnapshot _ = await transaction.get(doc);
         // The get itself will fail, because we already read an earlier version of this document.
         fail('Should have thrown exception');
       });
-    } catch (_) {}
-
-    final DocumentSnapshot snapshot = await doc.get();
-    expect(snapshot.getDouble('count').toInt(), 1234);
+    } on FirestoreError catch (e) {
+      expect(e.code, FirestoreErrorCode.aborted);
+    }
   });
 
   test('testCannotReadAfterWriting', () async {
@@ -542,6 +546,25 @@ void main() {
       expect(e.code, FirestoreErrorCode.invalidArgument);
       expect(e.message,
           'Every document read in a transaction must also be written.');
+    }
+  });
+
+  test('testDoesNotRetryOnPermanentError', () async {
+    final Firestore firestore = await testFirestore();
+    int count = 0;
+    try {
+      // Make a transaction that should fail with a permanent error
+      await firestore.runTransaction((Transaction transaction) async {
+        count++;
+        // Get and update a document that doesn't exist so that the transaction fails
+        final DocumentSnapshot doc = await transaction
+            .get(firestore.collection('nonexistent').document());
+        transaction.update(doc.reference, <String, String>{'foo': 'bar'});
+        return null;
+      });
+    } on FirestoreError catch (e) {
+      expect(e.code, FirestoreErrorCode.invalidArgument);
+      expect(count, 1);
     }
   });
 
