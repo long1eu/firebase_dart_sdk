@@ -27,13 +27,13 @@ class FieldFilter extends Filter {
     } else if (value == NullValue.nullValue()) {
       if (operator != FilterOperator.equal) {
         throw ArgumentError(
-            'Invalid Query. You can only perform equality comparisons on null (via whereEqualTo()).');
+            'Invalid Query. Null supports only equality comparisons (via whereEqualTo()).');
       }
       return FieldFilter._(path, operator, value);
     } else if (value == DoubleValue.nan) {
       if (operator != FilterOperator.equal) {
         throw ArgumentError(
-            'Invalid Query. You can only perform equality comparisons on NaN (via whereEqualTo()).');
+            'Invalid Query. NaN supports only equality comparisons (via whereEqualTo()).');
       }
       return FieldFilter._(path, operator, value);
     } else if (operator == FilterOperator.arrayContains) {

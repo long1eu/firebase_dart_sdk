@@ -465,27 +465,19 @@ void main() {
 
   test('queriesWithNullOrNaNFiltersOtherThanEqualityFail', () async {
     final CollectionReference collection = await testCollection();
-    await expectError(
-        () => collection.whereGreaterThan('a', null),
-        'Invalid Query. You can only perform equality comparisons on null '
-        '(via whereEqualTo()).');
-    await expectError(
-        () => collection.whereArrayContains('a', null),
-        'Invalid Query. You can only perform equality comparisons on null '
-        '(via whereEqualTo()).');
+    await expectError(() => collection.whereGreaterThan('a', null),
+        'Invalid Query. Null supports only equality comparisons (via whereEqualTo()).');
+    await expectError(() => collection.whereArrayContains('a', null),
+        'Invalid Query. Null supports only equality comparisons (via whereEqualTo()).');
     await expectError(() => collection.whereArrayContainsAny('a', null),
         'Invalid Query. A non-empty array is required for "array_contains_any" filters.');
     await expectError(() => collection.whereIn('a', null),
         'Invalid Query. A non-empty array is required for "in" filters.');
 
-    await expectError(
-        () => collection.whereGreaterThan('a', double.nan),
-        'Invalid Query. You can only perform equality comparisons on NaN '
-        '(via whereEqualTo()).');
-    await expectError(
-        () => collection.whereArrayContains('a', double.nan),
-        'Invalid Query. You can only perform equality comparisons on NaN '
-        '(via whereEqualTo()).');
+    await expectError(() => collection.whereGreaterThan('a', double.nan),
+        'Invalid Query. NaN supports only equality comparisons (via whereEqualTo()).');
+    await expectError(() => collection.whereArrayContains('a', double.nan),
+        'Invalid Query. NaN supports only equality comparisons (via whereEqualTo()).');
   });
 
   test('queriesCannotBeCreatedFromDocumentsMissingSortValues', () async {
