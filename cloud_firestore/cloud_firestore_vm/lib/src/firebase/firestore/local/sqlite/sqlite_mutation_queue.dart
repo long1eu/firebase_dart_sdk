@@ -7,12 +7,13 @@ part of sqlite_persistence;
 /// A mutation queue for a specific user, backed by SQLite.
 class SQLiteMutationQueue implements MutationQueue {
   /// Creates a mutation queue for the given user, in the SQLite database wrapped by the persistence interface.
-  SQLiteMutationQueue(this.db, this.serializer, User user)
+  SQLiteMutationQueue(this.db, this.serializer, this._statsCollector, User user)
       : uid = user.isAuthenticated ? user.uid : '',
         _lastStreamToken = Uint8List(0);
 
   final SQLitePersistence db;
   final LocalSerializer serializer;
+  final StatsCollector _statsCollector;
 
   /// The normalized uid (e.g. null => '') used in the uid column.
   final String uid;
@@ -204,11 +205,13 @@ class SQLiteMutationQueue implements MutationQueue {
       await db.indexManager.addToCollectionParentIndex(key.path.popLast());
     }
 
+    _statsCollector.recordRowsWritten(MutationQueue.statsTag, mutations.length);
     return batch;
   }
 
   @override
   Future<MutationBatch> lookupMutationBatch(int batchId) async {
+    _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
     final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
@@ -229,6 +232,7 @@ class SQLiteMutationQueue implements MutationQueue {
 
   @override
   Future<MutationBatch> getNextMutationBatchAfterBatchId(int batchId) async {
+    _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
     final int _nextBatchId = batchId + 1;
 
     final List<Map<String, dynamic>> result = await db.query(
@@ -269,6 +273,7 @@ class SQLiteMutationQueue implements MutationQueue {
       result.add(decodeMutationBatch(row['mutations']));
     }
 
+    _statsCollector.recordRowsRead(MutationQueue.statsTag, rows.length);
     return result;
   }
 
@@ -297,6 +302,7 @@ class SQLiteMutationQueue implements MutationQueue {
       result.add(decodeMutationBatch(row['mutations']));
     }
 
+    _statsCollector.recordRowsRead(MutationQueue.statsTag, rows.length);
     return result;
   }
 
@@ -315,6 +321,7 @@ class SQLiteMutationQueue implements MutationQueue {
         args,
         ') AND dm.uid = m.uid AND dm.batch_id = m.batch_id ORDER BY dm.batch_id');
 
+    int rowsProcessed = 0;
     final List<MutationBatch> result = <MutationBatch>[];
     final Set<int> uniqueBatchIds = <int>{};
     while (longQuery.hasMoreSubqueries) {
@@ -327,7 +334,10 @@ class SQLiteMutationQueue implements MutationQueue {
           result.add(decodeMutationBatch(row['mutations']));
         }
       }
+      rowsProcessed += rows.length;
     }
+
+    _statsCollector.recordRowsRead(MutationQueue.statsTag, rowsProcessed);
 
     // If more than one query was issued, batches might be in an unsorted order (batches are ordered within one query's
     // results, but not across queries). It's likely to be rare, so don't impose performance penalty on the normal case.
@@ -399,6 +409,7 @@ class SQLiteMutationQueue implements MutationQueue {
       result.add(decodeMutationBatch(row['mutations']));
     }
 
+    _statsCollector.recordRowsRead(MutationQueue.statsTag, rows.length);
     return result;
   }
 
@@ -438,6 +449,9 @@ class SQLiteMutationQueue implements MutationQueue {
       await db.execute(indexDeleter, <dynamic>[uid, path, batchId]);
       await db.referenceDelegate.removeMutationReference(key);
     }
+
+    _statsCollector.recordRowsDeleted(
+        MutationQueue.statsTag, batch.mutations.length);
   }
 
   @override

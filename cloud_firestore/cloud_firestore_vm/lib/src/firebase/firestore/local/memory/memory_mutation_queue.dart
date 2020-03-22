@@ -5,7 +5,7 @@
 part of memory_persistence;
 
 class MemoryMutationQueue implements MutationQueue {
-  MemoryMutationQueue(this.persistence)
+  MemoryMutationQueue(this.persistence, this._statsCollector)
       : _queue = <MutationBatch>[],
         _batchesByDocumentKey = ImmutableSortedSet<DocumentReference>(
             <DocumentReference>[], DocumentReference.byKey),
@@ -39,6 +39,7 @@ class MemoryMutationQueue implements MutationQueue {
   Uint8List lastStreamToken;
 
   final MemoryPersistence persistence;
+  final StatsCollector _statsCollector;
 
   // MutationQueue implementation
 
@@ -116,11 +117,13 @@ class MemoryMutationQueue implements MutationQueue {
           .addToCollectionParentIndex(mutation.key.path.popLast());
     }
 
+    _statsCollector.recordRowsWritten(MutationQueue.statsTag, 1);
     return batch;
   }
 
   @override
   Future<MutationBatch> lookupMutationBatch(int batchId) async {
+    _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
     final int index = _indexOfBatchId(batchId);
     if (index < 0 || index >= _queue.length) {
       return null;
@@ -166,6 +169,7 @@ class MemoryMutationQueue implements MutationQueue {
       result.add(batch);
     }
 
+    _statsCollector.recordRowsRead(MutationQueue.statsTag, result.length);
     return result;
   }
 

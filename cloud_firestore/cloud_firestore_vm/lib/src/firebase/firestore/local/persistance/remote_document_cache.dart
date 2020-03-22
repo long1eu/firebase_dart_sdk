@@ -18,6 +18,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart
 /// (an actual document with data) as well as [NoDocument] instances (indicating
 /// that the document is known to not exist).
 abstract class RemoteDocumentCache {
+  static const String statsTag = 'remote_documents';
+
   /// Adds or replaces an entry in the cache.
   ///
   /// The cache key is extracted from [MaybeDocument.key]. If there is already a

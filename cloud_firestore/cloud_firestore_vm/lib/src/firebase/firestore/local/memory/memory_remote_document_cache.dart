@@ -6,7 +6,7 @@ part of memory_persistence;
 
 /// In-memory cache of remote documents.
 class MemoryRemoteDocumentCache implements RemoteDocumentCache {
-  MemoryRemoteDocumentCache(MemoryPersistence persistence)
+  MemoryRemoteDocumentCache(MemoryPersistence persistence, this._statsCollector)
       : documents = DocumentCollections.emptyMaybeDocumentMap(),
         _persistence = persistence;
 
@@ -14,6 +14,7 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   ImmutableSortedMap<DocumentKey, MaybeDocument> documents;
 
   final MemoryPersistence _persistence;
+  final StatsCollector _statsCollector;
 
   @override
   Future<void> add(MaybeDocument document) async {
@@ -24,11 +25,15 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<void> remove(DocumentKey key) async {
+    _statsCollector.recordRowsDeleted(RemoteDocumentCache.statsTag, 1);
     documents = documents.remove(key);
   }
 
   @override
-  Future<MaybeDocument> get(DocumentKey key) async => documents[key];
+  Future<MaybeDocument> get(DocumentKey key) async {
+    _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, 1);
+    return documents[key];
+  }
 
   @override
   Future<Map<DocumentKey, MaybeDocument>> getAll(
@@ -37,6 +42,8 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
         await Future.wait(documentKeys.map((DocumentKey key) async =>
             MapEntry<DocumentKey, MaybeDocument>(key, await get(key))));
 
+    _statsCollector.recordRowsRead(
+        RemoteDocumentCache.statsTag, entries.length);
     return Map<DocumentKey, MaybeDocument>.fromEntries(entries);
   }
 
@@ -55,8 +62,10 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
         DocumentKey.fromPath(queryPath.appendSegment(''));
     final Iterator<MapEntry<DocumentKey, MaybeDocument>> iterator =
         documents.iteratorFrom(prefix);
+    int rowsRead = 0;
     while (iterator.moveNext()) {
       final MapEntry<DocumentKey, MaybeDocument> entry = iterator.current;
+      rowsRead++;
       final DocumentKey key = entry.key;
       if (!queryPath.isPrefixOf(key.path)) {
         break;
@@ -73,6 +82,7 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
       }
     }
 
+    _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rowsRead);
     return result;
   }
 

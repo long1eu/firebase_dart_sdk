@@ -25,6 +25,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/pers
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/reference_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/stats_collector.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
@@ -59,8 +60,10 @@ part 'sqlite_schema.dart';
 /// In addition to implementations of the methods in the Persistence interface, also contains helper
 /// routines that make dealing with SQLite much more pleasant.
 class SQLitePersistence extends Persistence {
-  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName)
-      : _semaphore = GlobalSemaphore() {
+  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName,
+      StatsCollector statsCollector)
+      : _statsCollector = statsCollector ?? StatsCollector.noOp,
+        _semaphore = GlobalSemaphore() {
     indexManager = SqliteIndexManager(this);
   }
 
@@ -69,6 +72,7 @@ class SQLitePersistence extends Persistence {
   final OpenDatabase openDatabase;
   final String databaseName;
   final LocalSerializer serializer;
+  final StatsCollector _statsCollector;
   final Semaphore _semaphore;
 
   Database _db;
@@ -115,16 +119,17 @@ class SQLitePersistence extends Persistence {
       DatabaseId databaseId,
       LocalSerializer serializer,
       OpenDatabase openDatabase,
-      LruGarbageCollectorParams params) async {
+      LruGarbageCollectorParams params,
+      [StatsCollector statsCollector = StatsCollector.noOp]) async {
     final String databaseName = sDatabaseName(persistenceKey, databaseId);
 
-    final SQLitePersistence persistence =
-        SQLitePersistence._(serializer, openDatabase, databaseName);
+    final SQLitePersistence persistence = SQLitePersistence._(
+        serializer, openDatabase, databaseName, statsCollector);
 
     final SQLiteQueryCache queryCache =
         SQLiteQueryCache(persistence, serializer);
     final SQLiteRemoteDocumentCache remoteDocumentCache =
-        SQLiteRemoteDocumentCache(persistence, serializer);
+        SQLiteRemoteDocumentCache(persistence, serializer, statsCollector);
     final SQLiteLruReferenceDelegate referenceDelegate =
         SQLiteLruReferenceDelegate(persistence, params);
 
@@ -176,7 +181,7 @@ class SQLitePersistence extends Persistence {
 
   @override
   MutationQueue getMutationQueue(User user) {
-    return SQLiteMutationQueue(this, serializer, user);
+    return SQLiteMutationQueue(this, serializer, _statsCollector, user);
   }
 
   @override

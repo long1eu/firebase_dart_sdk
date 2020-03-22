@@ -14,6 +14,8 @@ import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// A queue of mutations to apply to the remote store.
 abstract class MutationQueue {
+  static const String statsTag = 'mutations';
+
   /// Starts the mutation queue, performing any initial reads that might be
   /// required to establish invariants, etc.
   Future<void> start();

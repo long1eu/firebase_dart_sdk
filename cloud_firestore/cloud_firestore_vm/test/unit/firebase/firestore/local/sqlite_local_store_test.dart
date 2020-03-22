@@ -4,10 +4,12 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 
+import 'accumulating_stats_collector.dart';
 import 'cases/local_store_test_case.dart';
 import 'persistence_test_helpers.dart';
 
@@ -16,10 +18,18 @@ void main() {
 
   setUp(() async {
     print('setUp');
-    final SQLitePersistence persistence = await openSQLitePersistence(
-        'firebase/firestore/local/local_store_test-${Uuid().v4()}.db');
 
-    testCase = LocalStoreTestCase(persistence, garbageCollectorIsEager: false);
+    final AccumulatingStatsCollector statsCollector =
+        AccumulatingStatsCollector();
+
+    final SQLitePersistence persistence = await createSQLitePersistence(
+      'firebase/firestore/local/local_store_test-${Uuid().v4()}.db',
+      const LruGarbageCollectorParams(),
+      statsCollector,
+    );
+
+    testCase = LocalStoreTestCase(persistence, statsCollector,
+        garbageCollectorIsEager: false);
     await testCase.setUp();
     print('setUpDone');
   });
@@ -89,6 +99,8 @@ void main() {
       () => testCase.testCanExecuteCollectionQueries());
   test('testCanExecuteMixedCollectionQueries',
       () => testCase.testCanExecuteMixedCollectionQueries());
+  test('testReadsAllDocumentsForCollectionQueries',
+      () => testCase.testReadsAllDocumentsForCollectionQueries());
   test('testPersistsResumeTokens', () => testCase.testPersistsResumeTokens());
   test('testDoesNotReplaceResumeTokenWithEmptyByteString',
       () => testCase.testDoesNotReplaceResumeTokenWithEmptyByteString());

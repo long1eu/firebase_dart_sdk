@@ -22,6 +22,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/pers
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/reference_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/stats_collector.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
@@ -46,29 +47,35 @@ part 'memory_remote_document_cache.dart';
 
 class MemoryPersistence extends Persistence {
   /// Use factory constructors to instantiate
-  MemoryPersistence._()
-      : mutationQueues = <User, MemoryMutationQueue>{},
+  MemoryPersistence._(StatsCollector statsCollector)
+      : _statsCollector = statsCollector ?? StatsCollector.noOp,
+        mutationQueues = <User, MemoryMutationQueue>{},
         _semaphore = GlobalSemaphore(),
         indexManager = MemoryIndexManager() {
     queryCache = MemoryQueryCache(this);
-    remoteDocumentCache = MemoryRemoteDocumentCache(this);
+    remoteDocumentCache = MemoryRemoteDocumentCache(this, _statsCollector);
   }
 
-  factory MemoryPersistence.createEagerGcMemoryPersistence() {
-    final MemoryPersistence persistence = MemoryPersistence._();
+  factory MemoryPersistence.createEagerGcMemoryPersistence([
+    StatsCollector statsCollector = StatsCollector.noOp,
+  ]) {
+    final MemoryPersistence persistence = MemoryPersistence._(statsCollector);
     persistence.referenceDelegate = MemoryEagerReferenceDelegate(persistence);
     return persistence;
   }
 
   factory MemoryPersistence.createLruGcMemoryPersistence(
-      LruGarbageCollectorParams params, LocalSerializer serializer) {
-    final MemoryPersistence persistence = MemoryPersistence._();
+      LruGarbageCollectorParams params, LocalSerializer serializer,
+      [StatsCollector statsCollector = StatsCollector.noOp]) {
+    final MemoryPersistence persistence = MemoryPersistence._(statsCollector);
     persistence.referenceDelegate =
         MemoryLruReferenceDelegate(persistence, params, serializer);
     return persistence;
   }
 
   final Semaphore _semaphore;
+  final StatsCollector _statsCollector;
+
   @override
   final MemoryIndexManager indexManager;
 
@@ -113,7 +120,7 @@ class MemoryPersistence extends Persistence {
   MutationQueue getMutationQueue(User user) {
     MemoryMutationQueue queue = mutationQueues[user];
     if (queue == null) {
-      queue = MemoryMutationQueue(this);
+      queue = MemoryMutationQueue(this, _statsCollector);
       mutationQueues[user] = queue;
     }
     return queue;

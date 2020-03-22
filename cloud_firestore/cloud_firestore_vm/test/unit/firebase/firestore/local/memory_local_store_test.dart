@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory/memory_persistence.dart';
 import 'package:test/test.dart';
 
+import 'accumulating_stats_collector.dart';
 import 'cases/local_store_test_case.dart';
 import 'persistence_test_helpers.dart';
 
@@ -15,10 +16,13 @@ void main() {
 
   setUp(() async {
     print('setUp');
-    final MemoryPersistence persistence =
-        await createEagerGCMemoryPersistence();
 
-    testCase = LocalStoreTestCase(persistence, garbageCollectorIsEager: true);
+    final AccumulatingStatsCollector statsCollector =
+        AccumulatingStatsCollector();
+    final MemoryPersistence persistence =
+        await createEagerGCMemoryPersistence(statsCollector);
+    testCase = LocalStoreTestCase(persistence, statsCollector,
+        garbageCollectorIsEager: true);
     await testCase.setUp();
     print('setUpDone');
   });
@@ -88,6 +92,8 @@ void main() {
       () => testCase.testCanExecuteCollectionQueries());
   test('testCanExecuteMixedCollectionQueries',
       () => testCase.testCanExecuteMixedCollectionQueries());
+  test('testReadsAllDocumentsForCollectionQueries',
+      () => testCase.testReadsAllDocumentsForCollectionQueries());
   test('testPersistsResumeTokens', () => testCase.testPersistsResumeTokens());
   test('testDoesNotReplaceResumeTokenWithEmptyByteString',
       () => testCase.testDoesNotReplaceResumeTokenWithEmptyByteString());

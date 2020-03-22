@@ -5,11 +5,11 @@
 part of sqlite_persistence;
 
 class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
-  SQLiteRemoteDocumentCache(this.db, this.serializer);
+  SQLiteRemoteDocumentCache(this.db, this.serializer, this._statsCollector);
 
   final SQLitePersistence db;
-
   final LocalSerializer serializer;
+  final StatsCollector _statsCollector;
 
   @override
   Future<void> add(MaybeDocument maybeDocument) async {
@@ -17,6 +17,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final GeneratedMessage message =
         serializer.encodeMaybeDocument(maybeDocument);
 
+    _statsCollector.recordRowsWritten(RemoteDocumentCache.statsTag, 1);
     await db.execute(
         // @formatter:off
         '''
@@ -34,6 +35,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   @override
   Future<void> remove(DocumentKey documentKey) async {
     final String path = _pathForKey(documentKey);
+    _statsCollector.recordRowsDeleted(RemoteDocumentCache.statsTag, 1);
 
     await db.execute(
         // @formatter:off
@@ -50,6 +52,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   Future<MaybeDocument> get(DocumentKey documentKey) async {
     final String path = _pathForKey(documentKey);
 
+    _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, 1);
     final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
         '''
@@ -90,6 +93,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         args,
         ') ORDER BY path');
 
+    int rowsProcessed = 0;
     while (longQuery.hasMoreSubqueries) {
       final List<Map<String, dynamic>> rows =
           await longQuery.performNextSubquery();
@@ -97,8 +101,10 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         final MaybeDocument decoded = decodeMaybeDocument(row['contents']);
         results[decoded.key] = decoded;
       }
+      rowsProcessed += rows.length;
     }
 
+    _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rowsProcessed);
     return results;
   }
 
@@ -155,6 +161,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       results[doc.key] = doc;
     }
 
+    _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, result.length);
     return ImmutableSortedMap<DocumentKey, Document>.fromMap(
         results, DocumentKey.comparator);
   }

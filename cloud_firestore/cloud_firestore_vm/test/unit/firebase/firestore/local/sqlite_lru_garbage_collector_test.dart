@@ -18,7 +18,7 @@ void main() {
     print('setUp');
 
     testCase = LruGarbageCollectorTestCase((LruGarbageCollectorParams param) =>
-        openSQLitePersistence(
+        createSQLitePersistence(
             'firebase/firestore/local/sqlite_lru_garbage_collector_test-${Uuid().v4()}.db',
             param));
     await testCase.setUp();

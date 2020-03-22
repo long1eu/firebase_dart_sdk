@@ -6,7 +6,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:path/path.dart';
 import 'package:test/test.dart';
 
@@ -21,9 +20,8 @@ void main() {
   setUp(() async {
     testCase = SpecTestCase(
       (_, String name) {
-        return openSQLitePersistence(
-            'firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}b',
-            const LruGarbageCollectorParams());
+        return createSQLitePersistence(
+            'firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}b');
       },
       (Set<String> tags) => tags.contains(eagerGc),
     );

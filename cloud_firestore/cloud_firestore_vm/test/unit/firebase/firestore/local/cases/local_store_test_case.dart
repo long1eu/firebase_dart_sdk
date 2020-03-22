@@ -11,7 +11,9 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_write_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
@@ -36,11 +38,14 @@ import 'package:test/test.dart';
 
 import '../../../../../util/test_util.dart';
 import '../../../firestore/test_util.dart' as t;
+import '../accumulating_stats_collector.dart';
 
 class LocalStoreTestCase {
-  LocalStoreTestCase(this._persistence, {bool garbageCollectorIsEager})
+  LocalStoreTestCase(this._persistence, this._statsCollector,
+      {bool garbageCollectorIsEager})
       : _garbageCollectorIsEager = garbageCollectorIsEager;
 
+  final AccumulatingStatsCollector _statsCollector;
   final Persistence _persistence;
   final bool _garbageCollectorIsEager;
 
@@ -50,12 +55,12 @@ class LocalStoreTestCase {
   LocalStore _localStore;
 
   Future<void> setUp() async {
-    _localStore = LocalStore(_persistence, User.unauthenticated);
-    await _localStore.start();
-
     _batches = <MutationBatch>[];
     _lastChanges = null;
     _lastTargetId = 0;
+
+    _localStore = LocalStore(_persistence, User.unauthenticated);
+    await _localStore.start();
   }
 
   Future<void> tearDown() => _persistence.shutdown();
@@ -871,6 +876,25 @@ class LocalStoreTestCase {
   }
 
   @testMethod
+  Future<void> testReadsAllDocumentsForCollectionQueries() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    await _allocateQuery(query);
+
+    await _applyRemoteEvent(
+        updateRemoteEvent(doc('foo/baz', 10, map()), <int>[2], <int>[]));
+    await _applyRemoteEvent(
+        updateRemoteEvent(doc('foo/bar', 20, map()), <int>[2], <int>[]));
+    await _writeMutation(setMutation('foo/bonk', map()));
+
+    _resetPersistenceStats();
+
+    await _localStore.executeQuery(query);
+
+    _expectRemoteDocumentsRead(2);
+    _expectMutationsRead(1);
+  }
+
+  @testMethod
   Future<void> testPersistsResumeTokens() async {
     // This test only works in the absence of the EagerGarbageCollector.
     if (_garbageCollectorIsEager) {
@@ -1346,5 +1370,23 @@ class LocalStoreTestCase {
     final DocumentKey key = DocumentKey.fromPathString(keyPathString);
     final MaybeDocument actual = await _localStore.readDocument(key);
     expect(actual, isNull);
+  }
+
+  /// Asserts the expected numbers of mutation rows read by the [MutationQueue]
+  /// since the last call to [_resetPersistenceStats].
+  void _expectMutationsRead(int expected) {
+    expect(_statsCollector.getRowsRead(MutationQueue.statsTag), expected);
+  }
+
+  /// Asserts the expected numbers of document rows read by the
+  /// [RemoteDocumentCache] since the last call to [_resetPersistenceStats].
+  void _expectRemoteDocumentsRead(int expected) {
+    expect(_statsCollector.getRowsRead(RemoteDocumentCache.statsTag), expected);
+  }
+
+  /// Resets the count of rows read by [MutationQueue] and the
+  /// [RemoteDocumentCache].
+  void _resetPersistenceStats() {
+    _statsCollector.reset();
   }
 }
