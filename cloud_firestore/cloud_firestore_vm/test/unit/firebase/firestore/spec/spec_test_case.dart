@@ -348,7 +348,7 @@ class SpecTestCase implements RemoteStoreCallback {
           _events.add(QueryEvent(query: query, view: value));
         },
         onError: (dynamic error) {
-          asserts.hardAssert(error is FirebaseFirestoreError,
+          asserts.hardAssert(error is FirestoreError,
               'The recived error is not a FirebaseFirestoreError it is ${error.runtimeType}.');
           _events.add(QueryEvent(query: query, error: error));
         },

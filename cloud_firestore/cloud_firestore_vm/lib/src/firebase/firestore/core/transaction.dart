@@ -28,7 +28,78 @@ class Transaction {
   final TransactionClient _transactionClient;
   final Map<DocumentKey, SnapshotVersion> readVersions;
   final List<Mutation> mutations;
+
+  /// A deferred usage error that occurred previously in this transaction that will cause the
+  /// transaction to fail once it actually commits.
+  FirestoreError _lastWriteError;
+
+  /// Set of documents that have been written in the transaction.
+  ///
+  /// When there's more than one write to the same key in a transaction, any
+  /// writes after the first are handled differently.
+  final Set<DocumentKey> writtenDocs = <DocumentKey>{};
   bool committed;
+
+  /// Takes a set of keys and asynchronously attempts to fetch all the documents
+  /// from the backend, ignoring any local changes.
+  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
+    _ensureCommitNotCalled();
+
+    if (mutations.isNotEmpty) {
+      return Future<List<MaybeDocument>>.error(FirestoreError(
+          'Transactions lookups are invalid after writes.',
+          FirestoreErrorCode.invalidArgument));
+    }
+
+    final List<MaybeDocument> result = await _transactionClient.lookup(keys);
+    result.forEach(_recordVersion);
+    return result;
+  }
+
+  /// Stores a set mutation for the given key and value, to be committed when
+  /// [commit] is called.
+  void set(DocumentKey key, UserDataParsedSetData data) {
+    _write(data.toMutationList(key, _precondition(key)));
+    writtenDocs.add(key);
+  }
+
+  /// Stores an update mutation for the given key and values, to be committed
+  /// when [commit] is called.
+  void update(DocumentKey key, UserDataParsedUpdateData data) {
+    try {
+      _write(data.toMutationList(key, _preconditionForUpdate(key)));
+    } on FirestoreError catch (e) {
+      _lastWriteError = e;
+    }
+
+    writtenDocs.add(key);
+  }
+
+  void delete(DocumentKey key) {
+    _write(<DeleteMutation>[DeleteMutation(key, _precondition(key))]);
+    writtenDocs.add(key);
+  }
+
+  Future<void> commit() {
+    _ensureCommitNotCalled();
+    if (_lastWriteError != null) {
+      return Future<void>.error(_lastWriteError);
+    }
+
+    final Set<DocumentKey> unwritten = Set<DocumentKey>.from(readVersions.keys);
+    // For each mutation, note that the doc was written.
+    for (Mutation mutation in mutations) {
+      unwritten.remove(mutation.key);
+    }
+    if (unwritten.isNotEmpty) {
+      return Future<void>.error(FirestoreError(
+          'Every document read in a transaction must also be written.',
+          FirestoreErrorCode.invalidArgument));
+    }
+    committed = true;
+
+    return _transactionClient.commit(mutations);
+  }
 
   void _recordVersion(MaybeDocument doc) {
     SnapshotVersion docVersion;
@@ -46,46 +117,20 @@ class Transaction {
       final SnapshotVersion existingVersion = readVersions[doc.key];
       if (existingVersion != doc.version) {
         // This transaction will fail no matter what.
-        throw FirebaseFirestoreError(
+        throw FirestoreError(
             'Document version changed between two reads.',
-            FirestoreErrorCode.failedPrecondition);
+            FirestoreErrorCode.aborted);
       }
     } else {
       readVersions[doc.key] = docVersion;
     }
   }
 
-  /// Takes a set of keys and asynchronously attempts to fetch all the documents
-  /// from the backend, ignoring any local changes.
-  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
-    if (committed) {
-      return Future<List<MaybeDocument>>.error(FirebaseFirestoreError(
-          'Transaction has already completed.',
-          FirestoreErrorCode.failedPrecondition));
-    }
-    if (mutations.isNotEmpty) {
-      return Future<List<MaybeDocument>>.error(FirebaseFirestoreError(
-          'Transactions lookups are invalid after writes.',
-          FirestoreErrorCode.failedPrecondition));
-    }
-
-    final List<MaybeDocument> result = await _transactionClient.lookup(keys);
-    result.forEach(_recordVersion);
-    return result;
-  }
-
-  void _write(List<Mutation> mutations) {
-    if (committed) {
-      throw StateError('Transaction has already completed.');
-    }
-    this.mutations.addAll(mutations);
-  }
-
   /// Returns version of this doc when it was read in this transaction as a
   /// precondition, or no precondition if it was not read.
   Precondition _precondition(DocumentKey key) {
     final SnapshotVersion version = readVersions[key];
-    if (version != null) {
+    if (!writtenDocs.contains(key) && version != null) {
       return Precondition(updateTime: version);
     } else {
       return Precondition.none;
@@ -96,55 +141,43 @@ class Transaction {
   /// based on the provided [UpdateOptions].
   Precondition _preconditionForUpdate(DocumentKey key) {
     final SnapshotVersion version = readVersions[key];
-    if (version != null && version == SnapshotVersion.none) {
-      // The document to update doesn't exist, so fail the transaction.
-      throw StateError('Can\'t update a document that doesn\'t exist.');
-    } else if (version != null) {
+    // The first time a document is written, we want to take into account the
+    // read time and existence.
+    if (!writtenDocs.contains(key) && version != null) {
+      if (version != null && version == SnapshotVersion.none) {
+        // The document to update doesn't exist, so fail the transaction.
+        //
+        // This has to be validated locally because you can't send a
+        // precondition that a document does not exist without changing the
+        // semantics of the backend write to be an insert. This is the reverse
+        // of what we want, since we want to assert that the document doesn't
+        // exist but then send the update and have it fail. Since we can't
+        // express that to the backend, we have to validate locally.
+        //
+        // Note: this can change once we can send separate verify writes in the
+        // transaction.
+        throw FirestoreError(
+            "Can't update a document that doesn't exist.",
+            FirestoreErrorCode.invalidArgument);
+      }
       // Document exists, base precondition on document update time.
       return Precondition(updateTime: version);
     } else {
-      // Document was not read, so we just use the preconditions for a blind write.
+      // Document was not read, so we just use the preconditions for a blind
+      // write.
       return Precondition(exists: true);
     }
   }
 
-  /// Stores a set mutation for the given key and value, to be committed when
-  /// [commit] is called.
-  void set(DocumentKey key, UserDataParsedSetData data) {
-    _write(data.toMutationList(key, _precondition(key)));
-  }
-
-  /// Stores an update mutation for the given key and values, to be committed
-  /// when [commit] is called.
-  void update(DocumentKey key, UserDataParsedUpdateData data) {
-    _write(data.toMutationList(key, _preconditionForUpdate(key)));
-  }
-
-  void delete(DocumentKey key) {
-    _write(<DeleteMutation>[DeleteMutation(key, _precondition(key))]);
-    // Since the delete will be applied before all following writes, we need to
-    // ensure that the precondition for the next write will be exists: false.
-    readVersions[key] = SnapshotVersion.none;
-  }
-
-  Future<void> commit() {
+  void _write(List<Mutation> mutations) {
     if (committed) {
-      return Future<void>.error(FirebaseFirestoreError(
-          'Transaction has already completed.',
-          FirestoreErrorCode.failedPrecondition));
+      throw StateError('Transaction has already completed.');
     }
-    final Set<DocumentKey> unwritten = Set<DocumentKey>.from(readVersions.keys);
-    // For each mutation, note that the doc was written.
-    for (Mutation mutation in mutations) {
-      unwritten.remove(mutation.key);
-    }
-    if (unwritten.isNotEmpty) {
-      return Future<void>.error(FirebaseFirestoreError(
-          'Every document read in a transaction must also be written.',
-          FirestoreErrorCode.failedPrecondition));
-    }
-    committed = true;
+    this.mutations.addAll(mutations);
+  }
 
-    return _transactionClient.commit(mutations);
+  void _ensureCommitNotCalled() {
+    hardAssert(!committed,
+        'A transaction object cannot be used after its update callback has been invoked.');
   }
 }

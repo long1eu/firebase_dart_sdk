@@ -18,7 +18,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/transaction.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_write_result.dart';
@@ -208,9 +207,7 @@ class SyncEngine implements RemoteStoreCallback {
     } catch (e) {
       // TODO(long1eu): Only retry on real transaction failures.
       if (retries == 0) {
-        final Error error = FirebaseFirestoreError(
-            'Transaction failed all retries.', FirestoreErrorCode.aborted, e);
-        return Future<TResult>.error(error);
+        return Future<TResult>.error(e);
       }
       return this.transaction(updateFunction, retries - 1);
     }

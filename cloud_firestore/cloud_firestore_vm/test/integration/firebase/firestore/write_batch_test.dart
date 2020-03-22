@@ -247,7 +247,7 @@ void main() {
     expect(serverSnap.length, 0);
 
     expect(err, isNotNull);
-    expect(err, const TypeMatcher<FirebaseFirestoreError>());
+    expect(err, const TypeMatcher<FirestoreError>());
     expect(err.code, FirestoreErrorCode.notFound);
   });
 

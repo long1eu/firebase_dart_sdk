@@ -101,9 +101,9 @@ class FirestoreClient extends Client {
         .transform(OnErrorResumeStreamTransformer<R>(
             (dynamic error, [StackTrace stackTrace]) => Stream<R>.error(
                 error is GrpcError
-                    ? FirebaseFirestoreError(
+                    ? FirestoreError(
                         error.message, FirestoreErrorCode.values[error.code])
-                    : FirebaseFirestoreError(
+                    : FirestoreError(
                         error.toString(), FirestoreErrorCode.unknown),
                 stackTrace)));
   }

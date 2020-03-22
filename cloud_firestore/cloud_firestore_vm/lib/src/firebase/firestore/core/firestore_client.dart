@@ -150,7 +150,7 @@ class FirestoreClient implements RemoteStoreCallback {
     } else if (maybeDoc is NoDocument) {
       return null;
     } else {
-      throw FirebaseFirestoreError(
+      throw FirestoreError(
         'Failed to get document from cache. (However, this document may exist on the server. Run again without '
         'setting source to CACHE to attempt to retrieve the document from the server.)',
         FirestoreErrorCode.unavailable,

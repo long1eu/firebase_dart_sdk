@@ -328,7 +328,7 @@ void main() {
         // to try/catch it.
         try {
           await transaction.get(badRef);
-        } on FirebaseFirestoreError catch (e) {
+        } on FirestoreError catch (e) {
           fail('transaction.get() triggered wrong exception: $e');
         }
       }, reason);

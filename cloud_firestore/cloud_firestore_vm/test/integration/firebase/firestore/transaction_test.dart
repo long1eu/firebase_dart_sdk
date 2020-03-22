@@ -38,50 +38,207 @@ void main() {
     try {
       await firestore
           .runTransaction((Transaction transaction) => transaction.get(doc));
-    } catch (e) {
+    } on FirestoreError catch (e) {
       // We currently require every document read to also be written.
       // TODO(long1eu): Fix this check once we drop that requirement.
-      expect(e.message, 'Transaction failed all retries.');
-      expect(e.cause.message,
+      expect(e.code, FirestoreErrorCode.invalidArgument);
+      expect(e.message,
           'Every document read in a transaction must also be written.');
     }
   });
 
-  test('testDeleteDocument', () async {
-    final DocumentReference doc = firestore.collection('towns').document();
-    await doc.set(map(<String>['foo', 'bar']));
-    DocumentSnapshot snapshot = await doc.get();
-    expect(snapshot.getString('foo'), 'bar');
-    await firestore.runTransaction<void>((Transaction transaction) {
-      transaction.delete(doc);
-      return null;
-    });
-    snapshot = await doc.get();
-    expect(snapshot.exists, isFalse);
+  test('testRunsTransactionsAfterGettingExistingDoc', () async {
+    final Firestore firestore = await testFirestore();
+    final TransactionTester tt = TransactionTester._(firestore);
+
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.delete1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.delete1,
+      TransactionTester.update2
+    ])._expectError(FirestoreErrorCode.invalidArgument);
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.delete1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.update1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.update1,
+      TransactionTester.update2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.update1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.set1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.set1,
+      TransactionTester.update2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.set1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
   });
 
-  test('testGetNonexistentDocumentThenCreate', () async {
-    final DocumentReference docRef = firestore.collection('towns').document();
-    await firestore.runTransaction<void>((Transaction transaction) async {
-      final DocumentSnapshot docSnap = await transaction.get(docRef);
-      expect(docSnap.exists, isFalse);
-      transaction.set(docRef, map(<String>['foo', 'bar']));
-      return null;
-    });
-    final DocumentSnapshot snapshot = await docRef.get();
-    expect(snapshot.getString('foo'), 'bar');
+  test('testRunsTransactionsAfterGettingNonexistentDoc', () async {
+    final Firestore firestore = await testFirestore();
+    final TransactionTester tt = TransactionTester._(firestore);
+
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.delete1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.delete1,
+      TransactionTester.update2
+    ])._expectError(FirestoreErrorCode.invalidArgument);
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.delete1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.update1,
+      TransactionTester.delete1
+    ])._expectError(FirestoreErrorCode.invalidArgument);
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.update1,
+      TransactionTester.update2
+    ])._expectError(FirestoreErrorCode.invalidArgument);
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.update1,
+      TransactionTester.set2
+    ])._expectError(FirestoreErrorCode.invalidArgument);
+
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.set1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.set1,
+      TransactionTester.update2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.get,
+      TransactionTester.set1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
   });
 
-  test('testWriteDocumentTwice', () async {
-    final DocumentReference doc = firestore.collection('towns').document();
-    await firestore.runTransaction<void>((Transaction transaction) {
-      transaction
-          .set(doc, map(<String>['a', 'b']))
-          .set(doc, map(<String>['c', 'd']));
-      return null;
-    });
-    final DocumentSnapshot snapshot = await doc.get();
-    expect(snapshot.data, map<String>(<String>['c', 'd']));
+  test('testRunsTransactionsOnExistingDoc', () async {
+    final Firestore firestore = await testFirestore();
+    final TransactionTester tt = TransactionTester._(firestore);
+
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.delete1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.delete1,
+      TransactionTester.update2
+    ])._expectError(FirestoreErrorCode.invalidArgument);
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.delete1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.update1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.update1,
+      TransactionTester.update2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.update1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.set1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.set1,
+      TransactionTester.update2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+    await tt.withExistingDoc().run(<TransactionStage>[
+      TransactionTester.set1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+  });
+
+  test('testRunsTransactionsOnNonexistentDoc', () async {
+    final Firestore firestore = await testFirestore();
+    final TransactionTester tt = TransactionTester._(firestore);
+
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.delete1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.delete1,
+      TransactionTester.update2
+    ])._expectError(FirestoreErrorCode.invalidArgument);
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.delete1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.update1,
+      TransactionTester.delete1
+    ])._expectError(FirestoreErrorCode.notFound);
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.update1,
+      TransactionTester.update2
+    ])._expectError(FirestoreErrorCode.notFound);
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.update1,
+      TransactionTester.set2
+    ])._expectError(FirestoreErrorCode.notFound);
+
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.set1,
+      TransactionTester.delete1
+    ])._expectNoDoc();
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.set1,
+      TransactionTester.update2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
+    await tt.withNonexistentDoc().run(<TransactionStage>[
+      TransactionTester.set1,
+      TransactionTester.set2
+    ]).expectDoc(map<String>(<String>['foo', 'bar2']));
   });
 
   test('testSetDocumentWithMerge', () async {
@@ -163,81 +320,6 @@ void main() {
     expect(snapshot.getDouble('count').toInt(), 8);
   });
 
-  test('testTransactionRejectsUpdatesForNonexistentDocuments', () async {
-    // Make a transaction that will fail
-    final Future<void> transactionTask =
-        firestore.runTransaction<void>((Transaction transaction) async {
-      // Get and update a document that doesn't exist so that the transaction fails
-      final DocumentSnapshot doc =
-          await transaction.get(firestore.collection('nonexistent').document());
-      transaction.updateFromList(doc.reference, <String>['foo', 'bar']);
-      return null;
-    });
-
-    try {
-      await transactionTask;
-    } catch (e) {
-      // Let all of the transactions fetch the old value and stop once.
-      // TODO(long1eu): should this really be raised as a FirebaseFirestoreError?
-      // Note that this test might change if transaction.get throws a FirebaseFirestoreError.
-      expect(e, const TypeMatcher<StateError>());
-    }
-  });
-
-  test('testCantDeleteDocumentThenPatch', () async {
-    final DocumentReference docRef = firestore.collection('docs').document();
-    await docRef.set(map(<String>['foo', 'bar']));
-
-    // Make a transaction that will fail
-    final Future<void> transactionTask =
-        firestore.runTransaction<void>((Transaction transaction) async {
-      final DocumentSnapshot doc = await transaction.get(docRef);
-      expect(doc.exists, isTrue);
-      transaction
-        ..delete(docRef)
-        // Since we deleted the doc, the update will fail
-        ..updateFromList(docRef, <String>['foo', 'bar']);
-      return null;
-    });
-
-    try {
-      // Let all of the transactions fetch the old value and stop once.
-      await transactionTask;
-    } catch (e) {
-      // TODO(long1eu): should this really be raised as a FirebaseFirestoreError?
-      // Note that this test might change if transaction.update throws a FirebaseFirestoreError.
-      expect(e, const TypeMatcher<StateError>());
-    }
-  });
-
-  test('testCantDeleteDocumentThenSet', () async {
-    final DocumentReference docRef = firestore.collection('docs').document();
-    await docRef.set(map(<String>['foo', 'bar']));
-
-    // Make a transaction that will fail
-    final Future<void> transactionTask =
-        firestore.runTransaction<void>((Transaction transaction) async {
-      final DocumentSnapshot doc = await transaction.get(docRef);
-      expect(doc.exists, isTrue);
-      transaction
-        ..delete(docRef)
-        // TODO(long1eu): In theory this should work, but it's complex to make it work, so instead we just let the
-        //  transaction fail and verify it's unsupported for now
-        ..set(docRef, map(<String>['foo', 'new-bar']));
-      return null;
-    });
-
-    try {
-      // Let all of the transactions fetch the old value and stop once.
-      await transactionTask;
-    } catch (e) {
-      expect(e, const TypeMatcher<FirebaseFirestoreError>());
-
-      final FirebaseFirestoreError error = e;
-      expect(error.code, FirestoreErrorCode.aborted);
-    }
-  });
-
   test('testTransactionRaisesErrorsForInvalidUpdates', () async {
     // Make a transaction that will fail server-side.
     final Future<void> transactionTask =
@@ -253,10 +335,10 @@ void main() {
       // Let all of the transactions fetch the old value and stop once.
       await transactionTask;
     } catch (e) {
-      expect(e, const TypeMatcher<FirebaseFirestoreError>());
+      expect(e, const TypeMatcher<FirestoreError>());
       print(e);
 
-      final FirebaseFirestoreError error = e;
+      final FirestoreError error = e;
       expect(error.code, FirestoreErrorCode.invalidArgument);
     }
   });
@@ -371,7 +453,7 @@ void main() {
         transaction.set(doc2, map(<dynamic>['count', 16]));
         return null;
       });
-    } catch (e) {
+    } on FirestoreError catch (e) {
       // We currently require every document read to also be written.
       // TODO(long1eu): Add this check back once we drop that.
       // Document snapshot = await doc1.get();
@@ -379,8 +461,8 @@ void main() {
       // expect(snapshot.getDouble('count'), 1234);
       // snapshot = await doc2.get();
       // expect(snapshot.getDouble('count'), 16);
-      expect(e.message, 'Transaction failed all retries.');
-      expect(e.cause.message,
+      expect(e.code, FirestoreErrorCode.invalidArgument);
+      expect(e.message,
           'Every document read in a transaction must also be written.');
     }
   });
@@ -420,6 +502,32 @@ void main() {
     }
   });
 
+  test('testReadAndUpdateNonExistentDocumentWithExternalWrite', () async {
+    final Firestore firestore = await testFirestore();
+
+    try {
+      await firestore.runTransaction<void>((Transaction transaction) async {
+        // Get and update a document that doesn't exist so that the transaction fails.
+        final DocumentReference doc =
+            firestore.collection('nonexistent').document();
+        await transaction.get(doc);
+        // Do a write outside of the transaction.
+        await doc.set(map(<dynamic>['count', 1234]));
+        // Now try to update the other doc from within the transaction.
+        // This should fail, because the document didn't exist at the
+        // start of the transaction.
+        transaction.update(doc, <String, int>{'count': 16});
+        return null;
+      });
+    } on FirestoreError catch (e) {
+      // We currently require every document read to also be written.
+      // TODO(long1eu): Add this check back once we drop that.
+      // expect(snapshot.getString('foo'), 'bar');
+      expect(e.code, FirestoreErrorCode.invalidArgument);
+      expect(e.message, 'Can\'t update a document that doesn\'t exist.');
+    }
+  });
+
   test('testCannotHaveAGetWithoutMutations', () async {
     final DocumentReference doc = firestore.collection('foo').document();
     await doc.set(map(<String>['foo', 'bar']));
@@ -427,12 +535,12 @@ void main() {
     try {
       await firestore.runTransaction<void>(
           (Transaction transaction) => transaction.get(doc));
-    } catch (e) {
+    } on FirestoreError catch (e) {
       // We currently require every document read to also be written.
       // TODO(long1eu): Add this check back once we drop that.
       // expect(snapshot.getString('foo'), 'bar');
-      expect(e.message, 'Transaction failed all retries.');
-      expect(e.cause.message,
+      expect(e.code, FirestoreErrorCode.invalidArgument);
+      expect(e.message,
           'Every document read in a transaction must also be written.');
     }
   });
@@ -461,15 +569,156 @@ void main() {
   });
 }
 
-// ignore: always_specify_types, type_annotate_public_apis
+typedef TransactionStage = Future<void> Function(
+    Transaction transaction, DocumentReference docRef);
+
+class TransactionTester {
+  TransactionTester._(this._db);
+
+  static Future<void> delete1(
+      Transaction transaction, DocumentReference docRef) async {
+    return transaction.delete(docRef);
+  }
+
+  static Future<void> update1(
+      Transaction transaction, DocumentReference docRef) async {
+    return transaction.update(docRef, map(<String>['foo', 'bar1']));
+  }
+
+  static Future<void> update2(
+      Transaction transaction, DocumentReference docRef) async {
+    return transaction.update(docRef, map(<String>['foo', 'bar2']));
+  }
+
+  static Future<void> set1(
+      Transaction transaction, DocumentReference docRef) async {
+    return transaction.set(docRef, map(<String>['foo', 'bar1']));
+  }
+
+  static Future<void> set2(
+      Transaction transaction, DocumentReference docRef) async {
+    return transaction.set(docRef, map(<String>['foo', 'bar2']));
+  }
+
+  static Future<void> get(
+      Transaction transaction, DocumentReference docRef) async {
+    return transaction.get(docRef);
+  }
+
+  final Firestore _db;
+  DocumentReference _docRef;
+  bool _fromExistingDoc = false;
+  List<TransactionStage> _stages = <TransactionStage>[];
+
+  TransactionTester withExistingDoc() {
+    _fromExistingDoc = true;
+    return this;
+  }
+
+  TransactionTester withNonexistentDoc() {
+    _fromExistingDoc = false;
+    return this;
+  }
+
+  TransactionTester run(List<TransactionStage> inputStages) {
+    _stages = inputStages.toList();
+    return this;
+  }
+
+  Future<void> expectDoc(Object expected) async {
+    try {
+      await _prepareDoc();
+      await _runTransaction();
+      final DocumentSnapshot snapshot = await _docRef.get();
+      expect(snapshot.exists, isTrue);
+      expect(snapshot.data, expected);
+    } catch (e) {
+      fail(
+          'Expected the sequence (${_listStages(_stages)}) to succeed, but got $e');
+    }
+    _cleanupTester();
+  }
+
+  Future<void> _expectNoDoc() async {
+    try {
+      await _prepareDoc();
+      await _runTransaction();
+      final DocumentSnapshot snapshot = await _docRef.get();
+      expect(snapshot.exists, isFalse);
+    } catch (e) {
+      fail(
+          'Expected the sequence (${_listStages(_stages)}) to succeed, but got $e');
+    }
+    _cleanupTester();
+  }
+
+  Future<void> _expectError(FirestoreErrorCode expected) async {
+    await _prepareDoc();
+    try {
+      await _runTransaction();
+      throw AssertionError(
+          'Expected the sequence (${_listStages(_stages)}) to fail with the error $expected');
+    } on FirestoreError catch (e) {
+      expect(e.code, expected);
+      _cleanupTester();
+    } catch (e) {
+      throw AssertionError(
+          'Expected the sequence (${_listStages(_stages)}) to fail with the error $expected');
+    }
+  }
+
+  Future<void> _prepareDoc() async {
+    _docRef = _db.collection('tester-docref').document();
+    if (_fromExistingDoc) {
+      await _docRef.set(map(<String>['foo', 'bar0']));
+      final DocumentSnapshot docSnap = await _docRef.get();
+      expect(docSnap.exists, isTrue);
+    }
+  }
+
+  Future<void> _runTransaction() {
+    return _db.runTransaction((Transaction transaction) async {
+      for (TransactionStage stage in _stages) {
+        await stage(transaction, _docRef);
+      }
+      return null;
+    });
+  }
+
+  void _cleanupTester() {
+    _stages = <TransactionStage>[];
+    // Set the docRef to something else to lose the original reference.
+    _docRef = _db.collection('reset').document();
+  }
+
+  static String _listStages(List<TransactionStage> stages) {
+    final List<String> seqList = <String>[];
+    for (TransactionStage stage in stages) {
+      if (stage == delete1) {
+        seqList.add('delete');
+      } else if (stage == update1 || stage == update2) {
+        seqList.add('update');
+      } else if (stage == set1 || stage == set2) {
+        seqList.add('set');
+      } else if (stage == get) {
+        seqList.add('get');
+      } else {
+        throw ArgumentError('Stage not recognized');
+      }
+    }
+    return seqList.toString();
+  }
+}
+
+// ignore: always_specify_types, type_annotate__apis
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
-// ignore: always_specify_types, type_annotate_public_apis
+// ignore: always_specify_types, type_annotate__apis
 const testFirestore = IntegrationTestUtil.testFirestore;
-// ignore: always_specify_types, type_annotate_public_apis
+// ignore: always_specify_types, type_annotate__apis
 const testCollection = IntegrationTestUtil.testCollection;
-// ignore: always_specify_types, type_annotate_public_apis
+// ignore: always_specify_types, type_annotate__apis
 const testDocumentWithData = IntegrationTestUtil.testDocumentWithData;
-// ignore: always_specify_types, type_annotate_public_apis
+// ignore: always_specify_types, type_annotate__apis
 const toDataMap = IntegrationTestUtil.toDataMap;
-// ignore: always_specify_types, type_annotate_public_apis
+// ignore: always_specify_types, type_annotate__apis
 const testDocument = IntegrationTestUtil.testDocument;

@@ -67,7 +67,7 @@ void main() {
     // Nothing should be cached since it was an update and we had no base doc.
     try {
       await docRef.get(Source.cache);
-    } on FirebaseFirestoreError catch (e) {
+    } on FirestoreError catch (e) {
       expect(e.code, FirestoreErrorCode.unavailable);
     }
   });

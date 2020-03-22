@@ -72,8 +72,8 @@ class FirestoreErrorCode {
   String toString() => _names[value];
 }
 
-class FirebaseFirestoreError extends FirebaseError {
-  FirebaseFirestoreError(
+class FirestoreError extends FirebaseError {
+  FirestoreError(
     String message,
     this.code, [
     this.cause,

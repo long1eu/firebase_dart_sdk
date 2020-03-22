@@ -662,7 +662,7 @@ class Query {
 
     return _getSnapshotsInternal(options).map((QuerySnapshot snapshot) {
       if (snapshot.metadata.isFromCache && source == Source.server) {
-        throw FirebaseFirestoreError(
+        throw FirestoreError(
             'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
             'without setting source to Source.server to retrieve the cached documents.)',
             FirestoreErrorCode.unavailable);

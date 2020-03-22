@@ -54,7 +54,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
     // outstanding so the response is potentially for a previous user (which
     // user, we can't be sure).
     if (savedCounter != _tokenCounter) {
-      throw FirebaseFirestoreError('getToken aborted due to token change',
+      throw FirestoreError('getToken aborted due to token change',
           FirestoreErrorCode.aborted);
     }
 

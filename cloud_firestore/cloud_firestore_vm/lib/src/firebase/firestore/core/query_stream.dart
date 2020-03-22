@@ -85,7 +85,7 @@ class QueryStream extends Stream<ViewSnapshot> {
     _snapshot = newSnapshot;
   }
 
-  void onError(FirebaseFirestoreError error) {
+  void onError(FirestoreError error) {
     _sink.addError(error);
   }
 

@@ -39,8 +39,8 @@ int compareBools(bool b1, bool b2) {
   }
 }
 
-FirebaseFirestoreError exceptionFromStatus(GrpcError error) {
-  return FirebaseFirestoreError(
+FirestoreError exceptionFromStatus(GrpcError error) {
+  return FirestoreError(
     error.message,
     FirestoreErrorCode.values[error.code],
   );
@@ -68,11 +68,11 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
   try {
     await operation();
   } catch (e, s) {
-    if (e is FirebaseFirestoreError) {
+    if (e is FirestoreError) {
       rethrow;
     } else {
       return Future<void>.error(
-          FirebaseFirestoreError('$e', FirestoreErrorCode.unknown), s);
+          FirestoreError('$e', FirestoreErrorCode.unknown), s);
     }
   }
 }

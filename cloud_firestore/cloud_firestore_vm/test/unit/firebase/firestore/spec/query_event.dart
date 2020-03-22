@@ -15,12 +15,12 @@ class QueryEvent {
 
   final Query query;
   final ViewSnapshot view;
-  final FirebaseFirestoreError error;
+  final FirestoreError error;
 
   QueryEvent copyWith({
     Query query,
     ViewSnapshot view,
-    FirebaseFirestoreError error,
+    FirestoreError error,
   }) {
     return QueryEvent(
       query: query ?? this.query,

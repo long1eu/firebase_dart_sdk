@@ -265,7 +265,7 @@ void main() {
     bool hadError = false;
     try {
       await docRef.update(updateData);
-    } on FirebaseFirestoreError catch (e) {
+    } on FirestoreError catch (e) {
       hadError = true;
       expect(e, isNotNull);
       expect(e.code, FirestoreErrorCode.notFound);
@@ -283,12 +283,10 @@ void main() {
         transaction.update(docRef, updateData);
         return null;
       });
-    } on FirebaseFirestoreError catch (e) {
+    } on FirestoreError catch (e) {
       hadError = true;
       expect(e, isNotNull);
-      // TODO(long1eu): This should be a NOT_FOUND, but right now we retry transactions
-      // on any error and so this turns into ABORTED instead.
-      expect(e.code, FirestoreErrorCode.aborted);
+      expect(e.code, FirestoreErrorCode.notFound);
     } catch (e) {
       assert(false, 'This should not happen.');
     }

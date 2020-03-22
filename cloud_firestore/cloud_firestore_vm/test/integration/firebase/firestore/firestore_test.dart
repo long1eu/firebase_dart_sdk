@@ -70,7 +70,7 @@ void main() {
     expect(writerSnap.exists, isTrue);
 
     await expectLater(() => readerRef.get(Source.cache),
-        throwsA(isA<FirebaseFirestoreError>()));
+        throwsA(isA<FirestoreError>()));
     /*try {
       await readerRef.get(Source.cache);
       fail('Should have thrown exception');
@@ -576,7 +576,7 @@ void main() {
     bool hadError = false;
     try {
       await documentReference.update(map(<String>['owner', 'abc']));
-    } on FirebaseFirestoreError catch (e) {
+    } on FirestoreError catch (e) {
       hadError = true;
       expect(e, isNotNull);
       expect(e.code, FirestoreErrorCode.notFound);
