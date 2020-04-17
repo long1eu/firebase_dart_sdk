@@ -572,7 +572,7 @@ class LocalStore {
 
   Future<LruGarbageCollectorResults> collectGarbage(
       LruGarbageCollector garbageCollector) {
-    return _persistence.runTransaction('Collect garbage',
+    return _persistence.runTransactionAndReturn('Collect garbage',
         () => garbageCollector.collect(_targetIds.keys.toSet()));
   }
 }
