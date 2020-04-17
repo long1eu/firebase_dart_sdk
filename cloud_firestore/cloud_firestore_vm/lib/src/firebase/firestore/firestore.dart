@@ -89,7 +89,7 @@ class Firestore {
     final DatabaseId databaseId = DatabaseId.forDatabase(projectId, database);
 
     CredentialsProvider provider;
-    if (authProvider == null) {
+    if (authProvider == null || authProvider == app) {
       Log.d(_tag,
           'Firebase Auth not available, falling back to unauthenticated usage.');
       provider = EmptyCredentialsProvider();
@@ -225,7 +225,19 @@ class Firestore {
     return batch.commit();
   }
 
-  @visibleForTesting
+  /// Shuts down this [Firestore] instance.
+  ///
+  /// To restart after shutdown, simply create a new instance of Firestore with
+  /// [newInstance] or [getInstance].
+  ///
+  /// Shutdown does not cancel any pending writes and any tasks that are
+  /// awaiting a response from the server will not be resolved. The next time
+  /// you start this instance, it will resume attempting to send these writes to
+  /// the server.
+  ///
+  /// Note: Under normal circumstances, calling [shutdown] is not required. This
+  /// method is useful only when you want to force this instance to release all
+  /// of its resources.
   Future<void> shutdown() async {
     // The client must be initialized to ensure that all subsequent API usage
     // throws an exception.
@@ -265,7 +277,7 @@ class Firestore {
     checkNotNull(docRef, 'Provided DocumentReference must not be null.');
     if (docRef.firestore != this) {
       throw ArgumentError(
-          'Provided document reference is from a different Firestore instance.');
+          'Provided document reference is from a different Cloud Firestore instance.');
     }
   }
 }

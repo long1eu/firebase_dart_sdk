@@ -306,7 +306,7 @@ void main() {
     final DocumentReference badRef =
         (await testAlternateFirestore()).document('foo/bar');
     const String reason =
-        'Provided document reference is from a different Firestore instance.';
+        'Provided document reference is from a different Cloud Firestore instance.';
     final Map<String, Object> data = map<dynamic>(<dynamic>['foo', 1]);
     final WriteBatch batch = (await testFirestore()).batch();
     await expectError(() => batch.set(badRef, data), reason);
@@ -318,7 +318,7 @@ void main() {
     final DocumentReference badRef =
         (await testAlternateFirestore()).document('foo/bar');
     const String reason =
-        'Provided document reference is from a different Firestore instance.';
+        'Provided document reference is from a different Cloud Firestore instance.';
     final Map<String, Object> data = map<dynamic>(<dynamic>['foo', 1]);
 
     await (await testFirestore())

@@ -1,3 +1,5 @@
-## [0.0.1] - TODO: Add release date.
+## [0.0.2] - April 18, 2020 
+* update export statements
 
-* TODO: Describe initial release.
+## [0.0.1] - April 18, 2020 
+* initial release

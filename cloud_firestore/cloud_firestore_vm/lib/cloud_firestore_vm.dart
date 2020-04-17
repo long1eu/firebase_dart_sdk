@@ -11,6 +11,7 @@ export 'src/firebase/firestore/firestore.dart';
 export 'src/firebase/firestore/firestore_error.dart';
 export 'src/firebase/firestore/firestore_settings.dart';
 export 'src/firebase/firestore/geo_point.dart';
+export 'src/firebase/firestore/metadata_change.dart';
 export 'src/firebase/firestore/query.dart';
 export 'src/firebase/firestore/query_document_snapshot.dart';
 export 'src/firebase/firestore/query_snapshot.dart';

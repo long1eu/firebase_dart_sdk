@@ -8,12 +8,12 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 class FirestoreSettings {
   /// Constructs a FirebaseFirestoreSettings object
   FirestoreSettings({
-    this.host = _defaultHost,
+    this.host = defaultHost,
     this.sslEnabled = true,
     this.persistenceEnabled = true,
-    this.cacheSizeBytes = _defaultCacheSizeBytes,
+    this.cacheSizeBytes = defaultCacheSizeBytes,
   })  : assert(host != null, 'Provided host must not be null.'),
-        assert(!(!sslEnabled && host == _defaultHost),
+        assert(!(!sslEnabled && host == defaultHost),
             "You can't set the 'sslEnabled' setting unless you also set a non-default 'host'."),
         assert(
             !persistenceEnabled ||
@@ -21,13 +21,13 @@ class FirestoreSettings {
                 cacheSizeBytes > _minimumCacheBytes,
             'Cache size must be set to at least $_minimumCacheBytes bytes');
 
-  static const String _defaultHost = 'firestore.googleapis.com';
+  static const String defaultHost = 'firestore.googleapis.com';
 
   /// Constant to use with [cacheSizeBytes] to disable garbage collection.
   static const int cacheSizeUnlimited = -1;
 
   static const int _minimumCacheBytes = 1 * 1024 * 1024; // 1 MB
-  static const int _defaultCacheSizeBytes = 100 * 1024 * 1024; // 100 MB
+  static const int defaultCacheSizeBytes = 100 * 1024 * 1024; // 100 MB
 
   /// The host of the Firestore backend.
   final String host;

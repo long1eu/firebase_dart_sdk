@@ -14,16 +14,16 @@ import 'package:rxdart/rxdart.dart';
 /// [FirebaseAuthCredentialsProvider] uses Firebase Auth via [FirebaseApp] to
 /// get an auth token.
 class FirebaseAuthCredentialsProvider extends CredentialsProvider {
-  FirebaseAuthCredentialsProvider(this._authProvider)
-      : _onUserChange = BehaviorSubject<User>.seeded(_authProvider.uid != null
-            ? User(_authProvider.uid)
+  FirebaseAuthCredentialsProvider(this.authProvider)
+      : _onUserChange = BehaviorSubject<User>.seeded(authProvider.uid != null
+            ? User(authProvider.uid)
             : User.unauthenticated);
 
   /// Stream that will receive credential changes (sign-in / sign-out, token
   /// changes).
   final BehaviorSubject<User> _onUserChange;
 
-  final InternalTokenProvider _authProvider;
+  final InternalTokenProvider authProvider;
 
   /// Counter used to detect if the token changed while a getToken request was
   /// outstanding.
@@ -48,7 +48,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
     final int savedCounter = _tokenCounter;
 
     final GetTokenResult result =
-        await _authProvider.getAccessToken(forceRefresh: doForceRefresh);
+        await authProvider.getAccessToken(forceRefresh: doForceRefresh);
 
     // Cancel the request since the token changed while the request was
     // outstanding so the response is potentially for a previous user (which
@@ -67,7 +67,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   /// Returns the current [User] as obtained from the given [FirebaseApp]
   /// instance.
   User getUser() {
-    final String uid = _authProvider.uid;
+    final String uid = authProvider.uid;
     return uid != null ? User(uid) : User.unauthenticated;
   }
 
