@@ -240,30 +240,28 @@ class SQLitePersistence extends Persistence {
     bool configured;
 
     /// Ensures that onConfigure has been called. This should be called first from all methods.
-    FutureOr<void> ensureConfigured(Database db) async {
+    Future<void> ensureConfigured(Database db) async {
       if (!configured) {
         configured = true;
-        await db.query('PRAGMA locking_mode = EXCLUSIVE;');
+        // todo: this breaks flutter hot reload
+        // await db.query('PRAGMA locking_mode = EXCLUSIVE;');
       }
     }
 
     final Database db = await openDatabase(
       databaseName,
       version: SQLiteSchema.version,
-      onConfigure: (Database db) async {
-        configured = true;
-        await db.query('PRAGMA locking_mode = EXCLUSIVE;');
-      },
+      onConfigure: ensureConfigured,
       onCreate: (Database db, int version) async {
-        ensureConfigured(db);
+        await ensureConfigured(db);
         await SQLiteSchema(db).runMigrations(0);
       },
       onUpgrade: (Database db, int fromVersion, int toVersion) async {
-        ensureConfigured(db);
+        await ensureConfigured(db);
         await SQLiteSchema(db).runMigrations(fromVersion);
       },
       onDowngrade: (Database db, int fromVersion, int toVersion) async {
-        ensureConfigured(db);
+        await ensureConfigured(db);
 
         // For now, we can safely do nothing.
         //

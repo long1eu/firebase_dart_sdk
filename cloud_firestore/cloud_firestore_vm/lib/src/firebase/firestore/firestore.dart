@@ -66,6 +66,7 @@ class Firestore {
     FirestoreSettings settings,
   }) async {
     checkNotNull(app, 'Provided FirebaseApp must not be null.');
+    Firestore.setLoggingEnabled();
 
     final FirestoreMultiDbComponent component =
         FirestoreMultiDbComponent(app, app.authProvider, settings);
