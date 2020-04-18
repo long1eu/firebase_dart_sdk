@@ -1,3 +1,6 @@
+## [0.0.5] - April 18, 2020 
+* fix null bool
+
 ## [0.0.4] - April 18, 2020 
 * disable verbose logging
 * make sql connection not exclusive so we don't break hot reload

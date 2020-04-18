@@ -235,9 +235,10 @@ class SQLitePersistence extends Persistence {
   ///   * onOpen
   ///
   /// This attempts to obtain exclusive access to the database and attempts to do so as early as possible.
+  /// ^^^ todo: this breaks flutter hot reload
   static Future<Database> _openDb(
       String databaseName, OpenDatabase openDatabase) async {
-    bool configured;
+    bool configured = false;
 
     /// Ensures that onConfigure has been called. This should be called first from all methods.
     Future<void> ensureConfigured(Database db) async {

@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
-export NAME="cloud_firestore_vm"
+export NAME="cloud_firestore_dart"
 export MODULE_PATH="./cloud_firestore/${NAME}"
-export DESCRIPTION="Dart implementation of Cloud Firestore SDK that offers a cloud-hosted, noSQL database with live synchronization and offline support."
+export DESCRIPTION="Dart implementation of cloud_firestore using cloud_firestore_vm"
 
 dart $PWD/dev/tools/lib/create_app.dart                                                      \
     --serviceAccount="$PWD/dev/tools/service-account.json"                                   \

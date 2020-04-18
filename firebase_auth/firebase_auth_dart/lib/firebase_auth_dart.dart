@@ -25,7 +25,7 @@ class FirebaseAuthDart extends platform.FirebaseAuthPlatform {
 
   /// Registers this implementation as default implementation for FirebaseAuth
   ///
-  /// see [GoogleSignInPlatform.presenter]
+  /// see [FirebaseAuthPlatform.presenter]
   static Future<void> register({dart.UrlPresenter presenter}) async {
     presenter ??= (Uri uri) => launch(uri.toString());
 

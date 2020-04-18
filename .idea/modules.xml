@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/firebase_core/_firebase_database_collection_vm/_firebase_database_collection_vm.iml" filepath="$PROJECT_DIR$/firebase_core/_firebase_database_collection_vm/_firebase_database_collection_vm.iml" />
       <module fileurl="file://$PROJECT_DIR$/firebase_core/_firebase_internal_vm/_firebase_internal_vm.iml" filepath="$PROJECT_DIR$/firebase_core/_firebase_internal_vm/_firebase_internal_vm.iml" />
+      <module fileurl="file://$PROJECT_DIR$/cloud_firestore/cloud_firestore_dart/cloud_firestore_dart.iml" filepath="$PROJECT_DIR$/cloud_firestore/cloud_firestore_dart/cloud_firestore_dart.iml" />
       <module fileurl="file://$PROJECT_DIR$/cloud_firestore/cloud_firestore_vm/cloud_firestore_vm.iml" filepath="$PROJECT_DIR$/cloud_firestore/cloud_firestore_vm/cloud_firestore_vm.iml" />
       <module fileurl="file://$PROJECT_DIR$/firebase_auth/firebase_auth_dart/firebase_auth_dart.iml" filepath="$PROJECT_DIR$/firebase_auth/firebase_auth_dart/firebase_auth_dart.iml" />
       <module fileurl="file://$PROJECT_DIR$/firebase_auth/firebase_auth_vm/firebase_auth_vm.iml" filepath="$PROJECT_DIR$/firebase_auth/firebase_auth_vm/firebase_auth_vm.iml" />
