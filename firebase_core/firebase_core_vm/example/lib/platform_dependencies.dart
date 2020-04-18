@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// ignore_for_file: prefer_mixin
 class PlatformDependencies extends core.PlatformDependencies
     with WidgetsBindingObserver {
   PlatformDependencies(this._preferences)
@@ -20,18 +21,16 @@ class PlatformDependencies extends core.PlatformDependencies
   }
 
   final SharedPreferences _preferences;
+
   @override
   final BehaviorSubject<bool> onBackgroundChanged;
+
   @override
   final BehaviorSubject<bool> onNetworkConnected;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     onBackgroundChanged.add(state == AppLifecycleState.paused);
-  }
-
-  void _connectivityChanged(ConnectivityResult event) {
-    onNetworkConnected.add(event != ConnectivityResult.none);
   }
 
   @override
@@ -42,5 +41,9 @@ class PlatformDependencies extends core.PlatformDependencies
   @override
   Future<void> set(String key, String value) {
     return _preferences.setString(key, value);
+  }
+
+  void _connectivityChanged(ConnectivityResult event) {
+    onNetworkConnected.add(event != ConnectivityResult.none);
   }
 }

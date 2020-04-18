@@ -70,4 +70,4 @@ abstract class LocalStorage {
 
 /// Signature used to retrieved platform specific headers for every request made
 /// by Firebase services.
-typedef HeaderBuilder = Map<String, String> Function();
+typedef HeaderBuilder = Future<Map<String, String>> Function();

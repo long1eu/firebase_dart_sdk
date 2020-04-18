@@ -272,7 +272,7 @@ mixin _PlatformDependenciesMixin
   @override
   // ignore: prefer_function_declarations_over_variables
   HeaderBuilder get headersBuilder {
-    return _headersBuilder ?? () => <String, String>{};
+    return _headersBuilder ?? () async => <String, String>{};
   }
 
   @override

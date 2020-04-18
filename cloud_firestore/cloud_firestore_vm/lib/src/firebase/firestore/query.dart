@@ -672,11 +672,15 @@ class Query {
     }).first;
   }
 
+  /// Return cached results first and then queries the server with resume token
+  /// to ensure unnecessary reads are not made.
   Stream<QuerySnapshot> get snapshots {
     final ListenOptions options = _internalOptions(MetadataChanges.exclude);
     return _getSnapshotsInternal(options);
   }
 
+  /// Return cached results first and then queries the server with resume token
+  /// to ensure unnecessary reads are not made.
   Stream<QuerySnapshot> getSnapshots([MetadataChanges changes]) {
     final ListenOptions options =
         _internalOptions(changes ?? MetadataChanges.exclude);

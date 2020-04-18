@@ -11,7 +11,50 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'platform_dependencies.dart';
 
-void main() => runApp(MyApp());
+Future<void> main() async {
+  FirebaseOptions options;
+  if (Platform.isLinux) {
+    options = const FirebaseOptions(
+      apiKey: 'AIzaSyD9HeqeXUOXJh_DPDl211x8seUXlNmiJj0',
+      applicationId:
+          '1:233259864964:linux:0034c73393cdd58c1d50ac24850d6d01f1e57aff',
+    );
+  } else if (Platform.isMacOS) {
+    options = const FirebaseOptions(
+      apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
+      applicationId:
+          '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
+    );
+  } else if (Platform.isWindows) {
+    options = const FirebaseOptions(
+      apiKey: 'AIzaSyBNeYDWMlalWRL2M2_UhE5kiMmvVf3o9BM',
+      applicationId:
+          '1:233259864964:windows:0034c73393cdd58c1d50ac24850d6d01f1e57aff',
+    );
+  } else if (Platform.isAndroid) {
+    options = const FirebaseOptions(
+      apiKey: 'AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg',
+      applicationId: '1:233259864964:android:b2ec71b130a3170cd583d1',
+    );
+  } else if (Platform.isIOS) {
+    options = const FirebaseOptions(
+      apiKey: 'AIzaSyBguTk4w2Xk2LD0mSdB2Pi9LTtt5BeAE6U',
+      applicationId: '1:233259864964:ios:fff621fea008bff1d583d1',
+    );
+  } else if (Platform.isFuchsia) {
+    options = const FirebaseOptions(
+      apiKey: 'AIzaSyBOPFxmw3fni8Inzb_RhFDjb9zznXHfaRo',
+      applicationId:
+          '1:233259864964:fuchsia:8fc440667cd119c335cf58c7cbfd4374f96fe786',
+    );
+  }
+
+  final SharedPreferences preferences = await SharedPreferences.getInstance();
+  final PlatformDependencies platform = PlatformDependencies(preferences);
+  FirebaseApp.withOptions(options, name: 'foo', dependencies: platform);
+
+  runApp(MyApp());
+}
 
 class MyApp extends StatelessWidget {
   final String name = 'foo';
@@ -23,7 +66,6 @@ class MyApp extends StatelessWidget {
     final FirebaseApp app =
         FirebaseApp.withOptions(options, name: name, dependencies: platform);
     assert(app != null);
-    print('Configured $app');
   }
 
   Future<void> _allApps() async {
@@ -78,19 +120,17 @@ FirebaseOptions get options {
   if (Platform.isAndroid) {
     return const FirebaseOptions(
       applicationId: '1:233259864964:android:b2ec71b130a3170cd583d1',
-      gcmSenderId: '297855924061',
       apiKey: 'AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg',
     );
   } else if (Platform.isIOS) {
     return const FirebaseOptions(
       applicationId: '1:233259864964:ios:fff621fea008bff1d583d1',
-      gcmSenderId: '233259864964',
       apiKey: 'AIzaSyBguTk4w2Xk2LD0mSdB2Pi9LTtt5BeAE6U',
     );
   } else {
     return const FirebaseOptions(
-      applicationId: '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
-      gcmSenderId: '233259864964',
+      applicationId:
+          '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
       apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
     );
   }

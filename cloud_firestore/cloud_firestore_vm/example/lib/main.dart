@@ -11,13 +11,15 @@ import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'database.dart' as db;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final SharedPreferences preferences = await SharedPreferences.getInstance();
   final PlatformDependencies platform = PlatformDependencies(preferences);
   final FirebaseApp app =
       FirebaseApp.withOptions(options, dependencies: platform);
-  await Firestore.getInstance(app);
+  await Firestore.getInstance(app, openDatabase: db.Database.create);
 
   runApp(
     MaterialApp(
