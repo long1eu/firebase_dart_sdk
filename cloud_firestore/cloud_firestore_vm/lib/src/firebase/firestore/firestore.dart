@@ -90,12 +90,16 @@ class Firestore {
     final DatabaseId databaseId = DatabaseId.forDatabase(projectId, database);
 
     CredentialsProvider provider;
-    if (authProvider == null || authProvider == app) {
+    if (authProvider != null) {
+      provider = FirebaseAuthCredentialsProvider(authProvider);
+    } else if (app.authProvider != app) {
+      Log.d(
+          _tag, 'Using ${app.authProvider.runtimeType} as the auth provider.');
+      provider = FirebaseAuthCredentialsProvider(app.authProvider);
+    } else {
       Log.d(_tag,
           'Firebase Auth not available, falling back to unauthenticated usage.');
       provider = EmptyCredentialsProvider();
-    } else {
-      provider = FirebaseAuthCredentialsProvider(authProvider);
     }
 
     // Firestore uses a different database for each app name. Note that we
