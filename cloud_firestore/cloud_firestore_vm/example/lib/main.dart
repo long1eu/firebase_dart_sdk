@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore_vm/cloud_firestore_vm.dart';
 import 'package:cloud_firestore_vm_example/platform_dependencies.dart';
+import 'package:firebase_auth_vm/firebase_auth_vm.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,10 +16,14 @@ import 'database.dart' as db;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   final SharedPreferences preferences = await SharedPreferences.getInstance();
   final PlatformDependencies platform = PlatformDependencies(preferences);
   final FirebaseApp app =
       FirebaseApp.withOptions(options, dependencies: platform);
+  if (FirebaseAuth.instance.currentUser == null) {
+    await FirebaseAuth.instance.signInAnonymously();
+  }
   await Firestore.getInstance(app, openDatabase: db.Database.create);
 
   runApp(
@@ -54,7 +59,7 @@ class MessageList extends StatelessWidget {
             return ListTile(
               trailing: IconButton(
                 onPressed: () => document.reference.delete(),
-                icon: Icon(Icons.delete),
+                icon: const Icon(Icons.delete),
               ),
               title: Text(
                 message != null ? message.toString() : '<No message retrieved>',

@@ -3,11 +3,9 @@
 // on 24/09/2018
 import 'dart:async';
 
-import 'package:firebase_core_vm/firebase_core_vm.dart';
-import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/credentials_provider.dart';
-import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:grpc/grpc.dart';
 
 class FirestoreCallCredentials {
@@ -23,8 +21,8 @@ class FirestoreCallCredentials {
       Map<String, String> metadata, String uri) async {
     try {
       final String token = await credentialsProvider.token;
-      Log.d(tag, 'Successfully fetched token.');
       if (token != null && token.isNotEmpty) {
+        Log.d(tag, 'Successfully fetched token.');
         metadata[_authorizationHeader] = 'Bearer $token';
       }
     } on FirebaseApiNotAvailableError catch (_) {

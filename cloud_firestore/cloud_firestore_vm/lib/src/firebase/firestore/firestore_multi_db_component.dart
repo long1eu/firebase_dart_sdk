@@ -25,7 +25,7 @@ class FirestoreMultiDbComponent {
 
   /// Provides instances of Firestore for given database names.
   Future<Firestore> get(String databaseName, OpenDatabase openDatabase) async {
-    return instances[databaseName] ??= await Firestore.newInstance(
+    return Firestore.newInstance(
       app,
       databaseName,
       authProvider: authProvider,

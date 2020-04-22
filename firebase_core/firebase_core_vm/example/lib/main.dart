@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'platform_dependencies.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   FirebaseOptions options;
   if (Platform.isLinux) {
     options = const FirebaseOptions(

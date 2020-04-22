@@ -1,3 +1,11 @@
+## [0.0.7] - April 22, 2020 
+* make Firestore.newInstance register the new instance with the multi db component
+* add warning in case of not initializing FirebaseAuth prior to calling Firestore.instance 
+
+## [0.0.6] - April 21, 2020 
+* fix auth provider picker logic
+* fix exporting Source
+
 ## [0.0.5] - April 18, 2020 
 * fix null bool
 

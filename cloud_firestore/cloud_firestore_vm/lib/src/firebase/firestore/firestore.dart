@@ -51,9 +51,21 @@ class Firestore {
   static Firestore get instance {
     final FirebaseApp app = FirebaseApp.instance;
     if (app == null) {
-      throw StateError('You must call FirebaseApp.initializeApp first.');
+      throw StateError('You must call [FirebaseApp.initializeApp] first.');
     }
-    return FirestoreMultiDbComponent.instances[DatabaseId.defaultDatabaseId];
+
+    final Firestore firestore =
+        FirestoreMultiDbComponent.instances[DatabaseId.defaultDatabaseId];
+    if (firestore == null) {
+      throw StateError('You must call [Firestore.getInstance] first.');
+    }
+
+    if (app == app.authProvider) {
+      Log.w(_tag,
+          'In case you are using FirebaseAuth make sure to first call [FirebaseAuth.instance] to register the auth provider with other Firebase Services.');
+    }
+
+    return firestore;
   }
 
   @visibleForTesting
@@ -118,19 +130,21 @@ class Firestore {
     );
 
     final TaskScheduler scheduler = TaskScheduler(app.name);
-    return Firestore(
-      databaseId,
-      app,
-      await FirestoreClient.initialize(
-        databaseInfo,
-        settings,
-        provider,
-        openDatabase,
-        app.onNetworkConnected,
-        scheduler,
-      ),
+    final FirestoreClient firestoreClient = await FirestoreClient.initialize(
+      databaseInfo,
+      settings,
+      provider,
+      openDatabase,
+      app.onNetworkConnected,
       scheduler,
     );
+    final Firestore firestore = Firestore(
+      databaseId,
+      app,
+      firestoreClient,
+      scheduler,
+    );
+    return FirestoreMultiDbComponent.instances[database] = firestore;
   }
 
   void _ensureClientConfigured() {
