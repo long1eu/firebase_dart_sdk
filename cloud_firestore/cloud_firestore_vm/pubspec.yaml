@@ -1,0 +1,30 @@
+name: cloud_firestore_vm
+description: Dart implementation of Cloud Firestore SDK that offers a cloud-hosted, noSQL database with live synchronization and offline support.
+version: 0.0.7
+homepage: https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/cloud_firestore/cloud_firestore_vm
+
+environment:
+  sdk: ">=2.7.0 <3.0.0"
+
+dependencies:
+  _firebase_database_collection_vm:  ^0.0.2
+  _firebase_internal_vm: ^0.0.2
+  firebase_core_vm: ^0.0.4
+  protobuf: ^1.0.1
+  grpc: ^2.1.3
+  rxdart: ^0.23.1
+  semaphore: ^0.1.4
+  path: ^1.6.4
+  fixnum: ^0.10.11
+  meta: ^1.1.8
+  collection: ^1.14.12
+  pedantic: ^1.9.0
+  async: ^2.4.1
+
+dev_dependencies:
+  test: ^1.14.2
+  mockito: ^4.1.1
+  moor_ffi: ^0.4.0
+  uuid: ^2.0.4
+
+latest_commit: 576da00e85e3950bd53049f800a552f28a0c6d99

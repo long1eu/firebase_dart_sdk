@@ -1,0 +1,14 @@
+name: _firebase_internal_vm
+description: For internal use of the Firebase packages
+version: 0.0.2
+homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
+
+environment:
+  sdk: '>=2.0.0 <3.0.0'
+
+dependencies:
+  collection: ^1.0.0
+  meta: ^1.0.0
+
+dev_dependencies:
+  test: ^1.0.0

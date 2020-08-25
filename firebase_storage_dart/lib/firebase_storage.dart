@@ -1,0 +1,1 @@
+library firebase_storage_vm;

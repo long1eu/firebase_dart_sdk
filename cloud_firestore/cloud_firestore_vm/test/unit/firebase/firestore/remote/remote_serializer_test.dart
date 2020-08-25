@@ -1,0 +1,1048 @@
+// File created by
+// Lung Razvan <long1eu>
+// on 03/10/2018
+
+import 'dart:typed_data';
+
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/bound.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart'
+    as firestore;
+import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
+import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart'
+    as proto_;
+import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
+import 'package:fixnum/fixnum.dart';
+import 'package:grpc/grpc.dart';
+import 'package:test/test.dart';
+
+import '../../../../util/test_util.dart';
+
+void main() {
+  final Uint8List _resumeToken = Uint8List.fromList(<int>[]);
+
+  DatabaseId databaseId;
+  RemoteSerializer serializer;
+
+  setUp(() {
+    databaseId = DatabaseId.forDatabase('p', 'd');
+    serializer = RemoteSerializer(databaseId);
+  });
+
+  proto_.Value valueBuilder() => proto_.Value.create();
+
+  void assertRoundTrip(
+      FieldValue value, proto_.Value data, ValueTypeCase typeCase) {
+    final proto_.Value actual = serializer.encodeValue(value);
+
+    switch (typeCase) {
+      case ValueTypeCase.nullValue:
+        expect(actual.hasNullValue(), isTrue);
+        break;
+      case ValueTypeCase.booleanValue:
+        expect(actual.hasBooleanValue(), isTrue);
+        break;
+      case ValueTypeCase.integerValue:
+        expect(actual.hasIntegerValue(), isTrue);
+        break;
+      case ValueTypeCase.doubleValue:
+        expect(actual.hasDoubleValue(), isTrue);
+        break;
+      case ValueTypeCase.timestampValue:
+        expect(actual.hasTimestampValue(), isTrue);
+        break;
+      case ValueTypeCase.stringValue:
+        expect(actual.hasStringValue(), isTrue);
+        break;
+      case ValueTypeCase.bytesValue:
+        expect(actual.hasBytesValue(), isTrue);
+        break;
+      case ValueTypeCase.referenceValue:
+        expect(actual.hasReferenceValue(), isTrue);
+        break;
+      case ValueTypeCase.geoPointValue:
+        expect(actual.hasGeoPointValue(), isTrue);
+        break;
+      case ValueTypeCase.arrayValue:
+        expect(actual.hasArrayValue(), isTrue);
+        break;
+      case ValueTypeCase.mapValue:
+        expect(actual.hasMapValue(), isTrue);
+        break;
+    }
+
+    expect(actual, data);
+    expect(serializer.decodeValue(data), value);
+  }
+
+  void assertRoundTripForMutation(Mutation mutation, proto.Write data) {
+    final proto.Write actualProto = serializer.encodeMutation(mutation);
+    expect(actualProto, data);
+
+    final Mutation actualMutation = serializer.decodeMutation(data);
+    expect(actualMutation, mutation);
+  }
+
+  proto.StructuredQuery_Order defaultKeyOrder() {
+    return (proto.StructuredQuery_Order.create()
+      ..field_1 = (proto.StructuredQuery_FieldReference.create()
+        ..fieldPath = DocumentKey.keyFieldName)
+      ..direction = proto.StructuredQuery_Direction.ASCENDING)
+      ..freeze();
+  }
+
+  /// Wraps the given query in [QueryData]. This is useful because the APIs
+  /// we're testing accept [QueryData], but for the most part we're just testing
+  /// variations on [Query].
+  QueryData wrapQueryData(Query query) {
+    return QueryData(
+        query, 1, 2, QueryPurpose.listen, SnapshotVersion.none, Uint8List(0));
+  }
+
+  void unaryFilterTest(Object equalityValue,
+      proto.StructuredQuery_UnaryFilter_Operator unaryOperator) {
+    final Query q = Query(ResourcePath.fromString('docs'))
+        .filter(filter('prop', '==', equalityValue));
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..where = (proto.StructuredQuery_Filter.create()
+            ..unaryFilter = (proto.StructuredQuery_UnaryFilter.create()
+              ..field_2 = (proto.StructuredQuery_FieldReference.create()
+                ..fieldPath = 'prop')
+              ..op = unaryOperator))
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  }
+
+  test('testEncodesNull', () {
+    final FieldValue value = NullValue.nullValue();
+    final proto_.Value data = valueBuilder()
+      ..nullValue = proto.NullValue.NULL_VALUE
+      ..freeze();
+    assertRoundTrip(value, data, ValueTypeCase.nullValue);
+  });
+
+  test('testEncodesBoolean', () {
+    final List<bool> tests = <bool>[true, false];
+    for (bool test in tests) {
+      final FieldValue value = wrap(test);
+      final proto_.Value data = valueBuilder()
+        ..booleanValue = test
+        ..freeze();
+      assertRoundTrip(value, data, ValueTypeCase.booleanValue);
+    }
+  });
+
+  test('testEncodesIntegers', () {
+    final List<int> tests = <int>[
+      IntegerValue.min,
+      -100,
+      -1,
+      0,
+      1,
+      100,
+      IntegerValue.max
+    ];
+
+    for (int test in tests) {
+      final FieldValue value = wrap(test);
+      final proto_.Value data = valueBuilder()
+        ..integerValue = Int64(test)
+        ..freeze();
+      assertRoundTrip(value, data, ValueTypeCase.integerValue);
+    }
+  });
+
+  test('testEncodesDoubles', () {
+    final List<double> tests = <double>[
+      double.negativeInfinity,
+      -double.maxFinite,
+      IntegerValue.max * -1.0 - 1.0,
+      -2.0,
+      -1.1,
+      -1.0,
+      -double.minPositive,
+      -DoubleValue.minNormal,
+      -0.0,
+      0.0,
+      DoubleValue.minNormal,
+      double.minPositive,
+      0.1,
+      1.1,
+      IntegerValue.max * 1.0,
+      double.maxFinite,
+      double.infinity,
+    ];
+
+    for (double test in tests) {
+      final FieldValue value = wrap(test);
+      final proto_.Value data = valueBuilder()
+        ..doubleValue = test
+        ..freeze();
+      assertRoundTrip(value, data, ValueTypeCase.doubleValue);
+    }
+  });
+
+  test('testEncodesStrings', () {
+    final List<String> tests = <String>[
+      '',
+      'a',
+      'abc def',
+      'æ',
+      '\0\ud7ff\ue000\uffff',
+      '(╯°□°）╯︵ ┻━┻'
+    ];
+    for (String test in tests) {
+      final FieldValue value = wrap(test);
+      final proto_.Value data = valueBuilder()
+        ..stringValue = test
+        ..freeze();
+      assertRoundTrip(value, data, ValueTypeCase.stringValue);
+    }
+  });
+
+  test('testEncodesDates', () {
+    final DateTime date1 = DateTime.utc(2016, 1, 2, 10, 20, 50, 500);
+    final DateTime date2 = DateTime.utc(2016, 6, 17, 10, 50, 15);
+
+    final List<DateTime> tests = <DateTime>[date1, date2];
+
+    final proto.Timestamp ts1 = proto.Timestamp.create()
+      ..nanos = 500000000
+      ..seconds = Int64(1451730050);
+
+    final proto.Timestamp ts2 = proto.Timestamp.create()
+      ..nanos = 0
+      ..seconds = Int64(1466160615);
+
+    final List<proto_.Value> expected = <proto_.Value>[
+      valueBuilder()
+        ..timestampValue = ts1
+        ..freeze(),
+      valueBuilder()
+        ..timestampValue = ts2
+        ..freeze()
+    ];
+
+    for (int i = 0; i < tests.length; i++) {
+      final FieldValue value = wrap(tests[i]);
+      assertRoundTrip(value, expected[i], ValueTypeCase.timestampValue);
+    }
+  });
+
+  test('testEncodesGeoPoints', () {
+    final FieldValue geoPoint = wrap(const GeoPoint(1.23, 4.56));
+    final proto_.Value data = valueBuilder()
+      ..geoPointValue = (proto.LatLng.create()
+        ..latitude = 1.23
+        ..longitude = 4.56)
+      ..freeze();
+
+    assertRoundTrip(geoPoint, data, ValueTypeCase.geoPointValue);
+  });
+
+  test('testEncodesBlobs', () {
+    final FieldValue _blob = wrap(blob(<int>[0, 1, 2, 3]));
+    final proto_.Value data = valueBuilder()
+      ..bytesValue = <int>[0, 1, 2, 3]
+      ..freeze();
+
+    assertRoundTrip(_blob, data, ValueTypeCase.bytesValue);
+  });
+
+  test('testEncodesReferences', () {
+    final DocumentReference value = ref('foo/bar');
+    final FieldValue reference = wrap(value);
+    final proto_.Value data = valueBuilder()
+      ..referenceValue =
+          'projects/project/databases/(default)/documents/foo/bar'
+      ..freeze();
+
+    assertRoundTrip(reference, data, ValueTypeCase.referenceValue);
+  });
+
+  test('testEncodeArrays', () {
+    final FieldValue model = wrap(<dynamic>[true, 'foo']);
+    final proto.ArrayValue builder = proto.ArrayValue.create()
+      ..values.add(valueBuilder()..booleanValue = true)
+      ..values.add(valueBuilder()..stringValue = 'foo');
+
+    final proto_.Value data = valueBuilder()
+      ..arrayValue = builder
+      ..freeze();
+
+    assertRoundTrip(model, data, ValueTypeCase.arrayValue);
+  });
+
+  test('testEncodesNestedObjects', () {
+    final FieldValue model = wrapMap(map<dynamic>(<dynamic>[
+      'b',
+      true,
+      'd',
+      double.maxFinite,
+      'i',
+      1,
+      'n',
+      null,
+      's',
+      'foo',
+      'a',
+      <dynamic>[
+        2,
+        'bar',
+        map<dynamic>(<dynamic>['b', false])
+      ],
+      'o',
+      map<dynamic>(<dynamic>[
+        'd',
+        100,
+        'nested',
+        map<dynamic>(<dynamic>['e', IntegerValue.min])
+      ])
+    ]));
+
+    proto.MapValue inner = proto.MapValue.create()
+      ..fields['b'] = (valueBuilder()..booleanValue = false);
+
+    final proto.ArrayValue array = proto.ArrayValue.create()
+      ..values.add(valueBuilder()..integerValue = Int64(2))
+      ..values.add(valueBuilder()..stringValue = 'bar')
+      ..values.add(valueBuilder()..mapValue = inner);
+
+    inner = proto.MapValue.create()
+      ..fields['e'] = (valueBuilder()..integerValue = Int64(IntegerValue.min));
+
+    final proto.MapValue middle = proto.MapValue.create()
+      ..fields['d'] = (valueBuilder()..integerValue = Int64(100))
+      ..fields['nested'] = (valueBuilder()..mapValue = inner);
+
+    final proto.MapValue obj = proto.MapValue.create()
+      ..fields['b'] = (valueBuilder()..booleanValue = true)
+      ..fields['d'] = (valueBuilder()..doubleValue = double.maxFinite)
+      ..fields['i'] = (valueBuilder()..integerValue = Int64(1))
+      ..fields['n'] = (valueBuilder()..nullValue = proto.NullValue.NULL_VALUE)
+      ..fields['s'] = (valueBuilder()..stringValue = 'foo')
+      ..fields['a'] = (valueBuilder()..arrayValue = array)
+      ..fields['o'] = (valueBuilder()..mapValue = middle);
+
+    final Map<String, proto_.Value> sortedKey =
+        (obj.fields.keys.toList()..sort()).asMap().map((_, String key) =>
+            MapEntry<String, proto_.Value>(key, obj.fields[key]));
+
+    obj.fields
+      ..clear()
+      ..addAll(sortedKey);
+
+    final proto_.Value data = valueBuilder()
+      ..mapValue = obj
+      ..freeze();
+
+    assertRoundTrip(model, data, ValueTypeCase.mapValue);
+  });
+
+  test('testEncodeDeleteMutation', () {
+    final Mutation mutation = deleteMutation('docs/1');
+
+    final proto.Write expected = proto.Write.create()
+      ..delete = 'projects/p/databases/d/documents/docs/1'
+      ..freeze();
+    assertRoundTripForMutation(mutation, expected);
+  });
+
+  test('testEncodeSetMutation', () {
+    final Mutation mutation =
+        setMutation('docs/1', map(<String>['key', 'value']));
+
+    final proto.Write expected = proto.Write.create()
+      ..update = (proto.Document.create()
+        ..name = 'projects/p/databases/d/documents/docs/1'
+        ..fields['key'] = (valueBuilder()..stringValue = 'value'))
+      ..freeze();
+
+    assertRoundTripForMutation(mutation, expected);
+  });
+
+  test('testEncodesPatchMutation', () {
+    final Mutation mutation =
+        patchMutation('docs/1', map(<dynamic>['key', 'value', 'key2', true]));
+
+    final proto.Write expected = proto.Write.create()
+      ..update = (proto.Document.create()
+        ..name = 'projects/p/databases/d/documents/docs/1'
+        ..fields['key'] = (valueBuilder()..stringValue = 'value')
+        ..fields['key2'] = (valueBuilder()..booleanValue = true))
+      ..updateMask = (proto.DocumentMask.create()
+        ..fieldPaths.addAll(<String>['key', 'key2']))
+      ..currentDocument = (proto.Precondition.create()..exists = true)
+      ..freeze();
+
+    assertRoundTripForMutation(mutation, expected);
+  });
+
+  test('testEncodesPatchMutationWithFieldMask', () {
+    final Mutation mutation = patchMutation(
+        'docs/1',
+        map(<dynamic>['key', 'value', 'key2', true]),
+        <FieldPath>[field('key')]);
+
+    final proto.Write expected = proto.Write.create()
+      ..update = (proto.Document.create()
+        ..name = 'projects/p/databases/d/documents/docs/1'
+        ..fields['key'] = (valueBuilder()..stringValue = 'value')
+        ..fields['key2'] = (valueBuilder()..booleanValue = true))
+      ..updateMask = (proto.DocumentMask.create()..fieldPaths.add('key'))
+      ..freeze();
+
+    assertRoundTripForMutation(mutation, expected);
+  });
+
+  test('testEncodesServerTimestampTransformMutation', () {
+    final Mutation mutation = transformMutation(
+        'docs/1',
+        map(<dynamic>[
+          'a',
+          firestore.FieldValue.serverTimestamp(),
+          'bar.baz',
+          firestore.FieldValue.serverTimestamp()
+        ]));
+
+    final proto.Write expected = proto.Write.create()
+      ..transform = (proto.DocumentTransform.create()
+        ..document = 'projects/p/databases/d/documents/docs/1'
+        ..fieldTransforms.add(proto.DocumentTransform_FieldTransform.create()
+          ..fieldPath = 'a'
+          ..setToServerValue =
+              proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME)
+        ..fieldTransforms.add(proto.DocumentTransform_FieldTransform.create()
+          ..fieldPath = 'bar.baz'
+          ..setToServerValue =
+              proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME))
+      ..currentDocument = (proto.Precondition.create()..exists = true)
+      ..freeze();
+
+    assertRoundTripForMutation(mutation, expected);
+  });
+
+  test('testEncodesArrayTransformMutations', () {
+    final Mutation mutation = transformMutation(
+        'docs/1',
+        map(<dynamic>[
+          'a',
+          firestore.FieldValue.arrayUnion(<dynamic>['a', 2]),
+          'bar.baz',
+          firestore.FieldValue.arrayRemove(<dynamic>[
+            map<dynamic>(<dynamic>['x', 1])
+          ])
+        ]));
+
+    final proto.Write expected = proto.Write.create()
+      ..transform = (proto.DocumentTransform.create()
+        ..document = 'projects/p/databases/d/documents/docs/1'
+        ..fieldTransforms.add(proto.DocumentTransform_FieldTransform.create()
+          ..fieldPath = 'a'
+          ..appendMissingElements = (proto.ArrayValue.create()
+            ..values.add(serializer.encodeValue(wrap('a')))
+            ..values.add(serializer.encodeValue(wrap(2)))))
+        ..fieldTransforms.add(proto.DocumentTransform_FieldTransform.create()
+          ..fieldPath = 'bar.baz'
+          ..removeAllFromArray = (proto.ArrayValue.create()
+            ..values.add(serializer
+                .encodeValue(wrap(map<dynamic>(<dynamic>['x', 1])))))))
+      ..currentDocument = (proto.Precondition.create()..exists = true)
+      ..freeze();
+
+    assertRoundTripForMutation(mutation, expected);
+  });
+
+  test('testEncodesListenRequestLabels', () {
+    final Query _query = query('collection/key');
+    QueryData queryData = QueryData(_query, 2, 3, QueryPurpose.listen);
+
+    final Map<String, String> encoded =
+        serializer.encodeListenRequestLabels(queryData);
+    expect(encoded, isEmpty);
+
+    queryData = QueryData(_query, 2, 3, QueryPurpose.limboResolution);
+    MapEntry<String, String> result =
+        serializer.encodeListenRequestLabels(queryData).entries.first;
+    expect(result.key, 'goog-listen-tags');
+    expect(result.value, 'limbo-document');
+
+    queryData = QueryData(_query, 2, 3, QueryPurpose.existenceFilterMismatch);
+    result = serializer.encodeListenRequestLabels(queryData).entries.first;
+    expect(result.key, 'goog-listen-tags');
+    expect(result.value, 'existence-filter-mismatch');
+  });
+
+  test('testEncodesFirstLevelKeyQueries', () {
+    final Query q = Query(ResourcePath.fromString('docs/1'));
+    final proto_.Target actual = serializer.encodeTarget(QueryData(q, 1, 2,
+        QueryPurpose.limboResolution, SnapshotVersion.none, Uint8List(0)));
+
+    final proto_.Target_DocumentsTarget docs =
+        proto.Target_DocumentsTarget.create()
+          ..documents.add('projects/p/databases/d/documents/docs/1');
+
+    final proto_.Target expected = proto_.Target.create()
+      ..documents = docs
+      ..targetId = 1
+      ..resumeToken = _resumeToken
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q,
+        serializer.decodeDocumentsTarget(serializer.encodeDocumentsTarget(q)));
+  });
+
+  test('testEncodesFirstLevelAncestorQueries', () {
+    final Query q = Query(ResourcePath.fromString('messages'));
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'messages')
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = _resumeToken
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  });
+
+  test('testEncodesNestedAncestorQueries', () {
+    final Query q =
+        Query(ResourcePath.fromString('rooms/1/messages/10/attachments'));
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'attachments')
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents/rooms/1/messages/10'
+          ..structuredQuery = structuredQueryBuilder
+          ..freeze();
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = _resumeToken
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  });
+
+  test('testEncodesSingleFilterAtFirstLevelCollections', () {
+    final Query q =
+        Query(ResourcePath.fromString('docs')).filter(filter('prop', '<', 42));
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..where = (proto.StructuredQuery_Filter.create()
+            ..fieldFilter = (proto.StructuredQuery_FieldFilter.create()
+              ..field_1 = (proto.StructuredQuery_FieldReference.create()
+                ..fieldPath = 'prop')
+              ..op = proto.StructuredQuery_FieldFilter_Operator.LESS_THAN
+              ..value = (valueBuilder()..integerValue = Int64(42))))
+          ..orderBy.add(proto.StructuredQuery_Order.create()
+            ..field_1 = (proto.StructuredQuery_FieldReference.create()
+              ..fieldPath = 'prop')
+            ..direction = proto.StructuredQuery_Direction.ASCENDING)
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = _resumeToken
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  });
+
+  test('testEncodesMultipleFiltersOnDeeperCollections', () {
+    final Query q =
+        Query(ResourcePath.fromString('rooms/1/messages/10/attachments'))
+            .filter(filter('prop', '<', 42))
+            .filter(filter('author', '==', 'dimond'))
+            .filter(filter('tags', 'array-contains', 'pending'));
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    final proto
+        .StructuredQuery structuredQueryBuilder = proto.StructuredQuery.create()
+      ..from.add(proto.StructuredQuery_CollectionSelector.create()
+        ..collectionId = 'attachments')
+      ..where = (proto.StructuredQuery_Filter.create()
+        ..compositeFilter = (proto.StructuredQuery_CompositeFilter.create()
+          ..op = proto.StructuredQuery_CompositeFilter_Operator.AND
+          ..filters.add(proto.StructuredQuery_Filter.create()
+            ..fieldFilter = (proto.StructuredQuery_FieldFilter.create()
+              ..field_1 = (proto.StructuredQuery_FieldReference.create()
+                ..fieldPath = 'prop')
+              ..op = proto.StructuredQuery_FieldFilter_Operator.LESS_THAN
+              ..value = (valueBuilder()..integerValue = Int64(42))))
+          ..filters.add(proto.StructuredQuery_Filter.create()
+            ..fieldFilter = (proto.StructuredQuery_FieldFilter.create()
+              ..field_1 = (proto.StructuredQuery_FieldReference.create()
+                ..fieldPath = 'author')
+              ..op = proto.StructuredQuery_FieldFilter_Operator.EQUAL
+              ..value = (valueBuilder()..stringValue = 'dimond')))
+          ..filters.add(proto.StructuredQuery_Filter.create()
+            ..fieldFilter = (proto.StructuredQuery_FieldFilter.create()
+              ..field_1 = (proto.StructuredQuery_FieldReference.create()
+                ..fieldPath = 'tags')
+              ..op = proto.StructuredQuery_FieldFilter_Operator.ARRAY_CONTAINS
+              ..value = (valueBuilder()..stringValue = 'pending')))))
+      ..orderBy.add(proto.StructuredQuery_Order.create()
+        ..field_1 =
+            (proto.StructuredQuery_FieldReference.create()..fieldPath = 'prop')
+        ..direction = proto.StructuredQuery_Direction.ASCENDING)
+      ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents/rooms/1/messages/10'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = _resumeToken
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  });
+
+  test('testInSerialization', () {
+    final Filter inputFilter = filter('field', 'in', <int>[42]);
+    final proto.StructuredQuery_Filter apiFilter =
+        serializer.encodeUnaryOrFieldFilter(inputFilter);
+
+    final proto.ArrayValue inFilterValue = proto.ArrayValue()
+      ..values.add(valueBuilder()..integerValue = Int64(42));
+
+    final proto.StructuredQuery_Filter expectedFilter =
+        proto.StructuredQuery_Filter()
+          ..fieldFilter = (proto.StructuredQuery_FieldFilter()
+            ..field_1 =
+                (proto.StructuredQuery_FieldReference()..fieldPath = 'field')
+            ..op = proto.StructuredQuery_FieldFilter_Operator.IN
+            ..value = (valueBuilder()..arrayValue = inFilterValue));
+
+    expect(expectedFilter, apiFilter);
+    final FieldFilter roundTripped =
+        serializer.decodeFieldFilter(apiFilter.fieldFilter);
+    expect(inputFilter, roundTripped);
+    expect(roundTripped, isA<InFilter>());
+  });
+
+  test('testArrayContainsAnySerialization', () {
+    final Filter inputFilter = filter('field', 'array-contains-any', <int>[42]);
+    final proto.StructuredQuery_Filter apiFilter =
+        serializer.encodeUnaryOrFieldFilter(inputFilter);
+
+    final proto.ArrayValue arrayContainsAnyFilterValue = proto.ArrayValue()
+      ..values.add(valueBuilder()..integerValue = Int64(42));
+
+    final proto.StructuredQuery_Filter expectedFilter =
+        proto.StructuredQuery_Filter()
+          ..fieldFilter = (proto.StructuredQuery_FieldFilter()
+            ..field_1 =
+                (proto.StructuredQuery_FieldReference()..fieldPath = 'field')
+            ..op = proto.StructuredQuery_FieldFilter_Operator.ARRAY_CONTAINS_ANY
+            ..value =
+                (valueBuilder()..arrayValue = arrayContainsAnyFilterValue));
+
+    expect(expectedFilter, apiFilter);
+    final FieldFilter roundTripped =
+        serializer.decodeFieldFilter(apiFilter.fieldFilter);
+    expect(inputFilter, roundTripped);
+    expect(roundTripped, isA<ArrayContainsAnyFilter>());
+  });
+
+  test('testKeyFieldSerializationEncoding', () {
+    final FieldFilter inputFilter =
+        filter('__name__', '==', ref('project/database'));
+    final proto.StructuredQuery_Filter apiFilter =
+        serializer.encodeUnaryOrFieldFilter(inputFilter);
+
+    final proto
+        .StructuredQuery_Filter expectedFilter = proto.StructuredQuery_Filter()
+      ..fieldFilter = (proto.StructuredQuery_FieldFilter()
+        ..field_1 =
+            (proto.StructuredQuery_FieldReference()..fieldPath = '__name__')
+        ..op = proto.StructuredQuery_FieldFilter_Operator.EQUAL
+        ..value = (valueBuilder()
+          ..referenceValue =
+              'projects/project/databases/(default)/documents/project/database'))
+      ..freeze();
+
+    expect(expectedFilter, apiFilter);
+    final FieldFilter roundTripped =
+        serializer.decodeFieldFilter(apiFilter.fieldFilter);
+    expect(inputFilter, roundTripped);
+    expect(roundTripped, isA<KeyFieldFilter>());
+  });
+
+  // TODO(PORTING-NOTE): Android currently tests most filter serialization (for
+  //  equals, greater than, array-contains, etc.) only in
+  //  testEncodesMultipleFiltersOnDeeperCollections and lacks isolated filter
+  //  tests like the other platforms have. We should fix this.
+
+  test('testEncodesNullFilter', () {
+    unaryFilterTest(null, proto.StructuredQuery_UnaryFilter_Operator.IS_NULL);
+  });
+
+  test('testEncodesNaNFilter', () {
+    unaryFilterTest(
+        double.nan, proto.StructuredQuery_UnaryFilter_Operator.IS_NAN);
+  });
+
+  test('testEncodesSortOrders', () {
+    final Query q =
+        Query(ResourcePath.fromString('docs')).orderBy(orderBy('prop'));
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..orderBy.add(proto.StructuredQuery_Order.create()
+            ..direction = proto.StructuredQuery_Direction.ASCENDING
+            ..field_1 = (proto.StructuredQuery_FieldReference.create()
+              ..fieldPath = 'prop'))
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = _resumeToken
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  });
+
+  test('testEncodesSortOrdersDescending', () {
+    final Query q =
+        Query(ResourcePath.fromString('rooms/1/messages/10/attachments'))
+            .orderBy(orderBy('prop', 'desc'));
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'attachments')
+          ..orderBy.add(proto.StructuredQuery_Order.create()
+            ..direction = proto.StructuredQuery_Direction.DESCENDING
+            ..field_1 = (proto.StructuredQuery_FieldReference.create()
+              ..fieldPath = 'prop'))
+          ..orderBy.add(proto.StructuredQuery_Order.create()
+            ..direction = proto.StructuredQuery_Direction.DESCENDING
+            ..field_1 = (proto.StructuredQuery_FieldReference.create()
+              ..fieldPath = DocumentKey.keyFieldName));
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents/rooms/1/messages/10'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = Int8List.fromList(<int>[])
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  });
+
+  test('testEncodesLimits', () {
+    final Query q = Query(ResourcePath.fromString('docs')).limit(26);
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..orderBy.add(defaultKeyOrder())
+          ..limit = (proto.Int32Value.create()..value = 26);
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = Int8List.fromList(<int>[])
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  });
+
+  test('testEncodesBounds', () {
+    final Query q = Query(ResourcePath.fromString('docs'))
+        .startAt(Bound(position: <ReferenceValue>[
+          ReferenceValue.valueOf(databaseId, key('foo/bar'))
+        ], before: true))
+        .endAt(Bound(position: <ReferenceValue>[
+          ReferenceValue.valueOf(databaseId, key('foo/baz'))
+        ], before: false));
+
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..orderBy.add(defaultKeyOrder())
+          ..startAt = (proto.Cursor.create()
+            ..before = true
+            ..values.add(valueBuilder()
+              ..referenceValue = 'projects/p/databases/d/documents/foo/bar'))
+          ..endAt = (proto.Cursor.create()
+            ..before = false
+            ..values.add(valueBuilder()
+              ..referenceValue = 'projects/p/databases/d/documents/foo/baz'));
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = _resumeToken
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  });
+
+  test('testEncodesResumeTokens', () {
+    final Query q = Query(ResourcePath.fromString('docs'));
+    final proto_.Target actual = serializer.encodeTarget(QueryData(
+        q, 1, 2, QueryPurpose.listen, SnapshotVersion.none, resumeToken(1000)));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = resumeToken(1000)
+      ..freeze();
+
+    expect(actual, expected);
+    expect(q, serializer.decodeQueryTarget(serializer.encodeQueryTarget(q)));
+  });
+
+  test('testConvertsTargetChangeWithAdded', () {
+    final WatchChangeWatchTargetChange expected =
+        WatchChangeWatchTargetChange(WatchTargetChangeType.added, <int>[1, 4]);
+
+    final WatchChangeWatchTargetChange actual =
+        serializer.decodeWatchChange(proto.ListenResponse.create()
+          ..targetChange = (proto.TargetChange.create()
+            ..targetChangeType = proto_.TargetChange_TargetChangeType.ADD
+            ..targetIds.add(1)
+            ..targetIds.add(4))
+          ..freeze());
+
+    expect(actual, expected);
+  });
+
+  test('testConvertsTargetChangeWithRemoved', () {
+    final WatchChangeWatchTargetChange expected = WatchChangeWatchTargetChange(
+        WatchTargetChangeType.removed,
+        <int>[1, 4],
+        Uint8List.fromList(<int>[0, 1, 2]),
+        GrpcError.permissionDenied());
+
+    final WatchChangeWatchTargetChange actual =
+        serializer.decodeWatchChange(proto.ListenResponse.create()
+          ..targetChange = (proto.TargetChange.create()
+            ..targetChangeType = proto_.TargetChange_TargetChangeType.REMOVE
+            ..targetIds.add(1)
+            ..targetIds.add(4)
+            ..cause = (proto.Status.create()..code = 7)
+            ..resumeToken = Uint8List.fromList(<int>[0, 1, 2]))
+          ..freeze());
+
+    expect(actual, expected);
+  });
+
+  test('testConvertsTargetChangeWithNoChange', () {
+    final WatchChangeWatchTargetChange expected = WatchChangeWatchTargetChange(
+        WatchTargetChangeType.noChange, <int>[1, 4]);
+
+    final WatchChangeWatchTargetChange actual =
+        serializer.decodeWatchChange(proto.ListenResponse()
+          ..targetChange = (proto.TargetChange()
+            ..targetChangeType = proto_.TargetChange_TargetChangeType.NO_CHANGE
+            ..targetIds.add(1)
+            ..targetIds.add(4))
+          ..freeze());
+
+    expect(actual, expected);
+  });
+
+  test('testConvertsDocumentChangeWithTargetIds', () {
+    final WatchChangeDocumentChange expected = WatchChangeDocumentChange(
+        <int>[1, 2],
+        <int>[],
+        key('coll/1'),
+        doc('coll/1', 5, map(<String>['foo', 'bar'])));
+
+    final WatchChangeDocumentChange actual = serializer.decodeWatchChange(
+        proto.ListenResponse()
+          ..documentChange = (proto.DocumentChange.create()
+            ..document = (proto.Document.create()
+              ..name = serializer.encodeKey(key('coll/1'))
+              ..updateTime =
+                  serializer.encodeTimestamp(const Timestamp(0, 5000))
+              ..fields['foo'] = (proto_.Value()..stringValue = 'bar'))
+            ..targetIds.add(1)
+            ..targetIds.add(2))
+          ..freeze());
+
+    expect(actual, expected);
+  });
+
+  test('testConvertsDocumentChangeWithRemovedTargetIds', () {
+    final WatchChangeDocumentChange expected = WatchChangeDocumentChange(
+        <int>[2],
+        <int>[1],
+        key('coll/1'),
+        doc('coll/1', 5, map(<String>['foo', 'bar'])));
+
+    final WatchChangeDocumentChange actual = serializer.decodeWatchChange(
+        proto.ListenResponse()
+          ..documentChange = (proto.DocumentChange()
+            ..document = (proto.Document()
+              ..name = serializer.encodeKey(key('coll/1'))
+              ..updateTime =
+                  serializer.encodeTimestamp(const Timestamp(0, 5000))
+              ..fields['foo'] = (proto_.Value()..stringValue = 'bar'))
+            ..targetIds.add(2)
+            ..removedTargetIds.add(1))
+          ..freeze());
+
+    expect(actual, expected);
+  });
+
+  test('testConvertsDocumentChangeWithDeletions', () {
+    final WatchChangeDocumentChange expected = WatchChangeDocumentChange(
+        <int>[], <int>[1, 2], key('coll/1'), deletedDoc('coll/1', 5));
+
+    final WatchChangeDocumentChange actual =
+        serializer.decodeWatchChange(proto.ListenResponse()
+          ..documentDelete = (proto.DocumentDelete()
+            ..document = serializer.encodeKey(key('coll/1'))
+            ..readTime = serializer.encodeTimestamp(const Timestamp(0, 5000))
+            ..removedTargetIds.add(1)
+            ..removedTargetIds.add(2))
+          ..freeze());
+
+    expect(actual, expected);
+  });
+
+  test('testConvertsDocumentChangeWithRemoves', () {
+    final WatchChangeDocumentChange expected =
+        WatchChangeDocumentChange(<int>[], <int>[1, 2], key('coll/1'), null);
+
+    final WatchChangeDocumentChange actual =
+        serializer.decodeWatchChange(proto.ListenResponse()
+          ..documentRemove = (proto.DocumentRemove()
+            ..document = serializer.encodeKey(key('coll/1'))
+            ..removedTargetIds.add(1)
+            ..removedTargetIds.add(2))
+          ..freeze());
+
+    expect(actual, expected);
+  });
+}
+
+enum ValueTypeCase {
+  nullValue,
+  booleanValue,
+  integerValue,
+  doubleValue,
+  timestampValue,
+  stringValue,
+  bytesValue,
+  referenceValue,
+  geoPointValue,
+  arrayValue,
+  mapValue,
+}
