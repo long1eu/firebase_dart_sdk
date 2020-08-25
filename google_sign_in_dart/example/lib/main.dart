@@ -5,9 +5,11 @@
 // ignore_for_file: public_member_api_docs
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:html_unescape/html_unescape.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
@@ -23,7 +25,8 @@ GoogleSignIn _googleSignIn = GoogleSignIn(
 Future<void> main() async {
   if (isDesktop) {
     await GoogleSignInDart.register(
-      exchangeEndpoint: 'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
+      exchangeEndpoint:
+          'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
       clientId:
           '233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com',
     );
@@ -76,8 +79,10 @@ class SignInDemoState extends State<SignInDemo> {
     );
 
     String contact;
-    if (listResult.connections.isNotEmpty) {
-      final Person person = listResult.connections.firstWhere(
+    final List<Person> connections = listResult.connections;
+    if (connections != null && connections.isNotEmpty) {
+      connections.shuffle();
+      final Person person = connections.firstWhere(
         (Person person) =>
             person.names.any((Name name) => name.displayName != null),
         orElse: () => null,
@@ -114,14 +119,18 @@ class SignInDemoState extends State<SignInDemo> {
     final UsersMessagesResourceApi messagesApi =
         GmailApi(_client).users.messages;
 
-    final ListMessagesResponse listResult =
-        await messagesApi.list('me', maxResults: 1);
+    final ListMessagesResponse listResult = await messagesApi.list('me');
 
     String messageSnippet;
-    if (listResult.messages.isNotEmpty) {
-      Message message = listResult.messages.first;
-      message = await messagesApi.get('me', message.id, format: 'FULL');
-      messageSnippet = message.snippet;
+    if (listResult.messages != null && listResult.messages.isNotEmpty) {
+      for (Message message in listResult.messages..shuffle()) {
+        message = await messagesApi.get('me', message.id, format: 'FULL');
+        final String snippet = message.snippet;
+        if (snippet != null && snippet.trim().isNotEmpty) {
+          messageSnippet = HtmlUnescape().convert(snippet);
+          break;
+        }
+      }
     }
 
     setState(() {
