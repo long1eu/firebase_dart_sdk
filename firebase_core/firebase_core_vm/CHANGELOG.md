@@ -1,3 +1,9 @@
+## 0.0.5
+
+- Move default implementation for PlatformDependency
+- Drop the _dataCollectionDefaultEnabled and read directly from store
+- Add missing field to FirebaseOptions
+
 ## 0.0.4
 
 - Expose `isWeb`, `isMobile` and `isDesktop` based on conditional imports

@@ -1,7 +1,3 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:async';
 import 'dart:io';
 
@@ -13,74 +9,63 @@ import 'platform_dependencies.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  FirebaseOptions options;
-  if (Platform.isLinux) {
-    options = const FirebaseOptions(
-      apiKey: 'AIzaSyD9HeqeXUOXJh_DPDl211x8seUXlNmiJj0',
-      applicationId:
-          '1:233259864964:linux:0034c73393cdd58c1d50ac24850d6d01f1e57aff',
-    );
-  } else if (Platform.isMacOS) {
-    options = const FirebaseOptions(
-      apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
-      applicationId:
-          '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
-    );
-  } else if (Platform.isWindows) {
-    options = const FirebaseOptions(
-      apiKey: 'AIzaSyBNeYDWMlalWRL2M2_UhE5kiMmvVf3o9BM',
-      applicationId:
-          '1:233259864964:windows:0034c73393cdd58c1d50ac24850d6d01f1e57aff',
-    );
-  } else if (Platform.isAndroid) {
-    options = const FirebaseOptions(
-      apiKey: 'AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg',
-      applicationId: '1:233259864964:android:b2ec71b130a3170cd583d1',
-    );
-  } else if (Platform.isIOS) {
-    options = const FirebaseOptions(
-      apiKey: 'AIzaSyBguTk4w2Xk2LD0mSdB2Pi9LTtt5BeAE6U',
-      applicationId: '1:233259864964:ios:fff621fea008bff1d583d1',
-    );
-  } else if (Platform.isFuchsia) {
-    options = const FirebaseOptions(
-      apiKey: 'AIzaSyBOPFxmw3fni8Inzb_RhFDjb9zznXHfaRo',
-      applicationId:
-          '1:233259864964:fuchsia:8fc440667cd119c335cf58c7cbfd4374f96fe786',
-    );
-  }
-
   final SharedPreferences preferences = await SharedPreferences.getInstance();
-  final PlatformDependencies platform = PlatformDependencies(preferences);
-  FirebaseApp.withOptions(options, name: 'foo', dependencies: platform);
+  final PlatformDependencies dependencies = PlatformDependencies(preferences);
+  FirebaseApp.withOptions(options, dependencies: dependencies);
 
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  final String name = 'foo';
+class MyApp extends StatefulWidget {
+  const MyApp({Key key}) : super(key: key);
+
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final String _name = 'foo';
+  String _message;
 
   Future<void> _configure() async {
     final SharedPreferences preferences = await SharedPreferences.getInstance();
     final PlatformDependencies platform = PlatformDependencies(preferences);
 
-    final FirebaseApp app =
-        FirebaseApp.withOptions(options, name: name, dependencies: platform);
-    assert(app != null);
+    final bool exists = FirebaseApp.apps.any((FirebaseApp app) => app.name == _name);
+    if (exists) {
+      final FirebaseApp app = FirebaseApp.getInstance(_name);
+
+      setState(() {
+        _message = 'App $_name already exists with ${app.options}.';
+      });
+    } else {
+      // probably you are going to use a different set of options
+      final FirebaseApp app = FirebaseApp.withOptions(options, name: _name, dependencies: platform);
+
+      setState(() {
+        _message = 'App $_name was configured with ${app.options}';
+      });
+    }
   }
 
   Future<void> _allApps() async {
     final List<FirebaseApp> apps = FirebaseApp.apps;
-    print('Currently configured apps: $apps');
+    setState(() {
+      _message = 'Currently configured apps: $apps';
+    });
   }
 
   Future<void> _options() async {
     try {
-      final FirebaseApp app = FirebaseApp.getInstance(name);
+      final FirebaseApp app = FirebaseApp.getInstance(_name);
       final FirebaseOptions options = app.options;
-      print('Current options for app $name: $options');
+      setState(() {
+        _message = 'Current options for app $_name: $options';
+      });
     } catch (e) {
-      print('The app has not been yet initialized.');
+      setState(() {
+        _message = 'The app has not been yet initialized.';
+      });
     }
   }
 
@@ -97,6 +82,12 @@ class MyApp extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
+              if (_message != null)
+                Expanded(
+                  child: Center(
+                    child: Text(_message),
+                  ),
+                ),
               RaisedButton(
                 onPressed: _configure,
                 child: const Text('initialize'),
@@ -118,21 +109,49 @@ class MyApp extends StatelessWidget {
 }
 
 FirebaseOptions get options {
-  if (Platform.isAndroid) {
+  if (Platform.isLinux) {
     return const FirebaseOptions(
-      applicationId: '1:233259864964:android:b2ec71b130a3170cd583d1',
+      apiKey: 'AIzaSyD9HeqeXUOXJh_DPDl211x8seUXlNmiJj0',
+      appId: '1:233259864964:linux:0034c73393cdd58c1d50ac24850d6d01f1e57aff',
+      messagingSenderId: '233259864964',
+      projectId: 'flutter-sdk',
+    );
+  } else if (Platform.isMacOS) {
+    return const FirebaseOptions(
+      apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
+      appId: '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
+      messagingSenderId: '233259864964',
+      projectId: 'flutter-sdk',
+    );
+  } else if (Platform.isWindows) {
+    return const FirebaseOptions(
+      apiKey: 'AIzaSyBNeYDWMlalWRL2M2_UhE5kiMmvVf3o9BM',
+      appId: '1:233259864964:windows:0034c73393cdd58c1d50ac24850d6d01f1e57aff',
+      messagingSenderId: '233259864964',
+      projectId: 'flutter-sdk',
+    );
+  } else if (Platform.isAndroid) {
+    return const FirebaseOptions(
       apiKey: 'AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg',
+      appId: '1:233259864964:android:b2ec71b130a3170cd583d1',
+      messagingSenderId: '233259864964',
+      projectId: 'flutter-sdk',
     );
   } else if (Platform.isIOS) {
     return const FirebaseOptions(
-      applicationId: '1:233259864964:ios:fff621fea008bff1d583d1',
       apiKey: 'AIzaSyBguTk4w2Xk2LD0mSdB2Pi9LTtt5BeAE6U',
+      appId: '1:233259864964:ios:fff621fea008bff1d583d1',
+      messagingSenderId: '233259864964',
+      projectId: 'flutter-sdk',
+    );
+  } else if (Platform.isFuchsia) {
+    return const FirebaseOptions(
+      apiKey: 'AIzaSyBOPFxmw3fni8Inzb_RhFDjb9zznXHfaRo',
+      appId: '1:233259864964:fuchsia:8fc440667cd119c335cf58c7cbfd4374f96fe786',
+      messagingSenderId: '233259864964',
+      projectId: 'flutter-sdk',
     );
   } else {
-    return const FirebaseOptions(
-      applicationId:
-          '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
-      apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
-    );
+    throw UnimplementedError();
   }
 }

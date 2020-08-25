@@ -2,6 +2,6 @@
 // Lung Razvan <long1eu>
 // on 04/03/2020
 
-const bool isMobile = false;
-const bool isDesktop = false;
-const bool isWeb = true;
+const bool kIsMobile = false;
+const bool kIsDesktop = false;
+const bool kIsWeb = true;

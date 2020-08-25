@@ -5,46 +5,72 @@
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:meta/meta.dart';
 
+/// The options used to configure a Firebase app.
+///
+/// ```dart
+/// FirebaseApp.withOptions(
+///   const FirebaseOptions(
+///     apiKey: '...',
+///     appId: '...',
+///     messagingSenderId: '...',
+///     projectId: '...',
+///   ),
+///   name: 'SecondaryApp',
+/// );
+/// ```
 class FirebaseOptions {
   const FirebaseOptions({
     @required this.apiKey,
-    @required this.applicationId,
+    @required this.appId,
+    @required this.messagingSenderId,
+    @required this.projectId,
     this.databaseUrl,
     this.gaTrackingId,
-    this.gcmSenderId,
     this.storageBucket,
-    this.projectId,
-    this.dataCollectionEnabled = true,
+    this.authDomain,
+    this.measurementId,
+    this.trackingId,
+    this.clientId,
+    bool dataCollectionEnabled = true,
   })  : assert(apiKey != null),
-        // ignore: prefer_is_empty
-        assert(applicationId != null && applicationId.length > 0,
-            'ApplicationId must be set.');
+        assert(appId != null && appId.length > 0, 'ApplicationId must be set.'),
+        dataCollectionEnabled = dataCollectionEnabled ?? true;
 
   /// Creates a new [FirebaseOptions] instance that is populated from a map.
   /// Returns the populated options or null if applicationId is missing from
   /// the map.
-  factory FirebaseOptions.fromJson(Map<String, String> json) {
+  factory FirebaseOptions.fromJson(Map<String, dynamic> json) {
     if (json == null && !json.containsKey(_apiKey)) {
       return null;
     }
     return FirebaseOptions(
-      applicationId: json[_appId],
       apiKey: json[_apiKey],
+      appId: json[_appId],
+      messagingSenderId: json[_messagingSenderId],
       databaseUrl: json[_databaseUrl],
       gaTrackingId: json[_gaTrackingId],
-      gcmSenderId: json[_gcmSenderId],
       storageBucket: json[_storageBucket],
       projectId: json[_projectId],
+      authDomain: json[_authDomain],
+      measurementId: json[_measurementId],
+      trackingId: json[_trackingId],
+      clientId: json[_clientId],
+      dataCollectionEnabled: json[_dataCollectionEnabled],
     );
   }
 
-  static const String _apiKey = 'google_api_key';
-  static const String _appId = 'google_app_id';
-  static const String _databaseUrl = 'firebase_database_url';
-  static const String _gaTrackingId = 'ga_trackingId';
-  static const String _gcmSenderId = 'gcm_defaultSenderId';
-  static const String _storageBucket = 'google_storage_bucket';
+  static const String _apiKey = 'api_key';
+  static const String _appId = 'app_id';
+  static const String _messagingSenderId = 'messaging_sender_id';
+  static const String _databaseUrl = 'database_url';
+  static const String _gaTrackingId = 'ga_tracking_id';
+  static const String _storageBucket = 'storage_bucket';
   static const String _projectId = 'project_id';
+  static const String _authDomain = 'auth_domain';
+  static const String _measurementId = 'measurement_id';
+  static const String _trackingId = 'tracking_id';
+  static const String _clientId = 'client_id';
+  static const String _dataCollectionEnabled = 'data_collection_enabled';
 
   /// API key used for authenticating requests from your app, e.g.
   /// AIzaSyDdVgKwhZl0sTTTLZ7iTmt1r3N2cJLnaDk, used to identify your app to
@@ -52,26 +78,41 @@ class FirebaseOptions {
   final String apiKey;
 
   /// The Google App ID that is used to uniquely identify an instance of an app.
-  final String applicationId;
+  final String appId;
+
+  /// The unique sender ID value used in messaging to identify your app.
+  ///
+  /// This property is required cannot be `null`.
+  final String messagingSenderId;
 
   /// The database root URL, e.g. http://abc-xyz-123.firebaseio.com.
   final String databaseUrl;
 
+  /// The Google Cloud project ID, e.g. my-project-1234
+  final String projectId;
+
   /// The tracking ID for Google Analytics, e.g. UA-12345678-1, used to
   /// configure Google Analytics.
-  // TODO(long1eu): unhide once an API (AppInvite) starts reading it.
   final String gaTrackingId;
-
-  /// The Project Number from the Google Developer's console, for example
-  /// 012345678901, used to configure Google Cloud Messaging.
-  final String gcmSenderId;
 
   /// The Google Cloud Storage bucket name, e.g.
   /// abc-xyz-123.storage.firebase.com.
   final String storageBucket;
 
-  /// The Google Cloud project ID, e.g. my-project-1234
-  final String projectId;
+  /// The auth domain used to handle redirects from OAuth provides on web
+  /// platforms, for example "my-awesome-app.firebaseapp.com".
+  final String authDomain;
+
+  /// The project measurement ID value used on web platforms with analytics.
+  final String measurementId;
+
+  /// The tracking ID for Google Analytics, for example "UA-12345678-1", used to
+  /// configure Google Analytics.
+  final String trackingId;
+
+  /// The iOS client ID from the Firebase Console, for example
+  /// "12345.apps.googleusercontent.com."
+  final String clientId;
 
   /// Determine whether automatic data collection is enabled or disabled in all
   /// SDKs.
@@ -79,15 +120,20 @@ class FirebaseOptions {
   /// developer via SDK specific mechanisms.
   final bool dataCollectionEnabled;
 
-  Map<String, String> toJson() {
-    return <String, String>{
-      _appId: applicationId,
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
       _apiKey: apiKey,
+      _appId: appId,
+      _messagingSenderId: messagingSenderId,
       _databaseUrl: databaseUrl,
       _gaTrackingId: gaTrackingId,
-      _gcmSenderId: gcmSenderId,
       _storageBucket: storageBucket,
       _projectId: projectId,
+      _authDomain: authDomain,
+      _measurementId: measurementId,
+      _trackingId: trackingId,
+      _clientId: clientId,
+      _dataCollectionEnabled: dataCollectionEnabled,
     };
   }
 
@@ -97,34 +143,48 @@ class FirebaseOptions {
       other is FirebaseOptions &&
           runtimeType == other.runtimeType &&
           apiKey == other.apiKey &&
-          applicationId == other.applicationId &&
+          appId == other.appId &&
+          messagingSenderId == other.messagingSenderId &&
           databaseUrl == other.databaseUrl &&
+          projectId == other.projectId &&
           gaTrackingId == other.gaTrackingId &&
-          gcmSenderId == other.gcmSenderId &&
           storageBucket == other.storageBucket &&
-          projectId == other.projectId;
+          authDomain == other.authDomain &&
+          measurementId == other.measurementId &&
+          trackingId == other.trackingId &&
+          clientId == other.clientId &&
+          dataCollectionEnabled == other.dataCollectionEnabled;
 
   @override
   int get hashCode =>
       apiKey.hashCode ^
-      applicationId.hashCode ^
+      appId.hashCode ^
+      messagingSenderId.hashCode ^
       databaseUrl.hashCode ^
-      gaTrackingId.hashCode ^
-      gcmSenderId.hashCode ^
-      storageBucket.hashCode ^
       projectId.hashCode ^
+      gaTrackingId.hashCode ^
+      storageBucket.hashCode ^
+      authDomain.hashCode ^
+      measurementId.hashCode ^
+      trackingId.hashCode ^
+      clientId.hashCode ^
       dataCollectionEnabled.hashCode;
 
   @override
   String toString() {
     return (ToStringHelper(runtimeType)
           ..add('apiKey', apiKey)
-          ..add('applicationId', applicationId)
+          ..add('appId', appId)
+          ..add('messagingSenderId', messagingSenderId)
           ..add('databaseUrl', databaseUrl)
           ..add('gaTrackingId', gaTrackingId)
-          ..add('gcmSenderId', gcmSenderId)
           ..add('storageBucket', storageBucket)
-          ..add('projectId', projectId))
+          ..add('projectId', projectId)
+          ..add('authDomain', authDomain)
+          ..add('measurementId', measurementId)
+          ..add('trackingId', trackingId)
+          ..add('clientId', clientId)
+          ..add('dataCollectionEnabled', dataCollectionEnabled))
         .toString();
   }
 }

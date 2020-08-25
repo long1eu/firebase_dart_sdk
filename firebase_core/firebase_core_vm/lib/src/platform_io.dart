@@ -4,7 +4,7 @@
 
 import 'dart:io';
 
-final bool isMobile =
+final bool kIsMobile =
     Platform.isAndroid || Platform.isIOS || Platform.isFuchsia;
-final bool isDesktop = !isMobile;
-const bool isWeb = false;
+final bool kIsDesktop = !kIsMobile;
+const bool kIsWeb = false;

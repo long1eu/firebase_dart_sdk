@@ -5,13 +5,12 @@
 import 'dart:async';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// This class should provide services that Firebase depends on and are platform
 /// specific.
-class PlatformDependencies extends LocalStorage {
-  PlatformDependencies();
-
+class PlatformDependencies implements LocalStorage, InternalTokenProvider {
   final Map<String, String> _map = <String, String>{};
 
   /// This stream should emit true then the app enters in background and false
@@ -26,13 +25,11 @@ class PlatformDependencies extends LocalStorage {
     return BehaviorSubject<bool>.seeded(true);
   }
 
-  /// Used by Firebase services when a network call is made and the user are
+  /// Used by Firebase services when a network call is made and the user is
   /// allowed to add their own headers
   HeaderBuilder get headersBuilder => null;
 
   /// Used by Firebase services to persist various data (eg. user session)
-  ///
-  /// If you don't want that an in memory implementation should be used.
   LocalStorage get storage => this;
 
   /// Firebase services will use this to generate authorization headers
@@ -55,16 +52,31 @@ class PlatformDependencies extends LocalStorage {
       _map[key] = value;
     }
   }
+
+  // InternalTokenProvider implementation
+
+  @override
+  Future<GetTokenResult> getAccessToken({@required bool forceRefresh}) {
+    return Future<GetTokenResult>.value();
+  }
+
+  @override
+  String get uid => null;
+
+  @override
+  Stream<InternalTokenResult> get onTokenChanged => BehaviorSubject<InternalTokenResult>.seeded(null);
 }
 
 /// Local persistence interface to store key/value pairs
 abstract class LocalStorage {
+  const LocalStorage();
+
   /// Gets the values at [key], or null if none found.
   String get(String key);
 
   /// Saves the value at [key].
   ///
-  /// When a null value is provided the implementation should remove the value.
+  /// When a null value is provided the implementation should remove the value if one exists.
   Future<void> set(String key, String value);
 }
 

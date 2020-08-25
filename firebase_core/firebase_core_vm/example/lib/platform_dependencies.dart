@@ -9,8 +9,7 @@ import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ignore_for_file: prefer_mixin
-class PlatformDependencies extends core.PlatformDependencies
-    with WidgetsBindingObserver {
+class PlatformDependencies extends core.PlatformDependencies with WidgetsBindingObserver {
   PlatformDependencies(this._preferences)
       : onBackgroundChanged = BehaviorSubject<bool>.seeded(false),
         onNetworkConnected = BehaviorSubject<bool>.seeded(true) {

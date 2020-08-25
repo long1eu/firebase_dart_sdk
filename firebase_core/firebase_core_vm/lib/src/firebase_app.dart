@@ -12,48 +12,50 @@ import 'package:firebase_core_vm/src/platform_dependencies.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 
-class FirebaseApp with _PlatformDependenciesMixin {
-  FirebaseApp._(this._name, this._options, this._dependencies,
-      this._dataCollectionDefaultEnabled);
+class FirebaseApp extends _PlatformDependencies {
+  FirebaseApp._(
+    this._name,
+    this._options,
+    this._dependencies,
+  )   : assert(_name != null && _name.trim().isNotEmpty),
+        assert(_options != null),
+        assert(_dependencies != null);
 
   /// Initializes a [FirebaseApp] instance with [options] and [name].
   ///
-  /// If the name is not provided the [DEFAULT] app will be created. It is an
-  /// error to initialize an app with an already existing name.
+  /// If the name is not provided the [DEFAULT] app will be created. It is an error to initialize an app with an already
+  /// existing name.
   factory FirebaseApp.withOptions(
     FirebaseOptions options, {
     PlatformDependencies dependencies,
     String name = defaultAppName,
   }) {
-    if (isWeb) {
-      throw UnimplementedError(
-          'This library doesn\'t work on the web. Try the official Firebase Web SDK.');
+    if (kIsWeb) {
+      throw UnimplementedError("This library doesn't work on the web. Try the official Firebase Web SDK.");
     }
     final String normalizedName = _normalize(name);
+    Preconditions.checkState(
+      !_instances.containsKey(normalizedName),
+      'FirebaseApp name $normalizedName already exists!',
+    );
+    Preconditions.checkState(
+      normalizedName.trim().isNotEmpty,
+      'FirebaseApp name must not be an empty string!',
+    );
 
-    Preconditions.checkState(!_instances.containsKey(normalizedName),
-        'FirebaseApp name $normalizedName already exists!');
-
-    final LocalStorage storage = dependencies?.storage;
-    final String _dataCollectionDefaultEnabled =
-        storage?.get(_dataCollectionDefaultEnabledPreferenceKey) ?? 'true';
-    final FirebaseApp firebaseApp = FirebaseApp._(
-      normalizedName,
-      options,
-      dependencies,
-      _dataCollectionDefaultEnabled == 'true',
-    ).._initPlatformDependencies();
+    final FirebaseApp firebaseApp = FirebaseApp._(normalizedName, options, dependencies) //
+      .._initPlatformDependencies();
     _instances[normalizedName] = firebaseApp;
     return firebaseApp;
   }
 
-  /// Returns the default (first initialized) instance of the [FirebaseApp].
+  /// Returns the default instance of the [FirebaseApp].
+  ///
   /// Throws StateError if the default app was not initialized.
   static FirebaseApp get instance {
     final FirebaseApp defaultApp = _instances[defaultAppName];
     if (defaultApp == null) {
-      throw StateError(
-          'Default FirebaseApp is not initialized. Make sure to call [FirebaseApp()] or [FirebaseApp.withOptions()] first.');
+      throw StateError('Default FirebaseApp is not initialized. Make sure to call [FirebaseApp.withOptions()] first.');
     }
 
     return defaultApp;
@@ -61,8 +63,6 @@ class FirebaseApp with _PlatformDependenciesMixin {
 
   /// Returns the instance identified by the unique name, or throws if it does
   /// not exist.
-  ///
-  /// [name] represents the name of the [FirebaseApp] instance.
   static FirebaseApp getInstance(String name) {
     final FirebaseApp firebaseApp = _instances[_normalize(name)];
     if (firebaseApp != null) {
@@ -70,33 +70,27 @@ class FirebaseApp with _PlatformDependenciesMixin {
     }
 
     final List<String> availableAppNames = _getAllAppNames();
-    final String availableAppNamesMessage = availableAppNames.isNotEmpty
-        ? 'Available app names: ${availableAppNames.join(', ')}.'
-        : '';
+    final String availableAppNamesMessage =
+        availableAppNames.isNotEmpty ? 'Available app names: ${availableAppNames.join(', ')}.' : '';
 
-    throw StateError(
-        'FirebaseApp with name $name does\'t exist. $availableAppNamesMessage');
+    throw StateError('FirebaseApp with name $name does\'t exist. $availableAppNamesMessage');
   }
 
   static const String defaultAppName = '[DEFAULT]';
 
   static final Map<String, FirebaseApp> _instances = <String, FirebaseApp>{};
-  static const String _dataCollectionDefaultEnabledPreferenceKey =
-      'firebase_data_collection_default_enabled';
+  static const String _dataCollectionKey = 'firebase_data_collection_default_enabled';
 
   final String _name;
   final FirebaseOptions _options;
   @override
   final PlatformDependencies _dependencies;
 
-  final StreamController<bool> _dataCollectionChangeSink =
-      StreamController<bool>.broadcast();
-  final StreamController<String> _deleteSink =
-      StreamController<String>.broadcast();
+  final StreamController<bool> _dataCollectionChangeSink = StreamController<bool>.broadcast();
+  final StreamController<String> _deleteSink = StreamController<String>.broadcast();
 
   bool _automaticResourceManagementEnabled = false;
   bool _deleted = false;
-  bool _dataCollectionDefaultEnabled;
 
   Stream<bool> get onDataCollectionChange => _dataCollectionChangeSink.stream;
 
@@ -154,20 +148,25 @@ class FirebaseApp with _PlatformDependenciesMixin {
   ///
   /// Note: this value is respected by all SDKs unless overridden by the
   /// developer via SDK specific mechanisms.
-  bool get dataCollectionDefaultEnabled {
+  bool get dataCollectionEnabled {
     _checkNotDeleted();
-    return _dataCollectionDefaultEnabled;
+
+    final String storeValue = get(_dataCollectionKey);
+    if (storeValue == null) {
+      return options.dataCollectionEnabled;
+    } else {
+      return storeValue == 'true';
+    }
   }
 
   /// Enable or disable automatic data collection across all SDKs.
   ///
   /// Note: this value is respected by all SDKs unless overridden by the
   /// developer via SDK specific mechanisms.
-  void setDataCollectionDefaultEnabled({bool enabled = false}) {
+  set dataCollectionEnabled(bool enabled) {
     _checkNotDeleted();
-    if (_dataCollectionDefaultEnabled != enabled) {
-      _dataCollectionDefaultEnabled = enabled;
-      storage.set(_dataCollectionDefaultEnabledPreferenceKey, '$enabled');
+    if (dataCollectionEnabled != enabled) {
+      storage.set(_dataCollectionKey, '$enabled');
       _dataCollectionChangeSink.add(enabled);
     }
   }
@@ -181,7 +180,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
 
   /// Use this key to store data per FirebaseApp.
   String get persistenceKey {
-    return getPersistenceKeyFor(name, options.applicationId);
+    return getPersistenceKeyFor(name, options.appId);
   }
 
   @visibleForTesting
@@ -193,10 +192,8 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// Returns persistence key. Exists to support getting [FirebaseApp]
   /// persistence key after the app has been deleted.
   static String getPersistenceKeyFor(String name, String applicationId) {
-    final String encodedName =
-        base64Encode(utf8.encode(name)).replaceAll('=', '');
-    final String encodedApplicationId =
-        base64Encode(utf8.encode(applicationId)).replaceAll('=', '');
+    final String encodedName = base64Encode(utf8.encode(name)).replaceAll('=', '');
+    final String encodedApplicationId = base64Encode(utf8.encode(applicationId)).replaceAll('=', '');
 
     return '$encodedName+$encodedApplicationId';
   }
@@ -220,7 +217,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is FirebaseApp &&
+      other is FirebaseApp && //
           runtimeType == other.runtimeType &&
           _name == other._name;
 
@@ -237,10 +234,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
 }
 
 // ignore_for_file: close_sinks
-mixin _PlatformDependenciesMixin
-    implements PlatformDependencies, LocalStorage, InternalTokenProvider {
-  final Map<String, String> _map = <String, String>{};
-
+abstract class _PlatformDependencies extends PlatformDependencies {
   PlatformDependencies get _dependencies;
 
   BehaviorSubject<bool> _onBackgroundChanged;
@@ -270,9 +264,8 @@ mixin _PlatformDependenciesMixin
   }
 
   @override
-  // ignore: prefer_function_declarations_over_variables
   HeaderBuilder get headersBuilder {
-    return _headersBuilder ?? () async => <String, String>{};
+    return _headersBuilder ?? () => Future<Map<String, String>>.value(<String, String>{});
   }
 
   @override
@@ -291,34 +284,4 @@ mixin _PlatformDependenciesMixin
       .._authProvider = provider
       .._authProvider.getAccessToken(forceRefresh: true);
   }
-
-  // LocalStorage implementation
-
-  @override
-  String get(String key) {
-    return _map[key];
-  }
-
-  @override
-  Future<void> set(String key, String value) async {
-    if (value == null) {
-      _map.remove(key);
-    } else {
-      _map[key] = value;
-    }
-  }
-
-  // InternalTokenProvider implementation
-
-  @override
-  Future<GetTokenResult> getAccessToken({@required bool forceRefresh}) async {
-    return null;
-  }
-
-  @override
-  String get uid => null;
-
-  @override
-  Stream<InternalTokenResult> get onTokenChanged =>
-      BehaviorSubject<InternalTokenResult>.seeded(null);
 }

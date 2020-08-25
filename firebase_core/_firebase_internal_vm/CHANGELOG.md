@@ -1,3 +1,7 @@
+## 0.0.2+1
+
+- constrain test dependency
+
 ## 0.0.2
 
 - Update README
