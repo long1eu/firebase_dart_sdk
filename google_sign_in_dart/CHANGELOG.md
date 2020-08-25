@@ -1,3 +1,9 @@
+## 0.0.8
+
+* add linux example app
+* sign out when the userinfo endpoint returns 401
+* if the user info is null but we have a valid token we try to fetch the user again
+
 ## 0.0.7
 
 * add requestScopes
