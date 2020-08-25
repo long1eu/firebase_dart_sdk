@@ -1,7 +1,9 @@
 # google_sign_in_dartio
 
-A Flutter package that implements [Google Sign In](https://developers.google.com/identity/) in pure Dart. This package 
-is compatible with `google_sign_in` plugin and works on all platforms Flutter supports. 
+A Flutter package that implements [Google Sign In](https://developers.google.com/identity/)
+in pure Dart. This package is compatible with `google_sign_in` plugin
+and works on all platforms Flutter supports but it's intended to be
+mainly used on Desktop.
 
 ## Getting Started
 
@@ -10,7 +12,7 @@ is compatible with `google_sign_in` plugin and works on all platforms Flutter su
     ```yaml
     dependencies:
       google_sign_in: ^4.1.4
-      google_sign_in_dartio: ^0.0.1
+      google_sign_in_dartio: ^0.0.6
     ```
 1. Run `flutter pub get`
 1. Import
@@ -65,5 +67,13 @@ the package like this.
     
       runApp(MyApp());
     }
-    
+
+#### NOTE:
+`GoogleSignInTokenData` exposes `serverAuthCode` field that should
+contain the exchange code from the authorization request. This will
+always be null when using this package because we already allow you to
+provide a code exchange endpoint witch exposes the code and code
+verifier in a trusted environment and encourages not to do the code
+exchange on the client.
+
 See instruction on how to [deploy a code exchange endpoint](https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/google_sign_in_dart/example/gcp).    

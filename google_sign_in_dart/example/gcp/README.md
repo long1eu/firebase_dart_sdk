@@ -1,15 +1,21 @@
 # OAuth2 code exchange endpoint
 
-In order to keep the user logged in, we need an `refresh_token` from Google. This token is obtained by exchanging the 
-`code` we receive when the user logs in. This operation requires your app to be identified by Google using a `Client ID` 
-and a `Client Secret`. The `Client ID` must be shared with you client app and it's used to create the initial authentication
- request. The `Client Secret` on the other hand, can not be shared due to the fact that the app
- cannot keep the `Client Secret` confidential. This is why you need to create an endpoint in a trusted environment 
- (eg. Cloud Function, server), one that can keep both the `Client Secret` confidential, to do the code exchange.
+In order to keep the user logged in, we need an `refresh_token` from
+Google. This token is obtained by exchanging the `code` we receive when
+the user logs in. This operation requires your app to be identified by
+Google using a `Client ID` and a `Client Secret`. The `Client ID` must
+be shared with you client app and it's used to create the initial
+authentication request. The `Client Secret` on the other hand, can not
+be shared due to the fact that the app cannot keep the `Client Secret`
+confidential. This is why you need to create an endpoint in a trusted
+environment (eg. Cloud Function, server), one that can keep both the
+`Client Secret` confidential, to do the code exchange.
+
+The package is going to make the following two types of request to the
+same endpoint:
  
- The package is going to make the following two types of request to the same endpoint:
- 
- 1. Code exchange
+
+1. Code exchange
      ```http request
      POST <endpoint>
      Content-Type: application/json
@@ -21,8 +27,9 @@ and a `Client Secret`. The `Client ID` must be shared with you client app and it
        "redirectUrl": "<redirectUrl>"
      }
      ```
-     You are expected to make a request to the Google `token` endpoint with `grant_type` field set to `authorization_code`.
-      Return the response to the initial request.
+     You are expected to make a request to the Google `token` endpoint
+     with `grant_type` field set to `authorization_code`. Return the
+     response to the initial request.
      ```http request
      POST /token HTTP/1.1
      Host: oauth2.googleapis.com
@@ -32,6 +39,7 @@ and a `Client Secret`. The `Client ID` must be shared with you client app and it
      client_id=<clientId>&
      client_secret=<clientSecret>&
      redirect_uri=<returnUrl>&
+     code_verifier=<codeVerifier>&
      grant_type=authorization_code
      ```        
     

@@ -56,6 +56,7 @@ Future<Map<String, dynamic>> _tokenSignIn({
     'code_challenge_method': 'S256',
     'nonce': nonce,
     'state': state,
+    'include_granted_scopes': 'true',
   };
 
   if (hostedDomains != null && hostedDomains.isNotEmpty) {

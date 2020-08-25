@@ -19,6 +19,7 @@ class DataStorage {
   static const String _kIdTokenKey = 'idToken';
   static const String _kAccessTokenKey = 'accessToken';
   static const String _kRefreshTokenKey = 'refreshToken';
+  static const String _kScopeKey = 'scope';
   static const String _kExpirationAtKey = 'expiresAt';
   static const String _kIdKey = 'id';
   static const String _kNameKey = 'name';
@@ -63,9 +64,35 @@ class DataStorage {
 
   set refreshToken(String value) => _setValue(_kRefreshTokenKey, value);
 
+  /// Retrieve the authentication data after sign in.
+  platform.GoogleSignInTokenData get tokenData {
+    if (idToken != null || accessToken != null) {
+      return platform.GoogleSignInTokenData(
+          idToken: idToken, accessToken: accessToken);
+    }
+
+    return null;
+  }
+
   set tokenData(platform.GoogleSignInTokenData data) {
     idToken = data.idToken;
     accessToken = data.accessToken;
+  }
+
+  /// Save the scopes that we were granted access to in the last authorization.
+  ///
+  /// Returns an empty list if no authorization has take place yet.
+  List<String> get scopes {
+    final String value = _store.get(_getKey(_kScopeKey));
+    if (value == null || value.isEmpty) {
+      return <String>[];
+    }
+
+    return value.split(' ');
+  }
+
+  set scopes(List<String> value) {
+    _setValue(_kScopeKey, value.join(' '));
   }
 
   /// Convenience method to update all fields persisted by this object
@@ -73,6 +100,7 @@ class DataStorage {
     refreshToken = result['refresh_token'] ?? refreshToken;
     idToken = result['id_token'];
     accessToken = result['access_token'];
+    scopes = result['scope'].split(' ');
     expiresAt = DateTime.now()
         .add(Duration(seconds: int.parse('${result['expires_in']}')));
   }
@@ -95,6 +123,7 @@ class DataStorage {
     _setValue(_kIdTokenKey, null);
     _setValue(_kAccessTokenKey, null);
     _setValue(_kRefreshTokenKey, null);
+    _setValue(_kScopeKey, null);
     _setValue(_kExpirationAtKey, null);
     _setValue(_kNameKey, null);
     _setValue(_kEmailKey, null);
@@ -104,16 +133,6 @@ class DataStorage {
   /// Convenience method to clear all user this objects persisted
   void clearAll() {
     _store.clearAll();
-  }
-
-  /// Retrieve the authentication data after sign in.
-  platform.GoogleSignInTokenData get tokenData {
-    if (idToken != null || accessToken != null) {
-      return platform.GoogleSignInTokenData(
-          idToken: idToken, accessToken: accessToken);
-    }
-
-    return null;
   }
 
   /// Retrieve information about this signed in user based on the id_token.
@@ -140,4 +159,45 @@ class DataStorage {
   }
 
   String _getKey(String field) => 'DataStorage___$_clientId\__$field';
+}
+
+/// Interface for persisting key/value pairs
+abstract class Store {
+  /// Persist the [value] at [key].
+  void set(String key, String value);
+
+  /// Remove the value at specified [key] if exists.
+  void remove(String key);
+
+  /// Get the value at specified [key] or nul if it doesn't exists.
+  String get(String key);
+
+  /// Remove all the values store.
+  void clearAll();
+}
+
+class _SharedPreferencesStore extends Store {
+  _SharedPreferencesStore(this._preferences);
+
+  final SharedPreferences _preferences;
+
+  @override
+  String get(String key) {
+    return _preferences.get(key);
+  }
+
+  @override
+  void remove(String key) {
+    _preferences.remove(key);
+  }
+
+  @override
+  void set(String key, String value) {
+    _preferences.setString(key, value);
+  }
+
+  @override
+  void clearAll() {
+    _preferences.clear();
+  }
 }

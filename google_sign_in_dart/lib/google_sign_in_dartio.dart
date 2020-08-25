@@ -27,21 +27,6 @@ part 'src/token_sign_in.dart';
 /// in a platform specific way.
 typedef UrlPresenter = void Function(Uri uri);
 
-/// Interface for persisting key/value pairs
-abstract class Store {
-  /// Persist the [value] at [key].
-  void set(String key, String value);
-
-  /// Remove the value at specified [key] if exists.
-  void remove(String key);
-
-  /// Get the value at specified [key] or nul if it doesn't exists.
-  String get(String key);
-
-  /// Remove all the values store.
-  void clearAll();
-}
-
 /// Implementation of the google_sign_in plugin in pure dart.
 class GoogleSignInDart extends platform.GoogleSignInPlatform {
   GoogleSignInDart._({
@@ -59,11 +44,9 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
 
   /// Registers this implementation as default implementation for GoogleSignIn
   ///
-  /// [storage] is used to persist tokens between sessions, make sure you save
   /// Your application should provide a [storage] implementation that can store
   /// the tokens is a secure, long-lived location that is accessible between
   /// different invocations of your application.
-  /// see [GoogleSignInDart.presenter]
   static Future<void> register({
     @required String clientId,
     String exchangeEndpoint,
@@ -108,6 +91,18 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
   String _refreshToken;
   DateTime _expiresAt;
 
+  /// Used by the sign in flow to allow opening of a browser in a platform
+  /// specific way.
+  ///
+  /// You can open the link in a in-app WebView or you can open it in the system
+  /// browser
+  UrlPresenter get presenter => _presenter;
+
+  set presenter(UrlPresenter value) {
+    assert(value != null);
+    _presenter = value;
+  }
+
   @override
   Future<void> init({
     @required String hostedDomain,
@@ -132,28 +127,6 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     _initFromStore();
   }
 
-  /// Used by the sign in flow to allow opening of a browser in a platform
-  /// specific way.
-  ///
-  /// You can open the link in a in-app WebView or you can open it in the system
-  /// browser
-  UrlPresenter get presenter => _presenter;
-
-  set presenter(UrlPresenter value) {
-    assert(value != null);
-    _presenter = value;
-  }
-
-  @override
-  Future<platform.GoogleSignInUserData> signIn() async {
-    if (_haveValidToken) {
-      return _storage.userData;
-    } else {
-      await _performSignIn();
-      return _storage.userData;
-    }
-  }
-
   @override
   Future<platform.GoogleSignInUserData> signInSilently() async {
     if (_haveValidToken) {
@@ -172,6 +145,16 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
   }
 
   @override
+  Future<platform.GoogleSignInUserData> signIn() async {
+    if (_haveValidToken) {
+      return _storage.userData;
+    } else {
+      await _performSignIn(_scopes);
+      return _storage.userData;
+    }
+  }
+
+  @override
   Future<platform.GoogleSignInTokenData> getTokens(
       {String email, bool shouldRecoverAuth}) async {
     if (_haveValidToken) {
@@ -186,12 +169,25 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     }
 
     if (shouldRecoverAuth) {
-      await _performSignIn();
+      await _performSignIn(_scopes);
       return _tokenData;
     } else {
       throw PlatformException(
           code: GoogleSignInAccount.kUserRecoverableAuthError);
     }
+  }
+
+  @override
+  Future<void> signOut() async {
+    _storage.clearAll();
+    _initFromStore();
+  }
+
+  @override
+  Future<void> disconnect() async {
+    await _revokeToken();
+    _storage.clear();
+    _initFromStore();
   }
 
   @override
@@ -209,23 +205,26 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
   }
 
   @override
-  Future<void> signOut() async {
-    _storage.clearAll();
-    _initFromStore();
-  }
-
-  @override
-  Future<void> disconnect() async {
-    await _revokeToken();
-    _storage.clear();
-    _initFromStore();
-  }
-
-  @override
   Future<void> clearAuthCache({String token}) async {
     await _revokeToken();
     _storage.clear();
     _initFromStore();
+  }
+
+  @override
+  Future<bool> requestScopes(List<String> scopes) async {
+    List<String> grantedScopes = _storage.scopes;
+    final List<String> missingScopes =
+        scopes.where((String scope) => !grantedScopes.contains(scope)).toList();
+
+    if (missingScopes.isEmpty) {
+      return true;
+    }
+
+    await _performSignIn(missingScopes);
+
+    grantedScopes = _storage.scopes;
+    return scopes.every((String scope) => grantedScopes.contains(scope));
   }
 
   Future<void> _revokeToken() async {
@@ -258,11 +257,11 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     return _expiresAt != null && DateTime.now().isBefore(_expiresAt);
   }
 
-  Future<void> _performSignIn() async {
+  Future<void> _performSignIn(List<String> scopes) async {
     Future<Map<String, dynamic>> future;
     if (_exchangeEndpoint != null) {
       future = _codeExchangeSignIn(
-        scope: _scopes.join(' '),
+        scope: scopes.join(' '),
         clientId: _clientId,
         hostedDomains: _hostedDomain,
         presenter: presenter,
@@ -271,7 +270,7 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
       );
     } else {
       future = _tokenSignIn(
-        scope: _scopes.join(' '),
+        scope: scopes.join(' '),
         clientId: _clientId,
         hostedDomains: _hostedDomain,
         presenter: presenter,
@@ -282,8 +281,9 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     final Map<String, dynamic> result = await future.catchError(
       (dynamic error, StackTrace s) {
         throw PlatformException(
-            code: GoogleSignInAccount.kFailedToRecoverAuthError,
-            message: error.toString());
+          code: GoogleSignInAccount.kFailedToRecoverAuthError,
+          message: error.toString(),
+        );
       },
     );
 
@@ -319,31 +319,5 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     _refreshToken = _storage.refreshToken;
     _expiresAt = _storage.expiresAt;
     _tokenData = _storage.tokenData;
-  }
-}
-
-class _SharedPreferencesStore extends Store {
-  _SharedPreferencesStore(this._preferences);
-
-  final SharedPreferences _preferences;
-
-  @override
-  String get(String key) {
-    return _preferences.get(key);
-  }
-
-  @override
-  void remove(String key) {
-    _preferences.remove(key);
-  }
-
-  @override
-  void set(String key, String value) {
-    _preferences.setString(key, value);
-  }
-
-  @override
-  void clearAll() {
-    _preferences.clear();
   }
 }

@@ -66,6 +66,7 @@ Future<Map<String, dynamic>> _codeExchangeSignIn({
     'code_challenge_method': 'S256',
     'state': state,
     'access_type': 'offline',
+    'include_granted_scopes': 'true',
   };
 
   if (hostedDomains != null && hostedDomains.isNotEmpty) {

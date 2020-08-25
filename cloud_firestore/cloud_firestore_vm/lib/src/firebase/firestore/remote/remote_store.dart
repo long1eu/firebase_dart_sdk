@@ -50,7 +50,10 @@ class RemoteStore implements TargetMetadataProvider {
     _watchStreamSub = _watchStream.listen(_watchEvents);
     _writeStreamSub = _writeStream.listen(_writeEvents);
     // we skip the seed value
-    _onNetworkConnectedSub = _onNetworkConnected.skip(1).listen(_networkEvents);
+    _onNetworkConnectedSub = _onNetworkConnected
+        .skip(1)
+        .debounceTime(const Duration(seconds: 5))
+        .listen(_networkEvents);
   }
 
   final RemoteStoreCallback _remoteStoreCallback;
