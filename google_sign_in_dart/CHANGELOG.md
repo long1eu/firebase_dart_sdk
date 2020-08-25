@@ -1,3 +1,14 @@
+## 0.0.7
+
+* add requestScopes
+
+Note: `GoogleSignInTokenData` exposes `serverAuthCode` field that should
+contain the exchange code from the authorization request. This will
+always be null when using this package because we already allow you to
+provide a code exchange endpoint witch exposes the code and code
+verifier in a trusted environment and encourages not to do the code
+exchange on the client.
+
 ## 0.0.6
 
 * changed the name from `GoogleSignInPlatform` to `GoogleSignInDart` to match other packages
