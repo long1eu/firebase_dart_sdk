@@ -147,6 +147,10 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
   @override
   Future<platform.GoogleSignInUserData> signIn() async {
     if (_haveValidToken) {
+      final platform.GoogleSignInUserData userData = _storage.userData;
+      if (userData == null) {
+        await _fetchUserProfile();
+      }
       return _storage.userData;
     } else {
       await _performSignIn(_scopes);
@@ -247,6 +251,16 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
           'Authorization': 'Bearer $token',
         },
       );
+
+      if (response.statusCode > 300) {
+        if (response.statusCode == 401){
+          await signOut();
+        }
+        throw PlatformException(
+          code: GoogleSignInAccount.kFailedToRecoverAuthError,
+          message: response.body,
+        );
+      }
 
       final Map<String, dynamic> result = jsonDecode(response.body);
       _storage.saveUserProfile(result);
