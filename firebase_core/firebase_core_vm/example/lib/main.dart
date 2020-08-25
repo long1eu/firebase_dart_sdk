@@ -28,9 +28,6 @@ class _MyAppState extends State<MyApp> {
   String _message;
 
   Future<void> _configure() async {
-    final SharedPreferences preferences = await SharedPreferences.getInstance();
-    final PlatformDependencies platform = PlatformDependencies(preferences);
-
     final bool exists = FirebaseApp.apps.any((FirebaseApp app) => app.name == _name);
     if (exists) {
       final FirebaseApp app = FirebaseApp.getInstance(_name);
@@ -39,6 +36,9 @@ class _MyAppState extends State<MyApp> {
         _message = 'App $_name already exists with ${app.options}.';
       });
     } else {
+      final SharedPreferences preferences = await SharedPreferences.getInstance();
+      final PlatformDependencies platform = PlatformDependencies(preferences);
+
       // probably you are going to use a different set of options
       final FirebaseApp app = FirebaseApp.withOptions(options, name: _name, dependencies: platform);
 

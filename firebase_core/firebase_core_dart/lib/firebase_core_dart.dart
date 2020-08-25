@@ -128,9 +128,14 @@ class _DefaultPlatformDependencies extends PlatformDependencies with WidgetsBind
       : onBackgroundChanged = BehaviorSubject<bool>.seeded(false),
         onNetworkConnected = BehaviorSubject<bool>.seeded(true) {
     WidgetsBinding.instance.addObserver(this);
-    Connectivity()
-      ..checkConnectivity().then(_connectivityChanged)
-      ..onConnectivityChanged.listen(_connectivityChanged);
+    // todo(long1eu): remove this once we have Connectivity plugin on linux
+    try {
+      Connectivity()
+        ..checkConnectivity().then(_connectivityChanged)
+        ..onConnectivityChanged.listen(_connectivityChanged);
+    } catch (e) {
+      print(e);
+    }
   }
 
   final SharedPreferences _preferences;
