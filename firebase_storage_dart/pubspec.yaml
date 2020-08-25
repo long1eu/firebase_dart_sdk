@@ -1,0 +1,21 @@
+name: firebase_storage_vm
+description: A starting point for Dart libraries or applications.
+version: 0.0.1
+homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
+author: long1eu <home@long1.eu>
+
+environment:
+  sdk: '>=2.0.0 <3.0.0'
+
+dependencies:
+  isolate: ^2.0.2
+  rxdart: ^0.22.2
+  googleapis: 0.52.0
+  firebase_core_vm:
+    git:
+      url: https://github.com/fluttercommunity/firebase_dart_sdk
+      path: firebase_core_vm
+
+dev_dependencies:
+  test: ^1.6.8
+  mockito: ^4.1.0
