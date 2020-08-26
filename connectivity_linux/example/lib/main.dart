@@ -1,57 +1,93 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
 
-import 'package:flutter/services.dart';
+import 'package:connectivity/connectivity.dart';
 import 'package:connectivity_linux/connectivity_linux.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void main() {
-  runApp(MyApp());
+  ConnectivityLinux.register();
+  runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
+  const MyApp({Key key}) : super(key: key);
+
   @override
-  _MyAppState createState() => _MyAppState();
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: MyHomePage(),
+    );
+  }
 }
 
-class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({Key key}) : super(key: key);
+
+  @override
+  _MyHomePageState createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  String _connectionStatus = 'Unknown';
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<ConnectivityResult> _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
-    initPlatformState();
+    initConnectivity();
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(_updateConnectionStatus);
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
+  @override
+  void dispose() {
+    _connectivitySubscription.cancel();
+    super.dispose();
+  }
+
+  Future<void> initConnectivity() async {
+    ConnectivityResult result;
+
     try {
-      platformVersion = await ConnectivityLinux.platformVersion;
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
+      result = await _connectivity.checkConnectivity();
+    } on PlatformException catch (e) {
+      print(e.toString());
     }
 
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
+    if (!mounted) {
+      return Future<void>.value();
+    }
 
-    setState(() {
-      _platformVersion = platformVersion;
-    });
+    return _updateConnectionStatus(result);
+  }
+
+  Future<void> _updateConnectionStatus(ConnectivityResult result) async {
+    switch (result) {
+      case ConnectivityResult.wifi:
+        setState(() {
+          _connectionStatus = '$result';
+        });
+        break;
+      case ConnectivityResult.mobile:
+      case ConnectivityResult.none:
+        setState(() => _connectionStatus = result.toString());
+        break;
+      default:
+        setState(() => _connectionStatus = 'Failed to get connectivity.');
+        break;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
-        ),
-        body: Center(
-          child: Text('Running on: $_platformVersion\n'),
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Connectivity example app'),
+      ),
+      body: Center(
+        child: Text('Connection Status: $_connectionStatus'),
       ),
     );
   }

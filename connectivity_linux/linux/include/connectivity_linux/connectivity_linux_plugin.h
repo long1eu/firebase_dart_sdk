@@ -18,8 +18,7 @@ typedef struct {
 
 FLUTTER_PLUGIN_EXPORT GType connectivity_linux_plugin_get_type();
 
-FLUTTER_PLUGIN_EXPORT void connectivity_linux_plugin_register_with_registrar(
-    FlPluginRegistrar* registrar);
+FLUTTER_PLUGIN_EXPORT void connectivity_linux_plugin_register_with_registrar(FlPluginRegistrar* registrar);
 
 G_END_DECLS
 
