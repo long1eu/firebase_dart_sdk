@@ -99,6 +99,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.2.0"
+  hive:
+    dependency: "direct main"
+    description:
+      name: hive
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.4.4"
   html:
     dependency: transitive
     description:
@@ -156,7 +163,7 @@ packages:
     source: hosted
     version: "0.12.9"
   meta:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: meta
       url: "https://pub.dartlang.org"

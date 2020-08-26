@@ -3,15 +3,16 @@ import 'dart:io';
 
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'platform_dependencies.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final SharedPreferences preferences = await SharedPreferences.getInstance();
-  final PlatformDependencies dependencies = PlatformDependencies(preferences);
-  FirebaseApp.withOptions(options, dependencies: dependencies);
+
+  final Directory parent = await getApplicationDocumentsDirectory();
+  await PlatformDependencies.initialize(parent.path);
+  FirebaseApp.withOptions(options, dependencies: PlatformDependencies.instance);
 
   runApp(const MyApp());
 }
@@ -36,11 +37,9 @@ class _MyAppState extends State<MyApp> {
         _message = 'App $_name already exists with ${app.options}.';
       });
     } else {
-      final SharedPreferences preferences = await SharedPreferences.getInstance();
-      final PlatformDependencies platform = PlatformDependencies(preferences);
-
       // probably you are going to use a different set of options
-      final FirebaseApp app = FirebaseApp.withOptions(options, name: _name, dependencies: platform);
+      final FirebaseApp app =
+          FirebaseApp.withOptions(options, name: _name, dependencies: PlatformDependencies.instance);
 
       setState(() {
         _message = 'App $_name was configured with ${app.options}';

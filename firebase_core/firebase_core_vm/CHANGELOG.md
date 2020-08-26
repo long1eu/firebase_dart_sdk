@@ -1,3 +1,7 @@
+## 0.0.6
+
+- remove SharedPreferences from the example and require a Hive Box for persistent storage
+
 ## 0.0.5
 
 - Move default implementation for PlatformDependency

@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:hive/hive.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -12,6 +13,11 @@ import 'package:rxdart/rxdart.dart';
 /// specific.
 class PlatformDependencies implements LocalStorage, InternalTokenProvider {
   final Map<String, String> _map = <String, String>{};
+
+  /// A storage box that can save key/value pair that persists restarts.
+  ///
+  /// It is recommended that you use an encrypted box.
+  Box<String> get box => null;
 
   /// This stream should emit true then the app enters in background and false
   /// otherwise
@@ -37,19 +43,31 @@ class PlatformDependencies implements LocalStorage, InternalTokenProvider {
   /// If you are planing to also use FirebaseAuth you don't need to worry about
   /// this field. Firebase Auth SDK automatically registers as
   /// [InternalTokenProvider] if none is set.
-  InternalTokenProvider get authProvider => null;
+  InternalTokenProvider get authProvider => this;
 
   @override
   String get(String key) {
-    return _map[key];
+    if (box != null) {
+      return box.get(key);
+    } else {
+      return _map[key];
+    }
   }
 
   @override
   Future<void> set(String key, String value) async {
     if (value == null) {
-      _map.remove(key);
+      if (box != null) {
+        await box.delete(key);
+      } else {
+        _map.remove(key);
+      }
     } else {
-      _map[key] = value;
+      if (box != null) {
+        await box.put(key, value);
+      } else {
+        _map[key] = value;
+      }
     }
   }
 
@@ -64,7 +82,7 @@ class PlatformDependencies implements LocalStorage, InternalTokenProvider {
   String get uid => null;
 
   @override
-  Stream<InternalTokenResult> get onTokenChanged => BehaviorSubject<InternalTokenResult>.seeded(null);
+  Stream<InternalTokenResult> get onTokenChanged => const Stream<InternalTokenResult>.empty();
 }
 
 /// Local persistence interface to store key/value pairs

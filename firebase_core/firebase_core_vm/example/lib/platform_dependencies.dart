@@ -2,52 +2,88 @@
 // Lung Razvan <long1eu>
 // on 03/03/2020
 
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:connectivity/connectivity.dart';
 import 'package:firebase_core_vm/platform_dependencies.dart' as core;
 import 'package:flutter/widgets.dart';
+import 'package:hive/hive.dart';
 import 'package:rxdart/rxdart.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-// ignore_for_file: prefer_mixin
+// ignore_for_file: prefer_mixin, unawaited_futures
 class PlatformDependencies extends core.PlatformDependencies with WidgetsBindingObserver {
-  PlatformDependencies(this._preferences)
-      : onBackgroundChanged = BehaviorSubject<bool>.seeded(false),
-        onNetworkConnected = BehaviorSubject<bool>.seeded(true) {
-    WidgetsBinding.instance.addObserver(this);
+  PlatformDependencies._();
+
+  static PlatformDependencies instance = PlatformDependencies._();
+
+  static Future<void> initialize(String path) async {
+    if (instance._completer == null || instance._completer.isCompleted) {
+      instance._completer ??= Completer<void>();
+      return instance._completer.future;
+    }
+
+    final Box<Uint8List> keyBox = await Hive.openBox<Uint8List>('encryption.store', path: path);
+    if (!keyBox.containsKey('key')) {
+      final List<int> key = Hive.generateSecureKey();
+      await keyBox.put('key', key);
+    }
+    final Uint8List key = keyBox.get('key');
+
+    instance._box = await Hive.openBox<String>('firebase.store', encryptionKey: key, path: path);
+    instance._onBackgroundChanged = BehaviorSubject<bool>.seeded(false);
+    instance._onNetworkConnected = BehaviorSubject<bool>.seeded(true);
+    WidgetsBinding.instance.addObserver(instance);
+
     // todo(long1eu): remove this once we have Connectivity plugin on linux
     try {
       Connectivity()
-        ..checkConnectivity().then(_connectivityChanged)
-        ..onConnectivityChanged.listen(_connectivityChanged);
+        ..checkConnectivity().then(instance._connectivityChanged)
+        ..onConnectivityChanged.listen(instance._connectivityChanged);
     } catch (e) {
       print(e);
     }
+
+    instance._completer.complete();
   }
 
-  final SharedPreferences _preferences;
+  Completer<void> _completer;
+  Box<String> _box;
+  BehaviorSubject<bool> _onBackgroundChanged;
+  BehaviorSubject<bool> _onNetworkConnected;
 
   @override
-  final BehaviorSubject<bool> onBackgroundChanged;
+  Box<String> get box {
+    _ensureInitialized();
+    return _box;
+  }
 
   @override
-  final BehaviorSubject<bool> onNetworkConnected;
+  BehaviorSubject<bool> get onBackgroundChanged {
+    _ensureInitialized();
+    return _onBackgroundChanged;
+  }
+
+  @override
+  BehaviorSubject<bool> get onNetworkConnected {
+    _ensureInitialized();
+    return _onNetworkConnected;
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    onBackgroundChanged.add(state == AppLifecycleState.paused);
-  }
-
-  @override
-  String get(String key) {
-    return _preferences.getString(key);
-  }
-
-  @override
-  Future<void> set(String key, String value) {
-    return _preferences.setString(key, value);
+    _ensureInitialized();
+    _onBackgroundChanged.add(state == AppLifecycleState.paused);
   }
 
   void _connectivityChanged(ConnectivityResult event) {
-    onNetworkConnected.add(event != ConnectivityResult.none);
+    _ensureInitialized();
+    _onNetworkConnected.add(event != ConnectivityResult.none);
+  }
+
+  void _ensureInitialized() {
+    if (_completer == null || !_completer.isCompleted) {
+      throw StateError('Make sure to first call [PlatformDependencies.initialized].');
+    }
   }
 }
