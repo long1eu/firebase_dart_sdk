@@ -5,6 +5,8 @@
 library firebase_core_dart;
 
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:connectivity/connectivity.dart';
 import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart' as flutter;
@@ -12,8 +14,9 @@ import 'package:firebase_core_vm/firebase_core_vm.dart' as vm;
 import 'package:firebase_core_vm/platform_dependencies.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:hive/hive.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 export 'package:firebase_core_vm/firebase_core_vm.dart' show kIsWeb, kIsMobile, kIsDesktop;
 
@@ -33,9 +36,9 @@ class FirebaseDart extends flutter.FirebasePlatform {
   }) async {
     if (options != null) {
       if (dependencies == null) {
-        WidgetsFlutterBinding.ensureInitialized();
-        final SharedPreferences preferences = await SharedPreferences.getInstance();
-        dependencies = _DefaultPlatformDependencies(preferences);
+        final Directory parent = await getApplicationSupportDirectory();
+        await _DefaultPlatformDependencies.initialize(parent.path);
+        dependencies = _DefaultPlatformDependencies.instance;
       }
 
       vm.FirebaseApp.withOptions(_createFromPlatformOptions(options), name: name, dependencies: dependencies);
@@ -60,16 +63,17 @@ class FirebaseDart extends flutter.FirebasePlatform {
   /// Initializes a new [FirebaseAppPlatform] instance by [name] and [options] and returns
   /// the created app. This method should be called before any usage of FlutterFire plugins.
   ///
-  /// The platform interface doesn't allow use to pass the [PlatformDependencies] object,
+  /// The platform interface doesn't allow use to pass a custom [PlatformDependencies] object,
   /// the default implementation will be used in this case. See [_DefaultPlatformDependencies].
-  /// To create an app a custom [PlatformDependencies] use [FirebaseDart.register] and then
+  /// To create an app with a custom [PlatformDependencies] use [FirebaseDart.register] and then
   /// call [Firebase.app] to get a reference of that app.
   @override
   Future<flutter.FirebaseAppPlatform> initializeApp({String name, flutter.FirebaseOptions options}) async {
-    final SharedPreferences preferences = await SharedPreferences.getInstance();
-    final _DefaultPlatformDependencies dependencies = _DefaultPlatformDependencies(preferences);
+    final Directory parent = await getApplicationSupportDirectory();
+    await _DefaultPlatformDependencies.initialize(parent.path);
 
-    vm.FirebaseApp.withOptions(_createFromPlatformOptions(options), name: name, dependencies: dependencies);
+    vm.FirebaseApp.withOptions(_createFromPlatformOptions(options),
+        name: name, dependencies: _DefaultPlatformDependencies.instance);
     return FirebaseAppDart._(name);
   }
 }
@@ -123,44 +127,79 @@ class FirebaseAppDart extends flutter.FirebaseAppPlatform {
 /// This implementation provides basic information to Firebase services about
 /// connectivity and background state and also provides a light storage solution
 /// for persisting state across restarts.
-class _DefaultPlatformDependencies extends PlatformDependencies with WidgetsBindingObserver implements LocalStorage {
-  _DefaultPlatformDependencies(this._preferences)
-      : onBackgroundChanged = BehaviorSubject<bool>.seeded(false),
-        onNetworkConnected = BehaviorSubject<bool>.seeded(true) {
-    WidgetsBinding.instance.addObserver(this);
+class _DefaultPlatformDependencies extends PlatformDependencies with WidgetsBindingObserver {
+  _DefaultPlatformDependencies._();
+
+  static _DefaultPlatformDependencies instance = _DefaultPlatformDependencies._();
+
+  static Future<void> initialize(String path) async {
+    if (instance._completer == null || instance._completer.isCompleted) {
+      instance._completer ??= Completer<void>();
+      return instance._completer.future;
+    }
+
+    final Box<Uint8List> keyBox = await Hive.openBox<Uint8List>('encryption.store', path: path);
+    if (!keyBox.containsKey('key')) {
+      final List<int> key = Hive.generateSecureKey();
+      await keyBox.put('key', key);
+    }
+    final Uint8List key = keyBox.get('key');
+
+    instance._box = await Hive.openBox<String>('firebase.store', encryptionKey: key, path: path);
+    instance._onBackgroundChanged = BehaviorSubject<bool>.seeded(false);
+    instance._onNetworkConnected = BehaviorSubject<bool>.seeded(true);
+    WidgetsBinding.instance.addObserver(instance);
+
     // todo(long1eu): remove this once we have Connectivity plugin on linux
     try {
       Connectivity()
-        ..checkConnectivity().then(_connectivityChanged)
-        ..onConnectivityChanged.listen(_connectivityChanged);
+        ..checkConnectivity().then(instance._connectivityChanged)
+        ..onConnectivityChanged.listen(instance._connectivityChanged);
     } catch (e) {
       print(e);
     }
+
+    instance._completer.complete();
   }
 
-  final SharedPreferences _preferences;
+  Completer<void> _completer;
+  Box<String> _box;
+  BehaviorSubject<bool> _onBackgroundChanged;
+  BehaviorSubject<bool> _onNetworkConnected;
+
   @override
-  final BehaviorSubject<bool> onBackgroundChanged;
+  Box<String> get box {
+    _ensureInitialized();
+    return _box;
+  }
+
   @override
-  final BehaviorSubject<bool> onNetworkConnected;
+  BehaviorSubject<bool> get onBackgroundChanged {
+    _ensureInitialized();
+    return _onBackgroundChanged;
+  }
+
+  @override
+  BehaviorSubject<bool> get onNetworkConnected {
+    _ensureInitialized();
+    return _onNetworkConnected;
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    onBackgroundChanged.add(state == AppLifecycleState.paused);
+    _ensureInitialized();
+    _onBackgroundChanged.add(state == AppLifecycleState.paused);
   }
 
   void _connectivityChanged(ConnectivityResult event) {
-    onNetworkConnected.add(event != ConnectivityResult.none);
+    _ensureInitialized();
+    _onNetworkConnected.add(event != ConnectivityResult.none);
   }
 
-  @override
-  String get(String key) {
-    return _preferences.getString(key);
-  }
-
-  @override
-  Future<void> set(String key, String value) {
-    return _preferences.setString(key, value);
+  void _ensureInitialized() {
+    if (_completer == null || !_completer.isCompleted) {
+      throw StateError('Make sure to first call [PlatformDependencies.initialized].');
+    }
   }
 }
 
