@@ -9,9 +9,11 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:connectivity/connectivity.dart';
+import 'package:connectivity_linux/connectivity_linux.dart';
 import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart' as flutter;
 import 'package:firebase_core_vm/firebase_core_vm.dart' as vm;
 import 'package:firebase_core_vm/platform_dependencies.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:hive/hive.dart';
@@ -36,8 +38,7 @@ class FirebaseDart extends flutter.FirebasePlatform {
   }) async {
     if (options != null) {
       if (dependencies == null) {
-        final Directory parent = await getApplicationSupportDirectory();
-        await _DefaultPlatformDependencies.initialize(parent.path);
+        await _DefaultPlatformDependencies.initialize();
         dependencies = _DefaultPlatformDependencies.instance;
       }
 
@@ -69,8 +70,7 @@ class FirebaseDart extends flutter.FirebasePlatform {
   /// call [Firebase.app] to get a reference of that app.
   @override
   Future<flutter.FirebaseAppPlatform> initializeApp({String name, flutter.FirebaseOptions options}) async {
-    final Directory parent = await getApplicationSupportDirectory();
-    await _DefaultPlatformDependencies.initialize(parent.path);
+    await _DefaultPlatformDependencies.initialize();
 
     vm.FirebaseApp.withOptions(_createFromPlatformOptions(options),
         name: name, dependencies: _DefaultPlatformDependencies.instance);
@@ -132,31 +132,38 @@ class _DefaultPlatformDependencies extends PlatformDependencies with WidgetsBind
 
   static _DefaultPlatformDependencies instance = _DefaultPlatformDependencies._();
 
-  static Future<void> initialize(String path) async {
-    if (instance._completer == null || instance._completer.isCompleted) {
-      instance._completer ??= Completer<void>();
+  static Future<void> initialize() async {
+    if (instance._completer != null) {
       return instance._completer.future;
     }
+    instance._completer = Completer<void>();
 
-    final Box<Uint8List> keyBox = await Hive.openBox<Uint8List>('encryption.store', path: path);
+    final Directory parent = await getApplicationDocumentsDirectory();
+    final Box<Uint8List> keyBox = await Hive.openBox<Uint8List>('encryption.store', path: parent.path);
     if (!keyBox.containsKey('key')) {
       final List<int> key = Hive.generateSecureKey();
       await keyBox.put('key', key);
     }
     final Uint8List key = keyBox.get('key');
 
-    instance._box = await Hive.openBox<String>('firebase.store', encryptionKey: key, path: path);
+    instance._box = await Hive.openBox<String>('firebase.store', encryptionKey: key, path: parent.path);
     instance._onBackgroundChanged = BehaviorSubject<bool>.seeded(false);
     instance._onNetworkConnected = BehaviorSubject<bool>.seeded(true);
     WidgetsBinding.instance.addObserver(instance);
 
-    // todo(long1eu): remove this once we have Connectivity plugin on linux
-    try {
+    // todo(long1eu): remove this if the plugin is endorsed for Linux
+    if (!kIsWeb && Platform.isLinux) {
+      // ConnectivityLinux.register();
+      NetworkManager.instance.stateChanged
+          .map((NetworkManagerState event) =>
+              event == NetworkManagerState.connectedGlobal || event == NetworkManagerState.unknown
+                  ? ConnectivityResult.wifi
+                  : ConnectivityResult.none)
+          .listen(instance._connectivityChanged);
+    } else {
       Connectivity()
         ..checkConnectivity().then(instance._connectivityChanged)
         ..onConnectivityChanged.listen(instance._connectivityChanged);
-    } catch (e) {
-      print(e);
     }
 
     instance._completer.complete();

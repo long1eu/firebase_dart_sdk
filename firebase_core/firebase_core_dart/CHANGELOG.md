@@ -1,3 +1,7 @@
+## 0.0.4
+
+- add linux connectivity plugin implementation
+
 ## 0.0.3
 
 - remove SharedPreferences

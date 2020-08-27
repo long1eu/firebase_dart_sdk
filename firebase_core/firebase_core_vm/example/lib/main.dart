@@ -3,17 +3,14 @@ import 'dart:io';
 
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'platform_dependencies.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await PlatformDependencies.initialize();
 
-  final Directory parent = await getApplicationDocumentsDirectory();
-  await PlatformDependencies.initialize(parent.path);
   FirebaseApp.withOptions(options, dependencies: PlatformDependencies.instance);
-
   runApp(const MyApp());
 }
 
