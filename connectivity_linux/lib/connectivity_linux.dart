@@ -6,10 +6,6 @@ import 'package:flutter/services.dart';
 
 /// The Linux implementation of the ConnectivityPlatform of the Connectivity plugin.
 class ConnectivityLinux extends ConnectivityPlatform {
-  ConnectivityLinux() : _networkManager = NetworkManager();
-
-  final NetworkManager _networkManager;
-
   /// Factory method that initializes the connectivity plugin platform with an instance
   /// of the plugin for Linux.
   static void register() {
@@ -18,13 +14,13 @@ class ConnectivityLinux extends ConnectivityPlatform {
 
   @override
   Future<ConnectivityResult> checkConnectivity() async {
-    final NetworkManagerState state = await _networkManager.state();
+    final NetworkManagerState state = await NetworkManager.instance.state();
     return _stateToResult(state);
   }
 
   @override
   Stream<ConnectivityResult> get onConnectivityChanged {
-    return _networkManager.stateChanged.map(_stateToResult);
+    return NetworkManager.instance.stateChanged.map(_stateToResult);
   }
 
   // Creates an "unsupported_operation" PlatformException for a given `method` name.
@@ -79,10 +75,9 @@ class ConnectivityLinux extends ConnectivityPlatform {
 /// This exposes the state() method and the `StateChanged` signal.
 /// see [NetworkManager](https://developer.gnome.org/NetworkManager/stable/gdbus-org.freedesktop.NetworkManager.html)
 class NetworkManager {
-  NetworkManager() : _client = DBusClient.system() {
+  NetworkManager._() : _client = DBusClient.system() {
     _stateController = StreamController<NetworkManagerState>.broadcast(
       onListen: () async {
-        await _stateController.addStream(state().asStream());
         _stateSubscription = await _client.subscribeSignals(
           _onData,
           path: DBusObjectPath('/org/freedesktop/NetworkManager'),
@@ -90,6 +85,8 @@ class NetworkManager {
           interface: 'org.freedesktop.NetworkManager',
           member: 'StateChanged',
         );
+        final NetworkManagerState current = await state();
+        _stateController.add(current);
       },
       onCancel: () {
         _client.unsubscribeSignals(_stateSubscription);
@@ -97,6 +94,8 @@ class NetworkManager {
       },
     );
   }
+
+  static final NetworkManager instance = NetworkManager._();
 
   final DBusClient _client;
   StreamController<NetworkManagerState> _stateController;
@@ -118,6 +117,7 @@ class NetworkManager {
       return Future<NetworkManagerState>.error(
           StateError('${result.errorName}, ${result.values.join(',')}'), StackTrace.current);
     }
+    result.returnValues.first.signature;
     final DBusUint32 rawValue = result.returnValues.first;
     return NetworkManagerState.valueOf(rawValue.value);
   }

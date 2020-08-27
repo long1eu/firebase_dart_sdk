@@ -6,8 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-void main() {
+void main() async{
   ConnectivityLinux.register();
+  print(await NetworkManager.instance.stateChanged.take(1).toList());
   runApp(const MyApp());
 }
 

@@ -1,6 +1,6 @@
 name: connectivity_linux
-description: A new flutter plugin project.
-version: 0.0.1
+description: Linux implementation for `connectivity` plugin
+version: 0.0.0-dev.1
 homepage: https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/connectivity_linux
 
 environment:
@@ -11,8 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dbus: ^0.0.0-dev.15
   connectivity_platform_interface: ^1.0.6
+  dbus: ^0.0.0-dev.16
 
 dev_dependencies:
   flutter_test:
@@ -22,4 +22,5 @@ flutter:
   plugin:
     platforms:
       linux:
-        pluginClass: ConnectivityLinuxPlugin
+        dartPluginClass: ConnectivityLinuxPlugin
+        pluginClass: none

@@ -1,3 +1,3 @@
-## 0.0.1
+## 0.0.0-dev.1
 
-* TODO: Describe initial release.
+* Access the network state via dbus from NetworkManager 
