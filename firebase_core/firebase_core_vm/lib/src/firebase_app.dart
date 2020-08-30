@@ -234,7 +234,7 @@ class FirebaseApp extends _PlatformDependencies {
 }
 
 // ignore_for_file: close_sinks
-abstract class _PlatformDependencies extends PlatformDependencies {
+abstract class _PlatformDependencies extends PlatformDependencies implements InternalTokenProvider {
   PlatformDependencies get _dependencies;
 
   BehaviorSubject<bool> _onBackgroundChanged;
@@ -284,4 +284,15 @@ abstract class _PlatformDependencies extends PlatformDependencies {
       .._authProvider = provider
       .._authProvider.getAccessToken(forceRefresh: true);
   }
+
+  @override
+  Future<GetTokenResult> getAccessToken({@required bool forceRefresh}) {
+    return Future<GetTokenResult>.value();
+  }
+
+  @override
+  String get uid => null;
+
+  @override
+  Stream<InternalTokenResult> get onTokenChanged => const Stream<InternalTokenResult>.empty();
 }

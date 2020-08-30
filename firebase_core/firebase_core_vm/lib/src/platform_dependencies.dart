@@ -6,12 +6,11 @@ import 'dart:async';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:hive/hive.dart';
-import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// This class should provide services that Firebase depends on and are platform
 /// specific.
-class PlatformDependencies implements LocalStorage, InternalTokenProvider {
+class PlatformDependencies implements LocalStorage {
   final Map<String, String> _map = <String, String>{};
 
   /// A storage box that can save key/value pair that persists restarts.
@@ -42,8 +41,8 @@ class PlatformDependencies implements LocalStorage, InternalTokenProvider {
   ///
   /// If you are planing to also use FirebaseAuth you don't need to worry about
   /// this field. Firebase Auth SDK automatically registers as
-  /// [InternalTokenProvider] if none is set.
-  InternalTokenProvider get authProvider => this;
+  /// [InternalTokenProvider] if null is set.
+  InternalTokenProvider get authProvider => null;
 
   @override
   String get(String key) {
@@ -70,19 +69,6 @@ class PlatformDependencies implements LocalStorage, InternalTokenProvider {
       }
     }
   }
-
-  // InternalTokenProvider implementation
-
-  @override
-  Future<GetTokenResult> getAccessToken({@required bool forceRefresh}) {
-    return Future<GetTokenResult>.value();
-  }
-
-  @override
-  String get uid => null;
-
-  @override
-  Stream<InternalTokenResult> get onTokenChanged => const Stream<InternalTokenResult>.empty();
 }
 
 /// Local persistence interface to store key/value pairs
