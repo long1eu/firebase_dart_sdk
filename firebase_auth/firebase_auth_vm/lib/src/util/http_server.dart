@@ -18,8 +18,11 @@ typedef GetRecaptchaToken = Future<String> Function();
 ///
 /// Once the user successfully verified the app, the HTTP server will redirect the user agent to a URL pointing to a
 /// locally running HTTP server. Which in turn will be able to extract the recaptcha token.
-Future<String> getRecaptchaToken(
-    UrlPresenter urlPresenter, String apiKey, String languageCode) async {
+Future<String> getRecaptchaToken({
+  UrlPresenter urlPresenter,
+  String apiKey,
+  String languageCode,
+}) async {
   final Completer<String> completer = Completer<String>();
   final HttpServer server = await HttpServer.bind('localhost', 0);
   final Stream<HttpRequest> events = server.asBroadcastStream();
@@ -37,7 +40,6 @@ Future<String> getRecaptchaToken(
     },
   ));
 
-  // ignore: void_checks
   events.listen((HttpRequest request) async {
     switch (request.requestedUri.path) {
       case '/__/auth/handler':
@@ -65,12 +67,11 @@ Future<String> getRecaptchaToken(
         String message;
 
         if (request.method != 'GET') {
-          message =
-              'Invalid response from server (expected GET request callback, got: ${request.method}).';
+          message = 'Invalid response from server (expected GET request callback, got: ${request.method}).';
         } else if (state != returnedState) {
           message = 'Invalid response from server (state did not match).';
         } else if (error != null) {
-          message = 'Error occured while obtaining access credentials: $error';
+          message = 'Error occurred while obtaining access credentials: $error';
         } else if (token == null || token == '') {
           message = 'Invalid response from server (no token transmitted).';
         }
@@ -97,9 +98,7 @@ Future<String> getRecaptchaToken(
     }
   });
 
-  return completer.future
-      .timeout(const Duration(minutes: 2))
-      .whenComplete(server.close);
+  return completer.future.timeout(const Duration(minutes: 2)).whenComplete(server.close);
 }
 
 const String _initialHtml = '''<!DOCTYPE html>
@@ -107,22 +106,21 @@ const String _initialHtml = '''<!DOCTYPE html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/7.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.19.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.19.1/firebase-auth.js"></script>
     <script type="text/javascript">
-        var url = new URL(window.location.href);
-        var state = url.searchParams.get('state');
-        var apiKey = url.searchParams.get('apiKey');
-        var languageCode = url.searchParams.get('languageCode');
+        const url = new URL(window.location.href);
+        const state = url.searchParams.get('state');
+        const apiKey = url.searchParams.get('apiKey');
+        const languageCode = url.searchParams.get('languageCode');
         firebase.initializeApp({apiKey: apiKey});
-        if (languageCode)
-          firebase.auth().languageCode = languageCode;
+        firebase.auth().languageCode = languageCode;        
         
         function init() {
-            var recaptchaVerifier = new firebase.auth.RecaptchaVerifier(document.getElementById("grecaptcha-badge"), {
+            const recaptchaVerifier = new firebase.auth.RecaptchaVerifier(document.getElementById("grecaptcha-badge"), {
                 'size': 'invisible',
                 'callback': function (response) {
-                    var redirectURL = 'http://' + url.host + url.pathname + '/response?state=' + state + '&token=' + response;
+                    const redirectURL = 'http://' + url.host + url.pathname + '/response?state=' + state + '&token=' + response;
                     try {
                         window.location = redirectURL+"&a=b";
                         window.location = redirectURL;
@@ -131,9 +129,7 @@ const String _initialHtml = '''<!DOCTYPE html>
                     }
                 },
                 'expired-callback': function () {
-                    var redirectURL = 'http://' + url.host + url.pathname + '?state=' + state + '&error=expired';
-                    console.log('callback result ' + redirectURL);
-                    window.location = redirectURL;
+                    window.location = 'http://' + url.host + url.pathname + '?state=' + state + '&error=expired';
                 }
             });
             recaptchaVerifier.verify();

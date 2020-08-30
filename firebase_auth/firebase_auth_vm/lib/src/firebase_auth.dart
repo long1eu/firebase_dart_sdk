@@ -21,22 +21,23 @@ class FirebaseAuth implements InternalTokenProvider {
       return _instances[app.name];
     }
     _authStateChangedControllers[app.name] = StreamController<FirebaseUser>.broadcast();
+    final UserStorage userStorage = UserStorage(localStorage: app.storage, appName: app.name);
 
     // init the identity toolkit client
-    final ApiKeyClient apiKeyClient = ApiKeyClient(app.options.apiKey, app.headersBuilder);
+    final ApiKeyClient apiKeyClient = ApiKeyClient(app.options.apiKey, app.headersBuilder, locale: userStorage.locale);
     final FirebaseAuthApi firebaseAuthApi = FirebaseAuthApi(client: apiKeyClient);
 
-    final UserStorage userStorage = UserStorage(localStorage: app.storage, appName: app.name);
     final FirebaseAuth auth = FirebaseAuth._(app, firebaseAuthApi, apiKeyClient, userStorage);
     _instances[app.name] = auth;
 
+    final FirebaseUser user = userStorage.getUser(auth);
+    auth
+      .._updateCurrentUser(user, saveToDisk: false)
+      .._lastNotifiedUserToken = user?._rawAccessToken;
     if (app.authProvider == app) {
       app.authProvider = auth;
     }
-    final FirebaseUser user = userStorage.get(auth);
-    return auth
-      .._updateCurrentUser(user, saveToDisk: false)
-      .._lastNotifiedUserToken = user?._rawAccessToken;
+    return auth;
   }
 
   /// The auth object for the default Firebase app.
@@ -73,12 +74,15 @@ class FirebaseAuth implements InternalTokenProvider {
       <String, StreamController<FirebaseUser>>{};
 
   /// The current user language code.
-  String get languageCode => _apiKeyClient.locale;
+  String get languageCode => _userStorage.locale;
 
   /// Set the current user language code.
   ///
   /// The string used to set this property must be a language code that follows BCP 47.
-  set languageCode(String languageCode) => _apiKeyClient.locale = languageCode;
+  set languageCode(String languageCode) {
+    _userStorage.locale = languageCode;
+    _apiKeyClient.locale = languageCode;
+  }
 
   /// Gets the cached current user, or null if there is none.
   FirebaseUser get currentUser => _currentUser;
@@ -95,7 +99,7 @@ class FirebaseAuth implements InternalTokenProvider {
   ///
   /// An empty `List` is returned if the user could not be found. A null list indicates that the user has an account,
   /// but there are no providers registered. This can happen if the user unlinked all providers. The user can regain
-  /// access to his account by resetting the password. When the reset flow is completes successful the
+  /// access to his account by resetting the password. When the reset flow completes successful the
   /// [ProviderType.password] is linked to his account.
   ///
   /// Errors:
@@ -126,7 +130,7 @@ class FirebaseAuth implements InternalTokenProvider {
     assert(email != null);
     assert(password != null);
     final AuthCredential credential = EmailAuthProvider.getCredential(email: email, password: password);
-    return _signInAndRetrieveData(credential, isReauthentication: false);
+    return _signInAndRetrieveData(credential);
   }
 
   /// Signs in using an email address and email sign-in link.
@@ -141,7 +145,7 @@ class FirebaseAuth implements InternalTokenProvider {
     assert(link != null);
 
     final EmailPasswordAuthCredential credential = EmailAuthProvider.getCredentialWithLink(email: email, link: link);
-    return _signInAndRetrieveData(credential, isReauthentication: false);
+    return _signInAndRetrieveData(credential);
   }
 
   /// Asynchronously signs in to Firebase with the given 3rd-party credentials (e.g. a Facebook login Access Token, a
@@ -175,7 +179,7 @@ class FirebaseAuth implements InternalTokenProvider {
   ///   * [FirebaseAuthError.sessionExpired] - Indicates that the SMS code has expired.
   Future<AuthResult> signInWithCredential(AuthCredential credential) async {
     assert(credential != null);
-    return _signInAndRetrieveData(credential, isReauthentication: false);
+    return _signInAndRetrieveData(credential);
   }
 
   /// Asynchronously creates and becomes an anonymous user.
@@ -194,8 +198,11 @@ class FirebaseAuth implements InternalTokenProvider {
     final SignupNewUserResponse response = await _firebaseAuthApi.signupNewUser(request);
 
     final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, int.parse(response.expiresIn), response.refreshToken,
-        anonymous: true);
+      response.idToken,
+      int.parse(response.expiresIn),
+      response.refreshToken,
+      anonymous: true,
+    );
 
     return AuthResult._(user, AdditionalUserInfo.newAnonymous());
   }
@@ -412,7 +419,11 @@ class FirebaseAuth implements InternalTokenProvider {
     final bool isTest = Platform.environment['FIREBASE_AUTH_TEST'] ?? false;
     // We don't check the app if we are in a test
     if (!isTest) {
-      final String token = await getRecaptchaToken(presenter ?? print, app.options.apiKey, languageCode);
+      final String token = await getRecaptchaToken(
+        urlPresenter: presenter ?? print,
+        apiKey: app.options.apiKey,
+        languageCode: languageCode,
+      );
       request.recaptchaToken = token;
     }
 
@@ -423,7 +434,7 @@ class FirebaseAuth implements InternalTokenProvider {
 
   /// Signs in Firebase with the given 3rd party credentials (e.g. a Facebook login Access Token, a Google ID
   /// Token/Access Token pair, etc.) and returns additional identity provider data.
-  Future<AuthResult> _signInAndRetrieveData(AuthCredential credential, {@required bool isReauthentication}) async {
+  Future<AuthResult> _signInAndRetrieveData(AuthCredential credential, {bool isReauthentication = false}) async {
     if (credential is EmailPasswordAuthCredential) {
       if (credential.link != null) {
         return _signInAndRetrieveDataEmailAndLink(credential.email, credential.link);
@@ -590,7 +601,7 @@ class FirebaseAuth implements InternalTokenProvider {
       return;
     }
 
-    _userStorage.save(user);
+    _userStorage.saveUser(user);
     _possiblyPostAuthStateChangeNotification();
   }
 
@@ -610,7 +621,7 @@ class FirebaseAuth implements InternalTokenProvider {
     }
 
     if (saveToDisk) {
-      _userStorage.save(user);
+      _userStorage.saveUser(user);
     }
 
     _currentUser = user;
@@ -649,9 +660,10 @@ class FirebaseAuth implements InternalTokenProvider {
     }
 
     if (retry) {
-      print('Token auto-refresh re-scheduled in $delay because of error on previous refresh attempt.');
+      Log.d('FirebaseAuth-${app.name}',
+          'Token auto-refresh re-scheduled in $delay because of error on previous refresh attempt.');
     } else {
-      print('Token auto-refresh scheduled in $delay for the new token.');
+      Log.d('FirebaseAuth-${app.name}', 'Token auto-refresh scheduled in $delay for the new token.');
     }
     _autoRefreshScheduled = true;
 
@@ -698,7 +710,7 @@ class FirebaseAuth implements InternalTokenProvider {
     }
 
     if (!_autoRefreshTokens) {
-      print('Token auto-refresh enabled.');
+      Log.d('FirebaseAuth-${app.name}', 'Token auto-refresh enabled.');
       _autoRefreshTokens = true;
       _scheduleAutoTokenRefresh();
 
@@ -722,20 +734,5 @@ class FirebaseAuth implements InternalTokenProvider {
     if (!isBackground && !_autoRefreshScheduled) {
       _scheduleAutoTokenRefresh();
     }
-  }
-}
-
-extension on Relyingparty {
-  void updateWith(ActionCodeSettings settings) {
-    this
-          ..continueUrl = settings?.continueUrl
-          ..iOSBundleId = settings?.iOSBundleId
-          ..androidPackageName = settings?.androidPackageName
-          ..androidInstallApp = settings?.androidInstallIfNotAvailable
-          ..androidMinimumVersion = settings?.androidMinimumVersion
-          ..canHandleCodeInApp = settings?.handleCodeInApp
-        // TODO(long1eu): Add the dynamic link when moving to protobuf
-        // ..dynamicLinkDomain = settings?.dynamicLinkDomain
-        ;
   }
 }

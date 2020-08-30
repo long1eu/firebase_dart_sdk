@@ -8,7 +8,7 @@ typedef UpdateSetAccountInfoRequest = void Function(
     gitkit.UserInfo user, IdentitytoolkitRelyingpartySetAccountInfoRequest request);
 
 class FirebaseUser with UserInfoMixin {
-  FirebaseUser._({@required SecureTokenApi secureTokenApi, @required FirebaseAuth auth})
+  FirebaseUser._(SecureTokenApi secureTokenApi, FirebaseAuth auth)
       : assert(secureTokenApi != null),
         assert(auth != null),
         _secureTokenApi = secureTokenApi,
@@ -17,8 +17,12 @@ class FirebaseUser with UserInfoMixin {
 
   /// Constructs a user with Secure Token Service tokens, and obtains user details from the getAccountInfo endpoint.
   static Future<FirebaseUser> _retrieveUserWithAuth(
-      FirebaseAuth auth, String accessToken, DateTime accessTokenExpirationDate, String refreshToken,
-      {bool anonymous}) async {
+    FirebaseAuth auth,
+    String accessToken,
+    DateTime accessTokenExpirationDate,
+    String refreshToken, {
+    bool anonymous,
+  }) async {
     final SecureTokenApi secureTokenApi = SecureTokenApi(
       client: auth._apiKeyClient,
       accessToken: accessToken,
@@ -26,7 +30,7 @@ class FirebaseUser with UserInfoMixin {
       refreshToken: refreshToken,
     );
 
-    final FirebaseUser user = FirebaseUser._(secureTokenApi: secureTokenApi, auth: auth);
+    final FirebaseUser user = FirebaseUser._(secureTokenApi, auth);
     final String newAccessToken = await user._getToken();
 
     final IdentitytoolkitRelyingpartyGetAccountInfoRequest request = IdentitytoolkitRelyingpartyGetAccountInfoRequest()

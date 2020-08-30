@@ -94,3 +94,18 @@ class FirebaseAuthApi {
     return _requester.resetPassword(request);
   }
 }
+
+extension on Relyingparty {
+  void updateWith(ActionCodeSettings settings) {
+    this
+          ..continueUrl = settings?.continueUrl
+          ..iOSBundleId = settings?.iOSBundleId
+          ..androidPackageName = settings?.androidPackageName
+          ..androidInstallApp = settings?.androidInstallIfNotAvailable
+          ..androidMinimumVersion = settings?.androidMinimumVersion
+          ..canHandleCodeInApp = settings?.handleCodeInApp
+        // TODO(long1eu): Add the dynamic link when moving to protobuf
+        // ..dynamicLinkDomain = settings?.dynamicLinkDomain
+        ;
+  }
+}

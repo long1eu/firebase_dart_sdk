@@ -11,7 +11,6 @@ dependencies:
   _discoveryapis_commons: ^0.2.0
   _firebase_internal_vm: ^0.0.2+1
   firebase_core_vm: ^0.0.6
-  rxdart: ^0.24.1
   googleapis: ^0.55.0
   googleapis_auth: ^0.2.12
   http: ^0.12.2

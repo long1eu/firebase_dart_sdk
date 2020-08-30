@@ -15,8 +15,6 @@ import 'package:googleapis/identitytoolkit/v3.dart';
 import 'package:googleapis/identitytoolkit/v3.dart' as gitkit;
 import 'package:http/http.dart';
 import 'package:meta/meta.dart';
-import 'package:rxdart/rxdart.dart';
-import 'package:rxdart/subjects.dart';
 
 part 'src/auth_providers.dart';
 part 'src/auth_result.dart';

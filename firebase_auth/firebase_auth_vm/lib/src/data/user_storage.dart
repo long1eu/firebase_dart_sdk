@@ -14,7 +14,7 @@ class UserStorage {
   final LocalStorage _localStorage;
   final String _appName;
 
-  void save(FirebaseUser user) {
+  void saveUser(FirebaseUser user) {
     if (user != null) {
       final Map<String, dynamic> data = FirebaseUserExtension(user)._json;
       _localStorage.set(_userKey, jsonEncode(data));
@@ -23,7 +23,7 @@ class UserStorage {
     }
   }
 
-  FirebaseUser get(FirebaseAuth auth) {
+  FirebaseUser getUser(FirebaseAuth auth) {
     final String json = _localStorage.get(_userKey);
     if (json == null) {
       return null;
@@ -32,7 +32,17 @@ class UserStorage {
     return FirebaseUserExtension._fromJson(auth, jsonDecode(json));
   }
 
+  String get locale {
+    return _localStorage.get(_localeKey) ?? 'en';
+  }
+
+  set locale(String value) {
+    _localStorage.set(_localeKey, value ?? 'en');
+  }
+
   String get _userKey => _getKey('user');
+
+  String get _localeKey => _getKey('locale');
 
   String _getKey(String field) => 'UserStorage___${_appName}__$field';
 }
@@ -63,7 +73,7 @@ extension FirebaseUserExtension on FirebaseUser {
       refreshToken: refreshToken,
     );
 
-    return FirebaseUser._(secureTokenApi: secureTokenApi, auth: auth)
+    return FirebaseUser._(secureTokenApi, auth)
       .._isAnonymous = isAnonymous
       .._userInfo = UserInfo._(
         uid: uid,

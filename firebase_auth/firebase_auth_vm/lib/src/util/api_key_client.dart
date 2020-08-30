@@ -11,14 +11,17 @@ const String sdkVersion = '0.0.1';
 /// If 'key' is already present on the URI, it will complete with an exception.
 /// This will prevent accidental overrides of a query parameter with the API key.
 class ApiKeyClient extends DelegatingClient {
-  ApiKeyClient(String apiKey, this._headers, {Client client})
+  ApiKeyClient(String apiKey, this._headers, {Client client, String locale = 'en'})
       : _encodedApiKey = Uri.encodeQueryComponent(apiKey),
+        _locale = locale ?? 'en',
         super(client ?? Client(), closeUnderlyingClient: true);
 
   final String _encodedApiKey;
   final HeaderBuilder _headers;
 
-  String locale = 'en';
+  String _locale;
+
+  set locale(String value) => _locale = value ?? 'en';
 
   @override
   Future<StreamedResponse> send(BaseRequest request) async {
@@ -45,7 +48,7 @@ class ApiKeyClient extends DelegatingClient {
     headers = <String, String>{
       ...request.headers,
       ...headers,
-      if (locale != null) 'X-Firebase-Locale': locale,
+      'X-Firebase-Locale': _locale,
       'X-Client-Version': '${Platform.operatingSystem}/FirebaseSDK/$sdkVersion/dart',
     };
     modifiedRequest.headers.addAll(headers);
