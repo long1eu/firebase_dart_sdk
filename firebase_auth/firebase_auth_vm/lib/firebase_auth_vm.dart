@@ -9,11 +9,6 @@ import 'dart:typed_data';
 
 import 'package:_discoveryapis_commons/_discoveryapis_commons.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
-import 'package:built_collection/built_collection.dart';
-import 'package:built_value/built_value.dart';
-import 'package:built_value/json_object.dart';
-import 'package:built_value/serializer.dart';
-import 'package:firebase_auth_vm/src/models/serializers.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:firebase_core_vm/platform_dependencies.dart';
 import 'package:googleapis/identitytoolkit/v3.dart';
@@ -23,7 +18,6 @@ import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:rxdart/subjects.dart';
 
-part 'firebase_auth_vm.g.dart';
 part 'src/auth_providers.dart';
 part 'src/auth_result.dart';
 part 'src/data/firebase_auth_api.dart';
@@ -36,7 +30,6 @@ part 'src/models/action_code_info.dart';
 part 'src/models/action_code_settings.dart';
 part 'src/models/auth_credential.dart';
 part 'src/models/auth_operation_type.dart';
-part 'src/models/impl.dart';
 part 'src/models/oob_code_type.dart';
 part 'src/models/provider_type.dart';
 part 'src/models/secure_token.dart';

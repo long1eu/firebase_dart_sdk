@@ -49,7 +49,7 @@ Future<bool> _createCustomToken(FirebaseAuthOption option) async {
   final String customToken = jsonDecode(response.body)['result'];
   console
     ..println(
-        'Here is your custom token. He have signed you out so you can test it. Save it and the hit Enter.')
+        'Here is your custom token. We have signed you out so you can test it. Save it and the hit Enter.')
     ..println(customToken.bold.cyan.reset);
 
   await FirebaseAuth.instance.signOut();

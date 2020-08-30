@@ -14,7 +14,7 @@ import 'platform_dependencies.dart';
 import 'signin_page.dart';
 
 Future<void> main() async {
-  if (isDesktop) {
+  if (kIsDesktop) {
     await GoogleSignInDart.register(
       exchangeEndpoint:
           'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',

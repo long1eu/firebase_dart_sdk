@@ -9,11 +9,15 @@ Future<void> init(Map<String, String> config) async {
 
   await _initializeSecrets(config);
 
-  final Box<dynamic> firebaseBox = await Hive.openBox<dynamic>('firebase_auth',
-      encryptionCipher: HiveAesCipher(_hiveEncryptionKey.codeUnits));
+  final Box<String> firebaseBox =
+      await Hive.openBox<String>('firebase_auth', encryptionCipher: HiveAesCipher(_hiveEncryptionKey.codeUnits));
   final Dependencies dependencies = Dependencies(box: firebaseBox);
-  final FirebaseOptions options =
-      FirebaseOptions(apiKey: _apiKey, applicationId: 'appId');
+  final FirebaseOptions options = FirebaseOptions(
+    apiKey: _apiKey,
+    appId: 'appId',
+    messagingSenderId: 'null',
+    projectId: 'null',
+  );
   FirebaseApp.withOptions(options, dependencies: dependencies);
 }
 
@@ -91,19 +95,6 @@ Future<void> _initializeSecrets(Map<String, String> config) async {
 class Dependencies extends PlatformDependencies {
   Dependencies({@required this.box});
 
-  final Box<dynamic> box;
-
   @override
-  String get(String key) {
-    return box.get(key);
-  }
-
-  @override
-  Future<void> set(String key, String value) {
-    if (value == null) {
-      return box.delete(key);
-    } else {
-      return box.put(key, value);
-    }
-  }
+  final Box<String> box;
 }

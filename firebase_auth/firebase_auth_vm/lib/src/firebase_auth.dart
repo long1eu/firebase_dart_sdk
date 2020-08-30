@@ -4,7 +4,7 @@
 
 part of firebase_auth_vm;
 
-///  The maximum wait time before attempting to retry auto refreshing tokens after a failed attempt.
+/// The maximum wait time before attempting to retry auto refreshing tokens after a failed attempt.
 ///
 /// This is the upper limit of the exponential backoff used for retrying token refresh.
 const Duration _kMaxWaitTimeForBackoff = Duration(minutes: 16);
@@ -14,25 +14,20 @@ const Duration _kTokenRefreshHeadStart = Duration(minutes: 5);
 
 // ignore_for_file: prefer_constructors_over_static_methods
 class FirebaseAuth implements InternalTokenProvider {
-  FirebaseAuth._(
-      this.app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage);
+  FirebaseAuth._(this.app, this._firebaseAuthApi, this._apiKeyClient, this._userStorage);
 
   factory FirebaseAuth.getInstance(FirebaseApp app) {
     if (_instances.containsKey(app.name)) {
       return _instances[app.name];
     }
-    _authStateChangedSubjects[app.name] = BehaviorSubject<FirebaseUser>();
+    _authStateChangedControllers[app.name] = StreamController<FirebaseUser>.broadcast();
 
     // init the identity toolkit client
-    final ApiKeyClient apiKeyClient =
-        ApiKeyClient(app.options.apiKey, app.headersBuilder);
-    final FirebaseAuthApi firebaseAuthApi =
-        FirebaseAuthApi(client: apiKeyClient);
+    final ApiKeyClient apiKeyClient = ApiKeyClient(app.options.apiKey, app.headersBuilder);
+    final FirebaseAuthApi firebaseAuthApi = FirebaseAuthApi(client: apiKeyClient);
 
-    final UserStorage userStorage =
-        UserStorage(localStorage: app.storage, appName: app.name);
-    final FirebaseAuth auth =
-        FirebaseAuth._(app, firebaseAuthApi, apiKeyClient, userStorage);
+    final UserStorage userStorage = UserStorage(localStorage: app.storage, appName: app.name);
+    final FirebaseAuth auth = FirebaseAuth._(app, firebaseAuthApi, apiKeyClient, userStorage);
     _instances[app.name] = auth;
 
     if (app.authProvider == app) {
@@ -74,8 +69,8 @@ class FirebaseAuth implements InternalTokenProvider {
   bool _autoRefreshScheduled = false;
 
   static final Map<String, FirebaseAuth> _instances = <String, FirebaseAuth>{};
-  static final Map<String, BehaviorSubject<FirebaseUser>>
-      _authStateChangedSubjects = <String, BehaviorSubject<FirebaseUser>>{};
+  static final Map<String, StreamController<FirebaseUser>> _authStateChangedControllers =
+      <String, StreamController<FirebaseUser>>{};
 
   /// The current user language code.
   String get languageCode => _apiKeyClient.locale;
@@ -90,7 +85,7 @@ class FirebaseAuth implements InternalTokenProvider {
 
   /// Receive [FirebaseUser] each time the user signIn or signOut
   Stream<FirebaseUser> get onAuthStateChanged {
-    return _authStateChangedSubjects[app.name];
+    return _authStateChangedControllers[app.name].stream;
   }
 
   /// Returns a list of sign-in methods that can be used to sign in a given user (identified by its main email address).
@@ -105,17 +100,14 @@ class FirebaseAuth implements InternalTokenProvider {
   ///
   /// Errors:
   ///   * [FirebaseAuthError.invalidEmail] - If the [email] address is malformed.
-  Future<List<String>> fetchSignInMethodsForEmail(
-      {@required String email}) async {
+  Future<List<String>> fetchSignInMethodsForEmail({@required String email}) async {
     assert(email != null);
 
-    final IdentitytoolkitRelyingpartyCreateAuthUriRequest request =
-        IdentitytoolkitRelyingpartyCreateAuthUriRequest()
-          ..identifier = email
-          ..continueUri = 'http://www.google.com/';
+    final IdentitytoolkitRelyingpartyCreateAuthUriRequest request = IdentitytoolkitRelyingpartyCreateAuthUriRequest()
+      ..identifier = email
+      ..continueUri = 'http://www.google.com/';
 
-    final CreateAuthUriResponse response =
-        await _firebaseAuthApi.createAuthUri(request);
+    final CreateAuthUriResponse response = await _firebaseAuthApi.createAuthUri(request);
 
     return response.registered ? response.allProviders?.toList() : <String>[];
   }
@@ -130,12 +122,10 @@ class FirebaseAuth implements InternalTokenProvider {
   ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
   ///   * [FirebaseAuthError.wrongPassword] - Indicates the user's [password] is wrong.
   ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
-  Future<AuthResult> signInWithEmailAndPassword(
-      {@required String email, @required String password}) {
+  Future<AuthResult> signInWithEmailAndPassword({@required String email, @required String password}) {
     assert(email != null);
     assert(password != null);
-    final AuthCredential credential =
-        EmailAuthProvider.getCredential(email: email, password: password);
+    final AuthCredential credential = EmailAuthProvider.getCredential(email: email, password: password);
     return _signInAndRetrieveData(credential, isReauthentication: false);
   }
 
@@ -146,13 +136,11 @@ class FirebaseAuth implements InternalTokenProvider {
   ///       Enable them in the Auth section of the Firebase console.
   ///  * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
   ///  * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
-  Future<AuthResult> signInWithEmailAndLink(
-      {@required String email, @required String link}) async {
+  Future<AuthResult> signInWithEmailAndLink({@required String email, @required String link}) async {
     assert(email != null);
     assert(link != null);
 
-    final EmailPasswordAuthCredential credential =
-        EmailAuthProvider.getCredentialWithLink(email: email, link: link);
+    final EmailPasswordAuthCredential credential = EmailAuthProvider.getCredentialWithLink(email: email, link: link);
     return _signInAndRetrieveData(credential, isReauthentication: false);
   }
 
@@ -202,16 +190,14 @@ class FirebaseAuth implements InternalTokenProvider {
       return _ensureUserPersistence(AuthResult._(_currentUser));
     }
 
-    final IdentitytoolkitRelyingpartySignupNewUserRequest request =
-        IdentitytoolkitRelyingpartySignupNewUserRequest();
-    final SignupNewUserResponse response =
-        await _firebaseAuthApi.signupNewUser(request);
+    final IdentitytoolkitRelyingpartySignupNewUserRequest request = IdentitytoolkitRelyingpartySignupNewUserRequest();
+    final SignupNewUserResponse response = await _firebaseAuthApi.signupNewUser(request);
 
     final FirebaseUser user = await _completeSignInWithAccessToken(
         response.idToken, int.parse(response.expiresIn), response.refreshToken,
         anonymous: true);
 
-    return AuthResult._(user, AdditionalUserInfoImpl.newAnonymous());
+    return AuthResult._(user, AdditionalUserInfo.newAnonymous());
   }
 
   /// Tries to sign in a user with a given Custom Token [token].
@@ -236,14 +222,12 @@ class FirebaseAuth implements InternalTokenProvider {
     final IdentitytoolkitRelyingpartyVerifyCustomTokenRequest request =
         IdentitytoolkitRelyingpartyVerifyCustomTokenRequest()..token = token;
 
-    final VerifyCustomTokenResponse response =
-        await _firebaseAuthApi._requester.verifyCustomToken(request);
+    final VerifyCustomTokenResponse response = await _firebaseAuthApi._requester.verifyCustomToken(request);
 
     final String expiresIn = response.expiresIn ?? '3600';
-    final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, int.parse(expiresIn), response.refreshToken);
-    final AdditionalUserInfoImpl additionalUserInfo =
-        AdditionalUserInfoImpl(isNewUser: response.isNewUser);
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(expiresIn), response.refreshToken);
+    final AdditionalUserInfo additionalUserInfo = AdditionalUserInfo._(isNewUser: response.isNewUser);
     return AuthResult._(user, additionalUserInfo);
   }
 
@@ -260,23 +244,20 @@ class FirebaseAuth implements InternalTokenProvider {
   ///   * [FirebaseAuthError.operationNotAllowed] -  Indicates that email and password accounts are not enabled. Enable
   ///       them in the Auth section of the Firebase console.
   ///   * [FirebaseAuthError.weakPassword] - Indicates an attempt to set a password that is considered too weak.
-  Future<AuthResult> createUserWithEmailAndPassword(
-      {@required String email, @required String password}) async {
+  Future<AuthResult> createUserWithEmailAndPassword({@required String email, @required String password}) async {
     assert(email != null);
     assert(password != null);
 
-    final IdentitytoolkitRelyingpartySignupNewUserRequest request =
-        IdentitytoolkitRelyingpartySignupNewUserRequest()
-          ..email = email
-          ..password = password;
-    final SignupNewUserResponse response =
-        await _firebaseAuthApi.signupNewUser(request);
+    final IdentitytoolkitRelyingpartySignupNewUserRequest request = IdentitytoolkitRelyingpartySignupNewUserRequest()
+      ..email = email
+      ..password = password;
+    final SignupNewUserResponse response = await _firebaseAuthApi.signupNewUser(request);
 
-    final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, int.parse(response.expiresIn), response.refreshToken);
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
 
-    final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(
-        providerId: ProviderType.password, isNewUser: true);
+    final AdditionalUserInfo additionalUserInfo =
+        AdditionalUserInfo._(providerId: ProviderType.password, isNewUser: true);
 
     return AuthResult._(user, additionalUserInfo);
   }
@@ -289,15 +270,13 @@ class FirebaseAuth implements InternalTokenProvider {
   ///       identity provider.
   ///   * [FirebaseAuthError.expiredActionCode] - Indicates the OOB code is expired.
   ///   * [FirebaseAuthError.invalidActionCode] - Indicates the OOB code is invalid.
-  Future<void> confirmPasswordReset(
-      {@required String oobCode, @required String newPassword}) async {
+  Future<void> confirmPasswordReset({@required String oobCode, @required String newPassword}) async {
     assert(oobCode != null && oobCode.isNotEmpty);
     assert(newPassword != null && newPassword.isNotEmpty);
 
-    final IdentitytoolkitRelyingpartyResetPasswordRequest request =
-        IdentitytoolkitRelyingpartyResetPasswordRequest()
-          ..oobCode = oobCode
-          ..newPassword = newPassword;
+    final IdentitytoolkitRelyingpartyResetPasswordRequest request = IdentitytoolkitRelyingpartyResetPasswordRequest()
+      ..oobCode = oobCode
+      ..newPassword = newPassword;
 
     return _firebaseAuthApi.resetPassword(request);
   }
@@ -308,15 +287,13 @@ class FirebaseAuth implements InternalTokenProvider {
   Future<ActionCodeInfo> checkActionCode(String oobCode) async {
     assert(oobCode != null && oobCode.isNotEmpty);
 
-    final IdentitytoolkitRelyingpartyResetPasswordRequest request =
-        IdentitytoolkitRelyingpartyResetPasswordRequest()..oobCode = oobCode;
+    final IdentitytoolkitRelyingpartyResetPasswordRequest request = IdentitytoolkitRelyingpartyResetPasswordRequest()
+      ..oobCode = oobCode;
 
-    final gitkit.ResetPasswordResponse response =
-        await _firebaseAuthApi.resetPassword(request);
+    final gitkit.ResetPasswordResponse response = await _firebaseAuthApi.resetPassword(request);
 
-    final ActionCodeOperation operation = ActionCodeOperation.values.firstWhere(
-        (ActionCodeOperation it) => it.value == response.requestType,
-        orElse: () => null);
+    final ActionCodeOperation operation = ActionCodeOperation.values
+        .firstWhere((ActionCodeOperation it) => it.value == response.requestType, orElse: () => null);
     return ActionCodeInfo._(operation, response.email, response.newEmail);
   }
 
@@ -334,8 +311,8 @@ class FirebaseAuth implements InternalTokenProvider {
   /// code.
   Future<void> applyActionCode(String oobCode) async {
     assert(oobCode != null && oobCode.isNotEmpty);
-    final IdentitytoolkitRelyingpartySetAccountInfoRequest request =
-        IdentitytoolkitRelyingpartySetAccountInfoRequest()..oobCode = oobCode;
+    final IdentitytoolkitRelyingpartySetAccountInfoRequest request = IdentitytoolkitRelyingpartySetAccountInfoRequest()
+      ..oobCode = oobCode;
     return _firebaseAuthApi.setAccountInfo(request);
   }
 
@@ -354,8 +331,7 @@ class FirebaseAuth implements InternalTokenProvider {
   ///     whitelisted in the Firebase console.
   ///  * [FirebaseAuthError.invalidContinueURI] - Indicates that the domain specified in the continue URI is not valid.
   ///  * [FirebaseAuthError.userNotFound] - Indicates that there is no user corresponding to the given [email] address.
-  Future<void> sendPasswordResetEmail(
-      {@required String email, ActionCodeSettings settings}) async {
+  Future<void> sendPasswordResetEmail({@required String email, ActionCodeSettings settings}) async {
     assert(email != null);
 
     final Relyingparty request = Relyingparty()
@@ -375,8 +351,7 @@ class FirebaseAuth implements InternalTokenProvider {
   ///       enabled. Enable them in the Auth section of the Firebase console.
   ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
   ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
-  Future<void> sendSignInWithEmailLink(
-      {@required String email, @required ActionCodeSettings settings}) async {
+  Future<void> sendSignInWithEmailLink({@required String email, @required ActionCodeSettings settings}) async {
     assert(email != null);
     assert(settings != null);
 
@@ -428,19 +403,16 @@ class FirebaseAuth implements InternalTokenProvider {
   ///       exceeded.
   ///   * [FirebaseAuthError.invalidPhoneNumber] - Indicates that the phone number provided is invalid.
   ///   * [FirebaseAuthError.missingPhoneNumber] - Indicates that the phone number provided was not provided.
-  Future<String> verifyPhoneNumber(
-      {@required String phoneNumber, UrlPresenter presenter}) async {
+  Future<String> verifyPhoneNumber({@required String phoneNumber, UrlPresenter presenter}) async {
     // todo: save the recaptcha token, and use it until it expires
     assert(phoneNumber != null);
     final IdentitytoolkitRelyingpartySendVerificationCodeRequest request =
-        IdentitytoolkitRelyingpartySendVerificationCodeRequest()
-          ..phoneNumber = phoneNumber;
+        IdentitytoolkitRelyingpartySendVerificationCodeRequest()..phoneNumber = phoneNumber;
 
     final bool isTest = Platform.environment['FIREBASE_AUTH_TEST'] ?? false;
     // We don't check the app if we are in a test
     if (!isTest) {
-      final String token = await getRecaptchaToken(
-          presenter ?? print, app.options.apiKey, languageCode);
+      final String token = await getRecaptchaToken(presenter ?? print, app.options.apiKey, languageCode);
       request.recaptchaToken = token;
     }
 
@@ -451,22 +423,18 @@ class FirebaseAuth implements InternalTokenProvider {
 
   /// Signs in Firebase with the given 3rd party credentials (e.g. a Facebook login Access Token, a Google ID
   /// Token/Access Token pair, etc.) and returns additional identity provider data.
-  Future<AuthResult> _signInAndRetrieveData(AuthCredential credential,
-      {@required bool isReauthentication}) async {
+  Future<AuthResult> _signInAndRetrieveData(AuthCredential credential, {@required bool isReauthentication}) async {
     if (credential is EmailPasswordAuthCredential) {
       if (credential.link != null) {
-        return _signInAndRetrieveDataEmailAndLink(
-            credential.email, credential.link);
+        return _signInAndRetrieveDataEmailAndLink(credential.email, credential.link);
       } else {
-        return _signInAndRetrieveDataEmailAndPassword(
-            credential.email, credential.password);
+        return _signInAndRetrieveDataEmailAndPassword(credential.email, credential.password);
       }
     } else if (credential is GameCenterAuthCredential) {
       return _signInAndRetrieveDataGameCenter(credential);
     } else if (credential is PhoneAuthCredential) {
-      final AuthOperationType operation = isReauthentication
-          ? AuthOperationType.reauthenticate
-          : AuthOperationType.signUpOrSignIn;
+      final AuthOperationType operation =
+          isReauthentication ? AuthOperationType.reauthenticate : AuthOperationType.signUpOrSignIn;
       return _signInAndRetrieveDataPhone(credential, operation);
     }
 
@@ -477,8 +445,7 @@ class FirebaseAuth implements InternalTokenProvider {
           ..returnIdpCredential = true;
     credential.prepareVerifyAssertionRequest(request);
 
-    final VerifyAssertionResponse response =
-        await _firebaseAuthApi.verifyAssertion(request);
+    final VerifyAssertionResponse response = await _firebaseAuthApi.verifyAssertion(request);
 
     final AuthCredential oAuthCredential = OAuthCredential._(
       providerId: response.providerId,
@@ -489,17 +456,14 @@ class FirebaseAuth implements InternalTokenProvider {
     );
 
     if (response.needConfirmation ?? false) {
-      return Future<AuthResult>.error(
-          FirebaseAuthCredentialAlreadyInUseError(credential, response.email));
+      return Future<AuthResult>.error(FirebaseAuthCredentialAlreadyInUseError(credential, response.email));
     }
 
-    final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, int.parse(response.expiresIn), response.refreshToken);
-    final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+    final AdditionalUserInfo additionalUserInfo = AdditionalUserInfo._(
       providerId: response.providerId,
-      profile: response.rawUserInfo != null
-          ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo))
-          : null,
+      profile: response.rawUserInfo != null ? Map<String, dynamic>.from(jsonDecode(response.rawUserInfo)) : null,
       username: response.screenName,
       isNewUser: response.isNewUser ?? false,
     );
@@ -507,8 +471,7 @@ class FirebaseAuth implements InternalTokenProvider {
     return AuthResult._(user, additionalUserInfo, oAuthCredential);
   }
 
-  Future<AuthResult> _signInAndRetrieveDataEmailAndLink(
-      String email, String link) async {
+  Future<AuthResult> _signInAndRetrieveDataEmailAndLink(String email, String link) async {
     assert(email != null && email.isNotEmpty);
     assert(link != null && link.isNotEmpty);
 
@@ -521,36 +484,31 @@ class FirebaseAuth implements InternalTokenProvider {
           ..email = email
           ..oobCode = oobCode;
 
-    final EmailLinkSigninResponse response =
-        await _firebaseAuthApi.emailLinkSignin(request);
-    final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, int.parse(response.expiresIn), response.refreshToken);
-    final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(
-        providerId: ProviderType.password, isNewUser: response.isNewUser);
+    final EmailLinkSigninResponse response = await _firebaseAuthApi.emailLinkSignin(request);
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+    final AdditionalUserInfo additionalUserInfo =
+        AdditionalUserInfo._(providerId: ProviderType.password, isNewUser: response.isNewUser);
 
     return AuthResult._(user, additionalUserInfo);
   }
 
-  Future<AuthResult> _signInAndRetrieveDataEmailAndPassword(
-      String email, String password) async {
-    final IdentitytoolkitRelyingpartyVerifyPasswordRequest request =
-        IdentitytoolkitRelyingpartyVerifyPasswordRequest()
-          ..returnSecureToken = true
-          ..email = email
-          ..password = password;
+  Future<AuthResult> _signInAndRetrieveDataEmailAndPassword(String email, String password) async {
+    final IdentitytoolkitRelyingpartyVerifyPasswordRequest request = IdentitytoolkitRelyingpartyVerifyPasswordRequest()
+      ..returnSecureToken = true
+      ..email = email
+      ..password = password;
 
-    final VerifyPasswordResponse response =
-        await _firebaseAuthApi.verifyPassword(request);
+    final VerifyPasswordResponse response = await _firebaseAuthApi.verifyPassword(request);
 
-    final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, int.parse(response.expiresIn), response.refreshToken);
-    final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(
-        providerId: ProviderType.password, isNewUser: false);
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+    final AdditionalUserInfo additionalUserInfo =
+        AdditionalUserInfo._(providerId: ProviderType.password, isNewUser: false);
     return AuthResult._(user, additionalUserInfo);
   }
 
-  Future<AuthResult> _signInAndRetrieveDataGameCenter(
-      GameCenterAuthCredential credential) async {
+  Future<AuthResult> _signInAndRetrieveDataGameCenter(GameCenterAuthCredential credential) async {
     final SignInWithGameCenterRequest request = SignInWithGameCenterRequest(
       playerId: credential.playerId,
       publicKeyUrl: credential.publicKeyUrl,
@@ -560,20 +518,17 @@ class FirebaseAuth implements InternalTokenProvider {
       displayName: credential.displayName,
     );
 
-    final SignInWithGameCenterResponse response =
-        await _firebaseAuthApi.signInWithGameCenter(request);
-    final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, int.parse(response.expiresIn), response.refreshToken);
-    final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(
-        providerId: ProviderType.gameCenter, isNewUser: response.isNewUser);
+    final SignInWithGameCenterResponse response = await _firebaseAuthApi.signInWithGameCenter(request);
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+    final AdditionalUserInfo additionalUserInfo =
+        AdditionalUserInfo._(providerId: ProviderType.gameCenter, isNewUser: response.isNewUser);
     return AuthResult._(user, additionalUserInfo);
   }
 
-  Future<AuthResult> _signInAndRetrieveDataPhone(
-      PhoneAuthCredential credential, AuthOperationType operation) async {
+  Future<AuthResult> _signInAndRetrieveDataPhone(PhoneAuthCredential credential, AuthOperationType operation) async {
     final IdentitytoolkitRelyingpartyVerifyPhoneNumberRequest request =
-        IdentitytoolkitRelyingpartyVerifyPhoneNumberRequest()
-          ..operation = operation.value;
+        IdentitytoolkitRelyingpartyVerifyPhoneNumberRequest()..operation = operation.value;
 
     if (credential.temporaryProof != null && credential.phoneNumber != null) {
       request
@@ -591,27 +546,22 @@ class FirebaseAuth implements InternalTokenProvider {
     // Check whether or not the successful response is actually the special case phone auth flow that returns a
     // temporary proof and phone number.
     if (response.temporaryProof != null && response.phoneNumber != null) {
-      final PhoneAuthCredential credential =
-          PhoneAuthProvider.getCredentialWithTemporaryProof(
-              temporaryProof: response.temporaryProof,
-              phoneNumber: response.phoneNumber);
-      return Future<AuthResult>.error(
-          FirebaseAuthCredentialAlreadyInUseError(credential));
+      final PhoneAuthCredential credential = PhoneAuthProvider.getCredentialWithTemporaryProof(
+          temporaryProof: response.temporaryProof, phoneNumber: response.phoneNumber);
+      return Future<AuthResult>.error(FirebaseAuthCredentialAlreadyInUseError(credential));
     }
 
-    final FirebaseUser user = await _completeSignInWithAccessToken(
-        response.idToken, int.parse(response.expiresIn), response.refreshToken);
-    final AdditionalUserInfoImpl additionalUserInfo = AdditionalUserInfoImpl(
-        providerId: ProviderType.phone, isNewUser: response.isNewUser);
+    final FirebaseUser user =
+        await _completeSignInWithAccessToken(response.idToken, int.parse(response.expiresIn), response.refreshToken);
+    final AdditionalUserInfo additionalUserInfo =
+        AdditionalUserInfo._(providerId: ProviderType.phone, isNewUser: response.isNewUser);
     return AuthResult._(user, additionalUserInfo);
   }
 
   /// Completes a sign-in flow once we have [accessToken] and [refreshToken] for the user.
-  Future<FirebaseUser> _completeSignInWithAccessToken(
-      String accessToken, int expiresIn, String refreshToken,
+  Future<FirebaseUser> _completeSignInWithAccessToken(String accessToken, int expiresIn, String refreshToken,
       {bool anonymous = false}) async {
-    final DateTime accessTokenExpirationDate =
-        DateTime.now().add(Duration(seconds: expiresIn)).toUtc();
+    final DateTime accessTokenExpirationDate = DateTime.now().add(Duration(seconds: expiresIn)).toUtc();
     final FirebaseUser user = await FirebaseUser._retrieveUserWithAuth(
       this,
       accessToken,
@@ -669,8 +619,7 @@ class FirebaseAuth implements InternalTokenProvider {
 
   void _possiblyPostAuthStateChangeNotification() {
     final String token = _currentUser?._rawAccessToken;
-    if (_lastNotifiedUserToken == token ||
-        (token != null && _lastNotifiedUserToken == token)) {
+    if (_lastNotifiedUserToken == token || (token != null && _lastNotifiedUserToken == token)) {
       return;
     }
     _lastNotifiedUserToken = token;
@@ -686,27 +635,21 @@ class FirebaseAuth implements InternalTokenProvider {
   ///
   /// The token refresh is scheduled 5 minutes before the scheduled expiration time.
   void _scheduleAutoTokenRefresh() {
-    final DateTime preExpirationDate = _currentUser._accessTokenExpirationDate
-        .subtract(_kTokenRefreshHeadStart);
-    Duration tokenExpirationInterval =
-        preExpirationDate.difference(DateTime.now());
-    tokenExpirationInterval = tokenExpirationInterval < Duration.zero
-        ? Duration.zero
-        : tokenExpirationInterval;
+    final DateTime preExpirationDate = _currentUser._accessTokenExpirationDate.subtract(_kTokenRefreshHeadStart);
+    Duration tokenExpirationInterval = preExpirationDate.difference(DateTime.now());
+    tokenExpirationInterval = tokenExpirationInterval < Duration.zero ? Duration.zero : tokenExpirationInterval;
     _scheduleAutoTokenRefreshWithDelay(tokenExpirationInterval, false);
   }
 
   /// Schedules a task to automatically refresh tokens on the current user.
-  Future<void> _scheduleAutoTokenRefreshWithDelay(
-      Duration delay, bool retry) async {
+  Future<void> _scheduleAutoTokenRefreshWithDelay(Duration delay, bool retry) async {
     final String accessToken = _currentUser._rawAccessToken;
     if (accessToken == null) {
       return;
     }
 
     if (retry) {
-      print(
-          'Token auto-refresh re-scheduled in $delay because of error on previous refresh attempt.');
+      print('Token auto-refresh re-scheduled in $delay because of error on previous refresh attempt.');
     } else {
       print('Token auto-refresh scheduled in $delay for the new token.');
     }
@@ -735,9 +678,7 @@ class FirebaseAuth implements InternalTokenProvider {
         Duration rescheduleDelay;
         if (retry) {
           final Duration nextDelay = delay * 2;
-          rescheduleDelay = nextDelay < _kMaxWaitTimeForBackoff
-              ? nextDelay
-              : _kMaxWaitTimeForBackoff;
+          rescheduleDelay = nextDelay < _kMaxWaitTimeForBackoff ? nextDelay : _kMaxWaitTimeForBackoff;
         } else {
           rescheduleDelay = const Duration(minutes: 1);
         }
@@ -747,7 +688,7 @@ class FirebaseAuth implements InternalTokenProvider {
   }
 
   void _dispatchUser(FirebaseUser user) {
-    _authStateChangedSubjects[app.name].add(user);
+    _authStateChangedControllers[app.name].add(user);
   }
 
   @override
@@ -761,12 +702,10 @@ class FirebaseAuth implements InternalTokenProvider {
       _autoRefreshTokens = true;
       _scheduleAutoTokenRefresh();
 
-      _backgroundChangedSub =
-          app.onBackgroundChanged.listen(_backgroundStateChanged);
+      _backgroundChangedSub = app.onBackgroundChanged.listen(_backgroundStateChanged);
     }
 
-    final String token =
-        await _currentUser._getToken(forceRefresh: forceRefresh);
+    final String token = await _currentUser._getToken(forceRefresh: forceRefresh);
     return GetTokenResult(token);
   }
 
@@ -775,8 +714,7 @@ class FirebaseAuth implements InternalTokenProvider {
 
   @override
   Stream<InternalTokenResult> get onTokenChanged {
-    return onAuthStateChanged
-        .map((FirebaseUser user) => InternalTokenResult(user?.refreshToken));
+    return onAuthStateChanged.map((FirebaseUser user) => InternalTokenResult(user?.refreshToken));
   }
 
   void _backgroundStateChanged(bool isBackground) {

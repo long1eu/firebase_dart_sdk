@@ -18,6 +18,12 @@ Future<bool> _currentUser(FirebaseAuthOption option) async {
     ..printlnTabbed(_field('uid', user.uid))
     ..printlnTabbed(_field('isAnonymous', user.isAnonymous.toString()));
 
+  if (user.displayName != null) {
+    console.printlnTabbed(_field('displayName', user.displayName));
+  }
+  if (user.providerId != null) {
+    console.printlnTabbed(_field('providerId', user.providerId));
+  }
   if (user.email != null) {
     console.printlnTabbed(_field('email', user.email));
   }
@@ -25,8 +31,7 @@ Future<bool> _currentUser(FirebaseAuthOption option) async {
     console.printlnTabbed(_field('phoneNumber', user.phoneNumber));
   }
   if (user.isEmailVerified != null) {
-    console.printlnTabbed(
-        _field('isEmailVerified', user.isEmailVerified.toString()));
+    console.printlnTabbed(_field('isEmailVerified', user.isEmailVerified.toString()));
   }
   if (user.photoUrl != null) {
     console.printlnTabbed(_field('photoUrl', user.photoUrl));
@@ -35,10 +40,8 @@ Future<bool> _currentUser(FirebaseAuthOption option) async {
   final DateFormat format = DateFormat.yMMMMd().add_Hm();
   console
     ..println('Metadata'.bold.yellow.reset)
-    ..printlnTabbed(
-        _field('creationDate', format.format(user.metadata.creationDate)))
-    ..printlnTabbed(
-        _field('lastSignInDate', format.format(user.metadata.lastSignInDate)));
+    ..printlnTabbed(_field('creationDate', format.format(user.metadata.creationDate)))
+    ..printlnTabbed(_field('lastSignInDate', format.format(user.metadata.lastSignInDate)));
 
   if (user.providerData.isNotEmpty) {
     console.println('Providers'.bold.yellow.reset);
@@ -81,8 +84,7 @@ void _printProvider(UserInfo user) {
     console.printlnTabbed(_field('phoneNumber', user.phoneNumber), 6);
   }
   if (user.isEmailVerified != null) {
-    console.printlnTabbed(
-        _field('isEmailVerified', user.isEmailVerified.toString()), 6);
+    console.printlnTabbed(_field('isEmailVerified', user.isEmailVerified.toString()), 6);
   }
 }
 
@@ -90,13 +92,11 @@ void _printTokenResult(GetTokenResult token) {
   final DateFormat format = DateFormat.yMMMMd().add_Hm();
 
   if (token.claims.containsKey('auth_time')) {
-    console.printlnTabbed(
-        _field('authentication', format.format(token.authTimestamp)));
+    console.printlnTabbed(_field('authentication', format.format(token.authTimestamp)));
   }
   console
     ..printlnTabbed(_field('issuedAt', format.format(token.issuedAtTimestamp)))
-    ..printlnTabbed(
-        _field('expiration', format.format(token.expirationTimestamp)))
+    ..printlnTabbed(_field('expiration', format.format(token.expirationTimestamp)))
     ..printlnTabbed(_field('signInProvider', token.signInProvider));
 
   if (token.extraClaims != null) {
@@ -109,12 +109,9 @@ void _printTokenResult(GetTokenResult token) {
   }
 
   final List<List<int>> chunks = _split('token: ${token.token}'.codeUnits, 80);
-  final String firstLine =
-      String.fromCharCodes(chunks.removeAt(0)).split('token: ')[1];
+  final String firstLine = String.fromCharCodes(chunks.removeAt(0)).split('token: ')[1];
   console.printlnTabbed('token: ${firstLine.bold.cyan.reset}');
-  chunks
-      .map((List<int> it) => String.fromCharCodes(it).bold.cyan.reset)
-      .forEach(console.printlnTabbed);
+  chunks.map((List<int> it) => String.fromCharCodes(it).bold.cyan.reset).forEach(console.printlnTabbed);
 }
 
 List<List<int>> _split(List<int> list, int size) {

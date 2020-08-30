@@ -5,8 +5,7 @@
 part of firebase_auth_example;
 
 /// Signature for building a CodeResponse form the response that we received from [DeviceLogin._requestCodeUrl]
-typedef CodeResponseBuilder = CodeResponse Function(
-    Map<String, dynamic> response);
+typedef CodeResponseBuilder = CodeResponse Function(Map<String, dynamic> response);
 
 /// Signature for validating the response of each pool. If the response is not valid, should return a non null value
 /// witch will be thrown.
@@ -52,13 +51,10 @@ class DeviceLogin {
     final Response response = await _client.post(_requestCodeUrl);
     await progress.cancel();
 
-    final CodeResponse codeResponse = _codeResponseBuilder(
-        Map<String, dynamic>.from(jsonDecode(response.body)));
+    final CodeResponse codeResponse = _codeResponseBuilder(Map<String, dynamic>.from(jsonDecode(response.body)));
     Uri verifyUri = Uri.parse(codeResponse.verificationUri);
-    verifyUri = verifyUri.replace(queryParameters: <String, String>{
-      ...verifyUri.queryParameters,
-      'user_code': codeResponse.userCode
-    });
+    verifyUri = verifyUri
+        .replace(queryParameters: <String, String>{...verifyUri.queryParameters, 'user_code': codeResponse.userCode});
 
     console //
       ..println(
@@ -66,23 +62,18 @@ class DeviceLogin {
       ..println(verifyUri)
       ..println();
 
-    final Completer<Map<String, dynamic>> completer =
-        Completer<Map<String, dynamic>>();
+    final Completer<Map<String, dynamic>> completer = Completer<Map<String, dynamic>>();
     unawaited(_poll(codeResponse, completer));
     return completer.future;
   }
 
-  Future<void> _poll(CodeResponse codeResponse,
-      Completer<Map<String, dynamic>> completer) async {
-    final Progress progress =
-        Progress('Waiting for you authorization on $_providerName')..show();
+  Future<void> _poll(CodeResponse codeResponse, Completer<Map<String, dynamic>> completer) async {
+    final Progress progress = Progress('Waiting for you authorization on $_providerName')..show();
     final DateTime start = DateTime.now();
     do {
       await Future<void>.delayed(codeResponse.interval);
-      final Uri pollUrl = _pollUrl.replace(queryParameters: <String, String>{
-        ..._pollUrl.queryParameters,
-        'code': codeResponse.code
-      });
+      final Uri pollUrl =
+          _pollUrl.replace(queryParameters: <String, String>{..._pollUrl.queryParameters, 'code': codeResponse.code});
 
       final Response response = await _client.post(pollUrl);
       final Map<String, dynamic> responseData = jsonDecode(response.body);

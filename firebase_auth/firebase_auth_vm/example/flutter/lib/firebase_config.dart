@@ -14,7 +14,7 @@ FirebaseOptions get firebaseOptions {
       gcmSenderId: '233259864964',
       databaseUrl: 'https://flutter-sdk.firebaseio.com',
       storageBucket: 'flutter-sdk.appspot.com',
-      applicationId: '1:233259864964:android:824fdc4c5df0d579d583d1',
+      appId: '1:233259864964:android:824fdc4c5df0d579d583d1',
     );
   } else if (Platform.isIOS) {
     return FirebaseOptions(
@@ -23,7 +23,7 @@ FirebaseOptions get firebaseOptions {
       gcmSenderId: '233259864964',
       databaseUrl: 'https://flutter-sdk.firebaseio.com',
       storageBucket: 'flutter-sdk.appspot.com',
-      applicationId: '1:233259864964:ios:2523e686810855f4d583d1',
+      appId: '1:233259864964:ios:2523e686810855f4d583d1',
     );
   } else {
     return FirebaseOptions(
@@ -32,7 +32,7 @@ FirebaseOptions get firebaseOptions {
       gcmSenderId: '233259864964',
       databaseUrl: 'https://flutter-sdk.firebaseio.com',
       storageBucket: 'flutter-sdk.appspot.com',
-      applicationId:
+      appId:
           '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
     );
   }

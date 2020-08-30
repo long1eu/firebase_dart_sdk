@@ -6,14 +6,12 @@ part of firebase_auth_vm;
 
 abstract class EmailAuthProvider {
   /// Creates an [AuthCredential] for an email & password sign in.
-  static AuthCredential getCredential(
-      {@required String email, @required String password}) {
+  static AuthCredential getCredential({@required String email, @required String password}) {
     return EmailPasswordAuthCredential._(email: email, password: password);
   }
 
   /// Creates an [AuthCredential] for an email & link sign in.
-  static AuthCredential getCredentialWithLink(
-      {@required String email, @required String link}) {
+  static AuthCredential getCredentialWithLink({@required String email, @required String link}) {
     return EmailPasswordAuthCredential._(email: email, link: link);
   }
 }
@@ -55,8 +53,7 @@ class GithubAuthProvider {
 
 class GoogleAuthProvider {
   /// Creates an [AuthCredential] for a Google sign in.
-  static AuthCredential getCredential(
-      {@required String idToken, @required String accessToken}) {
+  static AuthCredential getCredential({@required String idToken, @required String accessToken}) {
     return GoogleAuthCredential._(idToken: idToken, accessToken: accessToken);
   }
 }
@@ -102,41 +99,28 @@ class OAuthProvider {
   }
 }
 
-class SamlAuthProvider {
-  static AuthCredential getCredential({
-    @required String providerId,
-    @required String signInMethod,
-    @required String pendingToken,
-  }) {
-    assert(providerId.startsWith('saml.'),
-        'SAML provider IDs must be prefixed with "saml."');
-    return SamlAuthCredential._(
-      providerId: providerId,
-      signInMethod: signInMethod,
-      pendingToken: pendingToken,
-    );
-  }
-}
-
 class PhoneAuthProvider {
-  static AuthCredential getCredential(
-      {@required String verificationId, @required String verificationCode}) {
-    return PhoneAuthCredential._(
-        verificationId: verificationId, verificationCode: verificationCode);
+  static AuthCredential getCredential({
+    @required String verificationId,
+    @required String verificationCode,
+  }) {
+    return PhoneAuthCredential._(verificationId: verificationId, verificationCode: verificationCode);
   }
 
-  static AuthCredential getCredentialWithTemporaryProof(
-      {@required String temporaryProof, @required String phoneNumber}) {
-    return PhoneAuthCredential._(
-        temporaryProof: temporaryProof, phoneNumber: phoneNumber);
+  static AuthCredential getCredentialWithTemporaryProof({
+    @required String temporaryProof,
+    @required String phoneNumber,
+  }) {
+    return PhoneAuthCredential._(temporaryProof: temporaryProof, phoneNumber: phoneNumber);
   }
 }
 
 class TwitterAuthProvider {
-  /// Creates an [AuthCredential] for a Google sign in.
-  static AuthCredential getCredential(
-      {@required String authToken, @required String authTokenSecret}) {
-    return TwitterAuthCredential._(
-        authToken: authToken, authTokenSecret: authTokenSecret);
+  /// Creates an [AuthCredential] for Twitter sign in.
+  static AuthCredential getCredential({
+    @required String authToken,
+    @required String authTokenSecret,
+  }) {
+    return TwitterAuthCredential._(authToken: authToken, authTokenSecret: authTokenSecret);
   }
 }

@@ -20,8 +20,7 @@ class SecureTokenApi {
   /// Creates a SecureTokenService with an authorization code.
   ///
   /// [authorizationCode] needs to be exchanged for STS tokens.
-  SecureTokenApi.authorizationCode(
-      {@required Client client, @required String authorizationCode})
+  SecureTokenApi.authorizationCode({@required Client client, @required String authorizationCode})
       : assert(client != null),
         _secureTokenService = SecureTokenService(client),
         _authorizationCode = authorizationCode;
@@ -58,8 +57,7 @@ class SecureTokenApi {
       request = SecureTokenRequest.withCode(_authorizationCode);
     }
 
-    final SecureTokenResponse response =
-        await _secureTokenService.refreshToken(request);
+    final SecureTokenResponse response = await _secureTokenService.refreshToken(request);
     final String newAccessToken = response.accessToken;
     if (newAccessToken != null && newAccessToken != _accessToken) {
       _accessToken = newAccessToken;
@@ -76,7 +74,6 @@ class SecureTokenApi {
 
   bool get hasValidAccessToken {
     return _accessToken != null &&
-        _accessTokenExpirationDate.difference(DateTime.now().toUtc()) >
-            _kTokenRefreshHeadStart;
+        _accessTokenExpirationDate.difference(DateTime.now().toUtc()) > _kTokenRefreshHeadStart;
   }
 }

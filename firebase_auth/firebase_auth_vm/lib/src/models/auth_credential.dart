@@ -9,264 +9,434 @@ mixin AuthCredential {
   /// The identity provider for the credential
   String get providerId;
 
-  @memoized
   Map<String, dynamic> get json;
 
   /// Called immediately before a request to the verifyAssertion endpoint is made.
   ///
   /// Implementers should update the passed request instance with their credentials.
-  void prepareVerifyAssertionRequest(
-      IdentitytoolkitRelyingpartyVerifyAssertionRequest request);
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request);
 }
 
 /// Internal implementation of [AuthCredential] for Email/Password credentials.
-abstract class EmailPasswordAuthCredential with AuthCredential {
-  factory EmailPasswordAuthCredential._(
-      {@required String email, String password, String link}) {
-    return _$EmailPasswordAuthCredentialImpl(
-        (EmailPasswordAuthCredentialImplBuilder b) {
-      b
-        ..providerId = ProviderType.password
-        ..email = email
-        ..password = password
-        ..link = link;
-    });
-  }
+class EmailPasswordAuthCredential with AuthCredential {
+  EmailPasswordAuthCredential._({
+    @required this.email,
+    this.password,
+    this.link,
+  })  : assert(password != null || link != null, 'You must either provide a password or the email link.'),
+        providerId = ProviderType.password;
+
+  /// The identity provider for the credential
+  @override
+  final String providerId;
 
   /// The user's email address.
-  String get email;
+  final String email;
 
   /// The user's password.
-  @nullable
-  String get password;
+  /*@nullable*/
+  final String password;
 
   /// The email sign-in link.
-  @nullable
-  String get link;
+  /*@nullable*/
+  final String link;
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a EmailPasswordAuthCredential.');
+  }
+
+  @override
+  Map<String, dynamic> get json {
+    return <String, dynamic>{
+      'providerId': providerId,
+      'email': email,
+      if (password != null) 'password': password,
+      if (link != null) 'link': link,
+    };
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(EmailPasswordAuthCredential)
+          ..add('providerId', providerId)
+          ..add('email', email)
+          ..add('password', password)
+          ..add('link', link))
+        .toString();
+  }
 }
 
 /// Internal implementation of [AuthCredential] for the Facebook IdP.
-abstract class FacebookAuthCredential with AuthCredential {
-  factory FacebookAuthCredential._(String accessToken) {
-    return _$FacebookAuthCredentialImpl((FacebookAuthCredentialImplBuilder b) {
-      b
-        ..providerId = ProviderType.facebook
-        ..accessToken = accessToken;
-    });
-  }
+class FacebookAuthCredential with AuthCredential {
+  FacebookAuthCredential._(this.accessToken) : providerId = ProviderType.facebook;
+
+  /// The identity provider for the credential
+  @override
+  final String providerId;
 
   /// The Access Token from Facebook.
-  String get accessToken;
+  final String accessToken;
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..postBody = 'providerId=$providerId&access_token=$accessToken'
+      ..requestUri = 'http://localhost';
+  }
+
+  @override
+  Map<String, dynamic> get json {
+    return <String, dynamic>{
+      'providerId': providerId,
+      'accessToken': accessToken,
+    };
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(FacebookAuthCredential)..add('providerId', providerId)..add('accessToken', accessToken))
+        .toString();
+  }
 }
 
 /// Internal implementation of [AuthCredential] for Game Center credentials.
-abstract class GameCenterAuthCredential with AuthCredential {
-  factory GameCenterAuthCredential._({
-    @required String playerId,
-    @required String publicKeyUrl,
-    @required Uint8List signature,
-    @required Uint8List salt,
-    @required DateTime timestamp,
-    @required String displayName,
-  }) {
-    return _$GameCenterAuthCredentialImpl(
-        (GameCenterAuthCredentialImplBuilder b) {
-      b
-        ..providerId = ProviderType.gameCenter
-        ..playerId = playerId
-        ..publicKeyUrl = publicKeyUrl
-        ..signature = signature
-        ..salt = salt
-        ..timestamp = timestamp
-        ..displayName = displayName;
-    });
-  }
+class GameCenterAuthCredential with AuthCredential {
+  GameCenterAuthCredential._({
+    @required this.playerId,
+    @required this.publicKeyUrl,
+    @required this.signature,
+    @required this.salt,
+    @required this.timestamp,
+    @required this.displayName,
+  }) : providerId = ProviderType.gameCenter;
+
+  /// The identity provider for the credential
+  @override
+  final String providerId;
 
   /// The ID of the Game Center local player.
-  String get playerId;
+  final String playerId;
 
   /// The URL for the public encryption key.
-  String get publicKeyUrl;
+  final String publicKeyUrl;
 
   /// The verification signature data generated.
-  Uint8List get signature;
+  final Uint8List signature;
 
   /// A random string used to compute the hash and keep it randomized.
-  Uint8List get salt;
+  final Uint8List salt;
 
   /// The date and time that the signature was created.
-  DateTime get timestamp;
+  final DateTime timestamp;
 
-  /// The date and time that the signature was created.
-  String get displayName;
+  /// A string chosen by the player to identify themselves to other players.
+  final String displayName;
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a GameCenterAuthCredential.');
+  }
+
+  @override
+  Map<String, dynamic> get json {
+    return <String, dynamic>{
+      'providerId': providerId,
+      'playerId': playerId,
+      'publicKeyUrl': publicKeyUrl,
+      'signature': signature,
+      'salt': salt,
+      'timestamp': timestamp,
+      'displayName': displayName,
+    };
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(GameCenterAuthCredential)
+          ..add('providerId', providerId)
+          ..add('playerId', playerId)
+          ..add('publicKeyUrl', publicKeyUrl)
+          ..add('signature', signature)
+          ..add('salt', salt)
+          ..add('timestamp', timestamp)
+          ..add('displayName', displayName))
+        .toString();
+  }
 }
 
 /// Internal implementation of [AuthCredential] for GitHub credentials.
-abstract class GithubAuthCredential with AuthCredential {
-  factory GithubAuthCredential._(String token) {
-    return _$GithubAuthCredentialImpl((GithubAuthCredentialImplBuilder b) {
-      b
-        ..providerId = ProviderType.github
-        ..token = token;
-    });
-  }
+class GithubAuthCredential with AuthCredential {
+  GithubAuthCredential._(this.token) : providerId = ProviderType.github;
+
+  /// The identity provider for the credential
+  @override
+  final String providerId;
 
   /// The GitHub OAuth access token.
-  String get token;
+  final String token;
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..postBody = 'providerId=$providerId&access_token=$token'
+      ..requestUri = 'http://localhost';
+  }
+
+  @override
+  Map<String, dynamic> get json {
+    return <String, dynamic>{
+      'providerId': providerId,
+      'token': token,
+    };
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(GithubAuthCredential) //
+          ..add('providerId', providerId)
+          ..add('token', token))
+        .toString();
+  }
 }
 
 /// Internal implementation of [AuthCredential] for the Google IdP.
-abstract class GoogleAuthCredential with AuthCredential {
-  factory GoogleAuthCredential._(
-      {@required String idToken, @required String accessToken}) {
-    return _$GoogleAuthCredentialImpl((GoogleAuthCredentialImplBuilder b) {
-      b
-        ..providerId = ProviderType.google
-        ..idToken = idToken
-        ..accessToken = accessToken;
-    });
-  }
+class GoogleAuthCredential with AuthCredential {
+  GoogleAuthCredential._({@required this.idToken, @required this.accessToken}) : providerId = ProviderType.google;
+
+  /// The identity provider for the credential
+  @override
+  final String providerId;
 
   /// The ID Token obtained from Google.
-  String get idToken;
+  final String idToken;
 
   /// The Access Token obtained from Google.
-  String get accessToken;
+  final String accessToken;
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..postBody = 'providerId=$providerId&id_token=$idToken&access_token=$accessToken'
+      ..requestUri = 'http://localhost';
+  }
+
+  @override
+  Map<String, dynamic> get json {
+    return <String, dynamic>{
+      'providerId': providerId,
+      'idToken': idToken,
+      'accessToken': accessToken,
+    };
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(GoogleAuthCredential) //
+          ..add('providerId', providerId)
+          ..add('idToken', idToken)
+          ..add('accessToken', accessToken))
+        .toString();
+  }
 }
 
 /// Internal implementation of [AuthCredential] for GitHub credentials.
-abstract class OAuthCredential with AuthCredential {
-  factory OAuthCredential._({
-    @required String providerId,
-    List<String> scopes,
-    Map<String, String> customParameters,
-    String sessionId,
-    String requestUri,
-    String idToken,
-    String accessToken,
-    String secret,
-    String pendingToken,
-    String nonce,
-  }) {
-    return _$OAuthCredentialImpl((OAuthCredentialImplBuilder b) {
-      b
-        ..providerId = providerId
-        ..scopes = scopes == null ? null : ListBuilder<String>(scopes)
-        ..customParameters = customParameters == null
-            ? null
-            : MapBuilder<String, String>(customParameters)
-        ..sessionId = sessionId
-        ..requestUri = requestUri
-        ..idToken = idToken
-        ..accessToken = accessToken
-        ..secret = secret
-        ..pendingToken = pendingToken
-        ..nonce = nonce;
-    });
-  }
+class OAuthCredential with AuthCredential {
+  OAuthCredential._({
+    @required this.providerId,
+    this.scopes,
+    this.customParameters,
+    this.sessionId,
+    this.requestUri,
+    this.idToken,
+    this.accessToken,
+    this.secret,
+    this.pendingToken,
+    this.nonce,
+  });
+
+  /// The identity provider for the credential
+  @override
+  final String providerId;
 
   /// Used to configure the OAuth scopes.
-  @nullable
-  BuiltList<String> get scopes;
+  /*@nullable*/
+  final List<String> scopes;
 
   /// Used to configure the OAuth custom parameters.
-  @nullable
-  BuiltMap<String, String> get customParameters;
+  /*@nullable*/
+  final Map<String, String> customParameters;
 
   /// The session ID used when completing the headful-lite flow.
-  @nullable
-  String get sessionId;
+  /*@nullable*/
+  final String sessionId;
 
   /// A string representation of the response URL corresponding to this OAuthCredential.
-  @nullable
-  String get requestUri;
+  /*@nullable*/
+  final String requestUri;
 
-  @nullable
-  String get idToken;
+  /*@nullable*/
+  final String idToken;
 
-  @nullable
-  String get accessToken;
+  /*@nullable*/
+  final String accessToken;
 
-  @nullable
-  String get secret;
+  /*@nullable*/
+  final String secret;
 
   /// The pending token used when completing the headful-lite flow.
   ///
   /// Where the IdP response is encrypted.
-  @nullable
-  String get pendingToken;
+  /*@nullable*/
+  final String pendingToken;
 
-  @nullable
-  String get nonce;
-}
+  /*@nullable*/
+  final String nonce;
 
-/// The SAML Auth credential class.
-abstract class SamlAuthCredential with AuthCredential {
-  factory SamlAuthCredential._({
-    @required String providerId,
-    @required String signInMethod,
-    @required String pendingToken,
-  }) {
-    return _$SamlAuthCredentialImpl((SamlAuthCredentialImplBuilder b) {
-      b
-        ..providerId = ProviderType.phone
-        ..providerId = providerId
-        ..signInMethod = signInMethod
-        ..pendingToken = pendingToken;
-    });
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    final Map<String, String> fields = <String, String>{
+      if (customParameters != null) ...customParameters,
+      if (scopes != null && scopes.isNotEmpty) 'scope': scopes.join(' '),
+      if (idToken != null) 'id_token': idToken,
+      if (secret != null) 'oauth_token_secret': secret,
+      'providerId': providerId,
+      'access_token': accessToken,
+    };
+
+    request
+      ..postBody = fields.keys.map((String key) => '$key=${fields[key]}').join('&')
+      ..requestUri = requestUri ?? 'http://localhost'
+      ..sessionId = sessionId
+      ..pendingIdToken = pendingToken;
   }
 
-  String get signInMethod;
+  @override
+  Map<String, dynamic> get json {
+    return <String, dynamic>{
+      'providerId': providerId,
+      'scopes': scopes,
+      'customParameters': customParameters,
+      'sessionId': sessionId,
+      'requestUri': requestUri,
+      'idToken': idToken,
+      'accessToken': accessToken,
+      'secret': secret,
+      'pendingToken': pendingToken,
+      'nonce': nonce,
+    };
+  }
 
-  String get pendingToken;
+  @override
+  String toString() {
+    return (ToStringHelper(OAuthCredential)
+          ..add('providerId', providerId)
+          ..add('scopes', scopes)
+          ..add('customParameters', customParameters)
+          ..add('sessionId', sessionId)
+          ..add('requestUri', requestUri)
+          ..add('idToken', idToken)
+          ..add('accessToken', accessToken)
+          ..add('secret', secret)
+          ..add('pendingToken', pendingToken)
+          ..add('nonce', nonce))
+        .toString();
+  }
 }
 
-abstract class PhoneAuthCredential with AuthCredential {
-  factory PhoneAuthCredential._({
-    String verificationId,
-    String verificationCode,
-    String temporaryProof,
-    String phoneNumber,
-  }) {
-    return _$PhoneAuthCredentialImpl((PhoneAuthCredentialImplBuilder b) {
-      b
-        ..providerId = ProviderType.phone
-        ..verificationId = verificationId
-        ..verificationCode = verificationCode
-        ..temporaryProof = temporaryProof
-        ..phoneNumber = phoneNumber;
-    });
-  }
+class PhoneAuthCredential with AuthCredential {
+  PhoneAuthCredential._({
+    this.verificationId,
+    this.verificationCode,
+    this.temporaryProof,
+    this.phoneNumber,
+  }) : providerId = ProviderType.phone;
+
+  /// The identity provider for the credential
+  @override
+  final String providerId;
 
   /// The verification ID obtained from invoking [FirebaseAuth.verifyPhoneNumber]
-  @nullable
-  String get verificationId;
+  /*@nullable*/
+  final String verificationId;
 
   /// The verification code provided by the user.
-  @nullable
-  String get verificationCode;
+  /*@nullable*/
+  final String verificationCode;
 
   /// The a temporary proof code pertaining to this credential, returned from the backend.
-  @nullable
-  String get temporaryProof;
+  /*@nullable*/
+  final String temporaryProof;
 
   /// The a phone number pertaining to this credential, returned from the backend.
-  @nullable
-  String get phoneNumber;
-}
+  /*@nullable*/
+  final String phoneNumber;
 
-abstract class TwitterAuthCredential with AuthCredential {
-  factory TwitterAuthCredential._(
-      {@required String authToken, @required String authTokenSecret}) {
-    return _$TwitterAuthCredentialImpl((TwitterAuthCredentialImplBuilder b) {
-      b
-        ..providerId = ProviderType.twitter
-        ..authToken = authToken
-        ..authTokenSecret = authTokenSecret;
-    });
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    throw FirebaseAuthError('NOT_IMPLEMENTED', 'You should not use the postBody of a PhoneAuthCredential.');
   }
 
-  String get authToken;
+  @override
+  Map<String, dynamic> get json {
+    return <String, dynamic>{
+      'providerId': providerId,
+      'verificationId': verificationId,
+      'verificationCode': verificationCode,
+      'temporaryProof': temporaryProof,
+      'phoneNumber': phoneNumber,
+    };
+  }
 
-  String get authTokenSecret;
+  @override
+  String toString() {
+    return (ToStringHelper(PhoneAuthCredential)
+          ..add('providerId', providerId)
+          ..add('verificationId', verificationId)
+          ..add('verificationCode', verificationCode)
+          ..add('temporaryProof', temporaryProof)
+          ..add('phoneNumber', phoneNumber))
+        .toString();
+  }
+}
+
+/// Internal implementation of FIRAuthCredential for Twitter credentials.
+class TwitterAuthCredential with AuthCredential {
+  TwitterAuthCredential._({@required this.authToken, @required this.authTokenSecret})
+      : providerId = ProviderType.twitter;
+
+  /// The identity provider for the credential
+  @override
+  final String providerId;
+
+  /// The Twitter OAuth token.
+  final String authToken;
+
+  /// The Twitter OAuth secret.
+  final String authTokenSecret;
+
+  @override
+  void prepareVerifyAssertionRequest(IdentitytoolkitRelyingpartyVerifyAssertionRequest request) {
+    request
+      ..postBody = 'providerId=$providerId&access_token=$authToken&oauth_token_secret=$authTokenSecret'
+      ..requestUri = 'http://localhost';
+  }
+
+  @override
+  Map<String, dynamic> get json {
+    return <String, dynamic>{
+      'providerId': providerId,
+      'authToken': authToken,
+      'authTokenSecret': authTokenSecret,
+    };
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(TwitterAuthCredential)
+          ..add('providerId', providerId)
+          ..add('authToken', authToken)
+          ..add('authTokenSecret', authTokenSecret))
+        .toString();
+  }
 }

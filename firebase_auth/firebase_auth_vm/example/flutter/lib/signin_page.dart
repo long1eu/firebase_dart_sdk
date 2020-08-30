@@ -59,7 +59,7 @@ class SignInPageState extends State<SignInPage> {
           scrollDirection: Axis.vertical,
           children: <Widget>[
             _EmailPasswordForm(),
-            if (isMobile) _EmailLinkSignInSection(),
+            if (kIsMobile) _EmailLinkSignInSection(),
             _AnonymouslySignInSection(),
             _GoogleSignInSection(),
             _PhoneSignInSection(scaffold: Scaffold.of(context)),
