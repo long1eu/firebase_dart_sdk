@@ -1,104 +1,108 @@
 // File created by
 // Lung Razvan <long1eu>
-// on 09/12/2019
+// on 31/08/2020
 
-part of firebase_auth_vm;
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:firebase_auth_vm/firebase_auth_vm.dart';
+
+import 'recaptcha_token.dart' as base;
 
 /// Function for directing the user or it's user-agent to [uri].
 ///
 /// The user is required to go to [uri] and either complete or decline the application verification.
 typedef UrlPresenter = void Function(Uri uri);
 
-typedef GetRecaptchaToken = Future<String> Function();
-
 /// Runs an reCAPTCHA flow using an HTTP server.
 ///
 /// It takes a user supplied function which will be called with an URI. The user is expected to navigate to that URI and
 /// verify the challenge.
-///
-/// Once the user successfully verified the app, the HTTP server will redirect the user agent to a URL pointing to a
-/// locally running HTTP server. Which in turn will be able to extract the recaptcha token.
-Future<String> getRecaptchaToken({
-  UrlPresenter urlPresenter,
-  String apiKey,
-  String languageCode,
-}) async {
-  final Completer<String> completer = Completer<String>();
-  final HttpServer server = await HttpServer.bind('localhost', 0);
-  final Stream<HttpRequest> events = server.asBroadcastStream();
+class RecaptchaToken implements base.RecaptchaToken {
+  const RecaptchaToken();
 
-  final int port = server.port;
-  final String state = randomString(32);
+  /// Once the user successfully verified the app, the HTTP server will redirect the user agent to a URL pointing to a
+  /// locally running HTTP server. Which in turn will be able to extract the recaptcha token.
+  @override
+  Future<String> get({UrlPresenter urlPresenter, String apiKey, String languageCode}) async {
+    final Completer<String> completer = Completer<String>();
+    final HttpServer server = await HttpServer.bind('localhost', 0);
+    final Stream<HttpRequest> events = server.asBroadcastStream();
 
-  urlPresenter(Uri.http(
-    'localhost:$port',
-    '__/auth/handler',
-    <String, String>{
-      'state': state,
-      'apiKey': apiKey,
-      if (languageCode != null) 'languageCode': languageCode,
-    },
-  ));
+    final int port = server.port;
+    final String state = randomString(32);
 
-  events.listen((HttpRequest request) async {
-    switch (request.requestedUri.path) {
-      case '/__/auth/handler':
-        // send the initial page
-        request.response
-          ..statusCode = 200
-          ..headers.set('content-type', 'text/html; charset=UTF-8')
-          ..write(_initialHtml);
-        await request.response.close();
-        break;
-      case '/favicon.ico':
-        // send the favicon
-        request.response
-          ..statusCode = 200
-          ..headers.set('content-type', 'image/png; base64')
-          ..add(base64Decode(
-              'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACY0lEQVR4AcWTA6xcQRhGn20rqm2bMRs3rM2wtm0zqhHUtqI6qm0s3ur+/Wa9/+Ji9qVJTjA652ISiCg2exP6gyZ8PF5oCZgOboHk/xVwEBCYGmGuFehS1wHPvQEW0JDNLQfH4xrABNnACcjLdZDknUsC74ELNKirgE6AGJO8cwODxraIsUgod5qmyASMjBBgAvXB/qAxCygJ23+vSROwXSZgEyCObVPKI8e2ZAsbn8PkzcEn8Eom4EakgN+Lssi0IoOPfwWZXnkb8AUQUOxXWuTqDRDyRPAnwtPT99m59GNOLim7EnnEKAjbgW+AfDivN+9sJKABIM6vhdnuAIFlbVro/KGstxD+BBSM62azoUYCBnF57cZUv1zwc3420R6fHG//TiMhDAM3YZWRgHnBciESQohDEJ8ET87lnNNGAk4GB1jXp4XJBeatRWpywVsjAS99cmVPIv2clxMm/7OhlJTbjYVAFdyEfM0BkBaEPP3atHD5RsjvqMuDbkI3PQG9/U+/O5F+zA19+r+bSonU5fwmjNQTMNEXYFmdHirfUqZX7rsJa/UE7ALk2oWnn5MTkG+F/K52KeO8noAHgMwr0wPybeUycsFHTQEQpwCra2cSfZ/jkZt2yMl9OK60KNIS0AyQaXmGR76rQkbKb0JPLQGDnduT3HLzbkk5w3Wr2RgtAcv/Lssk895KeSlDudtko2qAfUvKbdPe6rjL8fRku9jysmqAaU+N03q2lVgsNsVLTOJM8EU1AIv6gCuAJEK4WHAF9FEJkAzRIeYB0iF6xTzAaIhhMQ8wHKJTLB/AQ5hYN/8Am8FSntayj78AAAAASUVORK5CYII='));
-        await request.response.close();
-        break;
-      case '/__/auth/handler/response':
-        final Uri uri = request.requestedUri;
-        final String returnedState = uri.queryParameters['state'];
-        final String token = uri.queryParameters['token'];
-        final String error = uri.queryParameters['error'];
-        String message;
+    urlPresenter(Uri.http(
+      'localhost:$port',
+      '__/auth/handler',
+      <String, String>{
+        'state': state,
+        'apiKey': apiKey,
+        if (languageCode != null) 'languageCode': languageCode,
+      },
+    ));
 
-        if (request.method != 'GET') {
-          message = 'Invalid response from server (expected GET request callback, got: ${request.method}).';
-        } else if (state != returnedState) {
-          message = 'Invalid response from server (state did not match).';
-        } else if (error != null) {
-          message = 'Error occurred while obtaining access credentials: $error';
-        } else if (token == null || token == '') {
-          message = 'Invalid response from server (no token transmitted).';
-        }
-
-        if (message != null) {
-          request.response
-            ..statusCode = 500
-            ..headers.set('content-type', 'text/plain; charset=UTF-8')
-            ..write(message);
-          await request.response.close();
-          completer.completeError(Exception(message));
-        } else {
+    events.listen((HttpRequest request) async {
+      switch (request.requestedUri.path) {
+        case '/__/auth/handler':
+          // send the initial page
           request.response
             ..statusCode = 200
             ..headers.set('content-type', 'text/html; charset=UTF-8')
-            ..write(_successHtml);
+            ..write(_initialHtml);
           await request.response.close();
-          completer.complete(token);
-        }
-        break;
+          break;
+        case '/favicon.ico':
+          // send the favicon
+          request.response
+            ..statusCode = 200
+            ..headers.set('content-type', 'image/png; base64')
+            ..add(base64Decode(
+                'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACY0lEQVR4AcWTA6xcQRhGn20rqm2bMRs3rM2wtm0zqhHUtqI6qm0s3ur+/Wa9/+Ji9qVJTjA652ISiCg2exP6gyZ8PF5oCZgOboHk/xVwEBCYGmGuFehS1wHPvQEW0JDNLQfH4xrABNnACcjLdZDknUsC74ELNKirgE6AGJO8cwODxraIsUgod5qmyASMjBBgAvXB/qAxCygJ23+vSROwXSZgEyCObVPKI8e2ZAsbn8PkzcEn8Eom4EakgN+Lssi0IoOPfwWZXnkb8AUQUOxXWuTqDRDyRPAnwtPT99m59GNOLim7EnnEKAjbgW+AfDivN+9sJKABIM6vhdnuAIFlbVro/KGstxD+BBSM62azoUYCBnF57cZUv1zwc3420R6fHG//TiMhDAM3YZWRgHnBciESQohDEJ8ET87lnNNGAk4GB1jXp4XJBeatRWpywVsjAS99cmVPIv2clxMm/7OhlJTbjYVAFdyEfM0BkBaEPP3atHD5RsjvqMuDbkI3PQG9/U+/O5F+zA19+r+bSonU5fwmjNQTMNEXYFmdHirfUqZX7rsJa/UE7ALk2oWnn5MTkG+F/K52KeO8noAHgMwr0wPybeUycsFHTQEQpwCra2cSfZ/jkZt2yMl9OK60KNIS0AyQaXmGR76rQkbKb0JPLQGDnduT3HLzbkk5w3Wr2RgtAcv/Lssk895KeSlDudtko2qAfUvKbdPe6rjL8fRku9jysmqAaU+N03q2lVgsNsVLTOJM8EU1AIv6gCuAJEK4WHAF9FEJkAzRIeYB0iF6xTzAaIhhMQ8wHKJTLB/AQ5hYN/8Am8FSntayj78AAAAASUVORK5CYII='));
+          await request.response.close();
+          break;
+        case '/__/auth/handler/response':
+          final Uri uri = request.requestedUri;
+          final String returnedState = uri.queryParameters['state'];
+          final String token = uri.queryParameters['token'];
+          final String error = uri.queryParameters['error'];
+          String message;
 
-      default:
-        print(request.requestedUri);
-    }
-  });
+          if (request.method != 'GET') {
+            message = 'Invalid response from server (expected GET request callback, got: ${request.method}).';
+          } else if (state != returnedState) {
+            message = 'Invalid response from server (state did not match).';
+          } else if (error != null) {
+            message = 'Error occurred while obtaining access credentials: $error';
+          } else if (token == null || token == '') {
+            message = 'Invalid response from server (no token transmitted).';
+          }
 
-  return completer.future.timeout(const Duration(minutes: 2)).whenComplete(server.close);
+          if (message != null) {
+            request.response
+              ..statusCode = 500
+              ..headers.set('content-type', 'text/plain; charset=UTF-8')
+              ..write(message);
+            await request.response.close();
+            completer.completeError(Exception(message));
+          } else {
+            request.response
+              ..statusCode = 200
+              ..headers.set('content-type', 'text/html; charset=UTF-8')
+              ..write(_successHtml);
+            await request.response.close();
+            completer.complete(token);
+          }
+          break;
+
+        default:
+          print(request.requestedUri);
+      }
+    });
+
+    return completer.future.timeout(const Duration(minutes: 2)).whenComplete(server.close);
+  }
 }
 
 const String _initialHtml = '''<!DOCTYPE html>

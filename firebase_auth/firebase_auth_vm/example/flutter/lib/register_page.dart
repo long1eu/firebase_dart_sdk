@@ -4,11 +4,12 @@
 
 import 'package:firebase_auth_vm/firebase_auth_vm.dart';
 import 'package:flutter/material.dart';
-
-final FirebaseAuth _auth = FirebaseAuth.instance;
+import 'package:flutter/services.dart';
 
 class RegisterPage extends StatefulWidget {
-  final String title = 'Registration';
+  const RegisterPage({Key key}) : super(key: key);
+
+  static const String title = 'Registration';
 
   @override
   State<StatefulWidget> createState() => RegisterPageState();
@@ -16,6 +17,7 @@ class RegisterPage extends StatefulWidget {
 
 class RegisterPageState extends State<RegisterPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final GlobalKey<ScaffoldState> _scaffold = GlobalKey<ScaffoldState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _success;
@@ -23,20 +25,27 @@ class RegisterPageState extends State<RegisterPage> {
 
   // Example code for registration.
   Future<void> _register() async {
-    final FirebaseUser user = (await _auth.createUserWithEmailAndPassword(
-      email: _emailController.text,
-      password: _passwordController.text,
-    ))
-        .user;
+    final String email = _emailController.text.trim();
+    final String password = _passwordController.text;
 
-    print('user: $user');
-    if (user != null) {
+    try {
+      final AuthResult authResult =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: password);
+      final FirebaseUser user = authResult.user;
+
       setState(() {
-        _success = true;
-        _userEmail = user.email;
+        if (user != null) {
+          _success = true;
+          _userEmail = user.email;
+        } else {
+          _success = false;
+        }
       });
-    } else {
-      _success = false;
+    } on FirebaseAuthError catch (e) {
+      _scaffold.currentState.showSnackBar(SnackBar(content: Text(e.message)));
+      setState(() {
+        _success = false;
+      });
     }
   }
 
@@ -51,56 +60,58 @@ class RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffold,
       appBar: AppBar(
-        title: Text(widget.title),
+        title: const Text(RegisterPage.title),
       ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            TextFormField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email'),
-              validator: (String value) {
-                if (value.isEmpty) {
-                  return 'Please enter some text';
-                }
-                return null;
-              },
-            ),
-            TextFormField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
-              validator: (String value) {
-                if (value.isEmpty) {
-                  return 'Please enter some text';
-                }
-                return null;
-              },
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-              alignment: Alignment.center,
-              child: RaisedButton(
-                onPressed: () {
-                  if (_formKey.currentState.validate()) {
-                    _register();
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'Email'),
+                validator: (String value) {
+                  if (value.isEmpty) {
+                    return 'Please enter some text';
                   }
+                  return null;
                 },
-                child: const Text('Submit'),
               ),
-            ),
-            Container(
-              alignment: Alignment.center,
-              child: Text(_success == null
-                  ? ''
-                  : (_success
-                      ? 'Successfully registered $_userEmail'
-                      : 'Registration failed')),
-            )
-          ],
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: 'Password'),
+                validator: (String value) {
+                  if (value.isEmpty) {
+                    return 'Please enter some text';
+                  }
+                  return null;
+                },
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                alignment: Alignment.center,
+                child: RaisedButton(
+                  onPressed: () {
+                    if (_formKey.currentState.validate()) {
+                      _register();
+                    }
+                  },
+                  child: const Text('Submit'),
+                ),
+              ),
+              Container(
+                alignment: Alignment.center,
+                child: Text(
+                  _success == null ? '' : (_success ? 'Successfully registered $_userEmail' : 'Registration failed'),
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );

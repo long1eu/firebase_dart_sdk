@@ -410,21 +410,20 @@ class FirebaseAuth implements InternalTokenProvider {
   ///       exceeded.
   ///   * [FirebaseAuthError.invalidPhoneNumber] - Indicates that the phone number provided is invalid.
   ///   * [FirebaseAuthError.missingPhoneNumber] - Indicates that the phone number provided was not provided.
-  Future<String> verifyPhoneNumber({@required String phoneNumber, UrlPresenter presenter}) async {
+  Future<String> verifyPhoneNumber({@required String phoneNumber, bool isTest = false, UrlPresenter presenter}) async {
     // todo: save the recaptcha token, and use it until it expires
     assert(phoneNumber != null);
     final IdentitytoolkitRelyingpartySendVerificationCodeRequest request =
         IdentitytoolkitRelyingpartySendVerificationCodeRequest()..phoneNumber = phoneNumber;
 
-    final bool isTest = Platform.environment['FIREBASE_AUTH_TEST'] ?? false;
     // We don't check the app if we are in a test
     if (!isTest) {
-      final String token = await getRecaptchaToken(
+      const RecaptchaToken token = RecaptchaToken();
+      request.recaptchaToken = await token.get(
         urlPresenter: presenter ?? print,
         apiKey: app.options.apiKey,
         languageCode: languageCode,
       );
-      request.recaptchaToken = token;
     }
 
     final IdentitytoolkitRelyingpartySendVerificationCodeResponse response =

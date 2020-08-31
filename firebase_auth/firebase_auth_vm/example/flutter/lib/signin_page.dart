@@ -9,11 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-final FirebaseAuth _auth = FirebaseAuth.instance;
-final GoogleSignIn _googleSignIn = GoogleSignIn();
-
 class SignInPage extends StatefulWidget {
-  final String title = 'Registration';
+  const SignInPage({Key key}) : super(key: key);
+
+  static const String title = 'SignInPage';
 
   @override
   State<StatefulWidget> createState() => SignInPageState();
@@ -22,25 +21,23 @@ class SignInPage extends StatefulWidget {
 class SignInPageState extends State<SignInPage> {
   // Example code for sign out.
   Future<void> _signOut() async {
-    await _auth.signOut();
+    await FirebaseAuth.instance.signOut();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: const Text(SignInPage.title),
         actions: <Widget>[
           Builder(builder: (BuildContext context) {
             return FlatButton(
               textColor: Theme.of(context).buttonColor,
               onPressed: () async {
-                await _googleSignIn.signOut();
-                final FirebaseUser user = _auth.currentUser;
+                await GoogleSignIn().signOut();
+                final FirebaseUser user = FirebaseAuth.instance.currentUser;
                 if (user == null) {
-                  Scaffold.of(context).showSnackBar(const SnackBar(
-                    content: Text('No one has signed in.'),
-                  ));
+                  Scaffold.of(context).showSnackBar(const SnackBar(content: Text('No one has signed in.')));
                   return;
                 }
                 await _signOut();
@@ -56,9 +53,11 @@ class SignInPageState extends State<SignInPage> {
       ),
       body: Builder(builder: (BuildContext context) {
         return ListView(
+          padding: const EdgeInsets.all(16.0),
           scrollDirection: Axis.vertical,
           children: <Widget>[
             _EmailPasswordForm(),
+            // todo: implement on web and desktop
             if (kIsMobile) _EmailLinkSignInSection(),
             _AnonymouslySignInSection(),
             _GoogleSignInSection(),
@@ -85,7 +84,7 @@ class _EmailPasswordFormState extends State<_EmailPasswordForm> {
 
   // Example code of how to sign in with email and password.
   Future<void> _signInWithEmailAndPassword() async {
-    final FirebaseUser user = (await _auth.signInWithEmailAndPassword(
+    final FirebaseUser user = (await FirebaseAuth.instance.signInWithEmailAndPassword(
       email: _emailController.text,
       password: _passwordController.text,
     ))
@@ -156,12 +155,10 @@ class _EmailPasswordFormState extends State<_EmailPasswordForm> {
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              _success == null
-                  ? ''
-                  : _success
-                      ? 'Successfully signed in $_userEmail'
-                      : 'Sign in failed',
-              style: TextStyle(color: Colors.red),
+              _success == null ? '' : _success ? 'Successfully signed in $_userEmail' : 'Sign in failed',
+              style: const TextStyle(
+                color: Colors.red,
+              ),
             ),
           )
         ],
@@ -196,7 +193,7 @@ class _EmailLinkSignInSectionState extends State<_EmailLinkSignInSection> {
   Future<void> _retrieveDynamicLink(PendingDynamicLinkData data) async {
     final Uri link = data?.link;
     if (link != null) {
-      final FirebaseUser user = (await _auth.signInWithEmailAndLink(
+      final FirebaseUser user = (await FirebaseAuth.instance.signInWithEmailAndLink(
         email: _userEmail,
         link: link.toString(),
       ))
@@ -216,7 +213,7 @@ class _EmailLinkSignInSectionState extends State<_EmailLinkSignInSection> {
   Future<void> _signInWithEmailAndLink() async {
     _userEmail = _emailController.text;
 
-    return _auth.sendSignInWithEmailLink(
+    return FirebaseAuth.instance.sendSignInWithEmailLink(
       email: _userEmail,
       settings: ActionCodeSettings(
         continueUrl: 'https://flutter-sdk.firebaseapp.com',
@@ -278,12 +275,10 @@ class _EmailLinkSignInSectionState extends State<_EmailLinkSignInSection> {
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              _success == null
-                  ? ''
-                  : _success
-                      ? 'Successfully signed in, uid: $_userID'
-                      : 'Sign in failed',
-              style: TextStyle(color: Colors.red),
+              _success == null ? '' : _success ? 'Successfully signed in, uid: $_userID' : 'Sign in failed',
+              style: const TextStyle(
+                color: Colors.red,
+              ),
             ),
           )
         ],
@@ -303,14 +298,14 @@ class _AnonymouslySignInSectionState extends State<_AnonymouslySignInSection> {
 
   // Example code of how to sign in anonymously.
   Future<void> _signInAnonymously() async {
-    final FirebaseUser user = (await _auth.signInAnonymously()).user;
+    final FirebaseUser user = (await FirebaseAuth.instance.signInAnonymously()).user;
     assert(user != null);
     assert(user.isAnonymous);
     assert(!user.isEmailVerified);
     assert(await user.getIdToken() != null);
     assert(user.providerData.isEmpty);
 
-    final FirebaseUser currentUser = _auth.currentUser;
+    final FirebaseUser currentUser = FirebaseAuth.instance.currentUser;
     assert(user.uid == currentUser.uid);
     setState(() {
       if (user != null) {
@@ -344,12 +339,10 @@ class _AnonymouslySignInSectionState extends State<_AnonymouslySignInSection> {
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            _success == null
-                ? ''
-                : _success
-                    ? 'Successfully signed in, uid: $_userID'
-                    : 'Sign in failed',
-            style: TextStyle(color: Colors.red),
+            _success == null ? '' : _success ? 'Successfully signed in, uid: $_userID' : 'Sign in failed',
+            style: const TextStyle(
+              color: Colors.red,
+            ),
           ),
         )
       ],
@@ -368,21 +361,19 @@ class _GoogleSignInSectionState extends State<_GoogleSignInSection> {
 
   // Example code of how to sign in with google.
   Future<void> _signInWithGoogle() async {
-    final GoogleSignInAccount googleUser = await _googleSignIn.signIn();
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
-    final AuthCredential credential = GoogleAuthProvider.getCredential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-    final FirebaseUser user =
-        (await _auth.signInWithCredential(credential)).user;
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+    final GoogleSignInAccount googleUser = await googleSignIn.signIn();
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    final AuthCredential credential =
+        GoogleAuthProvider.getCredential(accessToken: googleAuth.accessToken, idToken: googleAuth.idToken);
+    final AuthResult authResult = await FirebaseAuth.instance.signInWithCredential(credential);
+    final FirebaseUser user = authResult.user;
 
     assert(user.email != null);
     assert(!user.isAnonymous);
     assert(await user.getIdToken() != null);
 
-    final FirebaseUser currentUser = _auth.currentUser;
+    final FirebaseUser currentUser = FirebaseAuth.instance.currentUser;
     assert(user.uid == currentUser.uid);
     setState(() {
       if (user != null) {
@@ -415,12 +406,10 @@ class _GoogleSignInSectionState extends State<_GoogleSignInSection> {
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            _success == null
-                ? ''
-                : _success
-                    ? 'Successfully signed in, uid: $_userID'
-                    : 'Sign in failed',
-            style: TextStyle(color: Colors.red),
+            _success == null ? '' : _success ? 'Successfully signed in, uid: $_userID' : 'Sign in failed',
+            style: const TextStyle(
+              color: Colors.red,
+            ),
           ),
         )
       ],
@@ -451,41 +440,44 @@ class _PhoneSignInSectionState extends State<_PhoneSignInSection> {
     });
 
     try {
-      final String verificationId = await _auth.verifyPhoneNumber(
-        phoneNumber: _phoneNumberController.text,
-        presenter: (Uri uri) => launch(uri.toString()),
-      );
+      final String verificationId =
+          await FirebaseAuth.instance.verifyPhoneNumber(phoneNumber: _phoneNumberController.text);
       widget.scaffold.showSnackBar(const SnackBar(
         content: Text('Please check your phone for the verification code.'),
       ));
       setState(() {
         _verificationId = verificationId;
       });
-    } catch (e) {
+    } on FirebaseAuthError catch (e) {
       setState(() {
-        _message =
-            'Phone number verification failed. Code: ${e.code}. Message: ${e.message}';
+        _message = 'Phone number verification failed. Code: ${e.code}. Message: ${e.message}';
       });
     }
   }
 
   // Example code of how to sign in with phone.
   Future<void> _signInWithPhoneNumber() async {
-    final AuthCredential credential = PhoneAuthProvider.getCredential(
-      verificationId: _verificationId,
-      verificationCode: _smsController.text,
-    );
-    final FirebaseUser user =
-        (await _auth.signInWithCredential(credential)).user;
-    final FirebaseUser currentUser = _auth.currentUser;
-    assert(user.uid == currentUser.uid);
-    setState(() {
-      if (user != null) {
-        _message = 'Successfully signed in, uid: ${user.uid}';
-      } else {
-        _message = 'Sign in failed';
-      }
-    });
+    try {
+      final AuthCredential credential = PhoneAuthProvider.getCredential(
+        verificationId: _verificationId,
+        verificationCode: _smsController.text.trim(),
+      );
+      final AuthResult authResult = await FirebaseAuth.instance.signInWithCredential(credential);
+      final FirebaseUser user = authResult.user;
+      final FirebaseUser currentUser = FirebaseAuth.instance.currentUser;
+      assert(user.uid == currentUser.uid);
+      setState(() {
+        if (user != null) {
+          _message = 'Successfully signed in, uid: ${user.uid}';
+        } else {
+          _message = 'Sign in failed';
+        }
+      });
+    } on FirebaseAuthError catch (e) {
+      setState(() {
+        _message = e.message;
+      });
+    }
   }
 
   @override
@@ -501,8 +493,7 @@ class _PhoneSignInSectionState extends State<_PhoneSignInSection> {
         TextFormField(
           controller: _phoneNumberController,
           keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(
-              labelText: 'Phone number (+x xxx-xxx-xxxx)'),
+          decoration: const InputDecoration(labelText: 'Phone number (+x xxx-xxx-xxxx)'),
           validator: (String value) {
             if (value.isEmpty) {
               return 'Phone number (+x xxx-xxx-xxxx)';
@@ -535,7 +526,9 @@ class _PhoneSignInSectionState extends State<_PhoneSignInSection> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             _message,
-            style: TextStyle(color: Colors.red),
+            style: const TextStyle(
+              color: Colors.red,
+            ),
           ),
         )
       ],
@@ -548,8 +541,7 @@ class _OtherProvidersSignInSection extends StatefulWidget {
   State<StatefulWidget> createState() => _OtherProvidersSignInSectionState();
 }
 
-class _OtherProvidersSignInSectionState
-    extends State<_OtherProvidersSignInSection> {
+class _OtherProvidersSignInSectionState extends State<_OtherProvidersSignInSection> {
   final TextEditingController _tokenController = TextEditingController();
   final TextEditingController _tokenSecretController = TextEditingController();
 
@@ -585,16 +577,14 @@ class _OtherProvidersSignInSectionState
 
   // Example code of how to sign in with Github.
   Future<void> _signInWithGithub() async {
-    final AuthCredential credential =
-        GithubAuthProvider.getCredential(_tokenController.text);
-    final FirebaseUser user =
-        (await _auth.signInWithCredential(credential)).user;
+    final AuthCredential credential = GithubAuthProvider.getCredential(_tokenController.text);
+    final FirebaseUser user = (await FirebaseAuth.instance.signInWithCredential(credential)).user;
     assert(user.email != null);
     assert(user.displayName != null);
     assert(!user.isAnonymous);
     assert(await user.getIdToken() != null);
 
-    final FirebaseUser currentUser = _auth.currentUser;
+    final FirebaseUser currentUser = FirebaseAuth.instance.currentUser;
     assert(user.uid == currentUser.uid);
     setState(() {
       if (user != null) {
@@ -607,16 +597,14 @@ class _OtherProvidersSignInSectionState
 
   // Example code of how to sign in with Facebook.
   Future<void> _signInWithFacebook() async {
-    final AuthCredential credential =
-        FacebookAuthProvider.getCredential(_tokenController.text);
-    final FirebaseUser user =
-        (await _auth.signInWithCredential(credential)).user;
+    final AuthCredential credential = FacebookAuthProvider.getCredential(_tokenController.text);
+    final FirebaseUser user = (await FirebaseAuth.instance.signInWithCredential(credential)).user;
     assert(user.email != null);
     assert(user.displayName != null);
     assert(!user.isAnonymous);
     assert(await user.getIdToken() != null);
 
-    final FirebaseUser currentUser = _auth.currentUser;
+    final FirebaseUser currentUser = FirebaseAuth.instance.currentUser;
     assert(user.uid == currentUser.uid);
     setState(() {
       if (user != null) {
@@ -630,16 +618,14 @@ class _OtherProvidersSignInSectionState
   // Example code of how to sign in with Twitter.
   Future<void> _signInWithTwitter() async {
     final AuthCredential credential = TwitterAuthProvider.getCredential(
-        authToken: _tokenController.text,
-        authTokenSecret: _tokenSecretController.text);
-    final FirebaseUser user =
-        (await _auth.signInWithCredential(credential)).user;
+        authToken: _tokenController.text, authTokenSecret: _tokenSecretController.text);
+    final FirebaseUser user = (await FirebaseAuth.instance.signInWithCredential(credential)).user;
     assert(user.email != null);
     assert(user.displayName != null);
     assert(!user.isAnonymous);
     assert(await user.getIdToken() != null);
 
-    final FirebaseUser currentUser = _auth.currentUser;
+    final FirebaseUser currentUser = FirebaseAuth.instance.currentUser;
     assert(user.uid == currentUser.uid);
     setState(() {
       if (user != null) {
@@ -701,15 +687,13 @@ class _OtherProvidersSignInSectionState
         ),
         TextField(
           controller: _tokenController,
-          decoration:
-              const InputDecoration(labelText: 'Enter provider\'s token'),
+          decoration: const InputDecoration(labelText: 'Enter provider\'s token'),
         ),
         Container(
           child: _showAuthSecretTextField
               ? TextField(
                   controller: _tokenSecretController,
-                  decoration: const InputDecoration(
-                      labelText: 'Enter provider\'s authTokenSecret'),
+                  decoration: const InputDecoration(labelText: 'Enter provider\'s authTokenSecret'),
                 )
               : null,
         ),
@@ -728,7 +712,9 @@ class _OtherProvidersSignInSectionState
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             _message,
-            style: TextStyle(color: Colors.red),
+            style: const TextStyle(
+              color: Colors.red,
+            ),
           ),
         )
       ],

@@ -9,12 +9,15 @@ import 'dart:typed_data';
 
 import 'package:_discoveryapis_commons/_discoveryapis_commons.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:firebase_auth_vm/src/util/recaptcha_token/recaptcha_token.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:firebase_core_vm/platform_dependencies.dart';
-import 'package:googleapis/identitytoolkit/v3.dart';
 import 'package:googleapis/identitytoolkit/v3.dart' as gitkit;
+import 'package:googleapis/identitytoolkit/v3.dart';
 import 'package:http/http.dart';
 import 'package:meta/meta.dart';
+
+export 'package:firebase_auth_vm/src/util/recaptcha_token/recaptcha_token.dart' show RecaptchaToken, UrlPresenter;
 
 part 'src/auth_providers.dart';
 part 'src/auth_result.dart';
@@ -36,6 +39,5 @@ part 'src/models/user.dart';
 part 'src/models/user_update_info.dart';
 part 'src/util/api_key_client.dart';
 part 'src/util/errors.dart';
-part 'src/util/http_server.dart';
 part 'src/util/sequential_runner.dart';
 part 'src/util/web_utils.dart';

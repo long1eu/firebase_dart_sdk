@@ -7,16 +7,17 @@ import 'package:firebase_auth_vm_example/generated/firebase_options_vm.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import './register_page.dart';
 import 'platform_dependencies.dart';
 import 'signin_page.dart';
 
 Future<void> main() async {
+  await PlatformDependencies.initialize();
+  FirebaseApp.withOptions(firebaseOptions, dependencies: PlatformDependencies.instance);
   await GoogleSignInDart.register(
-    exchangeEndpoint: 'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
     clientId: firebaseOptions.clientId,
+    exchangeEndpoint: 'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
   );
 
   runApp(MyApp());
@@ -31,34 +32,40 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    _initFirebase();
-  }
-
-  Future<void> _initFirebase() async {
-    final SharedPreferences preferences = await SharedPreferences.getInstance();
-    FirebaseApp.withOptions(firebaseOptions, dependencies: Dependencies(preferences));
   }
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       title: 'Firebase Auth Demo',
-      home: MyHomePage(title: 'Firebase Auth Demo'),
+      routes: <String, WidgetBuilder>{
+        RegisterPage.title: (_) => const RegisterPage(),
+        SignInPage.title: (_) => const SignInPage(),
+      },
+      home: const HomePage(
+        title: 'Firebase Auth Demo',
+      ),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key key, this.title}) : super(key: key);
+class HomePage extends StatefulWidget {
+  const HomePage({Key key, this.title}) : super(key: key);
 
   final String title;
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  _HomePageState createState() => _HomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _HomePageState extends State<HomePage> {
   FirebaseUser user;
+
+  void _pushPage(BuildContext context, Widget page) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => page),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,12 +94,6 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ],
       ),
-    );
-  }
-
-  void _pushPage(BuildContext context, Widget page) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => page),
     );
   }
 }

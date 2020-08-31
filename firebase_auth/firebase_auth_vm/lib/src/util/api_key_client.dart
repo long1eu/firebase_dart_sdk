@@ -49,7 +49,10 @@ class ApiKeyClient extends DelegatingClient {
       ...request.headers,
       ...headers,
       'X-Firebase-Locale': _locale,
-      'X-Client-Version': '${Platform.operatingSystem}/FirebaseSDK/$sdkVersion/dart',
+      if (kIsWeb)
+        'X-Client-Version': 'web/FirebaseSDK/$sdkVersion/dart'
+      else
+        'X-Client-Version': '${Platform.operatingSystem}/FirebaseSDK/$sdkVersion/dart',
     };
     modifiedRequest.headers.addAll(headers);
 
