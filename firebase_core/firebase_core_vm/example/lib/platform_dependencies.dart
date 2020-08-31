@@ -26,6 +26,7 @@ class PlatformDependencies extends core.PlatformDependencies with WidgetsBinding
       return instance._completer.future;
     }
     instance._completer = Completer<void>();
+    WidgetsFlutterBinding.ensureInitialized();
 
     final Directory parent = await getApplicationDocumentsDirectory();
     final Box<Uint8List> keyBox = await Hive.openBox<Uint8List>('encryption.store', path: parent.path);

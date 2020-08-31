@@ -3,9 +3,10 @@
 // on 16/09/2018
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:meta/meta.dart';
 
-/// The options used to configure a Firebase app.
+/// The options used to configure a [FirebaseApp].
 ///
 /// ```dart
 /// FirebaseApp.withOptions(
