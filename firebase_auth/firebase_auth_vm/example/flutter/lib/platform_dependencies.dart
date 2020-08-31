@@ -7,6 +7,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:connectivity/connectivity.dart';
+import 'package:connectivity_linux/connectivity_linux.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart' as core;
 import 'package:firebase_core_vm/platform_dependencies.dart' as core;
 import 'package:flutter/widgets.dart';
@@ -29,6 +30,7 @@ class PlatformDependencies extends core.PlatformDependencies with WidgetsBinding
 
     String path;
     if (!core.kIsWeb) {
+      ConnectivityLinux.register();
       final Directory parent = await getApplicationDocumentsDirectory();
       path = parent.path;
     }
