@@ -1,6 +1,6 @@
 name: firebase_core_vm
 description: Dart implementation of Firebase Core SDK that provides FirebaseApps used by all Firebase services
-version: 0.0.6
+version: 0.0.7
 homepage: https://github.com/fluttercommunity/firebase_flutter_sdk
 
 environment:

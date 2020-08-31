@@ -7,8 +7,7 @@ Please feel free to open an issue [here](https://github.com/fluttercommunity/fir
 [pull requests](https://github.com/fluttercommunity/firebase_flutter_sdk/pulls) if you feel brave.
 
 *NOTES*
-* can be used in CLIs, servers and Flutter. 
-* does not yet work on Web
+* can be used in CLIs, servers and Flutter.
 * To use this package with the official [firebase_core](https://pub.dev/packages/firebase_core) plugin on Flutter, 
   see [firebase_core_dart](https://pub.dev/packages/firebase_core_dart).
   
@@ -17,7 +16,7 @@ Please feel free to open an issue [here](https://github.com/fluttercommunity/fir
 ### 1. Add this to your package's dependencies and run `flutter pub get`:
 ```yaml
 dependencies:
-  firebase_core_vm: ^0.0.4
+  firebase_core_vm: ^0.0.7
 ```
 
 ### 2. Import it
@@ -90,7 +89,7 @@ Since desktop is not an officially supported platform, we need to create `applic
 1. Add the SHA1 hash to the first part, so you `applicationId` looks like this `<appNumber>:<gcmSenderID>:<os>:sha1(<appNumber>:<gcmSenderID>:<os>)`
 (eg. `1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1`)    
  
-### 4. Initialize multiple `FirebaseApp`s           
+### 4. Initialize multiple `FirebaseApp` objects
    1. make sure you first register this package:
       ```dart
       import 'package:firebase_core/firebase_core.dart';

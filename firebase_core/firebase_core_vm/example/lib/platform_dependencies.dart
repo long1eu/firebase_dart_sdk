@@ -7,9 +7,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:connectivity/connectivity.dart';
-import 'package:connectivity_linux/connectivity_linux.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:firebase_core_vm/platform_dependencies.dart' as core;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
@@ -28,33 +27,27 @@ class PlatformDependencies extends core.PlatformDependencies with WidgetsBinding
     instance._completer = Completer<void>();
     WidgetsFlutterBinding.ensureInitialized();
 
-    final Directory parent = await getApplicationDocumentsDirectory();
-    final Box<Uint8List> keyBox = await Hive.openBox<Uint8List>('encryption.store', path: parent.path);
+    String path;
+    if (!kIsWeb) {
+      final Directory parent = await getApplicationDocumentsDirectory();
+      path = parent.path;
+    }
+
+    final Box<Uint8List> keyBox = await Hive.openBox<Uint8List>('encryption.store', path: path);
     if (!keyBox.containsKey('key')) {
       final List<int> key = Hive.generateSecureKey();
       await keyBox.put('key', key);
     }
     final Uint8List key = keyBox.get('key');
 
-    instance._box = await Hive.openBox<String>('firebase.store', encryptionKey: key, path: parent.path);
+    instance._box = await Hive.openBox<String>('firebase.store', encryptionKey: key, path: path);
     instance._onBackgroundChanged = BehaviorSubject<bool>.seeded(false);
     instance._onNetworkConnected = BehaviorSubject<bool>.seeded(true);
     WidgetsBinding.instance.addObserver(instance);
 
-    // todo(long1eu): remove this if the plugin is endorsed for Linux
-    if (!kIsWeb && Platform.isLinux) {
-      // ConnectivityLinux.register();
-      NetworkManager.instance.stateChanged
-          .map((NetworkManagerState event) =>
-              event == NetworkManagerState.connectedGlobal || event == NetworkManagerState.unknown
-                  ? ConnectivityResult.wifi
-                  : ConnectivityResult.none)
-          .listen(instance._connectivityChanged);
-    } else {
-      Connectivity()
-        ..checkConnectivity().then(instance._connectivityChanged)
-        ..onConnectivityChanged.listen(instance._connectivityChanged);
-    }
+    Connectivity()
+      ..checkConnectivity().then(instance._connectivityChanged)
+      ..onConnectivityChanged.listen(instance._connectivityChanged);
 
     instance._completer.complete();
   }

@@ -1,3 +1,12 @@
+## 0.0.7
+
+- refactor to use the new platform interface
+- add linux example app
+- require a Hive Box for persistent storage
+- add linux connectivity implementation
+- make authProvider null by default so FirebaseAuth can register itself
+- add generated firebase options for the example app
+
 ## 0.0.6
 
 - remove SharedPreferences from the example and require a Hive Box for persistent storage

@@ -22,7 +22,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final String _name = 'foo';
-  String _message;
+  String _message = '';
 
   Future<void> _configure() async {
     final bool exists = FirebaseApp.apps.any((FirebaseApp app) => app.name == _name);
@@ -77,12 +77,11 @@ class _MyAppState extends State<MyApp> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              if (_message != null)
-                Expanded(
-                  child: Center(
-                    child: Text(_message),
-                  ),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Text(_message),
                 ),
+              ),
               RaisedButton(
                 onPressed: _configure,
                 child: const Text('initialize'),
