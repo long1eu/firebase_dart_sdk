@@ -3,25 +3,21 @@
 // found in the LICENSE file.
 
 import 'package:firebase_auth_vm/firebase_auth_vm.dart';
+import 'package:firebase_auth_vm_example/generated/firebase_options_vm.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import './register_page.dart';
-import 'firebase_config.dart';
 import 'platform_dependencies.dart';
 import 'signin_page.dart';
 
 Future<void> main() async {
-  if (kIsDesktop) {
-    await GoogleSignInDart.register(
-      exchangeEndpoint:
-          'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
-      clientId:
-          '233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com',
-    );
-  }
+  await GoogleSignInDart.register(
+    exchangeEndpoint: 'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
+    clientId: firebaseOptions.clientId,
+  );
 
   runApp(MyApp());
 }
@@ -40,8 +36,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initFirebase() async {
     final SharedPreferences preferences = await SharedPreferences.getInstance();
-    FirebaseApp.withOptions(firebaseOptions,
-        dependencies: Dependencies(preferences));
+    FirebaseApp.withOptions(firebaseOptions, dependencies: Dependencies(preferences));
   }
 
   @override

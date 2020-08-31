@@ -1,0 +1,37 @@
+general:
+  project_id: flutter-sdk
+  project_number: 233259864964
+  database_url: https://flutter-sdk.firebaseio.com
+  storage_bucket: flutter-sdk.appspot.com
+  auth_domain: flutter-sdk.firebaseapp.com
+  data_collection_enabled: true
+
+android:
+  app_id: 1:233259864964:android:b2ec71b130a3170cd583d1
+  api_key: AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg
+  client_id: 233259864964-mv1iokuepc0vh7kmqbs2u6drtv2e5o49.apps.googleusercontent.com
+
+ios:
+  app_id: 1:233259864964:ios:fff621fea008bff1d583d1
+  api_key: AIzaSyBguTk4w2Xk2LD0mSdB2Pi9LTtt5BeAE6U
+  client_id: 233259864964-323cge6aj1nl7q3rkb2tgra9guu3p2ep.apps.googleusercontent.com
+
+web:
+  app_id: 1:233259864964:web:95ef638de4a4693dd583d1
+  api_key: AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A
+  client_id: 233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com
+  measurement_id: G-KFTS2799LM
+
+linux:
+  api_key: AIzaSyD9HeqeXUOXJh_DPDl211x8seUXlNmiJj0
+  client_id: 233259864964-pnbmmuu4a7cfsjqm9iuk477jhrssqjje.apps.googleusercontent.com
+
+macos:
+  app_id: 1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1
+  api_key: AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A
+  client_id: 233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com
+
+windows:
+  app_id: 1:233259864964:windows:637a426b03bae337782539864340b6b22a4d2f7f
+  api_key: AIzaSyBNeYDWMlalWRL2M2_UhE5kiMmvVf3o9BM
+  client_id: 233259864964-c60tim526nr289h3m7m5dsautlkc8o9c.apps.googleusercontent.com
