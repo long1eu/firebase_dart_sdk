@@ -8,7 +8,7 @@ import 'package:googleapis_auth/auth_io.dart';
 import 'package:googleapis_beta/firebase/v1beta1.dart';
 import 'package:meta/meta.dart';
 import 'package:strings/strings.dart';
-import 'package:tools/run_command.dart';
+import 'package:firebase_sdk_tools/run_command.dart';
 
 part 'android.dart';
 part 'ios.dart';

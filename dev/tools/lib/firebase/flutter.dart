@@ -4,7 +4,7 @@
 
 import 'dart:io';
 
-import 'package:tools/run_command.dart';
+import 'package:firebase_sdk_tools/run_command.dart';
 
 /// Return the examples app root
 Future<String> createPackage(
