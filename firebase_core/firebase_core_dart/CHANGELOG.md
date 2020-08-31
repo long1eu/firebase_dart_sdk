@@ -1,3 +1,7 @@
+## 0.0.5
+
+- update vm dependency
+
 ## 0.0.4
 
 - add linux connectivity plugin implementation

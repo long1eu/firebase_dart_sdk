@@ -3,8 +3,8 @@ import 'package:firebase_core_dart/firebase_core_dart.dart';
 import 'package:firebase_core_dart_example/generated/firebase_options_dart.dart';
 import 'package:flutter/material.dart';
 
-void main() {
-  FirebaseDart.register(options: firebaseOptions);
+Future<void> main() async {
+  await FirebaseDart.register(options: firebaseOptions);
   runApp(const MyApp());
 }
 
@@ -18,7 +18,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final String _name = 'foo';
 
-  String _message;
+  String _message = '';
 
   Future<void> _configure() async {
     final bool exists = Firebase.apps.any((FirebaseApp app) => app.name == _name);
@@ -70,12 +70,11 @@ class _MyAppState extends State<MyApp> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              if (_message != null)
-                Expanded(
-                  child: Center(
-                    child: Text(_message),
-                  ),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Text(_message),
                 ),
+              ),
               RaisedButton(
                 onPressed: _configure,
                 child: const Text('initialize'),
