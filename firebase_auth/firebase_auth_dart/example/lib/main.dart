@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth_dart/firebase_auth_dart.dart';
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:firebase_core_dart/firebase_core_dart.dart';
-import 'package:firebase_core_vm/firebase_core_vm.dart' show isDesktop;
+import 'package:firebase_core_vm/firebase_core_vm.dart' show kIsDesktop;
 import 'package:flutter/material.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
 
@@ -14,7 +14,7 @@ import './register_page.dart';
 import './signin_page.dart';
 
 void main() {
-  if (isDesktop) {
+  if (kIsDesktop) {
     Future.wait(<Future<void>>[
       GoogleSignInDart.register(
         exchangeEndpoint:
