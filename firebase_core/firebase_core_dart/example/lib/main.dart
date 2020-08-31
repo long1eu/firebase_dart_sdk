@@ -1,13 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_core_dart/firebase_core_dart.dart';
+import 'package:firebase_core_dart_example/generated/firebase_options_dart.dart';
 import 'package:flutter/material.dart';
 
-import 'firebase_config_js.dart' if (dart.library.io) 'firebase_config_io.dart';
-
 void main() {
-  if (kIsDesktop) {
-    FirebaseDart.register(options: firebaseOptions);
-  }
+  FirebaseDart.register(options: firebaseOptions);
   runApp(const MyApp());
 }
 
