@@ -14,3 +14,4 @@
 *.ipr
 *.iws
 .idea/
+.dart_tool/
