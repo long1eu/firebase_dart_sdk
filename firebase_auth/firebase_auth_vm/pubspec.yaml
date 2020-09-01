@@ -14,6 +14,7 @@ dependencies:
   googleapis: ^0.55.0
   googleapis_auth: ^0.2.12
   http: ^0.12.2
+  firebase: ^7.3.0
 
 dev_dependencies:
   test: ^1.15.3

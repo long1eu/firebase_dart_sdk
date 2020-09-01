@@ -10,11 +10,6 @@ import 'package:firebase_auth_vm/firebase_auth_vm.dart';
 
 import 'recaptcha_token.dart' as base;
 
-/// Function for directing the user or it's user-agent to [uri].
-///
-/// The user is required to go to [uri] and either complete or decline the application verification.
-typedef UrlPresenter = void Function(Uri uri);
-
 /// Runs an reCAPTCHA flow using an HTTP server.
 ///
 /// It takes a user supplied function which will be called with an URI. The user is expected to navigate to that URI and

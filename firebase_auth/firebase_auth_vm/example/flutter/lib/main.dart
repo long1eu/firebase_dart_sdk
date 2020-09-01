@@ -5,20 +5,23 @@
 import 'package:firebase_auth_vm/firebase_auth_vm.dart';
 import 'package:firebase_auth_vm_example/generated/firebase_options_vm.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
+import 'package:firebase_core_vm/platform_dependencies.dart';
+import 'package:firebase_platform_dependencies/firebase_platform_dependencies.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
 
-import './register_page.dart';
-import 'platform_dependencies.dart';
+import 'register_page.dart';
 import 'signin_page.dart';
 
 Future<void> main() async {
-  await PlatformDependencies.initialize();
-  FirebaseApp.withOptions(firebaseOptions, dependencies: PlatformDependencies.instance);
-  await GoogleSignInDart.register(
-    clientId: firebaseOptions.clientId,
-    exchangeEndpoint: 'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
-  );
+  final PlatformDependencies dependencies = await FlutterPlatformDependencies.initializeForApp();
+  FirebaseApp.withOptions(firebaseOptions, dependencies: dependencies);
+  if (!kIsWeb) {
+    await GoogleSignInDart.register(
+      clientId: firebaseOptions.clientId,
+      exchangeEndpoint: 'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
+    );
+  }
 
   runApp(MyApp());
 }
@@ -80,7 +83,7 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.all(16),
             alignment: Alignment.center,
             child: RaisedButton(
-              onPressed: () => _pushPage(context, RegisterPage()),
+              onPressed: () => _pushPage(context, const RegisterPage()),
               child: const Text('Test registration'),
             ),
           ),
@@ -88,7 +91,7 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.all(16),
             alignment: Alignment.center,
             child: RaisedButton(
-              onPressed: () => _pushPage(context, SignInPage()),
+              onPressed: () => _pushPage(context, const SignInPage()),
               child: const Text('Test SignIn/SignOut'),
             ),
           ),
