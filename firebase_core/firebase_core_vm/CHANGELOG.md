@@ -1,3 +1,8 @@
+## 0.0.8
+
+- add firebase_platform_dependencies in the example app
+- make FirebaseError extend Error
+
 ## 0.0.7
 
 - refactor to use the new platform interface
