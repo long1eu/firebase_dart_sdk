@@ -1,0 +1,23 @@
+name: firebase_platform_dependencies
+description: Flutter implementation of the PlatformDependencies required by FirebaseApp
+version: 0.0.1+1
+repository: https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/firebase_core/firebase_platform_dependencies
+
+environment:
+  sdk: ">=2.7.0 <3.0.0"
+  flutter: ">=1.17.0 <2.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core_vm: ^0.0.7
+  path_provider: ^1.6.14
+  path_provider_linux: ^0.0.1+2
+  connectivity: ^0.4.9+2
+  connectivity_linux: ^0.0.0-dev.1
+  hive: ^1.4.4
+  rxdart: ^0.24.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
