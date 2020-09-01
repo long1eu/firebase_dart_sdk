@@ -13,7 +13,9 @@ dependencies:
   path_provider: '>=1.6.14 <2.0.0'
   connectivity: '>=0.4.9 <2.0.0'
   connectivity_linux: ^0.0.0-dev.1
+  firebase_platform_dependencies: ^0.0.1+1
 
+dependency_overrides:
   firebase_core_vm:
     path: ../
 

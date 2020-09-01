@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:firebase_core_vm_example/generated/firebase_options_vm.dart';
+import 'package:firebase_platform_dependencies/firebase_platform_dependencies.dart';
 import 'package:flutter/material.dart';
 
-import 'platform_dependencies.dart';
-
 Future<void> main() async {
-  await PlatformDependencies.initialize();
+  await FlutterPlatformDependencies.initializeForApp();
 
-  FirebaseApp.withOptions(firebaseOptions, dependencies: PlatformDependencies.instance);
+  FirebaseApp.withOptions(firebaseOptions, dependencies: FlutterPlatformDependencies.instance);
   runApp(const MyApp());
 }
 
@@ -33,9 +32,9 @@ class _MyAppState extends State<MyApp> {
         _message = 'App $_name already exists with ${app.options}.';
       });
     } else {
-      // probably you are going to use a different set of options
+      // probably you are going to use a different set of options and initialize a
       final FirebaseApp app =
-          FirebaseApp.withOptions(firebaseOptions, name: _name, dependencies: PlatformDependencies.instance);
+          FirebaseApp.withOptions(firebaseOptions, name: _name, dependencies: FlutterPlatformDependencies.instance);
 
       setState(() {
         _message = 'App $_name was configured with ${app.options}';
