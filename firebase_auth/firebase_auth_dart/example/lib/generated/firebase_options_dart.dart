@@ -15,6 +15,8 @@ FirebaseOptions get firebaseOptions {
       databaseURL: 'https://flutter-sdk.firebaseio.com',
       storageBucket: 'flutter-sdk.appspot.com',
       authDomain: 'flutter-sdk.firebaseapp.com',
+      iosClientId: '233259864964-323cge6aj1nl7q3rkb2tgra9guu3p2ep.apps.googleusercontent.com',
+      androidClientId: '233259864964-mv1iokuepc0vh7kmqbs2u6drtv2e5o49.apps.googleusercontent.com',
     );
   } else if (!kIsWeb && Platform.operatingSystem == 'ios') {
     return const FirebaseOptions(
@@ -25,6 +27,8 @@ FirebaseOptions get firebaseOptions {
       databaseURL: 'https://flutter-sdk.firebaseio.com',
       storageBucket: 'flutter-sdk.appspot.com',
       authDomain: 'flutter-sdk.firebaseapp.com',
+      iosClientId: '233259864964-323cge6aj1nl7q3rkb2tgra9guu3p2ep.apps.googleusercontent.com',
+      androidClientId: '233259864964-mv1iokuepc0vh7kmqbs2u6drtv2e5o49.apps.googleusercontent.com',
     );
   } else if (kIsWeb) {
     return const FirebaseOptions(
@@ -36,6 +40,7 @@ FirebaseOptions get firebaseOptions {
       storageBucket: 'flutter-sdk.appspot.com',
       authDomain: 'flutter-sdk.firebaseapp.com',
       measurementId: 'G-KFTS2799LM',
+      androidClientId: '233259864964-atj096gj4dkn2q5iciufgrugequubseo.apps.googleusercontent.com',
     );
   } else if (!kIsWeb && Platform.operatingSystem == 'linux') {
     return const FirebaseOptions(
@@ -46,6 +51,7 @@ FirebaseOptions get firebaseOptions {
       databaseURL: 'https://flutter-sdk.firebaseio.com',
       storageBucket: 'flutter-sdk.appspot.com',
       authDomain: 'flutter-sdk.firebaseapp.com',
+      androidClientId: '233259864964-pnbmmuu4a7cfsjqm9iuk477jhrssqjje.apps.googleusercontent.com',
     );
   } else if (!kIsWeb && Platform.operatingSystem == 'macos') {
     return const FirebaseOptions(
@@ -56,6 +62,7 @@ FirebaseOptions get firebaseOptions {
       databaseURL: 'https://flutter-sdk.firebaseio.com',
       storageBucket: 'flutter-sdk.appspot.com',
       authDomain: 'flutter-sdk.firebaseapp.com',
+      androidClientId: '233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com',
     );
   } else if (!kIsWeb && Platform.operatingSystem == 'windows') {
     return const FirebaseOptions(
@@ -66,6 +73,7 @@ FirebaseOptions get firebaseOptions {
       databaseURL: 'https://flutter-sdk.firebaseio.com',
       storageBucket: 'flutter-sdk.appspot.com',
       authDomain: 'flutter-sdk.firebaseapp.com',
+      androidClientId: '233259864964-c60tim526nr289h3m7m5dsautlkc8o9c.apps.googleusercontent.com',
     );
   } else {
     throw UnsupportedError('${Platform.operatingSystem} not supported.');

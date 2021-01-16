@@ -75,9 +75,10 @@ class SecureTokenResponse {
     if (json.containsKey('expires_in')) {
       final int seconds = int.parse(json['expires_in']);
       final Duration duration = Duration(seconds: seconds);
-      json['expires_in'] = DateTime.now().toUtc().add(duration).microsecondsSinceEpoch;
+      json['expires_in'] = DateTime.now().toUtc().add(duration);
     }
 
+    print(json['expires_in']);
     return SecureTokenResponse._(
       approximateExpirationDate: json['expires_in'],
       refreshToken: json['refresh_token'],

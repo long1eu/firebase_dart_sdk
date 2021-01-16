@@ -186,6 +186,15 @@ class GenerateFirebaseOptions extends Command<void> {
     if (data.containsKey('measurement_id')) {
       buffer.writeln("      measurementId: '${data['measurement_id']}',");
     }
+
+    if (data.containsKey('ios_client_id') || data.containsKey('android_client_id')) {
+      buffer
+        ..writeln("      iosClientId: '${data['ios_client_id']}',")
+        ..writeln("      androidClientId: '${data['android_client_id']}',");
+    } else if (data.containsKey('client_id')) {
+      buffer.writeln("      androidClientId: '${data['client_id']}',");
+    }
+
     if (os == 'ios') {
       if (data.containsKey('tracking_id')) {
         buffer.writeln("      trackingID: '${data['tracking_id']}',");
@@ -193,12 +202,7 @@ class GenerateFirebaseOptions extends Command<void> {
       if (data.containsKey('deep_link_url_scheme')) {
         buffer.writeln("      deepLinkURLScheme: '${data['deep_link_url_scheme']}',");
       }
-      if (data.containsKey('android_client_id')) {
-        buffer.writeln("      androidClientId: '${data['android_client_id']}',");
-      }
-      if (data.containsKey('ios_client_id')) {
-        buffer.writeln("      iosClientId: '${data['ios_client_id']}',");
-      }
+
       if (data.containsKey('ios_bundle_id')) {
         buffer.writeln("      iosBundleId: '${data['ios_bundle_id']}',");
       }
@@ -243,7 +247,18 @@ class GenerateFirebaseOptions extends Command<void> {
           continue;
         }
         if (package == 'dart') {
-          _addDartPlatform(buffer, os, <String, dynamic>{...general, ...data[os]});
+          final Map<String, dynamic> settings = <String, dynamic>{...general, ...data[os]};
+          _addDartPlatform(buffer, os, <String, dynamic>{
+            ...settings,
+            if (os == 'android') ...<String, dynamic>{
+              'android_client_id': settings['client_id'],
+              'ios_client_id': <String, dynamic>{...general, ...data['ios']}['client_id'],
+            },
+            if (os == 'ios') ...<String, dynamic>{
+              'ios_client_id': settings['client_id'],
+              'android_client_id': <String, dynamic>{...general, ...data['android']}['client_id'],
+            },
+          });
         } else {
           _addVmPlatform(buffer, os, <String, dynamic>{...general, ...data[os]});
         }

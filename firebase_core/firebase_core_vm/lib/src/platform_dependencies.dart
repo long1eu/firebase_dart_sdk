@@ -71,6 +71,7 @@ class PlatformDependencies implements LocalStorage {
   }
 }
 
+// todo(long1eu): implement a version of this that supports `userAccessGroup` on iOS
 /// Local persistence interface to store key/value pairs
 abstract class LocalStorage {
   const LocalStorage();

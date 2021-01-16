@@ -4,30 +4,62 @@
 
 import 'dart:async';
 import 'dart:html';
+import 'dart:js';
 
-import 'package:firebase/firebase.dart';
 import 'package:firebase_auth_vm/firebase_auth_vm.dart';
+import 'package:googleapis/identitytoolkit/v3.dart';
 
 import 'recaptcha_token.dart' as base;
 
 class RecaptchaToken implements base.RecaptchaToken {
-  const RecaptchaToken({this.appName = 'RecaptchaTokenApp'});
+  const RecaptchaToken(this.authApi);
 
-  final String appName;
+  final FirebaseAuthApi authApi;
 
   @override
   Future<String> get({UrlPresenter urlPresenter, String apiKey, String languageCode}) async {
-    final App app = initializeApp(apiKey: apiKey, name: appName);
-    app.auth().languageCode = languageCode;
+    final Completer<String> completer = Completer<String>();
+    final GetRecaptchaParamResponse params = await authApi.getRecaptchaParam();
 
     final DivElement div = DivElement() //
       ..id = 'grecaptcha-badge';
-
     document.body.children.add(div);
-    final String token = await RecaptchaVerifier(div.id, <String, dynamic>{'size': 'invisible'}, app).verify();
-    document.body.children.remove(div);
-    await app.delete();
 
-    return token;
+    ScriptElement script;
+    context['onLoad'] = () {
+      final JsObject grecaptcha = context['grecaptcha'];
+
+      void complete({String token, Object error}) {
+        if (token != null) {
+          completer.complete(token);
+        } else {
+          completer.completeError(error);
+        }
+
+        document.body.children.remove(div);
+        document.head.children.remove(script);
+      }
+
+      final int id = grecaptcha.callMethod(
+        'render',
+        <dynamic>[
+          div.id,
+          JsObject.jsify(<String, dynamic>{
+            'sitekey': params.recaptchaSiteKey,
+            'size': 'invisible',
+            'callback': (String token) => complete(token: token),
+            'expired-callback': () => complete(error: StateError('Session expired')),
+            'error-callback': (dynamic error) => complete(error: error),
+          }),
+        ],
+      );
+
+      grecaptcha.callMethod('execute', <int>[id]);
+    };
+
+    script = ScriptElement()..src = 'https://www.google.com/recaptcha/api.js?onload=onLoad&hl=$languageCode';
+    document.head.children.add(script);
+
+    return completer.future;
   }
 }

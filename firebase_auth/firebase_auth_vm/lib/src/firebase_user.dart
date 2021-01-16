@@ -341,15 +341,35 @@ class FirebaseUser with UserInfoMixin {
   ///       action.
   ///   * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
   ///   * [FirebaseAuthError.userNotFound] - Indicates the user account was not found.
-  Future<void> sendEmailVerification({ActionCodeSettings settings}) async {
+  Future<void> sendEmailVerification([ActionCodeSettings settings]) async {
     final String accessToken = await _getToken();
 
     final Relyingparty request = Relyingparty()
       ..requestType = ActionCodeOperation.verifyEmail.value
-      ..idToken = accessToken
-      ..updateWith(settings);
+      ..idToken = accessToken;
 
-    return _firebaseAuthApi.getOobConfirmationCode(request);
+    return _firebaseAuthApi.getOobConfirmationCode(request, settings);
+  }
+
+  /// Send an email to verify the ownership of the account then update to the new email.
+  ///
+  /// Errors:
+  ///   * [FirebaseAuthError.invalidRecipientEmail] - Indicates an invalid recipient email was sent in the request.
+  ///   * [FirebaseAuthError.invalidSender] - Indicates the supplied credential is invalid. This could happen if it
+  ///       has expired or it is malformed.
+  ///   * [FirebaseAuthError.credentialAlreadyInUse] - Indicates an invalid sender email is set in the console for this
+  ///       action.
+  ///   * [FirebaseAuthError.invalidMessagePayload] - Indicates an invalid email template for sending update email.
+  ///   * [FirebaseAuthError.userNotFound] - Indicates the user account was not found.
+  Future<void> sendEmailVerificationBeforeUpdating(String newEmail, [ActionCodeSettings settings]) async {
+    final String accessToken = await _getToken();
+
+    final Relyingparty request = Relyingparty()
+      ..requestType = ActionCodeOperation.verifyAndChangeEmail.value
+      ..newEmail = newEmail
+      ..idToken = accessToken;
+
+    return _firebaseAuthApi.getOobConfirmationCode(request, settings);
   }
 
   /// Deletes the current user (also signs out the user).

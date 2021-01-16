@@ -5,9 +5,14 @@
 part of firebase_auth_vm;
 
 /// Represents a credential.
-mixin AuthCredential {
+abstract class AuthCredential {
   /// The identity provider for the credential
   String get providerId;
+
+  /// The authentication sign in method for the credential. For example,
+  /// 'password', or 'emailLink'. This corresponds to the sign-in method
+  /// identifier returned in [FirebaseAuth.fetchSignInMethodsForEmail].
+  String get signInMethod;
 
   Map<String, dynamic> get json;
 
@@ -18,17 +23,22 @@ mixin AuthCredential {
 }
 
 /// Internal implementation of [AuthCredential] for Email/Password credentials.
-class EmailPasswordAuthCredential with AuthCredential {
+class EmailPasswordAuthCredential implements AuthCredential {
   EmailPasswordAuthCredential._({
     @required this.email,
     this.password,
     this.link,
   })  : assert(password != null || link != null, 'You must either provide a password or the email link.'),
-        providerId = ProviderType.password;
+        providerId = ProviderType.password,
+        signInMethod = link == null ? ProviderMethod.emailLink : ProviderMethod.password;
 
   /// The identity provider for the credential
   @override
   final String providerId;
+
+  /// The authentication sign in method for the credential.
+  @override
+  final String signInMethod;
 
   /// The user's email address.
   final String email;
@@ -60,6 +70,7 @@ class EmailPasswordAuthCredential with AuthCredential {
   String toString() {
     return (ToStringHelper(EmailPasswordAuthCredential)
           ..add('providerId', providerId)
+          ..add('signInMethod', signInMethod)
           ..add('email', email)
           ..add('password', password)
           ..add('link', link))
@@ -68,12 +79,18 @@ class EmailPasswordAuthCredential with AuthCredential {
 }
 
 /// Internal implementation of [AuthCredential] for the Facebook IdP.
-class FacebookAuthCredential with AuthCredential {
-  FacebookAuthCredential._(this.accessToken) : providerId = ProviderType.facebook;
+class FacebookAuthCredential implements AuthCredential {
+  FacebookAuthCredential._(this.accessToken)
+      : providerId = ProviderType.facebook,
+        signInMethod = ProviderMethod.facebook;
 
   /// The identity provider for the credential
   @override
   final String providerId;
+
+  /// The authentication sign in method for the credential.
+  @override
+  final String signInMethod;
 
   /// The Access Token from Facebook.
   final String accessToken;
@@ -95,13 +112,16 @@ class FacebookAuthCredential with AuthCredential {
 
   @override
   String toString() {
-    return (ToStringHelper(FacebookAuthCredential)..add('providerId', providerId)..add('accessToken', accessToken))
+    return (ToStringHelper(FacebookAuthCredential)
+          ..add('providerId', providerId)
+          ..add('signInMethod', signInMethod)
+          ..add('accessToken', accessToken))
         .toString();
   }
 }
 
 /// Internal implementation of [AuthCredential] for Game Center credentials.
-class GameCenterAuthCredential with AuthCredential {
+class GameCenterAuthCredential implements AuthCredential {
   GameCenterAuthCredential._({
     @required this.playerId,
     @required this.publicKeyUrl,
@@ -109,11 +129,16 @@ class GameCenterAuthCredential with AuthCredential {
     @required this.salt,
     @required this.timestamp,
     @required this.displayName,
-  }) : providerId = ProviderType.gameCenter;
+  })  : providerId = ProviderType.gameCenter,
+        signInMethod = ProviderMethod.gameCenter;
 
   /// The identity provider for the credential
   @override
   final String providerId;
+
+  /// The authentication sign in method for the credential.
+  @override
+  final String signInMethod;
 
   /// The ID of the Game Center local player.
   final String playerId;
@@ -155,6 +180,7 @@ class GameCenterAuthCredential with AuthCredential {
   String toString() {
     return (ToStringHelper(GameCenterAuthCredential)
           ..add('providerId', providerId)
+          ..add('signInMethod', signInMethod)
           ..add('playerId', playerId)
           ..add('publicKeyUrl', publicKeyUrl)
           ..add('signature', signature)
@@ -166,12 +192,18 @@ class GameCenterAuthCredential with AuthCredential {
 }
 
 /// Internal implementation of [AuthCredential] for GitHub credentials.
-class GithubAuthCredential with AuthCredential {
-  GithubAuthCredential._(this.token) : providerId = ProviderType.github;
+class GithubAuthCredential implements AuthCredential {
+  GithubAuthCredential._(this.token)
+      : providerId = ProviderType.github,
+        signInMethod = ProviderMethod.github;
 
   /// The identity provider for the credential
   @override
   final String providerId;
+
+  /// The authentication sign in method for the credential.
+  @override
+  final String signInMethod;
 
   /// The GitHub OAuth access token.
   final String token;
@@ -195,18 +227,25 @@ class GithubAuthCredential with AuthCredential {
   String toString() {
     return (ToStringHelper(GithubAuthCredential) //
           ..add('providerId', providerId)
+          ..add('signInMethod', signInMethod)
           ..add('token', token))
         .toString();
   }
 }
 
 /// Internal implementation of [AuthCredential] for the Google IdP.
-class GoogleAuthCredential with AuthCredential {
-  GoogleAuthCredential._({@required this.idToken, @required this.accessToken}) : providerId = ProviderType.google;
+class GoogleAuthCredential implements AuthCredential {
+  GoogleAuthCredential._({@required this.idToken, @required this.accessToken})
+      : providerId = ProviderType.google,
+        signInMethod = ProviderMethod.google;
 
   /// The identity provider for the credential
   @override
   final String providerId;
+
+  /// The authentication sign in method for the credential.
+  @override
+  final String signInMethod;
 
   /// The ID Token obtained from Google.
   final String idToken;
@@ -234,6 +273,7 @@ class GoogleAuthCredential with AuthCredential {
   String toString() {
     return (ToStringHelper(GoogleAuthCredential) //
           ..add('providerId', providerId)
+          ..add('signInMethod', signInMethod)
           ..add('idToken', idToken)
           ..add('accessToken', accessToken))
         .toString();
@@ -241,7 +281,7 @@ class GoogleAuthCredential with AuthCredential {
 }
 
 /// Internal implementation of [AuthCredential] for GitHub credentials.
-class OAuthCredential with AuthCredential {
+class OAuthCredential implements AuthCredential {
   OAuthCredential._({
     @required this.providerId,
     this.scopes,
@@ -253,11 +293,15 @@ class OAuthCredential with AuthCredential {
     this.secret,
     this.pendingToken,
     this.nonce,
-  });
+  }) : signInMethod = ProviderMethod.oauth;
 
   /// The identity provider for the credential
   @override
   final String providerId;
+
+  /// The authentication sign in method for the credential.
+  @override
+  final String signInMethod;
 
   /// Used to configure the OAuth scopes.
   /*@nullable*/
@@ -331,6 +375,7 @@ class OAuthCredential with AuthCredential {
   String toString() {
     return (ToStringHelper(OAuthCredential)
           ..add('providerId', providerId)
+          ..add('signInMethod', signInMethod)
           ..add('scopes', scopes)
           ..add('customParameters', customParameters)
           ..add('sessionId', sessionId)
@@ -344,17 +389,22 @@ class OAuthCredential with AuthCredential {
   }
 }
 
-class PhoneAuthCredential with AuthCredential {
+class PhoneAuthCredential implements AuthCredential {
   PhoneAuthCredential._({
     this.verificationId,
     this.verificationCode,
     this.temporaryProof,
     this.phoneNumber,
-  }) : providerId = ProviderType.phone;
+  })  : providerId = ProviderType.phone,
+        signInMethod = ProviderMethod.phone;
 
   /// The identity provider for the credential
   @override
   final String providerId;
+
+  /// The authentication sign in method for the credential.
+  @override
+  final String signInMethod;
 
   /// The verification ID obtained from invoking [FirebaseAuth.verifyPhoneNumber]
   /*@nullable*/
@@ -392,6 +442,7 @@ class PhoneAuthCredential with AuthCredential {
   String toString() {
     return (ToStringHelper(PhoneAuthCredential)
           ..add('providerId', providerId)
+          ..add('signInMethod', signInMethod)
           ..add('verificationId', verificationId)
           ..add('verificationCode', verificationCode)
           ..add('temporaryProof', temporaryProof)
@@ -401,13 +452,18 @@ class PhoneAuthCredential with AuthCredential {
 }
 
 /// Internal implementation of FIRAuthCredential for Twitter credentials.
-class TwitterAuthCredential with AuthCredential {
+class TwitterAuthCredential implements AuthCredential {
   TwitterAuthCredential._({@required this.authToken, @required this.authTokenSecret})
-      : providerId = ProviderType.twitter;
+      : providerId = ProviderType.twitter,
+        signInMethod = ProviderMethod.twitter;
 
   /// The identity provider for the credential
   @override
   final String providerId;
+
+  /// The authentication sign in method for the credential.
+  @override
+  final String signInMethod;
 
   /// The Twitter OAuth token.
   final String authToken;
@@ -435,6 +491,7 @@ class TwitterAuthCredential with AuthCredential {
   String toString() {
     return (ToStringHelper(TwitterAuthCredential)
           ..add('providerId', providerId)
+          ..add('signInMethod', signInMethod)
           ..add('authToken', authToken)
           ..add('authTokenSecret', authTokenSecret))
         .toString();

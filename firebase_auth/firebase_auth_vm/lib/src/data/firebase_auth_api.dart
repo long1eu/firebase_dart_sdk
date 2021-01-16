@@ -42,8 +42,26 @@ class FirebaseAuthApi {
     return _requester.createAuthUri(request);
   }
 
-  Future<GetOobConfirmationCodeResponse> getOobConfirmationCode(Relyingparty request) {
-    return _requester.getOobConfirmationCode(request);
+  Future<GetOobConfirmationCodeResponse> getOobConfirmationCode(Relyingparty request, ActionCodeSettings settings) {
+    if (settings == null) {
+      return _requester.getOobConfirmationCode(request);
+    }
+
+    final Map<String, Object> body = <String, Object>{
+      ...request.toJson(),
+      if (settings.androidInstallIfNotAvailable != null) 'androidInstallApp': settings.androidInstallIfNotAvailable,
+      if (settings.androidMinimumVersion != null) 'androidMinimumVersion': settings.androidMinimumVersion,
+      if (settings.androidPackageName != null) 'androidPackageName': settings.androidPackageName,
+      if (settings.handleCodeInApp != null) 'canHandleCodeInApp': settings.handleCodeInApp,
+      if (settings.continueUrl != null) 'continueUrl': settings.continueUrl,
+      if (settings.iOSAppStoreId != null) 'iOSAppStoreId': settings.iOSAppStoreId,
+      if (settings.iOSBundleId != null) 'iOSBundleId': settings.iOSBundleId,
+      if (settings.dynamicLinkDomain != null) 'dynamicLinkDomain': settings.dynamicLinkDomain,
+    };
+
+    return _rawRequester
+        .request('getOobConfirmationCode', 'POST', body: jsonEncode(body))
+        .then((dynamic data) => GetOobConfirmationCodeResponse.fromJson(data));
   }
 
   Future<EmailLinkSigninResponse> emailLinkSignin(IdentitytoolkitRelyingpartyEmailLinkSigninRequest request) {
@@ -92,20 +110,5 @@ class FirebaseAuthApi {
 
   Future<ResetPasswordResponse> resetPassword(IdentitytoolkitRelyingpartyResetPasswordRequest request) {
     return _requester.resetPassword(request);
-  }
-}
-
-extension on Relyingparty {
-  void updateWith(ActionCodeSettings settings) {
-    this
-          ..continueUrl = settings?.continueUrl
-          ..iOSBundleId = settings?.iOSBundleId
-          ..androidPackageName = settings?.androidPackageName
-          ..androidInstallApp = settings?.androidInstallIfNotAvailable
-          ..androidMinimumVersion = settings?.androidMinimumVersion
-          ..canHandleCodeInApp = settings?.handleCodeInApp
-        // TODO(long1eu): Add the dynamic link when moving to protobuf
-        // ..dynamicLinkDomain = settings?.dynamicLinkDomain
-        ;
   }
 }

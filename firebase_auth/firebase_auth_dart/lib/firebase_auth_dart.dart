@@ -1,36 +1,72 @@
 // File created by
 // Lung Razvan <long1eu>
-// on 04/03/2020
+// on 01/09/2020
 
 library firebase_auth_dart;
 
 import 'dart:async';
+import 'dart:io';
 
-import 'package:built_value/json_object.dart';
-import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart'
-    as platform;
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart' as platform;
 import 'package:firebase_auth_vm/firebase_auth_vm.dart' as dart;
+import 'package:firebase_core/firebase_core.dart' as platform;
 import 'package:firebase_core_vm/firebase_core_vm.dart' as dart;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:meta/meta.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-export 'package:firebase_auth_vm/firebase_auth_vm.dart' show UrlPresenter;
+part 'src/firebase_auth_dart_confirmation_result.dart';
 
+part 'src/firebase_auth_dart_recaptcha_verifier_factory.dart';
+
+part 'src/firebase_auth_dart_user.dart';
+
+part 'src/firebase_auth_dart_user_credential.dart';
+
+part 'src/utils.dart';
+
+/// The web delegate implementation for [FirebaseAuth].
 class FirebaseAuthDart extends platform.FirebaseAuthPlatform {
-  FirebaseAuthDart._({@required dart.UrlPresenter presenter})
-      : assert(presenter != null),
-        _presenter = presenter;
+  /// The entry point for the [FirebaseAuthDart] class.
+  FirebaseAuthDart._({@required platform.FirebaseApp app, dart.UrlPresenter presenter})
+      : assert(app != null),
+        _auth = dart.FirebaseAuth.getInstance(dart.FirebaseApp.getInstance(app?.name)),
+        _presenter = presenter,
+        _userChangesListeners = StreamController<platform.UserPlatform>.broadcast(),
+        _authStateChangesListeners = StreamController<platform.UserPlatform>.broadcast(),
+        _idTokenChangesListeners = StreamController<platform.UserPlatform>.broadcast(),
+        super(appInstance: app);
 
-  /// Registers this implementation as default implementation for FirebaseAuth
-  ///
-  /// see [FirebaseAuthPlatform.presenter]
-  static Future<void> register({dart.UrlPresenter presenter}) async {
-    presenter ??= (Uri uri) => launch(uri.toString());
+  /// Instance of Auth from the dart plugin
+  final dart.FirebaseAuth _auth;
+  bool _appVerificationDisabledForTesting = false;
 
-    platform.FirebaseAuthPlatform.instance =
-        FirebaseAuthDart._(presenter: presenter);
+  static Future<void> register({String appName = dart.FirebaseApp.defaultAppName, dart.UrlPresenter presenter}) async {
+    if (_instances.containsKey(appName)) {
+      final FirebaseAuthDart instance = _instances[appName];
+      platform.FirebaseAuthPlatform.instance = instance;
+      platform.RecaptchaVerifierFactoryPlatform.instance = RecaptchaVerifierFactoryDart._(instance._auth, presenter);
+      return;
+    }
+
+    presenter ??= (Uri uri) => launch('$uri');
+    final platform.FirebaseApp platformApp = platform.Firebase.app(appName);
+    final FirebaseAuthDart instance = FirebaseAuthDart._(app: platformApp, presenter: presenter);
+    _instances[appName] = instance;
+
+    instance //
+        ._auth
+        .onAuthStateChanged
+        .map((dart.FirebaseUser user) => user == null ? null : UserDart._(instance, user))
+        .listen((UserDart event) {
+      instance._authStateChangesListeners.add(event);
+      instance._idTokenChangesListeners.add(event);
+      instance._userChangesListeners.add(event);
+    });
+
+    platform.FirebaseAuthPlatform.instance = instance;
+    platform.RecaptchaVerifierFactoryPlatform.instance = RecaptchaVerifierFactoryDart._(instance._auth, presenter);
   }
 
   dart.UrlPresenter _presenter;
@@ -47,405 +83,259 @@ class FirebaseAuthDart extends platform.FirebaseAuthPlatform {
     _presenter = value;
   }
 
-  dart.FirebaseAuth _getAuth(String name) {
-    name = _normalizeName(name);
-    final dart.FirebaseApp app = dart.FirebaseApp.getInstance(name);
-    return dart.FirebaseAuth.getInstance(app);
+  static final Map<String, FirebaseAuthDart> _instances = <String, FirebaseAuthDart>{};
+
+  final StreamController<platform.UserPlatform> _authStateChangesListeners;
+  final StreamController<platform.UserPlatform> _idTokenChangesListeners;
+  final StreamController<platform.UserPlatform> _userChangesListeners;
+
+  @override
+  platform.FirebaseAuthPlatform delegateFor({platform.FirebaseApp app}) {
+    return FirebaseAuthDart._(app: app, presenter: (Uri uri) => launch('$uri'));
   }
 
-  String _normalizeName(String name) {
-    if (name == '__FIRAPP_DEFAULT' || name == '[DEFAULT]') {
-      return dart.FirebaseApp.defaultAppName;
-    } else {
-      return name;
-    }
+  @override
+  FirebaseAuthDart setInitialValues({Map<String, dynamic> currentUser, String languageCode}) {
+    // Values are already set on dart
+    return this;
   }
 
-  platform.PlatformAdditionalUserInfo _fromJsAdditionalUserInfo(
-      dart.AdditionalUserInfo additionalUserInfo) {
-    return platform.PlatformAdditionalUserInfo(
-      isNewUser: additionalUserInfo.isNewUser,
-      providerId: additionalUserInfo.providerId,
-      username: additionalUserInfo.username,
-      profile: additionalUserInfo.profile?.asMap()?.map<String, dynamic>(
-          (String key, JsonObject value) =>
-              MapEntry<String, dynamic>(key, value.value)),
-    );
-  }
+  @override
+  platform.UserPlatform get currentUser {
+    final dart.FirebaseUser dartCurrentUser = _auth.currentUser;
 
-  platform.PlatformUserInfo _fromDartUserInfo(dart.UserInfo userInfo) {
-    return platform.PlatformUserInfo(
-      providerId: userInfo.providerId,
-      uid: userInfo.providerId,
-      displayName: userInfo.displayName,
-      photoUrl: userInfo.photoUrl,
-      email: userInfo.email,
-      phoneNumber: userInfo.phoneNumber,
-    );
-  }
-
-  platform.PlatformUser _fromDartUser(dart.FirebaseUser user) {
-    if (user == null) {
+    if (dartCurrentUser == null) {
       return null;
     }
-    return platform.PlatformUser(
-      providerId: user.providerId,
-      uid: user.uid,
-      displayName: user.displayName,
-      photoUrl: user.photoUrl,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      creationTimestamp: user.metadata.creationDate.millisecondsSinceEpoch,
-      lastSignInTimestamp: user.metadata.lastSignInDate.millisecondsSinceEpoch,
-      isAnonymous: user.isAnonymous,
-      isEmailVerified: user.isEmailVerified,
-      providerData: user.providerData
-          .map<platform.PlatformUserInfo>(_fromDartUserInfo)
-          .toList(),
+
+    return UserDart._(this, _auth.currentUser);
+  }
+
+  @override
+  void sendAuthChangesEvent(String appName, platform.UserPlatform userPlatform) {
+    assert(appName != null);
+    _userChangesListeners.add(null);
+  }
+
+  @override
+  Future<void> applyActionCode(String code) {
+    try {
+      return _auth.applyActionCode(code);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<platform.ActionCodeInfo> checkActionCode(String code) async {
+    final dart.ActionCodeInfo codeInfo = await _auth.checkActionCode(code);
+    return convertDartActionCodeInfo(codeInfo);
+  }
+
+  @override
+  Future<platform.UserCredentialPlatform> createUserWithEmailAndPassword(String email, String password) async {
+    try {
+      final dart.AuthResult authResult = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      return UserCredentialDart._(this, authResult);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<List<String>> fetchSignInMethodsForEmail(String email) {
+    try {
+      return _auth.fetchSignInMethodsForEmail(email);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  /*
+  @override
+  Future<platform.UserCredentialPlatform> signInWithPopup(platform.AuthProvider provider) async {
+    try {
+      final dart.AuthProvider authProvider = convertPlatformAuthProvider(provider);
+      return UserCredentialDart._(this, await _auth.signInWithPopup(authProvider));
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<void> signInWithRedirect(platform.AuthProvider provider) async {
+    try {
+      final dart.AuthProvider authProvider = convertPlatformAuthProvider(provider);
+      return _auth.signInWithRedirect(authProvider);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<platform.UserCredentialPlatform> getRedirectResult() async {
+    try {
+      final authResult = await _auth.getRedirectResult();
+      return UserCredentialDart._(this, authResult);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+  */
+
+  @override
+  Stream<platform.UserPlatform> authStateChanges() => _authStateChangesListeners.stream;
+
+  @override
+  Stream<platform.UserPlatform> idTokenChanges() => _idTokenChangesListeners.stream;
+
+  @override
+  Stream<platform.UserPlatform> userChanges() => _userChangesListeners.stream;
+
+  @override
+  Future<void> sendPasswordResetEmail(String email, [platform.ActionCodeSettings actionCodeSettings]) {
+    try {
+      final dart.ActionCodeSettings codeSettings = convertPlatformActionCodeSettings(actionCodeSettings);
+      return _auth.sendPasswordResetEmail(email, codeSettings);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<void> sendSignInLinkToEmail(String email, [platform.ActionCodeSettings actionCodeSettings]) {
+    try {
+      final dart.ActionCodeSettings codeSettings = convertPlatformActionCodeSettings(actionCodeSettings);
+      return _auth.sendSignInWithEmailLink(email, codeSettings);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<void> setLanguageCode(String languageCode) async {
+    _auth.languageCode = languageCode;
+  }
+
+  @override
+  Future<void> setSettings({
+    bool appVerificationDisabledForTesting,
+    String userAccessGroup,
+  }) async {
+    if (userAccessGroup != null && !dart.kIsWeb && (Platform.isIOS || Platform.isMacOS)) {
+      Log.i('FirebaseAuthDart',
+          'userAccessGroup can be implemented by providing a custom implementation for the LocalStorage in the PlatformDependencies object used by this FirebaseApp.');
+    }
+
+    _appVerificationDisabledForTesting = appVerificationDisabledForTesting ?? false;
+  }
+
+  @override
+  Future<platform.UserCredentialPlatform> signInAnonymously() async {
+    try {
+      final dart.AuthResult authResult = await _auth.signInAnonymously();
+      return UserCredentialDart._(this, authResult);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<platform.UserCredentialPlatform> signInWithCredential(platform.AuthCredential credential) async {
+    try {
+      final dart.AuthCredential dartCredential = convertPlatformCredential(credential);
+      final dart.AuthResult authResult = await _auth.signInWithCredential(dartCredential);
+      return UserCredentialDart._(this, authResult);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<platform.UserCredentialPlatform> signInWithCustomToken(String token) async {
+    try {
+      final dart.AuthResult authResult = await _auth.signInWithCustomToken(token);
+      return UserCredentialDart._(this, authResult);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<platform.UserCredentialPlatform> signInWithEmailAndPassword(String email, String password) async {
+    try {
+      final dart.AuthResult authResult = await _auth.signInWithEmailAndPassword(email: email, password: password);
+      return UserCredentialDart._(this, authResult);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<platform.UserCredentialPlatform> signInWithEmailLink(String email, String emailLink) async {
+    try {
+      final dart.AuthResult authResult = await _auth.signInWithEmailAndLink(email: email, link: emailLink);
+      return UserCredentialDart._(this, authResult);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
+    }
+  }
+
+  @override
+  Future<platform.ConfirmationResultPlatform> signInWithPhoneNumber(
+    String phoneNumber,
+    platform.RecaptchaVerifierFactoryPlatform applicationVerifier,
+  ) async {
+    final platform.RecaptchaVerifierFactoryPlatform delegate = applicationVerifier.delegateFor(
+      parameters: <String, Object>{
+        'appName': _auth.app.name,
+        'presenter': presenter,
+      },
     );
-  }
 
-  platform.PlatformAuthResult _fromDartAuthResult(dart.AuthResult result) {
-    return platform.PlatformAuthResult(
-      user: _fromDartUser(result.user),
-      additionalUserInfo: _fromJsAdditionalUserInfo(
-        result.additionalUserInfo,
-      ),
+    final String verificationId = await _auth.verifyPhoneNumber(
+      phoneNumber,
+      isTest: _appVerificationDisabledForTesting,
+      provider: delegate.verify,
     );
+    return ConfirmationResultDart._(this, _auth, verificationId);
   }
 
-  platform.PlatformIdTokenResult _fromDartIdTokenResult(
-      dart.GetTokenResult idTokenResult) {
-    return platform.PlatformIdTokenResult(
-      token: idTokenResult.token,
-      expirationTimestamp:
-          idTokenResult.expirationTimestamp.millisecondsSinceEpoch,
-      authTimestamp: idTokenResult.authTimestamp.millisecondsSinceEpoch,
-      issuedAtTimestamp: idTokenResult.issuedAtTimestamp.millisecondsSinceEpoch,
-      claims: idTokenResult.claims,
-      signInProvider: idTokenResult.signInProvider,
-    );
-  }
-
-  dart.FirebaseUser _getCurrentUserOrThrow(dart.FirebaseAuth auth) {
-    final dart.FirebaseUser user = auth.currentUser;
-    if (user == null) {
-      throw PlatformException(
-        code: 'USER_REQUIRED',
-        message: 'Please authenticate with Firebase first',
-      );
+  @override
+  Future<void> signOut() {
+    try {
+      return _auth.signOut();
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
     }
-    return user;
   }
 
-  dart.AuthCredential _getCredential(platform.AuthCredential credential) {
-    if (credential is platform.EmailAuthCredential) {
-      return dart.EmailAuthProvider.getCredential(
-        email: credential.email,
-        password: credential.password,
-      );
+  @override
+  Future<String> verifyPasswordResetCode(String code) {
+    try {
+      return _auth.verifyPasswordReset(code);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
     }
-    if (credential is platform.GoogleAuthCredential) {
-      return dart.GoogleAuthProvider.getCredential(
-        idToken: credential.idToken,
-        accessToken: credential.accessToken,
-      );
-    }
-    if (credential is platform.FacebookAuthCredential) {
-      return dart.FacebookAuthProvider.getCredential(credential.accessToken);
-    }
-    if (credential is platform.TwitterAuthCredential) {
-      return dart.TwitterAuthProvider.getCredential(
-        authToken: credential.authToken,
-        authTokenSecret: credential.authTokenSecret,
-      );
-    }
-    if (credential is platform.GithubAuthCredential) {
-      return dart.GithubAuthProvider.getCredential(credential.token);
-    }
-    if (credential is platform.PhoneAuthCredential) {
-      return dart.PhoneAuthProvider.getCredential(
-        verificationId: credential.verificationId,
-        verificationCode: credential.smsCode,
-      );
-    }
-    return null;
   }
 
   @override
-  Future<platform.PlatformUser> getCurrentUser(String app) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = auth.currentUser;
-    return Future<platform.PlatformUser>.value(_fromDartUser(currentUser));
-  }
-
-  @override
-  Future<platform.PlatformAuthResult> signInAnonymously(String app) async {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.AuthResult result = await auth.signInAnonymously();
-    return _fromDartAuthResult(result);
-  }
-
-  @override
-  Future<platform.PlatformAuthResult> createUserWithEmailAndPassword(
-    String app,
-    String email,
-    String password,
-  ) async {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.AuthResult result = await auth.createUserWithEmailAndPassword(
-        email: email, password: password);
-    return _fromDartAuthResult(result);
-  }
-
-  @override
-  Future<List<String>> fetchSignInMethodsForEmail(String app, String email) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    return auth.fetchSignInMethodsForEmail(email: email);
-  }
-
-  @override
-  // TODO(long1eu): expose ActionCodeSettings
-  Future<void> sendPasswordResetEmail(String app, String email,
-      [dart.ActionCodeSettings settings]) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    return auth.sendPasswordResetEmail(email: email, settings: settings);
-  }
-
-  @override
-  Future<void> sendLinkToEmail(
-    String app, {
-    @required String email,
-    @required String url,
-    @required bool handleCodeInApp,
-    @required String iOSBundleID,
-    @required String androidPackageName,
-    @required bool androidInstallIfNotAvailable,
-    @required String androidMinimumVersion,
-  }) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.ActionCodeSettings actionCodeSettings = dart.ActionCodeSettings(
-      continueUrl: url,
-      handleCodeInApp: handleCodeInApp,
-      iOSBundleId: iOSBundleID,
-      androidPackageName: androidPackageName,
-      androidInstallIfNotAvailable: androidInstallIfNotAvailable,
-      androidMinimumVersion: androidMinimumVersion,
-    );
-    return auth.sendSignInWithEmailLink(
-        email: email, settings: actionCodeSettings);
-  }
-
-  @override
-  Future<bool> isSignInWithEmailLink(String app, String link) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    return Future<bool>.value(auth.isSignInWithEmailLink(link));
-  }
-
-  @override
-  Future<platform.PlatformAuthResult> signInWithEmailAndLink(
-    String app,
-    String email,
-    String link,
-  ) async {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.AuthResult result =
-        await auth.signInWithEmailAndLink(email: email, link: link);
-    return _fromDartAuthResult(result);
-  }
-
-  @override
-  Future<void> sendEmailVerification(String app) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = _getCurrentUserOrThrow(auth);
-    return currentUser.sendEmailVerification();
-  }
-
-  @override
-  Future<void> reload(String app) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = _getCurrentUserOrThrow(auth);
-    return currentUser.reload();
-  }
-
-  @override
-  Future<void> delete(String app) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser user = _getCurrentUserOrThrow(auth);
-    return user.delete();
-  }
-
-  @override
-  Future<platform.PlatformAuthResult> signInWithCredential(
-    String app,
-    platform.AuthCredential credential,
-  ) async {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.AuthCredential firebaseCredential = _getCredential(credential);
-    final dart.AuthResult result =
-        await auth.signInWithCredential(firebaseCredential);
-    return _fromDartAuthResult(result);
-  }
-
-  @override
-  Future<platform.PlatformAuthResult> signInWithCustomToken(
-      String app, String token) async {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.AuthResult result =
-        await auth.signInWithCustomToken(token: token);
-    return _fromDartAuthResult(result);
-  }
-
-  @override
-  Future<void> signOut(String app) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    return auth.signOut();
-  }
-
-  @override
-  Future<platform.PlatformIdTokenResult> getIdToken(
-      String app, bool refresh) async {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = auth.currentUser;
-    final dart.GetTokenResult idTokenResult =
-        await currentUser.getIdToken(forceRefresh: refresh);
-    return _fromDartIdTokenResult(idTokenResult);
-  }
-
-  @override
-  Future<platform.PlatformAuthResult> reauthenticateWithCredential(
-    String app,
-    platform.AuthCredential credential,
-  ) async {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = _getCurrentUserOrThrow(auth);
-    final dart.AuthCredential firebaseCredential = _getCredential(credential);
-    final dart.AuthResult result =
-        await currentUser.reauthenticateWithCredential(firebaseCredential);
-    return _fromDartAuthResult(result);
-  }
-
-  @override
-  Future<platform.PlatformAuthResult> linkWithCredential(
-    String app,
-    platform.AuthCredential credential,
-  ) async {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = _getCurrentUserOrThrow(auth);
-    final dart.AuthCredential firebaseCredential = _getCredential(credential);
-    final dart.AuthResult result =
-        await currentUser.linkWithCredential(firebaseCredential);
-    return _fromDartAuthResult(result);
-  }
-
-  @override
-  Future<void> unlinkFromProvider(String app, String provider) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = _getCurrentUserOrThrow(auth);
-    return currentUser.unlinkFromProvider(provider);
-  }
-
-  @override
-  Future<void> updateEmail(String app, String email) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = _getCurrentUserOrThrow(auth);
-    return currentUser.updateEmail(email);
-  }
-
-  @override
-  Future<void> updatePhoneNumberCredential(
-    String app,
-    platform.PhoneAuthCredential phoneAuthCredential,
-  ) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = _getCurrentUserOrThrow(auth);
-    final dart.AuthCredential credential = _getCredential(phoneAuthCredential);
-    return currentUser.updatePhoneNumberCredential(credential);
-  }
-
-  @override
-  Future<void> updatePassword(String app, String password) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = _getCurrentUserOrThrow(auth);
-    return currentUser.updatePassword(password);
-  }
-
-  // TODO(long1eu): This doesn't seem to allow removing of the name with a null value
-  @override
-  Future<void> updateProfile(
-    String app, {
-    String displayName,
-    String photoUrl,
-  }) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    final dart.FirebaseUser currentUser = _getCurrentUserOrThrow(auth);
-    final dart.UserUpdateInfo profile = dart.UserUpdateInfo();
-    if (displayName != null) {
-      profile.displayName = displayName;
-    }
-    if (photoUrl != null) {
-      profile.photoUrl = photoUrl;
-    }
-    return currentUser.updateProfile(profile);
-  }
-
-  @override
-  Future<void> setLanguageCode(String app, String language) async {
-    _getAuth(app).languageCode = language;
-  }
-
-  @override
-  Stream<platform.PlatformUser> onAuthStateChanged(String app) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    return auth.onAuthStateChanged.map<platform.PlatformUser>(_fromDartUser);
-  }
-
-  @override
-  Future<void> verifyPhoneNumber(
-    String app, {
+  Future<void> verifyPhoneNumber({
     @required String phoneNumber,
-    @required Duration timeout,
-    int forceResendingToken,
     @required platform.PhoneVerificationCompleted verificationCompleted,
     @required platform.PhoneVerificationFailed verificationFailed,
     @required platform.PhoneCodeSent codeSent,
     @required platform.PhoneCodeAutoRetrievalTimeout codeAutoRetrievalTimeout,
+    String autoRetrievedSmsCodeForTesting,
+    Duration timeout = const Duration(seconds: 30),
+    int forceResendingToken,
   }) async {
-    final dart.FirebaseAuth auth = _getAuth(app);
     try {
-      final String verificationId = await auth.verifyPhoneNumber(
-          phoneNumber: phoneNumber, presenter: presenter);
-
-      codeSent(verificationId);
-    } on dart.FirebaseAuthError catch (e) {
-      String code = 'verifyPhoneNumberError';
-      switch (e.code) {
-        case 17056:
-          code = 'captchaCheckFailed';
-          break;
-        case 17052:
-          code = 'quotaExceeded';
-          break;
-        case 17042:
-          code = 'invalidPhoneNumber';
-          break;
-        case 17041:
-          code = 'missingPhoneNumber';
-          break;
-      }
-
-      verificationFailed(platform.AuthException(code, e.message));
+      final String verificationId =
+          await _auth.verifyPhoneNumber(phoneNumber, isTest: _appVerificationDisabledForTesting, presenter: presenter);
+      codeSent(verificationId, null);
+    } catch (e) {
+      throw convertDartFirebaseAuthError(e);
     }
-  }
-
-  @override
-  Future<void> confirmPasswordReset(
-    String app,
-    String oobCode,
-    String newPassword,
-  ) {
-    final dart.FirebaseAuth auth = _getAuth(app);
-    return auth.confirmPasswordReset(
-        oobCode: oobCode, newPassword: newPassword);
   }
 }

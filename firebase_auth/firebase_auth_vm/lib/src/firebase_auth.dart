@@ -37,6 +37,8 @@ class FirebaseAuth implements InternalTokenProvider {
     if (app.authProvider == app) {
       app.authProvider = auth;
     }
+
+    app.onDeleteApp.first.then(auth._onDelete);
     return auth;
   }
 
@@ -53,6 +55,14 @@ class FirebaseAuth implements InternalTokenProvider {
     }
   }
 
+  Future<void> _onDelete(String appName) async {
+    if (_instances.containsKey(appName)) {
+      _instances.remove(appName);
+      await _backgroundChangedSub?.cancel();
+      await _authStateChangedControllers[appName]?.close();
+    }
+  }
+
   /// The [FirebaseApp] object that this auth object is connected to.
   final FirebaseApp app;
 
@@ -60,7 +70,6 @@ class FirebaseAuth implements InternalTokenProvider {
   final UserStorage _userStorage;
   final ApiKeyClient _apiKeyClient;
 
-  // TODO(long1eu): Is there a reason to cancel the reauth subscription?
   StreamSubscription<bool> _backgroundChangedSub;
   bool _isAppInBackground;
 
@@ -104,7 +113,7 @@ class FirebaseAuth implements InternalTokenProvider {
   ///
   /// Errors:
   ///   * [FirebaseAuthError.invalidEmail] - If the [email] address is malformed.
-  Future<List<String>> fetchSignInMethodsForEmail({@required String email}) async {
+  Future<List<String>> fetchSignInMethodsForEmail(String email) async {
     assert(email != null);
 
     final IdentitytoolkitRelyingpartyCreateAuthUriRequest request = IdentitytoolkitRelyingpartyCreateAuthUriRequest()
@@ -129,7 +138,7 @@ class FirebaseAuth implements InternalTokenProvider {
   Future<AuthResult> signInWithEmailAndPassword({@required String email, @required String password}) {
     assert(email != null);
     assert(password != null);
-    final AuthCredential credential = EmailAuthProvider.getCredential(email: email, password: password);
+    final AuthCredential credential = EmailAuthProvider.credential(email: email, password: password);
     return _signInAndRetrieveData(credential);
   }
 
@@ -144,7 +153,7 @@ class FirebaseAuth implements InternalTokenProvider {
     assert(email != null);
     assert(link != null);
 
-    final EmailPasswordAuthCredential credential = EmailAuthProvider.getCredentialWithLink(email: email, link: link);
+    final EmailPasswordAuthCredential credential = EmailAuthProvider.credentialWithLink(email: email, link: link);
     return _signInAndRetrieveData(credential);
   }
 
@@ -223,7 +232,7 @@ class FirebaseAuth implements InternalTokenProvider {
   ///   * [FirebaseAuthError.invalidCustomToken] - Indicates a validation error with the custom token.
   ///   * [FirebaseAuthError.customTokenMismatch] - Indicates the service account and the API key belong to different
   ///       projects. Also ensure your app's SHA1 is correct in the Firebase console.
-  Future<AuthResult> signInWithCustomToken({@required String token}) async {
+  Future<AuthResult> signInWithCustomToken(String token) async {
     assert(token != null);
 
     final IdentitytoolkitRelyingpartyVerifyCustomTokenRequest request =
@@ -338,15 +347,14 @@ class FirebaseAuth implements InternalTokenProvider {
   ///     whitelisted in the Firebase console.
   ///  * [FirebaseAuthError.invalidContinueURI] - Indicates that the domain specified in the continue URI is not valid.
   ///  * [FirebaseAuthError.userNotFound] - Indicates that there is no user corresponding to the given [email] address.
-  Future<void> sendPasswordResetEmail({@required String email, ActionCodeSettings settings}) async {
+  Future<void> sendPasswordResetEmail(String email, [ActionCodeSettings settings]) async {
     assert(email != null);
 
     final Relyingparty request = Relyingparty()
       ..requestType = OobCodeType.passwordReset.value
-      ..email = email
-      ..updateWith(settings);
+      ..email = email;
 
-    return _firebaseAuthApi.getOobConfirmationCode(request);
+    return _firebaseAuthApi.getOobConfirmationCode(request, settings);
   }
 
   /// Signs in using an email address and email sign-in link.
@@ -358,16 +366,15 @@ class FirebaseAuth implements InternalTokenProvider {
   ///       enabled. Enable them in the Auth section of the Firebase console.
   ///   * [FirebaseAuthError.userDisabled] - Indicates the user's account is disabled.
   ///   * [FirebaseAuthError.invalidEmail] - Indicates the email address is invalid.
-  Future<void> sendSignInWithEmailLink({@required String email, @required ActionCodeSettings settings}) async {
+  Future<void> sendSignInWithEmailLink(String email, ActionCodeSettings settings) async {
     assert(email != null);
     assert(settings != null);
 
     final Relyingparty request = Relyingparty()
       ..requestType = OobCodeType.emailLinkSignIn.value
-      ..email = email
-      ..updateWith(settings);
+      ..email = email;
 
-    return _firebaseAuthApi.getOobConfirmationCode(request);
+    return _firebaseAuthApi.getOobConfirmationCode(request, settings);
   }
 
   /// Signs out the current user and clears it from the disk cache.
@@ -402,7 +409,8 @@ class FirebaseAuth implements InternalTokenProvider {
 
   /// Starts the phone number authentication flow by sending a verification code to the specified phone number.
   ///
-  /// You can use [presenter] to present the user with the recaptcha url in order to verify the app.
+  /// You can use [presenter] to present the user with the recaptcha url in order to verify the app. Also you can
+  /// implement a custom flow and just provide the recaptcha token using [provider].
   /// Errors:
   ///   * [FirebaseAuthError.captchaCheckFailed] - Indicates that the reCAPTCHA token obtained by the Firebase Auth is
   ///       invalid or has expired.
@@ -410,15 +418,21 @@ class FirebaseAuth implements InternalTokenProvider {
   ///       exceeded.
   ///   * [FirebaseAuthError.invalidPhoneNumber] - Indicates that the phone number provided is invalid.
   ///   * [FirebaseAuthError.missingPhoneNumber] - Indicates that the phone number provided was not provided.
-  Future<String> verifyPhoneNumber({@required String phoneNumber, bool isTest = false, UrlPresenter presenter}) async {
+  Future<String> verifyPhoneNumber(
+    String phoneNumber, {
+    bool isTest = false,
+    UrlPresenter presenter,
+    RecaptchaTokenProvider provider,
+  }) async {
     // todo: save the recaptcha token, and use it until it expires
     assert(phoneNumber != null);
     final IdentitytoolkitRelyingpartySendVerificationCodeRequest request =
         IdentitytoolkitRelyingpartySendVerificationCodeRequest()..phoneNumber = phoneNumber;
 
-    // We don't check the app if we are in a test
-    if (!isTest) {
-      const RecaptchaToken token = RecaptchaToken();
+    if (provider != null) {
+      request.recaptchaToken = await provider();
+    } else if (!isTest) {
+      final RecaptchaToken token = RecaptchaToken(_firebaseAuthApi);
       request.recaptchaToken = await token.get(
         urlPresenter: presenter ?? print,
         apiKey: app.options.apiKey,
@@ -556,7 +570,7 @@ class FirebaseAuth implements InternalTokenProvider {
     // Check whether or not the successful response is actually the special case phone auth flow that returns a
     // temporary proof and phone number.
     if (response.temporaryProof != null && response.phoneNumber != null) {
-      final PhoneAuthCredential credential = PhoneAuthProvider.getCredentialWithTemporaryProof(
+      final PhoneAuthCredential credential = PhoneAuthProvider.credentialWithTemporaryProof(
           temporaryProof: response.temporaryProof, phoneNumber: response.phoneNumber);
       return Future<AuthResult>.error(FirebaseAuthCredentialAlreadyInUseError(credential));
     }

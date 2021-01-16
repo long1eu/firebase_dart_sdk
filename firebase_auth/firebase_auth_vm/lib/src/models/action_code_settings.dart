@@ -11,6 +11,7 @@ class ActionCodeSettings {
   /// If [androidInstallIfNotAvailable] is true you must specify the [androidPackageName].
   ActionCodeSettings({
     this.continueUrl,
+    this.iOSAppStoreId,
     this.iOSBundleId,
     this.androidPackageName,
     this.androidInstallIfNotAvailable,
@@ -22,6 +23,10 @@ class ActionCodeSettings {
   /// This URL represents the state/Continue URL in the form of a universal link.
   /*@nullable*/
   final String continueUrl;
+
+  /// iOS app store id to download the app if it's not already installed
+  /*@nullable*/
+  final String iOSAppStoreId;
 
   /// The iOS bundle Identifier, if available.
   /*@nullable*/
@@ -58,6 +63,7 @@ class ActionCodeSettings {
     return (ToStringHelper(ActionCodeInfo)
           ..add('continueUrl', continueUrl)
           ..add('iOSBundleId', iOSBundleId)
+          ..add('iOSAppStoreId', iOSAppStoreId)
           ..add('androidPackageName', androidPackageName)
           ..add('androidInstallIfNotAvailable', androidInstallIfNotAvailable)
           ..add('androidMinimumVersion', androidMinimumVersion)

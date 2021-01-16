@@ -17,10 +17,8 @@ Future<void> _fetchSignInMethod(FirebaseAuthOption option) async {
   );
 
   final String result = await option.show();
-  final Progress progress = Progress('Fetching sing in methods for $result')
-    ..show();
-  final List<String> providers =
-      await FirebaseAuth.instance.fetchSignInMethodsForEmail(email: result);
+  final Progress progress = Progress('Fetching sing in methods for $result')..show();
+  final List<String> providers = await FirebaseAuth.instance.fetchSignInMethodsForEmail(result);
   await progress.cancel();
 
   console
@@ -40,8 +38,7 @@ String _getResultMessage(String email, List<String> providers) {
   } else if (providers.length == 1) {
     return '${email.bold.cyan.reset} can login with ${providers.first.bold.yellow.reset}.';
   } else {
-    final StringBuffer buffer =
-        StringBuffer('${email.bold.cyan.reset} can login with ');
+    final StringBuffer buffer = StringBuffer('${email.bold.cyan.reset} can login with ');
     for (int i = 0; i < providers.length; i++) {
       final String provider = providers[i];
 

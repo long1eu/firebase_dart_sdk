@@ -1,71 +1,67 @@
-// Copyright 2017 The Chromium Authors. All rights reserved.
+// Copyright 2020 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:io';
+
 import 'package:firebase_auth_dart/firebase_auth_dart.dart';
-import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_core_dart/firebase_core_dart.dart';
-import 'package:firebase_core_vm/firebase_core_vm.dart' show kIsDesktop;
 import 'package:flutter/material.dart';
+import 'package:flutter_signin_button/button_builder.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
 
-import './register_page.dart';
-import './signin_page.dart';
+import 'generated/firebase_options_dart.dart';
+import 'register_page.dart';
+import 'signin_page.dart';
 
-void main() {
-  if (kIsDesktop) {
-    Future.wait(<Future<void>>[
-      GoogleSignInDart.register(
-        exchangeEndpoint:
-            'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
-        clientId:
-            '233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com',
-      ),
-      FirebaseCoreDart.register(
-        options: const FirebaseOptions(
-          apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
-          databaseURL: 'https://flutter-sdk.firebaseio.com',
-          projectID: 'flutter-sdk',
-          storageBucket: 'flutter-sdk.appspot.com',
-          gcmSenderID: '233259864964',
-          googleAppID:
-              '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
-        ),
-      ),
-      FirebaseAuthDart.register(),
-    ]);
-  }
-  runApp(MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Future.wait(<Future<void>>[
+    Firebase.initializeApp(),
+    GoogleSignInDart.register(
+      exchangeEndpoint: 'https://us-central1-flutter-sdk.cloudfunctions.net/authHandler',
+      // androidClientId is used for all the other platforms
+      clientId: !kIsWeb && Platform.isIOS ? firebaseOptions.iosClientId : firebaseOptions.androidClientId,
+    ),
+    FirebaseDart.register(options: firebaseOptions),
+    FirebaseAuthDart.register(),
+  ]);
+
+  runApp(const AuthExampleApp());
 }
 
-class MyApp extends StatelessWidget {
+/// The entry point of the application.
+///
+/// Returns a [MaterialApp].
+class AuthExampleApp extends StatelessWidget {
+  const AuthExampleApp({Key key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      title: 'Firebase Auth Demo',
-      home: MyHomePage(title: 'Firebase Auth Demo'),
+    return MaterialApp(
+      title: 'Firebase Example App',
+      theme: ThemeData.dark(),
+      home: Scaffold(
+        body: AuthTypeSelector(),
+      ),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key key, this.title}) : super(key: key);
-
-  final String title;
-
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  FirebaseUser user;
+/// Provides a UI to select a authentication type page
+class AuthTypeSelector extends StatelessWidget {
+  // Navigates to a new page
+  void _pushPage(BuildContext context, Widget page) {
+    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => page));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: const Text('Firebase Example App'),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,27 +69,25 @@ class _MyHomePageState extends State<MyHomePage> {
           Container(
             padding: const EdgeInsets.all(16),
             alignment: Alignment.center,
-            child: RaisedButton(
-              onPressed: () => _pushPage(context, RegisterPage()),
-              child: const Text('Test registration'),
+            child: SignInButtonBuilder(
+              icon: Icons.person_add,
+              backgroundColor: Colors.indigo,
+              text: 'Registration',
+              onPressed: () => _pushPage(context, const RegisterPage()),
             ),
           ),
           Container(
             padding: const EdgeInsets.all(16),
             alignment: Alignment.center,
-            child: RaisedButton(
+            child: SignInButtonBuilder(
+              icon: Icons.verified_user,
+              backgroundColor: Colors.orange,
+              text: 'Sign In',
               onPressed: () => _pushPage(context, SignInPage()),
-              child: const Text('Test SignIn/SignOut'),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  void _pushPage(BuildContext context, Widget page) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => page),
     );
   }
 }

@@ -20,10 +20,7 @@ class ActionCodeInfo {
 
   @override
   String toString() {
-    return (ToStringHelper(ActionCodeInfo)
-          ..add('operation', operation)
-          ..add('email', email)
-          ..add('forEmail', forEmail))
+    return (ToStringHelper(ActionCodeInfo)..add('operation', operation)..add('email', email)..add('forEmail', forEmail))
         .toString();
   }
 }
@@ -47,11 +44,20 @@ class ActionCodeOperation {
   /// The action code type value for an email sign-in link in the check action code response.
   static const ActionCodeOperation emailSignIn = ActionCodeOperation._(3, 'EMAIL_SIGNIN');
 
+  /// The action code type value for verifying and changing email in the check action code response.
+  static const ActionCodeOperation verifyAndChangeEmail = ActionCodeOperation._(4, 'VERIFY_AND_CHANGE_EMAIL');
+
+  /// The action code type value for reverting second factor addition in the check action code response.
+  static const ActionCodeOperation revertSecondFactorAddition =
+      ActionCodeOperation._(5, 'REVERT_SECOND_FACTOR_ADDITION');
+
   static const List<ActionCodeOperation> values = <ActionCodeOperation>[
     passwordReset,
     verifyEmail,
     recoverEmail,
     emailSignIn,
+    verifyAndChangeEmail,
+    revertSecondFactorAddition,
   ];
 
   static const List<String> _names = <String>[
@@ -59,6 +65,8 @@ class ActionCodeOperation {
     'verifyEmail',
     'recoverEmail',
     'emailSignIn',
+    'verifyAndChangeEmail',
+    'revertSecondFactorAddition',
   ];
 
   @override

@@ -4,19 +4,18 @@ version: 0.0.1
 homepage: https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/firebase_auth/firebase_auth_dart
 
 environment:
-  sdk: ">=2.7.0 <3.0.0"
+  sdk: ">=2.8.0 <3.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
   firebase_auth_platform_interface: ^2.0.1
-  firebase_auth_vm: ^0.0.2
-  firebase_core_vm: ^0.0.6
-  url_launcher: ^5.5.1
-  built_value: ^7.1.0
+  firebase_auth_vm: #^0.0.3
+    path: ../firebase_auth_vm
+  firebase_auth_web: ^0.3.0+1
+  firebase_core_vm: ^0.0.8
+  url_launcher: ^5.5.2
   meta: ^1.2.2
-
-dependency_overrides:
   rxdart: ^0.24.1
 
 dev_dependencies:
