@@ -12,21 +12,21 @@ import 'package:_firebase_database_collection_vm/_firebase_database_collection_v
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/index_range.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listen_sequence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/index_cursor.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/index_manager.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/stats_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/index_manager.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/lru_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/target_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
@@ -37,33 +37,36 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
-import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart' as proto hide Target;
+import 'package:cloud_firestore_vm/src/proto/index.dart' as proto hide Value;
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:semaphore/semaphore.dart';
 
 part 'sqlite_collection_index.dart';
+
 part 'sqlite_index_manager.dart';
+
 part 'sqlite_lru_reference_delegate.dart';
+
 part 'sqlite_mutation_queue.dart';
-part 'sqlite_query_cache.dart';
+
 part 'sqlite_remote_document_cache.dart';
+
 part 'sqlite_schema.dart';
+
+part 'sqlite_target_cache.dart';
 
 /// A SQLite-backed instance of Persistence.
 ///
 /// In addition to implementations of the methods in the Persistence interface, also contains helper
 /// routines that make dealing with SQLite much more pleasant.
 class SQLitePersistence extends Persistence {
-  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName,
-      StatsCollector statsCollector)
-      : _statsCollector = statsCollector ?? StatsCollector.noOp,
-        _semaphore = GlobalSemaphore() {
+  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName) : _semaphore = GlobalSemaphore() {
     indexManager = SqliteIndexManager(this);
   }
 
@@ -72,7 +75,6 @@ class SQLitePersistence extends Persistence {
   final OpenDatabase openDatabase;
   final String databaseName;
   final LocalSerializer serializer;
-  final StatsCollector _statsCollector;
   final Semaphore _semaphore;
 
   Database _db;
@@ -81,7 +83,7 @@ class SQLitePersistence extends Persistence {
   bool started = false;
 
   @override
-  SQLiteQueryCache queryCache;
+  SQLiteTargetCache targetCache;
 
   @override
   SqliteIndexManager indexManager;
@@ -115,26 +117,22 @@ class SQLitePersistence extends Persistence {
   }
 
   static Future<SQLitePersistence> create(
-      String persistenceKey,
-      DatabaseId databaseId,
-      LocalSerializer serializer,
-      OpenDatabase openDatabase,
-      LruGarbageCollectorParams params,
-      [StatsCollector statsCollector = StatsCollector.noOp]) async {
+    String persistenceKey,
+    DatabaseId databaseId,
+    LocalSerializer serializer,
+    OpenDatabase openDatabase,
+    LruGarbageCollectorParams params,
+  ) async {
     final String databaseName = sDatabaseName(persistenceKey, databaseId);
 
-    final SQLitePersistence persistence = SQLitePersistence._(
-        serializer, openDatabase, databaseName, statsCollector);
+    final SQLitePersistence persistence = SQLitePersistence._(serializer, openDatabase, databaseName);
 
-    final SQLiteQueryCache queryCache =
-        SQLiteQueryCache(persistence, serializer);
-    final SQLiteRemoteDocumentCache remoteDocumentCache =
-        SQLiteRemoteDocumentCache(persistence, serializer, statsCollector);
-    final SQLiteLruReferenceDelegate referenceDelegate =
-        SQLiteLruReferenceDelegate(persistence, params);
+    final SQLiteTargetCache targetCache = SQLiteTargetCache(persistence, serializer);
+    final SQLiteRemoteDocumentCache remoteDocumentCache = SQLiteRemoteDocumentCache(persistence, serializer);
+    final SQLiteLruReferenceDelegate referenceDelegate = SQLiteLruReferenceDelegate(persistence, params);
 
     return persistence
-      ..queryCache = queryCache
+      ..targetCache = targetCache
       ..remoteDocumentCache = remoteDocumentCache
       ..referenceDelegate = referenceDelegate;
   }
@@ -155,19 +153,21 @@ class SQLitePersistence extends Persistence {
   @override
   Future<void> start() async {
     await _semaphore.acquire();
-    Log.d(tag, 'Starting SQLite persistance');
+    Log.d(tag, 'Starting SQLite persistence');
     hardAssert(!started, 'SQLitePersistence double-started!');
-    _db = await _openDb(databaseName, openDatabase);
-    await queryCache.start();
+
+    _db = await _openDb(databaseName, serializer, openDatabase);
+
+    await targetCache.start();
     started = true;
-    referenceDelegate.start(queryCache.highestListenSequenceNumber);
+    referenceDelegate.start(targetCache.highestListenSequenceNumber);
     _semaphore.release();
   }
 
   @override
   Future<void> shutdown() async {
     await _semaphore.acquire();
-    Log.d(tag, 'Shutingdown SQLite persistance');
+    Log.d(tag, 'Shutdown SQLite persistence');
     hardAssert(started, 'SQLitePersistence shutdown without start!');
 
     started = false;
@@ -181,18 +181,16 @@ class SQLitePersistence extends Persistence {
 
   @override
   MutationQueue getMutationQueue(User user) {
-    return SQLiteMutationQueue(this, serializer, _statsCollector, user);
+    return SQLiteMutationQueue(this, serializer, user);
   }
 
   @override
-  Future<void> runTransaction(
-      String action, Transaction<void> operation) async {
+  Future<void> runTransaction(String action, Transaction<void> operation) async {
     return runTransactionAndReturn(action, operation);
   }
 
   @override
-  Future<T> runTransactionAndReturn<T>(
-      String action, Transaction<T> operation) async {
+  Future<T> runTransactionAndReturn<T>(String action, Transaction<T> operation) async {
     await _semaphore.acquire();
     Log.d(tag, 'Starting transaction: $action');
 
@@ -216,8 +214,7 @@ class SQLitePersistence extends Persistence {
     return _db.execute(statement, args);
   }
 
-  Future<List<Map<String, dynamic>>> query(String statement,
-      [List<dynamic> args]) {
+  Future<List<Map<String, dynamic>>> query(String statement, [List<dynamic> args]) {
     return _db.query(statement, args);
   }
 
@@ -236,8 +233,7 @@ class SQLitePersistence extends Persistence {
   ///
   /// This attempts to obtain exclusive access to the database and attempts to do so as early as possible.
   /// ^^^ todo: this breaks flutter hot reload
-  static Future<Database> _openDb(
-      String databaseName, OpenDatabase openDatabase) async {
+  static Future<Database> _openDb(String databaseName, LocalSerializer serializer, OpenDatabase openDatabase) async {
     bool configured = false;
 
     /// Ensures that onConfigure has been called. This should be called first from all methods.
@@ -255,11 +251,11 @@ class SQLitePersistence extends Persistence {
       onConfigure: ensureConfigured,
       onCreate: (Database db, int version) async {
         await ensureConfigured(db);
-        await SQLiteSchema(db).runMigrations(0);
+        await SQLiteSchema(db, serializer).runMigrations(0);
       },
       onUpgrade: (Database db, int fromVersion, int toVersion) async {
         await ensureConfigured(db);
-        await SQLiteSchema(db).runMigrations(fromVersion);
+        await SQLiteSchema(db, serializer).runMigrations(fromVersion);
       },
       onDowngrade: (Database db, int fromVersion, int toVersion) async {
         await ensureConfigured(db);
@@ -326,8 +322,7 @@ class LongQuery {
   /// subqueries take the form:
   ///
   /// [_head][_argsHead][an auto-generated comma-separated list of '?' placeholders][_tail]
-  LongQuery(this._db, this._head, List<dynamic> argsHead,
-      List<dynamic> argsIter, this._tail)
+  LongQuery(this._db, this._head, List<dynamic> argsHead, List<dynamic> argsIter, this._tail)
       : _argsIter = argsIter,
         _argsHead = argsHead ?? <dynamic>[],
         _subqueriesPerformed = 0;
@@ -365,9 +360,7 @@ class LongQuery {
     final List<Object> subqueryArgs = List<Object>.from(_argsHead);
     final StringBuffer placeholdersBuilder = StringBuffer();
 
-    for (int i = 0;
-        j < _argsIter.length && i < _limit - _argsHead.length;
-        i++) {
+    for (int i = 0; j < _argsIter.length && i < _limit - _argsHead.length; i++) {
       if (i > 0) {
         placeholdersBuilder.write(', ');
       }

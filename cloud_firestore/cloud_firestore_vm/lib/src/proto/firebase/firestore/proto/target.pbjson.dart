@@ -2,8 +2,8 @@
 //  Generated code. Do not modify.
 //  source: firebase/firestore/proto/target.proto
 //
-// @dart = 2.3
-// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
+// @dart = 2.7
+// ignore_for_file: annotate_overrides,camel_case_types,unnecessary_const,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type,unnecessary_this,prefer_final_fields
 
 const Target$json = const {
   '1': 'Target',
@@ -14,6 +14,7 @@ const Target$json = const {
     const {'1': 'last_listen_sequence_number', '3': 4, '4': 1, '5': 3, '10': 'lastListenSequenceNumber'},
     const {'1': 'query', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1.Target.QueryTarget', '9': 0, '10': 'query'},
     const {'1': 'documents', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1.Target.DocumentsTarget', '9': 0, '10': 'documents'},
+    const {'1': 'last_limbo_free_snapshot_version', '3': 7, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'lastLimboFreeSnapshotVersion'},
   ],
   '8': const [
     const {'1': 'target_type'},

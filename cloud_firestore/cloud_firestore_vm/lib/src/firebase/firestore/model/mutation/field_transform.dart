@@ -26,7 +26,7 @@ class FieldTransform {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
+    return (ToStringHelper(runtimeType) //
           ..add('fieldPath', fieldPath)
           ..add('operation', operation))
         .toString();

@@ -2,26 +2,46 @@
 //  Generated code. Do not modify.
 //  source: google/api/http.proto
 //
-// @dart = 2.3
-// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
+// @dart = 2.7
+// ignore_for_file: annotate_overrides,camel_case_types,unnecessary_const,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type,unnecessary_this,prefer_final_fields
 
 import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
 class Http extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('Http', package: const $pb.PackageName('google.api'), createEmptyInstance: create)
-    ..pc<HttpRule>(1, 'rules', $pb.PbFieldType.PM, subBuilder: HttpRule.create)
-    ..aOB(2, 'fullyDecodeReservedExpansion')
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'Http', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'google.api'), createEmptyInstance: create)
+    ..pc<HttpRule>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'rules', $pb.PbFieldType.PM, subBuilder: HttpRule.create)
+    ..aOB(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'fullyDecodeReservedExpansion')
     ..hasRequiredFields = false
   ;
 
   Http._() : super();
-  factory Http() => create();
+  factory Http({
+    $core.Iterable<HttpRule> rules,
+    $core.bool fullyDecodeReservedExpansion,
+  }) {
+    final _result = create();
+    if (rules != null) {
+      _result.rules.addAll(rules);
+    }
+    if (fullyDecodeReservedExpansion != null) {
+      _result.fullyDecodeReservedExpansion = fullyDecodeReservedExpansion;
+    }
+    return _result;
+  }
   factory Http.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory Http.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   Http clone() => Http()..mergeFromMessage(this);
-  Http copyWith(void Function(Http) updates) => super.copyWith((message) => updates(message as Http));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  Http copyWith(void Function(Http) updates) => super.copyWith((message) => updates(message as Http)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static Http create() => Http._();
@@ -64,26 +84,74 @@ class HttpRule extends $pb.GeneratedMessage {
     8 : HttpRule_Pattern.custom,
     0 : HttpRule_Pattern.notSet
   };
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('HttpRule', package: const $pb.PackageName('google.api'), createEmptyInstance: create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'HttpRule', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'google.api'), createEmptyInstance: create)
     ..oo(0, [2, 3, 4, 5, 6, 8])
-    ..aOS(1, 'selector')
-    ..aOS(2, 'get')
-    ..aOS(3, 'put')
-    ..aOS(4, 'post')
-    ..aOS(5, 'delete')
-    ..aOS(6, 'patch')
-    ..aOS(7, 'body')
-    ..aOM<CustomHttpPattern>(8, 'custom', subBuilder: CustomHttpPattern.create)
-    ..pc<HttpRule>(11, 'additionalBindings', $pb.PbFieldType.PM, subBuilder: HttpRule.create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'selector')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'get')
+    ..aOS(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'put')
+    ..aOS(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'post')
+    ..aOS(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'delete')
+    ..aOS(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'patch')
+    ..aOS(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'body')
+    ..aOM<CustomHttpPattern>(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'custom', subBuilder: CustomHttpPattern.create)
+    ..pc<HttpRule>(11, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'additionalBindings', $pb.PbFieldType.PM, subBuilder: HttpRule.create)
     ..hasRequiredFields = false
   ;
 
   HttpRule._() : super();
-  factory HttpRule() => create();
+  factory HttpRule({
+    $core.String selector,
+    $core.String get,
+    $core.String put,
+    $core.String post,
+    $core.String delete,
+    $core.String patch,
+    $core.String body,
+    CustomHttpPattern custom,
+    $core.Iterable<HttpRule> additionalBindings,
+  }) {
+    final _result = create();
+    if (selector != null) {
+      _result.selector = selector;
+    }
+    if (get != null) {
+      _result.get = get;
+    }
+    if (put != null) {
+      _result.put = put;
+    }
+    if (post != null) {
+      _result.post = post;
+    }
+    if (delete != null) {
+      _result.delete = delete;
+    }
+    if (patch != null) {
+      _result.patch = patch;
+    }
+    if (body != null) {
+      _result.body = body;
+    }
+    if (custom != null) {
+      _result.custom = custom;
+    }
+    if (additionalBindings != null) {
+      _result.additionalBindings.addAll(additionalBindings);
+    }
+    return _result;
+  }
   factory HttpRule.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory HttpRule.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   HttpRule clone() => HttpRule()..mergeFromMessage(this);
-  HttpRule copyWith(void Function(HttpRule) updates) => super.copyWith((message) => updates(message as HttpRule));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  HttpRule copyWith(void Function(HttpRule) updates) => super.copyWith((message) => updates(message as HttpRule)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static HttpRule create() => HttpRule._();
@@ -175,18 +243,38 @@ class HttpRule extends $pb.GeneratedMessage {
 }
 
 class CustomHttpPattern extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('CustomHttpPattern', package: const $pb.PackageName('google.api'), createEmptyInstance: create)
-    ..aOS(1, 'kind')
-    ..aOS(2, 'path')
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'CustomHttpPattern', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'google.api'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'kind')
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'path')
     ..hasRequiredFields = false
   ;
 
   CustomHttpPattern._() : super();
-  factory CustomHttpPattern() => create();
+  factory CustomHttpPattern({
+    $core.String kind,
+    $core.String path,
+  }) {
+    final _result = create();
+    if (kind != null) {
+      _result.kind = kind;
+    }
+    if (path != null) {
+      _result.path = path;
+    }
+    return _result;
+  }
   factory CustomHttpPattern.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory CustomHttpPattern.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   CustomHttpPattern clone() => CustomHttpPattern()..mergeFromMessage(this);
-  CustomHttpPattern copyWith(void Function(CustomHttpPattern) updates) => super.copyWith((message) => updates(message as CustomHttpPattern));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  CustomHttpPattern copyWith(void Function(CustomHttpPattern) updates) => super.copyWith((message) => updates(message as CustomHttpPattern)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static CustomHttpPattern create() => CustomHttpPattern._();

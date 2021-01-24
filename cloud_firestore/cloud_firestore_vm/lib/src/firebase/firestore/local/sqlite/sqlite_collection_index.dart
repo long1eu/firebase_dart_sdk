@@ -9,21 +9,18 @@ part of sqlite_persistence;
 ///
 /// NOTE: There is no in-memory implementation at this time.
 class SQLiteCollectionIndex {
-  SQLiteCollectionIndex(this.db, User user)
-      : uid = user.isAuthenticated ? user.uid : '';
+  SQLiteCollectionIndex(this.db, User user) : uid = user.isAuthenticated ? user.uid : '';
 
   final SQLitePersistence db;
   final String uid;
 
   /// Adds the specified entry to the index.
-  void addEntry(
-      FieldPath fieldPath, FieldValue fieldValue, DocumentKey documentKey) {
+  void addEntry(FieldPath fieldPath, proto.Value fieldValue, DocumentKey documentKey) {
     throw StateError('Not yet implemented.');
   }
 
   /// Adds the specified entry to the index.
-  void removeEntry(
-      FieldPath fieldPath, FieldValue fieldValue, DocumentKey documentKey) {
+  void removeEntry(FieldPath fieldPath, proto.Value fieldValue, DocumentKey documentKey) {
     throw StateError('Not yet implemented.');
   }
 

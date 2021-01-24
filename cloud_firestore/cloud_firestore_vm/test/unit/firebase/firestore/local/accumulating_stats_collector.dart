@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 22/03/2020
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/stats_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/stats_collector.dart';
 
 /// A test-only collector of operation counts from the persistence layer.
 class AccumulatingStatsCollector extends StatsCollector {

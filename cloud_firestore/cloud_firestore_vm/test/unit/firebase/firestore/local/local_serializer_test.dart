@@ -6,7 +6,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
@@ -167,7 +167,7 @@ void main() {
     final SnapshotVersion _version = version(1039);
     final Uint8List _resumeToken = resumeToken(1039);
 
-    final QueryData queryData = QueryData(
+    final TargetData queryData = TargetData(
       _query,
       targetId,
       sequenceNumber,
@@ -192,8 +192,8 @@ void main() {
             ..structuredQuery = queryTarget.structuredQuery))
         .freeze();
 
-    expect(serializer.encodeQueryData(queryData), expected);
-    final QueryData decoded = serializer.decodeQueryData(expected);
+    expect(serializer.encodeTargetData(queryData), expected);
+    final TargetData decoded = serializer.decodeTargetData(expected);
     expect(decoded, queryData);
   });
 }

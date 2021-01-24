@@ -4,7 +4,7 @@
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/object_value.dart';
 import 'package:collection/collection.dart';
 
 /// Provides a set of fields that can be used to partially patch a document. The [FieldMask] is used in conjunction

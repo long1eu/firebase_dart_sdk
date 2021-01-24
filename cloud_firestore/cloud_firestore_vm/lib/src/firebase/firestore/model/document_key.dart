@@ -15,6 +15,19 @@ class DocumentKey implements Comparable<DocumentKey> {
   /// Returns a document key for the empty path.
   factory DocumentKey.empty() => DocumentKey._(ResourcePath.empty);
 
+  /// Returns a DocumentKey from a fully qualified resource name.
+  factory DocumentKey.fromName(String name) {
+    final ResourcePath resourceName = ResourcePath.fromString(name);
+    hardAssert(
+      resourceName.length >= 4 &&
+          resourceName[0] == 'projects' &&
+          resourceName[2] == 'databases' &&
+          resourceName[4] == 'documents',
+      'Tried to parse an invalid key: $resourceName',
+    );
+    return DocumentKey.fromPath(resourceName.popFirst(5));
+  }
+
   /// Creates and returns a new document key with the given path.
   factory DocumentKey.fromPath(ResourcePath path) => DocumentKey._(path);
 
@@ -38,11 +51,9 @@ class DocumentKey implements Comparable<DocumentKey> {
     return path.length >= 2 && path.segments[path.length - 2] == collectionId;
   }
 
-  static int comparator(DocumentKey a, DocumentKey b) =>
-      a.path.compareTo(b.path);
+  static int comparator(DocumentKey a, DocumentKey b) => a.path.compareTo(b.path);
 
-  static final ImmutableSortedSet<DocumentKey> emptyKeySet =
-      ImmutableSortedSet<DocumentKey>();
+  static final ImmutableSortedSet<DocumentKey> emptyKeySet = ImmutableSortedSet<DocumentKey>();
 
   /// Returns true iff the given path is a path to a document.
   static bool isDocumentKey(ResourcePath path) => path.length.remainder(2) == 0;
@@ -58,10 +69,7 @@ class DocumentKey implements Comparable<DocumentKey> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is DocumentKey &&
-          runtimeType == other.runtimeType &&
-          path == other.path;
+      identical(this, other) || other is DocumentKey && runtimeType == other.runtimeType && path == other.path;
 
   @override
   int get hashCode => path.hashCode;

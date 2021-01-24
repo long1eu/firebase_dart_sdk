@@ -4,24 +4,23 @@
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/values.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart';
 import 'package:collection/collection.dart';
 
 abstract class ArrayTransformOperation implements TransformOperation {
   const ArrayTransformOperation(this.elements);
 
-  final List<FieldValue> elements;
+  final List<Value> elements;
 
   @override
-  FieldValue applyToLocalView(
-      FieldValue previousValue, Timestamp localWriteTime) {
+  Value applyToLocalView(Value previousValue, Timestamp localWriteTime) {
     return apply(previousValue);
   }
 
   @override
-  FieldValue applyToRemoteDocument(
-      FieldValue previousValue, FieldValue transformResult) {
+  Value applyToRemoteDocument(Value previousValue, Value transformResult) {
     // The server just sends null as the transform result for array operations,
     // so we have to calculate a result the same as we do for local
     // applications.
@@ -29,22 +28,22 @@ abstract class ArrayTransformOperation implements TransformOperation {
   }
 
   @override
-  FieldValue computeBaseValue(FieldValue currentValue) {
+  Value computeBaseValue(Value currentValue) {
     // Array transforms are idempotent and don't require a base value.
     return null;
   }
 
   /// Applies this ArrayTransformOperation against the specified previousValue.
-  ArrayValue apply(FieldValue previousValue);
+  Value apply(Value previousValue);
 
-  /// Inspects the provided value, returning an [List] copy of the internal array if it's an
-  /// ArrayValue and an empty [List] if it's null or any other type of FSTFieldValue.
-  static List<FieldValue> coercedFieldValuesArray(FieldValue value) {
-    if (value is ArrayValue) {
-      return value.internalValue.toList();
+  /// Inspects the provided value, returning an [ArrayValue] containing the existing array
+  /// elements or an empty builder if `value` is not an array.
+  static ArrayValue coercedFieldValuesArray(Value value) {
+    if (isArray(value)) {
+      return value.arrayValue.toBuilder();
     } else {
       // coerce to empty array.
-      return <FieldValue>[];
+      return ArrayValue();
     }
   }
 
@@ -66,30 +65,37 @@ abstract class ArrayTransformOperation implements TransformOperation {
 
 /// An array union transform operation.
 class ArrayTransformOperationUnion extends ArrayTransformOperation {
-  ArrayTransformOperationUnion(List<FieldValue> elements) : super(elements);
+  ArrayTransformOperationUnion(List<Value> elements) : super(elements);
 
   @override
-  ArrayValue apply(FieldValue previousValue) {
-    final List<FieldValue> result =
-        ArrayTransformOperation.coercedFieldValuesArray(previousValue);
-    for (FieldValue element in elements) {
-      if (!result.contains(element)) {
-        result.add(element);
+  Value apply(Value previousValue) {
+    final ArrayValue result = ArrayTransformOperation.coercedFieldValuesArray(previousValue);
+    for (Value element in elements) {
+      if (!contains(result, element)) {
+        result.values.add(element);
       }
     }
-    return ArrayValue.fromList(result);
+
+    return Value(arrayValue: result);
   }
 }
 
 /// An array remove transform operation.
 class ArrayTransformOperationRemove extends ArrayTransformOperation {
-  ArrayTransformOperationRemove(List<FieldValue> elements) : super(elements);
+  ArrayTransformOperationRemove(List<Value> elements) : super(elements);
 
   @override
-  ArrayValue apply(FieldValue previousValue) {
-    final List<FieldValue> result =
-        ArrayTransformOperation.coercedFieldValuesArray(previousValue)
-          ..removeWhere(elements.contains);
-    return ArrayValue.fromList(result);
+  Value apply(Value previousValue) {
+    final ArrayValue result = ArrayTransformOperation.coercedFieldValuesArray(previousValue);
+    for (Value removeElement in elements) {
+      for (int i = 0; i < result.values.length;) {
+        if (equals(result.values[i], removeElement)) {
+          result.values.remove(removeElement);
+        } else {
+          ++i;
+        }
+      }
+    }
+    return Value(arrayValue: result);
   }
 }

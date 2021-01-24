@@ -6,10 +6,10 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/auth/empty_credentials
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory/memory_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_task.dart';
 import 'package:mockito/mockito.dart';
 import 'package:rxdart/subjects.dart';
 import 'package:test/test.dart';
@@ -19,7 +19,7 @@ import '../../../../util/integration_test_util.dart';
 // ignore_for_file: cascade_invocations
 void main() {
   test('testRemoteStoreStreamStopsWhenNetworkUnreachable', () async {
-    final TaskScheduler scheduler = TaskScheduler('');
+    final AsyncQueue scheduler = AsyncQueue('');
     final Datastore datastore = Datastore(
       scheduler,
       IntegrationTestUtil.testEnvDatabaseInfo(),

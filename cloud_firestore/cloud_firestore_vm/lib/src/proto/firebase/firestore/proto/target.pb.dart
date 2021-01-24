@@ -2,8 +2,8 @@
 //  Generated code. Do not modify.
 //  source: firebase/firestore/proto/target.proto
 //
-// @dart = 2.3
-// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
+// @dart = 2.7
+// ignore_for_file: annotate_overrides,camel_case_types,unnecessary_const,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type,unnecessary_this,prefer_final_fields
 
 import 'dart:core' as $core;
 
@@ -25,23 +25,64 @@ class Target extends $pb.GeneratedMessage {
     6 : Target_TargetType.documents,
     0 : Target_TargetType.notSet
   };
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('Target', package: const $pb.PackageName('firestore.client'), createEmptyInstance: create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'Target', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'firestore.client'), createEmptyInstance: create)
     ..oo(0, [5, 6])
-    ..a<$core.int>(1, 'targetId', $pb.PbFieldType.O3)
-    ..aOM<$4.Timestamp>(2, 'snapshotVersion', subBuilder: $4.Timestamp.create)
-    ..a<$core.List<$core.int>>(3, 'resumeToken', $pb.PbFieldType.OY)
-    ..aInt64(4, 'lastListenSequenceNumber')
-    ..aOM<$0.Target_QueryTarget>(5, 'query', subBuilder: $0.Target_QueryTarget.create)
-    ..aOM<$0.Target_DocumentsTarget>(6, 'documents', subBuilder: $0.Target_DocumentsTarget.create)
+    ..a<$core.int>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'targetId', $pb.PbFieldType.O3)
+    ..aOM<$4.Timestamp>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'snapshotVersion', subBuilder: $4.Timestamp.create)
+    ..a<$core.List<$core.int>>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'resumeToken', $pb.PbFieldType.OY)
+    ..aInt64(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'lastListenSequenceNumber')
+    ..aOM<$0.Target_QueryTarget>(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'query', subBuilder: $0.Target_QueryTarget.create)
+    ..aOM<$0.Target_DocumentsTarget>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'documents', subBuilder: $0.Target_DocumentsTarget.create)
+    ..aOM<$4.Timestamp>(7, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'lastLimboFreeSnapshotVersion', subBuilder: $4.Timestamp.create)
     ..hasRequiredFields = false
   ;
 
   Target._() : super();
-  factory Target() => create();
+  factory Target({
+    $core.int targetId,
+    $4.Timestamp snapshotVersion,
+    $core.List<$core.int> resumeToken,
+    $fixnum.Int64 lastListenSequenceNumber,
+    $0.Target_QueryTarget query,
+    $0.Target_DocumentsTarget documents,
+    $4.Timestamp lastLimboFreeSnapshotVersion,
+  }) {
+    final _result = create();
+    if (targetId != null) {
+      _result.targetId = targetId;
+    }
+    if (snapshotVersion != null) {
+      _result.snapshotVersion = snapshotVersion;
+    }
+    if (resumeToken != null) {
+      _result.resumeToken = resumeToken;
+    }
+    if (lastListenSequenceNumber != null) {
+      _result.lastListenSequenceNumber = lastListenSequenceNumber;
+    }
+    if (query != null) {
+      _result.query = query;
+    }
+    if (documents != null) {
+      _result.documents = documents;
+    }
+    if (lastLimboFreeSnapshotVersion != null) {
+      _result.lastLimboFreeSnapshotVersion = lastLimboFreeSnapshotVersion;
+    }
+    return _result;
+  }
   factory Target.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory Target.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   Target clone() => Target()..mergeFromMessage(this);
-  Target copyWith(void Function(Target) updates) => super.copyWith((message) => updates(message as Target));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  Target copyWith(void Function(Target) updates) => super.copyWith((message) => updates(message as Target)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static Target create() => Target._();
@@ -113,23 +154,62 @@ class Target extends $pb.GeneratedMessage {
   void clearDocuments() => clearField(6);
   @$pb.TagNumber(6)
   $0.Target_DocumentsTarget ensureDocuments() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $4.Timestamp get lastLimboFreeSnapshotVersion => $_getN(6);
+  @$pb.TagNumber(7)
+  set lastLimboFreeSnapshotVersion($4.Timestamp v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasLastLimboFreeSnapshotVersion() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearLastLimboFreeSnapshotVersion() => clearField(7);
+  @$pb.TagNumber(7)
+  $4.Timestamp ensureLastLimboFreeSnapshotVersion() => $_ensure(6);
 }
 
 class TargetGlobal extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('TargetGlobal', package: const $pb.PackageName('firestore.client'), createEmptyInstance: create)
-    ..a<$core.int>(1, 'highestTargetId', $pb.PbFieldType.O3)
-    ..aInt64(2, 'highestListenSequenceNumber')
-    ..aOM<$4.Timestamp>(3, 'lastRemoteSnapshotVersion', subBuilder: $4.Timestamp.create)
-    ..a<$core.int>(4, 'targetCount', $pb.PbFieldType.O3)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'TargetGlobal', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'firestore.client'), createEmptyInstance: create)
+    ..a<$core.int>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'highestTargetId', $pb.PbFieldType.O3)
+    ..aInt64(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'highestListenSequenceNumber')
+    ..aOM<$4.Timestamp>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'lastRemoteSnapshotVersion', subBuilder: $4.Timestamp.create)
+    ..a<$core.int>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'targetCount', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
   TargetGlobal._() : super();
-  factory TargetGlobal() => create();
+  factory TargetGlobal({
+    $core.int highestTargetId,
+    $fixnum.Int64 highestListenSequenceNumber,
+    $4.Timestamp lastRemoteSnapshotVersion,
+    $core.int targetCount,
+  }) {
+    final _result = create();
+    if (highestTargetId != null) {
+      _result.highestTargetId = highestTargetId;
+    }
+    if (highestListenSequenceNumber != null) {
+      _result.highestListenSequenceNumber = highestListenSequenceNumber;
+    }
+    if (lastRemoteSnapshotVersion != null) {
+      _result.lastRemoteSnapshotVersion = lastRemoteSnapshotVersion;
+    }
+    if (targetCount != null) {
+      _result.targetCount = targetCount;
+    }
+    return _result;
+  }
   factory TargetGlobal.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory TargetGlobal.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   TargetGlobal clone() => TargetGlobal()..mergeFromMessage(this);
-  TargetGlobal copyWith(void Function(TargetGlobal) updates) => super.copyWith((message) => updates(message as TargetGlobal));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  TargetGlobal copyWith(void Function(TargetGlobal) updates) => super.copyWith((message) => updates(message as TargetGlobal)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static TargetGlobal create() => TargetGlobal._();

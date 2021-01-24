@@ -6,7 +6,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/database_info.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
@@ -16,7 +16,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datas
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
 import 'package:grpc/src/shared/status.dart';
@@ -26,7 +26,7 @@ import '../spec/spec_test_case.dart';
 /// A mock version of [Datastore] for SpecTest that allows the test to control
 /// the parts that would normally be sent from the backend.
 class MockDatastore extends Datastore {
-  factory MockDatastore(TaskScheduler scheduler) {
+  factory MockDatastore(AsyncQueue scheduler) {
     final DatabaseId databaseId = DatabaseId.forDatabase('project', 'database');
     final RemoteSerializer serializer = RemoteSerializer(databaseId);
     final DatabaseInfo databaseInfo =
@@ -50,7 +50,7 @@ class MockDatastore extends Datastore {
 
   MockDatastore._(
     DatabaseInfo databaseInfo,
-    TaskScheduler scheduler,
+    AsyncQueue scheduler,
     RemoteSerializer serializer,
     FirestoreClient client,
   )   : _serializer = serializer,
@@ -59,7 +59,7 @@ class MockDatastore extends Datastore {
         super.test(scheduler, databaseInfo, serializer, client);
 
   final FirestoreClient _client;
-  final TaskScheduler _scheduler;
+  final AsyncQueue _scheduler;
   final RemoteSerializer _serializer;
   _MockWatchStream _watchStream;
 
@@ -112,10 +112,10 @@ class MockDatastore extends Datastore {
   }
 
   /// Returns the map of active targets on the watch stream, keyed by target ID.
-  Map<int, QueryData> get activeTargets {
+  Map<int, TargetData> get activeTargets {
     // Make a defensive copy as the watch stream continues to modify the Map of
     // active targets.
-    return Map<int, QueryData>.from(_watchStream._activeTargets);
+    return Map<int, TargetData>.from(_watchStream._activeTargets);
   }
 
   /// Helper method to expose stream state to verify in tests.
@@ -126,7 +126,7 @@ class _MockWatchStream extends WatchStream {
   _MockWatchStream(
     this._datastore,
     RemoteSerializer serializer,
-    TaskScheduler scheduler,
+    AsyncQueue scheduler,
   ) : super.test(
           _datastore._client,
           scheduler,
@@ -139,7 +139,7 @@ class _MockWatchStream extends WatchStream {
   bool _open = false;
 
   /// Tracks the currently active watch targets as sent over the watch stream.
-  final Map<int, QueryData> _activeTargets = <int, QueryData>{};
+  final Map<int, TargetData> _activeTargets = <int, TargetData>{};
 
   @override
   // ignore: must_call_super
@@ -168,12 +168,12 @@ class _MockWatchStream extends WatchStream {
   }
 
   @override
-  void watchQuery(QueryData queryData) {
+  void watchQuery(TargetData queryData) {
     final String resumeToken = toDebugString(queryData.resumeToken);
     SpecTestCase.log(
-        '      watchQuery(${queryData.query}, ${queryData.targetId}, $resumeToken)');
+        '      watchQuery(${queryData.target}, ${queryData.targetId}, $resumeToken)');
     // Snapshot version is ignored on the wire
-    final QueryData sentQueryData = queryData.copyWith(
+    final TargetData sentQueryData = queryData.copyWith(
         snapshotVersion: SnapshotVersion.none,
         resumeToken: queryData.resumeToken,
         sequenceNumber: queryData.sequenceNumber);
@@ -225,7 +225,7 @@ class _MockWatchStream extends WatchStream {
 
 class _MockWriteStream extends WriteStream {
   _MockWriteStream(
-      this._datastore, RemoteSerializer serializer, TaskScheduler scheduler)
+      this._datastore, RemoteSerializer serializer, AsyncQueue scheduler)
       : _sentWrites = <List<Mutation>>[],
         super.test(
           _datastore._client,

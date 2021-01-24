@@ -52,8 +52,8 @@ class Transaction {
     checkNotNull(data, 'Provided data must not be null.');
     checkNotNull(options, 'Provided options must not be null.');
     final UserDataParsedSetData parsed = options.merge
-        ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
-        : _firestore.dataConverter.parseSetData(data);
+        ? _firestore.userDataReader.parseMergeData(data, options.fieldMask)
+        : _firestore.userDataReader.parseSetData(data);
     _transaction.set(documentRef.key, parsed);
     return this;
   }
@@ -67,7 +67,7 @@ class Transaction {
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
   Transaction updateFromList(DocumentReference documentRef, List<Object> data) {
-    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
+    final UserDataParsedUpdateData parsedData = _firestore.userDataReader
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
     return _update(documentRef, parsedData);
   }
@@ -82,7 +82,7 @@ class Transaction {
   /// Return this [Transaction] instance. Used for chaining method calls.
   Transaction update(DocumentReference documentRef, Map<String, Object> data) {
     final UserDataParsedUpdateData parsedData =
-        _firestore.dataConverter.parseUpdateData(data);
+        _firestore.userDataReader.parseUpdateData(data);
     return _update(documentRef, parsedData);
   }
 

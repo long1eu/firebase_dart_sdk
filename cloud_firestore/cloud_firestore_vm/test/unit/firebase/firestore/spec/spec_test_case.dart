@@ -18,7 +18,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/sync_engine.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
@@ -36,7 +36,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart'
     as asserts;
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_task.dart';
 import 'package:grpc/grpc.dart';
 import 'package:rxdart/subjects.dart';
 import 'package:test/test.dart';
@@ -77,7 +77,7 @@ class SpecTestCase implements RemoteStoreCallback {
   // Parts of the Firestore system that the spec tests need to control.
 
   Persistence _localPersistence;
-  TaskScheduler _queue;
+  AsyncQueue _queue;
   MockDatastore _datastore;
   RemoteStore _remoteStore;
   SyncEngine _syncEngine;
@@ -188,7 +188,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
     final LocalStore localStore = LocalStore(_localPersistence, _currentUser);
 
-    _queue = TaskScheduler('');
+    _queue = AsyncQueue('');
 
     // Set up the sync engine and various stores.
     _datastore = MockDatastore(_queue);
@@ -874,7 +874,7 @@ class SpecTestCase implements RemoteStoreCallback {
   void _validateLimboDocs() {
     // Make a copy so it can modified while checking against the expected limbo docs.
     final Map<DocumentKey, int> actualLimboDocs =
-        Map<DocumentKey, int>.from(_syncEngine.getCurrentLimboDocuments());
+        Map<DocumentKey, int>.from(_syncEngine.getActiveLimboDocumentResolutions());
 
     // Validate that each limbo doc has an expected active target
     for (MapEntry<DocumentKey, int> limboDoc in actualLimboDocs.entries) {
@@ -904,7 +904,7 @@ class SpecTestCase implements RemoteStoreCallback {
       //  only validate properties that can be validated.
       // expect(actualTarget, expectedTarget);
 
-      expect(actualTarget.query, expectedTarget.query);
+      expect(actualTarget.target, expectedTarget.target);
       expect(actualTarget.targetId, expectedTarget.targetId);
       expect(actualTarget.snapshotVersion, expectedTarget.snapshotVersion);
       expect(utf8.decode(actualTarget.resumeToken),

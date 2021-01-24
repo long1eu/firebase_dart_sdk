@@ -9,21 +9,31 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query_stream.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/sync_engine.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// EventManager is responsible for mapping queries to query event listeners.
 /// It handles 'fan-out.' (Identical queries will re-use the same watch on the
 /// backend.)
 class EventManager implements SyncEngineCallback {
-  EventManager(this._syncEngine) : _queries = <Query, _QueryListenersInfo>{} {
+  EventManager(this._syncEngine)
+      : _queries = <Query, _QueryListenersInfo>{},
+        _controller = BehaviorSubject<void>.seeded(null) {
     _syncEngine.syncEngineListener = this;
   }
 
   final SyncEngine _syncEngine;
   final Map<Query, _QueryListenersInfo> _queries;
 
+  // We user BehaviorSubject because it emits the last value received
+  final BehaviorSubject<void> _controller;
+
   OnlineState _onlineState = OnlineState.unknown;
+
+  /// Global snapshots stream
+  Stream<void> get snapshotsInSync => _controller;
 
   /// Adds a query listener that will be called with new snapshots for the
   /// query. The [EventManager] is responsible for multiplexing many listeners
@@ -44,10 +54,15 @@ class EventManager implements SyncEngineCallback {
 
     queryInfo.listeners.add(queryListener);
 
-    queryListener.onOnlineStateChanged(_onlineState);
+    // Run global snapshot listeners if a consistent snapshot has been emitted.
+    bool raisedEvent = queryListener.onOnlineStateChanged(_onlineState);
+    hardAssert(!raisedEvent, "onOnlineStateChanged() shouldn't raise an event for brand-new listeners.");
 
     if (queryInfo.viewSnapshot != null) {
-      await queryListener.onViewSnapshot(queryInfo.viewSnapshot);
+      raisedEvent = queryListener.onViewSnapshot(queryInfo.viewSnapshot);
+      if (raisedEvent) {
+        _controller.add(null);
+      }
     }
 
     if (firstListen) {
@@ -56,15 +71,13 @@ class EventManager implements SyncEngineCallback {
     return queryInfo.targetId;
   }
 
-  /// Removes a previously added listener and returns true if the listener was
-  /// found.
-  Future<bool> removeQueryListener(QueryStream listener) async {
+  /// It's a no-op if the listener is not found.
+  Future<void> removeQueryListener(QueryStream listener) async {
     final Query query = listener.query;
     final _QueryListenersInfo queryInfo = _queries[query];
     bool lastListen = false;
-    bool found = false;
     if (queryInfo != null) {
-      found = queryInfo.listeners.remove(listener);
+      queryInfo.listeners.remove(listener);
       lastListen = queryInfo.listeners.isEmpty;
     }
 
@@ -72,21 +85,25 @@ class EventManager implements SyncEngineCallback {
       _queries.remove(query);
       await _syncEngine.stopListening(query);
     }
-
-    return found;
   }
 
   @override
   Future<void> onViewSnapshots(List<ViewSnapshot> snapshotList) async {
+    bool raisedEvent = false;
     for (ViewSnapshot viewSnapshot in snapshotList) {
       final Query query = viewSnapshot.query;
       final _QueryListenersInfo info = _queries[query];
       if (info != null) {
         for (QueryStream listener in info.listeners.toList()) {
-          await listener.onViewSnapshot(viewSnapshot);
+          if (listener.onViewSnapshot(viewSnapshot)) {
+            raisedEvent = true;
+          }
         }
         info.viewSnapshot = viewSnapshot;
       }
+    }
+    if (raisedEvent) {
+      _controller.add(null);
     }
   }
 
@@ -103,11 +120,17 @@ class EventManager implements SyncEngineCallback {
 
   @override
   void handleOnlineStateChange(OnlineState onlineState) {
+    bool raisedEvent = false;
     _onlineState = onlineState;
     for (_QueryListenersInfo info in _queries.values) {
       for (QueryStream listener in info.listeners.toList()) {
-        listener.onOnlineStateChanged(onlineState);
+        if (listener.onOnlineStateChanged(onlineState)) {
+          raisedEvent = true;
+        }
       }
+    }
+    if (raisedEvent) {
+      _controller.add(null);
     }
   }
 }
@@ -126,7 +149,8 @@ class ListenOptions {
     this.includeDocumentMetadataChanges = false,
     this.includeQueryMetadataChanges = false,
     this.waitForSyncWhenOnline = false,
-  })  : assert(includeDocumentMetadataChanges != null),
+  })
+      : assert(includeDocumentMetadataChanges != null),
         assert(includeQueryMetadataChanges != null),
         assert(waitForSyncWhenOnline != null);
 
@@ -151,12 +175,9 @@ class ListenOptions {
     bool waitForSyncWhenOnline,
   }) {
     return ListenOptions(
-      includeDocumentMetadataChanges:
-          includeDocumentMetadataChanges ?? this.includeDocumentMetadataChanges,
-      includeQueryMetadataChanges:
-          includeQueryMetadataChanges ?? this.includeQueryMetadataChanges,
-      waitForSyncWhenOnline:
-          waitForSyncWhenOnline ?? this.waitForSyncWhenOnline,
+      includeDocumentMetadataChanges: includeDocumentMetadataChanges ?? this.includeDocumentMetadataChanges,
+      includeQueryMetadataChanges: includeQueryMetadataChanges ?? this.includeQueryMetadataChanges,
+      waitForSyncWhenOnline: waitForSyncWhenOnline ?? this.waitForSyncWhenOnline,
     );
   }
 }

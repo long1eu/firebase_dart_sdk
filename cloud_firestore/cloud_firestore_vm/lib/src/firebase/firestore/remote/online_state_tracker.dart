@@ -8,7 +8,7 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/online_state.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_task.dart';
 import 'package:grpc/grpc.dart';
 
 /// Called whenever the online state of the client changes. This is based on the watch stream for
@@ -39,7 +39,7 @@ class OnlineStateTracker {
   /// A timer that elapses after [_onlineStateTimeoutMs], at which point we transition from
   /// [OnlineState.unknown] to [OnlineState.offline] without waiting for the stream to actually fail
   /// ([_maxWatchStreamFailures] times).
-  TimerTask _onlineStateTimer;
+  DelayedTask<void> _onlineStateTimer;
 
   /// Whether the client should log a warning message if it fails to connect to the backend
   /// (initially true, cleared after a successful stream, or if we've logged the message already).
@@ -47,7 +47,7 @@ class OnlineStateTracker {
 
   /// The callback to notify on OnlineState changes.
   final OnlineStateCallback _onlineStateCallback;
-  final TaskScheduler _scheduler;
+  final AsyncQueue _scheduler;
 
   /// Called by [RemoteStore] when a watch stream is started (including on each
   /// backoff attempt).
@@ -58,16 +58,15 @@ class OnlineStateTracker {
     if (_watchStreamFailures == 0) {
       await _setAndBroadcastState(OnlineState.unknown);
 
-      hardAssert(_onlineStateTimer == null,
-          'onlineStateTimer shouldn\'t be started yet');
+      hardAssert(_onlineStateTimer == null, 'onlineStateTimer shouldn\'t be started yet');
 
-      _onlineStateTimer = _scheduler.add(
-        TaskId.onlineStateTimeout,
+      _onlineStateTimer = _scheduler.enqueueAfterDelay(
+        TimerId.onlineStateTimeout,
         const Duration(milliseconds: _onlineStateTimeoutMs),
         () async {
           _onlineStateTimer = null;
-          hardAssert(_state == OnlineState.unknown,
-              'Timer should be canceled if we transitioned to a different state.');
+          hardAssert(
+              _state == OnlineState.unknown, 'Timer should be canceled if we transitioned to a different state.');
           _logClientOfflineWarningIfNecessary(
               'Backend didn\'t respond within ${_onlineStateTimeoutMs / 1000} seconds\n');
           await _setAndBroadcastState(OnlineState.offline);
@@ -129,8 +128,7 @@ class OnlineStateTracker {
   }
 
   void _logClientOfflineWarningIfNecessary(String reason) {
-    final String message =
-        'Could not reach Cloud Firestore backend. $reason\nThis typically '
+    final String message = 'Could not reach Cloud Firestore backend. $reason\nThis typically '
         'indicates that your device does not have a healthy Internet connection at the moment. The '
         'client will operate in offline mode until it is able to successfully connect to the '
         'backend.';

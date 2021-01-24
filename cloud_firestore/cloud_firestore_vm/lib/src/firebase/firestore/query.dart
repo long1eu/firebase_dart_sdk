@@ -264,7 +264,7 @@ class Query {
       if (op == FilterOperator.IN || op == FilterOperator.arrayContainsAny) {
         _validateDisjunctiveFilterElements(value, op);
       }
-      fieldValue = firestore.dataConverter.parseQueryValue(value);
+      fieldValue = firestore.userDataReader.parseQueryValue(value);
     }
     final Filter filter = FieldFilter(fieldPath.internalPath, op, fieldValue);
     _validateNewFilter(filter);
@@ -629,7 +629,7 @@ class Query {
         components.add(ReferenceValue.valueOf(firestore.databaseId, key));
       } else {
         final FieldValue wrapped =
-            firestore.dataConverter.parseQueryValue(rawValue);
+            firestore.userDataReader.parseQueryValue(rawValue);
         components.add(wrapped);
       }
     }

@@ -8,14 +8,16 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dar
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/object_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/unknown_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart' show Value;
+import 'package:collection/collection.dart';
 
 /// A mutation that modifies fields of the document at the given key with the given values. The
 /// values are applied through a field mask:
@@ -24,9 +26,9 @@ import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 ///   * When a field is in the mask but not in the values, the corresponding field is deleted.
 ///   * When a field is not in the mask but is in the values, the values map is ignored.
 class PatchMutation extends Mutation {
-  const PatchMutation(
-      DocumentKey key, this.value, this.mask, Precondition precondition)
-      : super(key, precondition);
+  const PatchMutation(DocumentKey key, this.value, this.mask, Precondition precondition,
+      [List<FieldTransform> fieldTransforms = const <FieldTransform>[]])
+      : super(key, precondition, fieldTransforms);
 
   /// Returns the fields and associated values to use when patching the document.
   final ObjectValue value;
@@ -36,12 +38,8 @@ class PatchMutation extends Mutation {
   final FieldMask mask;
 
   @override
-  MaybeDocument applyToRemoteDocument(
-      MaybeDocument maybeDoc, MutationResult mutationResult) {
+  MaybeDocument applyToRemoteDocument(MaybeDocument maybeDoc, MutationResult mutationResult) {
     verifyKeyMatches(maybeDoc);
-
-    hardAssert(mutationResult.transformResults == null,
-        'Transform results received by PatchMutation.');
 
     if (!precondition.isValidFor(maybeDoc)) {
       // Since the mutation was not rejected, we know that the precondition matched on the backend.
@@ -50,53 +48,57 @@ class PatchMutation extends Mutation {
       return UnknownDocument(key, mutationResult.version);
     }
 
+    final List<Value> transformResults = mutationResult.transformResults != null
+        ? serverTransformResults(maybeDoc, mutationResult.transformResults)
+        : <Value>[];
+
     final SnapshotVersion version = mutationResult.version;
-    final ObjectValue newData = patchDocument(maybeDoc);
-    return Document(key, version, DocumentState.committedMutations, newData);
+    final ObjectValue newData = patchDocument(maybeDoc, transformResults);
+    return Document(key, version, newData, DocumentState.committedMutations);
   }
 
   @override
-  MaybeDocument applyToLocalView(
-      MaybeDocument maybeDoc, MaybeDocument baseDoc, Timestamp localWriteTime) {
+  MaybeDocument applyToLocalView(MaybeDocument maybeDoc, MaybeDocument baseDoc, Timestamp localWriteTime) {
     verifyKeyMatches(maybeDoc);
 
     if (!precondition.isValidFor(maybeDoc)) {
       return maybeDoc;
     }
 
+    final List<Value> transformResults = localTransformResults(localWriteTime, maybeDoc, baseDoc);
     final SnapshotVersion version = Mutation.getPostMutationVersion(maybeDoc);
-    final ObjectValue newData = patchDocument(maybeDoc);
-    return Document(key, version, DocumentState.localMutations, newData);
+    final ObjectValue newData = patchDocument(maybeDoc, transformResults);
+    return Document(key, version, newData, DocumentState.localMutations);
   }
 
   /// Patches the data of document if available or creates a new document. Note that this does not
   /// check whether or not the precondition of this patch holds.
-  ObjectValue patchDocument(MaybeDocument maybeDoc) {
+  ObjectValue patchDocument(MaybeDocument maybeDoc, List<Value> transformResults) {
     ObjectValue data;
     if (maybeDoc is Document) {
       data = maybeDoc.data;
     } else {
-      data = ObjectValue.empty;
+      data = ObjectValue.empty();
     }
-    return patchObject(data);
+    data = patchObject(data);
+    data = transformObject(data, transformResults);
+    return data;
   }
 
   ObjectValue patchObject(ObjectValue obj) {
+    final ObjectValueBuilder builder = obj.toBuilder();
     for (FieldPath path in mask.mask) {
       if (path.isNotEmpty) {
-        final FieldValue newValue = value.get(path);
+        final Value newValue = value.get(path);
         if (newValue == null) {
-          obj = obj.delete(path);
+          builder.delete(path);
         } else {
-          obj = obj.set(path, newValue);
+          builder[path] = newValue;
         }
       }
     }
-    return obj;
+    return builder.build();
   }
-
-  @override
-  ObjectValue extractBaseValue(MaybeDocument maybeDoc) => null;
 
   @override
   bool operator ==(Object other) =>
@@ -105,11 +107,15 @@ class PatchMutation extends Mutation {
           runtimeType == other.runtimeType &&
           hasSameKeyAndPrecondition(other) &&
           value == other.value &&
-          mask == other.mask;
+          mask == other.mask &&
+          const ListEquality<FieldTransform>().equals(fieldTransforms, other.fieldTransforms);
 
   @override
   int get hashCode =>
-      value.hashCode ^ mask.hashCode ^ keyAndPreconditionHashCode();
+      keyAndPreconditionHashCode() ^
+      value.hashCode ^
+      mask.hashCode ^
+      const ListEquality<FieldTransform>().hash(fieldTransforms);
 
   @override
   String toString() {

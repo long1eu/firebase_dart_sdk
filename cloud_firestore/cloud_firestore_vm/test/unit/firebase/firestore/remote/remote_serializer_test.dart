@@ -11,7 +11,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dar
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart'
     as firestore;
 import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
@@ -108,8 +108,8 @@ void main() {
   /// Wraps the given query in [QueryData]. This is useful because the APIs
   /// we're testing accept [QueryData], but for the most part we're just testing
   /// variations on [Query].
-  QueryData wrapQueryData(Query query) {
-    return QueryData(
+  TargetData wrapQueryData(Query query) {
+    return TargetData(
         query, 1, 2, QueryPurpose.listen, SnapshotVersion.none, Uint8List(0));
   }
 
@@ -486,19 +486,19 @@ void main() {
 
   test('testEncodesListenRequestLabels', () {
     final Query _query = query('collection/key');
-    QueryData queryData = QueryData(_query, 2, 3, QueryPurpose.listen);
+    TargetData queryData = TargetData(_query, 2, 3, QueryPurpose.listen);
 
     final Map<String, String> encoded =
         serializer.encodeListenRequestLabels(queryData);
     expect(encoded, isEmpty);
 
-    queryData = QueryData(_query, 2, 3, QueryPurpose.limboResolution);
+    queryData = TargetData(_query, 2, 3, QueryPurpose.limboResolution);
     MapEntry<String, String> result =
         serializer.encodeListenRequestLabels(queryData).entries.first;
     expect(result.key, 'goog-listen-tags');
     expect(result.value, 'limbo-document');
 
-    queryData = QueryData(_query, 2, 3, QueryPurpose.existenceFilterMismatch);
+    queryData = TargetData(_query, 2, 3, QueryPurpose.existenceFilterMismatch);
     result = serializer.encodeListenRequestLabels(queryData).entries.first;
     expect(result.key, 'goog-listen-tags');
     expect(result.value, 'existence-filter-mismatch');
@@ -506,7 +506,7 @@ void main() {
 
   test('testEncodesFirstLevelKeyQueries', () {
     final Query q = Query(ResourcePath.fromString('docs/1'));
-    final proto_.Target actual = serializer.encodeTarget(QueryData(q, 1, 2,
+    final proto_.Target actual = serializer.encodeTarget(TargetData(q, 1, 2,
         QueryPurpose.limboResolution, SnapshotVersion.none, Uint8List(0)));
 
     final proto_.Target_DocumentsTarget docs =
@@ -883,7 +883,7 @@ void main() {
 
   test('testEncodesResumeTokens', () {
     final Query q = Query(ResourcePath.fromString('docs'));
-    final proto_.Target actual = serializer.encodeTarget(QueryData(
+    final proto_.Target actual = serializer.encodeTarget(TargetData(
         q, 1, 2, QueryPurpose.listen, SnapshotVersion.none, resumeToken(1000)));
 
     final proto.StructuredQuery structuredQueryBuilder =

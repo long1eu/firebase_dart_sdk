@@ -3,56 +3,53 @@
 // on 13/03/2020
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/values.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart';
+import 'package:fixnum/fixnum.dart';
 
 /// Implements the backend semantics for locally computed NUMERIC_ADD
 /// (increment) transforms. Converts all field values to ints or doubles and
 /// resolves overflows to [IntegerValue.max]/[IntegerValue.min].
 class NumericIncrementTransformOperation implements TransformOperation {
-  NumericIncrementTransformOperation(this.operand);
+  NumericIncrementTransformOperation(this.operand) {
+    hardAssert(isNumber(operand), 'NumericIncrementTransformOperation expects a NumberValue operand');
+  }
 
-  final NumberValue operand;
+  final Value operand;
 
   @override
-  FieldValue applyToLocalView(
-      FieldValue previousValue, Timestamp localWriteTime) {
-    final NumberValue baseValue = computeBaseValue(previousValue);
+  Value applyToLocalView(Value previousValue, Timestamp localWriteTime) {
+    final Value baseValue = computeBaseValue(previousValue);
 
     // Return an integer value only if the previous value and the operand is an
     // integer.
-    if (baseValue is IntegerValue && operand is IntegerValue) {
-      final int sum = _safeIncrement(baseValue.value, _operandAsInt());
-      return IntegerValue.valueOf(sum);
-    } else if (baseValue is IntegerValue) {
-      final double sum = baseValue.value + _operandAsDouble();
-      return DoubleValue.valueOf(sum);
-    } else if (baseValue is DoubleValue) {
-      final double sum = baseValue.value + _operandAsDouble();
-      return DoubleValue.valueOf(sum);
+    if (isInteger(baseValue) && isInteger(operand)) {
+      final int sum = _safeIncrement(baseValue.integerValue.toInt(), _operandAsInt());
+      return Value(integerValue: Int64(sum));
+    } else if (isInteger(baseValue)) {
+      final double sum = baseValue.integerValue.toDouble() + _operandAsDouble();
+      return Value(doubleValue: sum);
     } else {
-      hardAssert(baseValue is DoubleValue,
-          'Expected NumberValue to be of type DoubleValue, but was $previousValue');
+      hardAssert(isDouble(baseValue), 'Expected NumberValue to be of type DoubleValue, but was $previousValue');
 
-      final double sum = baseValue.value + _operandAsDouble();
-      return DoubleValue.valueOf(sum);
+      final double sum = baseValue.doubleValue + _operandAsDouble();
+      return Value(doubleValue: sum);
     }
   }
 
   @override
-  FieldValue applyToRemoteDocument(
-      FieldValue previousValue, FieldValue transformResult) {
+  Value applyToRemoteDocument(Value previousValue, Value transformResult) {
     return transformResult;
   }
 
   /// Inspects the provided value, returning the provided value if it is already
   /// a [NumberValue], otherwise returning a coerced [IntegerValue] of 0.
   @override
-  NumberValue computeBaseValue(FieldValue previousValue) {
-    return previousValue is NumberValue
-        ? previousValue
-        : IntegerValue.valueOf(0);
+  Value computeBaseValue(Value previousValue) {
+    return isNumber(previousValue) ? previousValue : Value(integerValue: Int64(0));
   }
 
   int _safeIncrement(int x, int y) {
@@ -64,32 +61,26 @@ class NumericIncrementTransformOperation implements TransformOperation {
       return r;
     }
 
-    if (r >= 0) {
-      return IntegerValue.min;
-    } else {
-      return IntegerValue.max;
-    }
+    return r >= 0 ? kMinInt : kMaxInt;
   }
 
   double _operandAsDouble() {
-    if (operand is DoubleValue) {
-      return operand.value;
-    } else if (operand is IntegerValue) {
-      return operand.value.toDouble();
+    if (isDouble(operand)) {
+      return operand.doubleValue;
+    } else if (isInteger(operand)) {
+      return operand.integerValue.toDouble();
     } else {
-      throw fail(
-          "Expected 'operand' to be of Number type, but was ${operand.runtimeType}");
+      throw fail("Expected 'operand' to be of Number type, but was ${operand.runtimeType}");
     }
   }
 
   int _operandAsInt() {
-    if (operand is DoubleValue) {
-      return operand.value.toInt();
-    } else if (operand is IntegerValue) {
-      return operand.value;
+    if (isDouble(operand)) {
+      return operand.doubleValue.toInt();
+    } else if (isInteger(operand)) {
+      return operand.integerValue.toInt();
     } else {
-      throw fail(
-          "Expected 'operand' to be of Number type, but was ${operand.runtimeType}");
+      throw fail("Expected 'operand' to be of Number type, but was ${operand.runtimeType}");
     }
   }
 }

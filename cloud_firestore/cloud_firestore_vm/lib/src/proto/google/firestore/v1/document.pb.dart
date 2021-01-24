@@ -2,8 +2,8 @@
 //  Generated code. Do not modify.
 //  source: google/firestore/v1/document.proto
 //
-// @dart = 2.3
-// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
+// @dart = 2.7
+// ignore_for_file: annotate_overrides,camel_case_types,unnecessary_const,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type,unnecessary_this,prefer_final_fields
 
 import 'dart:core' as $core;
 
@@ -16,20 +16,48 @@ import '../../type/latlng.pb.dart' as $5;
 import '../../protobuf/struct.pbenum.dart' as $6;
 
 class Document extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('Document', package: const $pb.PackageName('google.firestore.v1'), createEmptyInstance: create)
-    ..aOS(1, 'name')
-    ..m<$core.String, Value>(2, 'fields', entryClassName: 'Document.FieldsEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OM, valueCreator: Value.create, packageName: const $pb.PackageName('google.firestore.v1'))
-    ..aOM<$4.Timestamp>(3, 'createTime', subBuilder: $4.Timestamp.create)
-    ..aOM<$4.Timestamp>(4, 'updateTime', subBuilder: $4.Timestamp.create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'Document', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'google.firestore.v1'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'name')
+    ..m<$core.String, Value>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'fields', entryClassName: 'Document.FieldsEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OM, valueCreator: Value.create, packageName: const $pb.PackageName('google.firestore.v1'))
+    ..aOM<$4.Timestamp>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'createTime', subBuilder: $4.Timestamp.create)
+    ..aOM<$4.Timestamp>(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'updateTime', subBuilder: $4.Timestamp.create)
     ..hasRequiredFields = false
   ;
 
   Document._() : super();
-  factory Document() => create();
+  factory Document({
+    $core.String name,
+    $core.Map<$core.String, Value> fields,
+    $4.Timestamp createTime,
+    $4.Timestamp updateTime,
+  }) {
+    final _result = create();
+    if (name != null) {
+      _result.name = name;
+    }
+    if (fields != null) {
+      _result.fields.addAll(fields);
+    }
+    if (createTime != null) {
+      _result.createTime = createTime;
+    }
+    if (updateTime != null) {
+      _result.updateTime = updateTime;
+    }
+    return _result;
+  }
   factory Document.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory Document.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   Document clone() => Document()..mergeFromMessage(this);
-  Document copyWith(void Function(Document) updates) => super.copyWith((message) => updates(message as Document));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  Document copyWith(void Function(Document) updates) => super.copyWith((message) => updates(message as Document)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static Document create() => Document._();
@@ -104,28 +132,84 @@ class Value extends $pb.GeneratedMessage {
     18 : Value_ValueType.bytesValue,
     0 : Value_ValueType.notSet
   };
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('Value', package: const $pb.PackageName('google.firestore.v1'), createEmptyInstance: create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'Value', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'google.firestore.v1'), createEmptyInstance: create)
     ..oo(0, [1, 2, 3, 5, 6, 8, 9, 10, 11, 17, 18])
-    ..aOB(1, 'booleanValue')
-    ..aInt64(2, 'integerValue')
-    ..a<$core.double>(3, 'doubleValue', $pb.PbFieldType.OD)
-    ..aOS(5, 'referenceValue')
-    ..aOM<MapValue>(6, 'mapValue', subBuilder: MapValue.create)
-    ..aOM<$5.LatLng>(8, 'geoPointValue', subBuilder: $5.LatLng.create)
-    ..aOM<ArrayValue>(9, 'arrayValue', subBuilder: ArrayValue.create)
-    ..aOM<$4.Timestamp>(10, 'timestampValue', subBuilder: $4.Timestamp.create)
-    ..e<$6.NullValue>(11, 'nullValue', $pb.PbFieldType.OE, defaultOrMaker: $6.NullValue.NULL_VALUE, valueOf: $6.NullValue.valueOf, enumValues: $6.NullValue.values)
-    ..aOS(17, 'stringValue')
-    ..a<$core.List<$core.int>>(18, 'bytesValue', $pb.PbFieldType.OY)
+    ..aOB(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'booleanValue')
+    ..aInt64(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'integerValue')
+    ..a<$core.double>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'doubleValue', $pb.PbFieldType.OD)
+    ..aOS(5, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'referenceValue')
+    ..aOM<MapValue>(6, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'mapValue', subBuilder: MapValue.create)
+    ..aOM<$5.LatLng>(8, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'geoPointValue', subBuilder: $5.LatLng.create)
+    ..aOM<ArrayValue>(9, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'arrayValue', subBuilder: ArrayValue.create)
+    ..aOM<$4.Timestamp>(10, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'timestampValue', subBuilder: $4.Timestamp.create)
+    ..e<$6.NullValue>(11, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'nullValue', $pb.PbFieldType.OE, defaultOrMaker: $6.NullValue.NULL_VALUE, valueOf: $6.NullValue.valueOf, enumValues: $6.NullValue.values)
+    ..aOS(17, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'stringValue')
+    ..a<$core.List<$core.int>>(18, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'bytesValue', $pb.PbFieldType.OY)
     ..hasRequiredFields = false
   ;
 
   Value._() : super();
-  factory Value() => create();
+  factory Value({
+    $core.bool booleanValue,
+    $fixnum.Int64 integerValue,
+    $core.double doubleValue,
+    $core.String referenceValue,
+    MapValue mapValue,
+    $5.LatLng geoPointValue,
+    ArrayValue arrayValue,
+    $4.Timestamp timestampValue,
+    $6.NullValue nullValue,
+    $core.String stringValue,
+    $core.List<$core.int> bytesValue,
+  }) {
+    final _result = create();
+    if (booleanValue != null) {
+      _result.booleanValue = booleanValue;
+    }
+    if (integerValue != null) {
+      _result.integerValue = integerValue;
+    }
+    if (doubleValue != null) {
+      _result.doubleValue = doubleValue;
+    }
+    if (referenceValue != null) {
+      _result.referenceValue = referenceValue;
+    }
+    if (mapValue != null) {
+      _result.mapValue = mapValue;
+    }
+    if (geoPointValue != null) {
+      _result.geoPointValue = geoPointValue;
+    }
+    if (arrayValue != null) {
+      _result.arrayValue = arrayValue;
+    }
+    if (timestampValue != null) {
+      _result.timestampValue = timestampValue;
+    }
+    if (nullValue != null) {
+      _result.nullValue = nullValue;
+    }
+    if (stringValue != null) {
+      _result.stringValue = stringValue;
+    }
+    if (bytesValue != null) {
+      _result.bytesValue = bytesValue;
+    }
+    return _result;
+  }
   factory Value.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory Value.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   Value clone() => Value()..mergeFromMessage(this);
-  Value copyWith(void Function(Value) updates) => super.copyWith((message) => updates(message as Value));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  Value copyWith(void Function(Value) updates) => super.copyWith((message) => updates(message as Value)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static Value create() => Value._();
@@ -247,17 +331,33 @@ class Value extends $pb.GeneratedMessage {
 }
 
 class ArrayValue extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('ArrayValue', package: const $pb.PackageName('google.firestore.v1'), createEmptyInstance: create)
-    ..pc<Value>(1, 'values', $pb.PbFieldType.PM, subBuilder: Value.create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'ArrayValue', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'google.firestore.v1'), createEmptyInstance: create)
+    ..pc<Value>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'values', $pb.PbFieldType.PM, subBuilder: Value.create)
     ..hasRequiredFields = false
   ;
 
   ArrayValue._() : super();
-  factory ArrayValue() => create();
+  factory ArrayValue({
+    $core.Iterable<Value> values,
+  }) {
+    final _result = create();
+    if (values != null) {
+      _result.values.addAll(values);
+    }
+    return _result;
+  }
   factory ArrayValue.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory ArrayValue.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   ArrayValue clone() => ArrayValue()..mergeFromMessage(this);
-  ArrayValue copyWith(void Function(ArrayValue) updates) => super.copyWith((message) => updates(message as ArrayValue));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ArrayValue copyWith(void Function(ArrayValue) updates) => super.copyWith((message) => updates(message as ArrayValue)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static ArrayValue create() => ArrayValue._();
@@ -272,17 +372,33 @@ class ArrayValue extends $pb.GeneratedMessage {
 }
 
 class MapValue extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('MapValue', package: const $pb.PackageName('google.firestore.v1'), createEmptyInstance: create)
-    ..m<$core.String, Value>(1, 'fields', entryClassName: 'MapValue.FieldsEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OM, valueCreator: Value.create, packageName: const $pb.PackageName('google.firestore.v1'))
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'MapValue', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'google.firestore.v1'), createEmptyInstance: create)
+    ..m<$core.String, Value>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'fields', entryClassName: 'MapValue.FieldsEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OM, valueCreator: Value.create, packageName: const $pb.PackageName('google.firestore.v1'))
     ..hasRequiredFields = false
   ;
 
   MapValue._() : super();
-  factory MapValue() => create();
+  factory MapValue({
+    $core.Map<$core.String, Value> fields,
+  }) {
+    final _result = create();
+    if (fields != null) {
+      _result.fields.addAll(fields);
+    }
+    return _result;
+  }
   factory MapValue.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory MapValue.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   MapValue clone() => MapValue()..mergeFromMessage(this);
-  MapValue copyWith(void Function(MapValue) updates) => super.copyWith((message) => updates(message as MapValue));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  MapValue copyWith(void Function(MapValue) updates) => super.copyWith((message) => updates(message as MapValue)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static MapValue create() => MapValue._();

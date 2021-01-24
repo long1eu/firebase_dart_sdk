@@ -11,6 +11,7 @@ abstract class CredentialsProvider {
   /// Requests token for the current user. Use [invalidateToken] to
   /// force-refresh the token. Returns future that will be completed with the
   /// current token.
+  // todo: make this a method
   Future<String> get token;
 
   /// Marks the last retrieved token as invalid, making the next [token] request

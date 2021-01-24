@@ -17,18 +17,20 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_collect
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/values.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart' hide Document;
 
 const double _kHighSelectivity = 1.0;
 const double _kLowSelectivity = 0.5;
 
-/// [ArrayValue] and [ObjectValue] are currently considered low cardinality
+/// [Value_ValueType.arrayValue] and [Value_ValueType.mapValue] are currently considered low cardinality
 /// because we don't index them uniquely.
-const List<Type> _kLowCardinalityTypes = <Type>[
-  BoolValue,
-  ArrayValue,
-  ObjectValue
+const List<Value_ValueType> _kLowCardinalityTypes = <Value_ValueType>[
+  Value_ValueType.booleanValue,
+  Value_ValueType.arrayValue,
+  Value_ValueType.mapValue
 ];
 
 /// An indexed implementation of [QueryEngine] which performs fairly efficient
@@ -53,7 +55,7 @@ const List<Type> _kLowCardinalityTypes = <Type>[
 ///   * HIGH_SELECTIVITY: [BlobValue], [DoubleValue], [GeoPointValue],
 ///   [NumberValue], [ReferenceValue], [StringValue], [TimestampValue],
 ///   [NullValue]
-///   * LOW_SELECTIVITY: [ArrayValue], [ObjectValue], [BoolValue]
+///   * LOW_SELECTIVITY: [ArrayValue], [MapValue], [BoolValue]
 ///
 /// Note that we consider [NullValue] a high selectivity filter as we only
 /// support equals comparisons against 'null' and expect most data to be
@@ -67,34 +69,34 @@ const List<Type> _kLowCardinalityTypes = <Type>[
 /// A full collection scan is therefore only needed when no [filters] or
 /// [orderBy] constraints are specified.
 class IndexedQueryEngine implements QueryEngine {
-  const IndexedQueryEngine(this.localDocuments, this.collectionIndex);
+  IndexedQueryEngine(this.collectionIndex);
 
-  final LocalDocumentsView localDocuments;
   final SQLiteCollectionIndex collectionIndex;
+  LocalDocumentsView _localDocuments;
+
+  @override
+  set localDocumentsView(LocalDocumentsView localDocuments) {
+    _localDocuments = localDocuments;
+  }
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
     Query query,
+    SnapshotVersion lastLimboFreeSnapshotVersion,
+    ImmutableSortedSet<DocumentKey> remoteKeys,
   ) {
-    return query.isDocumentQuery
-        ? localDocuments.getDocumentsMatchingQuery(query)
-        : _performCollectionQuery(query);
-  }
+    hardAssert(_localDocuments != null, 'localDocumentsView has not been set');
 
-  @override
-  void handleDocumentChange(
-      MaybeDocument oldDocument, MaybeDocument newDocument) {
-    // TODO(long1eu): Determine changed fields and make appropriate
-    //  addEntry() / removeEntry() on SQLiteCollectionIndex.
-    throw StateError('Not yet implemented.');
+    return query.isDocumentQuery
+        ? _localDocuments.getDocumentsMatchingQuery(query, SnapshotVersion.none)
+        : _performCollectionQuery(query);
   }
 
   /// Executes the query using both indexes and post-filtering.
   Future<ImmutableSortedMap<DocumentKey, Document>> _performCollectionQuery(
     Query query,
   ) async {
-    hardAssert(!query.isDocumentQuery,
-        'matchesCollectionQuery called with document query.');
+    hardAssert(!query.isDocumentQuery, 'matchesCollectionQuery called with document query.');
 
     final IndexRange indexRange = _extractBestIndexRange(query);
     ImmutableSortedMap<DocumentKey, Document> filteredResults;
@@ -102,12 +104,11 @@ class IndexedQueryEngine implements QueryEngine {
     if (indexRange != null) {
       filteredResults = await _performQueryUsingIndex(query, indexRange);
     } else {
-      hardAssert(query.filters.isEmpty,
-          'If there are any filters, we should be able to use an index.');
+      hardAssert(query.filters.isEmpty, 'If there are any filters, we should be able to use an index.');
       // TODO(long1eu): Call overlay.getCollectionDocuments(query.path) and
       //  filter the results (there may still be startAt/endAt bounds that
       //  apply).
-      filteredResults = await localDocuments.getDocumentsMatchingQuery(query);
+      filteredResults = await _localDocuments.getDocumentsMatchingQuery(query, SnapshotVersion.none);
     }
 
     return filteredResults;
@@ -116,16 +117,12 @@ class IndexedQueryEngine implements QueryEngine {
   /// Applies 'filter' to the index cursor, looks up the relevant documents from
   /// the local documents view and returns
   /// all matches.
-  Future<ImmutableSortedMap<DocumentKey, Document>> _performQueryUsingIndex(
-      Query query, IndexRange indexRange) async {
-    ImmutableSortedMap<DocumentKey, Document> results =
-        DocumentCollections.emptyDocumentMap();
-    final IndexCursor cursor =
-        collectionIndex.getCursor(query.path, indexRange);
+  Future<ImmutableSortedMap<DocumentKey, Document>> _performQueryUsingIndex(Query query, IndexRange indexRange) async {
+    ImmutableSortedMap<DocumentKey, Document> results = DocumentCollections.emptyDocumentMap();
+    final IndexCursor cursor = collectionIndex.getCursor(query.path, indexRange);
     try {
       while (cursor.next) {
-        final Document document =
-            await localDocuments.getDocument(cursor.documentKey);
+        final Document document = await _localDocuments.getDocument(cursor.documentKey);
         if (query.matches(document)) {
           results = results.insert(cursor.documentKey, document);
         }
@@ -146,17 +143,14 @@ class IndexedQueryEngine implements QueryEngine {
     hardAssert(filter is FieldFilter, 'Filter type expected to be FieldFilter');
 
     final FieldFilter fieldFilter = filter;
-    if (fieldFilter.value == null || fieldFilter.value == DoubleValue.nan) {
+    final Value filterValue = fieldFilter.value;
+    if (isNullValue(filterValue) || isNanValue(filterValue)) {
       return _kHighSelectivity;
     } else {
       final double operatorSelectivity =
-          fieldFilter.operator == FilterOperator.equal
-              ? _kHighSelectivity
-              : _kLowSelectivity;
+          fieldFilter.operator == FilterOperator.equal ? _kHighSelectivity : _kLowSelectivity;
       final double typeSelectivity =
-          _kLowCardinalityTypes.contains(fieldFilter.value.runtimeType)
-              ? _kLowSelectivity
-              : _kHighSelectivity;
+          _kLowCardinalityTypes.contains(fieldFilter.value.whichValueType()) ? _kLowSelectivity : _kHighSelectivity;
 
       return typeSelectivity * operatorSelectivity;
     }
@@ -174,8 +168,7 @@ class IndexedQueryEngine implements QueryEngine {
     if (query.filters.isNotEmpty) {
       Filter selectedFilter;
       for (Filter currentFilter in query.filters) {
-        final double estimatedSelectivity =
-            _estimateFilterSelectivity(currentFilter);
+        final double estimatedSelectivity = _estimateFilterSelectivity(currentFilter);
         if (estimatedSelectivity > currentSelectivity) {
           selectedFilter = currentFilter;
           currentSelectivity = estimatedSelectivity;
@@ -202,7 +195,7 @@ class IndexedQueryEngine implements QueryEngine {
   static IndexRange _convertFilterToIndexRange(Filter filter) {
     if (filter is FieldFilter) {
       final FieldFilter relationFilter = filter;
-      final FieldValue filterValue = relationFilter.value;
+      final Value filterValue = relationFilter.value;
       switch (relationFilter.operator) {
         case FilterOperator.equal:
           return IndexRange(
@@ -228,5 +221,12 @@ class IndexedQueryEngine implements QueryEngine {
       }
     }
     return IndexRange(fieldPath: filter.field);
+  }
+
+  @override
+  void handleDocumentChange(MaybeDocument oldDocument, MaybeDocument newDocument) {
+    // TODO(long1eu): Determine changed fields and make appropriate
+    //  addEntry() / removeEntry() on SQLiteCollectionIndex.
+    throw StateError('Not yet implemented.');
   }
 }

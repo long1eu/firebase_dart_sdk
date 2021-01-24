@@ -6,12 +6,11 @@ part of filter;
 
 /// A Filter that implements the array-contains operator.
 class ArrayContainsFilter extends FieldFilter {
-  ArrayContainsFilter(FieldPath field, FieldValue value)
-      : super._(field, FilterOperator.arrayContains, value);
+  ArrayContainsFilter(FieldPath field, Value value) : super._(field, FilterOperator.arrayContains, value);
 
   @override
   bool matches(Document doc) {
-    final FieldValue other = doc.getField(field);
-    return other is ArrayValue && other.internalValue.contains(value);
+    final Value other = doc.getField(field);
+    return isArray(other) && contains(other.arrayValue, value);
   }
 }

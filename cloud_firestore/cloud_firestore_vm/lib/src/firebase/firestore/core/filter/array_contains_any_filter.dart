@@ -6,21 +6,21 @@ part of filter;
 
 /// A Filter that implements the array-contains-any operator.
 class ArrayContainsAnyFilter extends FieldFilter {
-  ArrayContainsAnyFilter(FieldPath field, FieldValue value)
-      : super._(field, FilterOperator.arrayContainsAny, value);
+  ArrayContainsAnyFilter(FieldPath field, Value value) : super._(field, FilterOperator.arrayContainsAny, value) {
+    hardAssert(isArray(value), 'ArrayContainsAnyFilter expects an ArrayValue');
+  }
 
   @override
   bool matches(Document doc) {
-    final ArrayValue arrayValue = value;
-    final FieldValue other = doc.getField(field);
-    if (other is ArrayValue) {
-      for (FieldValue val in other.internalValue) {
-        if (arrayValue.internalValue.contains(val)) {
-          return true;
-        }
+    final Value other = doc.getField(field);
+    if (!isArray(other)) {
+      return false;
+    }
+    for (Value val in other.arrayValue.values) {
+      if (contains(value.arrayValue, val)) {
+        return true;
       }
     }
-
     return false;
   }
 }

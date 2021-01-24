@@ -10,9 +10,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/set_mutation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/object_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
@@ -36,20 +35,26 @@ class UserDataSource {
   /// UserDataParseContext.isWrite() will return false.
   static const UserDataSource argument = UserDataSource._(3);
 
+  /// Indicates that the source is an Argument that may directly contain nested arrays (e.g. the
+  /// operand of a `whereIn` query).
+  static const UserDataSource arrayArgument = UserDataSource._(4);
+
   String get name => _stringValues[_value];
 
   static const List<UserDataSource> values = <UserDataSource>[
     set,
     mergeSet,
     update,
-    argument
+    argument,
+    arrayArgument,
   ];
 
   static const List<String> _stringValues = <String>[
     'set',
     'mergeSet',
     'update',
-    'argument'
+    'argument',
+    'arrayArgument',
   ];
 }
 
@@ -64,10 +69,9 @@ class UserDataParseContext {
   /// data). The [arrayElement] specifies whether or not this context corresponds to an element of an array.
   // TODO(long1eu): We don't support array paths right now, so path can be null to indicate the context represents any
   //  location within an array (in which case certain features will not work and errors will be somewhat compromised).
-  const UserDataParseContext._(this._accumulator, this.path,
-      {@required this.arrayElement});
+  const UserDataParseContext._(this._accumulator, this.path, {@required this.arrayElement});
 
-  static final Pattern _reservedFieldRegex = RegExp('^__.*__\$');
+  static const String _kReservedFiledDesignator = '__';
 
   final UserDataParseAccumulator _accumulator;
 
@@ -90,6 +94,7 @@ class UserDataParseContext {
       case UserDataSource.update:
         return true;
       case UserDataSource.argument:
+      case UserDataSource.arrayArgument:
         return false;
       default:
         throw fail('Unexpected case for UserDataSource: '
@@ -98,25 +103,20 @@ class UserDataParseContext {
   }
 
   UserDataParseContext childContextForSegment(String fieldName) {
-    final FieldPath childPath =
-        path == null ? null : path.appendSegment(fieldName);
-    final UserDataParseContext context =
-        UserDataParseContext._(_accumulator, childPath, arrayElement: false);
+    final FieldPath childPath = path == null ? null : path.appendSegment(fieldName);
+    final UserDataParseContext context = UserDataParseContext._(_accumulator, childPath, arrayElement: false);
     return context.._validatePathSegment(fieldName);
   }
 
   UserDataParseContext childContextForField(FieldPath fieldPath) {
-    final FieldPath childPath =
-        path == null ? null : path.appendField(fieldPath);
-    final UserDataParseContext context =
-        UserDataParseContext._(_accumulator, childPath, arrayElement: false);
+    final FieldPath childPath = path == null ? null : path.appendField(fieldPath);
+    final UserDataParseContext context = UserDataParseContext._(_accumulator, childPath, arrayElement: false);
     return context.._validatePath();
   }
 
   UserDataParseContext childContextForArrayIndex(int arrayIndex) {
     // TODO(long1eu): We don't support array paths right now; so make path null.
-    return UserDataParseContext._(_accumulator, /*path:*/ null,
-        arrayElement: true);
+    return UserDataParseContext._(_accumulator, /*path:*/ null, arrayElement: true);
   }
 
   /// Adds the given [fieldPath] to the accumulated FieldMask.
@@ -125,15 +125,13 @@ class UserDataParseContext {
   }
 
   /// Adds a transformation for the given field path.
-  void addToFieldTransforms(
-      FieldPath fieldPath, TransformOperation transformOperation) {
+  void addToFieldTransforms(FieldPath fieldPath, TransformOperation transformOperation) {
     _accumulator.addToFieldTransforms(fieldPath, transformOperation);
   }
 
   /// Creates an error including the given reason and the current field path.
   Error createError(String reason) {
-    final String fieldDescription =
-        (path == null || path.isEmpty) ? '' : ' (found in field $path)';
+    final String fieldDescription = (path == null || path.isEmpty) ? '' : ' (found in field $path)';
     return ArgumentError('Invalid data. $reason$fieldDescription');
   }
 
@@ -148,52 +146,46 @@ class UserDataParseContext {
   }
 
   void _validatePathSegment(String segment) {
-    if (isWrite && _reservedFieldRegex.allMatches(segment).isNotEmpty) {
-      throw createError('Document fields cannot begin and end with __');
+    if (segment.isEmpty) {
+      throw createError('Document fields must not be empty');
+    }
+
+    if (isWrite && segment.startsWith(_kReservedFiledDesignator) && segment.endsWith(_kReservedFiledDesignator)) {
+      throw createError('Document fields cannot begin and end with \"__\"');
     }
   }
 }
 
 /// The result of parsing document data (e.g. for a setData call).
 class UserDataParsedSetData {
-  UserDataParsedSetData(this._data, this._fieldMask, this._fieldTransforms);
+  UserDataParsedSetData(this.data, this.fieldMask, this.fieldTransforms);
 
-  final ObjectValue _data;
-  final FieldMask _fieldMask;
-  final List<FieldTransform> _fieldTransforms;
+  final ObjectValue data;
+  final FieldMask fieldMask;
+  final List<FieldTransform> fieldTransforms;
 
-  List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
-    final List<Mutation> mutations = <Mutation>[];
-    if (_fieldMask != null) {
-      mutations.add(PatchMutation(key, _data, _fieldMask, precondition));
+  Mutation toMutation(DocumentKey key, Precondition precondition) {
+    if (fieldMask != null) {
+      return PatchMutation(key, data, fieldMask, precondition, fieldTransforms);
     } else {
-      mutations.add(SetMutation(key, _data, precondition));
+      return SetMutation(key, data, precondition, fieldTransforms);
     }
-    if (_fieldTransforms.isNotEmpty) {
-      mutations.add(TransformMutation(key, _fieldTransforms));
-    }
-    return mutations;
   }
 }
 
 /// The result of parsing 'update' data (i.e. for an updateData call).
 class UserDataParsedUpdateData {
-  UserDataParsedUpdateData(this._data, this._fieldMask, this.fieldTransforms);
+  UserDataParsedUpdateData(this.data, this.fieldMask, this.fieldTransforms);
 
-  final ObjectValue _data;
+  final ObjectValue data;
 
-  final FieldMask _fieldMask;
+  // The fieldMask does not include document transforms.
+  final FieldMask fieldMask;
 
   final List<FieldTransform> fieldTransforms;
 
-  List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
-    final List<Mutation> mutations = <Mutation>[
-      PatchMutation(key, _data, _fieldMask, precondition)
-    ];
-    if (fieldTransforms.isNotEmpty) {
-      mutations.add(TransformMutation(key, fieldTransforms));
-    }
-    return mutations;
+  Mutation toMutation(DocumentKey key, Precondition precondition) {
+    return PatchMutation(key, data, fieldMask, precondition, fieldTransforms);
   }
 }
 
@@ -220,8 +212,7 @@ class UserDataParseAccumulator {
 
   /// Returns a new [UserDataParseContext] representing the root of a user document.
   UserDataParseContext get rootContext {
-    return UserDataParseContext._(this, FieldPath.emptyPath,
-        arrayElement: false);
+    return UserDataParseContext._(this, FieldPath.emptyPath, arrayElement: false);
   }
 
   /// Returns true if the given [fieldPath] was encountered in the current document.
@@ -247,8 +238,7 @@ class UserDataParseAccumulator {
   }
 
   /// Adds a transformation for the given field path.
-  void addToFieldTransforms(
-      FieldPath fieldPath, TransformOperation transformOperation) {
+  void addToFieldTransforms(FieldPath fieldPath, TransformOperation transformOperation) {
     fieldTransforms.add(FieldTransform(fieldPath, transformOperation));
   }
 
@@ -262,11 +252,9 @@ class UserDataParseAccumulator {
   ///
   /// (Optional) The field mask in the result will be the [userFieldMask] and only transforms that are covered by the
   /// mask will be included.
-  UserDataParsedSetData toMergeData(ObjectValue data,
-      [FieldMask userFieldMask]) {
+  UserDataParsedSetData toMergeData(ObjectValue data, [FieldMask userFieldMask]) {
     if (userFieldMask == null) {
-      return UserDataParsedSetData(
-          data, FieldMask(_fieldMask), fieldTransforms.toList(growable: false));
+      return UserDataParsedSetData(data, FieldMask(_fieldMask), fieldTransforms.toList(growable: false));
     }
 
     final List<FieldTransform> coveredFieldTransforms = <FieldTransform>[];
@@ -277,8 +265,7 @@ class UserDataParseAccumulator {
       }
     }
 
-    return UserDataParsedSetData(
-        data, userFieldMask, coveredFieldTransforms.toList(growable: false));
+    return UserDataParsedSetData(data, userFieldMask, coveredFieldTransforms.toList(growable: false));
   }
 
   /// Wraps the given [data] along with any accumulated transforms into a [UserDataParsedSetData] that represents a
@@ -298,7 +285,6 @@ class UserDataParseAccumulator {
   ///
   /// Returns [UserDataParsedSetData] that wraps the contents of this [UserDataParseAccumulator].
   UserDataParsedUpdateData toUpdateData(ObjectValue data) {
-    return UserDataParsedUpdateData(
-        data, FieldMask(_fieldMask), fieldTransforms.toList(growable: false));
+    return UserDataParsedUpdateData(data, FieldMask(_fieldMask), fieldTransforms.toList(growable: false));
   }
 }

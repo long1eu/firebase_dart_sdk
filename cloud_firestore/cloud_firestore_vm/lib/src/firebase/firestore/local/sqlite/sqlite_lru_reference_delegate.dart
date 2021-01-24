@@ -10,6 +10,12 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
     garbageCollector = LruGarbageCollector(this, params);
   }
 
+  /// The batch size for orphaned document GC in [removeOrphanedDocuments].
+  ///
+  /// This addresses https://github.com/firebase/firebase-android-sdk/issues/706, where a customer
+  /// reported that LRU GC hit a CursorWindow size limit during orphaned document removal.
+  static const int _kRemoveOrphanedDocumentsBatchSize = 100;
+
   final SQLitePersistence persistence;
   ListenSequence listenSequence;
   int _currentSequenceNumber;
@@ -26,15 +32,19 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
-    hardAssert(_currentSequenceNumber == ListenSequence.invalid,
-        'Starting a transaction without committing the previous one');
+    hardAssert(
+      _currentSequenceNumber == ListenSequence.invalid,
+      'Starting a transaction without committing the previous one',
+    );
     _currentSequenceNumber = listenSequence.next;
   }
 
   @override
   Future<void> onTransactionCommitted() async {
-    hardAssert(_currentSequenceNumber != ListenSequence.invalid,
-        'Committing a transaction without having started one');
+    hardAssert(
+      _currentSequenceNumber != ListenSequence.invalid,
+      'Committing a transaction without having started one',
+    );
     _currentSequenceNumber = ListenSequence.invalid;
   }
 
@@ -47,9 +57,9 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<int> getSequenceNumberCount() async {
-    final int targetCount = persistence.queryCache.targetCount;
+    final int targetCount = persistence.targetCache.targetCount;
     final Map<String, dynamic> data = (await persistence.query(
-            // @formatter:off
+      // @formatter:off
             '''
               SELECT COUNT(*) as count
               FROM (SELECT sequence_number
@@ -64,15 +74,14 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<void> forEachTarget(Consumer<QueryData> consumer) async {
-    await persistence.queryCache.forEachTarget(consumer);
+  Future<void> forEachTarget(Consumer<TargetData> consumer) async {
+    await persistence.targetCache.forEachTarget(consumer);
   }
 
   @override
-  Future<void> forEachOrphanedDocumentSequenceNumber(
-      Consumer<int> consumer) async {
+  Future<void> forEachOrphanedDocumentSequenceNumber(Consumer<int> consumer) async {
     final List<Map<String, dynamic>> result = await persistence.query(
-        // @formatter:off
+      // @formatter:off
         '''
          SELECT sequence_number
          FROM target_documents
@@ -100,7 +109,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) {
-    return persistence.queryCache.removeQueries(upperBound, activeTargetIds);
+    return persistence.targetCache.removeQueries(upperBound, activeTargetIds);
   }
 
   @override
@@ -111,7 +120,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   /// Returns true if any mutation queue contains the given document.
   Future<bool> _mutationQueuesContainKey(DocumentKey key) async {
     return (await persistence.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT 1
           FROM document_mutations
@@ -134,7 +143,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   Future<void> _removeSentinel(DocumentKey key) async {
     await persistence.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           DELETE
           FROM target_documents
@@ -149,7 +158,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   Future<int> removeOrphanedDocuments(int upperBound) async {
     int count = 0;
     final List<Map<String, dynamic>> result = await persistence.query(
-        // @formatter:off
+      // @formatter:off
         '''
           SELECT path
           FROM target_documents
@@ -171,18 +180,45 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       }
     }
 
+    bool resultsRemaining = true;
+    while (resultsRemaining) {
+      int rowsProcessed = 0;
+      final List<Map<String, dynamic>> rows = await persistence.query(
+        // @formatter:off
+          '''
+          SELECT path
+          FROM target_documents
+          GROUP BY path
+          HAVING count(*) = 1
+             AND target_id = 0
+             AND sequence_number <= ?
+             LIMIT ?;
+        ''',
+        // @formatter:on
+        <int>[upperBound, _kRemoveOrphanedDocumentsBatchSize],
+      );
+
+      for (Map<String, dynamic> row in rows) {
+        final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
+        final DocumentKey key = DocumentKey.fromPath(path);
+        if (!await _isPinned(key)) {
+          count++;
+          await persistence.remoteDocumentCache.remove(key);
+          await _removeSentinel(key);
+        }
+        rowsProcessed++;
+      }
+
+      resultsRemaining = rowsProcessed == _kRemoveOrphanedDocumentsBatchSize;
+    }
+
     return count;
   }
 
   @override
-  Future<void> removeTarget(QueryData queryData) async {
-    final QueryData updated = queryData.copyWith(
-      snapshotVersion: queryData.snapshotVersion,
-      resumeToken: queryData.resumeToken,
-      sequenceNumber: currentSequenceNumber,
-    );
-
-    await persistence.queryCache.updateQueryData(updated);
+  Future<void> removeTarget(TargetData targetData) async {
+    final TargetData updated = targetData.copyWith(sequenceNumber: currentSequenceNumber);
+    await persistence.targetCache.updateTargetData(updated);
   }
 
   @override
@@ -193,7 +229,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   Future<void> _writeSentinel(DocumentKey key) async {
     final String path = EncodedPath.encode(key.path);
     await persistence.execute(
-        // @formatter:off
+      // @formatter:off
         '''
           INSERT
           OR REPLACE INTO target_documents (target_id, path, sequence_number)

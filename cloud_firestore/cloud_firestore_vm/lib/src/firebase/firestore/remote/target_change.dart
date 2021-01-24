@@ -25,6 +25,12 @@ class TargetChange {
     @required this.current,
   });
 
+  TargetChange.createSynthesizedTargetChangeForCurrentChange(this.current)
+      : resumeToken = Uint8List(0),
+        addedDocuments = DocumentKey.emptyKeySet,
+        modifiedDocuments = DocumentKey.emptyKeySet,
+        removedDocuments = DocumentKey.emptyKeySet;
+
   /// Returns the opaque, server-assigned token that allows watching a query to
   /// be resumed after disconnecting without retransmitting all the data that
   /// matches the query. The resume token essentially identifies a point in time
@@ -53,8 +59,7 @@ class TargetChange {
       identical(this, other) ||
       other is TargetChange &&
           runtimeType == other.runtimeType &&
-          const DeepCollectionEquality()
-              .equals(resumeToken, other.resumeToken) &&
+          const DeepCollectionEquality().equals(resumeToken, other.resumeToken) &&
           current == other.current &&
           addedDocuments == other.addedDocuments &&
           modifiedDocuments == other.modifiedDocuments &&

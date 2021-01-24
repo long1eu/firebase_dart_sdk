@@ -56,11 +56,11 @@ class MutationBatch {
   /// [documentKey] is the key of the document to apply mutations to, [maybeDoc] is the document to
   /// apply mutations to and [batchResult] is the result of applying the [MutationBatch] to the
   /// backend.
-  MaybeDocument applyToRemoteDocument(DocumentKey documentKey,
-      MaybeDocument maybeDoc, MutationBatchResult batchResult) {
+  MaybeDocument applyToRemoteDocument(
+      DocumentKey documentKey, MaybeDocument maybeDoc, MutationBatchResult batchResult) {
     if (maybeDoc != null) {
       hardAssert(maybeDoc.key == documentKey,
-          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
+          "applyToRemoteDocument: key $documentKey doesn't match maybeDoc key ${maybeDoc.key}");
     }
 
     final int size = mutations.length;
@@ -79,19 +79,17 @@ class MutationBatch {
   }
 
   /// Computes the local view of a document given all the mutations in this batch.
-  MaybeDocument applyToLocalView(
-      DocumentKey documentKey, MaybeDocument maybeDoc) {
+  MaybeDocument applyToLocalView(DocumentKey documentKey, MaybeDocument maybeDoc) {
     if (maybeDoc != null) {
       hardAssert(maybeDoc.key == documentKey,
-          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
+          "applyToRemoteDocument: key $documentKey doesn't match maybeDoc key ${maybeDoc.key}");
     }
     // First, apply the base state. This allows us to apply non-idempotent transform against a
     // consistent set of values.
     for (int i = 0; i < baseMutations.length; i++) {
       final Mutation mutation = baseMutations[i];
       if (mutation.key == documentKey) {
-        maybeDoc =
-            mutation.applyToLocalView(maybeDoc, maybeDoc, localWriteTime);
+        maybeDoc = mutation.applyToLocalView(maybeDoc, maybeDoc, localWriteTime);
       }
     }
 
@@ -115,14 +113,11 @@ class MutationBatch {
     //  mutations first (as done in [applyToLocalView]), we can reduce the
     //  complexity to O(n).
 
-    ImmutableSortedMap<DocumentKey, MaybeDocument> mutatedDocuments =
-        maybeDocumentMap;
+    ImmutableSortedMap<DocumentKey, MaybeDocument> mutatedDocuments = maybeDocumentMap;
     for (DocumentKey key in keys) {
-      final MaybeDocument mutatedDocument =
-          applyToLocalView(key, mutatedDocuments[key]);
+      final MaybeDocument mutatedDocument = applyToLocalView(key, mutatedDocuments[key]);
       if (mutatedDocument != null) {
-        mutatedDocuments =
-            mutatedDocuments.insert(mutatedDocument.key, mutatedDocument);
+        mutatedDocuments = mutatedDocuments.insert(mutatedDocument.key, mutatedDocument);
       }
     }
     return mutatedDocuments;
@@ -144,8 +139,7 @@ class MutationBatch {
           runtimeType == other.runtimeType &&
           batchId == other.batchId &&
           localWriteTime == other.localWriteTime &&
-          const DeepCollectionEquality()
-              .equals(baseMutations, other.baseMutations) &&
+          const DeepCollectionEquality().equals(baseMutations, other.baseMutations) &&
           const DeepCollectionEquality().equals(mutations, other.mutations);
 
   @override

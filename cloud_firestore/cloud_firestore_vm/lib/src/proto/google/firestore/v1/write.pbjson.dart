@@ -2,16 +2,18 @@
 //  Generated code. Do not modify.
 //  source: google/firestore/v1/write.proto
 //
-// @dart = 2.3
-// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
+// @dart = 2.7
+// ignore_for_file: annotate_overrides,camel_case_types,unnecessary_const,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type,unnecessary_this,prefer_final_fields
 
 const Write$json = const {
   '1': 'Write',
   '2': const [
     const {'1': 'update', '3': 1, '4': 1, '5': 11, '6': '.google.firestore.v1.Document', '9': 0, '10': 'update'},
     const {'1': 'delete', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'delete'},
+    const {'1': 'verify', '3': 5, '4': 1, '5': 9, '9': 0, '10': 'verify'},
     const {'1': 'transform', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentTransform', '9': 0, '10': 'transform'},
     const {'1': 'update_mask', '3': 3, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentMask', '10': 'updateMask'},
+    const {'1': 'update_transforms', '3': 7, '4': 3, '5': 11, '6': '.google.firestore.v1.DocumentTransform.FieldTransform', '10': 'updateTransforms'},
     const {'1': 'current_document', '3': 4, '4': 1, '5': 11, '6': '.google.firestore.v1.Precondition', '10': 'currentDocument'},
   ],
   '8': const [

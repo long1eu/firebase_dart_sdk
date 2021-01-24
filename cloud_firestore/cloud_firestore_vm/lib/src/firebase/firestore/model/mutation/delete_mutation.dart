@@ -10,22 +10,18 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// Represents a Delete operation
 class DeleteMutation extends Mutation {
-  const DeleteMutation(DocumentKey key, Precondition precondition)
-      : super(key, precondition);
+  const DeleteMutation(DocumentKey key, Precondition precondition) : super(key, precondition);
 
   @override
-  MaybeDocument applyToRemoteDocument(
-      MaybeDocument maybeDoc, MutationResult mutationResult) {
+  MaybeDocument applyToRemoteDocument(MaybeDocument maybeDoc, MutationResult mutationResult) {
     verifyKeyMatches(maybeDoc);
 
-    hardAssert(mutationResult.transformResults == null,
-        'Transform results received by DeleteMutation.');
+    hardAssert(mutationResult.transformResults == null, 'Transform results received by DeleteMutation.');
 
     // Unlike applyToLocalView, if we're applying a mutation to a remote document the server has
     // accepted the mutation so the precondition must have held.
@@ -37,8 +33,7 @@ class DeleteMutation extends Mutation {
   }
 
   @override
-  MaybeDocument applyToLocalView(
-      MaybeDocument maybeDoc, MaybeDocument baseDoc, Timestamp localWriteTime) {
+  MaybeDocument applyToLocalView(MaybeDocument maybeDoc, MaybeDocument baseDoc, Timestamp localWriteTime) {
     verifyKeyMatches(maybeDoc);
 
     if (!precondition.isValidFor(maybeDoc)) {
@@ -53,12 +48,9 @@ class DeleteMutation extends Mutation {
   }
 
   @override
-  ObjectValue extractBaseValue(MaybeDocument maybeDoc) => null;
-
-  @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is DeleteMutation &&
+      other is DeleteMutation && //
           runtimeType == other.runtimeType &&
           hasSameKeyAndPrecondition(other);
 
@@ -67,7 +59,7 @@ class DeleteMutation extends Mutation {
 
   @override
   String toString() {
-    return (ToStringHelper(runtimeType)
+    return (ToStringHelper(runtimeType) //
           ..add('key', key)
           ..add('precondition', precondition))
         .toString();

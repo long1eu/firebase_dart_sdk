@@ -53,8 +53,8 @@ class WriteBatch {
     checkNotNull(data, 'Provided data must not be null.');
     _verifyNotCommitted();
     final UserDataParsedSetData parsed = options.merge
-        ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
-        : _firestore.dataConverter.parseSetData(data);
+        ? _firestore.userDataReader.parseMergeData(data, options.fieldMask)
+        : _firestore.userDataReader.parseSetData(data);
     _mutations
         .addAll(parsed.toMutationList(documentRef.key, Precondition.none));
     return this;
@@ -70,7 +70,7 @@ class WriteBatch {
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
   WriteBatch updateFromList(DocumentReference documentRef, List<Object> data) {
-    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
+    final UserDataParsedUpdateData parsedData = _firestore.userDataReader
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
 
     _firestore.validateReference(documentRef);
@@ -90,7 +90,7 @@ class WriteBatch {
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
   WriteBatch update(DocumentReference documentRef, Map<String, Object> data) {
     final UserDataParsedUpdateData parsedData =
-        _firestore.dataConverter.parseUpdateData(data);
+        _firestore.userDataReader.parseUpdateData(data);
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();

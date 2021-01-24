@@ -11,22 +11,22 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/auth/firebase_auth_cre
 import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/database_info.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/firestore_client.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart'
-    as core;
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/transaction.dart'
-    as core;
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart' as core;
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/transaction.dart' as core;
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_multi_db_component.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_settings.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/write_batch.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:meta/meta.dart';
@@ -38,15 +38,15 @@ import 'package:meta/meta.dart';
 class Firestore {
   @visibleForTesting
   Firestore(this.databaseId, this.firebaseApp, this.client, this._scheduler)
-      : dataConverter = UserDataConverter(databaseId);
+      : userDataReader = UserDataConverter(databaseId);
 
   static const String _tag = 'FirebaseFirestore';
 
   final DatabaseId databaseId;
   final FirebaseApp firebaseApp;
-  final UserDataConverter dataConverter;
+  final UserDataConverter userDataReader;
   final FirestoreClient client;
-  final TaskScheduler _scheduler;
+  final AsyncQueue _scheduler;
 
   static Firestore get instance {
     final FirebaseApp app = FirebaseApp.instance;
@@ -54,8 +54,7 @@ class Firestore {
       throw StateError('You must call [FirebaseApp.initializeApp] first.');
     }
 
-    final Firestore firestore =
-        FirestoreMultiDbComponent.instances[DatabaseId.defaultDatabaseId];
+    final Firestore firestore = FirestoreMultiDbComponent.instances[DatabaseId.defaultDatabaseId];
     if (firestore == null) {
       throw StateError('You must call [Firestore.getInstance] first.');
     }
@@ -69,7 +68,7 @@ class Firestore {
   }
 
   @visibleForTesting
-  TaskScheduler get scheduler => _scheduler;
+  AsyncQueue get scheduler => _scheduler;
 
   static Future<Firestore> getInstance(
     FirebaseApp app, {
@@ -80,8 +79,7 @@ class Firestore {
     checkNotNull(app, 'Provided FirebaseApp must not be null.');
     Firestore.setLoggingEnabled();
 
-    final FirestoreMultiDbComponent component =
-        FirestoreMultiDbComponent(app, app.authProvider, settings);
+    final FirestoreMultiDbComponent component = FirestoreMultiDbComponent(app, app.authProvider, settings);
     checkNotNull(component, 'Firestore component is not present.');
 
     final Firestore firestore = await component.get(database, openDatabase);
@@ -105,12 +103,10 @@ class Firestore {
     if (authProvider != null) {
       provider = FirebaseAuthCredentialsProvider(authProvider);
     } else if (app.authProvider != app) {
-      Log.d(
-          _tag, 'Using ${app.authProvider.runtimeType} as the auth provider.');
+      Log.d(_tag, 'Using ${app.authProvider.runtimeType} as the auth provider.');
       provider = FirebaseAuthCredentialsProvider(app.authProvider);
     } else {
-      Log.d(_tag,
-          'Firebase Auth not available, falling back to unauthenticated usage.');
+      Log.d(_tag, 'Firebase Auth not available, falling back to unauthenticated usage.');
       provider = EmptyCredentialsProvider();
     }
 
@@ -129,7 +125,7 @@ class Firestore {
       sslEnabled: settings.sslEnabled,
     );
 
-    final TaskScheduler scheduler = TaskScheduler(app.name);
+    final AsyncQueue scheduler = AsyncQueue(app.name);
     final FirestoreClient firestoreClient = await FirestoreClient.initialize(
       databaseInfo,
       settings,
@@ -169,8 +165,7 @@ class Firestore {
   DocumentReference document(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
     _ensureClientConfigured();
-    return DocumentReference.forPath(
-        ResourcePath.fromString(documentPath), this);
+    return DocumentReference.forPath(ResourcePath.fromString(documentPath), this);
   }
 
   /// Creates and returns a new [Query] that includes all documents in the
@@ -182,8 +177,7 @@ class Firestore {
   Query collectionGroup(String collectionId) {
     checkNotNull(collectionId, 'Provided collection ID must not be null.');
     if (collectionId.contains('/')) {
-      throw ArgumentError(
-          'Invalid collectionId \'$collectionId\'. Collection IDs must not contain \'/\'.');
+      throw ArgumentError('Invalid collectionId \'$collectionId\'. Collection IDs must not contain \'/\'.');
     }
 
     _ensureClientConfigured();
@@ -244,6 +238,12 @@ class Firestore {
     return batch.commit();
   }
 
+  Future<void> _shutdownInternal() {
+    // The client must be initialized to ensure that all subsequent API usage throws an exception.
+    _ensureClientConfigured();
+    return client.terminate();
+  }
+
   /// Shuts down this [Firestore] instance.
   ///
   /// To restart after shutdown, simply create a new instance of Firestore with
@@ -258,10 +258,7 @@ class Firestore {
   /// method is useful only when you want to force this instance to release all
   /// of its resources.
   Future<void> shutdown() async {
-    // The client must be initialized to ensure that all subsequent API usage
-    // throws an exception.
-    _ensureClientConfigured();
-    return client.shutdown();
+    return _shutdownInternal();
   }
 
   /// Re-enables network usage for this instance after a prior call to [disableNetwork].
@@ -291,12 +288,44 @@ class Firestore {
     }
   }
 
+  /// Clears the persistent storage, including pending writes and cached documents.
+  ///
+  /// <p>Must be called while the FirebaseFirestore instance is not started (after the app is
+  /// shutdown or when the app is first initialized). On startup, this method must be called before
+  /// other methods (other than <code>setFirestoreSettings()</code>). If the FirebaseFirestore
+  /// instance is still running, the <code>Task</code> will fail with an error code of <code>
+  /// FAILED_PRECONDITION</code>.
+  ///
+  /// <p>Note: <code>clearPersistence()</code> is primarily intended to help write reliable tests
+  /// that use Cloud Firestore. It uses an efficient mechanism for dropping existing data but does
+  /// not attempt to securely overwrite or otherwise make cached data unrecoverable. For applications
+  /// that are sensitive to the disclosure of cached data in between user sessions, we strongly
+  /// recommend not enabling persistence at all.
+  ///
+  /// @return A <code>Task</code> that is resolved when the persistent storage is cleared. Otherwise,
+  ///     the <code>Task</code> is rejected with an error.
+  Future<void> clearPersistence() {
+    final Completer<void> completer = Completer<void>();
+    _scheduler.enqueueAndForgetEvenAfterShutdown(() async {
+      try {
+        if (client != null && !client.isTerminated) {
+          throw FirestoreError('Persistence cannot be cleared while the firestore instance is running.',
+              FirestoreErrorCode.failedPrecondition);
+        }
+        SQLitePersistence.clearPersistence(databaseId, persistenceKey);
+        completer.complete();
+      } on FirestoreError catch (e, s) {
+        completer.completeError(e, s);
+      }
+    });
+    return completer.future;
+  }
+
   /// Helper to validate a [DocumentReference]. Used by [WriteBatch] and [Transaction].
   void validateReference(DocumentReference docRef) {
     checkNotNull(docRef, 'Provided DocumentReference must not be null.');
     if (docRef.firestore != this) {
-      throw ArgumentError(
-          'Provided document reference is from a different Cloud Firestore instance.');
+      throw ArgumentError('Provided document reference is from a different Cloud Firestore instance.');
     }
   }
 }

@@ -6,8 +6,9 @@ import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/target_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
@@ -27,7 +28,7 @@ class QueryCacheTestCase {
   int _previousSequenceNumber;
 
   void setUp() {
-    _queryCache = _persistence.queryCache;
+    _queryCache = _persistence.targetCache;
     _previousSequenceNumber = 1000;
   }
 
@@ -35,7 +36,7 @@ class QueryCacheTestCase {
 
   @testMethod
   Future<void> testReadQueryNotInCache() async {
-    expect(await _queryCache.getQueryData(query('rooms')), isNull);
+    expect(await _queryCache.getTargetData(query('rooms')), isNull);
   }
 
   @testMethod
@@ -43,9 +44,9 @@ class QueryCacheTestCase {
     final QueryData queryData = _newQueryData(query('rooms'), 1, 1);
     await _addQueryData(queryData);
 
-    final QueryData result = await _queryCache.getQueryData(query('rooms'));
+    final QueryData result = await _queryCache.getTargetData(query('rooms'));
     expect(result, isNotNull);
-    expect(result.query, queryData.query);
+    expect(result.target, queryData.target);
     expect(result.targetId, queryData.targetId);
     expect(result.resumeToken, queryData.resumeToken);
   }
@@ -62,24 +63,24 @@ class QueryCacheTestCase {
     await _addQueryData(data1);
 
     // Using the other query should not return the query cache entry despite equal canonicalIDs.
-    expect(await _queryCache.getQueryData(q2), isNull);
-    expect(await _queryCache.getQueryData(q1), data1);
+    expect(await _queryCache.getTargetData(q2), isNull);
+    expect(await _queryCache.getTargetData(q1), data1);
 
     final QueryData data2 = _newQueryData(q2, 2, 1);
     await _addQueryData(data2);
     expect(_queryCache.targetCount, 2);
 
-    expect(await _queryCache.getQueryData(q1), data1);
-    expect(await _queryCache.getQueryData(q2), data2);
+    expect(await _queryCache.getTargetData(q1), data1);
+    expect(await _queryCache.getTargetData(q2), data2);
 
     await _removeQueryData(data1);
-    expect(await _queryCache.getQueryData(q1), isNull);
-    expect(await _queryCache.getQueryData(q2), data2);
+    expect(await _queryCache.getTargetData(q1), isNull);
+    expect(await _queryCache.getTargetData(q2), data2);
     expect(_queryCache.targetCount, 1);
 
     await _removeQueryData(data2);
-    expect(await _queryCache.getQueryData(q1), isNull);
-    expect(await _queryCache.getQueryData(q2), isNull);
+    expect(await _queryCache.getTargetData(q1), isNull);
+    expect(await _queryCache.getTargetData(q2), isNull);
     expect(_queryCache.targetCount, 0);
   }
 
@@ -91,7 +92,7 @@ class QueryCacheTestCase {
     final QueryData queryData2 = _newQueryData(query('rooms'), 1, 2);
     await _addQueryData(queryData2);
 
-    final QueryData result = await _queryCache.getQueryData(query('rooms'));
+    final QueryData result = await _queryCache.getTargetData(query('rooms'));
 
     // There's no assertArrayNotEquals
     expect(queryData2.resumeToken, isNot(queryData1.resumeToken));
@@ -108,7 +109,7 @@ class QueryCacheTestCase {
 
     await _removeQueryData(queryData1);
 
-    final QueryData result = await _queryCache.getQueryData(query('rooms'));
+    final QueryData result = await _queryCache.getTargetData(query('rooms'));
     expect(result, isNull);
   }
 
@@ -116,7 +117,7 @@ class QueryCacheTestCase {
   Future<void> testRemoveNonExistentQuery() async {
     // no-op, but make sure it doesn't throw.
     try {
-      await _queryCache.getQueryData(query('rooms'));
+      await _queryCache.getTargetData(query('rooms'));
       expect(true, true);
     } catch (e) {
       assert(false, 'This should not thow');
@@ -283,7 +284,7 @@ class QueryCacheTestCase {
       await _persistence.start();
     }
 
-    _queryCache = _persistence.queryCache;
+    _queryCache = _persistence.targetCache;
     expect(_queryCache.highestTargetId, 42);
   }
 
@@ -310,7 +311,7 @@ class QueryCacheTestCase {
       await _persistence.start();
     }
 
-    _queryCache = _persistence.queryCache;
+    _queryCache = _persistence.targetCache;
     expect(_queryCache.lastRemoteSnapshotVersion, version(42));
   }
 
@@ -325,14 +326,14 @@ class QueryCacheTestCase {
   /// Adds the given query data to the [_queryCache] under test, committing immediately.
   Future<QueryData> _addQueryData(QueryData queryData) async {
     await _persistence.runTransaction(
-        'addQueryData', () => _queryCache.addQueryData(queryData));
+        'addQueryData', () => _queryCache.addTargetData(queryData));
     return queryData;
   }
 
   /// Removes the given query data from the queryCache under test, committing immediately.
   Future<void> _removeQueryData(QueryData queryData) async {
     await _persistence.runTransaction(
-        'removeQueryData', () => _queryCache.removeQueryData(queryData));
+        'removeQueryData', () => _queryCache.removeTargetData(queryData));
   }
 
   Future<void> _addMatchingKey(DocumentKey key, int targetId) async {

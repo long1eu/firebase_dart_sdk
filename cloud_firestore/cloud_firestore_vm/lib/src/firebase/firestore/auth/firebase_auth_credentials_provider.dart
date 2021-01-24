@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -15,9 +14,8 @@ import 'package:rxdart/rxdart.dart';
 /// get an auth token.
 class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   FirebaseAuthCredentialsProvider(this.authProvider)
-      : _onUserChange = BehaviorSubject<User>.seeded(authProvider.uid != null
-            ? User(authProvider.uid)
-            : User.unauthenticated);
+      : _onUserChange =
+            BehaviorSubject<User>.seeded(authProvider.uid != null ? User(authProvider.uid) : User.unauthenticated);
 
   /// Stream that will receive credential changes (sign-in / sign-out, token
   /// changes).
@@ -47,15 +45,14 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
     // the request is outstanding.
     final int savedCounter = _tokenCounter;
 
-    final GetTokenResult result =
-        await authProvider.getAccessToken(forceRefresh: doForceRefresh);
+    final GetTokenResult result = await authProvider.getAccessToken(forceRefresh: doForceRefresh);
 
     // Cancel the request since the token changed while the request was
     // outstanding so the response is potentially for a previous user (which
     // user, we can't be sure).
     if (savedCounter != _tokenCounter) {
-      throw FirestoreError('getToken aborted due to token change',
-          FirestoreErrorCode.aborted);
+      Log.d('FirebaseAuthCredentialsProvider', 'getToken aborted due to token change');
+      return token;
     }
 
     return result?.token;

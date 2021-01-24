@@ -11,9 +11,9 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_write_result.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/remote_document_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
@@ -922,10 +922,10 @@ class LocalStoreTestCase {
     await _applyRemoteEvent(remoteEvent);
 
     // Stop listening so that the query should become inactive (but persistent)
-    await _localStore.releaseQuery(_query);
+    await _localStore.releaseTarget(_query);
 
     // Should come back with the same resume token
-    final QueryData queryData2 = await _localStore.allocateQuery(_query);
+    final QueryData queryData2 = await _localStore.allocateTarget(_query);
     expect(queryData2.resumeToken, _resumeToken);
   }
 
@@ -969,10 +969,10 @@ class LocalStoreTestCase {
     await _applyRemoteEvent(remoteEvent2);
 
     // Stop listening so that the query should become inactive (but persistent)
-    await _localStore.releaseQuery(_query);
+    await _localStore.releaseTarget(_query);
 
     // Should come back with the same resume token
-    final QueryData queryData2 = await _localStore.allocateQuery(_query);
+    final QueryData queryData2 = await _localStore.allocateTarget(_query);
     expect(queryData2.resumeToken, _resumeToken);
   }
 
@@ -1316,13 +1316,13 @@ class LocalStoreTestCase {
   }
 
   Future<int> _allocateQuery(Query query) async {
-    final QueryData queryData = await _localStore.allocateQuery(query);
+    final QueryData queryData = await _localStore.allocateTarget(query);
     _lastTargetId = queryData.targetId;
     return queryData.targetId;
   }
 
   Future<void> _releaseQuery(Query query) async {
-    await _localStore.releaseQuery(query);
+    await _localStore.releaseTarget(query);
   }
 
   /// Asserts that the last target ID is the given number.

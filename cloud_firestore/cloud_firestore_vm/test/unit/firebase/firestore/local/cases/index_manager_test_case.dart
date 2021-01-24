@@ -4,8 +4,8 @@
 
 import 'dart:async';
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/index_manager.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/index_manager.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:test/test.dart';
 

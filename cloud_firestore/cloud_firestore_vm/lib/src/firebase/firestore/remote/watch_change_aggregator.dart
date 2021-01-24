@@ -4,8 +4,8 @@
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
@@ -29,12 +29,10 @@ class WatchChangeAggregator {
   final Map<int, TargetState> _targetStates = <int, TargetState>{};
 
   /// Keeps track of the documents to update since the last raised snapshot.
-  Map<DocumentKey, MaybeDocument> _pendingDocumentUpdates =
-      <DocumentKey, MaybeDocument>{};
+  Map<DocumentKey, MaybeDocument> _pendingDocumentUpdates = <DocumentKey, MaybeDocument>{};
 
   /// A mapping of document keys to their set of target IDs.
-  Map<DocumentKey, Set<int>> _pendingDocumentTargetMapping =
-      <DocumentKey, Set<int>>{};
+  Map<DocumentKey, Set<int>> _pendingDocumentTargetMapping = <DocumentKey, Set<int>>{};
 
   /// A list of targets with existence filter mismatches. These targets are known to be inconsistent
   /// and their listens needs to be re-established by [RemoteStore].
@@ -54,8 +52,7 @@ class WatchChangeAggregator {
     }
 
     for (int targetId in documentChange.removedTargetIds) {
-      _removeDocumentFromTarget(
-          targetId, documentKey, documentChange.newDocument);
+      _removeDocumentFromTarget(targetId, documentKey, documentChange.newDocument);
     }
   }
 
@@ -89,8 +86,7 @@ class WatchChangeAggregator {
           if (!targetState.isPending()) {
             removeTarget(targetId);
           }
-          hardAssert(targetChange.cause == null,
-              'WatchChangeAggregator does not handle errored targets');
+          hardAssert(targetChange.cause == null, 'WatchChangeAggregator does not handle errored targets');
           break;
         case WatchTargetChangeType.current:
           if (_isActiveTarget(targetId)) {
@@ -108,8 +104,7 @@ class WatchChangeAggregator {
           }
           break;
         default:
-          throw fail(
-              'Unknown target watch change state: ${targetChange.changeType}');
+          throw fail('Unknown target watch change state: ${targetChange.changeType}');
       }
     }
   }
@@ -121,27 +116,26 @@ class WatchChangeAggregator {
     if (targetIds.isNotEmpty) {
       return targetIds;
     } else {
-      return _targetStates.keys;
+      return _targetStates.keys.where(_isActiveTarget);
     }
   }
 
   /// Handles existence filters and synthesizes deletes for filter mismatches. Targets that are
   /// invalidated by filter mismatches are added to [pendingTargetResets].
-  void handleExistenceFilter(
-      WatchChangeExistenceFilterWatchChange watchChange) {
+  void handleExistenceFilter(WatchChangeExistenceFilterWatchChange watchChange) {
     final int targetId = watchChange.targetId;
     final int expectedCount = watchChange.existenceFilter.count;
 
-    final QueryData queryData = _queryDataForActiveTarget(targetId);
-    if (queryData != null) {
-      final Query query = queryData.query;
-      if (query.isDocumentQuery) {
+    final TargetData targetData = _queryDataForActiveTarget(targetId);
+    if (targetData != null) {
+      final Target target = targetData.target;
+      if (target.isDocumentQuery) {
         if (expectedCount == 0) {
           // The existence filter told us the document does not exist. We deduce that this document
           // does not exist and apply a deleted document to our updates. Without applying this
           // deleted document there might be another query that will raise this document as part of
           // a snapshot until it is resolved, essentially exposing inconsistency between queries.
-          final DocumentKey key = DocumentKey.fromPath(query.path);
+          final DocumentKey key = DocumentKey.fromPath(target.path);
           _removeDocumentFromTarget(
             targetId,
             key,
@@ -152,8 +146,7 @@ class WatchChangeAggregator {
             ),
           );
         } else {
-          hardAssert(expectedCount == 1,
-              'Single document existence filter with count: $expectedCount');
+          hardAssert(expectedCount == 1, 'Single document existence filter with count: $expectedCount');
         }
       } else {
         final int currentSize = _getCurrentDocumentCountForTarget(targetId);
@@ -176,16 +169,15 @@ class WatchChangeAggregator {
       final int targetId = entry.key;
       final TargetState targetState = entry.value;
 
-      final QueryData queryData = _queryDataForActiveTarget(targetId);
-      if (queryData != null) {
-        if (targetState.isCurrent && queryData.query.isDocumentQuery) {
+      final TargetData targetData = _queryDataForActiveTarget(targetId);
+      if (targetData != null) {
+        if (targetState.isCurrent && targetData.target.isDocumentQuery) {
           // Document queries for document that don't exist can produce an empty result set. To
           // update our local cache, we synthesize a document delete if we have not previously
           // received the document. This resolves the limbo state of the document, removing it from
           // [limboDocumentRefs].
-          final DocumentKey key = DocumentKey.fromPath(queryData.query.path);
-          if (_pendingDocumentUpdates[key] == null &&
-              !_targetContainsDocument(targetId, key)) {
+          final DocumentKey key = DocumentKey.fromPath(targetData.target.path);
+          if (_pendingDocumentUpdates[key] == null && !_targetContainsDocument(targetId, key)) {
             _removeDocumentFromTarget(
               targetId,
               key,
@@ -209,17 +201,15 @@ class WatchChangeAggregator {
 
     // We extract the set of limbo-only document updates as the GC logic special-cases documents
     // that do not appear in the query cache.
-    for (MapEntry<DocumentKey, Set<int>> entry
-        in _pendingDocumentTargetMapping.entries) {
+    for (MapEntry<DocumentKey, Set<int>> entry in _pendingDocumentTargetMapping.entries) {
       final DocumentKey key = entry.key;
       final Set<int> targets = entry.value;
 
       bool isOnlyLimboTarget = true;
 
       for (int targetId in targets) {
-        final QueryData queryData = _queryDataForActiveTarget(targetId);
-        if (queryData != null &&
-            queryData.purpose != QueryPurpose.limboResolution) {
+        final TargetData targetData = _queryDataForActiveTarget(targetId);
+        if (targetData != null && targetData.purpose != QueryPurpose.limboResolution) {
           isOnlyLimboTarget = false;
           break;
         }
@@ -234,8 +224,7 @@ class WatchChangeAggregator {
       snapshotVersion: snapshotVersion,
       targetChanges: Map<int, TargetChange>.from(targetChanges),
       targetMismatches: Set<int>.from(_pendingTargetResets),
-      documentUpdates:
-          Map<DocumentKey, MaybeDocument>.from(_pendingDocumentUpdates),
+      documentUpdates: Map<DocumentKey, MaybeDocument>.from(_pendingDocumentUpdates),
       resolvedLimboDocuments: Set<DocumentKey>.from(resolvedLimboDocuments),
     );
 
@@ -254,13 +243,11 @@ class WatchChangeAggregator {
       return;
     }
 
-    final DocumentViewChangeType changeType =
-        _targetContainsDocument(targetId, document.key)
-            ? DocumentViewChangeType.modified
-            : DocumentViewChangeType.added;
+    final DocumentViewChangeType changeType = _targetContainsDocument(targetId, document.key)
+        ? DocumentViewChangeType.modified
+        : DocumentViewChangeType.added;
 
-    final TargetState targetState = _ensureTargetState(targetId);
-    targetState.addDocumentChange(document.key, changeType);
+    _ensureTargetState(targetId).addDocumentChange(document.key, changeType);
 
     _pendingDocumentUpdates[document.key] = document;
 
@@ -271,8 +258,7 @@ class WatchChangeAggregator {
   /// target, but the document's state is still known (e.g. we know that the document was deleted or
   /// we received the change that caused the filter mismatch), the new document can be provided to
   /// update the remote document cache.
-  void _removeDocumentFromTarget(
-      int targetId, DocumentKey key, MaybeDocument updatedDocument) {
+  void _removeDocumentFromTarget(int targetId, DocumentKey key, MaybeDocument updatedDocument) {
     if (!_isActiveTarget(targetId)) {
       return;
     }
@@ -310,8 +296,7 @@ class WatchChangeAggregator {
   /// 'in-sync' with the client's active targets.
   void recordPendingTargetRequest(int targetId) {
     // For each request we get we need to record we need a response for it.
-    final TargetState targetState = _ensureTargetState(targetId);
-    targetState.recordPendingTargetRequest();
+    _ensureTargetState(targetId).recordPendingTargetRequest();
   }
 
   TargetState _ensureTargetState(int targetId) {
@@ -329,33 +314,31 @@ class WatchChangeAggregator {
     return targetMapping;
   }
 
-  /// Verifies that the user is still interested in this target (by calling [getQueryDataForTarget])
+  /// Verifies that the user is still interested in this target (by calling [getTargetDataForTarget])
   /// and that we are not waiting for pending ADDs from watch.
   bool _isActiveTarget(int targetId) {
     return _queryDataForActiveTarget(targetId) != null;
   }
 
-  /// Returns the [QueryData] for an active target (i.e. a target that the user is still interested
+  /// Returns the [TargetData] for an active target (i.e. a target that the user is still interested
   /// in that has no outstanding target change requests).
-  QueryData _queryDataForActiveTarget(int targetId) {
+  TargetData _queryDataForActiveTarget(int targetId) {
     final TargetState targetState = _targetStates[targetId];
     return targetState != null && targetState.isPending()
         ? null
-        : _targetMetadataProvider.getQueryDataForTarget(targetId);
+        : _targetMetadataProvider.getTargetDataForTarget(targetId);
   }
 
   /// Resets the state of a [Watch] target to its initial state (e.g. sets [current] to false,
   /// clears the resume token and removes its target mapping from all documents).
   void _resetTarget(int targetId) {
     hardAssert(
-        _targetStates[targetId] != null && !_targetStates[targetId].isPending(),
-        'Should only reset active targets');
+        _targetStates[targetId] != null && !_targetStates[targetId].isPending(), 'Should only reset active targets');
     _targetStates[targetId] = TargetState();
 
     // Trigger removal for any documents currently mapped to this target. These removals will be
     // part of the initial snapshot if [Watch] does not resend these documents.
-    final ImmutableSortedSet<DocumentKey> existingKeys =
-        _targetMetadataProvider.getRemoteKeysForTarget(targetId);
+    final ImmutableSortedSet<DocumentKey> existingKeys = _targetMetadataProvider.getRemoteKeysForTarget(targetId);
     for (DocumentKey key in existingKeys) {
       _removeDocumentFromTarget(targetId, key, null);
     }
@@ -363,8 +346,7 @@ class WatchChangeAggregator {
 
   /// Returns whether the LocalStore considers the document to be part of the specified target.
   bool _targetContainsDocument(int targetId, DocumentKey key) {
-    final ImmutableSortedSet<DocumentKey> existingKeys =
-        _targetMetadataProvider.getRemoteKeysForTarget(targetId);
+    final ImmutableSortedSet<DocumentKey> existingKeys = _targetMetadataProvider.getRemoteKeysForTarget(targetId);
     return existingKeys.contains(key);
   }
 }
@@ -373,15 +355,14 @@ class WatchChangeAggregator {
 class TargetMetadataProvider {
   const TargetMetadataProvider({
     @required this.getRemoteKeysForTarget,
-    @required this.getQueryDataForTarget,
+    @required this.getTargetDataForTarget,
   });
 
   /// Returns the set of remote document keys for the given target id as of the last raised snapshot
   /// or an empty set of document keys for unknown targets.
-  final ImmutableSortedSet<DocumentKey> Function(int targetId)
-      getRemoteKeysForTarget;
+  final ImmutableSortedSet<DocumentKey> Function(int targetId) getRemoteKeysForTarget;
 
-  /// Returns the [QueryData] for an active target id or 'null' if this query is unknown or has
+  /// Returns the [TargetData] for an active target id or 'null' if this query is unknown or has
   /// become inactive.
-  final QueryData Function(int targetId) getQueryDataForTarget;
+  final TargetData Function(int targetId) getTargetDataForTarget;
 }

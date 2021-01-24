@@ -4,27 +4,31 @@ version: 0.0.7
 homepage: https://github.com/fluttercommunity/firebase_dart_sdk/tree/develop/cloud_firestore/cloud_firestore_vm
 
 environment:
-  sdk: ">=2.7.0 <3.0.0"
+  sdk: ">=2.10.0 <3.0.0"
 
 dependencies:
-  _firebase_database_collection_vm:  ^0.0.2
-  _firebase_internal_vm: ^0.0.2
-  firebase_core_vm: ^0.0.4
-  protobuf: ^1.0.1
-  grpc: ^2.1.3
-  rxdart: ^0.23.1
+
+  protobuf: ^1.1.0
+  grpc: ^2.8.0
+  rxdart: ^0.24.1
   semaphore: ^0.1.4
-  path: ^1.6.4
+  path: ^1.7.0
   fixnum: ^0.10.11
-  meta: ^1.1.8
-  collection: ^1.14.12
-  pedantic: ^1.9.0
-  async: ^2.4.1
+  meta: ^1.2.4
+  collection: ^1.14.13
+  pedantic: ^1.9.2
+  async: ^2.4.2
+
+  _firebase_internal_vm: ^0.0.2+1
+  _firebase_database_collection_vm:
+    path: ../../firebase_core/_firebase_database_collection_vm
+  firebase_core_vm:
+    path: ../../firebase_core/firebase_core_vm
 
 dev_dependencies:
-  test: ^1.14.2
-  mockito: ^4.1.1
-  moor_ffi: ^0.4.0
-  uuid: ^2.0.4
+  test: ^1.15.7
+  mockito: ^4.1.3
+  moor_ffi: ^0.8.0
+  uuid: ^2.2.2
 
 latest_commit: 576da00e85e3950bd53049f800a552f28a0c6d99

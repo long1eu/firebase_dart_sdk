@@ -17,8 +17,7 @@ class FirestoreCallCredentials {
 
   final CredentialsProvider credentialsProvider;
 
-  Future<void> getRequestMetadata(
-      Map<String, String> metadata, String uri) async {
+  Future<void> getRequestMetadata(Map<String, String> metadata, String uri) async {
     try {
       final String token = await credentialsProvider.token;
       if (token != null && token.isNotEmpty) {

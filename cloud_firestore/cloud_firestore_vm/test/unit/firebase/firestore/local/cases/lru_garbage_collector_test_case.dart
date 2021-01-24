@@ -6,15 +6,15 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listen_sequence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/target_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
@@ -164,7 +164,7 @@ class LruGarbageCollectorTestCase {
       await _addNextQuery();
     }
     await _persistence.runTransaction('query with a mutation', () async {
-      final QueryData queryData = await _addNextQueryInTransaction();
+      final TargetData queryData = await _addNextQueryInTransaction();
       await _addDocumentToTarget(docInQuery, queryData.targetId);
     });
 
@@ -175,9 +175,9 @@ class LruGarbageCollectorTestCase {
 
   @testMethod
   Future<void> testRemoveQueriesUpThroughSequenceNumber() async {
-    final Map<int, QueryData> activeTargetIds = <int, QueryData>{};
+    final Map<int, TargetData> activeTargetIds = <int, TargetData>{};
     for (int i = 0; i < 100; i++) {
-      final QueryData queryData = await _addNextQuery();
+      final TargetData queryData = await _addNextQuery();
       // Mark odd queries as live so we can test filtering out live queries.
       final int targetId = queryData.targetId;
       if (targetId % 2 == 1) {
@@ -195,7 +195,7 @@ class LruGarbageCollectorTestCase {
     // Make sure we removed the even targets with targetID <= 20.
     await _persistence
         .runTransaction('verify remaining targets are > 20 or odd', () async {
-      return _queryCache.forEachTarget((QueryData queryData) {
+      return _queryCache.forEachTarget((TargetData queryData) {
         final bool isOdd = queryData.targetId.remainder(2) == 1;
         final bool isOver20 = queryData.targetId > 20;
         expect(isOdd || isOver20, isTrue);
@@ -214,7 +214,7 @@ class LruGarbageCollectorTestCase {
     await _persistence
         .runTransaction('add a target and add two documents to it', () async {
       // Add two documents to first target, queue a mutation on the second document
-      final QueryData queryData = await _addNextQueryInTransaction();
+      final TargetData queryData = await _addNextQueryInTransaction();
       final Document doc1 = await _cacheADocumentInTransaction();
       await _addDocumentToTarget(doc1.key, queryData.targetId);
       expectedRetained.add(doc1.key);
@@ -227,7 +227,7 @@ class LruGarbageCollectorTestCase {
 
     // Add a second query and register a third document on it
     await _persistence.runTransaction('second query', () async {
-      final QueryData queryData = await _addNextQueryInTransaction();
+      final TargetData queryData = await _addNextQueryInTransaction();
       final Document doc3 = await _cacheADocumentInTransaction();
       await _addDocumentToTarget(doc3.key, queryData.targetId);
       expectedRetained.add(doc3.key);
@@ -301,9 +301,9 @@ class LruGarbageCollectorTestCase {
 
     // Add oldest target, 5 documents, and add those documents to the target. This target will not be removed, so all
     // documents that are part of it will be retained.
-    final QueryData oldestTarget = await _persistence
+    final TargetData oldestTarget = await _persistence
         .runTransactionAndReturn('Add oldest target and docs', () async {
-      final QueryData queryData = await _addNextQueryInTransaction();
+      final TargetData queryData = await _addNextQueryInTransaction();
       for (int i = 0; i < 5; i++) {
         final Document doc = await _cacheADocumentInTransaction();
         expectedRetained.add(doc.key);
@@ -316,9 +316,9 @@ class LruGarbageCollectorTestCase {
     final Set<DocumentKey> middleDocsToRemove = <DocumentKey>{};
     // This will be the document in this target that gets an update later.
     DocumentKey middleDocToUpdateHolder;
-    final QueryData middleTarget = await _persistence
+    final TargetData middleTarget = await _persistence
         .runTransactionAndReturn('Add middle target and docs', () async {
-      final QueryData queryData = await _addNextQueryInTransaction();
+      final TargetData queryData = await _addNextQueryInTransaction();
       // These docs will be removed from this target later, triggering a bump to their sequence numbers. Since they will
       // not be a part of the target, we expect them to be removed.
       for (int i = 0; i < 2; i++) {
@@ -350,7 +350,7 @@ class LruGarbageCollectorTestCase {
     // since this target will be removed.
     final Set<DocumentKey> newestDocsToAddToOldest = <DocumentKey>{};
     await _persistence.runTransaction('Add newest target and docs', () async {
-      final QueryData queryData = await _addNextQueryInTransaction();
+      final TargetData queryData = await _addNextQueryInTransaction();
       // These documents are only in this target. They are expected to be removed because this target will also be
       // removed.
       for (int i = 0; i < 3; i++) {
@@ -525,7 +525,7 @@ class LruGarbageCollectorTestCase {
       // Use separate transactions so that each target and associated documents get their own sequence number.
       await _persistence.runTransaction('Add a target and some documents',
           () async {
-        final QueryData queryData = await _addNextQueryInTransaction();
+        final TargetData queryData = await _addNextQueryInTransaction();
         for (int j = 0; j < 10; j++) {
           final Document doc = await _cacheADocumentInTransaction();
           await _addDocumentToTarget(doc.key, queryData.targetId);
@@ -551,7 +551,7 @@ class LruGarbageCollectorTestCase {
     _persistence = await _getPersistence(params);
 
     _persistence.referenceDelegate.inMemoryPins = ReferenceSet();
-    _queryCache = _persistence.queryCache;
+    _queryCache = _persistence.targetCache;
     _documentCache = _persistence.remoteDocumentCache;
     const User user = User('user');
     _mutationQueue = _persistence.getMutationQueue(user);
@@ -564,32 +564,32 @@ class LruGarbageCollectorTestCase {
     _lruParams = params;
   }
 
-  Future<QueryData> _nextQueryData() async {
+  Future<TargetData> _nextQueryData() async {
     final int targetId = ++_previousTargetId;
     final int sequenceNumber =
         _persistence.referenceDelegate.currentSequenceNumber;
     final Query _query = query('path$targetId');
-    return QueryData(_query, targetId, sequenceNumber, QueryPurpose.listen);
+    return TargetData(_query, targetId, sequenceNumber, QueryPurpose.listen);
   }
 
-  Future<void> _updateTargetInTransaction(QueryData queryData) async {
+  Future<void> _updateTargetInTransaction(TargetData queryData) async {
     final SnapshotVersion _version = version(2);
     final Uint8List _resumeToken = resumeToken(2);
-    final QueryData updated = queryData.copyWith(
+    final TargetData updated = queryData.copyWith(
       sequenceNumber: _persistence.referenceDelegate.currentSequenceNumber,
       snapshotVersion: _version,
       resumeToken: _resumeToken,
     );
-    await _queryCache.updateQueryData(updated);
+    await _queryCache.updateTargetData(updated);
   }
 
-  Future<QueryData> _addNextQueryInTransaction() async {
-    final QueryData queryData = await _nextQueryData();
-    await _queryCache.addQueryData(queryData);
+  Future<TargetData> _addNextQueryInTransaction() async {
+    final TargetData queryData = await _nextQueryData();
+    await _queryCache.addTargetData(queryData);
     return queryData;
   }
 
-  Future<QueryData> _addNextQuery() {
+  Future<TargetData> _addNextQuery() {
     return _persistence.runTransactionAndReturn(
         'Add query', _addNextQueryInTransaction);
   }

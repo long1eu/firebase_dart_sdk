@@ -46,20 +46,20 @@ class DocumentChange {
   final QueryDocumentSnapshot document;
 
   /// The index of the changed document in the result set immediately prior to this [DocumentChange]
-  /// (i.e. supposing that all prior [DocumentChange] objects have been applied). Returns -1 for
+  /// (i.e. assuming that all prior [DocumentChange] objects have been applied). Returns -1 for
   /// 'added' events.
   ///
   /// Returns the index in the old snapshot, after processing all previous changes.
   final int oldIndex;
 
   /// The index of the changed document in the result set immediately after this [DocumentChange]
-  /// (i.e. supposing that all prior [DocumentChange] objects and the current [DocumentChange]
+  /// (i.e. assuming that all prior [DocumentChange] objects and the current [DocumentChange]
   /// object have been applied). Returns -1 for 'removed' events.
   ///
   /// The index in the new snapshot, after processing all previous changes.
   final int newIndex;
 
-  /// Creates the list of DocumentChanges from a ViewSnapshot.
+  /// Creates the list of document changes from a ViewSnapshot.
   static List<DocumentChange> changesFromSnapshot(Firestore firestore,
       MetadataChanges metadataChanges, ViewSnapshot snapshot) {
     final List<DocumentChange> documentChanges = <DocumentChange>[];

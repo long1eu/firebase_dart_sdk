@@ -5,9 +5,12 @@
 library filter;
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/values.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/values.dart' as values;
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart' hide Document;
 
 part 'array_contains_any_filter.dart';
 part 'array_contains_filter.dart';
@@ -16,6 +19,8 @@ part 'filter_operator.dart';
 part 'in_filter.dart';
 part 'key_field_filter.dart';
 part 'key_field_in_filter.dart';
+part 'key_field_not_in_filter.dart';
+part 'not_in_filter.dart';
 
 /// Interface used for all query filters.
 abstract class Filter {

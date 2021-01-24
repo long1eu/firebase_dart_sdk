@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 
 void main() {
   test('testConstructor', () {
-    expect(TargetIdGenerator.forQueryCache(0).nextId, 2);
+    expect(TargetIdGenerator.forTargetCache(0).nextId, 2);
     expect(TargetIdGenerator.forSyncEngine().nextId, 1);
   });
 

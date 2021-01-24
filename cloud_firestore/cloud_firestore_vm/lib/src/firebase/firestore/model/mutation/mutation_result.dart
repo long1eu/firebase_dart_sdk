@@ -3,7 +3,7 @@
 // on 17/09/2018
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart';
 
 /// The result of applying a mutation to the server. This is a model of the [WriteResult] proto
 /// message.
@@ -23,9 +23,9 @@ class MutationResult {
   /// though the [commitTime] advances.
   final SnapshotVersion version;
 
-  /// The resulting fields returned from the backend after a [TransformMutation] has been committed.
-  /// Contains one [FieldValue] for each [FieldTransform] that was in the mutation.
+  /// The resulting fields returned from the backend after a mutation containing field transforms has been committed.
+  /// Contains one [Value] for each [FieldTransform] that was in the mutation.
   ///
-  /// Will be null if the mutation was not a [TransformMutation].
-  final List<FieldValue> transformResults;
+  /// Will be null if the mutation did not a contain any field transforms.
+  final List<Value> transformResults;
 }

@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:collection/collection.dart';
 
+/// Immutable class representing an array of bytes in Cloud Firestore.
 class Blob implements Comparable<Blob> {
   Blob(Uint8List bytes) : bytes = Uint8List.fromList(bytes);
 

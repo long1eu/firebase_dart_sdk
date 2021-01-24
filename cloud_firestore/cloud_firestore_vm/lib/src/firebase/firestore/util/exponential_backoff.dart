@@ -5,7 +5,7 @@
 import 'dart:math';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_task.dart';
 
 /// Helper for running delayed tasks following an exponential backoff curve between attempts using the [backoffFactor]
 /// to determine the extended base delay after each attempt.
@@ -18,35 +18,45 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 /// as little as 0.5 * [initialDelay] and as much as 1.5 * [maxDelay]. After [maxDelay] is reached no further backoff
 /// is performed.
 class ExponentialBackoff {
-  // Initial backoff set to 1s according to https://cloud.google.com/apis/design/errors.
   ExponentialBackoff(
-    TaskScheduler scheduler,
-    TaskId taskId, {
-    Duration initialDelay = const Duration(seconds: 1),
-    double backoffFactor = 1.5,
-    Duration maxDelay = const Duration(minutes: 1),
-  })  : assert(scheduler != null),
-        assert(taskId != null),
+    AsyncQueue asyncQueue,
+    TimerId timerId, {
+    Duration initialDelay = _kDefaultBackoffInitialDelay,
+    double backoffFactor = _kDefaultBackoffFactor,
+    Duration maxDelay = _kDefaultBackoffMaxDelay,
+  })  : assert(asyncQueue != null),
+        assert(timerId != null),
         assert(initialDelay != null),
         assert(backoffFactor != null),
         assert(maxDelay != null),
-        _scheduler = scheduler,
-        _taskId = taskId,
+        _asyncQueue = asyncQueue,
+        _timerId = timerId,
         _initialDelay = initialDelay,
         _backoffFactor = backoffFactor,
         _maxDelay = maxDelay,
+        _nextMaxDelay = maxDelay,
         _lastAttemptTime = DateTime.now(),
         _currentBase = Duration.zero;
 
-  final TaskScheduler _scheduler;
-  final TaskId _taskId;
+  /// Initial backoff time in milliseconds after an error. Set to 1s according to
+  /// https://cloud.google.com/apis/design/errors.
+  static const Duration _kDefaultBackoffInitialDelay = Duration(seconds: 1);
+  static const double _kDefaultBackoffFactor = 1.5;
+  static const Duration _kDefaultBackoffMaxDelay = Duration(seconds: 60);
+
+  final AsyncQueue _asyncQueue;
+  final TimerId _timerId;
   final Duration _initialDelay;
   final double _backoffFactor;
   final Duration _maxDelay;
 
+  /// The maximum backoff time used when calculating the next backoff. This value can be changed for
+  /// a single backoffAndRun call, after which it resets to maxDelayMs.
+  Duration _nextMaxDelay;
+
   Duration _currentBase;
   DateTime _lastAttemptTime;
-  TimerTask _timerTask;
+  DelayedTask<dynamic> _timerTask;
 
   /// Resets the backoff delay.
   ///
@@ -56,6 +66,12 @@ class ExponentialBackoff {
 
   /// Resets the backoff delay to the maximum delay (e.g. for use after a RESOURCE_EXHAUSTED error).
   void resetToMax() => _currentBase = _maxDelay;
+
+  /// Set the backoff's maximum delay for only the next call to backoffAndRun, after which the delay
+  /// will be reset to maxDelayMs.
+  set temporaryMaxDelay(Duration newMax) {
+    _nextMaxDelay = newMax;
+  }
 
   /// Waits for [currentDelayMs], increases the delay and runs the specified task. If there was a pending backoff task
   /// waiting to run already, it will be canceled.
@@ -69,13 +85,11 @@ class ExponentialBackoff {
 
     // Guard against lastAttemptTime being in the future due to a clock change.
     final Duration difference = DateTime.now().difference(_lastAttemptTime);
-    final Duration delaySoFar =
-        difference < Duration.zero ? Duration.zero : difference;
+    final Duration delaySoFar = difference < Duration.zero ? Duration.zero : difference;
 
     // Guard against the backoff delay already being past.
     final Duration remaining = desiredDelayWithJitter - delaySoFar;
-    final Duration remainingDelay =
-        remaining < Duration.zero ? Duration.zero : remaining;
+    final Duration remainingDelay = remaining < Duration.zero ? Duration.zero : remaining;
 
     if (_currentBase > Duration.zero) {
       Log.d(
@@ -84,12 +98,12 @@ class ExponentialBackoff {
           'last attempt: $delaySoFar ago)');
     }
 
-    _timerTask = _scheduler.add(
-      _taskId,
+    _timerTask = _asyncQueue.enqueueAfterDelay<dynamic>(
+      _timerId,
       remainingDelay,
-      () {
+      () async {
         _lastAttemptTime = DateTime.now();
-        task();
+        await task();
       },
     );
 
@@ -97,9 +111,12 @@ class ExponentialBackoff {
     _currentBase = _currentBase * _backoffFactor;
     if (_currentBase < _initialDelay) {
       _currentBase = _initialDelay;
-    } else if (_currentBase > _maxDelay) {
-      _currentBase = _maxDelay;
+    } else if (_currentBase > _nextMaxDelay) {
+      _currentBase = _nextMaxDelay;
     }
+
+    // Reset max delay to the default.
+    _nextMaxDelay = _maxDelay;
   }
 
   void cancel() {
@@ -112,7 +129,6 @@ class ExponentialBackoff {
   /// Returns a random value in the range [-currentBaseMs/2, currentBaseMs/2]
   Duration _jitterDelay() {
     final double value = Random().nextDouble() - 0.5;
-    return Duration(
-        milliseconds: (value * _currentBase.inMilliseconds).toInt());
+    return Duration(milliseconds: (value * _currentBase.inMilliseconds).toInt());
   }
 }

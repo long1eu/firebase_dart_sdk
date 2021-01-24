@@ -15,12 +15,12 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dar
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_settings.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:rxdart/subjects.dart';
 import 'package:test/test.dart';
@@ -102,7 +102,7 @@ class IntegrationTestUtil {
       DatabaseId databaseId,
       String persistenceKey,
       CredentialsProvider provider,
-      TaskScheduler scheduler,
+      AsyncQueue scheduler,
       OpenDatabase openDatabase,
       FirestoreSettings settings) async {
     final DatabaseInfo databaseInfo = DatabaseInfo(
@@ -143,7 +143,7 @@ class IntegrationTestUtil {
 
     _clearPersistence(dbFullPath);
 
-    final TaskScheduler scheduler = TaskScheduler('');
+    final AsyncQueue scheduler = AsyncQueue('');
     final Firestore firestore = await forTests(
       databaseId,
       persistenceKey,

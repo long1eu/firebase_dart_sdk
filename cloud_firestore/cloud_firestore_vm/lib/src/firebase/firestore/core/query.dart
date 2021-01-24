@@ -5,40 +5,44 @@
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/bound.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/order_by.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:collection/collection.dart';
 
-/// Represents the internal structure of a Firestore Query
+enum QueryLimitType { limitToFirst, limitToLast }
+
+/// Encapsulates all the query attributes we support in the SDK. It can be run against the
+/// LocalStore, as well as be converted to a {@code Target} to query the RemoteStore results.
 class Query {
   /// Initializes a Query with all of its components directly.
-  const Query(
+  Query(
     this.path, {
     this.collectionGroup,
     this.filters = const <Filter>[],
     this.explicitSortOrder = const <OrderBy>[],
-    int limit = noLimit,
+    int limit = Target.kNoLimit,
+    QueryLimitType limitType = QueryLimitType.limitToFirst,
     Bound startAt,
     Bound endAt,
   })  : _limit = limit,
+        _limitType = limitType,
         _startAt = startAt,
         _endAt = endAt;
 
-  static const int noLimit = -1;
+  static final OrderBy keyOrderingAsc = OrderBy.getInstance(OrderByDirection.ascending, FieldPath.keyPath);
 
-  static final OrderBy keyOrderingAsc =
-      OrderBy.getInstance(OrderByDirection.ascending, FieldPath.keyPath);
-
-  static final OrderBy keyOrderingDesc =
-      OrderBy.getInstance(OrderByDirection.descending, FieldPath.keyPath);
+  static final OrderBy keyOrderingDesc = OrderBy.getInstance(OrderByDirection.descending, FieldPath.keyPath);
 
   /// Returns the list of ordering constraints that were explicitly requested on the query by the user.
   ///
   /// Note that the actual query performed might add additional sort orders to match the behavior of the backend.
   final List<OrderBy> explicitSortOrder;
+
+  // The corresponding Target of this Query instance.
+  Target _memoizedTarget;
 
   /// The filters on the documents returned by the query.
   final List<Filter> filters;
@@ -49,6 +53,7 @@ class Query {
   final String collectionGroup;
 
   final int _limit;
+  final QueryLimitType _limitType;
 
   /// An optional bound to start the query at.
   final Bound _startAt;
@@ -58,30 +63,47 @@ class Query {
 
   /// Returns true if this Query is for a specific document.
   bool get isDocumentQuery {
-    return DocumentKey.isDocumentKey(path) &&
-        collectionGroup == null &&
-        filters.isEmpty;
+    return DocumentKey.isDocumentKey(path) && collectionGroup == null && filters.isEmpty;
   }
 
   /// Returns true if this is a collection group query.
   bool get isCollectionGroupQuery => collectionGroup != null;
 
-  /// The maximum number of results to return. If there is no limit on the
-  /// query, then this will cause an assertion failure.
-  int getLimit() {
-    hardAssert(hasLimit, 'Called getLimit when no limit was set');
+  /// Returns true if this query does not specify any query constraints that could remove results.
+  bool get matchesAllDocuments {
+    return filters.isEmpty &&
+        _limit == Target.kNoLimit &&
+        startAt == null &&
+        endAt == null &&
+        (explicitSortOrder.isEmpty || (explicitSortOrder.length == 1 && firstOrderByField.isKeyField));
+  }
+
+  /// The maximum number of results to return. If there is no limit on the query, then this will
+  /// cause an assertion failure.
+  int getLimitToFirst() {
+    hardAssert(hasLimitToFirst, 'Called getLimitToFirst when no limit was set');
     return _limit;
   }
 
-  bool get hasLimit => _limit != noLimit;
+  bool get hasLimitToFirst {
+    return _limitType == QueryLimitType.limitToFirst && _limit != Target.kNoLimit;
+  }
 
-  /// Returns a new [Query] with the given limit on how many results can be
-  /// returned.
-  ///
-  /// [limit] represents the maximum number of results to return. If
-  /// `limit == noLimit`, then no limit is applied. Otherwise, if `limit <= 0`,
-  /// behavior is unspecified.
-  Query limit(int limit) => copyWith(limit: limit);
+  /// The maximum number of last-matching results to return. If there is no limit on the query, then
+  /// this will cause an assertion failure.
+  int getLimitToLast() {
+    hardAssert(hasLimitToLast, 'Called getLimitToLast when no limit was set');
+    return _limit;
+  }
+
+  bool get hasLimitToLast {
+    return _limitType == QueryLimitType.limitToLast && _limit != Target.kNoLimit;
+  }
+
+  QueryLimitType getLimitType() {
+    hardAssert(hasLimitToLast || hasLimitToFirst, 'Called getLimitType when no limit was set');
+    return _limitType;
+  }
 
   /// An optional bound to start the query at.
   Bound getStartAt() => _startAt;
@@ -137,16 +159,11 @@ class Query {
     }
 
     final FieldPath queryInequalityField = inequalityField;
-    hardAssert(
-        queryInequalityField == null ||
-            newInequalityField == null ||
-            queryInequalityField == newInequalityField,
+    hardAssert(queryInequalityField == null || newInequalityField == null || queryInequalityField == newInequalityField,
         'Query must only have one inequality field');
 
     hardAssert(
-        explicitSortOrder.isEmpty ||
-            newInequalityField == null ||
-            explicitSortOrder[0].field == newInequalityField,
+        explicitSortOrder.isEmpty || newInequalityField == null || explicitSortOrder[0].field == newInequalityField,
         'First orderBy must match inequality field');
 
     return copyWith(filters: <Filter>[...filters, filter]);
@@ -164,11 +181,18 @@ class Query {
         throw fail('First orderBy must match inequality field');
       }
     }
-    final List<OrderBy> updatedSortOrder = <OrderBy>[
-      ...explicitSortOrder,
-      order
-    ];
+    final List<OrderBy> updatedSortOrder = <OrderBy>[...explicitSortOrder, order];
     return copyWith(explicitSortOrder: updatedSortOrder);
+  }
+
+  /// Returns a new Query with the given [limit] on how many results can be returned.
+  Query limitToFirst(int limit) {
+    return copyWith(limit: limit, limitType: QueryLimitType.limitToFirst);
+  }
+
+  /// Returns a new Query with the given limit on how many last-matching results can be returned.
+  Query limitToLast(int limit) {
+    return copyWith(limit: limit, limitType: QueryLimitType.limitToLast);
   }
 
   /// Creates a new Query starting at the provided bound.
@@ -195,6 +219,10 @@ class Query {
     );
   }
 
+  List<OrderBy> getOrderBy() {
+    return orderByConstraints;
+  }
+
   /// Returns the full list of ordering constraints on the query.
   ///
   /// This might include additional sort orders added implicitly to match the
@@ -208,10 +236,7 @@ class Query {
       if (inequalityField.isKeyField) {
         return <OrderBy>[keyOrderingAsc];
       } else {
-        return <OrderBy>[
-          OrderBy.getInstance(OrderByDirection.ascending, inequalityField),
-          keyOrderingAsc
-        ];
+        return <OrderBy>[OrderBy.getInstance(OrderByDirection.ascending, inequalityField), keyOrderingAsc];
       }
     } else {
       final List<OrderBy> res = <OrderBy>[];
@@ -228,9 +253,7 @@ class Query {
         final OrderByDirection lastDirection = explicitSortOrder.isNotEmpty
             ? explicitSortOrder[explicitSortOrder.length - 1].direction
             : OrderByDirection.ascending;
-        res.add(lastDirection == OrderByDirection.ascending
-            ? keyOrderingAsc
-            : keyOrderingDesc);
+        res.add(lastDirection == OrderByDirection.ascending ? keyOrderingAsc : keyOrderingDesc);
       }
       return res;
     }
@@ -241,8 +264,7 @@ class Query {
     if (collectionGroup != null) {
       // NOTE: this.path is currently always empty since we don't expose
       // Collection Group queries rooted at a document path yet.
-      return doc.key.hasCollectionId(collectionGroup) &&
-          path.isPrefixOf(docPath);
+      return doc.key.hasCollectionId(collectionGroup) && path.isPrefixOf(docPath);
     } else if (DocumentKey.isDocumentKey(path)) {
       return path == docPath;
     } else {
@@ -263,8 +285,7 @@ class Query {
   bool _matchesOrderBy(Document doc) {
     for (OrderBy order in explicitSortOrder) {
       // order by key always matches
-      if (order.field != FieldPath.keyPath &&
-          doc.getField(order.field) == null) {
+      if (order.field != FieldPath.keyPath && doc.getField(order.field) == null) {
         return false;
       }
     }
@@ -273,8 +294,7 @@ class Query {
 
   /// Makes sure a document is within the bounds, if provided.
   bool _matchesBounds(Document doc) {
-    if (_startAt != null &&
-        !_startAt.sortsBeforeDocument(orderByConstraints, doc)) {
+    if (_startAt != null && !_startAt.sortsBeforeDocument(orderByConstraints, doc)) {
       return false;
     }
     if (_endAt != null && _endAt.sortsBeforeDocument(orderByConstraints, doc)) {
@@ -285,64 +305,60 @@ class Query {
 
   /// Returns true if the document matches the constraints of this query.
   bool matches(Document doc) {
-    return _matchesPathAndCollectionGroup(doc) &&
-        _matchesOrderBy(doc) &&
-        _matchesFilters(doc) &&
-        _matchesBounds(doc);
+    return _matchesPathAndCollectionGroup(doc) && _matchesOrderBy(doc) && _matchesFilters(doc) && _matchesBounds(doc);
   }
 
   /// Returns a comparator that will sort documents according to this Query's
   /// sort order.
-  Comparator<Document> get comparator =>
-      QueryComparator(orderByConstraints).comparator;
+  Comparator<Document> get comparator => QueryComparator(orderByConstraints).comparator;
+
+  /// Returns a [Target] instance this query will be mapped to in backend and local store.
+  Target toTarget() {
+    if (_memoizedTarget == null) {
+      if (_limitType == QueryLimitType.limitToFirst) {
+        _memoizedTarget = Target(
+          path: path,
+          collectionGroup: collectionGroup,
+          filters: filters,
+          orderBy: getOrderBy(),
+          limit: _limit,
+          startAt: getStartAt(),
+          endAt: getEndAt(),
+        );
+      } else {
+        // Flip the orderBy directions since we want the last results
+        final List<OrderBy> newOrderBy = <OrderBy>[];
+        for (OrderBy orderBy in orderByConstraints) {
+          final OrderByDirection dir = orderBy.direction == OrderByDirection.descending
+              ? OrderByDirection.ascending
+              : OrderByDirection.descending;
+          newOrderBy.add(OrderBy.getInstance(dir, orderBy.field));
+        }
+
+        // We need to swap the cursors to match the now-flipped query ordering.
+        final Bound newStartAt = _endAt != null ? Bound(position: _endAt.position, before: !_endAt.before) : null;
+        final Bound newEndAt = _startAt != null ? Bound(position: _startAt.position, before: !_startAt.before) : null;
+
+        _memoizedTarget = Target(
+          path: path,
+          collectionGroup: collectionGroup,
+          filters: filters,
+          orderBy: newOrderBy,
+          limit: _limit,
+          startAt: newStartAt,
+          endAt: newEndAt,
+        );
+      }
+    }
+
+    return _memoizedTarget;
+  }
 
   /// Returns a canonical string representing this query. This should match the
   /// iOS and Android canonical ids for a query exactly.
+  // TODO(long1eu): This is now only used in tests and SpecTestCase. Maybe we can delete it?
   String get canonicalId {
-    // TODO(long1eu): Cache the return value.
-    final StringBuffer builder = StringBuffer(path.canonicalString);
-
-    if (collectionGroup != null) {
-      builder //
-        ..write('|cg:')
-        ..write(collectionGroup);
-    }
-
-    // Add filters.
-    builder.write('|f:');
-    for (Filter filter in filters) {
-      builder.write(filter.canonicalId);
-    }
-
-    // Add order by.
-    builder.write('|ob:');
-    for (OrderBy orderBy in orderByConstraints) {
-      builder
-        ..write(orderBy.field.canonicalString)
-        ..write(
-            orderBy.direction == OrderByDirection.ascending ? 'asc' : 'desc');
-    }
-
-    // Add limit.
-    if (hasLimit) {
-      builder //
-        ..write('|l:')
-        ..write(limit);
-    }
-
-    if (_startAt != null) {
-      builder //
-        ..write('|lb:')
-        ..write(_startAt.canonicalString());
-    }
-
-    if (_endAt != null) {
-      builder //
-        ..write('|ub:')
-        ..write(_endAt.canonicalString());
-    }
-
-    return builder.toString();
+    return '${toTarget().canonicalId}|lt:$_limitType';
   }
 
   Query copyWith({
@@ -350,6 +366,7 @@ class Query {
     String collectionGroup,
     List<OrderBy> explicitSortOrder,
     int limit,
+    QueryLimitType limitType,
     Bound startAt,
     Bound endAt,
   }) {
@@ -359,6 +376,7 @@ class Query {
       filters: filters ?? this.filters,
       explicitSortOrder: explicitSortOrder ?? this.explicitSortOrder,
       limit: limit ?? _limit,
+      limitType: limitType ?? _limitType,
       startAt: startAt ?? _startAt,
       endAt: endAt ?? _endAt,
     );
@@ -369,58 +387,22 @@ class Query {
     return identical(this, other) ||
         other is Query &&
             runtimeType == other.runtimeType &&
-            _limit == other._limit &&
-            const ListEquality<OrderBy>()
-                .equals(orderByConstraints, other.orderByConstraints) &&
-            const ListEquality<Filter>().equals(filters, other.filters) &&
-            path == other.path &&
-            collectionGroup == other.collectionGroup &&
-            _startAt == other._startAt &&
-            _endAt == other._endAt;
+            _limitType == other._limitType &&
+            toTarget() == other.toTarget();
   }
 
   @override
-  int get hashCode =>
-      const ListEquality<Filter>().hash(filters) ^
-      path.hashCode ^
-      collectionGroup.hashCode ^
-      _limit.hashCode ^
-      _startAt.hashCode ^
-      _endAt.hashCode ^
-      const ListEquality<OrderBy>().hash(orderByConstraints);
+  int get hashCode => _limitType.hashCode ^ toTarget().hashCode;
 
   @override
   String toString() {
-    final StringBuffer builder = StringBuffer() //
-      ..write('Query(')
-      ..write(path.canonicalString);
-    if (collectionGroup != null) {
-      builder //
-        ..write(' collectionGroup=')
-        ..write(collectionGroup);
-    }
-    if (filters.isNotEmpty) {
-      builder.write(' where ');
-      for (int i = 0; i < filters.length; i++) {
-        if (i > 0) {
-          builder.write(' and ');
-        }
-        builder.write(filters[i]);
-      }
-    }
-
-    if (explicitSortOrder.isNotEmpty) {
-      builder.write(' order by ');
-      for (int i = 0; i < explicitSortOrder.length; i++) {
-        if (i > 0) {
-          builder.write(', ');
-        }
-        builder.write(explicitSortOrder[i]);
-      }
-    }
-
-    builder.write(')');
-    return builder.toString();
+    return (StringBuffer()
+          ..write('Query(target=')
+          ..write(toTarget())
+          ..write(';limitType=')
+          ..write(_limitType)
+          ..write(')'))
+        .toString();
   }
 }
 

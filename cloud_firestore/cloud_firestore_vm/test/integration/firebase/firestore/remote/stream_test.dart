@@ -7,7 +7,7 @@ import 'dart:async';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_task.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 
@@ -45,7 +45,7 @@ void main() {
   }
 
   /// Creates a WriteStream and gets it in a state that accepts mutations.
-  Future<WriteStream> createAndOpenWriteStream(TaskScheduler scheduler) async {
+  Future<WriteStream> createAndOpenWriteStream(AsyncQueue scheduler) async {
     final Datastore datastore = Datastore(
       scheduler,
       IntegrationTestUtil.testEnvDatabaseInfo(),
@@ -59,7 +59,7 @@ void main() {
 
   test('testWatchStreamStopBeforeHandshake', () async {
     final Datastore datastore = Datastore(
-      TaskScheduler(''),
+      AsyncQueue(''),
       IntegrationTestUtil.testEnvDatabaseInfo(),
       EmptyCredentialsProvider(),
     );
@@ -92,7 +92,7 @@ void main() {
 
   test('testWriteStreamStopAfterHandshake', () async {
     final Datastore datastore = Datastore(
-      TaskScheduler(''),
+      AsyncQueue(''),
       IntegrationTestUtil.testEnvDatabaseInfo(),
       EmptyCredentialsProvider(),
     );
@@ -135,7 +135,7 @@ void main() {
   /// [WriteStream.stop].
   test('testWriteStreamStopPartial', () async {
     final Datastore datastore = Datastore(
-      TaskScheduler(''),
+      AsyncQueue(''),
       IntegrationTestUtil.testEnvDatabaseInfo(),
       EmptyCredentialsProvider(),
     );
@@ -167,7 +167,7 @@ void main() {
   });
 
   test('testWriteStreamStop', () async {
-    final TaskScheduler scheduler = TaskScheduler('');
+    final AsyncQueue scheduler = AsyncQueue('');
     final WriteStream writeStream = await createAndOpenWriteStream(scheduler);
 
     writeStream.stop();
@@ -175,7 +175,7 @@ void main() {
   });
 
   test('testStreamClosesWhenIdle', () async {
-    final TaskScheduler scheduler = TaskScheduler('');
+    final AsyncQueue scheduler = AsyncQueue('');
     final WriteStream writeStream = await createAndOpenWriteStream(scheduler);
     writeStream.markIdle();
     expect(scheduler.getTask(TaskId.writeStreamIdle), isNotNull);
@@ -186,7 +186,7 @@ void main() {
   });
 
   test('testStreamCancelsIdleOnWrite', () async {
-    final TaskScheduler scheduler = TaskScheduler('');
+    final AsyncQueue scheduler = AsyncQueue('');
     final WriteStream writeStream = await createAndOpenWriteStream(scheduler);
 
     writeStream
@@ -197,7 +197,7 @@ void main() {
   });
 
   test('testStreamStaysIdle', () async {
-    final TaskScheduler scheduler = TaskScheduler('');
+    final AsyncQueue scheduler = AsyncQueue('');
     final WriteStream writeStream = await createAndOpenWriteStream(scheduler);
 
     writeStream //

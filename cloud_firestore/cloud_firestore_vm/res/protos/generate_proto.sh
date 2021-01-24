@@ -1,2 +1,2 @@
 #!/bin/sh
-protoc **/**.proto --dart_out=grpc:../../lib/src/proto
+protoc -- **/**.proto --dart_out=grpc:../../lib/src/proto

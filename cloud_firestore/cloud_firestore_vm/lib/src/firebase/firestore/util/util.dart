@@ -9,10 +9,12 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:grpc/grpc.dart';
 
+const int kMaxInt = 9223372036854775807;
+const int kMinInt = -9223372036854775808;
+
 const int _autoIdLength = 20;
 
-const String _autoIdAlphabet =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const String _autoIdAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 final Random rand = Random();
 
@@ -71,8 +73,7 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
     if (e is FirestoreError) {
       rethrow;
     } else {
-      return Future<void>.error(
-          FirestoreError('$e', FirestoreErrorCode.unknown), s);
+      return Future<void>.error(FirestoreError('$e', FirestoreErrorCode.unknown), s);
     }
   }
 }
@@ -82,23 +83,36 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
 ///
 /// [fieldPathOffset] is the offset of the first field path in the original update API (used as the
 /// index in error messages)
-List<Object> collectUpdateArguments(
-    int fieldPathOffset, List<Object> fieldsAndValues) {
+List<Object> collectUpdateArguments(int fieldPathOffset, List<Object> fieldsAndValues) {
   if (fieldsAndValues.length % 2 == 1) {
-    throw ArgumentError(
-        'Missing value in call to update().  There must be an even number of '
+    throw ArgumentError('Missing value in call to update().  There must be an even number of '
         'arguments that alternate between field names and values');
   }
   final List<Object> argumentList = fieldsAndValues.toList(growable: false);
   for (int i = 0; i < argumentList.length; i += 2) {
     final Object fieldPath = argumentList[i];
     if (fieldPath is! String && fieldPath is! FieldPath) {
-      throw ArgumentError(
-          'Excepted field name at argument position ${i + fieldPathOffset + 1} but '
+      throw ArgumentError('Excepted field name at argument position ${i + fieldPathOffset + 1} but '
           'got $fieldPath in call to update. The arguments to update should alternate between '
           'field names and values');
     }
   }
 
   return argumentList;
+}
+
+int compareBytes(List<int> b1, List<int> b2) {
+  final int size = min(b1.length, b2.length);
+  for (int i = 0; i < size; i++) {
+    // Make sure the bytes are unsigned
+    final int thisByte = b1[i] & 0xff;
+    final int otherByte = b2[i] & 0xff;
+    if (thisByte < otherByte) {
+      return -1;
+    } else if (thisByte > otherByte) {
+      return 1;
+    }
+    // Byte values are equal, continue with comparison
+  }
+  return b1.length.compareTo(b2.length);
 }

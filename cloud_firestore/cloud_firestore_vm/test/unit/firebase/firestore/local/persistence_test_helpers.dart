@@ -7,7 +7,7 @@ import 'dart:async';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory/memory_persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/stats_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/stats_collector.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';

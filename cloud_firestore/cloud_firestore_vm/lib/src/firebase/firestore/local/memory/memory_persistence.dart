@@ -10,20 +10,20 @@ import 'dart:typed_data';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listen_sequence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/index_manager.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/reference_delegate.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remote_document_cache.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/stats_collector.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/index_manager.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/lru_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/mutation_queue.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/reference_delegate.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/remote_document_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/target_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_collections.dart';
@@ -42,39 +42,32 @@ part 'memory_eager_reference_delegate.dart';
 part 'memory_index_manager.dart';
 part 'memory_lru_reference_delegate.dart';
 part 'memory_mutation_queue.dart';
-part 'memory_query_cache.dart';
 part 'memory_remote_document_cache.dart';
+part 'memory_target_cache.dart';
 
 class MemoryPersistence extends Persistence {
   /// Use factory constructors to instantiate
-  MemoryPersistence._(StatsCollector statsCollector)
-      : _statsCollector = statsCollector ?? StatsCollector.noOp,
-        mutationQueues = <User, MemoryMutationQueue>{},
+  MemoryPersistence._()
+      : mutationQueues = <User, MemoryMutationQueue>{},
         _semaphore = GlobalSemaphore(),
         indexManager = MemoryIndexManager() {
-    queryCache = MemoryQueryCache(this);
-    remoteDocumentCache = MemoryRemoteDocumentCache(this, _statsCollector);
+    targetCache = MemoryTargetCache(this);
+    remoteDocumentCache = MemoryRemoteDocumentCache(this);
   }
 
-  factory MemoryPersistence.createEagerGcMemoryPersistence([
-    StatsCollector statsCollector = StatsCollector.noOp,
-  ]) {
-    final MemoryPersistence persistence = MemoryPersistence._(statsCollector);
+  factory MemoryPersistence.createEagerGcMemoryPersistence() {
+    final MemoryPersistence persistence = MemoryPersistence._();
     persistence.referenceDelegate = MemoryEagerReferenceDelegate(persistence);
     return persistence;
   }
 
-  factory MemoryPersistence.createLruGcMemoryPersistence(
-      LruGarbageCollectorParams params, LocalSerializer serializer,
-      [StatsCollector statsCollector = StatsCollector.noOp]) {
-    final MemoryPersistence persistence = MemoryPersistence._(statsCollector);
-    persistence.referenceDelegate =
-        MemoryLruReferenceDelegate(persistence, params, serializer);
+  factory MemoryPersistence.createLruGcMemoryPersistence(LruGarbageCollectorParams params, LocalSerializer serializer) {
+    final MemoryPersistence persistence = MemoryPersistence._();
+    persistence.referenceDelegate = MemoryLruReferenceDelegate(persistence, params, serializer);
     return persistence;
   }
 
   final Semaphore _semaphore;
-  final StatsCollector _statsCollector;
 
   @override
   final MemoryIndexManager indexManager;
@@ -90,7 +83,7 @@ class MemoryPersistence extends Persistence {
   MemoryRemoteDocumentCache remoteDocumentCache;
 
   @override
-  MemoryQueryCache queryCache;
+  MemoryTargetCache targetCache;
 
   @override
   ReferenceDelegate referenceDelegate;
@@ -120,7 +113,7 @@ class MemoryPersistence extends Persistence {
   MutationQueue getMutationQueue(User user) {
     MemoryMutationQueue queue = mutationQueues[user];
     if (queue == null) {
-      queue = MemoryMutationQueue(this, _statsCollector);
+      queue = MemoryMutationQueue(this);
       mutationQueues[user] = queue;
     }
     return queue;
@@ -129,14 +122,12 @@ class MemoryPersistence extends Persistence {
   Iterable<MemoryMutationQueue> getMutationQueues() => mutationQueues.values;
 
   @override
-  Future<void> runTransaction(
-      String action, Transaction<void> operation) async {
+  Future<void> runTransaction(String action, Transaction<void> operation) async {
     return runTransactionAndReturn(action, operation);
   }
 
   @override
-  Future<T> runTransactionAndReturn<T>(
-      String action, Transaction<T> operation) async {
+  Future<T> runTransactionAndReturn<T>(String action, Transaction<T> operation) async {
     await _semaphore.acquire();
 
     Log.d('$runtimeType', 'Starting transaction: $action');

@@ -2,8 +2,8 @@
 //  Generated code. Do not modify.
 //  source: firebase/firestore/proto/maybe_document.proto
 //
-// @dart = 2.3
-// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
+// @dart = 2.7
+// ignore_for_file: annotate_overrides,camel_case_types,unnecessary_const,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type,unnecessary_this,prefer_final_fields
 
 import 'dart:core' as $core;
 
@@ -13,18 +13,38 @@ import '../../../google/protobuf/timestamp.pb.dart' as $4;
 import '../../../google/firestore/v1/document.pb.dart' as $1;
 
 class NoDocument extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('NoDocument', package: const $pb.PackageName('firestore.client'), createEmptyInstance: create)
-    ..aOS(1, 'name')
-    ..aOM<$4.Timestamp>(2, 'readTime', subBuilder: $4.Timestamp.create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'NoDocument', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'firestore.client'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'name')
+    ..aOM<$4.Timestamp>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'readTime', subBuilder: $4.Timestamp.create)
     ..hasRequiredFields = false
   ;
 
   NoDocument._() : super();
-  factory NoDocument() => create();
+  factory NoDocument({
+    $core.String name,
+    $4.Timestamp readTime,
+  }) {
+    final _result = create();
+    if (name != null) {
+      _result.name = name;
+    }
+    if (readTime != null) {
+      _result.readTime = readTime;
+    }
+    return _result;
+  }
   factory NoDocument.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory NoDocument.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   NoDocument clone() => NoDocument()..mergeFromMessage(this);
-  NoDocument copyWith(void Function(NoDocument) updates) => super.copyWith((message) => updates(message as NoDocument));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  NoDocument copyWith(void Function(NoDocument) updates) => super.copyWith((message) => updates(message as NoDocument)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static NoDocument create() => NoDocument._();
@@ -56,18 +76,38 @@ class NoDocument extends $pb.GeneratedMessage {
 }
 
 class UnknownDocument extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('UnknownDocument', package: const $pb.PackageName('firestore.client'), createEmptyInstance: create)
-    ..aOS(1, 'name')
-    ..aOM<$4.Timestamp>(2, 'version', subBuilder: $4.Timestamp.create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'UnknownDocument', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'firestore.client'), createEmptyInstance: create)
+    ..aOS(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'name')
+    ..aOM<$4.Timestamp>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'version', subBuilder: $4.Timestamp.create)
     ..hasRequiredFields = false
   ;
 
   UnknownDocument._() : super();
-  factory UnknownDocument() => create();
+  factory UnknownDocument({
+    $core.String name,
+    $4.Timestamp version,
+  }) {
+    final _result = create();
+    if (name != null) {
+      _result.name = name;
+    }
+    if (version != null) {
+      _result.version = version;
+    }
+    return _result;
+  }
   factory UnknownDocument.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory UnknownDocument.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   UnknownDocument clone() => UnknownDocument()..mergeFromMessage(this);
-  UnknownDocument copyWith(void Function(UnknownDocument) updates) => super.copyWith((message) => updates(message as UnknownDocument));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  UnknownDocument copyWith(void Function(UnknownDocument) updates) => super.copyWith((message) => updates(message as UnknownDocument)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static UnknownDocument create() => UnknownDocument._();
@@ -112,21 +152,49 @@ class MaybeDocument extends $pb.GeneratedMessage {
     3 : MaybeDocument_DocumentType.unknownDocument,
     0 : MaybeDocument_DocumentType.notSet
   };
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('MaybeDocument', package: const $pb.PackageName('firestore.client'), createEmptyInstance: create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'MaybeDocument', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'firestore.client'), createEmptyInstance: create)
     ..oo(0, [1, 2, 3])
-    ..aOM<NoDocument>(1, 'noDocument', subBuilder: NoDocument.create)
-    ..aOM<$1.Document>(2, 'document', subBuilder: $1.Document.create)
-    ..aOM<UnknownDocument>(3, 'unknownDocument', subBuilder: UnknownDocument.create)
-    ..aOB(4, 'hasCommittedMutations')
+    ..aOM<NoDocument>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'noDocument', subBuilder: NoDocument.create)
+    ..aOM<$1.Document>(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'document', subBuilder: $1.Document.create)
+    ..aOM<UnknownDocument>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'unknownDocument', subBuilder: UnknownDocument.create)
+    ..aOB(4, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'hasCommittedMutations')
     ..hasRequiredFields = false
   ;
 
   MaybeDocument._() : super();
-  factory MaybeDocument() => create();
+  factory MaybeDocument({
+    NoDocument noDocument,
+    $1.Document document,
+    UnknownDocument unknownDocument,
+    $core.bool hasCommittedMutations,
+  }) {
+    final _result = create();
+    if (noDocument != null) {
+      _result.noDocument = noDocument;
+    }
+    if (document != null) {
+      _result.document = document;
+    }
+    if (unknownDocument != null) {
+      _result.unknownDocument = unknownDocument;
+    }
+    if (hasCommittedMutations != null) {
+      _result.hasCommittedMutations = hasCommittedMutations;
+    }
+    return _result;
+  }
   factory MaybeDocument.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory MaybeDocument.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   MaybeDocument clone() => MaybeDocument()..mergeFromMessage(this);
-  MaybeDocument copyWith(void Function(MaybeDocument) updates) => super.copyWith((message) => updates(message as MaybeDocument));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  MaybeDocument copyWith(void Function(MaybeDocument) updates) => super.copyWith((message) => updates(message as MaybeDocument)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static MaybeDocument create() => MaybeDocument._();

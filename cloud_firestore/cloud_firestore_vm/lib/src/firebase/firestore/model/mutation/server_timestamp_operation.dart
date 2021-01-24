@@ -3,8 +3,9 @@
 // on 17/09/2018
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/server_timestamps.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart';
 
 /// Transforms a value into a server-generated timestamp.
 class ServerTimestampOperation implements TransformOperation {
@@ -12,23 +13,20 @@ class ServerTimestampOperation implements TransformOperation {
 
   const ServerTimestampOperation._();
 
-  static const ServerTimestampOperation sharedInstance =
-      ServerTimestampOperation._();
+  static const ServerTimestampOperation sharedInstance = ServerTimestampOperation._();
 
   @override
-  FieldValue applyToLocalView(
-      FieldValue previousValue, Timestamp localWriteTime) {
-    return ServerTimestampValue(localWriteTime, previousValue);
+  Value applyToLocalView(Value previousValue, Timestamp localWriteTime) {
+    return ServerTimestamps.valueOf(localWriteTime, previousValue);
   }
 
   @override
-  FieldValue applyToRemoteDocument(
-      FieldValue previousValue, FieldValue transformResult) {
+  Value applyToRemoteDocument(Value previousValue, Value transformResult) {
     return transformResult;
   }
 
   @override
-  FieldValue computeBaseValue(FieldValue currentValue) {
+  Value computeBaseValue(Value currentValue) {
     // Server timestamps are idempotent and don't require a base value.
     return null;
   }

@@ -14,7 +14,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/user_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_view_changes.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
@@ -255,8 +255,8 @@ void testEquality(List<List<int>> equalityGroups) {
   }
 }
 
-QueryData queryData(int targetId, QueryPurpose queryPurpose, String path) {
-  return QueryData(
+TargetData queryData(int targetId, QueryPurpose queryPurpose, String path) {
+  return TargetData(
       query(path), targetId, arbitrarySequenceNumber, queryPurpose);
 }
 
@@ -314,22 +314,22 @@ TargetChange ackTarget([List<Document> docs]) {
       current: true);
 }
 
-Map<int, QueryData> activeQueries([List<int> targets = const <int>[]]) {
+Map<int, TargetData> activeQueries([List<int> targets = const <int>[]]) {
   final Query theQuery = query('foo');
-  final Map<int, QueryData> listenMap = <int, QueryData>{};
+  final Map<int, TargetData> listenMap = <int, TargetData>{};
   for (int targetId in targets) {
-    final QueryData queryData = QueryData(
+    final TargetData queryData = TargetData(
         theQuery, targetId, arbitrarySequenceNumber, QueryPurpose.listen);
     listenMap[targetId] = queryData;
   }
   return listenMap;
 }
 
-Map<int, QueryData> activeLimboQueries(String docKey, Iterable<int> targets) {
+Map<int, TargetData> activeLimboQueries(String docKey, Iterable<int> targets) {
   final Query theQuery = query(docKey);
-  final Map<int, QueryData> listenMap = <int, QueryData>{};
+  final Map<int, TargetData> listenMap = <int, TargetData>{};
   for (int targetId in targets) {
-    final QueryData queryData = QueryData(theQuery, targetId,
+    final TargetData queryData = TargetData(theQuery, targetId,
         arbitrarySequenceNumber, QueryPurpose.limboResolution);
     listenMap[targetId] = queryData;
   }
@@ -343,7 +343,7 @@ RemoteEvent addedRemoteEvent(MaybeDocument doc, List<int> updatedInTargets,
   final WatchChangeAggregator aggregator =
       WatchChangeAggregator(TargetMetadataProvider(
     getRemoteKeysForTarget: (int targetId) => DocumentKey.emptyKeySet,
-    getQueryDataForTarget: (int targetId) =>
+    getTargetDataForTarget: (int targetId) =>
         queryData(targetId, QueryPurpose.listen, doc.key.toString()),
   ))
         ..handleDocumentChange(change);
@@ -360,7 +360,7 @@ RemoteEvent updateRemoteEvent(
     getRemoteKeysForTarget: (int targetId) {
       return DocumentKey.emptyKeySet.insert(doc.key);
     },
-    getQueryDataForTarget: (int targetId) {
+    getTargetDataForTarget: (int targetId) {
       final bool isLimbo = !(updatedInTargets.contains(targetId) ||
           removedFromTargets.contains(targetId));
       final QueryPurpose purpose =

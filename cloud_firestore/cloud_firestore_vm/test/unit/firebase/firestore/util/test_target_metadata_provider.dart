@@ -3,7 +3,7 @@
 // on 22/03/2020
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_aggregator.dart';
 import 'package:meta/meta.dart';
@@ -11,7 +11,7 @@ import 'package:meta/meta.dart';
 TestTargetMetadataProvider get testTargetMetadataProvider {
   final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys =
       <int, ImmutableSortedSet<DocumentKey>>{};
-  final Map<int, QueryData> queryDataMap = <int, QueryData>{};
+  final Map<int, TargetData> queryDataMap = <int, TargetData>{};
 
   return TestTargetMetadataProvider(
     syncedKeys,
@@ -33,19 +33,19 @@ class TestTargetMetadataProvider extends TargetMetadataProvider {
           ImmutableSortedSet<DocumentKey> Function(int targetId)
               getRemoteKeysForTarget,
       @required
-          QueryData Function(int targetId) getQueryDataForTarget})
+          TargetData Function(int targetId) getQueryDataForTarget})
       : super(
           getRemoteKeysForTarget: getRemoteKeysForTarget,
-          getQueryDataForTarget: getQueryDataForTarget,
+          getTargetDataForTarget: getQueryDataForTarget,
         );
 
   final Map<int, ImmutableSortedSet<DocumentKey>> syncedKeys;
 
-  final Map<int, QueryData> queryDataMap;
+  final Map<int, TargetData> queryDataMap;
 
   /// Sets or replaces the local state for the provided query data.
   void setSyncedKeys(
-      QueryData queryData, ImmutableSortedSet<DocumentKey> keys) {
+      TargetData queryData, ImmutableSortedSet<DocumentKey> keys) {
     queryDataMap[queryData.targetId] = queryData;
     syncedKeys[queryData.targetId] = keys;
   }

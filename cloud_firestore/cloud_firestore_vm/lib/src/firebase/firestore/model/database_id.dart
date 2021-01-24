@@ -2,6 +2,9 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+
 class DatabaseId implements Comparable<DatabaseId> {
   const DatabaseId._(this.projectId, this.databaseId);
 
@@ -11,6 +14,16 @@ class DatabaseId implements Comparable<DatabaseId> {
 
   factory DatabaseId.forDatabase(String projectId, String databaseId) {
     return DatabaseId._(projectId, databaseId);
+  }
+
+  /// Returns a DatabaseId from a fully qualified resource name.
+  factory DatabaseId.fromName(String name) {
+    final ResourcePath resourceName = ResourcePath.fromString(name);
+    hardAssert(
+      resourceName.length >= 3 && resourceName[0] == 'projects' && resourceName[2] == 'databases',
+      'Tried to parse an invalid resource name: $resourceName',
+    );
+    return DatabaseId._(resourceName[1], resourceName[3]);
   }
 
   static const String defaultDatabaseId = '(default)';

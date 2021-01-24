@@ -6,11 +6,9 @@ part of memory_persistence;
 
 /// Provides LRU garbage collection functionality for [MemoryPersistence].
 class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
-  MemoryLruReferenceDelegate(
-      this.persistence, LruGarbageCollectorParams params, this.serializer)
+  MemoryLruReferenceDelegate(this.persistence, LruGarbageCollectorParams params, this.serializer)
       : orphanedSequenceNumbers = <DocumentKey, int>{},
-        listenSequence =
-            ListenSequence(persistence.queryCache.highestListenSequenceNumber),
+        listenSequence = ListenSequence(persistence.targetCache.highestListenSequenceNumber),
         _currentSequenceNumber = ListenSequence.invalid {
     garbageCollector = LruGarbageCollector(this, params);
   }
@@ -30,15 +28,14 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
-    hardAssert(_currentSequenceNumber == ListenSequence.invalid,
-        'Starting a transaction without committing the previous one');
+    hardAssert(
+        _currentSequenceNumber == ListenSequence.invalid, 'Starting a transaction without committing the previous one');
     _currentSequenceNumber = listenSequence.next;
   }
 
   @override
   Future<void> onTransactionCommitted() async {
-    hardAssert(_currentSequenceNumber != ListenSequence.invalid,
-        'Committing a transaction without having started one');
+    hardAssert(_currentSequenceNumber != ListenSequence.invalid, 'Committing a transaction without having started one');
     _currentSequenceNumber = ListenSequence.invalid;
   }
 
@@ -50,22 +47,20 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<void> forEachTarget(Consumer<QueryData> consumer) async {
-    await persistence.queryCache.forEachTarget(consumer);
+  Future<void> forEachTarget(Consumer<TargetData> consumer) async {
+    await persistence.targetCache.forEachTarget(consumer);
   }
 
   @override
   Future<int> getSequenceNumberCount() async {
-    final int targetCount = persistence.queryCache.targetCount;
+    final int targetCount = persistence.targetCache.targetCount;
     int orphanedCount = 0;
-    await forEachOrphanedDocumentSequenceNumber(
-        (int sequenceNumber) => orphanedCount++);
+    await forEachOrphanedDocumentSequenceNumber((int sequenceNumber) => orphanedCount++);
     return targetCount + orphanedCount;
   }
 
   @override
-  Future<void> forEachOrphanedDocumentSequenceNumber(
-      Consumer<int> consumer) async {
+  Future<void> forEachOrphanedDocumentSequenceNumber(Consumer<int> consumer) async {
     for (MapEntry<DocumentKey, int> entry in orphanedSequenceNumbers.entries) {
       // Pass in the exact sequence number as the upper bound so we know it won't be pinned by being too recent.
       final bool isPinned = await _isPinned(entry.key, entry.value);
@@ -77,15 +72,15 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<int> removeTargets(int upperBound, Set<int> activeTargetIds) async {
-    return persistence.queryCache.removeQueries(upperBound, activeTargetIds);
+    return persistence.targetCache.removeQueries(upperBound, activeTargetIds);
   }
 
   @override
   Future<int> removeOrphanedDocuments(int upperBound) async {
     int count = 0;
     final MemoryRemoteDocumentCache cache = persistence.remoteDocumentCache;
-    for (MapEntry<DocumentKey, MaybeDocument> entry in cache.documents) {
-      final DocumentKey key = entry.key;
+    for (MaybeDocument doc in cache.documents) {
+      final DocumentKey key = doc.key;
       if (!(await _isPinned(key, upperBound))) {
         await cache.remove(key);
         orphanedSequenceNumbers.remove(key);
@@ -101,13 +96,9 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   @override
-  Future<void> removeTarget(QueryData queryData) async {
-    final QueryData updated = queryData.copyWith(
-      snapshotVersion: queryData.snapshotVersion,
-      resumeToken: queryData.resumeToken,
-      sequenceNumber: currentSequenceNumber,
-    );
-    await persistence.queryCache.updateQueryData(updated);
+  Future<void> removeTarget(TargetData targetData) async {
+    final TargetData updated = targetData.copyWith(sequenceNumber: currentSequenceNumber);
+    await persistence.targetCache.updateTargetData(updated);
   }
 
   @override
@@ -145,7 +136,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       return true;
     }
 
-    if (await persistence.queryCache.containsKey(key)) {
+    if (await persistence.targetCache.containsKey(key)) {
       return true;
     }
 
@@ -158,7 +149,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
     // Note that this method is only used for testing because this delegate is only used for testing. The algorithm here
     // (loop through everything, serialize it and count bytes) is inefficient and inexact, but won't run in production.
     int count = 0;
-    count += persistence.queryCache.getByteSize(serializer);
+    count += persistence.targetCache.getByteSize(serializer);
     count += persistence.remoteDocumentCache.getByteSize(serializer);
     for (MemoryMutationQueue queue in persistence.getMutationQueues()) {
       count += queue.getByteSize(serializer);

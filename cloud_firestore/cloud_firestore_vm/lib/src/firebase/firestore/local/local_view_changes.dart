@@ -13,15 +13,13 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dar
 /// These changes are sent to the [LocalStore] by the [View] (via the [SyncEngine]) and are used to
 /// pin / unpin documents as appropriate.
 class LocalViewChanges {
-  const LocalViewChanges(this.targetId, this.added, this.removed);
+  const LocalViewChanges(this.targetId, this.fromCache, this.added, this.removed);
 
-  factory LocalViewChanges.fromViewSnapshot(
-      int targetId, ViewSnapshot snapshot) {
-    ImmutableSortedSet<DocumentKey> addedKeys = ImmutableSortedSet<DocumentKey>(
-        <DocumentKey>[], DocumentKey.comparator);
+  factory LocalViewChanges.fromViewSnapshot(int targetId, ViewSnapshot snapshot) {
+    ImmutableSortedSet<DocumentKey> addedKeys =
+        ImmutableSortedSet<DocumentKey>(<DocumentKey>[], DocumentKey.comparator);
     ImmutableSortedSet<DocumentKey> removedKeys =
-        ImmutableSortedSet<DocumentKey>(
-            <DocumentKey>[], DocumentKey.comparator);
+        ImmutableSortedSet<DocumentKey>(<DocumentKey>[], DocumentKey.comparator);
 
     for (DocumentViewChange docChange in snapshot.changes) {
       if (docChange.type == DocumentViewChangeType.added) {
@@ -33,10 +31,11 @@ class LocalViewChanges {
       }
     }
 
-    return LocalViewChanges(targetId, addedKeys, removedKeys);
+    return LocalViewChanges(targetId, snapshot.isFromCache, addedKeys, removedKeys);
   }
 
   final int targetId;
+  final bool fromCache;
   final ImmutableSortedSet<DocumentKey> added;
   final ImmutableSortedSet<DocumentKey> removed;
 }

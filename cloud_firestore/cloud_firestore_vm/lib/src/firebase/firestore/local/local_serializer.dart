@@ -4,18 +4,18 @@
 
 import 'dart:typed_data';
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistence/target_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/object_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/unknown_document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
@@ -37,7 +37,7 @@ class LocalSerializer {
         ..hasCommittedMutations = document.hasCommittedMutations;
     } else if (document is Document) {
       builder
-        ..document = document.proto ?? _encodeDocument(document)
+        ..document = _encodeDocument(document)
         ..hasCommittedMutations = document.hasCommittedMutations;
     } else if (document is UnknownDocument) {
       builder
@@ -66,13 +66,9 @@ class LocalSerializer {
   /// Encodes a Document for local storage. This differs from the v1 RPC serializer for Documents in that it preserves
   /// the updateTime, which is considered an output only value by the server.
   proto.Document _encodeDocument(Document document) {
-    final proto.Document builder = proto.Document.create()
-      ..name = rpcSerializer.encodeKey(document.key);
-
-    final ObjectValue value = document.data;
-    for (MapEntry<String, FieldValue> entry in value.internalValue) {
-      builder.fields[entry.key] = rpcSerializer.encodeValue(entry.value);
-    }
+    final proto.Document builder = proto.Document.create() //
+      ..name = rpcSerializer.encodeKey(document.key)
+      ..fields.addAll(document.data.fields);
 
     final Timestamp updateTime = document.version.timestamp;
     builder.updateTime = rpcSerializer.encodeTimestamp(updateTime);
@@ -80,20 +76,15 @@ class LocalSerializer {
   }
 
   /// Decodes a Document proto to the equivalent model.
-  Document _decodeDocument(
-      proto.Document document, bool hasCommittedMutations) {
+  Document _decodeDocument(proto.Document document, bool hasCommittedMutations) {
     final DocumentKey key = rpcSerializer.decodeKey(document.name);
 
-    final SnapshotVersion version =
-        rpcSerializer.decodeVersion(document.updateTime);
-    return Document.fromProto(
+    final SnapshotVersion version = rpcSerializer.decodeVersion(document.updateTime);
+    return Document(
       key,
       version,
-      hasCommittedMutations
-          ? DocumentState.committedMutations
-          : DocumentState.synced,
-      document,
-      rpcSerializer.decodeValue,
+      ObjectValue.fromMap(document.fields),
+      hasCommittedMutations ? DocumentState.committedMutations : DocumentState.synced,
     );
   }
 
@@ -106,12 +97,10 @@ class LocalSerializer {
   }
 
   /// Decodes a NoDocument proto to the equivalent model.
-  NoDocument _decodeNoDocument(
-      proto.NoDocument proto, bool hasCommittedMutations) {
+  NoDocument _decodeNoDocument(proto.NoDocument proto, bool hasCommittedMutations) {
     final DocumentKey key = rpcSerializer.decodeKey(proto.name);
     final SnapshotVersion version = rpcSerializer.decodeVersion(proto.readTime);
-    return NoDocument(key, version,
-        hasCommittedMutations: hasCommittedMutations);
+    return NoDocument(key, version, hasCommittedMutations: hasCommittedMutations);
   }
 
   /// Encodes a [UnknownDocument] value to the equivalent proto.
@@ -147,73 +136,97 @@ class LocalSerializer {
   /// Decodes a [WriteBatch] proto into a MutationBatch model. */
   MutationBatch decodeMutationBatch(proto.WriteBatch batch) {
     final int batchId = batch.batchId;
-    final Timestamp localWriteTime =
-        rpcSerializer.decodeTimestamp(batch.localWriteTime);
+    final Timestamp localWriteTime = rpcSerializer.decodeTimestamp(batch.localWriteTime);
 
     final int baseMutationsCount = batch.baseWrites.length;
     final List<Mutation> baseMutations = List<Mutation>(baseMutationsCount);
     for (int i = 0; i < baseMutationsCount; i++) {
       baseMutations[i] = rpcSerializer.decodeMutation(batch.baseWrites[i]);
     }
-    final int mutationsCount = batch.writes.length;
-    final List<Mutation> mutations = List<Mutation>(mutationsCount);
-    for (int i = 0; i < mutationsCount; i++) {
-      mutations[i] = rpcSerializer.decodeMutation(batch.writes[i]);
+    final List<Mutation> mutations = <Mutation>[];
+    // Squash old transform mutations into existing patch or set mutations. The replacement of
+    // representing `transforms` with `update_transforms` on the SDK means that old `transform`
+    // mutations stored in IndexedDB need to be updated to `update_transforms`.
+    // TODO(b/174608374): Remove this code once we perform a schema migration.
+    for (int i = batch.writes.length - 1; i >= 0; --i) {
+      final proto.Write mutation = batch.writes[i];
+      if (mutation.hasTransform()) {
+        hardAssert(
+          i >= 1 && !batch.writes[i - 1].hasTransform() && batch.writes[i - 1].hasUpdate(),
+          'TransformMutation should be preceded by a patch or set mutation',
+        );
+        final proto.Write newMutationBuilder = batch.writes[i - 1].toBuilder();
+        newMutationBuilder.updateTransforms.addAll(mutation.transform.fieldTransforms);
+
+        mutations.add(rpcSerializer.decodeMutation(newMutationBuilder.freeze()));
+        --i;
+      } else {
+        mutations.add(rpcSerializer.decodeMutation(mutation));
+      }
     }
+
     return MutationBatch(
       batchId: batchId,
       localWriteTime: localWriteTime,
       baseMutations: baseMutations,
-      mutations: mutations,
+      // Reverse the mutations to preserve the original ordering since the above for-loop iterates in
+      // reverse order. We use reverse() instead of prepending the elements into the mutations array
+      // since prepending to a List is O(n).
+      mutations: mutations.reversed.toList(),
     );
   }
 
-  proto.Target encodeQueryData(QueryData queryData) {
+  proto.Target encodeTargetData(TargetData targetData) {
     hardAssert(
-        queryData.purpose == QueryPurpose.listen,
-        'Only queries with purpose ${QueryPurpose.listen} '
-        'may be stored, got ${queryData.purpose}');
+      targetData.purpose == QueryPurpose.listen,
+      'Only queries with purpose ${QueryPurpose.listen} may be stored, got ${targetData.purpose}',
+    );
 
     final proto.Target result = proto.Target.create()
-      ..targetId = queryData.targetId
-      ..lastListenSequenceNumber = Int64(queryData.sequenceNumber)
-      ..snapshotVersion = rpcSerializer.encodeVersion(queryData.snapshotVersion)
-      ..resumeToken = queryData.resumeToken;
+      ..targetId = targetData.targetId
+      ..lastListenSequenceNumber = Int64(targetData.sequenceNumber)
+      ..lastLimboFreeSnapshotVersion = rpcSerializer.encodeVersion(targetData.lastLimboFreeSnapshotVersion)
+      ..snapshotVersion = rpcSerializer.encodeVersion(targetData.snapshotVersion)
+      ..resumeToken = targetData.resumeToken;
 
-    final Query query = queryData.query;
-    if (query.isDocumentQuery) {
-      result.documents = rpcSerializer.encodeDocumentsTarget(query);
+    final Target target = targetData.target;
+    if (target.isDocumentQuery) {
+      result.documents = rpcSerializer.encodeDocumentsTarget(target);
     } else {
-      result.query = rpcSerializer.encodeQueryTarget(query);
+      result.query = rpcSerializer.encodeQueryTarget(target);
     }
 
     return result..freeze();
   }
 
-  QueryData decodeQueryData(proto.Target target) {
-    final int targetId = target.targetId;
+  TargetData decodeTargetData(proto.Target targetProto) {
+    final int targetId = targetProto.targetId;
 
-    final SnapshotVersion version =
-        rpcSerializer.decodeVersion(target.snapshotVersion);
-    final Uint8List resumeToken = Uint8List.fromList(target.resumeToken);
-    final int sequenceNumber = target.lastListenSequenceNumber.toInt();
+    final SnapshotVersion version = rpcSerializer.decodeVersion(targetProto.snapshotVersion);
+    final SnapshotVersion lastLimboFreeSnapshotVersion =
+        rpcSerializer.decodeVersion(targetProto.lastLimboFreeSnapshotVersion);
+    final Uint8List resumeToken = Uint8List.fromList(targetProto.resumeToken);
+    final int sequenceNumber = targetProto.lastListenSequenceNumber.toInt();
 
-    Query query;
-
-    if (target.hasDocuments()) {
-      query = rpcSerializer.decodeDocumentsTarget(target.documents);
-    } else if (target.hasQuery()) {
-      query = rpcSerializer.decodeQueryTarget(target.query);
-    } else {
-      throw fail('Unknown targetType $target}');
+    Target target;
+    switch (targetProto.whichTargetType()) {
+      case proto.Target_TargetType.documents:
+        target = rpcSerializer.decodeDocumentsTarget(targetProto.documents);
+        break;
+      case proto.Target_TargetType.query:
+        target = rpcSerializer.decodeQueryTarget(targetProto.query);
+        break;
+      default:
+        throw fail('Unknown targetType $targetProto}');
     }
 
-    return QueryData(
-      query,
+    return TargetData(
+      target,
       targetId,
       sequenceNumber,
       QueryPurpose.listen,
       version,
+      lastLimboFreeSnapshotVersion,
       resumeToken,
     );
   }

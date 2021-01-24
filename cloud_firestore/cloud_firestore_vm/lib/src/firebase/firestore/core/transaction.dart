@@ -12,20 +12,21 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.d
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/delete_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/verify_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// Internal transaction object responsible for accumulating the mutations to
 /// perform and the base versions for any documents read.
 class Transaction {
-  Transaction(this._transactionClient)
+  Transaction(this._datastore)
       : readVersions = <DocumentKey, SnapshotVersion>{},
         mutations = <Mutation>[],
         committed = false;
 
-  final TransactionClient _transactionClient;
+  final Datastore _datastore;
   final Map<DocumentKey, SnapshotVersion> readVersions;
   final List<Mutation> mutations;
 
@@ -46,12 +47,11 @@ class Transaction {
     _ensureCommitNotCalled();
 
     if (mutations.isNotEmpty) {
-      return Future<List<MaybeDocument>>.error(FirestoreError(
-          'Transactions lookups are invalid after writes.',
-          FirestoreErrorCode.invalidArgument));
+      return Future<List<MaybeDocument>>.error(
+          FirestoreError('Transactions lookups are invalid after writes.', FirestoreErrorCode.invalidArgument));
     }
 
-    final List<MaybeDocument> result = await _transactionClient.lookup(keys);
+    final List<MaybeDocument> result = await _datastore.lookup(keys);
     result.forEach(_recordVersion);
     return result;
   }
@@ -59,7 +59,7 @@ class Transaction {
   /// Stores a set mutation for the given key and value, to be committed when
   /// [commit] is called.
   void set(DocumentKey key, UserDataParsedSetData data) {
-    _write(data.toMutationList(key, _precondition(key)));
+    _write(<Mutation>[data.toMutation(key, _precondition(key))]);
     writtenDocs.add(key);
   }
 
@@ -67,7 +67,7 @@ class Transaction {
   /// when [commit] is called.
   void update(DocumentKey key, UserDataParsedUpdateData data) {
     try {
-      _write(data.toMutationList(key, _preconditionForUpdate(key)));
+      _write(<Mutation>[data.toMutation(key, _preconditionForUpdate(key))]);
     } on FirestoreError catch (e) {
       _lastWriteError = e;
     }
@@ -91,14 +91,13 @@ class Transaction {
     for (Mutation mutation in mutations) {
       unwritten.remove(mutation.key);
     }
-    if (unwritten.isNotEmpty) {
-      return Future<void>.error(FirestoreError(
-          'Every document read in a transaction must also be written.',
-          FirestoreErrorCode.invalidArgument));
+    // For each document that was read but not written to, we want to perform a `verify` operation.
+    for (DocumentKey key in unwritten) {
+      mutations.add(VerifyMutation(key, _precondition(key)));
     }
     committed = true;
 
-    return _transactionClient.commit(mutations);
+    return _datastore.commit(mutations);
   }
 
   void _recordVersion(MaybeDocument doc) {
@@ -117,9 +116,7 @@ class Transaction {
       final SnapshotVersion existingVersion = readVersions[doc.key];
       if (existingVersion != doc.version) {
         // This transaction will fail no matter what.
-        throw FirestoreError(
-            'Document version changed between two reads.',
-            FirestoreErrorCode.aborted);
+        throw FirestoreError('Document version changed between two reads.', FirestoreErrorCode.aborted);
       }
     } else {
       readVersions[doc.key] = docVersion;
@@ -156,9 +153,7 @@ class Transaction {
         //
         // Note: this can change once we can send separate verify writes in the
         // transaction.
-        throw FirestoreError(
-            "Can't update a document that doesn't exist.",
-            FirestoreErrorCode.invalidArgument);
+        throw FirestoreError("Can't update a document that doesn't exist.", FirestoreErrorCode.invalidArgument);
       }
       // Document exists, base precondition on document update time.
       return Precondition(updateTime: version);
@@ -177,7 +172,6 @@ class Transaction {
   }
 
   void _ensureCommitNotCalled() {
-    hardAssert(!committed,
-        'A transaction object cannot be used after its update callback has been invoked.');
+    hardAssert(!committed, 'A transaction object cannot be used after its update callback has been invoked.');
   }
 }

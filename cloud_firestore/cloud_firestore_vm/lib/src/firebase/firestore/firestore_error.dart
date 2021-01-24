@@ -29,8 +29,8 @@ class FirestoreErrorCode {
   static const FirestoreErrorCode dataLoss = FirestoreErrorCode._(15);
   static const FirestoreErrorCode unauthenticated = FirestoreErrorCode._(16);
 
-  static FirestoreErrorCode fromValue(GrpcError error) {
-    return values[error.code];
+  static FirestoreErrorCode fromValue(GrpcError code) {
+    return values[code.code];
   }
 
   static const List<FirestoreErrorCode> values = <FirestoreErrorCode>[
@@ -82,8 +82,7 @@ class FirestoreError extends FirebaseError {
     String message,
     this.code, [
     this.cause,
-    StackTrace stackTrance,
-  ]) : super(message, stackTrance) {
+  ]) : super(message) {
     Preconditions.checkNotNull(message);
     Preconditions.checkNotNull(code);
   }

@@ -2,7 +2,6 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-
 /// Controls the return value for server timestamps that have not yet been set to their final value.
 enum ServerTimestampBehavior {
   /// Return 'null' for [FieldValue.serverTimestampServerTimestamps] that have not yet been set to

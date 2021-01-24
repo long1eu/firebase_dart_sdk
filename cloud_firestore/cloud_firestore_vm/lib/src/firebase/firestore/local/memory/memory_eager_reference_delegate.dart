@@ -34,12 +34,12 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   }
 
   @override
-  Future<void> removeTarget(QueryData queryData) async {
-    final MemoryQueryCache queryCache = persistence.queryCache;
-    (await queryCache.getMatchingKeysForTargetId(queryData.targetId))
-        .forEach(orphanedDocuments.add);
-
-    await queryCache.removeQueryData(queryData);
+  Future<void> removeTarget(TargetData queryData) async {
+    final MemoryTargetCache targetCache = persistence.targetCache;
+    await targetCache //
+        .getMatchingKeysForTargetId(queryData.targetId)
+        .then(orphanedDocuments.addAll);
+    await targetCache.removeTargetData(queryData);
   }
 
   @override
@@ -50,8 +50,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   /// In eager garbage collection, collection is run on transaction commit.
   @override
   Future<void> onTransactionCommitted() async {
-    final MemoryRemoteDocumentCache remoteDocuments =
-        persistence.remoteDocumentCache;
+    final MemoryRemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
 
     for (DocumentKey key in orphanedDocuments) {
       final bool isReferenced = await _isReferenced(key);
@@ -83,7 +82,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
 
   /// Returns true if the given document is referenced by anything.
   Future<bool> _isReferenced(DocumentKey key) async {
-    final bool containsKey = await persistence.queryCache.containsKey(key);
+    final bool containsKey = await persistence.targetCache.containsKey(key);
     if (containsKey) {
       return true;
     }

@@ -2,29 +2,53 @@
 //  Generated code. Do not modify.
 //  source: google/rpc/status.proto
 //
-// @dart = 2.3
-// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
+// @dart = 2.7
+// ignore_for_file: annotate_overrides,camel_case_types,unnecessary_const,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type,unnecessary_this,prefer_final_fields
 
 import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import '../protobuf/any.pb.dart' as $10;
+import '../protobuf/any.pb.dart' as $11;
 
 class Status extends $pb.GeneratedMessage {
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo('Status', package: const $pb.PackageName('google.rpc'), createEmptyInstance: create)
-    ..a<$core.int>(1, 'code', $pb.PbFieldType.O3)
-    ..aOS(2, 'message')
-    ..pc<$10.Any>(3, 'details', $pb.PbFieldType.PM, subBuilder: $10.Any.create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'Status', package: const $pb.PackageName(const $core.bool.fromEnvironment('protobuf.omit_message_names') ? '' : 'google.rpc'), createEmptyInstance: create)
+    ..a<$core.int>(1, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'code', $pb.PbFieldType.O3)
+    ..aOS(2, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'message')
+    ..pc<$11.Any>(3, const $core.bool.fromEnvironment('protobuf.omit_field_names') ? '' : 'details', $pb.PbFieldType.PM, subBuilder: $11.Any.create)
     ..hasRequiredFields = false
   ;
 
   Status._() : super();
-  factory Status() => create();
+  factory Status({
+    $core.int code,
+    $core.String message,
+    $core.Iterable<$11.Any> details,
+  }) {
+    final _result = create();
+    if (code != null) {
+      _result.code = code;
+    }
+    if (message != null) {
+      _result.message = message;
+    }
+    if (details != null) {
+      _result.details.addAll(details);
+    }
+    return _result;
+  }
   factory Status.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory Status.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
   Status clone() => Status()..mergeFromMessage(this);
-  Status copyWith(void Function(Status) updates) => super.copyWith((message) => updates(message as Status));
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  Status copyWith(void Function(Status) updates) => super.copyWith((message) => updates(message as Status)); // ignore: deprecated_member_use
   $pb.BuilderInfo get info_ => _i;
   @$core.pragma('dart2js:noInline')
   static Status create() => Status._();
@@ -53,6 +77,6 @@ class Status extends $pb.GeneratedMessage {
   void clearMessage() => clearField(2);
 
   @$pb.TagNumber(3)
-  $core.List<$10.Any> get details => $_getList(2);
+  $core.List<$11.Any> get details => $_getList(2);
 }
 
