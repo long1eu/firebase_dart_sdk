@@ -1,6 +1,6 @@
 # Firebase Core
 
-Dart implementation of the Firebase Core API, which enables connecting to multiple Firebase apps.
+Dart implementation of the Firebase C   ore API, which enables connecting to multiple Firebase apps.
 
 *Note*: This library is still under development, and some APIs might not be available yet or work correctly. 
 Please feel free to open an issue [here](https://github.com/fluttercommunity/firebase_flutter_sdk/issues) or even a
@@ -164,4 +164,4 @@ functionality will be provided by the corresponding `FirebaseAuth` instance. If 
 to null.
 
 All Firebase services can work with the default implementation. However it is a good idea to provide your own based on 
-the application that you are trying to use. You can find a good example [here](https://github.com/fluttercommunity/firebase_dart_sdk/blob/develop/firebase_auth/firebase_auth_vm/example/flutter/lib/platform_dependencies.dart).  
+the application that you are trying to use. You can find a good example [here](https://github.com/fluttercommunity/firebase_dart_sdk/blob/develop/firebase_auth/firebase_auth_vm/example/flutter/lib/platform_dependencies.dart).

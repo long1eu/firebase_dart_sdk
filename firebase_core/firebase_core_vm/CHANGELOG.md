@@ -1,3 +1,7 @@
+## 0.0.9
+
+- add heart beat support
+
 ## 0.0.8
 
 - add firebase_platform_dependencies in the example app

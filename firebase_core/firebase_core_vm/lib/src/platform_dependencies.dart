@@ -6,16 +6,16 @@ import 'dart:async';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:hive/hive.dart';
+import 'package:path/path.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// This class should provide services that Firebase depends on and are platform
 /// specific.
-class PlatformDependencies implements LocalStorage {
-  final Map<String, String> _map = <String, String>{};
-
+class PlatformDependencies with LocalStoreMixin implements LocalStorage {
   /// A storage box that can save key/value pair that persists restarts.
   ///
   /// It is recommended that you use an encrypted box.
+  @override
   Box<String> get box => null;
 
   /// This stream should emit true then the app enters in background and false
@@ -43,32 +43,6 @@ class PlatformDependencies implements LocalStorage {
   /// this field. Firebase Auth SDK automatically registers as
   /// [InternalTokenProvider] if null is set.
   InternalTokenProvider get authProvider => null;
-
-  @override
-  String get(String key) {
-    if (box != null) {
-      return box.get(key);
-    } else {
-      return _map[key];
-    }
-  }
-
-  @override
-  Future<void> set(String key, String value) async {
-    if (value == null) {
-      if (box != null) {
-        await box.delete(key);
-      } else {
-        _map.remove(key);
-      }
-    } else {
-      if (box != null) {
-        await box.put(key, value);
-      } else {
-        _map[key] = value;
-      }
-    }
-  }
 }
 
 // todo(long1eu): implement a version of this that supports `userAccessGroup` on iOS
@@ -76,15 +50,108 @@ class PlatformDependencies implements LocalStorage {
 abstract class LocalStorage {
   const LocalStorage();
 
+  Future<LocalStorage> getStore(String key);
+
+  /// Returns all the keys saved by this store
+  Set<String> get keys;
+
   /// Gets the values at [key], or null if none found.
-  String get(String key);
+  dynamic get(String key);
 
   /// Saves the value at [key].
   ///
   /// When a null value is provided the implementation should remove the value if one exists.
-  Future<void> set(String key, String value);
+  Future<void> set(String key, dynamic value);
 }
 
 /// Signature used to retrieved platform specific headers for every request made
 /// by Firebase services.
 typedef HeaderBuilder = Future<Map<String, String>> Function();
+
+mixin LocalStoreMixin implements LocalStorage {
+  Box<String> get box;
+
+  LocalStorage _store;
+
+  LocalStorage get store {
+    if (_store != null) {
+      return _store;
+    }
+    if (box != null) {
+      _store = _HiveLocalStorage(box);
+    } else {
+      _store = _MemoryLocalStorage();
+    }
+    return _store;
+  }
+
+  @override
+  Future<LocalStorage> getStore(String key) => store.getStore(key);
+
+  @override
+  Set<String> get keys => store.keys;
+
+  @override
+  String get(String key) => store.get(key);
+
+  @override
+  Future<void> set(String key, dynamic value) => store.set(key, value);
+}
+
+class _MemoryLocalStorage implements LocalStorage {
+  _MemoryLocalStorage([Map<String, dynamic> map]) : _map = map ?? <String, dynamic>{};
+
+  final Map<String, dynamic> _map;
+
+  @override
+  Future<LocalStorage> getStore(String key) {
+    return Future<LocalStorage>.value(_MemoryLocalStorage());
+  }
+
+  @override
+  Set<String> get keys {
+    return _map.keys.toSet();
+  }
+
+  @override
+  dynamic get(String key) {
+    return _map[key];
+  }
+
+  @override
+  Future<void> set(String key, dynamic value) async {
+    if (value == null) {
+      _map.remove(key);
+    } else {
+      _map[key] = value;
+    }
+  }
+}
+
+class _HiveLocalStorage implements LocalStorage {
+  _HiveLocalStorage(Box<dynamic> box) : _box = box ?? <String, dynamic>{};
+
+  final Box<dynamic> _box;
+
+  @override
+  Future<LocalStorage> getStore(String key) async {
+    final String name = basenameWithoutExtension(_box.path);
+    final Box<dynamic> box = await Hive.openBox<dynamic>('$name-$key');
+    return _HiveLocalStorage(box);
+  }
+
+  @override
+  Set<String> get keys => _box.keys.toSet();
+
+  @override
+  dynamic get(String key) => _box.get(key);
+
+  @override
+  Future<void> set(String key, dynamic value) async {
+    if (value == null) {
+      await _box.delete(key);
+    } else {
+      await _box.put(key, value);
+    }
+  }
+}
