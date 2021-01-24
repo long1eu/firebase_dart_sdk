@@ -1,3 +1,7 @@
+## 0.0.10
+
+- add user agent publisher
+
 ## 0.0.9
 
 - add heart beat support
