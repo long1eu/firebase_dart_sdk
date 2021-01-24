@@ -1,5 +1,7 @@
-## 0.0.2+1
+## 0.0.3
+- add unionWith to sorted set to mirror Web SDK.
 
+## 0.0.2+1
 - constrain test, collection, meta dependency
 
 ## 0.0.2

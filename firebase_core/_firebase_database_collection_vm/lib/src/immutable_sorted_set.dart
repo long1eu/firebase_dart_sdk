@@ -33,6 +33,22 @@ class ImmutableSortedSet<T> extends Iterable<T> {
     return ImmutableSortedSet<T>._(_map.insert(entry, null));
   }
 
+  ImmutableSortedSet<T> unionWith(ImmutableSortedSet<T> other) {
+    ImmutableSortedSet<T> result = this;
+
+    // Make sure `result` always refers to the larger one of the two sets.
+    if (result.length < other.length) {
+      result = other;
+      other = this;
+    }
+
+    for (T elem in other) {
+      result = result.insert(elem);
+    }
+
+    return result;
+  }
+
   T get minEntry => _map.minKey;
 
   T get maxEntry => _map.maxKey;
@@ -70,10 +86,7 @@ class ImmutableSortedSet<T> extends Iterable<T> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ImmutableSortedSet &&
-          runtimeType == other.runtimeType &&
-          _map == other._map;
+      identical(this, other) || other is ImmutableSortedSet && runtimeType == other.runtimeType && _map == other._map;
 
   @override
   int get hashCode => _map.hashCode;
