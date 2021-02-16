@@ -14,9 +14,9 @@ import 'heart_beat_result.dart';
 /// This also exposes functions to store and retrieve [HeartBeatInfo] in the form of
 /// [HeartBeatResult].
 abstract class HeartBeatInfo {
-  HeartBeat getHeartBeatCode(String heartBeatTag);
+  HeartBeat getHeartBeatCode(String heartBeatKey);
 
-  Future<void> storeHeartBeatInfo(String heartBeatTag);
+  Future<void> storeHeartBeatInfo(String heartBeatKey);
 
   Future<List<HeartBeatResult>> getAndClearStoredHeartBeatInfo();
 }

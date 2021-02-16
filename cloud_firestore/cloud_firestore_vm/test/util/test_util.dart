@@ -39,7 +39,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_aggregator.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_converter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_writer.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
@@ -73,7 +73,7 @@ final Map<String, Object> emptyMap = <String, Object>{};
 
 FieldValue wrap(Object value) {
   final DatabaseId databaseId = DatabaseId.forProject('project');
-  final UserDataConverter dataConverter = UserDataConverter(databaseId);
+  final UserDataWriter dataConverter = UserDataWriter(databaseId);
   // HACK: We use parseQueryValue() since it accepts scalars as well as
   // arrays / objects, and our tests currently use wrap() pretty generically
   // so we don't know the intent.
@@ -408,8 +408,8 @@ DeleteMutation deleteMutation(String path) {
 /// use dotted-notation for nested fields (i.e. { 'foo.bar': FieldValue.foo() } and must not contain any non-sentinel
 /// data.
 TransformMutation transformMutation(String path, Map<String, Object> data) {
-  final UserDataConverter dataConverter =
-      UserDataConverter(DatabaseId.forProject('project'));
+  final UserDataWriter dataConverter =
+      UserDataWriter(DatabaseId.forProject('project'));
   final UserDataParsedUpdateData result = dataConverter.parseUpdateData(data);
 
   // The order of the transforms doesn't matter, but we sort them so tests can

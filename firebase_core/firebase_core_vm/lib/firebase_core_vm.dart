@@ -12,4 +12,7 @@ export 'src/heart_beat/heart_beat_info.dart';
 export 'src/heart_beat/heart_beat_info_storage.dart';
 export 'src/heart_beat/heart_beat_result.dart';
 export 'src/heart_beat/sdk_heart_beat_result.dart';
+export 'src/platform/global_library_version_registrar.dart';
+export 'src/platform/library_version.dart';
+export 'src/platform/user_agent_publiser.dart';
 export 'src/platform_js.dart' if (dart.library.io) 'src/platform_io.dart';

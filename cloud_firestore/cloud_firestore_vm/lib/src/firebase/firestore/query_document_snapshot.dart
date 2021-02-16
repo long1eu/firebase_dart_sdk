@@ -18,7 +18,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 /// contain only existing documents, the [exists] method will always return true and [data] will
 /// never be null.
 ///
-/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
+/// **Subclassing Note**: Cloud Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class QueryDocumentSnapshot extends DocumentSnapshot {

@@ -23,7 +23,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/transaction.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_converter.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_reader.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_writer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/async_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
@@ -38,13 +39,13 @@ import 'package:meta/meta.dart';
 class Firestore {
   @visibleForTesting
   Firestore(this.databaseId, this.firebaseApp, this.client, this._scheduler)
-      : userDataReader = UserDataConverter(databaseId);
+      : userDataReader = UserDataReader(databaseId);
 
   static const String _tag = 'FirebaseFirestore';
 
   final DatabaseId databaseId;
   final FirebaseApp firebaseApp;
-  final UserDataConverter userDataReader;
+  final UserDataReader userDataReader;
   final FirestoreClient client;
   final AsyncQueue _scheduler;
 
@@ -212,7 +213,7 @@ class Firestore {
       return updateFunction(Transaction(internalTransaction, this));
     }
 
-    return client.transaction(wrappedUpdateFunction, 5);
+    return client.transaction(wrappedUpdateFunction);
   }
 
   /// Creates a write batch, used for performing multiple writes as a single

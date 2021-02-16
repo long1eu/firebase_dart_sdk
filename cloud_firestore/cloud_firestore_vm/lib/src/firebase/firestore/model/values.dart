@@ -23,7 +23,7 @@ final Value NULL_VALUE = Value(nullValue: NullValue.NULL_VALUE);
 /// support server timestamps.
 const int TYPE_ORDER_NULL = 0;
 
-const int TYPE_ORDER_bool = 1;
+const int TYPE_ORDER_BOOL = 1;
 const int TYPE_ORDER_NUMBER = 2;
 const int TYPE_ORDER_TIMESTAMP = 3;
 const int TYPE_ORDER_SERVER_TIMESTAMP = 4;
@@ -40,7 +40,7 @@ int typeOrder(Value value) {
     case Value_ValueType.nullValue:
       return TYPE_ORDER_NULL;
     case Value_ValueType.booleanValue:
-      return TYPE_ORDER_bool;
+      return TYPE_ORDER_BOOL;
     case Value_ValueType.integerValue:
       return TYPE_ORDER_NUMBER;
     case Value_ValueType.doubleValue:
@@ -161,7 +161,7 @@ int compare(Value left, Value right) {
   switch (leftType) {
     case TYPE_ORDER_NULL:
       return 0;
-    case TYPE_ORDER_bool:
+    case TYPE_ORDER_BOOL:
       return compareBools(left.booleanValue, right.booleanValue);
     case TYPE_ORDER_NUMBER:
       return _compareNumbers(left, right);

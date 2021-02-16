@@ -24,10 +24,10 @@ class SetOptions {
       : merge = true,
         fieldMask = null;
 
-  /// Changes the behavior of set() calls to only replace the fields under [fieldPaths]. Any field
-  /// that is not specified in [fieldPaths] is ignored and remains untouched.
+  /// Changes the behavior of [set] calls to only replace the given [fields]. Any field
+  /// that is not specified in [fields] is ignored and remains untouched.
   ///
-  /// It is an error to pass a [SetOptions] object to a set() call that is missing a value for any
+  /// It is an error to pass a [SetOptions] object to a [set] call that is missing a value for any
   /// of the fields specified here.
   ///
   /// [fields] the list of fields to merge. Fields can contain dots to reference nested fields
@@ -40,10 +40,10 @@ class SetOptions {
     return SetOptions._(true, FieldMask(fieldPaths));
   }
 
-  /// Changes the behavior of set() calls to only replace the fields under [fieldPaths]. Any field
+  /// Changes the behavior of [set] calls to only replace the given [fields]. Any field
   /// that is not specified in [fieldPaths] is ignored and remains untouched.
   ///
-  /// It is an error to pass a SetOptions object to a set() call that is missing a value for any of
+  /// It is an error to pass a SetOptions object to a [set] call that is missing a value for any of
   /// the fields specified here in its to data argument.
   factory SetOptions.mergeFieldPaths(List<FieldPath> fields) {
     final Set<model.FieldPath> fieldPaths =

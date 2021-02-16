@@ -51,7 +51,7 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
   /// be in the list as added changes.
   ///
-  /// [metadataChanges] Indicates whether metadata-only changes (i.e. only [Query.metadata] changed) should be included.
+  /// [metadataChanges] Indicates whether metadata-only changes (i.e. only [DocumentSnapshot.metadata] changed) should be included.
   ///
   /// Returns the list of document changes since the last snapshot.
   List<DocumentChange> getDocumentChanges(MetadataChanges metadataChanges) {
