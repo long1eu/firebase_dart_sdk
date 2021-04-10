@@ -131,7 +131,7 @@ Future<Map<String, dynamic>> _exchangeCode({
   @required String codeVerifier,
 }) async {
   final Response response = await post(
-    exchangeEndpoint,
+    Uri.parse(exchangeEndpoint),
     body: json.encode(<String, String>{
       'code': code,
       'codeVerifier': codeVerifier,

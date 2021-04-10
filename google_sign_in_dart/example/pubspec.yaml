@@ -7,12 +7,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^0.12.2
+  http: ^0.13.1
   url_launcher: ^5.5.0
-  googleapis: ^0.55.0
-  extension_google_sign_in_as_googleapis_auth: ^1.0.0
+  googleapis: ^2.0.0
+  googleapis_auth: ^1.1.0
+  extension_google_sign_in_as_googleapis_auth: ^2.0.2
 
-  google_sign_in: ^4.5.3
+  google_sign_in: ^5.0.1
   google_sign_in_dartio:
     path: ../
 

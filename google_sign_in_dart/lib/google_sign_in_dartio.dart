@@ -234,7 +234,7 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
   Future<void> _revokeToken() async {
     if (_haveValidToken) {
       await get(
-        'https://oauth2.googleapis.com/revoke?token=${_tokenData.accessToken}',
+        Uri.parse('https://oauth2.googleapis.com/revoke?token=${_tokenData.accessToken}'),
         headers: <String, String>{
           'content-type': 'application/x-www-form-urlencoded'
         },
@@ -246,7 +246,7 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     if (_haveValidToken) {
       final String token = _tokenData.accessToken;
       final Response response = await get(
-        'https://openidconnect.googleapis.com/v1/userinfo',
+        Uri.parse('https://openidconnect.googleapis.com/v1/userinfo'),
         headers: <String, String>{
           'Authorization': 'Bearer $token',
         },
@@ -311,7 +311,7 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     assert(_refreshToken != null);
 
     final Response response = await post(
-      _exchangeEndpoint,
+      Uri.parse(_exchangeEndpoint),
       body: json.encode(<String, String>{
         'refreshToken': _refreshToken,
         'clientId': _clientId,

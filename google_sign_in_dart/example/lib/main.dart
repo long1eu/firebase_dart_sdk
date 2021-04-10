@@ -9,18 +9,21 @@ import 'dart:convert';
 
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:html_unescape/html_unescape.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
 import 'package:googleapis/gmail/v1.dart';
 import 'package:googleapis/people/v1.dart';
-import 'package:googleapis_auth/auth.dart';
 
 import 'platform_js.dart' if (dart.library.io) 'platform_io.dart';
 
-GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: <String>['email', 'profile', PeopleApi.ContactsReadonlyScope]);
+GoogleSignIn _googleSignIn = GoogleSignIn(scopes: <String>[
+  'email',
+  'profile',
+  PeopleServiceApi.contactsReadonlyScope
+]);
 
 Future<void> main() async {
   if (isDesktop) {
@@ -70,8 +73,8 @@ class SignInDemoState extends State<SignInDemo> {
   Future<void> _handleGetContact() async {
     setState(() => _contactText = 'Loading contact info...');
 
-    final PeopleConnectionsResourceApi connectionsApi =
-        PeopleApi(_client).people.connections;
+    final PeopleConnectionsResource connectionsApi =
+        PeopleServiceApi(_client).people.connections;
 
     final ListConnectionsResponse listResult = await connectionsApi.list(
       'people/me',
@@ -108,7 +111,7 @@ class SignInDemoState extends State<SignInDemo> {
     setState(() => _emailText = 'Loading emails...');
 
     final bool granted = await _googleSignIn
-        .requestScopes(<String>[GmailApi.GmailReadonlyScope]);
+        .requestScopes(<String>[GmailApi.gmailReadonlyScope]);
 
     if (!granted) {
       setState(() => _emailText = 'Gmail scope was not granted by the user.');
@@ -116,8 +119,7 @@ class SignInDemoState extends State<SignInDemo> {
     }
 
     _client = await _googleSignIn.authenticatedClient();
-    final UsersMessagesResourceApi messagesApi =
-        GmailApi(_client).users.messages;
+    final UsersMessagesResource messagesApi = GmailApi(_client).users.messages;
 
     final ListMessagesResponse listResult = await messagesApi.list('me');
 
