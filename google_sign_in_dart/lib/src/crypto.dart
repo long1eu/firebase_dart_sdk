@@ -13,10 +13,8 @@ const String _charset =
 /// See "Proof Key for Code Exchange by OAuth Public Clients (RFC 7636)
 /// <https://tools.ietf.org/html/rfc7636>"
 String _generateSecureRandomString(
-    [Random entropySource, int entropyBytes = 64]) {
+    [Random? entropySource, int entropyBytes = 64]) {
   entropySource ??= Random.secure();
-  assert(entropySource != null, 'entropySource cannot be null');
-  assert(entropyBytes != null, 'entropyBytes cannot be null');
 
   final StringBuffer buffer = StringBuffer();
   int remainingLength = entropyBytes;

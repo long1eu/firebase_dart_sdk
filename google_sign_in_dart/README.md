@@ -17,24 +17,19 @@ mainly used on Desktop.
 1. Run `flutter pub get`
 1. Import
     ```dart
-    import 'package:google_sign_in/google_sign_in.dart';
     import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
     ```        
 1. Register the package
-    ```dart 
-    import 'package:flutter/material.dart';
-    import 'package:google_sign_in/google_sign_in.dart';
-    import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
-    
-    void main() {
+    ```dart
+    Future<void> main() async {
       if (isDesktop) {
-        GoogleSignInPlatform.register(clientId: <clientId>);
+        await GoogleSignInDart.register(clientId: <clientId>);
       }
     
       runApp(MyApp());
     }
     ``` 
-    Note: You might want to `await` for the `register` method to finish before calling any `GoogleSignIn` methods when your app starts.  
+    Note: You should ensure the `register` method completes before calling any `GoogleSignIn` methods when your app starts. 
 
 ###  Usage
 You can use the normal `GoogleSignIn` methods.
@@ -54,12 +49,11 @@ keep the user logged in, you need to deploy a oAuth code exchange endpoint. Once
 the package like this. 
 
     import 'package:flutter/material.dart';
-    import 'package:google_sign_in/google_sign_in.dart';
     import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
     
-    void main() {
+    Future<void> main() async {
       if (isDesktop) {
-        GoogleSignInPlatform.register(
+        await GoogleSignInDart.register(
             clientId: <clientId>, 
             exchangeEndpoint: <endpoint>,
         );
