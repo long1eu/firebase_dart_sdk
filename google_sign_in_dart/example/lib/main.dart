@@ -5,17 +5,16 @@
 // ignore_for_file: public_member_api_docs
 
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:googleapis_auth/googleapis_auth.dart';
-import 'package:html_unescape/html_unescape.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_dartio/google_sign_in_dartio.dart';
 import 'package:googleapis/gmail/v1.dart';
 import 'package:googleapis/people/v1.dart';
+import 'package:googleapis_auth/googleapis_auth.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 import 'platform_js.dart' if (dart.library.io) 'platform_io.dart';
 
