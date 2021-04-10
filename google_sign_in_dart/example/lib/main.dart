@@ -178,7 +178,7 @@ class SignInDemoState extends State<SignInDemo> {
                 children: <Widget>[
                   const Text('You are not currently signed in.'),
                   const SizedBox(height: 16.0),
-                  RaisedButton(
+                  ElevatedButton(
                     onPressed: _handleSignIn,
                     child: const Text('SIGN IN'),
                   ),
@@ -223,18 +223,18 @@ class SignInDemoState extends State<SignInDemo> {
                 ),
               ButtonBar(
                 children: <Widget>[
-                  FlatButton(
+                  TextButton(
                     onPressed: _handleSignOut,
                     child: const Text('SIGN OUT'),
                   ),
-                  FlatButton(
+                  TextButton(
                     onPressed: () {
                       _handleGetContact();
                       _handleGetEmail();
                     },
                     child: const Text('REFRESH'),
                   ),
-                  FlatButton(
+                  TextButton(
                     onPressed: _handleGetEmail,
                     child: const Text('ADD GMAIL SCOPE'),
                   ),
