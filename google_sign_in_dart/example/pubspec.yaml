@@ -1,6 +1,9 @@
 name: google_sign_in_dart_example
 description: Example app for google_sign_in_dart
 
+environment:
+  sdk: ">=2.8.0 <3.0.0"
+
 dependencies:
   flutter:
     sdk: flutter
