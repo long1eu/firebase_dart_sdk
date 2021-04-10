@@ -10,18 +10,13 @@ part of '../google_sign_in_dartio.dart';
 /// Once the auth code comes back it make a post to [exchangeEndpoint] for
 /// to obtain the access and refresh tokens.
 Future<Map<String, dynamic>> _codeExchangeSignIn({
-  @required String clientId,
-  @required String exchangeEndpoint,
-  @required String scope,
-  @required UrlPresenter presenter,
-  String hostedDomains,
-  String uid,
+  required String clientId,
+  required String exchangeEndpoint,
+  required String scope,
+  required UrlPresenter presenter,
+  String? hostedDomains,
+  String? uid,
 }) async {
-  assert(clientId != null);
-  assert(exchangeEndpoint != null);
-  assert(presenter != null);
-  assert(scope != null);
-
   final Completer<Map<String, dynamic>> completer =
       Completer<Map<String, dynamic>>();
 
@@ -84,18 +79,18 @@ Future<Map<String, dynamic>> _codeExchangeSignIn({
 }
 
 Future<Map<String, dynamic>> _validateAndExchangeCodeResponse({
-  @required HttpRequest request,
-  @required String state,
-  @required String exchangeEndpoint,
-  @required String redirectUrl,
-  @required String clientId,
-  @required String codeVerifier,
+  required HttpRequest request,
+  required String state,
+  required String exchangeEndpoint,
+  required String redirectUrl,
+  required String clientId,
+  required String codeVerifier,
 }) {
   final Map<String, String> authResponse = request.requestedUri.queryParameters;
-  final String returnedState = authResponse['state'];
-  final String code = authResponse['code'];
+  final String? returnedState = authResponse['state'];
+  final String? code = authResponse['code'];
 
-  String message;
+  String? message;
   if (state != returnedState) {
     message = 'Invalid response from server (state did not match).';
   }
@@ -124,15 +119,15 @@ Future<Map<String, dynamic>> _validateAndExchangeCodeResponse({
 }
 
 Future<Map<String, dynamic>> _exchangeCode({
-  @required String exchangeEndpoint,
-  @required String redirectUrl,
-  @required String clientId,
-  @required String code,
-  @required String codeVerifier,
+  required String exchangeEndpoint,
+  required String redirectUrl,
+  required String clientId,
+  required String? code,
+  required String codeVerifier,
 }) async {
   final Response response = await post(
     Uri.parse(exchangeEndpoint),
-    body: json.encode(<String, String>{
+    body: json.encode(<String, String?>{
       'code': code,
       'codeVerifier': codeVerifier,
       'clientId': clientId,

@@ -6,6 +6,7 @@
 
 import 'dart:async';
 
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -48,11 +49,11 @@ class SignInDemo extends StatefulWidget {
 }
 
 class SignInDemoState extends State<SignInDemo> {
-  StreamSubscription<GoogleSignInAccount> sub;
-  AuthClient _client;
-  GoogleSignInAccount _currentUser;
-  String _contactText;
-  String _emailText;
+  late StreamSubscription<GoogleSignInAccount?> sub;
+  AuthClient? _client;
+  GoogleSignInAccount? _currentUser;
+  String? _contactText;
+  String? _emailText;
 
   @override
   void initState() {
@@ -61,7 +62,7 @@ class SignInDemoState extends State<SignInDemo> {
     _googleSignIn.signInSilently();
   }
 
-  Future<void> _onUserChanged(GoogleSignInAccount account) async {
+  Future<void> _onUserChanged(GoogleSignInAccount? account) async {
     setState(() => _currentUser = account);
     if (_currentUser != null) {
       _client = await _googleSignIn.authenticatedClient();
@@ -73,26 +74,25 @@ class SignInDemoState extends State<SignInDemo> {
     setState(() => _contactText = 'Loading contact info...');
 
     final PeopleConnectionsResource connectionsApi =
-        PeopleServiceApi(_client).people.connections;
+        PeopleServiceApi(_client!).people.connections;
 
     final ListConnectionsResponse listResult = await connectionsApi.list(
       'people/me',
       requestMask_includeField: 'person.names',
     );
 
-    String contact;
-    final List<Person> connections = listResult.connections;
+    String? contact;
+    final List<Person>? connections = listResult.connections;
     if (connections != null && connections.isNotEmpty) {
       connections.shuffle();
-      final Person person = connections.firstWhere(
+      final Person? person = connections.firstWhereOrNull(
         (Person person) =>
-            person.names.any((Name name) => name.displayName != null),
-        orElse: () => null,
+            person.names!.any((Name name) => name.displayName != null),
       );
 
       if (person != null) {
         final Name name =
-            person.names.firstWhere((Name name) => name.displayName != null);
+            person.names!.firstWhere((Name name) => name.displayName != null);
         contact = name.displayName;
       }
     }
@@ -118,15 +118,15 @@ class SignInDemoState extends State<SignInDemo> {
     }
 
     _client = await _googleSignIn.authenticatedClient();
-    final UsersMessagesResource messagesApi = GmailApi(_client).users.messages;
+    final UsersMessagesResource messagesApi = GmailApi(_client!).users.messages;
 
     final ListMessagesResponse listResult = await messagesApi.list('me');
 
-    String messageSnippet;
-    if (listResult.messages != null && listResult.messages.isNotEmpty) {
-      for (Message message in listResult.messages..shuffle()) {
-        message = await messagesApi.get('me', message.id, format: 'FULL');
-        final String snippet = message.snippet;
+    String? messageSnippet;
+    if (listResult.messages != null && listResult.messages!.isNotEmpty) {
+      for (Message message in listResult.messages!..shuffle()) {
+        message = await messagesApi.get('me', message.id!, format: 'FULL');
+        final String? snippet = message.snippet;
         if (snippet != null && snippet.trim().isNotEmpty) {
           messageSnippet = HtmlUnescape().convert(snippet);
           break;
@@ -191,21 +191,21 @@ class SignInDemoState extends State<SignInDemo> {
               ListTile(
                 leading: kIsWeb
                     ? GoogleUserCircleAvatar(
-                        identity: _currentUser,
+                        identity: _currentUser!,
                       )
                     : ClipOval(
                         child: Image.network(
-                          _currentUser.photoUrl ??
+                          _currentUser!.photoUrl ??
                               'https://lh3.googleusercontent.com/a/default-user=s160-c',
                         ),
                       ),
-                title: Text(_currentUser.displayName ?? ''),
-                subtitle: Text(_currentUser.email ?? ''),
+                title: Text(_currentUser!.displayName ?? ''),
+                subtitle: Text(_currentUser!.email),
               ),
               if (_contactText != null)
                 ListTile(
                   title: Text(
-                    _contactText,
+                    _contactText!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -214,7 +214,7 @@ class SignInDemoState extends State<SignInDemo> {
               if (_emailText != null)
                 ListTile(
                   title: Text(
-                    _emailText,
+                    _emailText!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

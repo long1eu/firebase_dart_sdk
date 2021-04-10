@@ -10,16 +10,12 @@ part of '../google_sign_in_dartio.dart';
 /// Using this implementation will not provide a refresh token, that means that
 /// the user will need to login again after the access token expires (~1 hour)
 Future<Map<String, dynamic>> _tokenSignIn({
-  @required String clientId,
-  @required String scope,
-  @required UrlPresenter presenter,
-  String hostedDomains,
-  String uid,
+  required String clientId,
+  required String scope,
+  required UrlPresenter presenter,
+  String? hostedDomains,
+  String? uid,
 }) async {
-  assert(presenter != null);
-  assert(clientId != null);
-  assert(scope != null);
-
   final Completer<Map<String, dynamic>> completer =
       Completer<Map<String, dynamic>>();
 
@@ -76,11 +72,11 @@ Future<Map<String, dynamic>> _tokenSignIn({
 Future<Map<String, String>> _validateTokenResponse(
     HttpRequest request, String state) async {
   final Map<String, String> authResponse = request.requestedUri.queryParameters;
-  final String returnedState = authResponse['state'];
-  final String accessToken = authResponse['access_token'];
-  final String idToken = authResponse['id_token'];
+  final String? returnedState = authResponse['state'];
+  final String? accessToken = authResponse['access_token'];
+  final String? idToken = authResponse['id_token'];
 
-  String message;
+  String? message;
   if (state != returnedState) {
     message = 'Invalid response from server (state did not match).';
   }
