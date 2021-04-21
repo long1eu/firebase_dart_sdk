@@ -34,13 +34,17 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     @required String clientId,
     @required UrlPresenter presenter,
     String exchangeEndpoint,
+    String successUrl,
+    String failUrl,
   })  : assert(storage != null),
         assert(clientId != null),
         assert(presenter != null),
         _storage = storage,
         _clientId = clientId,
         _presenter = presenter,
-        _exchangeEndpoint = exchangeEndpoint;
+        _exchangeEndpoint = exchangeEndpoint,
+        _successUrl = successUrl,
+        _failUrl = failUrl;
 
   /// Registers this implementation as default implementation for GoogleSignIn
   ///
@@ -52,6 +56,8 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     String exchangeEndpoint,
     DataStorage storage,
     UrlPresenter presenter,
+    String successUrl,
+    String failUrl,
   }) async {
     presenter ??= (Uri uri) => launch(uri.toString());
 
@@ -72,16 +78,19 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     }
 
     platform.GoogleSignInPlatform.instance = GoogleSignInDart._(
-      presenter: presenter,
-      storage: storage,
-      exchangeEndpoint: exchangeEndpoint,
-      clientId: clientId,
-    );
+        presenter: presenter,
+        storage: storage,
+        exchangeEndpoint: exchangeEndpoint,
+        clientId: clientId,
+        successUrl: successUrl,
+        failUrl: failUrl);
   }
 
   final String _exchangeEndpoint;
   final String _clientId;
   final DataStorage _storage;
+  final String _successUrl;
+  final String _failUrl;
 
   UrlPresenter _presenter;
   List<String> _scopes;
@@ -253,7 +262,7 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
       );
 
       if (response.statusCode > 300) {
-        if (response.statusCode == 401){
+        if (response.statusCode == 401) {
           await signOut();
         }
         throw PlatformException(
@@ -289,6 +298,8 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
         hostedDomains: _hostedDomain,
         presenter: presenter,
         uid: _storage.id,
+        successUrl: _successUrl ?? '',
+        failUrl: _failUrl ?? '',
       );
     }
 
