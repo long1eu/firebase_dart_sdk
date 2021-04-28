@@ -78,12 +78,13 @@ class GoogleSignInDart extends platform.GoogleSignInPlatform {
     }
 
     platform.GoogleSignInPlatform.instance = GoogleSignInDart._(
-        presenter: presenter,
-        storage: storage,
-        exchangeEndpoint: exchangeEndpoint,
-        clientId: clientId,
-        successUrl: successUrl,
-        failUrl: failUrl);
+      presenter: presenter,
+      storage: storage,
+      exchangeEndpoint: exchangeEndpoint,
+      clientId: clientId,
+      successUrl: successUrl,
+      failUrl: failUrl,
+    );
   }
 
   final String _exchangeEndpoint;
