@@ -155,8 +155,8 @@ class FirestoreSettings {
       throw ArgumentError.value(
           sslEnabled,
           'sslEnabled',
-          "You can't turn off SSL for the production host '$defaultHost'; "
-              "set a different 'host' (for example with withEmulator) first");
+          "You can't set the 'sslEnabled' setting unless you also set a "
+              "non-default 'host'.");
     }
     return sslEnabled;
   }
