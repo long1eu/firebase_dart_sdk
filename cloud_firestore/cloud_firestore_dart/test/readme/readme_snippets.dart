@@ -239,8 +239,8 @@ Future<void> migrationGuideLine143() async {
 Future<void> migrationGuideLine172() async {
 }
 
-// ../../docs/migrating_from_vm_packages.md:233
-Future<void> migrationGuideLine233() async {
+// ../../docs/migrating_from_vm_packages.md:252
+Future<void> migrationGuideLine252() async {
   final QuerySnapshot<Map<String, Object?>> result = await firestore
       .collection('users')
       .where(FieldPath.documentIdField, isEqualTo: 'ada')
@@ -251,20 +251,20 @@ Future<void> migrationGuideLine233() async {
   await firestore.terminate();
 }
 
-// ../../docs/migrating_from_vm_packages.md:264
-Future<void> migrationGuideLine264() async {
+// ../../docs/migrating_from_vm_packages.md:283
+Future<void> migrationGuideLine283() async {
   final DocumentReference<Map<String, Object?>> ref =
       firestore.collection('users').doc('ada');
   final DocumentSnapshot<Map<String, Object?>> snapshot = await ref.get();
 }
 
-// ../../docs/migrating_from_vm_packages.md:298
-Future<void> migrationGuideLine298() async {
+// ../../docs/migrating_from_vm_packages.md:317
+Future<void> migrationGuideLine317() async {
   print('${firestore.projectId} / ${firestore.databaseName}');
 }
 
-// ../../docs/migrating_from_vm_packages.md:321
-Future<void> migrationGuideLine321() async {
+// ../../docs/migrating_from_vm_packages.md:340
+Future<void> migrationGuideLine340() async {
     final configRef = firestore.doc('config/plans');
     final userRef = users.doc('ada');
     await firestore.runTransaction<void>((Transaction tx) async {
@@ -273,10 +273,20 @@ Future<void> migrationGuideLine321() async {
     });
 }
 
-// ../../docs/migrating_from_vm_packages.md:333
-Future<void> migrationGuideLine333() async {
+// ../../docs/migrating_from_vm_packages.md:352
+Future<void> migrationGuideLine352() async {
     await firestore.runTransaction<void>(
       (Transaction tx) async {},
       options: TransactionOptions(maxAttempts: 6),
     );
+}
+
+// ../../docs/migrating_from_vm_packages.md:375
+Future<void> migrationGuideLine375() async {
+    await firestore.terminate();
+    try {
+      await users.doc('ada').get();
+    } on FirestoreError catch (e) {
+      print(e.code == FirestoreErrorCode.failedPrecondition); // true
+    }
 }

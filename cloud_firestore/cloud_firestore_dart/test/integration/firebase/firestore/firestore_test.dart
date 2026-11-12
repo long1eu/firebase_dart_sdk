@@ -1227,8 +1227,8 @@ void main() {
   test('testClientCallsAfterShutdownFails', () async {
     final Firestore firestore = await testFirestore();
     await firestore.shutdown();
-    expectError(
-        firestore.disableNetwork, 'The client has already been shutdown');
+    await expectError(
+        firestore.disableNetwork, 'The client has already been terminated.');
   });
 
   test('testUpdateWithEmptyObjectReplacesAllFields', () async {
@@ -1297,7 +1297,7 @@ void main() {
 
     await instance.terminate();
 
-    const String expectedMessage = 'The client has already been shutdown';
+    const String expectedMessage = 'The client has already been terminated.';
     await expectErrorContaining(reference.get, expectedMessage);
     await expectErrorContaining(
         () => reference.update(<String, Object?>{'Field': 1}), expectedMessage);
@@ -1321,7 +1321,7 @@ void main() {
 
     await instance.terminate();
 
-    const String expectedMessage = 'The client has already been shutdown';
+    const String expectedMessage = 'The client has already been terminated.';
     await expectErrorContaining(reference.get, expectedMessage);
 
     // Calling a second time should go through and change nothing.

@@ -81,18 +81,26 @@ class FirestoreMultiDbComponent {
   Future<Firestore> get(String databaseName, OpenDatabase? openDatabase) {
     final String key = keyFor(app.name, databaseName);
     final Firestore? existing = instances[key];
-    if (existing != null) {
+    if (existing != null && identical(existing.firebaseApp, app)) {
       return Future<Firestore>.value(existing);
     }
 
-    return _pending[key] ??= Firestore.newInstance(
-      app,
-      databaseName,
-      authProvider: authProvider,
-      appCheckProvider: appCheckProvider,
-      openDatabase: openDatabase,
-      settings: settings,
-    ).whenComplete(() {
+    Future<Firestore> create() => Firestore.newInstance(
+          app,
+          databaseName,
+          authProvider: authProvider,
+          appCheckProvider: appCheckProvider,
+          openDatabase: openDatabase,
+          settings: settings,
+        );
+
+    return _pending[key] ??= (existing == null
+            ? create()
+            // The instance of another FirebaseApp object with the same name: app names are unique among live apps,
+            // so that app was deleted and its delete event (which is delivered asynchronously) has not terminated
+            // the instance yet. Terminate it before the new instance opens the same persistence.
+            : existing.terminate().then((_) => create()))
+        .whenComplete(() {
       // Not an arrow: remove() returns this very future, which whenComplete
       // would then wait for.
       _pending.remove(key);

@@ -195,10 +195,29 @@ class MyDatabase implements Database {
 A complete implementation on top of `package:sqlite3` that you can copy is
 [`example/sqlite_database.dart`](../cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart).
 
+### An existing cache file is kept
+
 The database name passed to the opener is built the same way as in 0.0.7
 (`firestore.<app name>.<project id>.<database>`), so an opener that maps names to files the same
-way finds the existing cache. The schema version went from 8 to 9; the migration runs through
-your opener's `onUpgrade` callback on the first open.
+way finds the existing cache. 0.0.7 wrote schema version 8; the first open with the new package
+runs the newer migrations through your opener's `onUpgrade` callback (it must call it when the
+stored `user_version` is lower than the requested one, see the contract on `OpenDatabase`).
+
+After the upgrade:
+
+- Cached documents, including known-deleted ones, are read as before.
+- Listen targets are reused. The canonical id that identifies a query in the cache has the same
+  format as in 0.0.7, so listening to a query again finds its stored target with its resume token
+  and the backend only sends what changed since. Nothing is orphaned.
+- Pending writes that were not sent yet are kept and sent. 0.0.7 stored field transforms
+  (`serverTimestamp`, `increment`, array union and remove) as a separate write after the set or
+  update; those are folded into the write they belong to when the batch is loaded.
+- Collection group queries keep working (the collection parents index is kept).
+
+This is tested with a schema 8 database built from the 0.0.7 sources
+(`test/unit/firebase/firestore/local/legacy_cache_upgrade_test.dart`; the file was reconstructed
+from the sources, 0.0.7 itself does not run on Dart 3). Going back to 0.0.7 on an upgraded file
+is not supported.
 
 `ConflictAlgorithm` is no longer exported; nothing in the SDK used it.
 
@@ -348,6 +367,20 @@ print('${firestore.projectId} / ${firestore.databaseName}');
   converted when they are loaded.
 - **Locally changed documents** have no version until the backend acknowledges the write. This
   is not visible through the public API.
+- **Using an instance after `terminate()`** fails with a `FirestoreError` with the code
+  `failedPrecondition` ("The client has already been terminated."), delivered through the
+  returned `Future` or `Stream`. 0.0.7 threw an `ArgumentError` ("The client has already been
+  shutdown"). Code that caught `ArgumentError` for this has to catch `FirestoreError`:
+
+  ```dart
+  await firestore.terminate();
+  try {
+    await users.doc('ada').get();
+  } on FirestoreError catch (e) {
+    print(e.code == FirestoreErrorCode.failedPrecondition); // true
+  }
+  ```
+
 - **`Timestamp.fromDate` / `toDate`** keep microseconds (they truncated to milliseconds).
   Results for millisecond inputs are unchanged.
 

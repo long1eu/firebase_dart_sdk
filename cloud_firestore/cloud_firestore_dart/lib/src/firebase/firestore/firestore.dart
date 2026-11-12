@@ -333,7 +333,16 @@ class Firestore {
     }
 
     controller = StreamController<void>(
-      onListen: () => client.addSnapshotsInSyncListener(listener),
+      // A terminated instance fails the listen: report it on the stream.
+      onListen: () => client
+          .addSnapshotsInSyncListener(listener)
+          .catchError((Object error, StackTrace stackTrace) {
+        if (!controller.isClosed) {
+          controller
+            ..addError(error, stackTrace)
+            ..close();
+        }
+      }),
       onCancel: () => client.removeSnapshotsInSyncListener(listener),
     );
     return controller.stream;
@@ -347,6 +356,10 @@ class Firestore {
   /// Termination does not cancel any pending writes and any tasks that are awaiting a response from the server will
   /// not be resolved. The next time you start an instance, it will resume attempting to send these writes to the
   /// server.
+  ///
+  /// Every operation on a terminated instance fails with a [FirestoreError] with the code
+  /// [FirestoreErrorCode.failedPrecondition], delivered through the returned future or stream. Calling [terminate]
+  /// again does nothing.
   ///
   /// Note: Under normal circumstances, calling [terminate] is not required. This method is useful only when you want
   /// to force this instance to release all of its resources.

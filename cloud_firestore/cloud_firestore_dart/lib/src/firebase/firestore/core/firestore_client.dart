@@ -145,7 +145,7 @@ class FirestoreClient implements RemoteStoreCallback {
 
   /// Returns a future that completes when all the writes that are pending right now were acknowledged (or rejected)
   /// by the backend.
-  Future<void> waitForPendingWrites() {
+  Future<void> waitForPendingWrites() async {
     _verifyNotShutdown();
 
     final Completer<void> source = Completer<void>();
@@ -160,7 +160,7 @@ class FirestoreClient implements RemoteStoreCallback {
 
   /// Adds a listener that is called whenever all the snapshot listeners are in sync with each other (and once right
   /// away).
-  Future<void> addSnapshotsInSyncListener(void Function() listener) {
+  Future<void> addSnapshotsInSyncListener(void Function() listener) async {
     _verifyNotShutdown();
     return _enqueue<void>(
         () async => eventManager.addSnapshotsInSyncListener(listener));
@@ -175,12 +175,12 @@ class FirestoreClient implements RemoteStoreCallback {
         () async => eventManager.removeSnapshotsInSyncListener(listener));
   }
 
-  Future<void> disableNetwork() {
+  Future<void> disableNetwork() async {
     _verifyNotShutdown();
     return _enqueue<void>(() => remoteStore.disableNetwork());
   }
 
-  Future<void> enableNetwork() {
+  Future<void> enableNetwork() async {
     _verifyNotShutdown();
     return _enqueue<void>(() => remoteStore.enableNetwork());
   }
@@ -279,7 +279,7 @@ class FirestoreClient implements RemoteStoreCallback {
 
   /// Loads the bundle read from [bundleData] into the local cache, reporting the progress to [resultTask].
   Future<void> loadBundle(
-      Stream<List<int>> bundleData, LoadBundleTask resultTask) {
+      Stream<List<int>> bundleData, LoadBundleTask resultTask) async {
     _verifyNotShutdown();
 
     final BundleReader bundleReader = BundleReader(
@@ -290,7 +290,7 @@ class FirestoreClient implements RemoteStoreCallback {
   }
 
   /// Returns the named query saved by a loaded bundle under [queryName], or null if there is none.
-  Future<Query?> getNamedQuery(String queryName) {
+  Future<Query?> getNamedQuery(String queryName) async {
     _verifyNotShutdown();
 
     return _enqueue<Query?>(() async {
@@ -314,7 +314,7 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Runs an aggregation over [query] on the server. Fails with an
   /// `unavailable` error when offline.
   Future<Map<String, FieldValue>> runAggregateQuery(
-      Query query, List<AggregateField> aggregateFields) {
+      Query query, List<AggregateField> aggregateFields) async {
     _verifyNotShutdown();
 
     return _enqueue<Map<String, FieldValue>>(
@@ -323,7 +323,8 @@ class FirestoreClient implements RemoteStoreCallback {
 
   /// Runs a vector query over [query] on the server. Fails with an
   /// `unavailable` error when offline.
-  Future<List<Document>> runVectorQuery(Query query, VectorQuery vectorQuery) {
+  Future<List<Document>> runVectorQuery(
+      Query query, VectorQuery vectorQuery) async {
     _verifyNotShutdown();
 
     return _enqueue<List<Document>>(
@@ -333,7 +334,7 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Executes a pipeline on the server. Fails with an `unavailable` error when
   /// offline.
   Future<List<proto.ExecutePipelineResponse>> executePipeline(
-      proto.ExecutePipelineRequest request) {
+      proto.ExecutePipelineRequest request) async {
     _verifyNotShutdown();
 
     return _enqueue<List<proto.ExecutePipelineResponse>>(
@@ -343,11 +344,12 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Executes the transaction in [updateFunction], with up to [maxAttempts] attempts (with a backoff in between).
   Future<TResult> transaction<TResult>(
       Future<TResult> Function(Transaction) updateFunction, int maxAttempts,
-      {bool readOnly = false}) {
+      {bool readOnly = false}) async {
     _verifyNotShutdown();
 
     return TransactionRunner<TResult>(
-      createTransaction: () => remoteStore.createTransaction(readOnly: readOnly),
+      createTransaction: () =>
+          remoteStore.createTransaction(readOnly: readOnly),
       maxAttempts: maxAttempts,
       // A scheduler of its own: a [TaskScheduler] holds only one pending task per [TaskId], and transactions run
       // concurrently, each one waiting for its own backoff.
@@ -426,11 +428,21 @@ class FirestoreClient implements RemoteStoreCallback {
     await remoteStore.start();
   }
 
+  /// Throws the error every client call fails with once [shutdown] was called: a [FirestoreError] with
+  /// [FirestoreErrorCode.failedPrecondition], as the JS SDK (Android throws an IllegalStateException with the same
+  /// message). The methods that call it are `async`, so callers get it through the returned future.
   void _verifyNotShutdown() {
     if (_isShutdown) {
-      throw ArgumentError('The client has already been shutdown');
+      throw FirestoreError(
+        terminatedMessage,
+        FirestoreErrorCode.failedPrecondition,
+      );
     }
   }
+
+  /// The message of the error for a call on a terminated client.
+  static const String terminatedMessage =
+      'The client has already been terminated.';
 
   @override
   Future<void> handleRemoteEvent(RemoteEvent remoteEvent) {

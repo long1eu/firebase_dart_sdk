@@ -63,6 +63,17 @@ only. **Nothing was run against production Firestore.**
     `LoadBundleTaskProgress.forInitial` / `forSuccess`; `FirestoreErrorCode.fromValue`;
     `Timestamp.validateRange`.
   - Deprecated, still working: `Firestore.shutdown` (use `terminate`).
+- Operations on a terminated instance fail with a `FirestoreError` with the code
+  `failedPrecondition` and the message "The client has already been terminated." (as the JS SDK;
+  it was an `ArgumentError` "The client has already been shutdown"). The error always arrives
+  through the returned `Future`, as the first event of a `Stream` (which then closes;
+  `snapshotsInSync` used to stay silent) or through the `LoadBundleTask`, never as a
+  synchronous throw. Builders that do no I/O (`collection`, `doc`, `batch`, `where`, ...) and
+  committing an empty `WriteBatch` keep working, as upstream.
+- `Firestore.instanceFor` with a new `FirebaseApp` that has the name of a deleted one no longer
+  returns the instance of the deleted app (which was about to be terminated, since
+  `FirebaseApp.delete()` terminates the instances of the app in the background). It waits for
+  that instance to close and returns a new one on the same cache.
 - `Database.file` (a `dart:io` `File`) is replaced by `Database.path` (a `String`), so the
   persistence interface no longer needs `dart:io`. Implementations of `Database` must rename
   the getter.
@@ -199,6 +210,14 @@ only. **Nothing was run against production Firestore.**
   the first time the client starts. As upstream, array transforms (`arrayUnion` / `arrayRemove`)
   now keep their local result until the write is acknowledged instead of being re-applied on top
   of newer server data.
+
+### Upgrading an existing cache
+
+- A SQLite cache written by `cloud_firestore_vm` 0.0.7 (schema 8) is opened and migrated to the
+  current schema with its documents, targets (reused: the canonical ids did not change), pending
+  writes (legacy transform writes are folded into the preceding write) and collection parents.
+  Covered by a test on a schema 8 database reconstructed from the 0.0.7 sources, and by a
+  migration test from every intermediate schema version.
 
 ### Documentation
 

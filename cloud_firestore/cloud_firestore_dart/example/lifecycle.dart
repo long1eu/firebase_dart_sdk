@@ -51,8 +51,15 @@ Future<void> main() async {
   print('listeners are in sync');
 
   // terminate releases the connection, the timers and the database file. The
-  // instance cannot be used afterwards.
+  // instance cannot be used afterwards: every operation fails with a
+  // FirestoreError with the code failedPrecondition.
   await firestore.terminate();
+  try {
+    await firestore.doc(path).get();
+  } on FirestoreError catch (e) {
+    print('after terminate: ${e.code} (${e.message})');
+  }
+
   // clearPersistence deletes the cache file of a terminated instance.
   print('database file before clearPersistence: ${hasDatabaseFile()}');
   await firestore.clearPersistence();
