@@ -186,4 +186,57 @@ void main() {
           contains('MetadataChanges.include'));
     });
   });
+  group('long polling settings', () {
+    test('auto detection is on by default and off when polling is forced', () {
+      final FirestoreSettings defaults = FirestoreSettings();
+      expect(defaults.experimentalForceLongPolling, isFalse);
+      expect(defaults.experimentalAutoDetectLongPolling, isTrue);
+
+      final FirestoreSettings forced =
+          FirestoreSettings(experimentalForceLongPolling: true);
+      expect(forced.experimentalForceLongPolling, isTrue);
+      expect(forced.experimentalAutoDetectLongPolling, isFalse);
+
+      final FirestoreSettings off =
+          FirestoreSettings(experimentalAutoDetectLongPolling: false);
+      expect(off.experimentalForceLongPolling, isFalse);
+      expect(off.experimentalAutoDetectLongPolling, isFalse);
+    });
+
+    test('both together are rejected, as in the JS SDK', () {
+      expect(
+          () => FirestoreSettings(
+              experimentalForceLongPolling: true,
+              experimentalAutoDetectLongPolling: true),
+          throwsArgumentError);
+    });
+
+    test('copies keep them, and forcing in a copy turns detection off', () {
+      final FirestoreSettings forced =
+          FirestoreSettings(experimentalForceLongPolling: true);
+      final FirestoreSettings emulator = forced.withEmulator('localhost', 8080);
+      expect(emulator.experimentalForceLongPolling, isTrue);
+      expect(emulator.experimentalAutoDetectLongPolling, isFalse);
+      expect(forced.copyWith(port: 1).experimentalForceLongPolling, isTrue);
+
+      final FirestoreSettings copy =
+          FirestoreSettings().copyWith(experimentalForceLongPolling: true);
+      expect(copy.experimentalForceLongPolling, isTrue);
+      expect(copy.experimentalAutoDetectLongPolling, isFalse);
+      expect(
+          copy
+              .copyWith(experimentalForceLongPolling: false)
+              .experimentalAutoDetectLongPolling,
+          isTrue);
+    });
+
+    test('they are part of equality', () {
+      expect(FirestoreSettings(experimentalForceLongPolling: true),
+          FirestoreSettings(experimentalForceLongPolling: true));
+      expect(FirestoreSettings(experimentalForceLongPolling: true),
+          isNot(FirestoreSettings()));
+      expect(FirestoreSettings(experimentalAutoDetectLongPolling: false),
+          isNot(FirestoreSettings()));
+    });
+  });
 }

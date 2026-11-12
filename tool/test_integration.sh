@@ -3,7 +3,8 @@
 # both editions. The emulators must already run (start_emulator.sh,
 # start_enterprise_emulator.sh); this script never starts or stops them.
 #
-# Usage: tool/test_integration.sh [standard|enterprise|both] [--transport=grpc|webchannel]
+# Usage: tool/test_integration.sh [standard|enterprise|both]
+#                                 [--transport=grpc|webchannel|webchannel-longpolling]
 #                                 [dart test arguments...]
 #
 #   standard    (default) test/integration against the Standard edition emulator.
@@ -15,13 +16,16 @@
 #
 # --transport=webchannel runs the same tests over the web transport (REST and WebChannel,
 # through dart:io HTTP) instead of gRPC; the default, grpc, is what the VM uses.
+# webchannel-longpolling does the same with the streams in long polling mode.
 #
 # Extra arguments replace the default test paths and are passed to `dart test`, for example:
 #   tool/test_integration.sh enterprise test/integration/firebase/firestore/query_test.dart
 #   tool/test_integration.sh standard --transport=webchannel
 #
 # Environment:
-#   FIRESTORE_EMULATOR_HOST             Standard edition emulator (default 127.0.0.1:8080)
+#   FIRESTORE_EMULATOR_HOST             Standard edition emulator (default 127.0.0.1:8080, or
+#                                       127.0.0.1:8090 with a webchannel transport: start it
+#                                       with tool/start_private_emulator.sh)
 #   FIRESTORE_ENTERPRISE_EMULATOR_HOST  Enterprise edition emulator (default 127.0.0.1:8181)
 #   TEST_LOG_DIR                        where the full outputs go (default: a new temp dir)
 #
@@ -33,7 +37,7 @@ PKG="$ROOT/cloud_firestore/cloud_firestore_dart"
 MODE="standard"
 case "${1:-}" in
   standard|enterprise|both) MODE="$1"; shift;;
-  -h|--help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+  -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
 esac
 
 TRANSPORT="${FIRESTORE_TEST_TRANSPORT:-grpc}"
@@ -43,10 +47,17 @@ esac
 case "$TRANSPORT" in
   grpc) TRANSPORT_ENV="FIRESTORE_TEST_TRANSPORT="; SUFFIX="";;
   webchannel) TRANSPORT_ENV="FIRESTORE_TEST_TRANSPORT=webchannel"; SUFFIX="_webchannel";;
-  *) echo "Unknown transport '$TRANSPORT' (grpc or webchannel)"; exit 2;;
+  webchannel-longpolling)
+    TRANSPORT_ENV="FIRESTORE_TEST_TRANSPORT=webchannel-longpolling"; SUFFIX="_webchannel_longpolling";;
+  *) echo "Unknown transport '$TRANSPORT' (grpc, webchannel or webchannel-longpolling)"; exit 2;;
 esac
 
-STANDARD_HOST="${FIRESTORE_EMULATOR_HOST:-127.0.0.1:8080}"
+# The web transport opens and drops many HTTP connections, which the shared emulator on 8080
+# does not take well (see "Web transport and the emulator" in tool/README.md): by default it
+# runs against a private emulator (tool/start_private_emulator.sh, port 8090).
+if [ -n "$SUFFIX" ]; then DEFAULT_STANDARD_HOST="127.0.0.1:8090"; else DEFAULT_STANDARD_HOST="127.0.0.1:8080"; fi
+STANDARD_HOST="${FIRESTORE_EMULATOR_HOST:-$DEFAULT_STANDARD_HOST}"
+
 ENTERPRISE_HOST="${FIRESTORE_ENTERPRISE_EMULATOR_HOST:-127.0.0.1:8181}"
 LOG_DIR="${TEST_LOG_DIR:-$(mktemp -d)}"
 mkdir -p "$LOG_DIR" || exit 2
@@ -84,7 +95,7 @@ run() {
 
 run_standard() {
   if ! reachable "$STANDARD_HOST"; then
-    echo "Standard emulator not reachable on $STANDARD_HOST (tool/start_emulator.sh)"
+    echo "Standard emulator not reachable on $STANDARD_HOST (tool/start_emulator.sh, or tool/start_private_emulator.sh for a webchannel transport)"
     summary+=("standard: NOT RUN (no emulator on $STANDARD_HOST)"); failed=1; return
   fi
   RUN_ENV=("FIRESTORE_EMULATOR_HOST=$STANDARD_HOST" "FIRESTORE_EMULATOR_EDITION=standard")

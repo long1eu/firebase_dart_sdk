@@ -1,5 +1,6 @@
 // Helpers of the browser tests: clients made through the public API, against
-// the Firestore emulator on 127.0.0.1:8080. No `dart:io` here.
+// a private Firestore emulator on 127.0.0.1:8090 (tool/start_private_emulator.sh).
+// No `dart:io` here.
 
 import 'dart:async';
 import 'dart:math';
@@ -12,7 +13,7 @@ const String emulatorHost = String.fromEnvironment(
     'FIRESTORE_EMULATOR_HOST_NAME',
     defaultValue: '127.0.0.1');
 const int emulatorPort =
-    int.fromEnvironment('FIRESTORE_EMULATOR_PORT', defaultValue: 8080);
+    int.fromEnvironment('FIRESTORE_EMULATOR_PORT', defaultValue: 8090);
 const String projectId =
     String.fromEnvironment('FIRESTORE_PROJECT_ID', defaultValue: 'demo-test');
 
@@ -21,7 +22,10 @@ int _apps = 0;
 
 /// A new client with its own app and its own cache (in memory unless
 /// [openDatabase] is given). It is terminated when the test ends.
-Future<Firestore> newClient({OpenDatabase? openDatabase}) async {
+Future<Firestore> newClient({
+  OpenDatabase? openDatabase,
+  bool forceLongPolling = false,
+}) async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
@@ -34,6 +38,7 @@ Future<Firestore> newClient({OpenDatabase? openDatabase}) async {
     app: app,
     openDatabase: openDatabase,
     settings: FirestoreSettings(
+            experimentalForceLongPolling: forceLongPolling,
             cacheSettings:
                 openDatabase == null ? const MemoryCacheSettings() : null)
         .withEmulator(emulatorHost, emulatorPort),

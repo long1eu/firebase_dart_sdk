@@ -11,7 +11,14 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dar
 
 /// Calls the REST endpoints of the Firestore service.
 class RestClient {
-  RestClient(this._http, this._baseUrl);
+  RestClient(this._http, this._baseUrl, {this.timeout = defaultTimeout});
+
+  /// The time a call may take, as in the JS SDK (`XHR_TIMEOUT_SECS`).
+  static const Duration defaultTimeout = Duration(seconds: 15);
+
+  /// How long a call may take before it is aborted and fails with
+  /// DEADLINE_EXCEEDED, which the callers treat as a transient error.
+  final Duration timeout;
 
   final WebHttpClient _http;
 
@@ -78,6 +85,11 @@ class RestClient {
     );
     onRequest?.call(call);
 
+    bool timedOut = false;
+    final Timer timer = Timer(timeout, () {
+      timedOut = true;
+      call.abort();
+    });
     final WebHttpResponse response;
     final String text;
     try {
@@ -86,7 +98,16 @@ class RestClient {
     } on GrpcError {
       rethrow;
     } catch (e) {
+      if (timedOut) {
+        throw const GrpcError.deadlineExceeded('Request time out');
+      }
       throw GrpcError.unavailable('Request failed with error: $e');
+    } finally {
+      timer.cancel();
+    }
+    if (timedOut) {
+      // The abort ended the body without an error.
+      throw const GrpcError.deadlineExceeded('Request time out');
     }
 
     Object? json;

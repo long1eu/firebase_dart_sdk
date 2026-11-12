@@ -22,6 +22,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/proto3_json.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as pb;
@@ -44,35 +45,10 @@ void expectSameValue(FieldValue other, FieldValue value) {
   expect(other.runtimeType, value.runtimeType);
 }
 
-/// Whether [message] holds something that `toProto3Json()` of
-/// package:protobuf does not write faithfully: a negative zero (written as
-/// `0`) or an empty `bytesValue` (written as an empty value). See the pinned
-/// tests in the group "proto3 JSON".
-bool hasProto3JsonQuirk(Object? field) {
-  if (field is double) {
-    return field == 0 && field.isNegative;
-  } else if (field is pb.Value) {
-    if (field.whichValueType() == pb.Value_ValueType.bytesValue &&
-        field.bytesValue.isEmpty) {
-      return true;
-    }
-  }
-  if (field is GeneratedMessage) {
-    for (final FieldInfo<dynamic> info in field.info_.fieldInfo.values) {
-      if (hasProto3JsonQuirk(field.getFieldOrNull(info.tagNumber))) {
-        return true;
-      }
-    }
-  } else if (field is List) {
-    return field.any(hasProto3JsonQuirk);
-  } else if (field is Map) {
-    return field.values.any(hasProto3JsonQuirk);
-  }
-  return false;
-}
-
-/// Sends [message] through the binary encoding and through proto3 JSON (the
-/// encoding of the web transport and of bundles) and expects the same bytes.
+/// Sends [message] through the binary encoding and through proto3 JSON as the
+/// web transport writes it ([toFirestoreProto3Json]: `toProto3Json()` alone
+/// loses a negative zero and an empty `bytesValue`, see the group
+/// "proto3 JSON") and expects the same bytes.
 void expectProtoRoundTrips<T extends GeneratedMessage>(
   T message,
   T Function() create,
@@ -82,10 +58,7 @@ void expectProtoRoundTrips<T extends GeneratedMessage>(
   // Compared as bytes: a message with a NaN is not equal to itself.
   expect(fromBinary.writeToBuffer(), bytes, reason: 'binary round trip');
 
-  if (hasProto3JsonQuirk(message)) {
-    return;
-  }
-  final Object? json = jsonDecode(jsonEncode(message.toProto3Json()));
+  final Object? json = jsonDecode(jsonEncode(toFirestoreProto3Json(message)));
   final T fromJson = create()..mergeFromProto3Json(json);
   expect(
     fromJson.writeToBuffer(),
@@ -315,11 +288,8 @@ void main() {
         generate: (Gen gen) => gen.modelValue(),
         show: (FieldValue value) => value.toString(),
         check: (FieldValue value) {
-          if (hasProto3JsonQuirk(remote.encodeValue(value))) {
-            return;
-          }
           final Object? json = jsonDecode(
-            jsonEncode(remote.encodeValue(value).toProto3Json()),
+            jsonEncode(toFirestoreProto3Json(remote.encodeValue(value))),
           );
           expectSameValue(
             bundle.decodeValue(json! as Map<String, dynamic>),
@@ -339,10 +309,9 @@ void main() {
           final proto.Document encoded =
               remote.encodeDocument(doc.key, doc.data).deepCopy()
                 ..updateTime = remote.encodeVersion(doc.version);
-          if (hasProto3JsonQuirk(encoded)) {
-            return;
-          }
-          final Object? json = jsonDecode(jsonEncode(encoded.toProto3Json()));
+          final Object? json = jsonDecode(
+            jsonEncode(toFirestoreProto3Json(encoded)),
+          );
           final Document decoded = bundle
               .decodeDocument(json! as Map<String, dynamic>)
               .document;
@@ -355,8 +324,8 @@ void main() {
   });
 
   // What `toProto3Json()` of package:protobuf loses. The bundle builder
-  // writes values itself for this reason; the web transport sends
-  // `request.toProto3Json()` as it is.
+  // writes values itself for this reason, and so does the web transport
+  // (`toFirestoreProto3Json`).
   group('proto3 JSON', () {
     test('quirk: a negative zero is written as 0', () {
       final pb.Value value = pb.Value()..doubleValue = -0.0;
@@ -376,8 +345,33 @@ void main() {
         decoded.writeToBuffer(),
         isNot(value.writeToBuffer()),
         reason:
-            'fixed in package:protobuf? Then drop hasProto3JsonQuirk. '
+            'fixed in package:protobuf? Then toFirestoreProto3Json can go. '
             'JSON: $json',
+      );
+    });
+
+    test('the encoder of the web transport writes both faithfully', () {
+      for (final pb.Value value in <pb.Value>[
+        pb.Value()..doubleValue = -0.0,
+        pb.Value()..bytesValue = <int>[],
+      ]) {
+        final String json = jsonEncode(toFirestoreProto3Json(value));
+        final pb.Value decoded = pb.Value()
+          ..mergeFromProto3Json(jsonDecode(json));
+        expect(decoded.writeToBuffer(), value.writeToBuffer(), reason: json);
+        expect(decoded.whichValueType(), value.whichValueType());
+      }
+      expect(
+        (pb.Value()..mergeFromProto3Json(
+              jsonDecode(
+                jsonEncode(
+                  toFirestoreProto3Json(pb.Value()..doubleValue = -0.0),
+                ),
+              ),
+            ))
+            .doubleValue
+            .isNegative,
+        isTrue,
       );
     });
   });

@@ -13,6 +13,8 @@ class DatabaseInfo {
     this.host, {
     required this.sslEnabled,
     this.port = 443,
+    this.forceLongPolling = false,
+    this.autoDetectLongPolling = true,
   });
 
   final DatabaseId databaseId;
@@ -20,6 +22,13 @@ class DatabaseInfo {
   final String host;
   final int port;
   final bool sslEnabled;
+
+  /// Web transport only: always request the streams in long polling mode.
+  final bool forceLongPolling;
+
+  /// Web transport only: switch a stream to long polling when its responses
+  /// seem to be held back by a buffering proxy.
+  final bool autoDetectLongPolling;
 
   @override
   String toString() {

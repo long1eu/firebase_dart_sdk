@@ -20,6 +20,7 @@ final String? needsEmulator = IntegrationTestUtil.emulatorHost == null
     : null;
 
 void main() {
+  configureGeneratorsForBackend();
   IntegrationTestUtil.currentDatabasePath = 'integration/property_query';
 
   tearDown(() async {

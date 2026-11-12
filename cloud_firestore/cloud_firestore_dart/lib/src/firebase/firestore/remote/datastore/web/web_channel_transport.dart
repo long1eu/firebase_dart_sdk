@@ -3,28 +3,78 @@
 // the JS SDK. Platform neutral: the HTTP layer is injected.
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/firestore_transport.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/proto3_json.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rest_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_channel.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_http_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
+import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
+    as proto;
 import 'package:protobuf/protobuf.dart';
 
 /// A [FirestoreTransport] that only needs HTTP requests with streamed
 /// responses. Messages are exchanged as proto3 JSON.
 class WebChannelTransport implements FirestoreTransport {
-  WebChannelTransport(this._http, DatabaseInfo databaseInfo, this._options)
-    : _baseUrl =
-          '${databaseInfo.sslEnabled ? 'https' : 'http'}://'
-          '${databaseInfo.host}:${databaseInfo.port}',
-      _database =
-          'projects/${databaseInfo.databaseId.projectId}'
-          '/databases/${databaseInfo.databaseId.databaseId}' {
-    _rest = RestClient(_http, _baseUrl);
+  WebChannelTransport(
+    this._http,
+    DatabaseInfo databaseInfo,
+    this._options, {
+    Duration unaryTimeout = RestClient.defaultTimeout,
+    this.longPollingDetectionTimeout = const Duration(seconds: 10),
+  }) : _forceLongPolling = databaseInfo.forceLongPolling,
+       _autoDetectLongPolling = databaseInfo.autoDetectLongPolling,
+       _baseUrl =
+           '${databaseInfo.sslEnabled ? 'https' : 'http'}://'
+           '${databaseInfo.host}:${databaseInfo.port}',
+       _database =
+           'projects/${databaseInfo.databaseId.projectId}'
+           '/databases/${databaseInfo.databaseId.databaseId}' {
+    checkProto3JsonNames();
+    _rest = RestClient(_http, _baseUrl, timeout: unaryTimeout);
+  }
+
+  final bool _forceLongPolling;
+  final bool _autoDetectLongPolling;
+
+  /// See [WebChannelStream.longPollingDetectionTimeout].
+  final Duration longPollingDetectionTimeout;
+
+  /// The web transport exchanges proto3 JSON, which is built from the field
+  /// and enum names of the generated messages. An application compiled with
+  /// `-Dprotobuf.omit_field_names=true` or `-Dprotobuf.omit_enum_names=true`
+  /// has no names, and every request would be silently wrong. Fails with a
+  /// clear error instead.
+  static void checkProto3JsonNames({
+    Object? Function()? encodeRequest,
+    Object? Function()? encodeEnum,
+  }) {
+    final Object? request =
+        (encodeRequest ??
+        () => (proto.ListenRequest()..database = 'd').toProto3Json())();
+    final Object? change =
+        (encodeEnum ??
+        () =>
+            (proto.TargetChange()
+                  ..targetChangeType =
+                      proto.TargetChange_TargetChangeType.REMOVE)
+                .toProto3Json())();
+    final bool fieldNames = request is Map && request['database'] == 'd';
+    final bool enumNames =
+        change is Map && change['targetChangeType'] == 'REMOVE';
+    if (!fieldNames || !enumNames) {
+      throw UnsupportedError(
+        'Cloud Firestore on the web needs the ${fieldNames ? 'enum' : 'field'} '
+        'names of its protobuf messages to talk to the backend (proto3 JSON). '
+        'Do not compile with -Dprotobuf.omit_field_names=true or '
+        '-Dprotobuf.omit_enum_names=true.',
+      );
+    }
   }
 
   final WebHttpClient _http;
@@ -34,6 +84,9 @@ class WebChannelTransport implements FirestoreTransport {
   late final RestClient _rest;
 
   final Set<_WebCall> _calls = <_WebCall>{};
+
+  /// The sessions that are not over on the server yet.
+  final Set<WebChannelStream> _sessions = <WebChannelStream>{};
   bool _shutdown = false;
 
   @override
@@ -87,7 +140,7 @@ class WebChannelTransport implements FirestoreTransport {
       }
       final List<Object?> results = await _rest.invoke(
         rpc.name,
-        (request.toProto3Json()! as Map<Object?, Object?>)
+        (toFirestoreProto3Json(request)! as Map<Object?, Object?>)
             .cast<String, Object?>(),
         headers,
         onRequest: (WebHttpRequest http) => call.onCancel = http.abort,
@@ -138,13 +191,38 @@ class WebChannelTransport implements FirestoreTransport {
       '$_baseUrl${rpc.path}/channel',
       _database,
       headers,
+      forceLongPolling: _forceLongPolling,
+      autoDetectLongPolling: _autoDetectLongPolling,
+      longPollingDetectionTimeout: longPollingDetectionTimeout,
     );
+    _sessions.add(channel);
+    unawaited(channel.released.then((_) => _sessions.remove(channel)));
     late final StreamSubscription<Req> requestSub;
     call.onCancel = () {
       unawaited(requestSub.cancel());
       unawaited(channel.close());
     };
     unawaited(channel.handshakeHeaders.then(call.completeHeaders));
+
+    // The Write RPC answers every request with one response, and the next
+    // request is only sent once the answer to the previous one arrived.
+    //
+    // Over gRPC the backend ends the call when a write fails, so the writes
+    // that were sent ahead are not applied. Over WebChannel the error is a
+    // message like any other and the session goes on (observed on the
+    // emulator, v1.22.0): writes sent ahead of it are applied although the
+    // client, which closes the stream on the error, never sees their
+    // acknowledgements and sends them again. An `increment` behind a rejected
+    // write was counted twice that way.
+    final bool oneAtATime = identical(rpc, FirestoreRpc.write);
+    final Queue<Req> waiting = Queue<Req>();
+    bool awaitingResponse = false;
+    void sendNext() {
+      while (waiting.isNotEmpty && !(oneAtATime && awaitingResponse)) {
+        awaitingResponse = true;
+        channel.send(jsonEncode(toFirestoreProto3Json(waiting.removeFirst())));
+      }
+    }
 
     channel.messages.listen(
       (Map<String, Object?> message) {
@@ -160,6 +238,10 @@ class WebChannelTransport implements FirestoreTransport {
           return;
         }
         responses.add(response);
+        if (oneAtATime) {
+          awaitingResponse = false;
+          sendNext();
+        }
       },
       onError: (Object e, StackTrace s) {
         if (!responses.isClosed) {
@@ -176,10 +258,27 @@ class WebChannelTransport implements FirestoreTransport {
     );
 
     requestSub = requests.listen(
-      (Req request) => channel.send(jsonEncode(request.toProto3Json())),
-      // The client is done with the stream (it half-closes a gRPC call the same way): end the session, otherwise it
-      // stays open, with its long poll, until the call is cancelled.
-      onDone: channel.closeWhenFlushed,
+      (Req request) {
+        waiting.add(request);
+        sendNext();
+      },
+      // The client is done with the stream (the half-close of gRPC): deliver
+      // what was queued and end the session, which also ends the responses.
+      //
+      // A gRPC call is not cancelled at this point, because resetting an HTTP/2
+      // stream that the backend is finishing can break the whole connection
+      // (see CallReleaser). There is no such hazard here: the session is a set
+      // of independent HTTP requests, ending it is a request of its own, and
+      // aborting the back channel request only concerns that one request,
+      // whose connection handling belongs to the browser. Waiting for the
+      // grace period of CallReleaser would only keep the back channel request
+      // open, and a browser allows few connections per host over HTTP/1.1.
+      onDone: () {
+        // What was not sent stays with the caller (the writes are still in
+        // its queue and go out on its next stream).
+        waiting.clear();
+        channel.closeWhenFlushed();
+      },
     );
   }
 
@@ -224,6 +323,11 @@ class WebChannelTransport implements FirestoreTransport {
     for (final _WebCall call in _calls.toList()) {
       await call.cancel();
     }
+    // The sessions are terminated on the server before the HTTP client goes
+    // away, see [WebChannelStream.released]. Each of them gives up by itself.
+    await Future.wait(
+      _sessions.map((WebChannelStream session) => session.released).toList(),
+    );
     _http.close();
   }
 }

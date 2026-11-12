@@ -15,7 +15,7 @@ How this was verified:
 - Features of the Enterprise edition (BSON value types, Pipelines) were run against the
   emulator in Enterprise edition only.
 - Web support is experimental: it was run in Chrome only, against the emulator only, with a
-  memory cache only (16 browser tests, and the standard integration suite on the VM over the web
+  memory cache only (19 browser tests, and the standard integration suite on the VM over the web
   transport).
 
 ### Renamed packages
@@ -270,11 +270,48 @@ Networking:
   - The cache is in memory only on the web; there is no SQLite persistence there yet.
   - Verified against the emulator only: on the VM, where the whole standard integration suite
     runs over the web transport (`tool/test_integration.sh standard --transport=webchannel`, or
-    `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 16 browser tests
-    (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 15 pass and 1 is
+    `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 19 browser tests
+    (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 18 pass and 1 is
     skipped). No other browser and no production backend was tried.
   - Compile with dart2wasm to keep 64 bit integers exact. Compiled with dart2js, integers
     above 2^53 lose precision.
+- Web transport robustness (web only, the gRPC transport is unchanged):
+  - `FirestoreSettings.experimentalForceLongPolling` and
+    `experimentalAutoDetectLongPolling` (on by default), for networks where a proxy buffers
+    streamed responses. Forced long polling was run against the emulator (the whole standard
+    integration suite on the VM with `--transport=webchannel-longpolling`, and a test in
+    Chrome). The automatic switch has the purpose of the JS option of the same name but its own
+    detection (no data on the first stream response within 10 seconds), and was only tested
+    with a simulated silent response, not behind a real buffering proxy.
+  - Unary calls time out after 15 seconds with `DEADLINE_EXCEEDED`, as in the JS SDK.
+  - The client listens to the `online` / `offline` events of the browser and restarts its
+    streams when the network comes back.
+  - A WebChannel session is now always terminated on the server: also when it is closed while
+    its handshake is in flight, and the HTTP layer of a client that is terminated waits for
+    those requests (up to 3 seconds) instead of cutting them off. Before, every terminated
+    client left its sessions behind, and the emulator keeps a socket for each (see
+    `tool/README.md`).
+  - A stream request that is lost on the way is sent again with the same request id (the
+    server applies an id once; checked on the emulator), and a listen or write response that
+    is cut is asked for again from the last message that arrived, both after 100 ms and after
+    1 s, before the stream fails with `UNAVAILABLE`. A WebChannel session therefore survives a
+    cut connection without losing or repeating a message. The chaos tests (cuts, stalls,
+    delays) run over the web transport as well.
+  - Values are sent faithfully: an empty `Blob` was sent without its type (and rejected or
+    misread), and the sign of `-0.0` was dropped before sending, also in a `GeoPoint`. They are
+    now encoded like the JS SDK does (`"bytesValue": ""`, `"doubleValue": "-0"`). The JSON
+    endpoints of the emulator (v1.22.0) still store `-0.0` as `0.0`, whatever its spelling, so
+    the sign only round-trips there over gRPC.
+  - Write requests go out one at a time over WebChannel: the next one is sent when the
+    previous one was answered. There a failed write is reported as a message and the session
+    goes on (seen on the emulator), so writes sent ahead of the failure were applied although
+    the client closes the stream and sends them again: an `increment` behind a rejected write
+    was counted twice. Over gRPC the backend ends the call instead.
+  - Request headers with a line break are refused instead of being sent in the handshake, and
+    `fetch` no longer follows redirects (a redirect would re-send the credentials elsewhere).
+  - A clear `UnsupportedError` at start when the application was compiled with
+    `-Dprotobuf.omit_field_names=true` or `-Dprotobuf.omit_enum_names=true`, which would
+    make every request wrong.
 
 Documentation and tests:
 

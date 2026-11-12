@@ -76,7 +76,14 @@ class Gen {
 
   bool chance(int percent) => below(100) < percent;
 
-  T pick<T>(List<T> options) => options[below(options.length)];
+  T pick<T>(List<T> options) {
+    final T picked = options[below(options.length)];
+    // See [negativeZero].
+    if (!negativeZero && picked is double && picked == 0) {
+      return 0.0 as T;
+    }
+    return picked;
+  }
 
   /// A uniformly random 64-bit pattern.
   int bits64() => (_next() << 32) | _next();
@@ -112,7 +119,21 @@ class Gen {
     0.1, 0.30000000000000004,
   ];
 
+  /// Whether negative zeros are generated. A backend that does not keep the
+  /// sign cannot be compared with the client: the JSON endpoints of the
+  /// emulator (v1.22.0), which the web transport uses, store -0.0 as 0.0
+  /// whatever its spelling (see value_fidelity_test.dart).
+  static bool negativeZero = true;
+
+  /// -0.0, or 0.0 when no [negativeZero] may be generated.
+  static double get signedZero => negativeZero ? -0.0 : 0.0;
+
   double float() {
+    final double value = _float();
+    return !negativeZero && value == 0 ? 0.0 : value;
+  }
+
+  double _float() {
     switch (below(4)) {
       case 0:
         return pick(_interestingDoubles);
@@ -190,7 +211,7 @@ class Gen {
 
   GeoPoint geoPoint() {
     double coordinate(double limit) => chance(30)
-        ? pick(<double>[-limit, limit, 0.0, -0.0])
+        ? pick(<double>[-limit, limit, 0.0, if (negativeZero) -0.0 else 0.0])
         : between(-(limit * 1000).toInt(), (limit * 1000).toInt()) / 1000.0;
     return GeoPoint(coordinate(90), coordinate(180));
   }

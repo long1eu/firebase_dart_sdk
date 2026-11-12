@@ -21,6 +21,10 @@
 //    with a status. When the GET ends it is issued again with `AID`, the last
 //    array id that was received.
 //  * `TYPE=terminate` ends the session.
+//  * Long polling: with `CI=1` instead of `CI=0` the server ends each back
+//    channel response as soon as it wrote data (keep-alives excepted), so that
+//    a proxy that buffers responses until they are complete still lets the
+//    data through. The client then simply asks again.
 
 import 'dart:async';
 import 'dart:convert';
@@ -86,9 +90,48 @@ class WebChannelStream {
     this._database,
     this._initHeaders, {
     Random? random,
-  }) : _random = random ?? Random() {
+    bool forceLongPolling = false,
+    this.autoDetectLongPolling = false,
+    this.longPollingDetectionTimeout = const Duration(seconds: 10),
+    this.releaseTimeout = const Duration(seconds: 3),
+    this.retryDelays = const <Duration>[
+      Duration(milliseconds: 100),
+      Duration(seconds: 1),
+    ],
+  }) : _random = random ?? Random(),
+       _longPolling = forceLongPolling {
     _requestId = _random.nextInt(100000);
   }
+
+  /// Whether to switch to long polling when the first back channel request
+  /// stays silent for [longPollingDetectionTimeout]: every first message of
+  /// Firestore is answered right away, so silence after a handshake that
+  /// worked points at a proxy that holds the response back until it is
+  /// complete. A wrong guess only costs efficiency, long polling works on every
+  /// connection.
+  ///
+  /// PORTING NOTE: this is in the spirit of `detectBufferingProxy` of the
+  /// closure WebChannel (`experimentalAutoDetectLongPolling` in the JS SDK), not
+  /// a port of its detection.
+  final bool autoDetectLongPolling;
+
+  /// How long the first back channel request may stay silent, see
+  /// [autoDetectLongPolling].
+  final Duration longPollingDetectionTimeout;
+
+  /// How long to wait before a request that failed on the way (not one the
+  /// server answered with an error) is sent again, once per element. After
+  /// that the stream fails with UNAVAILABLE.
+  final List<Duration> retryDelays;
+
+  /// How long the requests that end a session may take, see [released].
+  final Duration releaseTimeout;
+
+  /// Whether the back channel is requested in long polling mode.
+  bool get isLongPolling => _longPolling;
+  bool _longPolling;
+  bool _receivedBackChannelData = false;
+  Timer? _detectionTimer;
 
   final WebHttpClient _http;
 
@@ -150,8 +193,22 @@ class WebChannelStream {
     unawaited(_flush());
   }
 
-  /// Ends the session.
+  /// Ends the session right away: [messages] ends now, the server is told in
+  /// the background (see [released]).
   Future<void> close() => _shutdown();
+
+  /// Completes when the session is over on the server too, or could not be
+  /// ended within [releaseTimeout]. Never fails.
+  ///
+  /// A session is always terminated explicitly, also when its handshake was
+  /// still in flight when it was closed: the server (measured on the
+  /// emulator, v1.22.0) keeps the connection of an aborted back channel
+  /// request of a session that was not terminated until the session expires,
+  /// minutes later, and a burst of those exhausts it. The owner of the HTTP
+  /// client must wait for this before it closes the client.
+  Future<void> get released => _released.future;
+  final Completer<void> _released = Completer<void>();
+  Future<void>? _flushing;
 
   /// Closes the stream once everything that was passed to [send] has been delivered. WebChannel has no half-close:
   /// this is what the end of the client's requests means for it.
@@ -167,10 +224,11 @@ class WebChannelStream {
       'database': _database,
       if (_httpSessionId != null) 'gsessionid': _httpSessionId!,
       'VER': _protocolVersion,
+      // The attempt number of the request.
+      't': '1',
       ...params,
       // Defeats caches.
       'zx': _random.nextInt(0x7fffffff).toRadixString(36),
-      't': '1',
     };
     final String query = all.entries
         .map(
@@ -181,27 +239,46 @@ class WebChannelStream {
     return Uri.parse('$_channelUrl?$query');
   }
 
-  Future<void> _flush() async {
+  Future<void> _flush() {
     if (_sending || _closed || _outgoing.isEmpty) {
-      return;
+      return Future<void>.value();
     }
+    final Future<void> flushing = _flushOnce();
+    _flushing = flushing;
+    return flushing.whenComplete(() {
+      if (identical(_flushing, flushing)) {
+        _flushing = null;
+      }
+    });
+  }
+
+  Future<void> _flushOnce() async {
     _sending = true;
     final List<String> batch = List<String>.of(_outgoing);
     _outgoing.clear();
 
     final bool handshake = !_opened;
     _opened = true;
+    final String encodedHeaders;
+    try {
+      encodedHeaders = handshake ? _encodeHeaders(_initHeaders) : '';
+    } on GrpcError catch (e) {
+      _sending = false;
+      _fail(e);
+      return;
+    }
     final List<String> form = <String>[
       if (handshake && _initHeaders.isNotEmpty)
-        'headers=${Uri.encodeComponent(_encodeHeaders(_initHeaders))}',
+        'headers=${Uri.encodeComponent(encodedHeaders)}',
       'count=${batch.length}',
       'ofs=$_sentCount',
       for (int i = 0; i < batch.length; i++)
         'req${i}___data__=${Uri.encodeComponent(batch[i])}',
     ];
-    final Uri url = handshake
+    final String requestId = '${_requestId++}';
+    Uri url(int attempt) => handshake
         ? _url(<String, String>{
-            'RID': '${_requestId++}',
+            'RID': requestId,
             'CVER': _clientVersion,
             // Asks for the session id of the HTTP layer in this header, to be
             // echoed as `gsessionid` (backend stickiness).
@@ -209,24 +286,53 @@ class WebChannelStream {
           })
         : _url(<String, String>{
             'SID': _sessionId!,
-            'RID': '${_requestId++}',
+            'RID': requestId,
             'AID': '$_lastArrayId',
+            't': '$attempt',
           });
 
     try {
-      final WebHttpRequest request = _http.send(
-        'POST',
-        url,
-        headers: const <String, String>{
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: form.join('&'),
-      );
-      _forwardRequest = request;
-      final WebHttpResponse response = await request.response;
-      final String text = await response.readAll();
+      late WebHttpResponse response;
+      late String text;
+      for (int attempt = 1; ; attempt++) {
+        try {
+          final WebHttpRequest request = _http.send(
+            'POST',
+            url(attempt),
+            headers: const <String, String>{
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: form.join('&'),
+          );
+          _forwardRequest = request;
+          final WebHttpResponse received = await request.response;
+          final String body = await received.readAll();
+          response = received;
+          text = body;
+          break;
+        } catch (_) {
+          // The request, or its answer, was lost on the way. It is sent again
+          // with the same request id: the server applies a request id once
+          // (checked on the emulator, v1.22.0), so nothing is duplicated and
+          // the session survives a connection that was cut. Not for the
+          // handshake, which would open a second session.
+          if (handshake || _closed || attempt > retryDelays.length) {
+            rethrow;
+          }
+          _forwardRequest = null;
+          await Future<void>.delayed(retryDelays[attempt - 1]);
+          if (_closed) {
+            rethrow;
+          }
+        }
+      }
       _forwardRequest = null;
       if (_closed) {
+        if (handshake && response.statusCode == 200) {
+          // Closed while the handshake was in flight: all that matters now is
+          // the session it opened, so that it can be terminated.
+          _sessionId ??= _parseSessionId(text);
+        }
         return;
       }
       if (response.statusCode != 200) {
@@ -255,12 +361,52 @@ class WebChannelStream {
     unawaited(_flush());
   }
 
+  /// The headers in the form the handshake carries them: `name:value` lines.
+  ///
+  /// Throws a [GrpcError] if a name or value contains a line break, which
+  /// would let it smuggle another header (for example a token taken from
+  /// untrusted input).
   static String _encodeHeaders(Map<String, String> headers) {
     final StringBuffer buffer = StringBuffer();
     headers.forEach((String name, String value) {
+      if (name.contains(_lineBreak) ||
+          value.contains(_lineBreak) ||
+          name.contains(':')) {
+        throw GrpcError.invalidArgument(
+          'The request header "${name.replaceAll(_lineBreak, ' ')}" is not valid: '
+          'header names and values must not contain line breaks',
+        );
+      }
       buffer.write('$name:$value\r\n');
     });
     return buffer.toString();
+  }
+
+  static final RegExp _lineBreak = RegExp(r'[\r\n]');
+
+  /// The session id of a handshake response, or null if it has none.
+  static String? _parseSessionId(String text) {
+    try {
+      for (final Object? chunk in WebChannelChunkParser().add(text)) {
+        if (chunk is! List) {
+          continue;
+        }
+        for (final Object? array in chunk) {
+          if (array is List && array.length >= 2) {
+            final Object? payload = array[1];
+            if (payload is List &&
+                payload.length >= 2 &&
+                payload[0] == 'c' &&
+                payload[1] is String) {
+              return payload[1] as String;
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Not a handshake response.
+    }
+    return null;
   }
 
   static GrpcError _httpError(int status, String body) {
@@ -333,19 +479,22 @@ class WebChannelStream {
     int emptyRequests = 0;
     while (!_closed) {
       bool receivedData = false;
+      bool failed = false;
       final WebHttpRequest request = _http.send(
         'GET',
         _url(<String, String>{
           'RID': 'rpc',
           'SID': _sessionId!,
           'AID': '$_lastArrayId',
-          // 0: the response may be streamed in chunks.
-          'CI': '0',
+          // 0: the response may be streamed in chunks. 1: long polling, the
+          // response ends once it carries data.
+          'CI': _longPolling ? '1' : '0',
           'TYPE': 'xmlhttp',
         }),
       );
       _backRequest = request;
       _armBackChannelTimer(request);
+      _armLongPollingDetection(request);
       try {
         final WebHttpResponse response = await request.response;
         if (_closed) {
@@ -360,18 +509,22 @@ class WebChannelStream {
         final WebChannelChunkParser parser = WebChannelChunkParser();
         await for (final String text in response.body) {
           if (_closed) {
-            return;
+            // The session is being terminated, which makes the server end
+            // this response: it is read to its end rather than cut off.
+            continue;
           }
           _armBackChannelTimer(request);
           for (final Object? chunk in parser.add(text)) {
-            if (chunk is! List) {
+            if (chunk is! List || _closed) {
               continue;
             }
             for (final Object? array in chunk) {
               receivedData = true;
+              _receivedBackChannelData = true;
+              _detectionTimer?.cancel();
               _onArray(array);
               if (_closed) {
-                return;
+                break;
               }
             }
           }
@@ -383,9 +536,25 @@ class WebChannelStream {
         return;
       } catch (_) {
         // A network error or the timeout below: counted as an empty request.
+        failed = true;
       }
       if (_closed) {
         return;
+      }
+      if (failed &&
+          !_switchedToLongPolling &&
+          emptyRequests < retryDelays.length) {
+        // The request is made again with the last array id that arrived: the
+        // server sends what the client missed, so a cut loses nothing.
+        await Future<void>.delayed(retryDelays[emptyRequests]);
+        if (_closed) {
+          return;
+        }
+      }
+      if (_switchedToLongPolling) {
+        // The request was given up to try long polling, not a failure.
+        _switchedToLongPolling = false;
+        continue;
       }
       emptyRequests = receivedData ? 0 : emptyRequests + 1;
       if (emptyRequests >= _maxEmptyBackChannelRequests) {
@@ -400,6 +569,24 @@ class WebChannelStream {
   void _armBackChannelTimer(WebHttpRequest request) {
     _backChannelTimer?.cancel();
     _backChannelTimer = Timer(_backChannelTimeout, request.abort);
+  }
+
+  bool _switchedToLongPolling = false;
+
+  /// See [autoDetectLongPolling].
+  void _armLongPollingDetection(WebHttpRequest request) {
+    if (!autoDetectLongPolling || _longPolling || _receivedBackChannelData) {
+      return;
+    }
+    _detectionTimer?.cancel();
+    _detectionTimer = Timer(longPollingDetectionTimeout, () {
+      if (_closed || _receivedBackChannelData || _longPolling) {
+        return;
+      }
+      _longPolling = true;
+      _switchedToLongPolling = true;
+      request.abort();
+    });
   }
 
   /// Handles one `[arrayId, payload]` of the server.
@@ -460,15 +647,30 @@ class WebChannelStream {
     }
     _closed = true;
     _backChannelTimer?.cancel();
+    _detectionTimer?.cancel();
     _outgoing.clear();
     if (!_handshakeHeaders.isCompleted) {
       _handshakeHeaders.complete(const <String, String>{});
     }
 
-    final String? sessionId = _sessionId;
-    if (sessionId != null) {
-      // Best effort: the server also drops sessions that go silent.
-      try {
+    unawaited(_endSession());
+    await _messages.close();
+  }
+
+  /// Tells the server that the session is over, see [released].
+  Future<void> _endSession() async {
+    try {
+      final Future<void>? flushing = _flushing;
+      if (flushing != null) {
+        // A request in flight is left to finish: the handshake names the
+        // session to terminate, and a message is delivered, not cut off.
+        await flushing.timeout(
+          releaseTimeout,
+          onTimeout: () => _forwardRequest?.abort(),
+        );
+      }
+      final String? sessionId = _sessionId;
+      if (sessionId != null) {
         final WebHttpRequest terminate = _http.send(
           'GET',
           _url(<String, String>{
@@ -477,17 +679,16 @@ class WebChannelStream {
             'TYPE': 'terminate',
           }),
         );
-        unawaited(
-          terminate.response
-              .then((WebHttpResponse response) => response.body.drain<void>())
-              .catchError((Object _) {}),
-        );
-      } catch (_) {
-        // The client may already be closed.
+        await terminate.response
+            .then((WebHttpResponse response) => response.body.drain<void>())
+            .timeout(releaseTimeout, onTimeout: terminate.abort);
       }
+    } catch (_) {
+      // Best effort: the server also drops sessions that go silent.
+    } finally {
+      // Without a session there is nothing the server could still send.
+      _backRequest?.abort();
+      _released.complete();
     }
-    _backRequest?.abort();
-    _forwardRequest?.abort();
-    await _messages.close();
   }
 }

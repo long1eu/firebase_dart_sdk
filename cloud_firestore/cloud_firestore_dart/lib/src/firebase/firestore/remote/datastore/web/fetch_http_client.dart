@@ -71,6 +71,9 @@ class _FetchRequest implements WebHttpRequest {
       signal: _abort.signal,
       // No cookies: the session is carried in the URL.
       credentials: 'omit',
+      // A redirect would send the request, with its credentials, to wherever
+      // the response says. Firestore never redirects.
+      redirect: 'error',
       cache: 'no-store',
     );
     if (body != null) {

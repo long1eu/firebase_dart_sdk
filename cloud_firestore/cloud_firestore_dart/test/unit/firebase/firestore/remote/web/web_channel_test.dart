@@ -86,10 +86,21 @@ void main() {
     late List<Object> errors;
     late bool done;
 
-    void open({Map<String, String> headers = const <String, String>{}}) {
+    void open({
+      Map<String, String> headers = const <String, String>{},
+      bool forceLongPolling = false,
+      bool autoDetectLongPolling = false,
+    }) {
       http = FakeHttpClient();
       stream = WebChannelStream(http, channelUrl, database, headers,
-          random: Random(1));
+          random: Random(1),
+          retryDelays: const <Duration>[
+            Duration(milliseconds: 5),
+            Duration(milliseconds: 10),
+          ],
+          forceLongPolling: forceLongPolling,
+          autoDetectLongPolling: autoDetectLongPolling,
+          longPollingDetectionTimeout: const Duration(milliseconds: 60));
       messages = <Map<String, Object?>>[];
       errors = <Object>[];
       done = false;
@@ -271,6 +282,13 @@ void main() {
       expect(error.code, StatusCode.permissionDenied);
       expect(error.message, startsWith('Cloud Firestore API has not been'));
       expect(done, isTrue);
+      // The session is terminated on the server as well, and only then is the
+      // back channel request given up.
+      expect(back.aborted, isFalse);
+      final FakeRequest terminate = await http.next();
+      expect(terminate.query['TYPE'], 'terminate');
+      terminate.respond(200);
+      await stream.released;
       expect(back.aborted, isTrue);
     });
 
@@ -369,7 +387,6 @@ void main() {
       await pump();
 
       await stream.close();
-      expect(back.aborted, isTrue);
       expect(done, isTrue);
       expect(errors, isEmpty);
 
@@ -378,12 +395,273 @@ void main() {
       expect(terminate.query['TYPE'], 'terminate');
       expect(terminate.query['SID'], sessionId);
       expect(terminate.query['database'], database);
+      // The back channel request is not cut off before the server knows.
+      expect(back.aborted, isFalse);
       terminate.respond(200);
+      await stream.released;
+      expect(back.aborted, isTrue);
+      expect(terminate.aborted, isFalse);
 
       // Nothing is sent after the close.
       stream.send('{"late":true}');
       await pump();
       expect(http.hasUnclaimed, isFalse);
+    });
+
+    test(
+      'forced long polling asks for responses that end with the data',
+      () async {
+        open(forceLongPolling: true);
+        await handshake();
+        final FakeRequest back = await http.next();
+        expect(back.query['CI'], '1');
+        expect(stream.isLongPolling, isTrue);
+
+        // As the emulator does in this mode: the response ends after the data.
+        back.respond(200, body: chunk(listenChunk));
+        await pump();
+        expect(messages, hasLength(4));
+        final FakeRequest again = await http.next();
+        expect(again.query['CI'], '1');
+        expect(again.query['AID'], '4');
+        expect(errors, isEmpty);
+        await stream.close();
+      },
+    );
+
+    test(
+      'switches to long polling when the first response is held back',
+      () async {
+        open(autoDetectLongPolling: true);
+        await handshake();
+        final FakeRequest first = await http.next();
+        expect(first.query['CI'], '0');
+        // A buffering proxy: the headers may arrive, the data does not.
+        first.stream(200);
+
+        final FakeRequest second = await http.next();
+        expect(first.aborted, isTrue);
+        expect(second.query['CI'], '1');
+        expect(second.query['AID'], '0');
+        expect(stream.isLongPolling, isTrue);
+        expect(errors, isEmpty);
+
+        second.respond(200, body: chunk(listenChunk));
+        await pump();
+        expect(messages, hasLength(4));
+        // Giving up the first request did not count as a failure.
+        (await http.next()).respond(200);
+        (await http.next()).respond(200);
+        await pump();
+        expect(errors, isEmpty);
+        await stream.close();
+      },
+    );
+
+    test(
+      'stays in streaming mode when the first response arrives in time',
+      () async {
+        open(autoDetectLongPolling: true);
+        await handshake();
+        final FakeRequest back = await http.next();
+        back.stream(200);
+        back.add(chunk(listenChunk));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        expect(back.aborted, isFalse);
+        expect(stream.isLongPolling, isFalse);
+        expect(http.hasUnclaimed, isFalse);
+        await stream.close();
+      },
+    );
+
+    test(
+      'closeWhenFlushed delivers the queued messages before it ends the session',
+      () async {
+        open();
+        await handshake();
+        final FakeRequest back = await http.next();
+        back.stream(200);
+        await pump();
+
+        stream.send('{"removeTarget":2}');
+        final FakeRequest forward = await http.next();
+        stream.closeWhenFlushed();
+        await pump();
+        // Still waiting for the request in flight.
+        expect(done, isFalse);
+        expect(forward.aborted, isFalse);
+        expect(back.aborted, isFalse);
+
+        forward.respond(200, body: '7\n[1,2,7]');
+        final FakeRequest terminate = await http.next();
+        expect(terminate.query['TYPE'], 'terminate');
+        terminate.respond(200);
+        await pump();
+        expect(back.aborted, isTrue);
+        expect(done, isTrue);
+        expect(errors, isEmpty);
+      },
+    );
+
+    test(
+      'closeWhenFlushed on a session that never opened just ends it',
+      () async {
+        open();
+        stream.closeWhenFlushed();
+        await pump();
+        expect(http.requests, isEmpty);
+        expect(done, isTrue);
+      },
+    );
+
+    test('a session closed during its handshake is still terminated',
+        () async {
+      open();
+      stream.send(addTarget);
+      final FakeRequest request = await http.next();
+      await stream.close();
+      expect(done, isTrue);
+      // The handshake is left to finish: it names the session to terminate.
+      expect(request.aborted, isFalse);
+      expect(http.hasUnclaimed, isFalse);
+
+      request.respond(200, body: handshakeResponse);
+      final FakeRequest terminate = await http.next();
+      expect(terminate.query['TYPE'], 'terminate');
+      expect(terminate.query['SID'], sessionId);
+      terminate.respond(200);
+      await stream.released;
+      // No back channel was ever requested.
+      expect(http.requests, hasLength(2));
+      expect(errors, isEmpty);
+    });
+
+    test('released completes even when the server never answers', () async {
+      http = FakeHttpClient();
+      stream = WebChannelStream(http, channelUrl, database,
+          const <String, String>{},
+          random: Random(1), releaseTimeout: const Duration(milliseconds: 50));
+      stream.messages.listen((_) {}, onError: (Object _) {});
+      stream.send(addTarget);
+      (await http.next()).respond(200, body: handshakeResponse);
+      final FakeRequest back = await http.next();
+      back.stream(200);
+      await pump();
+
+      await stream.close();
+      final FakeRequest terminate = await http.next();
+      await stream.released;
+      expect(terminate.aborted, isTrue);
+      expect(back.aborted, isTrue);
+    });
+
+    test('a session that never opened is released at once', () async {
+      open();
+      await stream.close();
+      await stream.released;
+      expect(http.requests, isEmpty);
+    });
+
+    test('a header with a line break is refused, nothing is sent', () async {
+      open(headers: <String, String>{
+        'Authorization': 'Bearer x\r\nX-Injected: 1',
+      });
+      stream.send(addTarget);
+      await pump();
+      expect(http.requests, isEmpty);
+      final GrpcError error = errors.single as GrpcError;
+      expect(error.code, StatusCode.invalidArgument);
+      expect(error.message, contains('Authorization'));
+      expect(done, isTrue);
+    });
+
+    test('a forward request that is lost is sent again with the same id',
+        () async {
+      open();
+      final FakeRequest first = await handshake();
+      final FakeRequest back = await http.next();
+      back.stream(200);
+      await pump();
+
+      stream.send('{"removeTarget":2}');
+      final FakeRequest lost = await http.next();
+      lost.fail(StateError('connection reset'));
+
+      // Same request id and body: the server applies a request id once, so
+      // the message is not duplicated if only the answer was lost.
+      final FakeRequest again = await http.next();
+      expect(again.method, 'POST');
+      expect(again.query['RID'], lost.query['RID']);
+      expect(int.parse(again.query['RID']!), int.parse(first.query['RID']!) + 1);
+      expect(again.query['SID'], sessionId);
+      expect(again.body, lost.body);
+      expect(lost.query['t'], '1');
+      expect(again.query['t'], '2');
+      again.respond(200, body: '7\n[1,2,7]');
+      await pump();
+      expect(errors, isEmpty);
+      expect(done, isFalse);
+
+      // The next message has the next id and offset.
+      stream.send('{"x":1}');
+      final FakeRequest next = await http.next();
+      expect(int.parse(next.query['RID']!), int.parse(again.query['RID']!) + 1);
+      expect(next.form['ofs'], '2');
+      await stream.close();
+    });
+
+    test('a forward request that keeps failing ends the stream', () async {
+      open();
+      await handshake();
+      (await http.next()).stream(200);
+      stream.send('{"removeTarget":2}');
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        expect(errors, isEmpty);
+        final FakeRequest request = await http.next();
+        expect(request.query['t'], '$attempt');
+        request.fail(StateError('offline'));
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      }
+      await pump();
+      expect((errors.single as GrpcError).code, StatusCode.unavailable);
+      expect(done, isTrue);
+    });
+
+    test('an error answer to a forward request is not retried', () async {
+      open();
+      await handshake();
+      (await http.next()).stream(200);
+      stream.send('{"removeTarget":2}');
+      (await http.next()).respond(400);
+      await pump();
+      expect((errors.single as GrpcError).code, StatusCode.unavailable);
+      // Only the terminate request follows.
+      expect((await http.next()).query['TYPE'], 'terminate');
+      expect(http.hasUnclaimed, isFalse);
+    });
+
+    test('a back channel request that is cut resumes after the last array',
+        () async {
+      open();
+      await handshake();
+      final FakeRequest back = await http.next();
+      back.stream(200);
+      back.add(chunk(listenChunk));
+      await pump();
+      expect(messages, hasLength(4));
+
+      // The connection is cut in the middle of the response.
+      back.cutBody();
+      final FakeRequest again = await http.next();
+      expect(again.query['RID'], 'rpc');
+      expect(again.query['SID'], sessionId);
+      expect(again.query['AID'], '4');
+      again.stream(200);
+      again.add(chunk('[[5,[{"targetChange":{"targetChangeType":"NO_CHANGE"}}]]]'));
+      await pump();
+      expect(messages, hasLength(5));
+      expect(errors, isEmpty);
+      await stream.close();
     });
   });
 }

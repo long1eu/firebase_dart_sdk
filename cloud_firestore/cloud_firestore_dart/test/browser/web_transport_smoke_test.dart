@@ -1,5 +1,6 @@
 // A smoke test of the web transport (REST and WebChannel over `fetch`) in a
-// real browser, against the Firestore emulator on 127.0.0.1:8080:
+// real browser, against a private Firestore emulator on 127.0.0.1:8090
+// (tool/start_private_emulator.sh):
 //
 //   dart test -p chrome -c dart2wasm test/browser/web_transport_smoke_test.dart
 //
@@ -25,7 +26,7 @@ const String emulatorHost = String.fromEnvironment(
     'FIRESTORE_EMULATOR_HOST_NAME',
     defaultValue: '127.0.0.1');
 const int emulatorPort =
-    int.fromEnvironment('FIRESTORE_EMULATOR_PORT', defaultValue: 8080);
+    int.fromEnvironment('FIRESTORE_EMULATOR_PORT', defaultValue: 8090);
 const String projectId =
     String.fromEnvironment('FIRESTORE_PROJECT_ID', defaultValue: 'demo-test');
 

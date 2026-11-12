@@ -87,6 +87,13 @@ class FakeRequest implements WebHttpRequest {
   /// The request fails before any response, like a network error.
   void fail(Object error) => _response.completeError(error);
 
+  /// The response body breaks off with an error, like a connection that is
+  /// cut in the middle of a response.
+  void cutBody() {
+    _body.addError(StateError('connection cut'));
+    _body.close();
+  }
+
   @override
   Future<WebHttpResponse> get response => _response.future;
 

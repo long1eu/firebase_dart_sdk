@@ -305,16 +305,18 @@ class FirestoreErrorCode
   toString(): String
 class FirestoreSettings
   ==(Object other): bool
-  copyWith({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings}): FirestoreSettings
+  copyWith({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling}): FirestoreSettings
   final cacheSettings: LocalCacheSettings
   final cacheSizeBytes: int
+  final experimentalAutoDetectLongPolling: bool
+  final experimentalForceLongPolling: bool
   final host: String
   final mockUserToken: Object
   final persistenceEnabled: bool
   final port: int
   final sslEnabled: bool
   get hashCode: int
-  new FirestoreSettings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings})
+  new FirestoreSettings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling})
   static final cacheSizeUnlimited: int
   static final defaultCacheSizeBytes: int
   static final defaultHost: String

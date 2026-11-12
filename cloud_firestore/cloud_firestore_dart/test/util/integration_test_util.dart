@@ -103,16 +103,32 @@ class IntegrationTestUtil {
   static final ApplicationDefaultTokenSource _realProjectTokens =
       ApplicationDefaultTokenSource();
 
-  /// With `FIRESTORE_TEST_TRANSPORT=webchannel` every client of the test run
+  /// With `FIRESTORE_TEST_TRANSPORT=webchannel` (or `webchannel-longpolling`) every client of the test run
   /// uses the web transport (REST and WebChannel, over `dart:io` HTTP) instead
   /// of gRPC. Returns whether it is in use.
   static bool useWebTransportIfRequested() {
-    if (Platform.environment['FIRESTORE_TEST_TRANSPORT'] != 'webchannel') {
+    final String? transport = Platform.environment['FIRESTORE_TEST_TRANSPORT'];
+    // `webchannel-longpolling` requests the streams in long polling mode.
+    final bool longPolling = transport == 'webchannel-longpolling';
+    if (transport != 'webchannel' && !longPolling) {
       return false;
     }
     Datastore.transportOverride =
         (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
-            WebChannelTransport(IoWebHttpClient(), databaseInfo, options);
+            WebChannelTransport(
+              IoWebHttpClient(),
+              DatabaseInfo(
+                databaseInfo.databaseId,
+                databaseInfo.persistenceKey,
+                databaseInfo.host,
+                port: databaseInfo.port,
+                sslEnabled: databaseInfo.sslEnabled,
+                forceLongPolling: longPolling,
+                autoDetectLongPolling:
+                    !longPolling && databaseInfo.autoDetectLongPolling,
+              ),
+              options,
+            );
     return true;
   }
 

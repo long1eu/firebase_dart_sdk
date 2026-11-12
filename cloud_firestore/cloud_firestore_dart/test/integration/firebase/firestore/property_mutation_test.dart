@@ -24,6 +24,8 @@ import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
 import '../../../util/property.dart';
+import '../../../util/property_backend.dart'
+    show configureGeneratorsForBackend;
 
 /// One write: how to issue it through the public API, the mutation the SDK
 /// builds for it, and a description.
@@ -301,6 +303,7 @@ final String? needsEmulator = IntegrationTestUtil.emulatorHost == null
     : null;
 
 void main() {
+  configureGeneratorsForBackend();
   IntegrationTestUtil.currentDatabasePath = 'integration/property_mutation';
 
   late Firestore firestore;

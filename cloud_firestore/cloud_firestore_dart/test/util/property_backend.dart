@@ -3,6 +3,7 @@
 // (test/integration_enterprise), which adds the BSON types.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -13,6 +14,16 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart'
 import 'package:test/test.dart';
 
 import 'property.dart';
+
+/// Adapts the generators to what the backend of this run can hold. Call it first in `main` of a test that compares
+/// the client with the backend.
+///
+/// On the web transport (`FIRESTORE_TEST_TRANSPORT=webchannel*`) no negative zero is generated: the JSON endpoints
+/// of the emulator store -0.0 as 0.0, so the backend could never agree with the client about its sign.
+void configureGeneratorsForBackend() {
+  Gen.negativeZero = !(Platform.environment['FIRESTORE_TEST_TRANSPORT'] ?? '')
+      .startsWith('webchannel');
+}
 
 /// Writes [documents] (id to data) to [collection] in batches.
 Future<void> writeAll(CollectionReference<Map<String, Object?>> collection,
@@ -102,7 +113,7 @@ Future<void> checkValueOrderAgainstBackend(
 List<Object?> queryValuePool(
         Gen gen, DocumentReference<Object?> Function(String id) doc) =>
     <Object?>[
-      null, double.nan, false, true, 0, -0.0, 1, 1.0, 2, 2.5, -1, 3, //
+      null, double.nan, false, true, 0, Gen.signedZero, 1, 1.0, 2, 2.5, -1, 3, //
       9007199254740993, 9007199254740992.0, '', 'a', 'b', 'aa', 'é', 'A',
       const <Object?>[], const <Object?>[1], const <Object?>[1, 2],
       const <Object?>['a', null], const <Object?>[double.nan],

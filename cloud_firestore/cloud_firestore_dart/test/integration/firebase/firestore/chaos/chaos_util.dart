@@ -13,19 +13,22 @@ import '../../../../util/chaos_proxy.dart';
 import '../../../../util/integration_test_util.dart';
 import '../../../../util/test_backend.dart';
 
-/// Why the chaos tests cannot run, or null: they only ever run against the emulator, over the gRPC transport.
+/// Why the chaos tests cannot run, or null: they only ever run against the emulator.
 String? get chaosSkipReason {
   if (IntegrationTestUtil.emulatorHost == null) {
     return 'FIRESTORE_EMULATOR_HOST is not set: the chaos tests only run against the emulator';
   }
-  if (Platform.environment['FIRESTORE_TEST_TRANSPORT'] == 'webchannel') {
-    // The scenarios cut the single HTTP/2 connection of the gRPC transport at chosen moments. The web transport
-    // uses several short HTTP/1.1 connections, and under this load even the undisturbed clients go offline against
-    // the emulator (see reviews/chaos_findings.md, F3).
-    return 'The chaos tests are written for the gRPC transport (FIRESTORE_TEST_TRANSPORT=webchannel is set)';
-  }
   return null;
 }
+
+/// Whether the clients of this run use the web transport (REST and WebChannel) instead of gRPC.
+bool get usesWebTransport =>
+    (Platform.environment['FIRESTORE_TEST_TRANSPORT'] ?? '')
+        .startsWith('webchannel');
+
+/// The skip reason of a scenario that cannot hold on the web transport, or null on gRPC.
+String? webTransportSkipReason(String why) =>
+    usesWebTransport ? 'Not on the web transport: $why' : null;
 
 int _names = 0;
 

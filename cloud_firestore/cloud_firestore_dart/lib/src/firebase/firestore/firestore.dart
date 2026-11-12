@@ -34,6 +34,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/persistent_cache_index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/connectivity_monitor.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
@@ -213,6 +214,9 @@ class Firestore {
       firestoreSettings.host,
       port: firestoreSettings.port,
       sslEnabled: firestoreSettings.sslEnabled,
+      forceLongPolling: firestoreSettings.experimentalForceLongPolling,
+      autoDetectLongPolling:
+          firestoreSettings.experimentalAutoDetectLongPolling,
     );
 
     final TaskScheduler scheduler = TaskScheduler(app.name);
@@ -221,7 +225,7 @@ class Firestore {
       firestoreSettings,
       provider,
       openDatabase,
-      app.onNetworkConnected,
+      withPlatformConnectivity(app.onNetworkConnected),
       scheduler,
       appCheckProvider: appCheck,
     );

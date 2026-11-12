@@ -16,6 +16,7 @@ final String? needsEmulator = IntegrationTestUtil.emulatorHost == null
     : null;
 
 void main() {
+  configureGeneratorsForBackend();
   IntegrationTestUtil.currentDatabasePath = 'integration/property_value_order';
 
   tearDown(() async {

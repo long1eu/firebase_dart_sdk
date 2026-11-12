@@ -305,7 +305,12 @@ void main() {
       // Reading the document from the backend (a get or a listener) repairs the cache.
       expect((await doc.get(Source.server)).data, server);
       expect((await doc.get(Source.cache)).data, server);
-    });
+    },
+        // Over WebChannel a client message is a request of its own, and one is sent at a time (as WebChannel does
+        // over HTTP/1.1): while the answer to the first write is held back the second write is not sent, so the
+        // backend never has both. The lost acknowledgement itself is covered by the scenarios above.
+        skip: webTransportSkipReason(
+            'needs two writes in flight at once; the web transport sends one request at a time'));
 
     test('survive a stalled connection that is then cut', () async {
       final Firestore db = await env.newClient();

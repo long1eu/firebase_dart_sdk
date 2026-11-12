@@ -17,7 +17,11 @@ class FirestoreSettings {
     bool persistenceEnabled = true,
     int cacheSizeBytes = defaultCacheSizeBytes,
     LocalCacheSettings? cacheSettings,
+    bool experimentalForceLongPolling = false,
+    bool? experimentalAutoDetectLongPolling,
   }) : this._(
+         experimentalForceLongPolling: experimentalForceLongPolling,
+         experimentalAutoDetectLongPolling: experimentalAutoDetectLongPolling,
          host: host,
          port: port,
          sslEnabled: sslEnabled,
@@ -40,9 +44,15 @@ class FirestoreSettings {
     required this.cacheSettings,
     required bool emulator,
     required Object? mockUserToken,
+    required this.experimentalForceLongPolling,
+    required bool? experimentalAutoDetectLongPolling,
   }) : _emulator = emulator,
        host = _checkHost(host),
        sslEnabled = _checkSslEnabled(sslEnabled, host),
+       experimentalAutoDetectLongPolling = _resolveAutoDetectLongPolling(
+         experimentalForceLongPolling,
+         experimentalAutoDetectLongPolling,
+       ),
        mockUserToken = _checkMockUserToken(
          mockUserToken,
          emulator,
@@ -130,6 +140,31 @@ class FirestoreSettings {
   /// `sub` or `user_id`, which becomes the user id; missing claims get
   /// defaults. For example `{'sub': 'alice', 'email': 'alice@example.com'}`.
   final Object? mockUserToken;
+
+  /// Web only (ignored where the client uses gRPC): always use long polling
+  /// for the listen and write streams, instead of a streamed HTTP response.
+  /// For networks with a proxy or an antivirus that buffers responses, which
+  /// otherwise shows as listeners and writes that never complete. Less
+  /// efficient. Same as `experimentalForceLongPolling` of the JS SDK. Cannot be
+  /// combined with [experimentalAutoDetectLongPolling].
+  final bool experimentalForceLongPolling;
+
+  /// Web only (ignored where the client uses gRPC): switch a stream to long
+  /// polling when its first response does not arrive in time, which is how a
+  /// buffering proxy shows. On by default, unless
+  /// [experimentalForceLongPolling] is set. The option of the same name of the
+  /// JS SDK has the same purpose but detects differently.
+  final bool experimentalAutoDetectLongPolling;
+
+  static bool _resolveAutoDetectLongPolling(bool force, bool? autoDetect) {
+    if (force && autoDetect == true) {
+      throw ArgumentError(
+        'experimentalForceLongPolling and experimentalAutoDetectLongPolling '
+        'cannot be used together.',
+      );
+    }
+    return autoDetect ?? !force;
+  }
 
   /// Whether these settings were made by [withEmulator] (and the host was not
   /// changed afterwards).
@@ -286,6 +321,8 @@ class FirestoreSettings {
     bool? persistenceEnabled,
     int? cacheSizeBytes,
     LocalCacheSettings? cacheSettings,
+    bool? experimentalForceLongPolling,
+    bool? experimentalAutoDetectLongPolling,
   }) {
     // The settings stay emulator settings (and keep their mock user token)
     // only while they point at the same emulator. Changing the host of
@@ -302,6 +339,8 @@ class FirestoreSettings {
       persistenceEnabled: persistenceEnabled,
       cacheSizeBytes: cacheSizeBytes,
       cacheSettings: cacheSettings,
+      experimentalForceLongPolling: experimentalForceLongPolling,
+      experimentalAutoDetectLongPolling: experimentalAutoDetectLongPolling,
       emulator: emulator,
       mockUserToken: mockUserToken,
     );
@@ -314,9 +353,13 @@ class FirestoreSettings {
     bool? persistenceEnabled,
     int? cacheSizeBytes,
     LocalCacheSettings? cacheSettings,
+    bool? experimentalForceLongPolling,
+    bool? experimentalAutoDetectLongPolling,
     required bool emulator,
     required Object? mockUserToken,
   }) {
+    final bool forceLongPolling =
+        experimentalForceLongPolling ?? this.experimentalForceLongPolling;
     // The persistence flags are derived when there are cache settings, so only
     // the explicitly given ones are forwarded (and checked) in that case.
     final LocalCacheSettings? newCacheSettings =
@@ -336,6 +379,13 @@ class FirestoreSettings {
               ? this.cacheSizeBytes
               : defaultCacheSizeBytes),
       cacheSettings: newCacheSettings,
+      experimentalForceLongPolling: forceLongPolling,
+      // Turning one option on turns the other off, unless both are given.
+      experimentalAutoDetectLongPolling:
+          experimentalAutoDetectLongPolling ??
+          (experimentalForceLongPolling == null
+              ? this.experimentalAutoDetectLongPolling
+              : null),
       emulator: emulator,
       mockUserToken: mockUserToken,
     );
@@ -352,6 +402,9 @@ class FirestoreSettings {
           persistenceEnabled == other.persistenceEnabled &&
           cacheSizeBytes == other.cacheSizeBytes &&
           cacheSettings == other.cacheSettings &&
+          experimentalForceLongPolling == other.experimentalForceLongPolling &&
+          experimentalAutoDetectLongPolling ==
+              other.experimentalAutoDetectLongPolling &&
           const DeepCollectionEquality().equals(
             mockUserToken,
             other.mockUserToken,
@@ -365,6 +418,8 @@ class FirestoreSettings {
       persistenceEnabled.hashCode ^
       cacheSizeBytes.hashCode ^
       cacheSettings.hashCode ^
+      experimentalForceLongPolling.hashCode ^
+      experimentalAutoDetectLongPolling.hashCode ^
       const DeepCollectionEquality().hash(mockUserToken);
 
   @override
@@ -376,6 +431,11 @@ class FirestoreSettings {
           ..add('persistenceEnabled', persistenceEnabled)
           ..add('cacheSizeBytes', cacheSizeBytes)
           ..add('cacheSettings', cacheSettings)
+          ..add('experimentalForceLongPolling', experimentalForceLongPolling)
+          ..add(
+            'experimentalAutoDetectLongPolling',
+            experimentalAutoDetectLongPolling,
+          )
           ..add('mockUserToken', mockUserToken == null ? null : '<set>'))
         .toString();
   }

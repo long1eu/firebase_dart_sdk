@@ -49,12 +49,18 @@ Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChann
 listen and write streams, over `fetch`. What to know:
 
 - The cache is in memory only on the web (no SQLite persistence there yet).
-- It was verified against the emulator only: 16 tests in Chrome
-  (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 15 pass and 1 is skipped),
+- It was verified against the emulator only: 19 tests in Chrome
+  (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 18 pass and 1 is skipped),
   and the whole standard integration suite on the VM over the web transport
   (`tool/test_integration.sh standard --transport=webchannel`). Other browsers and the
   production backend are untested.
 - Prefer dart2wasm. Compiled to JavaScript, integers above 2^53 lose precision.
+- If listeners or writes never complete on some network (a proxy or antivirus that buffers
+  streamed responses), set `FirestoreSettings(experimentalForceLongPolling: true)`. The
+  client also tries to detect this by itself (`experimentalAutoDetectLongPolling`, on by
+  default).
+- Do not compile with `-Dprotobuf.omit_field_names=true` or `-Dprotobuf.omit_enum_names=true`:
+  the web transport needs those names, and refuses to start without them.
 
 ## Features
 

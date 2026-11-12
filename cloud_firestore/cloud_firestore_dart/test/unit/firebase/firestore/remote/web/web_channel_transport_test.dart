@@ -9,6 +9,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/firestore_transport.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rest_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rpc_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_channel_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
@@ -314,8 +315,11 @@ void main() {
       expect(errors, isEmpty);
 
       await call.cancel();
+      final FakeRequest terminate = await http.next();
+      expect(terminate.query['TYPE'], 'terminate');
+      terminate.respond(200);
+      await pump();
       expect(back.aborted, isTrue);
-      expect((await http.next()).query['TYPE'], 'terminate');
       await requests.close();
     });
 
@@ -338,6 +342,8 @@ void main() {
           body: '52\n[[0,["c","YpagAp1anIKb52xNgWf4xg==","",8,12,30000]]]');
       final FakeRequest back = await http.next();
       back.stream(200);
+      // The answer to the handshake: the next request is only sent after it.
+      back.add('49\n[[1,[{"streamId":"15395","streamToken":"MA=="}]]]');
       await pump();
 
       // The final (empty) write of a write stream, then the close.
@@ -349,7 +355,9 @@ void main() {
       expect(done, isFalse);
       lastWrite.respond(200, body: '7\n[1,2,7]');
 
-      expect((await http.next()).query['TYPE'], 'terminate');
+      final FakeRequest terminate = await http.next();
+      expect(terminate.query['TYPE'], 'terminate');
+      terminate.respond(200);
       await pump();
       expect(back.aborted, isTrue);
       expect(done, isTrue);
@@ -425,7 +433,14 @@ void main() {
       back.stream(200);
       await pump();
 
-      await transport.shutdown();
+      final Future<void> shutdown = transport.shutdown();
+      // The session is terminated before the HTTP client is closed, which
+      // would cut the request off.
+      final FakeRequest terminate = await http.next();
+      expect(terminate.query['TYPE'], 'terminate');
+      expect(http.closed, isFalse);
+      terminate.respond(200);
+      await shutdown;
       await pump();
       expect(back.aborted, isTrue);
       expect(done, isTrue);
@@ -441,6 +456,252 @@ void main() {
               .toList(),
           throwsA(isA<GrpcError>()));
       await requests.close();
+    });
+  });
+
+  group('write requests go out one at a time', () {
+    late StreamController<proto.WriteRequest> requests;
+    late List<proto.WriteResponse> responses;
+    late List<Object> errors;
+    late FakeRequest back;
+
+    proto.WriteRequest write(String id) => proto.WriteRequest()
+      ..streamToken = <int>[0x30]
+      ..writes.add(proto.Write()..delete = '$database/documents/c/$id');
+
+    String deleted(FakeRequest request) =>
+        ((((jsonDecode(request.form['req0___data__']!)
+                        as Map<String, Object?>)['writes']!
+                    as List<Object?>)
+                .single!
+            as Map<String, Object?>)['delete']!
+            as String)
+            .split('/')
+            .last;
+
+    setUp(() async {
+      requests = StreamController<proto.WriteRequest>();
+      responses = <proto.WriteResponse>[];
+      errors = <Object>[];
+      transport
+          .startCall(FirestoreRpc.write, requests.stream)
+          .listen(responses.add, onError: errors.add);
+      requests.add(proto.WriteRequest()..database = database);
+      (await http.next()).respond(200,
+          body: '52\n[[0,["c","YpagAp1anIKb52xNgWf4xg==","",8,12,30000]]]');
+      back = await http.next();
+      back.stream(200);
+      await pump();
+    });
+
+    tearDown(() => requests.close());
+
+    test('the next write waits for the response to the previous one',
+        () async {
+      // Queued while the handshake is not answered yet.
+      requests.add(write('a'));
+      requests.add(write('b'));
+      await pump();
+      expect(http.hasUnclaimed, isFalse);
+
+      back.add('49\n[[1,[{"streamId":"15395","streamToken":"MA=="}]]]');
+      final FakeRequest first = await http.next();
+      expect(first.form['count'], '1');
+      expect(deleted(first), 'a');
+      first.respond(200, body: '7\n[1,2,7]');
+      await pump();
+      // Delivered, but not answered: `b` stays back.
+      expect(http.hasUnclaimed, isFalse);
+
+      back.add(chunk(
+          '[[2,[{"streamToken":"MQ==","writeResults":[{}],"commitTime":"2026-11-12T21:14:41.553199Z"}]]]'));
+      final FakeRequest second = await http.next();
+      expect(deleted(second), 'b');
+      expect(second.form['ofs'], '2');
+      second.respond(200, body: '7\n[1,3,7]');
+      await pump();
+      expect(responses, hasLength(2));
+      expect(errors, isEmpty);
+    });
+
+    test('a write that fails is not followed by the writes behind it',
+        () async {
+      back.add('49\n[[1,[{"streamId":"15395","streamToken":"MA=="}]]]');
+      requests.add(write('a'));
+      requests.add(write('b'));
+      final FakeRequest first = await http.next();
+      first.respond(200, body: '7\n[1,2,7]');
+      await pump();
+
+      // As the emulator reports a failed write: a message, and the session
+      // goes on, so `b` would be applied if it had been sent ahead.
+      back.add(chunk(
+          '[[2,[{"error":{"message":"NOT_FOUND: no entity to update","status":"NOT_FOUND"}}]]]'));
+      await pump();
+      expect((errors.single as GrpcError).code, StatusCode.notFound);
+
+      // Only the end of the session follows; `b` goes out on the next stream.
+      final FakeRequest terminate = await http.next();
+      expect(terminate.query['TYPE'], 'terminate');
+      terminate.respond(200);
+      await pump();
+      expect(http.hasUnclaimed, isFalse);
+      expect(
+          http.requests.where((FakeRequest r) => r.method == 'POST'),
+          hasLength(2),
+          reason: 'the handshake and the first write');
+    });
+  });
+
+  group('robustness', () {
+    test(
+      'a unary call that takes too long fails with DEADLINE_EXCEEDED',
+      () async {
+        final DatabaseId databaseId = DatabaseId.forProject('demo-test');
+        final WebChannelTransport quick = WebChannelTransport(
+          http,
+          DatabaseInfo(
+            databaseId,
+            'key',
+            '127.0.0.1',
+            port: 8080,
+            sslEnabled: false,
+          ),
+          ChannelOptionsProvider(
+            databaseId: databaseId,
+            credentialsProvider: _TokenProvider(),
+          ),
+          unaryTimeout: const Duration(milliseconds: 50),
+        );
+        final Future<List<proto.CommitResponse>> responses = quick
+            .startCall(
+              FirestoreRpc.commit,
+              Stream<proto.CommitRequest>.value(
+                proto.CommitRequest()..database = database,
+              ),
+            )
+            .toList();
+        final FakeRequest request = await http.next();
+        // Headers arrive, the body never ends.
+        request.stream(200);
+
+        await expectLater(
+          responses,
+          throwsA(
+            isA<GrpcError>()
+                .having(
+                  (GrpcError e) => e.code,
+                  'code',
+                  StatusCode.deadlineExceeded,
+                )
+                .having(
+                  (GrpcError e) => e.message,
+                  'message',
+                  'Request time out',
+                ),
+          ),
+        );
+        expect(request.aborted, isTrue);
+      },
+    );
+
+    test('the default unary timeout is the 15 seconds of the JS SDK', () {
+      expect(RestClient.defaultTimeout, const Duration(seconds: 15));
+    });
+
+    test('closing the requests of a stream ends its session', () async {
+      final StreamController<proto.ListenRequest> requests =
+          StreamController<proto.ListenRequest>();
+      bool done = false;
+      final List<Object> errors = <Object>[];
+      transport
+          .startCall(FirestoreRpc.listen, requests.stream)
+          .listen((_) {}, onError: errors.add, onDone: () => done = true);
+      requests.add(proto.ListenRequest()..database = database);
+      (await http.next()).respond(
+        200,
+        body: '52\n[[0,["c","4ApGpUebBDNnT9YbQeHo6g==","",8,12,30000]]]',
+      );
+      final FakeRequest back = await http.next();
+      back.stream(200);
+      await pump();
+
+      // What BaseStream does when the client stops a stream: no cancel.
+      await requests.close();
+      final FakeRequest terminate = await http.next();
+      expect(terminate.query['TYPE'], 'terminate');
+      terminate.respond(200);
+      await pump();
+      expect(back.aborted, isTrue);
+      expect(done, isTrue);
+      expect(errors, isEmpty);
+    });
+
+    test('long polling settings of the database reach the streams', () async {
+      final DatabaseId databaseId = DatabaseId.forProject('demo-test');
+      final WebChannelTransport polling = WebChannelTransport(
+        http,
+        DatabaseInfo(
+          databaseId,
+          'key',
+          '127.0.0.1',
+          port: 8080,
+          sslEnabled: false,
+          forceLongPolling: true,
+          autoDetectLongPolling: false,
+        ),
+        ChannelOptionsProvider(
+          databaseId: databaseId,
+          credentialsProvider: _TokenProvider(),
+        ),
+      );
+      final StreamController<proto.ListenRequest> requests =
+          StreamController<proto.ListenRequest>();
+      final ResponseStream<proto.ListenResponse> call = polling.startCall(
+        FirestoreRpc.listen,
+        requests.stream,
+      );
+      call.listen((_) {});
+      requests.add(proto.ListenRequest()..database = database);
+      (await http.next()).respond(
+        200,
+        body: '52\n[[0,["c","4ApGpUebBDNnT9YbQeHo6g==","",8,12,30000]]]',
+      );
+      expect((await http.next()).query['CI'], '1');
+      await call.cancel();
+      await requests.close();
+    });
+
+    test('refuses to start without the protobuf names proto3 JSON needs', () {
+      // The real messages have their names.
+      WebChannelTransport.checkProto3JsonNames();
+
+      // As with -Dprotobuf.omit_field_names=true: the keys are field numbers.
+      expect(
+        () => WebChannelTransport.checkProto3JsonNames(
+          encodeRequest: () => <String, Object?>{'1': 'd'},
+        ),
+        throwsA(
+          isA<UnsupportedError>().having(
+            (UnsupportedError e) => e.message,
+            'message',
+            contains('protobuf.omit_field_names'),
+          ),
+        ),
+      );
+      // As with -Dprotobuf.omit_enum_names=true: enums are numbers.
+      expect(
+        () => WebChannelTransport.checkProto3JsonNames(
+          encodeEnum: () => <String, Object?>{'targetChangeType': 2},
+        ),
+        throwsA(
+          isA<UnsupportedError>().having(
+            (UnsupportedError e) => e.message,
+            'message',
+            contains('enum names'),
+          ),
+        ),
+      );
     });
   });
 
