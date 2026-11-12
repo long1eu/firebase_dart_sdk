@@ -22,7 +22,15 @@ import 'package:test/test.dart';
 bool _isPublic(Symbol symbol) => !MirrorSystem.getName(symbol).startsWith('_');
 
 final RegExp _typedef =
-    RegExp(r'^typedef (\w+)(?:<[^=]*>)? = ([^;]+);', multiLine: true);
+    RegExp(r'^typedef (\w+)(?:<[^=]*>)?\s*=\s*([^;]+);', multiLine: true);
+
+/// The right-hand side of a typedef on one line, independent of how the
+/// formatter laid it out (line breaks, trailing commas).
+String _normalizeTypedef(String type) => type
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .replaceAllMapped(RegExp(r'([(\[{<]) '), (Match m) => m.group(1)!)
+    .replaceAllMapped(RegExp(r',? ?([)\]}>])'), (Match m) => m.group(1)!)
+    .trim();
 
 String _name(Symbol symbol) => MirrorSystem.getName(symbol);
 
@@ -167,7 +175,7 @@ String describePublicApi([Symbol library = #cloud_firestore_dart]) {
         continue;
       }
       entries[name] = <String>[
-        'typedef $name = ${m.group(2)!.replaceAll(RegExp(r'\s+'), ' ')}'
+        'typedef $name = ${_normalizeTypedef(m.group(2)!)}'
       ];
     }
   }

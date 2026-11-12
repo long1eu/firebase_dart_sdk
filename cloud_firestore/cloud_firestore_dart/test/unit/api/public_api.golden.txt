@@ -420,7 +420,7 @@ typedef OnConfigure = Future<void> Function(Database db)
 typedef OnCreate = Future<void> Function(Database db, int version)
 typedef OnOpen = Future<void> Function(Database db)
 typedef OnProgressListener = void Function(LoadBundleTaskProgress snapshot)
-typedef OnVersionChange = Future<void> Function( Database db, int oldVersion, int newVersion)
+typedef OnVersionChange = Future<void> Function(Database db, int oldVersion, int newVersion)
 typedef OpenDatabase = Future<Database> Function(String path, {int version, OnConfigure onConfigure, OnCreate onCreate, OnVersionChange onUpgrade, OnVersionChange onDowngrade, OnOpen onOpen})
 class PersistentCacheIndexManager
   deleteAllIndexes(): Future<void>
