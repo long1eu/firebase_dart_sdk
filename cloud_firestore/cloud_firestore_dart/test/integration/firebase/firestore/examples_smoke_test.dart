@@ -9,6 +9,8 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
+import '../../../util/test_hygiene.dart';
+
 /// Files of example/ that are libraries, not programs.
 const Set<String> _libraries = <String>{'common.dart', 'sqlite_database.dart'};
 
@@ -28,6 +30,8 @@ const Set<String> _expected = <String>{
 };
 
 void main() {
+  checkTestsLeaveNothingBehind();
+
   final String? emulator = Platform.environment['FIRESTORE_EMULATOR_HOST'];
   final Object skip = emulator == null || emulator.isEmpty
       ? 'The examples need the Firestore emulator: set FIRESTORE_EMULATOR_HOST.'

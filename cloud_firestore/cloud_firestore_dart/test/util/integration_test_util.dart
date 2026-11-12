@@ -35,6 +35,7 @@ import '../unit/firebase/firestore/local/mock/database_mock.dart';
 import 'io_web_http_client.dart';
 import 'prod_provider/firestore_provider.dart';
 import 'test_backend.dart';
+import 'test_hygiene.dart';
 
 // ignore: avoid_classes_with_only_static_members
 /// A set of helper methods for tests
@@ -309,6 +310,8 @@ class IntegrationTestUtil {
     }
     firestoreStatus.clear();
     credentialsProviders.clear();
+    // Instances that a test created through the public API are its own to terminate.
+    await expectTestLeftNothingBehind();
   }
 
   static Future<DocumentReference> testDocument() async {

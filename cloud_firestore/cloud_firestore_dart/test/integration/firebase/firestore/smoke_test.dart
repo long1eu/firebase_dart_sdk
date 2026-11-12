@@ -16,7 +16,6 @@ import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/smoke';
 
@@ -56,7 +55,7 @@ void main() {
         .listen(accumulator.onData, onError: accumulator.onError);
     final DocumentSnapshot doc = await accumulator.wait();
     expect(doc.data, testData);
-    listener.cancel();
+    await listener.cancel();
   });
 
   test('testObservesNewDocument', () async {
@@ -78,7 +77,7 @@ void main() {
     doc = await accumulator.wait();
     expect(doc.data, testData);
     expect(doc.metadata.hasPendingWrites, isFalse);
-    listener.cancel();
+    await listener.cancel();
   });
 
   test('testWillFireValueEventsForEmptyCollections', () async {
@@ -92,7 +91,7 @@ void main() {
     final QuerySnapshot querySnap = await accumulator.wait();
     expect(querySnap.length, 0);
     expect(querySnap, isEmpty);
-    listener.cancel();
+    await listener.cancel();
   });
 
   test('testGetCollectionQuery', () async {

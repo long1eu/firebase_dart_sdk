@@ -39,7 +39,6 @@ const testFirestore = IntegrationTestUtil.testFirestore;
 const testCollectionWithDocs = IntegrationTestUtil.testCollectionWithDocs;
 const querySnapshotToIds = IntegrationTestUtil.querySnapshotToIds;
 
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/or_query';
 

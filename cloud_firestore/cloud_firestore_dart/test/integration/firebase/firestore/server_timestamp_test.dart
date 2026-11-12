@@ -19,7 +19,6 @@ import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/server_timestamp';
 
@@ -204,12 +203,12 @@ void main() {
     await docRef.firestore.client.disableNetwork();
     await accumulator.awaitRemoteEvent();
 
-    docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]);
+    unawaited(docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]));
     DocumentSnapshot localSnapshot = await accumulator.awaitLocalEvent();
     expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
 
     // include b=1 to ensure there's a change resulting in a new snapshot.
-    docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp(), 'b', 1]);
+    unawaited(docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp(), 'b', 1]));
     localSnapshot = await accumulator.awaitLocalEvent();
     expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
 
@@ -225,14 +224,14 @@ void main() {
     await docRef.firestore.client.disableNetwork();
     await accumulator.awaitRemoteEvent();
 
-    docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]);
+    unawaited(docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]));
     DocumentSnapshot localSnapshot = await accumulator.awaitLocalEvent();
     expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 42);
 
-    docRef.updateFromList(<dynamic>['a', 1337]);
+    unawaited(docRef.updateFromList(<dynamic>['a', 1337]));
     await accumulator.awaitLocalEvent();
 
-    docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]);
+    unawaited(docRef.updateFromList(<dynamic>['a', FieldValue.serverTimestamp()]));
     localSnapshot = await accumulator.awaitLocalEvent();
     expect(localSnapshot.get('a', ServerTimestampBehavior.previous), 1337);
 

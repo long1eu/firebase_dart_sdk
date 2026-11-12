@@ -2,6 +2,8 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
+import '../../../util/test_hygiene.dart';
+
 FirebaseApp newApp(String name) => FirebaseApp.withOptions(
       const FirebaseOptions(
           apiKey: 'key', applicationId: 'appId', projectId: 'projectId'),
@@ -10,6 +12,8 @@ FirebaseApp newApp(String name) => FirebaseApp.withOptions(
     );
 
 void main() {
+  checkTestsLeaveNothingBehind();
+
   test('getInstance returns the cached instance per app and database',
       () async {
     final FirebaseApp app = newApp('cacheTestApp');

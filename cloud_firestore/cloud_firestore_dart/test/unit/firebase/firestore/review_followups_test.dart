@@ -15,6 +15,8 @@ import 'clear_persistence_test.dart'
     show firestoreErrorWithCode, newApp, offlineSettings, openFixed;
 import 'local/mock/database_mock.dart';
 
+import '../../../util/test_hygiene.dart';
+
 class _Client extends Mock implements FirestoreClient {}
 
 String? _nickname(
@@ -41,6 +43,8 @@ const FirestoreDataConverter<String?> upperNicknameConverter =
 );
 
 void main() {
+  checkTestsLeaveNothingBehind();
+
   group('converters', () {
     late Firestore db;
 

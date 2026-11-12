@@ -1,6 +1,8 @@
 // File created by
 // Lung Razvan <long1eu>
 // on 26/09/2018
+import 'dart:async';
+
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/event_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
@@ -160,7 +162,7 @@ void main() {
 
     final QueryListenerMock spy = QueryListenerMock(query1);
 
-    eventManager.addQueryListener(spy);
+    unawaited(eventManager.addQueryListener(spy));
     expect(spy.onlineStates, <OnlineState>[OnlineState.unknown]);
     eventManager.handleOnlineStateChange(OnlineState.online);
     expect(spy.onlineStates,

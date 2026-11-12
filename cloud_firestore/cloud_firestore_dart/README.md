@@ -374,6 +374,27 @@ When the stream breaks, the writes that were not acknowledged are sent again on 
 upstream does. Overwrites and deletes are harmless to repeat; whether the backend recognises a
 repeated write that carries a relative transform such as `FieldValue.increment` was not verified.
 
+## Lifecycle: `terminate()`
+
+`await firestore.terminate()` stops the instance: listeners stop receiving events, the streams and
+the local cache are closed, and `Firestore.instanceFor` returns a new instance from then on. What
+happens to work that was in progress, as in the Android and JS SDKs:
+
+- A write whose future has not completed (it was not acknowledged by the backend yet) **never
+  completes**: its future neither succeeds nor fails. With persistence the write is still in the
+  local cache and is sent by the next instance; with a memory cache it is lost. Call
+  `waitForPendingWrites()` before `terminate()` if the writes matter, and do not `await` a write
+  after terminating the instance.
+- A transaction, an aggregate query or a server read that is in flight fails with the error of the
+  closed connection; a transaction is not retried once the instance is terminated.
+- Calls made after `terminate()` fail (`terminate()` itself can be called again).
+- A call that the client had finished with but the backend had not closed yet (a stopped
+  listener, for example) is cancelled.
+
+In tests, terminate every instance and `await` every operation before the test ends: an operation
+that is still in flight when its instance is terminated fails afterwards, and an unhandled error
+then fails whichever test is running.
+
 ## Persistence and connectivity
 
 - The package does not open SQLite files itself: you pass an `OpenDatabase` function to

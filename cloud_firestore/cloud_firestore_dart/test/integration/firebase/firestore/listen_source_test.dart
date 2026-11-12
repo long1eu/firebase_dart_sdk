@@ -21,7 +21,6 @@ import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
 // NOT RUN by the author: written without executing it, needs the emulator.
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/listen_source_test';
 
@@ -80,7 +79,7 @@ void main() {
 
     // A local write raises an event even though the cache only listener never
     // contacts the backend itself.
-    collection.document('c').set(map(<String>['k', 'c']));
+    unawaited(collection.document('c').set(map(<String>['k', 'c'])));
     await waitFor(events, 2);
     expect(events.last.documentChanges.length, 1);
     expect(events.last.metadata.hasPendingWrites, isTrue);

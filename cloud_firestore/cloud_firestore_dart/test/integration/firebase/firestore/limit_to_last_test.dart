@@ -32,7 +32,6 @@ const querySnapshotToValues = IntegrationTestUtil.querySnapshotToValues;
 
 const testFirestore = IntegrationTestUtil.testFirestore;
 
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/limit_to_last';
 

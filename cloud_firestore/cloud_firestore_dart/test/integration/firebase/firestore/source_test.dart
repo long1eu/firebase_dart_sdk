@@ -15,7 +15,6 @@ import 'package:test/test.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/source_test';
 
@@ -88,11 +87,11 @@ void main() {
     await colRef.firestore.disableNetwork();
 
     // Since we're offline, the returned promises won't complete
-    colRef
+    unawaited(colRef
         .document('doc2')
-        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
-    colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
-    colRef.document('doc4').set(map(<String>['key4', 'value4']));
+        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields));
+    unawaited(colRef.document('doc3').set(map(<String>['key3b', 'value3b'])));
+    unawaited(colRef.document('doc4').set(map(<String>['key4', 'value4'])));
 
     final QuerySnapshot qrySnap = await colRef.get();
     expect(qrySnap.metadata.isFromCache, isTrue);
@@ -177,11 +176,11 @@ void main() {
     await colRef.firestore.disableNetwork();
 
     // Since we're offline, the returned promises won't complete
-    colRef
+    unawaited(colRef
         .document('doc2')
-        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
-    colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
-    colRef.document('doc4').set(map(<String>['key4', 'value4']));
+        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields));
+    unawaited(colRef.document('doc3').set(map(<String>['key3b', 'value3b'])));
+    unawaited(colRef.document('doc4').set(map(<String>['key4', 'value4'])));
 
     final QuerySnapshot qrySnap = await colRef.get(Source.cache);
     expect(qrySnap.metadata.isFromCache, isTrue);
@@ -310,11 +309,11 @@ void main() {
     await colRef.firestore.disableNetwork();
 
     // since we're offline, the returned promises won't complete
-    colRef
+    unawaited(colRef
         .document('doc2')
-        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields);
-    colRef.document('doc3').set(map(<String>['key3b', 'value3b']));
-    colRef.document('doc4').set(map(<String>['key4', 'value4']));
+        .set(map(<String>['key2b', 'value2b']), SetOptions.mergeAllFields));
+    unawaited(colRef.document('doc3').set(map(<String>['key3b', 'value3b'])));
+    unawaited(colRef.document('doc4').set(map(<String>['key4', 'value4'])));
 
     // Create an initial listener for this query (to attempt to disrupt the gets
     // below) and wait for the listener to deliver its initial snapshot before

@@ -22,7 +22,6 @@ import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
 // Port of the upstream SnapshotListenerSourceTest (the cases that listen_source_test.dart does not cover).
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath =
       'integration/snapshot_listener_source';

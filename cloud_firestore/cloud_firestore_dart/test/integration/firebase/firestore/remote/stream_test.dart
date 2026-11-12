@@ -13,7 +13,6 @@ import 'package:test/test.dart';
 import '../../../../util/integration_test_util.dart';
 import '../../../../util/test_util.dart';
 
-// ignore_for_file: unawaited_futures
 class MockCredentialsProvider extends EmptyCredentialsProvider {
   final List<String> states = <String>[];
 
@@ -80,7 +79,7 @@ void main() {
         expect(events.length, 2);
 
         completer.complete();
-        sub.cancel();
+        await sub.cancel();
       } else {
         fail('We should not received any other events.');
       }
@@ -124,7 +123,7 @@ void main() {
         await writeStream.stop();
       } else if (event is CloseEvent) {
         completer.complete();
-        sub.cancel();
+        await sub.cancel();
       }
 
       events.add(event);
@@ -159,7 +158,7 @@ void main() {
         expect(events.length, 2);
 
         completer.complete();
-        sub.cancel();
+        await sub.cancel();
       } else {
         fail('We should not received any other events.');
       }
@@ -172,8 +171,11 @@ void main() {
     final TaskScheduler scheduler = TaskScheduler('');
     final WriteStream writeStream = await createAndOpenWriteStream(scheduler);
 
-    writeStream.stop();
-    expectLater(writeStream, emits(isA<CloseEvent>()));
+    // Subscribed before the stream stops, awaited so that the expectation is checked before the test ends.
+    final Future<void> closed =
+        expectLater(writeStream, emits(isA<CloseEvent>()));
+    await writeStream.stop();
+    await closed;
   });
 
   test('testStreamClosesWhenIdle', () async {

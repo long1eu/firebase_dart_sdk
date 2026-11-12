@@ -12,6 +12,8 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:grpc/grpc.dart';
 import 'package:test/test.dart';
 
+import '../../../../util/test_hygiene.dart';
+
 Map<String, Object?> decodePart(String part) {
   final String padded = part.padRight((part.length + 3) ~/ 4 * 4, '=');
   return jsonDecode(utf8.decode(base64Url.decode(padded)))
@@ -47,6 +49,8 @@ FirebaseApp newApp(String name) => FirebaseApp.withOptions(
     );
 
 void main() {
+  checkTestsLeaveNothingBehind();
+
   group('createMockUserToken', () {
     // Port of packages/util/test/emulator.test.ts.
     test('creates a well-formed JWT', () {

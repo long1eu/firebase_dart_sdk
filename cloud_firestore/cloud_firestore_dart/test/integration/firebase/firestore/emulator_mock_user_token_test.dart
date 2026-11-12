@@ -7,12 +7,16 @@ import 'package:uuid/uuid.dart';
 
 import '../../../util/integration_test_util.dart';
 
+import '../../../util/test_hygiene.dart';
+
 /// The mockUserToken of the emulator settings against the emulator. The rules
 /// of the test project allow everything, so these check that requests carrying
 /// a valid token succeed and that a malformed token reaches the emulator (the
 /// header itself is checked by
 /// test/unit/firebase/firestore/auth/emulator_mock_user_token_test.dart).
 void main() {
+  checkTestsLeaveNothingBehind();
+
   Future<Firestore> instanceWith(Object mockUserToken) async {
     final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
     final FirebaseApp app = FirebaseApp.withOptions(

@@ -14,7 +14,6 @@ import '../../../util/await_helper.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/stream_subscription';
 
@@ -50,7 +49,7 @@ void main() {
     await events.following(2);
 
     // Trigger new events
-    documentReference.set(map(<String>['foo', 'bar']));
+    unawaited(documentReference.set(map(<String>['foo', 'bar'])));
 
     // Write events should have triggered
     await events.following(2);
@@ -72,13 +71,11 @@ void main() {
     final StreamSubscription<DocumentSnapshot> two =
         reference.document().snapshots.listen((DocumentSnapshot value) {});
 
-    one //
-      ..cancel()
-      ..cancel();
+    await one.cancel();
+    await one.cancel();
 
-    two //
-      ..cancel()
-      ..cancel();
+    await two.cancel();
+    await two.cancel();
   });
 
   test('canBeRemovedIndependently', () async {
@@ -108,15 +105,15 @@ void main() {
     await eventsTwo.next;
 
     // Trigger new events
-    collectionReference.add(map(<String>['foo', 'bar']));
+    unawaited(collectionReference.add(map(<String>['foo', 'bar'])));
 
     await eventsOne.next;
     await eventsTwo.next;
 
     // Should leave 'two' unaffected
-    one.cancel();
+    await one.cancel();
 
-    collectionReference.add(map(<String>['foo', 'new-bar']));
+    unawaited(collectionReference.add(map(<String>['foo', 'new-bar'])));
 
     // Assert only events for 'two' actually occurred
     expect(eventsOne.isCompleted, isTrue);
@@ -125,7 +122,7 @@ void main() {
     await eventsTwo.next;
 
     // No more events should occur
-    two.cancel();
+    await two.cancel();
   });
 }
 

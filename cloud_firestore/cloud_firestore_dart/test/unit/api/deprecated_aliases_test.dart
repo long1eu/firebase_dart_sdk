@@ -18,6 +18,8 @@ import 'package:test/test.dart';
 
 import '../../util/test_util.dart' as util;
 
+import '../../util/test_hygiene.dart';
+
 class _Client extends Mock implements FirestoreClient {}
 
 /// Subclassing and constructing through the `FirebaseFirestore` alias.
@@ -28,6 +30,8 @@ class _TestFirestore extends FirebaseFirestore {
 }
 
 void main() {
+  checkTestsLeaveNothingBehind();
+
   group('FirebaseFirestore alias of Firestore', () {
     test('is the same type', () {
       final FirebaseFirestore viaAlias = _TestFirestore();

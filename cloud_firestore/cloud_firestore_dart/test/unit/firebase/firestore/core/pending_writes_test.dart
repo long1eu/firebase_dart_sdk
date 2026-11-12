@@ -67,7 +67,7 @@ void main() {
   Future<void> writeLocally(String path) {
     final Completer<void> writeTask = Completer<void>();
     // A rejected write fails its task; the tests only look at the pending writes tasks.
-    writeTask.future.catchError((Object _) {});
+    unawaited(writeTask.future.catchError((Object _) {}));
     return syncEngine.writeMutations(<Mutation>[
       setMutation(path, map(<String>['a', 'b']))
     ], writeTask);

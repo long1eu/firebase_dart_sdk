@@ -22,7 +22,6 @@ import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/write_batch';
 
@@ -34,7 +33,7 @@ void main() {
   });
 
   test('testSupportEmptyBatches', () async {
-    (await testFirestore()).batch().commit();
+    await (await testFirestore()).batch().commit();
   });
 
   test('testSetDocuments', () async {

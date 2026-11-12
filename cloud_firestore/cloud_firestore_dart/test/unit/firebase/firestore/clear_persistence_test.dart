@@ -13,6 +13,8 @@ import 'package:uuid/uuid.dart';
 
 import 'local/mock/database_mock.dart';
 
+import '../../../util/test_hygiene.dart';
+
 /// An [OpenDatabase] that always opens the file of [dbName], keeping it when
 /// the database is closed (like a real app restart).
 OpenDatabase openFixed(String dbName) {
@@ -51,6 +53,8 @@ TypeMatcher<FirestoreError> firestoreErrorWithCode(FirestoreErrorCode code) =>
     isA<FirestoreError>().having((FirestoreError e) => e.code, 'code', code);
 
 void main() {
+  checkTestsLeaveNothingBehind();
+
   group('deleteSqliteDatabaseFiles', () {
     test('deletes the database and its journal, WAL and shm files', () {
       final String dbName = 'clear-${const Uuid().v4()}.db';

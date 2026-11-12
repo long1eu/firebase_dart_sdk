@@ -22,7 +22,6 @@ import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/query';
 
@@ -236,7 +235,7 @@ void main() {
     expect(snapshotsFull[0].metadata.isFromCache, isTrue);
     expect(snapshotsFull[1].metadata.isFromCache, isFalse);
 
-    collection.document('a').set(map<String>(<String>['v', 'a1']));
+    unawaited(collection.document('a').set(map<String>(<String>['v', 'a1'])));
 
     // Only one event without options
     await testCounter.next;
@@ -420,7 +419,7 @@ void main() {
 
   test('testCanQueryWithAndWithoutDocumentKey', () async {
     final CollectionReference collection = await testCollection();
-    collection.add(map());
+    unawaited(collection.add(map()));
     final Future<QuerySnapshot> query1 = collection
         .orderByField(FieldPath.documentId(), Direction.ascending)
         .get();
@@ -446,8 +445,8 @@ void main() {
     });
 
     await firestore.disableNetwork();
-    collectionReference
-        .add(map(<dynamic>['foo', FieldValue.serverTimestamp()]));
+    unawaited(collectionReference
+        .add(map(<dynamic>['foo', FieldValue.serverTimestamp()])));
     await firestore.enableNetwork();
 
     await receivedDocument.next;

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'dart:async';
+
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query_snapshot.dart';
@@ -606,11 +608,11 @@ void main() {
       });
 
       // The result is intentionally not awaited: terminating with the query in flight must not crash.
-      collection
+      unawaited(collection
           .orderBy('k')
           .count()
           .get(AggregateSource.server)
-          .then<void>((_) {}, onError: (Object _) {});
+          .then<void>((_) {}, onError: (Object _) {}));
       await collection.firestore.terminate();
     });
 
@@ -618,14 +620,14 @@ void main() {
       final CollectionReference collection =
           await testCollectionWithDocs(books);
 
-      collection
+      unawaited(collection
           .aggregate(<AggregateField>[
             AggregateField.count(),
             AggregateField.sum('pages'),
             AggregateField.average('pages'),
           ])
           .get(AggregateSource.server)
-          .then<void>((_) {}, onError: (Object _) {});
+          .then<void>((_) {}, onError: (Object _) {}));
       await collection.firestore.terminate();
     });
 

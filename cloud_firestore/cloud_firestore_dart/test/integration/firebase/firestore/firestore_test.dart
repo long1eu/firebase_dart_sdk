@@ -33,7 +33,6 @@ import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
 
-// ignore_for_file: unawaited_futures
 void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/firestore';
 
@@ -150,7 +149,7 @@ void main() {
         .listen(eventAccumulator.onData, onError: eventAccumulator.onError);
     await eventAccumulator.wait();
 
-    documentReference.set(<String, dynamic>{});
+    unawaited(documentReference.set(<String, dynamic>{}));
     DocumentSnapshot snapshot = await eventAccumulator.wait();
     expect(snapshot.data, isEmpty);
 
@@ -618,7 +617,7 @@ void main() {
       await barrier.future;
     } finally {
       if (listenerRegistration != null) {
-        listenerRegistration.cancel();
+        await listenerRegistration.cancel();
       }
     }
   });
@@ -714,7 +713,7 @@ void main() {
     });
 
     await emptyLatch.all;
-    docRef.set(map(<dynamic>['a', 1.0]));
+    unawaited(docRef.set(map(<dynamic>['a', 1.0])));
     await dataLatch.all;
     await listener.cancel();
   });
@@ -791,7 +790,7 @@ void main() {
     });
 
     await initialLatch.all;
-    docRef.delete();
+    unawaited(docRef.delete());
     await latch.all;
     await listener.cancel();
   });
@@ -832,7 +831,7 @@ void main() {
     });
 
     await emptyLatch.all;
-    docRef.set(data);
+    unawaited(docRef.set(data));
     await dataLatch.all;
     await listener.cancel();
   });
@@ -919,7 +918,7 @@ void main() {
     });
 
     await initialLatch.all;
-    docRef.delete();
+    unawaited(docRef.delete());
     await dataLatch.all;
     await listener.cancel();
   });
@@ -948,9 +947,8 @@ void main() {
       }
     });
 
-    docRef //
-      ..set(initialData)
-      ..set(updateData);
+    unawaited(docRef.set(initialData));
+    unawaited(docRef.set(updateData));
     await dataLatch.all;
     await listener.cancel();
   });
