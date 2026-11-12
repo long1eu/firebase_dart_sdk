@@ -240,10 +240,30 @@ await firestore
 - **Anything else**: `FunctionExpression('server_name', [args])`,
   `AggregateFunction('server_name', [args])`, `Pipeline.rawStage(name, args)` and the `rawOptions`
   parameter of every stage send functions, stages and options this package has no helper for yet.
-- **Not done yet**: functions that take a lambda (`arrayFilter`, `arrayTransform`), `switchOn`,
-  full-text search, subqueries, window functions, the write stages
-  (`insert`, `update`, `upsert`, `delete`), pipelines inside transactions, explain, and
-  evaluation against the local cache or real-time pipelines.
+- **Write stages**: `update`, `delete`, `insert` and `upsert` end a pipeline and change the
+  documents on the server; the result is one row with `documents_modified`. With
+  `execute(atomic: true)` the pipeline runs in a transaction that is committed at the end. The
+  server demands that for `insert` and `upsert` of documents read from a collection, and after
+  an aggregation, `unnest`, `union` or a subquery. These writes bypass the local cache and the
+  write queue: they fail while offline, and cached copies are stale until the server reports the
+  change. The emulator (v1.22.0) never reports it: listeners and `get(Source.server)` return the
+  old version until a regular write touches the document, while pipelines read the new one.
+- **Variables and subqueries**: `define([...])` with `variable(name)`, `currentDocument()`,
+  `getField`, `firestore.pipeline().subcollection(path)`, and `toArrayExpression()` /
+  `toScalarExpression()` to use a pipeline inside a stage of another one.
+- **Lambdas**: `arrayFilter((e) => e.greaterThan(1))`, `arrayTransform`,
+  `arrayTransformWithIndex`; the callback builds the expression once, from a variable that
+  stands for the element (name it with `alias` when lambdas are nested).
+- **Explain**: `execute(explainOptions: PipelineExplainOptions())` and
+  `PipelineSnapshot.explainStats`. Not verified: the JS and Android SDKs have no such option yet
+  and the emulator ignores it (it accepts any option), so the option names have not been checked
+  against a real backend.
+- **Not done yet**: full-text search (the emulator has no `document_matches` function, so the
+  `search` stage could not be checked; `rawStage('search', [], options: {...})` can send it),
+  window functions, pipelines inside a `Transaction`, and evaluation against the local cache or
+  real-time pipelines.
+- **Emulator gaps** (v1.22.0): `geoDistance`, `search` and window functions are rejected, and the
+  `literals` source is denied for clients that are subject to security rules.
 - A result is a document (`ref`, `id`, `createTime`, `updateTime`) only while the pipeline filters,
   sorts and limits; after `select`, `aggregate`, `distinct`, `unnest` and similar it is a plain
   map. BSON values come back as their value classes.

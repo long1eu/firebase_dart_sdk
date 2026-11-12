@@ -116,7 +116,7 @@ class PipelineResult {
 class PipelineSnapshot {
   @internal
   PipelineSnapshot(this.pipeline, List<PipelineResult> results,
-      {this.executionTime})
+      {this.executionTime, this.explainStats})
       : results = List<PipelineResult>.unmodifiable(results);
 
   /// The pipeline that produced these results.
@@ -129,9 +129,44 @@ class PipelineSnapshot {
   /// report one.
   final Timestamp? executionTime;
 
+  /// What the server reported about how it ran the pipeline; null unless
+  /// `explainOptions` was passed to `Pipeline.execute` and the server
+  /// answered.
+  final PipelineExplainStats? explainStats;
+
   @override
   String toString() =>
       'PipelineSnapshot{executionTime: $executionTime, results: $results}';
+}
+
+/// The explanation of a pipeline execution, as sent by the server.
+///
+/// **Preview**: the Pipelines API is experimental and may change.
+class PipelineExplainStats {
+  /// Wraps the `Any` message of the response.
+  @internal
+  PipelineExplainStats(this.typeUrl, List<int> value)
+      : value = List<int>.unmodifiable(value);
+
+  /// The type of the message in [value], for example
+  /// `type.googleapis.com/google.protobuf.StringValue`.
+  final String typeUrl;
+
+  /// The serialized message of the server.
+  final List<int> value;
+
+  /// The explanation as text (plain text or JSON, depending on the requested
+  /// output format), or null if the server sent something other than a
+  /// string.
+  String? get text {
+    if (!typeUrl.endsWith('/google.protobuf.StringValue')) {
+      return null;
+    }
+    return proto.StringValue.fromBuffer(value).value;
+  }
+
+  @override
+  String toString() => 'PipelineExplainStats{${text ?? typeUrl}}';
 }
 
 /// Builds a snapshot from the responses of an `ExecutePipeline` call.
@@ -144,10 +179,15 @@ PipelineSnapshot decodePipelineResponses(
 ) {
   Timestamp? executionTime;
   final List<PipelineResult> results = <PipelineResult>[];
+  PipelineExplainStats? explainStats;
   for (final proto.ExecutePipelineResponse response in responses) {
     // Like the other SDKs, report the time of the first response.
     if (executionTime == null && response.hasExecutionTime()) {
       executionTime = serializer.decodeTimestamp(response.executionTime);
+    }
+    if (response.hasExplainStats() && response.explainStats.hasData()) {
+      explainStats = PipelineExplainStats(
+          response.explainStats.data.typeUrl, response.explainStats.data.value);
     }
     for (final proto.Document document in response.results) {
       results.add(PipelineResult(
@@ -163,5 +203,6 @@ PipelineSnapshot decodePipelineResponses(
       ));
     }
   }
-  return PipelineSnapshot(pipeline, results, executionTime: executionTime);
+  return PipelineSnapshot(pipeline, results,
+      executionTime: executionTime, explainStats: explainStats);
 }

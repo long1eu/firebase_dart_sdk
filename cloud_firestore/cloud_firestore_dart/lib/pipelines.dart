@@ -20,7 +20,7 @@
 library cloud_firestore_dart.pipelines;
 
 export 'src/firebase/firestore/pipeline/expression.dart'
-    hide PipelineEncoder, fieldOrExpression, toExpression;
+    hide PipelineEncoder, RawValueExpression, fieldOrExpression, toExpression;
 export 'src/firebase/firestore/pipeline/functions.dart';
 export 'src/firebase/firestore/pipeline/pipeline.dart';
 export 'src/firebase/firestore/pipeline/pipeline_result.dart'

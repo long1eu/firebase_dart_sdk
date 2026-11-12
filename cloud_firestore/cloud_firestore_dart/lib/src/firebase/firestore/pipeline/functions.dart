@@ -90,3 +90,28 @@ FunctionExpression currentTimestamp() =>
 
 /// A random number between 0 (inclusive) and 1 (exclusive).
 FunctionExpression rand() => FunctionExpression('rand');
+
+/// Whether none of the conditions holds.
+BooleanExpression nor(BooleanExpression first, BooleanExpression second,
+        [List<BooleanExpression> more = const <BooleanExpression>[]]) =>
+    first.nor(second, more);
+
+/// The result that follows the first condition that holds.
+///
+/// [others] continues the list of condition/result pairs and may end with a
+/// single default result:
+///
+/// ```dart
+/// switchOn(field('n').equal(1), 'one', [field('n').equal(2), 'two', 'many']);
+/// ```
+FunctionExpression switchOn(BooleanExpression condition, Object? result,
+        [List<Object?> others = const <Object?>[]]) =>
+    FunctionExpression('switch_on', <Object?>[condition, result, ...others]);
+
+/// A reference to the variable [name], defined with `Pipeline.define` in this
+/// pipeline or in a pipeline that contains this one as a subquery.
+VariableExpression variable(String name) => VariableExpression(name);
+
+/// The document that the enclosing stage is processing, as a map. Useful in
+/// `Pipeline.define` to hand the outer document to a subquery.
+FunctionExpression currentDocument() => FunctionExpression('current_document');

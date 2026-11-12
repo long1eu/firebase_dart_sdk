@@ -78,6 +78,10 @@ only. **Nothing was run against production Firestore.**
   Pipelines need an Enterprise edition database and are always executed by the server (no
   cache, no offline support, no listeners). The API is experimental and may change. Tested
   with the unit suite and an Enterprise edition emulator only.
+  The preview also has the write stages `update`, `delete`, `insert` and `upsert` with
+  `execute(atomic: true)`, variables and subqueries (`define`, `variable`, `subcollection`,
+  `toArrayExpression`, `toScalarExpression`), lambda functions (`arrayFilter`,
+  `arrayTransform`), `switchOn`, `nor`, and explain options (not verified against a backend).
 
 - BSON value types for Enterprise edition databases: `MinKey`, `MaxKey`, `Int32Value`,
   `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue`, and BSON binary data as a

@@ -151,6 +151,35 @@ class PipelineSource {
     ));
   }
 
+  /// Reads the documents of the subcollection [path] of the document that an
+  /// enclosing pipeline is processing.
+  ///
+  /// The returned pipeline cannot be executed on its own; use it as a
+  /// subquery, with [Pipeline.toArrayExpression] or
+  /// [Pipeline.toScalarExpression]:
+  ///
+  /// ```dart
+  /// firestore.pipeline().collection('books').addFields([
+  ///   firestore.pipeline().subcollection('reviews')
+  ///       .select(['stars']).toArrayExpression().as('stars'),
+  /// ]);
+  /// ```
+  Pipeline subcollection(String path, {Map<String, Object?>? rawOptions}) {
+    final ResourcePath resourcePath = _parsePath(path, 'subcollection');
+    if (resourcePath.length.isEven) {
+      throw ArgumentError(
+          'Invalid subcollection path ($path). A collection path must have '
+          'an odd number of segments.');
+    }
+    return _start(Stage(
+      'subcollection',
+      args: <pb.Value Function(PipelineEncoder)>[
+        (_) => stringValue(resourcePath.canonicalString),
+      ],
+      rawOptions: rawOptions,
+    ));
+  }
+
   /// Creates the pipeline that returns the same documents, in the same
   /// order, as the classic [query].
   Pipeline createFrom(Query<Object?> query) {
@@ -165,6 +194,32 @@ class PipelineSource {
     return <String, pb.Value Function(PipelineEncoder)>{
       if (forceIndex != null) 'force_index': (_) => stringValue(forceIndex),
     };
+  }
+
+  /// Resolves the `collection` argument of the `insert` and `upsert` stages
+  /// to a path relative to the database root.
+  @internal
+  static String collectionPath(
+      Firestore firestore, Object collection, String method) {
+    final String path;
+    if (collection is CollectionReference) {
+      PipelineSource(firestore)._validateDatabase(
+          collection.firestore.databaseId, 'CollectionReference');
+      path = collection.path;
+    } else if (collection is String) {
+      path = collection;
+    } else {
+      throw ArgumentError(
+          '$method() takes a path or a CollectionReference as the '
+          'collection, but got: $collection');
+    }
+    final ResourcePath resourcePath = _parsePath(path, method);
+    if (resourcePath.length.isEven) {
+      throw ArgumentError(
+          'Invalid collection path ($path). A collection path must have an '
+          'odd number of segments.');
+    }
+    return resourcePath.canonicalString;
   }
 
   static ResourcePath _parsePath(String path, String method) {

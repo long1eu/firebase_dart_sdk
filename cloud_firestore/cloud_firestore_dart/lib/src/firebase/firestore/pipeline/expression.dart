@@ -515,6 +515,69 @@ abstract class Expression {
   FunctionExpression arrayIndexOfAll(Object? search) =>
       _function('array_index_of_all', <Object?>[search]);
 
+  /// The elements of this array for which [filter] holds.
+  ///
+  /// [filter] is called once, with an expression that stands for the current
+  /// element, to build the condition:
+  ///
+  /// ```dart
+  /// field('scores').arrayFilter((score) => score.greaterThan(50));
+  /// ```
+  ///
+  /// [alias] is the name of the server-side variable that holds the element;
+  /// change it when lambdas are nested.
+  FunctionExpression arrayFilter(
+      BooleanExpression Function(Expression element) filter,
+      {String alias = 'element'}) {
+    return _function(
+        'array_filter', <Object?>[alias, filter(VariableExpression(alias))]);
+  }
+
+  /// This array with every element replaced by the result of [transform].
+  ///
+  /// [transform] is called once, with an expression that stands for the
+  /// current element; a result that is not an [Expression] is a constant.
+  ///
+  /// ```dart
+  /// field('prices').arrayTransform((price) => price.multiply(2));
+  /// ```
+  ///
+  /// [alias] is the name of the server-side variable that holds the element.
+  FunctionExpression arrayTransform(
+      Object? Function(Expression element) transform,
+      {String alias = 'element'}) {
+    return _function('array_transform',
+        <Object?>[alias, toExpression(transform(VariableExpression(alias)))]);
+  }
+
+  /// Like [arrayTransform], but [transform] also receives an expression for
+  /// the position of the element in the array.
+  FunctionExpression arrayTransformWithIndex(
+      Object? Function(Expression element, Expression index) transform,
+      {String elementAlias = 'element',
+      String indexAlias = 'index'}) {
+    return _function('array_transform', <Object?>[
+      elementAlias,
+      indexAlias,
+      toExpression(transform(
+          VariableExpression(elementAlias), VariableExpression(indexAlias))),
+    ]);
+  }
+
+  /// The largest element of this array.
+  FunctionExpression arrayMaximum() => _function('maximum');
+
+  /// The smallest element of this array.
+  FunctionExpression arrayMinimum() => _function('minimum');
+
+  /// The [n] largest elements of this array, largest first.
+  FunctionExpression arrayMaximumN(Object n) =>
+      _function('maximum_n', <Object?>[n]);
+
+  /// The [n] smallest elements of this array, smallest first.
+  FunctionExpression arrayMinimumN(Object n) =>
+      _function('minimum_n', <Object?>[n]);
+
   // More maps
 
   /// This map merged with [second] and [others]; later maps win.
@@ -529,6 +592,11 @@ abstract class Expression {
   /// This map with [key] set to [value].
   FunctionExpression mapSet(Object key, Object? value) =>
       _function('map_set', <Object?>[key, value]);
+
+  /// The value of the field [key] of this map or document, for example of
+  /// `currentDocument()` or of a variable that holds a document.
+  FunctionExpression getField(Object key) =>
+      _function('get_field', <Object?>[key]);
 
   /// The keys of this map.
   FunctionExpression mapKeys() => _function('map_keys');
@@ -705,6 +773,41 @@ class Constant extends Expression {
   String toString() => 'Constant($value)';
 }
 
+/// A reference to a variable: one defined with `Pipeline.define`, or the
+/// element of a lambda such as [Expression.arrayFilter]. Create it with
+/// `variable(name)`.
+class VariableExpression extends Expression {
+  /// A reference to the variable [name].
+  VariableExpression(this.name);
+
+  /// The name of the variable.
+  final String name;
+
+  @override
+  pb.Value toProto(PipelineEncoder encoder) {
+    return pb.Value()..variableReferenceValue = name;
+  }
+
+  @override
+  String toString() => 'Variable($name)';
+}
+
+/// An expression whose wire form is built by a callback (a pipeline used as a
+/// value).
+@internal
+class RawValueExpression extends Expression {
+  RawValueExpression(this._build, this._description);
+
+  final pb.Value Function(PipelineEncoder encoder) _build;
+  final String _description;
+
+  @override
+  pb.Value toProto(PipelineEncoder encoder) => _build(encoder);
+
+  @override
+  String toString() => _description;
+}
+
 /// A list of expressions encoded as a plain array (the operand of `equalAny`
 /// and friends).
 class _ListOfExpressions extends Expression {
@@ -776,6 +879,11 @@ class BooleanExpression extends Expression {
   BooleanExpression or(BooleanExpression other,
           [List<BooleanExpression> others = const <BooleanExpression>[]]) =>
       _condition('or', <Object?>[other, ...others]);
+
+  /// Whether neither this condition nor any of [others] holds.
+  BooleanExpression nor(BooleanExpression other,
+          [List<BooleanExpression> others = const <BooleanExpression>[]]) =>
+      _condition('nor', <Object?>[other, ...others]);
 
   /// Whether an odd number of this condition and [others] hold.
   BooleanExpression xor(BooleanExpression other,

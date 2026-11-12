@@ -21,6 +21,7 @@ class BooleanExpression extends Expression
   countIf(): AggregateFunction
   final expression: Expression
   new BooleanExpression(Expression expression)
+  nor(BooleanExpression other, [List<BooleanExpression> others]): BooleanExpression
   not(): BooleanExpression
   or(BooleanExpression other, [List<BooleanExpression> others]): BooleanExpression
   toProto(PipelineEncoder encoder): Value
@@ -41,6 +42,7 @@ abstract class Expression
   arrayContains(Object element): BooleanExpression
   arrayContainsAll(Object values): BooleanExpression
   arrayContainsAny(Object values): BooleanExpression
+  arrayFilter((.Expression) -> .BooleanExpression filter, {String alias}): FunctionExpression
   arrayFirst(): FunctionExpression
   arrayFirstN(Object n): FunctionExpression
   arrayGet(Object index): FunctionExpression
@@ -50,8 +52,14 @@ abstract class Expression
   arrayLastIndexOf(Object search): FunctionExpression
   arrayLastN(Object n): FunctionExpression
   arrayLength(): FunctionExpression
+  arrayMaximum(): FunctionExpression
+  arrayMaximumN(Object n): FunctionExpression
+  arrayMinimum(): FunctionExpression
+  arrayMinimumN(Object n): FunctionExpression
   arrayReverse(): FunctionExpression
   arraySlice(Object offset, [Object length]): FunctionExpression
+  arrayTransform((.Expression) -> dart.core.Object transform, {String alias}): FunctionExpression
+  arrayTransformWithIndex((.Expression, .Expression) -> dart.core.Object transform, {String elementAlias, String indexAlias}): FunctionExpression
   as(String alias): AliasedExpression
   asBoolean(): BooleanExpression
   ascending(): Ordering
@@ -78,6 +86,7 @@ abstract class Expression
   first(): AggregateFunction
   floor(): FunctionExpression
   geoDistance(Object location): FunctionExpression
+  getField(Object key): FunctionExpression
   greaterThan(Object other): BooleanExpression
   greaterThanOrEqual(Object other): BooleanExpression
   ifAbsent(Object elseValue): FunctionExpression
@@ -185,11 +194,14 @@ enum OrderingDirection
 class Pipeline
   addFields(List<Selectable> fields, {Map<String, Object> rawOptions}): Pipeline
   aggregate(List<AliasedAggregate> accumulators, {List<Object> groups, Map<String, Object> rawOptions}): Pipeline
+  define(List<AliasedExpression> variables, {Map<String, Object> rawOptions}): Pipeline
+  delete({Map<String, Object> rawOptions}): Pipeline
   distinct(List<Object> groups, {Map<String, Object> rawOptions}): Pipeline
-  execute({PipelineIndexMode indexMode, Map<String, Object> rawOptions}): Future<PipelineSnapshot>
+  execute({bool atomic, PipelineIndexMode indexMode, PipelineExplainOptions explainOptions, Map<String, Object> rawOptions}): Future<PipelineSnapshot>
   final firestore: Firestore
   final stages: List<Stage> @internal
   findNearest(Object field, Object vector, DistanceMeasure distanceMeasure, {int limit, String distanceField, Map<String, Object> rawOptions}): Pipeline
+  insert({Object collection, Object documentId, Map<String, Object> rawOptions}): Pipeline
   limit(int limit, {Map<String, Object> rawOptions}): Pipeline
   new Pipeline(Firestore firestore, List<Stage> stages) @internal
   offset(int offset, {Map<String, Object> rawOptions}): Pipeline
@@ -199,12 +211,39 @@ class Pipeline
   sample({int documents, double percentage, Map<String, Object> rawOptions}): Pipeline
   select(List<Object> selections, {Map<String, Object> rawOptions}): Pipeline
   sort(List<Ordering> orderings, {Map<String, Object> rawOptions}): Pipeline
-  toExecuteRequest(PipelineEncoder encoder, {PipelineIndexMode indexMode, Map<String, Object> rawOptions}): ExecutePipelineRequest @internal
+  toArrayExpression(): Expression
+  toExecuteRequest(PipelineEncoder encoder, {bool atomic, PipelineIndexMode indexMode, PipelineExplainOptions explainOptions, Map<String, Object> rawOptions}): ExecutePipelineRequest @internal
   toProto(PipelineEncoder encoder): Pipeline @internal
+  toScalarExpression(): Expression
   toString(): String
   union(Pipeline other, {Map<String, Object> rawOptions}): Pipeline
   unnest(Selectable selectable, {String indexField, Map<String, Object> rawOptions}): Pipeline
+  update({List<Selectable> transformedFields, Map<String, Object> rawOptions}): Pipeline
+  upsert({List<Selectable> additionalFields, Object collection, Object documentId, Map<String, Object> rawOptions}): Pipeline
   where(BooleanExpression condition, {Map<String, Object> rawOptions}): Pipeline
+enum PipelineExplainMode
+  final serverName: String @internal
+  new PipelineExplainMode(int #index, String #name, String serverName)
+  static final analyze: PipelineExplainMode
+  static final explain: PipelineExplainMode
+  static final values: List<PipelineExplainMode>
+class PipelineExplainOptions
+  final mode: PipelineExplainMode
+  final outputFormat: PipelineExplainOutputFormat
+  new PipelineExplainOptions({PipelineExplainMode mode, PipelineExplainOutputFormat outputFormat})
+  toProto(): Value @internal
+enum PipelineExplainOutputFormat
+  final serverName: String @internal
+  new PipelineExplainOutputFormat(int #index, String #name, String serverName)
+  static final json: PipelineExplainOutputFormat
+  static final text: PipelineExplainOutputFormat
+  static final values: List<PipelineExplainOutputFormat>
+class PipelineExplainStats
+  final typeUrl: String
+  final value: List<int>
+  get text: String
+  new PipelineExplainStats(String typeUrl, List<int> value) @internal
+  toString(): String
 enum PipelineIndexMode
   final serverName: String @internal
   new PipelineIndexMode(int #index, String #name, String serverName)
@@ -221,9 +260,10 @@ class PipelineResult
   toString(): String
 class PipelineSnapshot
   final executionTime: Timestamp
+  final explainStats: PipelineExplainStats
   final pipeline: Pipeline
   final results: List<PipelineResult>
-  new PipelineSnapshot(Pipeline pipeline, List<PipelineResult> results, {Timestamp executionTime}) @internal
+  new PipelineSnapshot(Pipeline pipeline, List<PipelineResult> results, {Timestamp executionTime, PipelineExplainStats explainStats}) @internal
   toString(): String
 class PipelineSource
   collection(Object collection, {String forceIndex, Map<String, Object> rawOptions}): Pipeline
@@ -233,20 +273,31 @@ class PipelineSource
   documents(List<Object> documents, {Map<String, Object> rawOptions}): Pipeline
   literals(List<Map<String, Object>> documents, {Map<String, Object> rawOptions}): Pipeline
   new PipelineSource(Firestore _firestore) @internal
+  static collectionPath(Firestore firestore, Object collection, String method): String @internal
+  subcollection(String path, {Map<String, Object> rawOptions}): Pipeline
 abstract class Selectable
   get alias: String
   get expression: Expression
   new Selectable()
+class VariableExpression extends Expression
+  final name: String
+  new VariableExpression(String name)
+  toProto(PipelineEncoder encoder): Value
+  toString(): String
 and(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression
 array(List<Object> elements): FunctionExpression
 conditional(BooleanExpression condition, Object thenValue, Object elseValue): FunctionExpression
 constant(Object value): Constant
 countAll(): AggregateFunction
 countIf(BooleanExpression condition): AggregateFunction
+currentDocument(): FunctionExpression
 currentTimestamp(): FunctionExpression
 field(Object nameOrPath): Field
 map(Map<String, Object> entries): FunctionExpression
+nor(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression
 not(BooleanExpression condition): BooleanExpression
 or(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression
 rand(): FunctionExpression
+switchOn(BooleanExpression condition, Object result, [List<Object> others]): FunctionExpression
+variable(String name): VariableExpression
 xor(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression

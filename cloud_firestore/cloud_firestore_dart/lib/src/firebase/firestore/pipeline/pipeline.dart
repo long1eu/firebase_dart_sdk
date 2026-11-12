@@ -16,6 +16,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/expression.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/stage.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
@@ -32,6 +33,69 @@ enum PipelineIndexMode {
 
   @internal
   final String serverName;
+}
+
+/// What the server reports about how it runs a pipeline.
+enum PipelineExplainMode {
+  /// Run the pipeline and report the plan together with execution
+  /// statistics.
+  analyze('analyze'),
+
+  /// Only report the plan.
+  explain('explain');
+
+  const PipelineExplainMode(this.serverName);
+
+  /// The name the server knows this mode by.
+  @internal
+  final String serverName;
+}
+
+/// The format of [PipelineExplainStats].
+enum PipelineExplainOutputFormat {
+  /// Human readable text.
+  text('text'),
+
+  /// A JSON document.
+  json('json');
+
+  const PipelineExplainOutputFormat(this.serverName);
+
+  /// The name the server knows this format by.
+  @internal
+  final String serverName;
+}
+
+/// Asks the server to explain how it runs a pipeline; pass it to
+/// [Pipeline.execute].
+///
+/// **Not verified**: the other client SDKs do not have this option yet and
+/// the emulator ignores it, so the option names sent here (`explain_options`
+/// with `mode` and `output_format`) are taken from the API description and
+/// have not been checked against a real backend.
+class PipelineExplainOptions {
+  /// Explain in [mode], formatting the answer as [outputFormat] (the server
+  /// default when null).
+  const PipelineExplainOptions(
+      {this.mode = PipelineExplainMode.analyze, this.outputFormat});
+
+  /// What to report.
+  final PipelineExplainMode mode;
+
+  /// The format of the report, or null for the server default.
+  final PipelineExplainOutputFormat? outputFormat;
+
+  /// The wire form of these options.
+  @internal
+  pb.Value toProto() {
+    final PipelineExplainOutputFormat? format = outputFormat;
+    return pb.Value()
+      ..mapValue = (pb.MapValue()
+        ..fields['mode'] = stringValue(mode.serverName)
+        ..fields.addAll(<String, pb.Value>{
+          if (format != null) 'output_format': stringValue(format.serverName),
+        }));
+  }
 }
 
 /// A query made of an ordered list of stages, executed by the server.
@@ -334,6 +398,133 @@ class Pipeline {
     ));
   }
 
+  /// Defines variables for the following stages and for subqueries used in
+  /// them: every aliased expression becomes the variable with that name, read
+  /// with `variable(name)`.
+  ///
+  /// ```dart
+  /// firestore.pipeline().collection('authors')
+  ///     .define([field('name').as('authorName')])
+  ///     .addFields([
+  ///       firestore.pipeline().collection('books')
+  ///           .where(field('author').equal(variable('authorName')))
+  ///           .aggregate([countAll().as('count')])
+  ///           .toScalarExpression().as('bookCount'),
+  ///     ]);
+  /// ```
+  Pipeline define(List<AliasedExpression> variables,
+      {Map<String, Object?>? rawOptions}) {
+    return _expressionMapStage('let', 'define', variables, rawOptions);
+  }
+
+  /// This pipeline as an expression that evaluates to the array of its
+  /// results, for use in a stage of another pipeline (a subquery).
+  ///
+  /// A pipeline that outputs a single field yields an array of the values of
+  /// that field; otherwise every element is a map of the fields of a result.
+  Expression toArrayExpression() => FunctionExpression(
+      'array', <Object?>[RawValueExpression(_toPipelineValue, toString())]);
+
+  /// This pipeline as an expression that evaluates to its single result, for
+  /// use in a stage of another pipeline (a subquery). The pipeline must
+  /// produce at most one result; with a single output field the expression
+  /// is the value of that field.
+  Expression toScalarExpression() => FunctionExpression(
+      'scalar', <Object?>[RawValueExpression(_toPipelineValue, toString())]);
+
+  pb.Value _toPipelineValue(PipelineEncoder encoder) =>
+      pb.Value()..pipelineValue = toProto(encoder);
+
+  /// Deletes every input document. The result of the pipeline is one row
+  /// with the number of `documents_modified`.
+  ///
+  /// The write stages ([delete], [update], [insert], [upsert]) change the
+  /// database directly on the server. They are not queued while offline, do
+  /// not go through the local cache and do not raise local events; listeners
+  /// see the change when the server reports it (the emulator does not report
+  /// it at all, see the README). Use `execute(atomic: true)` to apply all
+  /// writes of a pipeline in one transaction; the server requires it whenever
+  /// it cannot apply the stages to one document at a time, for example for
+  /// [insert] and [upsert] of documents read from a collection, or after an
+  /// aggregation, `unnest`, `union` or a subquery.
+  Pipeline delete({Map<String, Object?>? rawOptions}) {
+    return _append(Stage('delete', rawOptions: rawOptions));
+  }
+
+  /// Writes every input document back to where it was read from.
+  ///
+  /// With [transformedFields] only those fields are written, with the values
+  /// of the given aliased expressions. Without them the documents are
+  /// written as the preceding stages left them (for example after
+  /// `addFields`). See [delete] for how write stages behave.
+  Pipeline update(
+      {List<Selectable> transformedFields = const <Selectable>[],
+      Map<String, Object?>? rawOptions}) {
+    final Map<String, Expression> fields =
+        selectablesToMap(transformedFields, method: 'update');
+    return _append(Stage(
+      'update',
+      args: <pb.Value Function(PipelineEncoder)>[
+        (PipelineEncoder encoder) => encodeExpressionMap(encoder, fields),
+      ],
+      rawOptions: rawOptions,
+    ));
+  }
+
+  /// Creates a document from every input; fails with `already-exists` if one
+  /// of them exists.
+  ///
+  /// [collection] (a path or a `CollectionReference`) is where the documents
+  /// are created; without it they are created where the inputs were read
+  /// from. [documentId] (a field name or an [Expression]) gives the id of
+  /// each new document; without it the server assigns ids. See [delete] for
+  /// how write stages behave.
+  Pipeline insert(
+      {Object? collection,
+      Object? documentId,
+      Map<String, Object?>? rawOptions}) {
+    return _append(Stage(
+      'insert',
+      options: _writeTarget('insert', collection, documentId),
+      rawOptions: rawOptions,
+    ));
+  }
+
+  /// Creates or replaces a document from every input.
+  ///
+  /// [additionalFields] are aliased expressions that are written on top of
+  /// the input. [collection] and [documentId] are as for [insert]. See
+  /// [delete] for how write stages behave.
+  Pipeline upsert(
+      {List<Selectable> additionalFields = const <Selectable>[],
+      Object? collection,
+      Object? documentId,
+      Map<String, Object?>? rawOptions}) {
+    final Map<String, Expression> fields =
+        selectablesToMap(additionalFields, method: 'upsert');
+    return _append(Stage(
+      'upsert',
+      args: <pb.Value Function(PipelineEncoder)>[
+        (PipelineEncoder encoder) => encodeExpressionMap(encoder, fields),
+      ],
+      options: _writeTarget('upsert', collection, documentId),
+      rawOptions: rawOptions,
+    ));
+  }
+
+  Map<String, pb.Value Function(PipelineEncoder)> _writeTarget(
+      String method, Object? collection, Object? documentId) {
+    final String? path = collection == null
+        ? null
+        : PipelineSource.collectionPath(firestore, collection, method);
+    final Expression? id =
+        documentId == null ? null : fieldOrExpression(documentId);
+    return <String, pb.Value Function(PipelineEncoder)>{
+      if (path != null) 'collection': (_) => relativeReferenceValue(path),
+      if (id != null) 'document_id': id.toProto,
+    };
+  }
+
   /// Adds a stage this SDK has no method for: [name] is the server name of
   /// the stage (snake case), [args] its positional arguments (values or
   /// [Expression]s) and [options] its named options.
@@ -361,13 +552,31 @@ class Pipeline {
   /// Executes this pipeline on the server.
   ///
   /// [rawOptions] are named options sent to the server as they are.
+  ///
+  /// With [atomic] the pipeline runs in a read-write transaction that is
+  /// committed when it completes, so the writes of a write stage ([delete],
+  /// [update], [insert], [upsert]) are applied together or not at all.
+  ///
+  /// With [explainOptions] the server is asked to describe how it runs the
+  /// pipeline; the answer is in [PipelineSnapshot.explainStats].
   Future<PipelineSnapshot> execute({
+    bool atomic = false,
     PipelineIndexMode? indexMode,
+    PipelineExplainOptions? explainOptions,
     Map<String, Object?>? rawOptions,
   }) async {
+    if (stages.isNotEmpty && stages.first.name == 'subcollection') {
+      throw StateError(
+          'This pipeline starts at a subcollection of the document of an '
+          'enclosing pipeline and cannot be executed directly. It can only '
+          'be used as part of another pipeline.');
+    }
     final PipelineEncoder encoder = PipelineEncoder(firestore.databaseId);
-    final proto.ExecutePipelineRequest request =
-        toExecuteRequest(encoder, indexMode: indexMode, rawOptions: rawOptions);
+    final proto.ExecutePipelineRequest request = toExecuteRequest(encoder,
+        atomic: atomic,
+        indexMode: indexMode,
+        explainOptions: explainOptions,
+        rawOptions: rawOptions);
     final List<proto.ExecutePipelineResponse> responses =
         await firestore.client.executePipeline(request);
     return decodePipelineResponses(
@@ -378,7 +587,9 @@ class Pipeline {
   @internal
   proto.ExecutePipelineRequest toExecuteRequest(
     PipelineEncoder encoder, {
+    bool atomic = false,
     PipelineIndexMode? indexMode,
+    PipelineExplainOptions? explainOptions,
     Map<String, Object?>? rawOptions,
   }) {
     final proto.StructuredPipeline structured = proto.StructuredPipeline()
@@ -386,10 +597,22 @@ class Pipeline {
     if (indexMode != null) {
       structured.options['index_mode'] = stringValue(indexMode.serverName);
     }
+    if (explainOptions != null) {
+      structured.options['explain_options'] = explainOptions.toProto();
+    }
     structured.options.addAll(encodeOptions(encoder, rawOptions));
-    return proto.ExecutePipelineRequest()
+    final proto.ExecutePipelineRequest request = proto.ExecutePipelineRequest()
       ..database = encoder.serializer.databaseName
       ..structuredPipeline = structured;
+    if (atomic) {
+      request
+        ..newTransaction = (proto.TransactionOptions()
+          ..readWrite = (proto.TransactionOptions_ReadWrite()
+            ..concurrencyMode =
+                proto.TransactionOptions_ConcurrencyMode.OPTIMISTIC))
+        ..autoCommitTransaction = true;
+    }
+    return request;
   }
 
   /// The wire representation of the stages.
