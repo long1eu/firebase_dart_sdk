@@ -4,7 +4,6 @@ abstract class AggregateField
   final operator: String
   get fieldPath: String
   get hashCode: int
-  new AggregateField._(FieldPath _fieldPath, String operator)
   static average(String field): AverageAggregateField
   static averageField(FieldPath fieldPath): AverageAggregateField
   static count(): CountAggregateField
@@ -35,7 +34,6 @@ enum AggregateSource
   static final server: AggregateSource
   static final values: List<AggregateSource>
 class AverageAggregateField extends AggregateField
-  new AverageAggregateField._(FieldPath fieldPath)
 typedef BatchCallback = Future<void> Function(WriteBatch)
 class Blob
   ==(Object other): bool
@@ -76,7 +74,6 @@ class CollectionReference extends Query<X0>
   withConverter(FirestoreDataConverter<dynamic> converter): CollectionReference<dynamic>
   withoutConverter(): CollectionReference<Map<String, Object>>
 class CountAggregateField extends AggregateField
-  new CountAggregateField._()
 abstract class Database
   close(): void
   delete(String statement, [List<Object> arguments]): Future<int>
@@ -205,7 +202,6 @@ abstract class FieldValue
   get isMinimum: bool @internal
   get isServerTimestamp: bool @internal
   get methodName: String @internal
-  new FieldValue._(List<Object> elements)
   new FieldValue.arrayRemove(List<Object> elements)
   new FieldValue.arrayUnion(List<Object> elements)
   new FieldValue.delete()
@@ -215,7 +211,6 @@ abstract class FieldValue
   new FieldValue.serverTimestamp()
   static vector(List<double> values): VectorValue
 class Filter
-  new Filter._()
   static and(List<Filter> filters): Filter
   static arrayContains(String field, Object value): Filter
   static arrayContainsAny(String field, List<Object> values): Filter
@@ -286,7 +281,6 @@ class FirestoreError extends FirebaseError
   toString(): String
 class FirestoreErrorCode
   final value: int
-  new FirestoreErrorCode._(int value)
   static final aborted: FirestoreErrorCode
   static final alreadyExists: FirestoreErrorCode
   static final cancelled: FirestoreErrorCode
@@ -319,7 +313,6 @@ class FirestoreSettings
   final sslEnabled: bool
   get hashCode: int
   new FirestoreSettings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings})
-  new FirestoreSettings._({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool emulator, Object mockUserToken})
   static final cacheSizeUnlimited: int
   static final defaultCacheSizeBytes: int
   static final defaultHost: String
@@ -392,7 +385,6 @@ enum LogLevel
   static final silent: LogLevel
   static final values: List<LogLevel>
 class MaxKey
-  new MaxKey._()
   static final instance: MaxKey
   toString(): String
 class MemoryCacheSettings extends LocalCacheSettings
@@ -420,7 +412,6 @@ enum MetadataChanges
   static final include: MetadataChanges
   static final values: List<MetadataChanges>
 class MinKey
-  new MinKey._()
   static final instance: MinKey
   toString(): String
 typedef OnConfigure = Future<void> Function(Database db)
@@ -490,7 +481,6 @@ class Query
 class QueryDocumentSnapshot extends DocumentSnapshot<X0>
   get data: X0
   getData(ServerTimestampBehavior serverTimestampBehavior): X0
-  new QueryDocumentSnapshot._(Firestore firestore, DocumentKey key, Document doc, bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<X0> converter)
   new QueryDocumentSnapshot.fromDocument(Firestore firestore, Document doc, {bool fromCache, bool hasPendingWrites, FirestoreDataConverter<X0> converter}) @internal
 class QuerySnapshot extends Iterable<QueryDocumentSnapshot<C1X0>>
   ==(Object other): bool
@@ -527,9 +517,6 @@ enum ServerTimestampBehavior
 class SetOptions
   final fieldMask: FieldMask @internal
   final merge: bool
-  new SetOptions._(bool merge, FieldMask fieldMask)
-  new SetOptions._mergeAll()
-  new SetOptions._overwrite()
   new SetOptions.mergeFieldPaths(List<FieldPath> fields)
   new SetOptions.mergeFields(List<String> fields)
   static final mergeAllFields: SetOptions
@@ -560,7 +547,6 @@ enum Source
   static final serverAndCache: Source
   static final values: List<Source>
 class SumAggregateField extends AggregateField
-  new SumAggregateField._(FieldPath fieldPath)
 class Timestamp
   ==(Object other): bool
   compareTo(Timestamp other): int
@@ -592,7 +578,6 @@ class TransactionOptions
   final readOnly: bool
   get hashCode: int
   new TransactionOptions({int maxAttempts, bool readOnly})
-  new TransactionOptions._(int maxAttempts, bool readOnly)
   static final defaultMaxAttempts: int
   static final defaultOptions: TransactionOptions
   toString(): String

@@ -106,6 +106,11 @@ List<String> _describeClass(ClassMirror cls) {
       final String isStatic = d.isStatic ? 'static ' : '';
       final String name = _name(d.simpleName);
       if (d.isConstructor) {
+        // The simple name of a named constructor is `Class.name`, so a
+        // private one (`Class._`) passes the check above.
+        if (_name(d.constructorName).startsWith('_')) {
+          continue;
+        }
         members.add('  new $name${_params(d)}${_flags(d)}');
       } else if (d.isGetter) {
         members
