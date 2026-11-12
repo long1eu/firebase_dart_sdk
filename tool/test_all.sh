@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
-# Runs pub get, analyze (lib) and tests for the four migrated packages.
-# cloud_firestore_vm runs only test/unit (integration needs a live backend).
+# Runs pub get, analyze (lib) and tests for the two published packages.
+# cloud_firestore_dart runs only test/unit (integration needs a live backend).
 # Exits non-zero if any step of any package fails.
 # Usage: tool/test_all.sh [package-name ...]
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 PACKAGES=(
-  "_firebase_internal_vm|firebase_core/_firebase_internal_vm|"
-  "_firebase_database_collection_vm|firebase_core/_firebase_database_collection_vm|"
-  "firebase_core_vm|firebase_core/firebase_core_vm|"
-  "cloud_firestore_vm|cloud_firestore/cloud_firestore_vm|test/unit"
+  "firebase_app_dart|firebase_core/firebase_app_dart|"
+  "cloud_firestore_dart|cloud_firestore/cloud_firestore_dart|test/unit"
 )
 
 summary=()

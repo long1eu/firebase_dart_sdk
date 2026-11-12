@@ -3,16 +3,16 @@
 // `dart compile exe bench_c4.dart` (AOT).
 import 'dart:collection';
 
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change_set.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/order_by.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/document_view_change.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/document_view_change_set.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/order_by.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 
 const int reps = 9;
 int sink = 0;

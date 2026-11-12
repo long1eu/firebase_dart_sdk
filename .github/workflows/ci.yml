@@ -44,7 +44,7 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
       - name: Start Firestore emulator
-        working-directory: cloud_firestore/cloud_firestore_vm
+        working-directory: cloud_firestore/cloud_firestore_dart
         run: |
           firebase emulators:start --only firestore --project demo-test \
             --config firebase.json > "$RUNNER_TEMP/emulator.log" 2>&1 &
@@ -54,7 +54,7 @@ jobs:
           done
           echo "emulator did not start"; cat "$RUNNER_TEMP/emulator.log"; exit 1
       - name: Run integration tests
-        working-directory: cloud_firestore/cloud_firestore_vm
+        working-directory: cloud_firestore/cloud_firestore_dart
         env:
           FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
         run: |

@@ -1,0 +1,16 @@
+cloud_firestore_dart
+Copyright 2018 Razvan Lung (long1eu) and contributors.
+
+This package is an unofficial Dart port of the Cloud Firestore client from the
+Firebase Android SDK (https://github.com/firebase/firebase-android-sdk),
+Copyright Google LLC, licensed under the Apache License, Version 2.0.
+Behaviour, structure and documentation comments are derived from that project.
+
+The generated protocol buffer code under lib/src/proto is compiled from
+Google API definitions (googleapis), Copyright Google LLC, licensed under the
+Apache License, Version 2.0.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" and "Cloud Firestore" are trademarks of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.

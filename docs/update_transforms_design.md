@@ -1,6 +1,6 @@
 # Folding field transforms into set/patch mutations (upstream d40e7f1, df6a201, 8655b90, 7055d2a)
 
-Scope: package `cloud_firestore/cloud_firestore_vm`. Protos already have `Write.update_transforms` (commit 36bcc4b).
+Scope: package `cloud_firestore/cloud_firestore_dart`. Protos already have `Write.update_transforms` (commit 36bcc4b).
 
 ## What changes
 

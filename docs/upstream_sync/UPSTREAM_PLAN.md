@@ -1,4 +1,4 @@
-# Upstream sync plan for cloud_firestore_vm
+# Upstream sync plan for cloud_firestore_dart
 
 ## Status at the end of the revival
 

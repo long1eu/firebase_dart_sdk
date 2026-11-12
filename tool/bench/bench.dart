@@ -1,7 +1,7 @@
-import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart' as u;
+import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart' as u;
 
 const int n = 100000;
 const int reps = 9;

@@ -3,7 +3,7 @@
 ROOT0="$(cd "$(dirname "$0")/.." && pwd)"
 EMU="${EMULATOR_DIR:-$ROOT0/.emulator}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PKG="$ROOT/cloud_firestore/cloud_firestore_vm"
+PKG="$ROOT/cloud_firestore/cloud_firestore_dart"
 PID="$EMU/emulator.pid"
 LOG="$EMU/emulator.log"
 

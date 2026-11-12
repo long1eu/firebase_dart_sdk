@@ -1,0 +1,38 @@
+## 0.1.0
+
+First release under the new name. This package was published as `firebase_core_vm` (last
+version 0.0.4); it is the same code base, revived as part of the Firestore port. Class names
+(`FirebaseApp`, `FirebaseOptions`, `PlatformDependencies`, ...) are unchanged; import
+`package:firebase_app_dart/firebase_app_dart.dart` instead of
+`package:firebase_core_vm/firebase_core_vm.dart`.
+
+- `_firebase_internal_vm` is folded into this package. Its utilities are reachable through
+  `package:firebase_app_dart/internal.dart`, which exists for `cloud_firestore_dart` and is
+  **not public API**.
+- Migrated to Dart 3 (`sdk: ^3.0.0`) with sound null safety.
+- Breaking: `FirebaseApp.setDataCollectionDefaultEnabled` takes a required named `enabled`;
+  `persistenceKey` uses URL-safe base64 without padding.
+- `FirebaseApp.delete` removes the app by name; `appCheckProvider` added; tolerant `GetTokenResult`;
+  `FirebaseOptions` equality and `fromJson`.
+- The Flutter example app is replaced by a command-line `example/main.dart`.
+- Verified with unit tests, and through `cloud_firestore_dart`'s emulator suite.
+
+## Versions published as `firebase_core_vm`
+
+## 0.0.4
+
+- Expose `isWeb`, `isMobile` and `isDesktop` based on conditional imports
+- Throw unimplemented error when trying to create a FirebaseApp in a js/html context
+
+## 0.0.3
+
+- Rename library from `firebase_common` to `firebase_core`
+
+## 0.0.2
+
+- Add flutter example
+- Update README
+
+## 0.0.1
+
+- Initial release

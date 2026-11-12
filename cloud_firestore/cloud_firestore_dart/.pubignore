@@ -1,0 +1,26 @@
+# Files left out of the published package. When this file exists, pub does not
+# read .gitignore in this directory, so the build output entries are repeated.
+.dart_tool/
+.packages
+.pub/
+build/
+doc/api/
+.idea/
+*.iml
+.DS_Store
+.metadata
+pubspec.lock
+
+# Local development only: path override for firebase_app_dart.
+pubspec_overrides.yaml
+
+# Repository tooling and design notes (see the GitHub repository).
+tool/
+docs/
+res/
+firebase.json
+firestore.rules
+
+# Large test fixtures (spec JSON ~7.8 MB, bloom filter goldens ~0.7 MB). Test
+# sources are published; the tests that read these fixtures need a checkout.
+test/res/

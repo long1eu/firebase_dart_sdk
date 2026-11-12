@@ -9,7 +9,7 @@ cache, listeners with local-write snapshots, transactions and retry logic. It is
 with or endorsed by Google or Firebase.
 
 ```dart
-import 'package:cloud_firestore_vm/cloud_firestore_vm.dart';
+import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 
 final firestore = await Firestore.instanceFor(app: app);
 await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
@@ -25,8 +25,13 @@ firestore
     .listen((snapshot) => print(snapshot.docs.length));
 ```
 
-(`app` is a `FirebaseApp` from `firebase_core_vm`; see the
-[package README](cloud_firestore/cloud_firestore_vm/README.md) for current, verified examples.)
+(`app` is a `FirebaseApp` from `firebase_app_dart`; see the
+[package README](cloud_firestore/cloud_firestore_dart/README.md) for current examples and
+`cloud_firestore/cloud_firestore_dart/example/main.dart` for a runnable program.)
+
+```shell
+dart pub add cloud_firestore_dart firebase_app_dart
+```
 
 ## What it does
 
@@ -45,9 +50,12 @@ SDK's behaviour up to late 2026 on Dart 3 with sound null safety.
 
 - **Tested against the Firestore emulator only. Nothing has been run against production Firestore.**
   Treat it as untested there, and test against your own project before relying on it.
-- Not published from this branch; package versions in the pubspecs are the old ones.
+- Version 0.1.0 is prepared for pub.dev as `cloud_firestore_dart` and `firebase_app_dart`. They
+  replace the packages published as `cloud_firestore_vm` and `firebase_core_vm` (and the internal
+  `_firebase_internal_vm` and `_firebase_database_collection_vm`, now folded in).
 - Not implemented: BSON value types, index-free queries and overlays, the client-side index engine,
-  clearing persistence (API undecided), Pipelines. Web is not supported.
+  clearing persistence (API undecided), Pipelines. Web is not supported yet (the transport uses native gRPC from `dart:io`; web
+  support is planned).
 - The JS SDK is the reference for the public API of other Firebase clients. A comparison and a
   roadmap are in `docs/` notes; typed converters (`withConverter`) are the main API gap.
 
@@ -61,14 +69,18 @@ are not part of the migrated, tested set.
 
 | Package | Path | Purpose |
 |---|---|---|
-| `cloud_firestore_vm` | `cloud_firestore/cloud_firestore_vm` | The Firestore client |
-| `firebase_core_vm` | `firebase_core/firebase_core_vm` | `FirebaseApp` and options |
-| `_firebase_internal_vm` | `firebase_core/_firebase_internal_vm` | Internal utilities (not for direct use) |
-| `_firebase_database_collection_vm` | `firebase_core/_firebase_database_collection_vm` | Immutable sorted collections (not for direct use) |
+| `cloud_firestore_dart` | `cloud_firestore/cloud_firestore_dart` | The Firestore client (formerly `cloud_firestore_vm`) |
+| `firebase_app_dart` | `firebase_core/firebase_app_dart` | `FirebaseApp` and options (formerly `firebase_core_vm`) |
+
+The former internal packages are folded in: `_firebase_database_collection_vm` into
+`cloud_firestore_dart` (`lib/src/database_collection`) and `_firebase_internal_vm` into
+`firebase_app_dart` (`package:firebase_app_dart/internal.dart`, not public API).
+`cloud_firestore_dart` depends on the hosted `firebase_app_dart`; inside this repository its
+`pubspec_overrides.yaml` points it at the sibling directory.
 
 ## Running the tests
 
-Unit tests (pub get, analyze `lib`, and tests for the four packages; only `test/unit` for
+Unit tests (pub get, analyze `lib`, and tests for both packages; only `test/unit` for
 Firestore):
 
     ./tool/test_all.sh
@@ -81,7 +93,7 @@ CLI locally once:
 Then:
 
     ./tool/start_emulator.sh        # emulator on 127.0.0.1:8080, project demo-test
-    cd cloud_firestore/cloud_firestore_vm
+    cd cloud_firestore/cloud_firestore_dart
     FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration
     cd ../..
     ./tool/stop_emulator.sh
@@ -91,12 +103,12 @@ See `tool/README.md` for details.
 ## Regenerating protos
 
     dart pub global activate protoc_plugin 21.1.2
-    cloud_firestore/cloud_firestore_vm/tool/gen_protos.sh
+    cloud_firestore/cloud_firestore_dart/tool/gen_protos.sh
 
 If the installed `protoc` is unusable, set up the Python wrapper (instructions at the top of
 `tool/protoc_wrap.sh`) and run:
 
-    PROTOC="$PWD/tool/protoc_wrap.sh" cloud_firestore/cloud_firestore_vm/tool/gen_protos.sh
+    PROTOC="$PWD/tool/protoc_wrap.sh" cloud_firestore/cloud_firestore_dart/tool/gen_protos.sh
 
 ## Upstream sync
 

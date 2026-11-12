@@ -1,0 +1,39 @@
+// File created by
+// Lung Razvan <long1eu>
+// on 04/10/2018
+
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
+import 'package:firebase_app_dart/internal.dart';
+
+/// Object that contains exactly one of either a view snapshot or an error for
+/// the given query.
+class QueryEvent {
+  const QueryEvent({required this.query, this.view, this.error});
+
+  final Query query;
+  final ViewSnapshot? view;
+  final FirestoreError? error;
+
+  QueryEvent copyWith({
+    Query? query,
+    ViewSnapshot? view,
+    FirestoreError? error,
+  }) {
+    return QueryEvent(
+      query: query ?? this.query,
+      view: view ?? this.view,
+      error: error ?? this.error,
+    );
+  }
+
+  @override
+  String toString() {
+    return (ToStringHelper(runtimeType)
+          ..add('query', query)
+          ..add('view', view)
+          ..add('error', error))
+        .toString();
+  }
+}

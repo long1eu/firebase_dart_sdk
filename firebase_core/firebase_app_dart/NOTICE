@@ -1,0 +1,12 @@
+firebase_app_dart
+Copyright 2018 Razvan Lung (long1eu) and contributors.
+
+This package is an unofficial Dart port of parts of Firebase Common and
+Firebase Core from the Firebase Android SDK
+(https://github.com/firebase/firebase-android-sdk), Copyright Google LLC,
+licensed under the Apache License, Version 2.0.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" is a trademark of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.

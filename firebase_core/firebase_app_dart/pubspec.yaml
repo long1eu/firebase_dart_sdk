@@ -1,0 +1,31 @@
+name: firebase_app_dart
+description: >-
+  Unofficial pure-Dart FirebaseApp and FirebaseOptions for Dart servers, CLIs
+  and Flutter apps. The app layer used by cloud_firestore_dart.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_core/firebase_app_dart
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - firestore
+  - dart
+  - server
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  windows:
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  collection: ^1.18.0
+  meta: ^1.11.0
+  rxdart: ^0.28.0
+
+dev_dependencies:
+  test: ^1.25.0
