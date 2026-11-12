@@ -18,7 +18,8 @@ void main() {
     print('setUp');
     final SQLitePersistence persistence = await createSQLitePersistence(
         'firebase/firestore/local/sqlite_index_manager_test-${const Uuid().v4()}.db');
-    testCase = IndexManagerTestCase(persistence)..setUp();
+    testCase = IndexManagerTestCase(persistence);
+    await testCase.setUp();
     print('setUpDone');
   });
 

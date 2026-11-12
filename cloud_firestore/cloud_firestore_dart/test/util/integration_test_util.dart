@@ -14,7 +14,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
@@ -251,9 +250,6 @@ class IntegrationTestUtil {
       String databaseName = DatabaseId.defaultDatabaseId}) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.level = logLevel;
-
-    // TODO(long1eu): Remove this once this is ready to ship.
-    Persistence.indexingSupportEnabled = true;
 
     final DatabaseId databaseId =
         DatabaseId.forDatabase(projectId, databaseName);

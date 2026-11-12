@@ -8,6 +8,7 @@ import 'package:cloud_firestore_dart/src/database_collection/database_collection
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
@@ -18,6 +19,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_versi
 /// [MaybeDocument] instances, meaning we can cache both [Document] instances
 /// (an actual document with data) as well as [NoDocument] instances (indicating
 /// that the document is known to not exist).
+/// A cached document together with the time at which it was read.
+///
+/// PORTING NOTE: upstream keeps the read time on the document itself (`MutableDocument.getReadTime`). The documents of
+/// the port have no read time, so the scans that are ordered by read time return it next to the document.
+typedef ReadDocument = ({MaybeDocument document, SnapshotVersion readTime});
+
 abstract class RemoteDocumentCache {
   static const String statsTag = 'remote_documents';
 
@@ -47,6 +54,14 @@ abstract class RemoteDocumentCache {
   /// value.
   Future<Map<DocumentKey, MaybeDocument?>> getAll(
       Iterable<DocumentKey> documentKeys);
+
+  /// Looks up the next [limit] documents for a collection group based on the provided [offset]. The ordering is based
+  /// on the document's read time and key.
+  ///
+  /// The result includes the cached [NoDocument] entries. Only supported by the SQLite implementation (it is used to
+  /// backfill field indexes, which memory persistence does not have).
+  Future<Map<DocumentKey, ReadDocument>> getAllForCollectionGroup(
+      String collectionGroup, IndexOffset offset, int limit);
 
   /// Executes a query against the cached [Document] entries
   ///

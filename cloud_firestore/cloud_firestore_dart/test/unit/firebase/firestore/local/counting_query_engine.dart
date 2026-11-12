@@ -24,6 +24,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/re
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
@@ -109,6 +110,15 @@ class _CountingRemoteDocumentCache implements RemoteDocumentCache {
     final Map<DocumentKey, MaybeDocument?> result =
         await _subject.getAll(documentKeys);
     _counter.documentsReadByKey += result.length;
+    return result;
+  }
+
+  @override
+  Future<Map<DocumentKey, ReadDocument>> getAllForCollectionGroup(
+      String collectionGroup, IndexOffset offset, int limit) async {
+    final Map<DocumentKey, ReadDocument> result =
+        await _subject.getAllForCollectionGroup(collectionGroup, offset, limit);
+    _counter.documentsReadByQuery += result.length;
     return result;
   }
 

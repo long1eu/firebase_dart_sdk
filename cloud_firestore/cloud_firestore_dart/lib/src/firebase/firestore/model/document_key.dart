@@ -30,6 +30,9 @@ class DocumentKey implements Comparable<DocumentKey> {
 
   static const String keyFieldName = '__name__';
 
+  /// Returns the collection group (the ID of the collection that immediately contains the document) of this key.
+  String get collectionGroup => path.getSegment(path.length - 2);
+
   /// The path to the document.
   final ResourcePath path;
 

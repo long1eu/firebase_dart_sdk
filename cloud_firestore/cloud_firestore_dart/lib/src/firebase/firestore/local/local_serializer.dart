@@ -12,6 +12,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
@@ -24,6 +26,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/proto/google/firestore/admin/v1/index.dart'
+    as admin;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:fixnum/fixnum.dart';
 
@@ -388,5 +392,43 @@ class LocalSerializer {
     );
 
     return BundledQuery(query, limitType);
+  }
+
+  /// Encodes the segments of a field index as the admin `Index` message that is stored with the index configuration.
+  admin.Index encodeFieldIndexSegments(List<IndexSegment> segments) {
+    // The Mobile SDKs treat all indices as collection group indices, as we run all collection group queries against
+    // each collection separately.
+    final admin.Index index = admin.Index.create()
+      ..queryScope = admin.Index_QueryScope.COLLECTION_GROUP;
+
+    for (final IndexSegment segment in segments) {
+      final admin.Index_IndexField indexField = admin.Index_IndexField.create()
+        ..fieldPath = segment.fieldPath.canonicalString;
+      if (segment.kind == SegmentKind.contains) {
+        indexField.arrayConfig = admin.Index_IndexField_ArrayConfig.CONTAINS;
+      } else if (segment.kind == SegmentKind.ascending) {
+        indexField.order = admin.Index_IndexField_Order.ASCENDING;
+      } else {
+        indexField.order = admin.Index_IndexField_Order.DESCENDING;
+      }
+      index.fields.add(indexField);
+    }
+
+    return index;
+  }
+
+  List<IndexSegment> decodeFieldIndexSegments(admin.Index index) {
+    final List<IndexSegment> result = <IndexSegment>[];
+    for (final admin.Index_IndexField field in index.fields) {
+      final FieldPath fieldPath = FieldPath.fromServerFormat(field.fieldPath);
+      final SegmentKind kind = field.whichValueMode() ==
+              admin.Index_IndexField_ValueMode.arrayConfig
+          ? SegmentKind.contains
+          : (field.order == admin.Index_IndexField_Order.ASCENDING
+              ? SegmentKind.ascending
+              : SegmentKind.descending);
+      result.add(IndexSegment(fieldPath, kind));
+    }
+    return result;
   }
 }

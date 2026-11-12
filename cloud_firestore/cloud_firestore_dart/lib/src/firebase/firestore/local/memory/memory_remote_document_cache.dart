@@ -56,6 +56,14 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
+  Future<Map<DocumentKey, ReadDocument>> getAllForCollectionGroup(
+      String collectionGroup, IndexOffset offset, int limit) {
+    // This method should only be called from the IndexBackfiller if SQLite is enabled.
+    throw UnsupportedError(
+        'getAllForCollectionGroup(String, IndexOffset, int) is not supported.');
+  }
+
+  @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
       getAllDocumentsMatchingQuery(
           Query query, SnapshotVersion sinceReadTime) async {

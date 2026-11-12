@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
@@ -17,8 +18,9 @@ class IndexManagerTestCase {
   final Persistence _persistence;
   late IndexManager _indexManager;
 
-  void setUp() {
-    _indexManager = _persistence.indexManager;
+  Future<void> setUp() async {
+    _indexManager = _persistence.getIndexManager(User.unauthenticated);
+    await _indexManager.start();
   }
 
   Future<void> tearDown() async => _persistence.shutdown();

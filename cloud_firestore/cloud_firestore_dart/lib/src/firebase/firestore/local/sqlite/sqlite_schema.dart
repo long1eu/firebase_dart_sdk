@@ -16,10 +16,11 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 11;
+  static const int version = 13;
 
-  // Remove this constant and increment version to enable indexing support
-  static const int indexingSupportVersion = version + 1;
+  /// The batch size for data migrations on a large table. This is chosen to balance the memory usage of the rows read
+  /// with the number of round trips.
+  static const int migrationBatchSize = 100;
 
   final Database db;
 
@@ -96,6 +97,21 @@ class SQLiteSchema {
       await _addPendingDataMigration(Persistence.dataMigrationBuildOverlays);
     }
 
+    // Migration 12 corresponds to migrations 13 and 15 of the Android SDK: the number of segments of the path of each
+    // remote document (to scan a collection without its subcollections in SQL), and a read time of zero for the
+    // documents that were written before read times existed, so that scans ordered by read time (the index backfill)
+    // return them first instead of never.
+    if (fromVersion < 12 && toVersion >= 12) {
+      await _addPathLength();
+      await _ensurePathLength();
+      await _ensureReadTime();
+    }
+
+    // Migration 13 corresponds to migration 16 of the Android SDK (client-side field indexes).
+    if (fromVersion < 13 && toVersion >= 13) {
+      await _createFieldIndex();
+    }
+
     // Adding a new migration? READ THIS FIRST!
     //
     // Be aware that the SDK version may be downgraded then re-upgraded. This means that running your new migration must
@@ -106,13 +122,6 @@ class SQLiteSchema {
     //  * Data migrations should *probably* always run. Older versions of the SDK will not have maintained invariants
     //  from later versions, so migrations that update values cannot assume that existing values have been properly
     //  maintained. Calculate them again, if applicable.
-
-    if (fromVersion < indexingSupportVersion &&
-        toVersion >= indexingSupportVersion) {
-      if (Persistence.indexingSupportEnabled) {
-        await _createLocalDocumentsCollectionIndex();
-      }
-    }
   }
 
   /// Used to assert that a set of tables either all exist or not. The supplied function is run if none of the tables
@@ -319,32 +328,6 @@ class SQLiteSchema {
           CREATE TABLE remote_documents (
             path     TEXT PRIMARY KEY,
             contents BLOB
-          );
-        '''
-          // @formatter:on
-          );
-    });
-  }
-
-  // TODO(indexing): Put the schema version in this method name.
-  Future<void> _createLocalDocumentsCollectionIndex() async {
-    // field_value_type determines type of field_value fields.
-    // field_value_1 is first component
-    // field_value_2 is the second component; required for timestamps, GeoPoints
-    return _ifTablesDontExist(<String>['collection_index'], () async {
-      // A per-user, per-collection index for cached documents indexed by a single field's name and value.
-      await db.query(
-          // @formatter:off
-          '''
-          CREATE TABLE collection_index (
-            uid              TEXT,
-            collection_path  TEXT,
-            field_path       TEXT,
-            field_value_type INTEGER,
-            field_value_1,
-            field_value_2,
-            document_id      TEXT,
-            PRIMARY KEY (uid, collection_path, field_path, field_value_type, field_value_1, field_value_2, document_id)
           );
         '''
           // @formatter:on
@@ -583,6 +566,108 @@ class SQLiteSchema {
     await db.execute(
         'INSERT OR IGNORE INTO data_migrations (migration_name) VALUES (?)',
         <Object>[migration]);
+  }
+
+  Future<void> _addPathLength() async {
+    if (!(await _tableContainsColumn('remote_documents', 'path_length'))) {
+      // The "path_length" column store the number of segments in the path.
+      await db.execute(
+          'ALTER TABLE remote_documents ADD COLUMN path_length INTEGER');
+    }
+  }
+
+  /// Populates the remote_document's path_length column.
+  Future<void> _ensurePathLength() async {
+    while (true) {
+      final List<Map<String, dynamic>> rows = await db.query(
+          'SELECT path FROM remote_documents WHERE path_length IS NULL LIMIT ?',
+          <Object>[migrationBatchSize]);
+      if (rows.isEmpty) {
+        break;
+      }
+
+      for (final Map<String, dynamic> row in rows) {
+        final String encodedPath = row['path'];
+        final ResourcePath decodedPath =
+            EncodedPath.decodeResourcePath(encodedPath);
+        await db.execute(
+            'UPDATE remote_documents SET path_length = ? WHERE path = ?',
+            <Object>[decodedPath.length, encodedPath]);
+      }
+    }
+  }
+
+  /// Initialize the remote_document's read_time column with 0 values if they are not set.
+  Future<void> _ensureReadTime() async {
+    await db.execute(
+        'UPDATE remote_documents SET read_time_seconds = 0, read_time_nanos = 0 WHERE read_time_seconds IS NULL');
+  }
+
+  /// Creates the tables of the field indexes.
+  ///
+  /// The `index_configuration` table holds the configuration for all indices. Entries in this table apply for all
+  /// users. It is not possible to only enable indices for a subset of users.
+  ///
+  /// The `index_state` table holds backfill information on each index that stores when it was last updated.
+  ///
+  /// The `index_entries` table holds the index values themselves. An index value is created for every field
+  /// combination that matches a configured index.
+  Future<void> _createFieldIndex() async {
+    await _ifTablesDontExist(
+        <String>['index_configuration', 'index_state', 'index_entries'],
+        () async {
+      // Global configuration for all existing field indexes
+      await db.execute(
+          // @formatter:off
+          '''
+            CREATE TABLE index_configuration (
+              index_id         INTEGER,
+              collection_group TEXT,
+              index_proto      BLOB, -- V1 Admin index proto
+              PRIMARY KEY (index_id)
+            );
+          '''
+          // @formatter:on
+          );
+
+      // Per index per user state to track the backfill state for each index
+      await db.execute(
+          // @formatter:off
+          '''
+            CREATE TABLE index_state (
+              index_id          INTEGER,
+              uid               TEXT,
+              sequence_number   INTEGER, -- Specifies the order of updates
+              read_time_seconds INTEGER, -- Read time of last processed document
+              read_time_nanos   INTEGER,
+              document_key      TEXT,    -- Key of the last processed document
+              largest_batch_id  INTEGER, -- Largest mutation batch id that was processed
+              PRIMARY KEY (index_id, uid)
+            );
+          '''
+          // @formatter:on
+          );
+
+      // The index entry table stores the encoded entries for all fields.
+      // The table only has a single primary index. `array_value` should be set for all queries.
+      await db.execute(
+          // @formatter:off
+          '''
+            CREATE TABLE index_entries (
+              index_id          INTEGER, -- The index_id of the field index creating this entry
+              uid               TEXT,
+              array_value       BLOB,    -- index values for ArrayContains/ArrayContainsAny
+              directional_value BLOB,    -- index values for equality and inequalities
+              document_key      TEXT,
+              PRIMARY KEY (index_id, uid, array_value, directional_value, document_key)
+            );
+          '''
+          // @formatter:on
+          );
+
+      await db.execute(
+          'CREATE INDEX read_time ON remote_documents(read_time_seconds, read_time_nanos)');
+    });
   }
 
   Future<bool> _hasReadTime() async {

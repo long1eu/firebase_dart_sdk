@@ -17,7 +17,8 @@ void main() {
     print('setUp');
     final MemoryPersistence persistence =
         await createEagerGCMemoryPersistence();
-    testCase = IndexManagerTestCase(persistence)..setUp();
+    testCase = IndexManagerTestCase(persistence);
+    await testCase.setUp();
     print('setUpDone');
   });
 

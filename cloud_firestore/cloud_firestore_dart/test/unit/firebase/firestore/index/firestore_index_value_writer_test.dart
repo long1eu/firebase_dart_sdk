@@ -321,7 +321,8 @@ void main() {
       });
     });
 
-    test('references write the segments of the document key', () {
+    test('references write the segments of the document key and a terminator',
+        () {
       check(ref('coll/doc/sub/other'), (DirectionalIndexByteEncoder e) {
         e
           ..writeLong(typeReference)
@@ -332,7 +333,8 @@ void main() {
           ..writeLong(typeReferenceSegment)
           ..writeString('sub')
           ..writeLong(typeReferenceSegment)
-          ..writeString('other');
+          ..writeString('other')
+          ..writeLong(notTruncated); // not upstream
       });
     });
 
@@ -473,6 +475,7 @@ void main() {
       ],
       <Object?>[Blob.bsonBinary(2, Uint8List(0))],
       <Object?>[ref('a/a')],
+      <Object?>[ref('a/a/b/b')],
       <Object?>[ref('a/b')],
       <Object?>[ref('b/a')],
       <Object?>[const BsonObjectId('507f191e810c19729de860ea')],
@@ -555,15 +558,19 @@ void main() {
       }
     });
 
-    test('a reference sorts after the references it is a prefix of', () {
-      // Same as upstream: a reference has no terminator of its own, so the
-      // separator that follows it (0xffff ascending) is compared with the
-      // segment label of the longer reference. DocumentKey orders these two
-      // the other way around.
+    test('a reference sorts before the references it is a prefix of', () {
+      // Not upstream, where a reference has no terminator and `a/a` sorts
+      // after `a/a/b/b` in the index (the opposite of the document key
+      // order), which makes range scans on reference fields wrong.
       final FieldValue parent = wrap(ref('a/a'));
       final FieldValue child = wrap(ref('a/a/b/b'));
       expect(parent.compareTo(child).sign, -1);
-      expect(compareByteArrays(encode(parent), encode(child)).sign, 1);
+      expect(compareByteArrays(encode(parent), encode(child)).sign, -1);
+      expect(
+          compareByteArrays(encode(parent, SegmentKind.descending),
+                  encode(child, SegmentKind.descending))
+              .sign,
+          1);
     });
 
     test('a BSON timestamp past 2^31 seconds sorts before the smaller ones',

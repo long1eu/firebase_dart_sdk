@@ -5,17 +5,22 @@
 library sqlite_persistence;
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/core/index_range.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/bound.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/listent_sequence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/firestore_index_value_writer.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_byte_encoder.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_entry.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/encoded_path.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_cursor.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
@@ -38,24 +43,29 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/target_index_matcher.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/logic_utils.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/types.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/proto/google/firestore/admin/v1/index.dart'
+    as admin;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
+import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:semaphore/semaphore.dart';
 
-part 'sqlite_collection_index.dart';
 part 'sqlite_index_manager.dart';
 part 'sqlite_lru_reference_delegate.dart';
 part 'sqlite_mutation_queue.dart';
@@ -201,6 +211,11 @@ class SQLitePersistence extends Persistence {
 
   @visibleForTesting
   Database get database => _db;
+
+  @override
+  IndexManager getIndexManager(User user) {
+    return SqliteIndexManager(this, serializer, user);
+  }
 
   /// Deletes the database file and its journal, WAL and shared memory side
   /// files. Only valid after [shutdown]; does nothing when the database was

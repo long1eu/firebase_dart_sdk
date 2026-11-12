@@ -33,6 +33,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_collections.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
@@ -149,6 +150,13 @@ class MemoryPersistence extends Persistence {
   @override
   OverlayMigrationManager get overlayMigrationManager =>
       const NoOpOverlayMigrationManager();
+
+  @override
+  IndexManager getIndexManager(User user) {
+    // We do not currently support indices for memory persistence, so we can return the same shared instance of the
+    // memory index manager.
+    return indexManager;
+  }
 
   @override
   DocumentOverlayCache getDocumentOverlayCache(User user) {

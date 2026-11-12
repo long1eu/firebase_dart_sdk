@@ -3,9 +3,11 @@
 // on 20/09/2018
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_documents_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
@@ -13,6 +15,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/re
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_collections.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
@@ -151,6 +154,69 @@ class LocalDocumentsView {
 
     result.addAll(await _recalculateAndSaveOverlays(recalculateDocuments));
     return result;
+  }
+
+  /// Given a collection group, returns the next documents that follow the provided offset, along with an updated batch
+  /// id.
+  ///
+  /// The documents returned by this method are ordered by remote version from the provided offset. If there are no
+  /// more remote documents after the provided offset, documents with mutations in order of batch id from the offset
+  /// are returned. Since all documents in a batch are returned together, the total number of documents returned can
+  /// exceed [count].
+  ///
+  /// Only supported with SQLite persistence (it is used to backfill the field indexes).
+  Future<LocalDocumentsResult> getNextDocuments(
+      String collectionGroup, IndexOffset offset, int count) async {
+    final Map<DocumentKey, ReadDocument> remoteDocs = await remoteDocumentCache
+        .getAllForCollectionGroup(collectionGroup, offset, count);
+    final Map<DocumentKey, MaybeDocument?> docs = <DocumentKey, MaybeDocument?>{
+      for (final MapEntry<DocumentKey, ReadDocument> entry
+          in remoteDocs.entries)
+        entry.key: entry.value.document,
+    };
+    final Map<DocumentKey, SnapshotVersion> readTimes =
+        <DocumentKey, SnapshotVersion>{
+      for (final MapEntry<DocumentKey, ReadDocument> entry
+          in remoteDocs.entries)
+        entry.key: entry.value.readTime,
+    };
+
+    final Map<DocumentKey, Overlay> overlays = count - docs.length > 0
+        ? await documentOverlayCache.getOverlaysForCollectionGroup(
+            collectionGroup, offset.largestBatchId, count - docs.length)
+        : <DocumentKey, Overlay>{};
+
+    int largestBatchId = FieldIndex.initialLargestBatchId;
+    for (final Overlay overlay in overlays.values) {
+      if (!docs.containsKey(overlay.key)) {
+        docs[overlay.key] = await _getBaseDocument(overlay.key, overlay);
+        // The document is processed for its mutation, not for a remote change: like upstream, where the base document
+        // of an overlay that was not part of the read-time scan has no read time.
+        readTimes[overlay.key] = SnapshotVersion.none;
+      }
+      // The callsite will use the largest batch ID together with the latest read time to create a new index offset.
+      // Since we only process batch IDs if all remote documents have been read, no overlay will increase the overall
+      // read time. This is why we only need to special case the batch id.
+      largestBatchId = max(largestBatchId, overlay.largestBatchId);
+    }
+
+    // Fetch the overlays of the remote documents and add them to the overlay map.
+    final List<DocumentKey> missingOverlays = <DocumentKey>[
+      for (final DocumentKey key in docs.keys)
+        if (!overlays.containsKey(key)) key,
+    ];
+    overlays.addAll(await documentOverlayCache.getOverlays(missingOverlays));
+
+    final Map<DocumentKey, OverlayedDocument> localDocs =
+        await _computeViews(docs, overlays, const <DocumentKey>{});
+    return LocalDocumentsResult(
+        largestBatchId,
+        <DocumentKey, MaybeDocument?>{
+          for (final MapEntry<DocumentKey, OverlayedDocument> entry
+              in localDocs.entries)
+            entry.key: entry.value.document,
+        },
+        readTimes);
   }
 
   /// Applies the pending mutations to [docs], saves the resulting overlays and returns the local views.

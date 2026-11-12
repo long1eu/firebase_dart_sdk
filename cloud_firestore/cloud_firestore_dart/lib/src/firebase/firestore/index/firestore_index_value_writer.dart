@@ -16,6 +16,9 @@ import 'package:fixnum/fixnum.dart';
 ///   * A [ReferenceValue] holds a document key, so its segments are written
 ///     directly (upstream skips the five `projects/p/databases/d/documents`
 ///     segments of the resource name).
+///   * A reference ends with a truncation marker, which upstream does not
+///     write: see [_writeIndexEntityRef]. The index entries are only read by
+///     this SDK, so the different bytes are not a compatibility concern.
 ///   * A [VectorFieldValue] is its own type, written the way upstream writes
 ///     the `{__type__: __vector__, value: [...]}` map.
 ///   * A [ServerTimestampValue] (a pending local write) is written as the map
@@ -252,6 +255,14 @@ class FirestoreIndexValueWriter {
       _writeValueTypeLabel(encoder, indexTypeReferenceSegment);
       encoder.writeString(path.getSegment(index));
     }
+    // PORTING NOTE: not upstream. Without a terminator the value separator
+    // (0xffff ascending) follows the last segment and sorts after the segment
+    // label of a longer reference, so `a/b` sorts after `a/b/c/d` and the
+    // lowest reference (no segments) after every reference. Index scans for
+    // `<`, `<=`, `>`, `>=`, cursors and limits on reference fields then return
+    // other documents than a collection scan. The marker is smaller than
+    // every label, which gives references the order of their document keys.
+    _writeTruncationMarker(encoder);
   }
 
   void _writeValueTypeLabel(

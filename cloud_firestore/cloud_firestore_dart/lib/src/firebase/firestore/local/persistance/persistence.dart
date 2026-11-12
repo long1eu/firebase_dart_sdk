@@ -53,11 +53,6 @@ import 'index_manager.dart';
 abstract class Persistence {
   const Persistence();
 
-  /// Temporary setting for enabling indexing-specific code paths while in
-  /// development.
-  // TODO(long1eu): Remove this.
-  static bool indexingSupportEnabled = false;
-
   /// Starts persistent storage, opening the database or similar.
   Future<void> start();
 
@@ -98,8 +93,15 @@ abstract class Persistence {
   /// documents.
   RemoteDocumentCache get remoteDocumentCache;
 
-  /// Creates an IndexManager that manages our persisted query indexes.
+  /// The collection parent index, which is the same for all users.
+  ///
+  /// The field index methods of this [IndexManager] must not be used: field indexes keep their state per user, see
+  /// [getIndexManager].
   IndexManager get indexManager;
+
+  /// Returns an [IndexManager] that manages the persisted field indexes for the given user (and the collection parent
+  /// index). It has to be started before its field index methods are used.
+  IndexManager getIndexManager(User user);
 
   /// Performs an operation inside a persistence transaction. Any reads or
   /// writes against persistence must be performed within a transaction. Writes

@@ -128,10 +128,6 @@ void main() {
     for (final List<Object?> type in types) {
       for (final Object? value in type) {
         final Uint8List encoded = encode(wrap(value));
-        if (wrap(value) is ReferenceValue) {
-          // See the next test.
-          continue;
-        }
         expect(
             compareByteArrays(
                 encode(ValueBounds.getLowerBound(wrap(value))), encoded),
@@ -149,21 +145,15 @@ void main() {
     }
   });
 
-  test('the lower bound of references sorts after every reference in the index',
+  test(
+      'the lower bound of references sorts before every reference in the index',
       () {
-    // Same as upstream, a consequence of references having no terminator in
-    // the index encoding: the lower bound is the reference without segments,
-    // whose value separator (0xffff) sorts after the segment label of any
-    // real reference. In memory it sorts first.
+    // Not so upstream: there the lower bound (the reference without
+    // segments) is encoded after every real reference.
     final FieldValue reference = wrap(ref('a/b'));
     final FieldValue lower = ValueBounds.getLowerBound(reference);
     expect(lower.compareTo(reference), lessThan(0));
-    expect(compareByteArrays(encode(lower), encode(reference)), greaterThan(0));
-    // The upper bound is on the right side.
-    expect(
-        compareByteArrays(
-            encode(ValueBounds.getUpperBound(reference)), encode(reference)),
-        greaterThan(0));
+    expect(compareByteArrays(encode(lower), encode(reference)), lessThan(0));
   });
 
   test('the index writer encodes the internal max value', () {

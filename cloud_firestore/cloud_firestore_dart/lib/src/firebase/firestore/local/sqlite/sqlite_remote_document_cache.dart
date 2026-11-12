@@ -12,7 +12,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   final StatsCollector _statsCollector;
 
   @override
-  Future<void> add(MaybeDocument maybeDocument, SnapshotVersion readTime) async {
+  Future<void> add(
+      MaybeDocument maybeDocument, SnapshotVersion readTime) async {
     hardAssert(readTime != SnapshotVersion.none,
         'Cannot add document to the RemoteDocumentCache with a read time of zero');
 
@@ -26,12 +27,13 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         // @formatter:off
         '''
           INSERT
-          OR REPLACE INTO remote_documents (path, read_time_seconds, read_time_nanos, contents)
-          VALUES (?, ?, ?, ?);
+          OR REPLACE INTO remote_documents (path, path_length, read_time_seconds, read_time_nanos, contents)
+          VALUES (?, ?, ?, ?, ?);
         ''',
         // @formatter:on
         <dynamic>[
           path,
+          maybeDocument.key.path.length,
           timestamp.seconds,
           timestamp.nanoseconds,
           message.writeToBuffer()
@@ -114,6 +116,99 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     }
 
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rowsProcessed);
+    return results;
+  }
+
+  /// The number of bind arguments of the statement for one collection in [_getAllForCollections].
+  @visibleForTesting
+  static const int bindsPerStatement = 9;
+
+  /// The number of bind arguments a statement may have (SQLite supports 999).
+  static const int _maxArgs = 900;
+
+  @override
+  Future<Map<DocumentKey, ReadDocument>> getAllForCollectionGroup(
+      String collectionGroup, IndexOffset offset, int limit) async {
+    final List<ResourcePath> collectionParents =
+        await db.indexManager.getCollectionParents(collectionGroup);
+    final List<ResourcePath> collections = <ResourcePath>[
+      for (final ResourcePath collectionParent in collectionParents)
+        collectionParent.appendSegment(collectionGroup),
+    ];
+
+    if (collections.isEmpty) {
+      return <DocumentKey, ReadDocument>{};
+    } else if (bindsPerStatement * collections.length < _maxArgs) {
+      return _getAllForCollections(collections, offset, limit);
+    } else {
+      // We need to fan out our collection scan since SQLite only supports 999 binds per statement.
+      final Map<DocumentKey, ReadDocument> results =
+          <DocumentKey, ReadDocument>{};
+      const int pageSize = _maxArgs ~/ bindsPerStatement;
+      for (int i = 0; i < collections.length; i += pageSize) {
+        results.addAll(await _getAllForCollections(
+            collections.sublist(i, min(collections.length, i + pageSize)),
+            offset,
+            limit));
+      }
+      // The first [limit] entries, by read time and key.
+      final List<MapEntry<DocumentKey, ReadDocument>> entries = results.entries
+          .toList()
+        ..sort((MapEntry<DocumentKey, ReadDocument> l,
+            MapEntry<DocumentKey, ReadDocument> r) {
+          final int cmp = l.value.readTime.compareTo(r.value.readTime);
+          return cmp != 0 ? cmp : l.key.compareTo(r.key);
+        });
+      return Map<DocumentKey, ReadDocument>.fromEntries(entries.take(limit));
+    }
+  }
+
+  /// Returns the next [count] documents from the provided collections, ordered by read time.
+  Future<Map<DocumentKey, ReadDocument>> _getAllForCollections(
+      List<ResourcePath> collections, IndexOffset offset, int count) async {
+    final Timestamp readTime = offset.readTime.timestamp;
+    final DocumentKey documentKey = offset.documentKey;
+
+    final String sql = '${List<String>.filled(collections.length, '''
+          SELECT contents, read_time_seconds, read_time_nanos, path
+          FROM remote_documents
+          WHERE path >= ? AND path < ? AND path_length = ?
+            AND (read_time_seconds > ?
+              OR (read_time_seconds = ? AND read_time_nanos > ?)
+              OR (read_time_seconds = ? AND read_time_nanos = ? AND path > ?))
+        ''').join(' UNION ')}'
+        'ORDER BY read_time_seconds, read_time_nanos, path LIMIT ?';
+
+    final List<Object> bindVars = <Object>[];
+    for (final ResourcePath collection in collections) {
+      final String prefixPath = EncodedPath.encode(collection);
+      bindVars
+        ..add(prefixPath)
+        ..add(EncodedPath.prefixSuccessor(prefixPath))
+        ..add(collection.length + 1)
+        ..add(readTime.seconds)
+        ..add(readTime.seconds)
+        ..add(readTime.nanoseconds)
+        ..add(readTime.seconds)
+        ..add(readTime.nanoseconds)
+        ..add(EncodedPath.encode(documentKey.path));
+    }
+    bindVars.add(count);
+
+    final List<Map<String, dynamic>> rows = await db.query(sql, bindVars);
+
+    final Map<DocumentKey, ReadDocument> results =
+        <DocumentKey, ReadDocument>{};
+    for (final Map<String, dynamic> row in rows) {
+      final MaybeDocument document = decodeMaybeDocument(row['contents']);
+      results[document.key] = (
+        document: document,
+        readTime: SnapshotVersion(
+            Timestamp(row['read_time_seconds'], row['read_time_nanos'])),
+      );
+    }
+
+    _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rows.length);
     return results;
   }
 
