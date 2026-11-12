@@ -29,6 +29,7 @@ import 'package:test/test.dart';
 
 import '../unit/firebase/firestore/local/mock/database_mock.dart';
 import 'prod_provider/firestore_provider.dart';
+import 'test_backend.dart';
 
 // ignore: avoid_classes_with_only_static_members
 /// A set of helper methods for tests
@@ -59,10 +60,30 @@ class IntegrationTestUtil {
 
   /// The `host:port` of the Firestore emulator, taken from the
   /// `FIRESTORE_EMULATOR_HOST` environment variable, or null if it is not set.
-  static String? get emulatorHost {
-    final String? value = Platform.environment['FIRESTORE_EMULATOR_HOST'];
-    return value == null || value.isEmpty ? null : value;
-  }
+  static String? get emulatorHost => TestBackend().emulatorHost;
+
+  /// The `host:port` of the Enterprise edition emulator, taken from the
+  /// `FIRESTORE_ENTERPRISE_EMULATOR_HOST` environment variable, or null if it
+  /// is not set (see `tool/start_enterprise_emulator.sh`).
+  static String? get enterpriseEmulatorHost =>
+      TestBackend().enterpriseEmulatorHost;
+
+  /// The reason to skip a test that needs the Enterprise edition emulator, or
+  /// null when it is configured: `test('...', skip: enterpriseEmulatorSkipReason, ...)`.
+  static String? get enterpriseEmulatorSkipReason =>
+      TestBackend().enterpriseEmulatorSkipReason;
+
+  /// The project of the Enterprise edition emulator.
+  static const String enterpriseProjectId = FirestoreProvider.fallbackProjectId;
+
+  /// Whether the suite runs against a real Firebase project (opt-in with
+  /// `FIRESTORE_TEST_PROJECT_ID`, see `test/util/test_backend.dart`).
+  static bool get usesRealProject => TestBackend().usesRealProject;
+
+  /// Access tokens for the real project. Created lazily and shared, so that
+  /// the credentials are resolved once per test process.
+  static final ApplicationDefaultTokenSource _realProjectTokens =
+      ApplicationDefaultTokenSource();
 
   static DatabaseInfo testEnvDatabaseInfo() {
     return DatabaseInfo(
@@ -80,17 +101,40 @@ class IntegrationTestUtil {
       return FirestoreSettings();
     }
 
-    final int separator = emulator.lastIndexOf(':');
-    final String host =
-        separator < 0 ? emulator : emulator.substring(0, separator);
-    final int port =
-        separator < 0 ? 8080 : int.parse(emulator.substring(separator + 1));
-    return FirestoreSettings(host: host, port: port, sslEnabled: false);
+    return _emulatorSettings(emulator);
   }
 
+  static FirestoreSettings _emulatorSettings(String emulator) {
+    final EmulatorAddress address = EmulatorAddress.parse(emulator);
+    return FirestoreSettings(
+        host: address.host, port: address.port, sslEnabled: false);
+  }
+
+  /// Initializes a new Firestore instance that talks to the Enterprise edition
+  /// emulator. Guard the tests that use it with [enterpriseEmulatorSkipReason].
+  static Future<Firestore> testEnterpriseFirestore([String? dbPath]) {
+    final String? emulator = enterpriseEmulatorHost;
+    if (emulator == null) {
+      throw StateError(enterpriseEmulatorSkipReason!);
+    }
+    return testFirestoreInstance(
+      enterpriseProjectId,
+      InternalLogLevel.w,
+      _emulatorSettings(emulator),
+      dbPath ?? currentDatabasePath,
+    );
+  }
+
+  /// Deletes all the documents from the Enterprise edition emulator.
+  static Future<void> clearEnterpriseEmulatorData() =>
+      _clearEmulatorData(enterpriseEmulatorHost, enterpriseProjectId);
+
   /// Deletes all the documents from the emulator for the test project.
-  static Future<void> clearEmulatorData() async {
-    final String? emulator = emulatorHost;
+  static Future<void> clearEmulatorData() =>
+      _clearEmulatorData(emulatorHost, provider.projectId);
+
+  static Future<void> _clearEmulatorData(
+      String? emulator, String projectId) async {
     if (emulator == null) {
       return;
     }
@@ -98,7 +142,7 @@ class IntegrationTestUtil {
     final HttpClient client = HttpClient();
     try {
       final HttpClientRequest request = await client.deleteUrl(Uri.parse(
-          'http://$emulator/emulator/v1/projects/${provider.projectId}/databases/(default)/documents'));
+          'http://$emulator/emulator/v1/projects/$projectId/databases/(default)/documents'));
       final HttpClientResponse response = await request.close();
       await response.drain<void>();
     } finally {
@@ -115,6 +159,8 @@ class IntegrationTestUtil {
       InternalLogLevel.w,
       settings ?? newTestSettings(),
       dbPath ?? currentDatabasePath,
+      databaseName:
+          TestBackend().realDatabaseId ?? DatabaseId.defaultDatabaseId,
     );
   }
 
@@ -181,8 +227,12 @@ class IntegrationTestUtil {
     }
 
     final TaskScheduler scheduler = TaskScheduler('');
-    final MockCredentialsProvider credentialsProvider =
-        MockCredentialsProvider();
+    // Only requests to production Firestore of an opted-in real project carry
+    // a token; the emulators get none.
+    final bool authenticate =
+        usesRealProject && settings.host == TestBackend.productionHost;
+    final MockCredentialsProvider credentialsProvider = MockCredentialsProvider(
+        tokenSource: authenticate ? _realProjectTokens : null);
     final Firestore firestore = await forTests(
       databaseId,
       persistenceKey,
@@ -434,11 +484,18 @@ class MockCredentialsProvider extends CredentialsProvider {
   final BehaviorSubject<User> _onChange =
       BehaviorSubject<User>.seeded(User.unauthenticated);
 
-  @override
-  Future<String?> get token => Future<String?>.value(null);
+  MockCredentialsProvider({this.tokenSource});
+
+  /// Where the tokens come from, or null for unauthenticated requests (the
+  /// emulators).
+  final ApplicationDefaultTokenSource? tokenSource;
 
   @override
-  void invalidateToken() {}
+  Future<String?> get token =>
+      tokenSource?.token ?? Future<String?>.value(null);
+
+  @override
+  void invalidateToken() => tokenSource?.invalidate();
 
   @override
   Stream<User> get onChange => _onChange;

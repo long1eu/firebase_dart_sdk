@@ -98,7 +98,16 @@ Then:
     cd ../..
     ./tool/stop_emulator.sh
 
-See `tool/README.md` for details.
+Tests that need the Enterprise edition of Firestore use a second emulator on port 8181:
+
+    ./tool/start_enterprise_emulator.sh
+    cd cloud_firestore/cloud_firestore_dart
+    FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise
+    cd ../..
+    ./tool/stop_enterprise_emulator.sh
+
+See `tool/README.md` for details, and the Testing section of
+`cloud_firestore/cloud_firestore_dart/README.md` for the opt-in run against a real project.
 
 ## Regenerating protos
 

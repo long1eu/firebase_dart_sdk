@@ -181,8 +181,7 @@ not compiled).
 
 The public entry point is `package:cloud_firestore_dart/cloud_firestore_dart.dart` (class
 `Firestore`). It needs a `FirebaseApp` from `firebase_app_dart`. A runnable program is in
-`example/main.dart`. To run the integration tests
-against the emulator set `FIRESTORE_EMULATOR_HOST` (see `test/util/integration_test_util.dart`).
+`example/main.dart`. See [Testing](#testing) for how to run the tests.
 
 ## Pipelines (preview)
 
@@ -276,6 +275,57 @@ are skipped.
   event. To react to real connectivity changes, subclass `PlatformDependencies`, override
   `onNetworkConnected` and feed it from your own source (for example the `connectivity_plus`
   plugin in a Flutter app, or a periodic reachability probe in a server process).
+
+## Testing
+
+Run everything from this directory. The scripts are in `tool/` at the repository root (see
+`tool/README.md`).
+
+| Tests | Command | Backend |
+| --- | --- | --- |
+| Unit | `dart test test/unit` | none |
+| Integration | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration` | standard emulator (`tool/start_emulator.sh`) |
+| Enterprise | `FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise` | Enterprise edition emulator (`tool/start_enterprise_emulator.sh`) |
+
+The environment variables are read by `test/util/test_backend.dart`:
+
+- `FIRESTORE_EMULATOR_HOST` (`host:port`): the standard edition emulator, used by
+  `test/integration`.
+- `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (`host:port`): a second emulator started in Enterprise
+  edition, for the tests that need Enterprise features. Those tests live in
+  `test/integration_enterprise`, get their instance from
+  `IntegrationTestUtil.testEnterpriseFirestore()` and are skipped with a reason
+  (`skip: IntegrationTestUtil.enterpriseEmulatorSkipReason`) while the variable is not set. Both
+  emulators can run at the same time and both variables can be set together.
+
+### Against a real Firebase project (opt-in)
+
+The integration suite can also run against a real project. Nothing does this by default: it
+only happens when you set `FIRESTORE_TEST_PROJECT_ID` yourself and `FIRESTORE_EMULATOR_HOST` is
+not set (the emulator always wins, so an emulator run can never reach a real project).
+
+    # Either a service-account key file...
+    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+    # ...or the credentials of: gcloud auth application-default login
+
+    export FIRESTORE_TEST_PROJECT_ID=my-test-project
+    export FIRESTORE_TEST_DATABASE_ID=my-database   # optional, default: (default)
+    dart test test/integration/firebase/firestore/smoke_test.dart
+
+- Credentials are Application Default Credentials, resolved by `package:grpc`: the file named
+  by `GOOGLE_APPLICATION_CREDENTIALS`, else the gcloud application-default file, else the
+  metadata server. The test code only passes the resulting access token to the gRPC calls; it
+  does not store or print it. Do not commit key files.
+- A service account needs the `Cloud Datastore User` role (`roles/datastore.user`). Its requests
+  bypass security rules. With gcloud user credentials the Firestore API may ask for a quota
+  project; a service account avoids that.
+- **Use a throwaway project.** The tests create many documents in collections with random names
+  and do not delete them; the suite makes thousands of reads and writes, which are billed.
+- The suite is written for the emulator. Against production expect failures in tests that rely
+  on emulator behaviour (open security rules and unauthenticated users, emulator-only limits,
+  queries that need composite indexes you have not created). Start with single files.
+- This path has only been exercised up to the token plumbing (unit tests with a fake
+  authenticator); it has not been run against a real project.
 
 ## Not supported or not done
 

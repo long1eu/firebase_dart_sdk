@@ -20,13 +20,13 @@ jobs:
       - name: Analyze and run unit tests
         run: ./tool/test_all.sh
 
-  # Optional job. The emulator suite has 1-2 known flaky tests (event ordering in the
-  # emulator, e.g. write_batch_test testWriteTheSameServerTimestampAcrossWrites).
+  # The emulator suite has 1-2 known flaky tests (event ordering in the emulator, e.g.
+  # write_batch_test testWriteTheSameServerTimestampAcrossWrites).
   # `continue-on-error: true` keeps this job from failing the workflow, but the job still
   # shows as failed in the UI and the full test output is uploaded, so failures stay visible.
   # Do not rely on this job to gate merges until the flaky tests are fixed.
   integration:
-    name: Emulator integration tests (allowed to fail)
+    name: Standard emulator integration tests (allowed to fail)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -67,3 +67,64 @@ jobs:
         with:
           name: integration-log
           path: ${{ runner.temp }}/*.log
+
+  # Tests that need the Enterprise edition of Firestore (test/integration_enterprise). They run
+  # against a second emulator started from the emulator JAR with `--database-edition enterprise`
+  # on port 8181 (tool/start_enterprise_emulator.sh); the standard emulator runs next to it on
+  # 8080 for the tests that compare the two. Allowed to fail for the same reason as the job
+  # above, and because Enterprise support in the emulator is recent.
+  enterprise:
+    name: Enterprise emulator tests (allowed to fail)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: stable
+      - uses: actions/setup-java@v4.7.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '20'
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+      - name: Download the Firestore emulator JAR
+        # Puts cloud-firestore-emulator-v*.jar in ~/.cache/firebase/emulators.
+        run: firebase setup:emulators:firestore
+      - name: Start standard Firestore emulator
+        working-directory: cloud_firestore/cloud_firestore_dart
+        run: |
+          mkdir -p "$EMULATOR_DIR"
+          firebase emulators:start --only firestore --project demo-test \
+            --config firebase.json > "$EMULATOR_DIR/emulator.log" 2>&1 &
+          for i in $(seq 1 120); do
+            if curl -s -o /dev/null http://127.0.0.1:8080; then echo "emulator up"; exit 0; fi
+            sleep 1
+          done
+          echo "emulator did not start"; cat "$EMULATOR_DIR/emulator.log"; exit 1
+      - name: Start Enterprise Firestore emulator
+        run: ./tool/start_enterprise_emulator.sh
+      - name: Run enterprise tests
+        working-directory: cloud_firestore/cloud_firestore_dart
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+          FIRESTORE_ENTERPRISE_EMULATOR_HOST: 127.0.0.1:8181
+        run: |
+          dart pub get
+          dart test test/integration_enterprise 2>&1 | tee "$EMULATOR_DIR/enterprise.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Stop Enterprise Firestore emulator
+        if: always()
+        run: ./tool/stop_enterprise_emulator.sh
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: enterprise-log
+          path: ${{ runner.temp }}/emulator/*.log

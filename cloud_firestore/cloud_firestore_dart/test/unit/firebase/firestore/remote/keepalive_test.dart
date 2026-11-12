@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_channel.dart';
 import 'package:grpc/grpc.dart';
 import 'package:grpc/grpc_connection_interface.dart' show ClientChannelBase;
+import 'package:http2/transport.dart' show ServerTransportConnection;
 import 'package:test/test.dart';
 
 /// A server streaming method that never answers: it keeps the call open.
@@ -25,8 +26,10 @@ class _HangService extends Service {
     $addMethod(
       ServiceMethod<int, int>(
         'Hang',
-        (ServiceCall call, Future<int> request) =>
-            StreamController<int>().stream,
+        (ServiceCall call, Future<int> request) {
+          calls++;
+          return StreamController<int>().stream;
+        },
         false,
         true,
         (List<int> value) => value.isEmpty ? 0 : value.first,
@@ -34,6 +37,9 @@ class _HangService extends Service {
       ),
     );
   }
+
+  /// The number of calls that reached the server.
+  int calls = 0;
 
   @override
   String get $name => 'test.Hang';
@@ -137,6 +143,7 @@ void main() {
     const Duration pingTimeout = Duration(milliseconds: 200);
 
     late Server server;
+    late _HangService service;
     late _BlackholeProxy proxy;
     late ClientChannelBase channel;
     final List<StreamSubscription<int>> subscriptions =
@@ -151,7 +158,8 @@ void main() {
 
     Future<void> start(
         ClientChannelBase Function(int port) createChannel) async {
-      server = Server.create(services: <Service>[_HangService()]);
+      service = _HangService();
+      server = Server.create(services: <Service>[service]);
       await server.serve(address: InternetAddress.loopbackIPv4, port: 0);
       proxy = await _BlackholeProxy.start(server.port!);
       channel = createChannel(proxy.port);
@@ -166,6 +174,23 @@ void main() {
           keepAliveTimeout: pingTimeout,
         );
 
+    /// The number of connections the server currently has.
+    // ignore: invalid_use_of_visible_for_testing_member
+    int serverConnections() => server.handlers.length;
+
+    /// Waits until [condition] holds. The waits of this group depend on what
+    /// the server has seen instead of on fixed delays, so that a loaded
+    /// machine only makes the tests slower.
+    Future<void> waitFor(bool Function() condition, String description) async {
+      final Stopwatch stopwatch = Stopwatch()..start();
+      while (!condition()) {
+        if (stopwatch.elapsed > const Duration(seconds: 15)) {
+          fail('Timed out waiting until $description');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    }
+
     tearDown(() async {
       for (StreamSubscription<int> subscription in subscriptions) {
         await subscription.cancel();
@@ -173,6 +198,25 @@ void main() {
       subscriptions.clear();
       await channel.terminate();
       await proxy.close();
+      // The server only learns that a black-holed connection is gone when
+      // the proxy closes its socket, and `Server.shutdown` must not run
+      // before it has processed that: it calls `finish()` on the connections
+      // it still has, and http2's `finish()` never completes for a
+      // connection whose transport dies while a call is still open on it
+      // (the call that hangs on purpose here). Under load the close could be
+      // processed late, and the test then hung in this tearDown until its
+      // timeout.
+      final Stopwatch stopwatch = Stopwatch()..start();
+      while (serverConnections() > 0 &&
+          stopwatch.elapsed < const Duration(seconds: 10)) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      // ignore: invalid_use_of_visible_for_testing_member
+      for (final ServerTransportConnection connection
+          in server.handlers.keys.toList()) {
+        // Not expected: drop what is left without waiting for its calls.
+        await connection.terminate();
+      }
       await server.shutdown();
     });
 
@@ -183,7 +227,7 @@ void main() {
       hang(failure.complete);
 
       // Let the call get established, then silently drop all traffic.
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await waitFor(() => service.calls == 1, 'the call reached the server');
       proxy.blackhole = true;
 
       final Object error =
@@ -212,7 +256,7 @@ void main() {
 
       final Completer<Object> failure = Completer<Object>();
       hang(failure.complete);
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await waitFor(() => service.calls == 1, 'the call reached the server');
       proxy.blackhole = true;
       await failure.future.timeout(const Duration(seconds: 5));
 
@@ -220,9 +264,17 @@ void main() {
       proxy.blackhole = false;
       Object? secondFailure;
       hang((Object error) => secondFailure = error);
+      // The first connection was terminated, so the call can only reach the
+      // server through a new one.
+      await waitFor(() => secondFailure != null || service.calls == 2,
+          'the second call reached the server');
+      expect(secondFailure, isNull);
+
+      // And it stays up: the keepalive pings are answered again.
       await Future<void>.delayed(const Duration(milliseconds: 600));
 
       expect(secondFailure, isNull);
+      expect(service.calls, 2);
     });
 
     test(
