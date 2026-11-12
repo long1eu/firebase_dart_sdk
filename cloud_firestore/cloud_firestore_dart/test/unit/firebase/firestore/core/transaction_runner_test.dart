@@ -85,6 +85,30 @@ void main() {
     }
   });
 
+  test('does not retry once the client is terminated', () async {
+    bool terminated = false;
+    int attempts = 0;
+    final Future<String> result = TransactionRunner<String>(
+      createTransaction: () => Transaction(_FakeTransactionClient()),
+      maxAttempts: 5,
+      backoff: ExponentialBackoff(scheduler, TaskId.retryTransaction,
+          initialDelay: const Duration(milliseconds: 1)),
+      isTerminated: () => terminated,
+      updateFunction: (Transaction transaction) async {
+        attempts++;
+        // The client is terminated while the attempt runs: its calls fail with a retryable code.
+        terminated = true;
+        throw FirestoreError('unavailable', FirestoreErrorCode.unavailable);
+      },
+    ).run();
+
+    await expectLater(
+        result,
+        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+            'code', FirestoreErrorCode.unavailable)));
+    expect(attempts, 1);
+  });
+
   test('gives up after the maximum number of attempts', () async {
     int attempts = 0;
     final Future<String> result = runner(3, (Transaction transaction) async {

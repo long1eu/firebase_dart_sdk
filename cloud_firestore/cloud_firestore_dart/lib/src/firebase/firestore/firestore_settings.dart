@@ -250,10 +250,12 @@ class FirestoreSettings {
       host: host ?? this.host,
       port: port ?? this.port,
       sslEnabled: sslEnabled ?? this.sslEnabled,
+      // Flags that these settings derived from their own cache settings are not forwarded. Flags that were set
+      // directly are, so that adding cache settings to them is reported as mixing both APIs, as in the constructor.
       persistenceEnabled: persistenceEnabled ??
-          (newCacheSettings != null || this.persistenceEnabled),
+          (this.cacheSettings != null || this.persistenceEnabled),
       cacheSizeBytes: cacheSizeBytes ??
-          (newCacheSettings == null
+          (this.cacheSettings == null
               ? this.cacheSizeBytes
               : defaultCacheSizeBytes),
       cacheSettings: newCacheSettings,

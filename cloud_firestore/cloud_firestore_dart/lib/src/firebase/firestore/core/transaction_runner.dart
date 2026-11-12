@@ -17,7 +17,9 @@ class TransactionRunner<TResult> {
     required int maxAttempts,
     required ExponentialBackoff backoff,
     required Future<TResult> Function(Transaction) updateFunction,
+    bool Function()? isTerminated,
   })  : _createTransaction = createTransaction,
+        _isTerminated = isTerminated,
         _attemptsRemaining = maxAttempts,
         _backoff = backoff,
         _updateFunction = updateFunction;
@@ -26,6 +28,10 @@ class TransactionRunner<TResult> {
   final ExponentialBackoff _backoff;
   final Future<TResult> Function(Transaction) _updateFunction;
   int _attemptsRemaining;
+
+  /// Whether the client that runs this transaction was terminated; a terminated client can't succeed, so the
+  /// transaction is not retried (upstream stops retrying because its queue no longer runs).
+  final bool Function()? _isTerminated;
 
   /// Runs the transaction and returns the result of the update function.
   Future<TResult> run() async {
@@ -39,7 +45,9 @@ class TransactionRunner<TResult> {
         await transaction.commit();
         return result;
       } catch (error) {
-        if (_attemptsRemaining > 0 && _isRetryableTransactionError(error)) {
+        if (_attemptsRemaining > 0 &&
+            !(_isTerminated?.call() ?? false) &&
+            _isRetryableTransactionError(error)) {
           continue;
         }
         rethrow;

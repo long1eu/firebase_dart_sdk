@@ -38,8 +38,8 @@ typedef BatchCallback = Future<void> Function(WriteBatch)
 class Blob
   ==(Object other): bool
   compareTo(Blob other): int
-  final bytes: Uint8List
   final subtype: int
+  get bytes: Uint8List
   get hashCode: int
   new Blob(Uint8List bytes)
   new Blob.bsonBinary(int subtype, Uint8List bytes)

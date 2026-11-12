@@ -16,7 +16,7 @@ import 'package:collection/collection.dart';
 class Blob implements Comparable<Blob> {
   /// Creates a blob holding a copy of [bytes].
   Blob(Uint8List bytes)
-      : bytes = Uint8List.fromList(bytes),
+      : _bytes = Uint8List.fromList(bytes),
         subtype = 0;
 
   /// Creates BSON binary data, a blob with a [subtype].
@@ -26,7 +26,7 @@ class Blob implements Comparable<Blob> {
   ///
   /// Throws an [ArgumentError] if [subtype] is not in the range `[0, 255]`.
   Blob.bsonBinary(this.subtype, Uint8List bytes)
-      : bytes = Uint8List.fromList(bytes) {
+      : _bytes = Uint8List.fromList(bytes) {
     if (subtype < 0 || subtype > 255) {
       throw ArgumentError.value(subtype, 'subtype',
           'The subtype for Blob must be a value in the inclusive [0, 255] range.');
@@ -61,13 +61,16 @@ class Blob implements Comparable<Blob> {
   static const String jsonType = 'firestore/bytes/1.0';
 
   /// The bytes of this blob.
-  final Uint8List bytes;
+  final Uint8List _bytes;
+
+  /// A copy of the bytes of this blob (a blob is immutable, as upstream).
+  Uint8List get bytes => Uint8List.fromList(_bytes);
 
   /// The subtype of BSON binary data, 0 for a regular blob.
   final int subtype;
 
   /// The bytes of this blob, base64-encoded.
-  String toBase64() => base64Encode(bytes);
+  String toBase64() => base64Encode(_bytes);
 
   /// A JSON-serializable representation of this blob, in the same shape as the
   /// JS SDK's `Bytes.toJSON()`. Read it back with [Blob.fromJson].
@@ -88,12 +91,12 @@ class Blob implements Comparable<Blob> {
       return subtype.compareTo(other.subtype);
     }
 
-    final int size = min(bytes.length, other.bytes.length);
+    final int size = min(_bytes.length, other._bytes.length);
 
     for (int i = 0; i < size; i++) {
       // Make sure the bytes are unsigned
-      final int thisByte = bytes[i] & 0xff;
-      final int otherByte = other.bytes[i] & 0xff;
+      final int thisByte = _bytes[i] & 0xff;
+      final int otherByte = other._bytes[i] & 0xff;
       if (thisByte < otherByte) {
         return -1;
       } else if (thisByte > otherByte) {
@@ -102,7 +105,7 @@ class Blob implements Comparable<Blob> {
       // Byte values are equal, continue with comparison
     }
 
-    return bytes.length.compareTo(other.bytes.length);
+    return _bytes.length.compareTo(other._bytes.length);
   }
 
   @override
@@ -111,17 +114,17 @@ class Blob implements Comparable<Blob> {
       other is Blob &&
           runtimeType == other.runtimeType &&
           subtype == other.subtype &&
-          const ListEquality<int>().equals(bytes, other.bytes);
+          const ListEquality<int>().equals(_bytes, other._bytes);
 
   @override
   int get hashCode => subtype == 0
-      ? const ListEquality<int>().hash(bytes)
-      : Object.hash(subtype, const ListEquality<int>().hash(bytes));
+      ? const ListEquality<int>().hash(_bytes)
+      : Object.hash(subtype, const ListEquality<int>().hash(_bytes));
 
   // The string of a regular blob is part of the canonical id of a query, which
   // is persisted, so it must not change.
   @override
   String toString() => subtype == 0
-      ? 'Blob { bytes= ${toDebugString(bytes)} }'
-      : 'Blob { bytes= ${toDebugString(bytes)}, subtype= $subtype }';
+      ? 'Blob { bytes= ${toDebugString(_bytes)} }'
+      : 'Blob { bytes= ${toDebugString(_bytes)}, subtype= $subtype }';
 }

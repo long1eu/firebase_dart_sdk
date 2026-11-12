@@ -120,6 +120,14 @@ only. **Nothing was run against production Firestore.**
 - `Firestore.instanceFor` no longer returns an instance whose `terminate()` is still in progress; a
   `QueryDocumentSnapshot` returns a null produced by a converter of a nullable type; `DocumentSnapshot`
   equality takes the converter into account.
+- Transactions: a document lookup no longer resets its call as soon as the last document arrived. The
+  reset could make the HTTP/2 connection fail every call in flight, so a commit that the backend had
+  applied looked failed and was retried (a counter incremented twice). Transactions are also no longer
+  retried once the instance is terminated.
+- `Blob.bytes` returns a copy; out-of-range `Timestamp`s are rejected with an `ArgumentError` when written,
+  also in builds without asserts; `FirestoreSettings.copyWith(cacheSettings: ...)` on settings that set
+  `persistenceEnabled` or `cacheSizeBytes` throws instead of dropping them; a `mockUserToken` with an
+  empty `sub` uses `user_id` for the user.
 - `Firestore.setLogLevel(LogLevel)` with `debug`, `error` and `silent` (as the JS SDK);
   `setLoggingEnabled` still works.
 - `FirestoreSettings.withEmulator(host, port, mockUserToken: ...)` (and the `mockUserToken`

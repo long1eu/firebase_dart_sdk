@@ -22,8 +22,12 @@ class _FakeResponse implements Response {
   Future<Map<String, String>> get trailers =>
       Future<Map<String, String>>.value(<String, String>{});
 
+  int cancelCount = 0;
+
   @override
-  Future<void> cancel() async {}
+  Future<void> cancel() async {
+    cancelCount++;
+  }
 }
 
 /// Serves a canned BatchGetDocuments response stream that the test controls.
@@ -38,6 +42,7 @@ class _FakeClient extends FirestoreClient {
         );
 
   final StreamController<proto.BatchGetDocumentsResponse> responses;
+  final _FakeResponse call = _FakeResponse();
 
   @override
   ResponseStream<proto.BatchGetDocumentsResponse> batchGetDocuments(
@@ -45,7 +50,7 @@ class _FakeClient extends FirestoreClient {
     CallOptions? options,
   }) =>
       ResponseStream<proto.BatchGetDocumentsResponse>(
-          _FakeResponse(), responses.stream);
+          call, responses.stream);
 }
 
 proto.BatchGetDocumentsResponse _missing(String path) {
@@ -60,12 +65,15 @@ void main() {
   final DocumentKey b = DocumentKey.fromPathString('rooms/b');
 
   late StreamController<proto.BatchGetDocumentsResponse> responses;
+  late _FakeClient fakeClient;
   late TransactionClient client;
 
   setUp(() {
     responses = StreamController<proto.BatchGetDocumentsResponse>();
+    fakeClient = _FakeClient(responses);
     client = TransactionClient(
-        _FakeClient(responses), RemoteSerializer(DatabaseId.forProject('p')));
+        fakeClient, RemoteSerializer(DatabaseId.forProject('p')),
+        lookupCloseGracePeriod: const Duration(milliseconds: 200));
   });
 
   tearDown(() => responses.close());
@@ -83,6 +91,32 @@ void main() {
     final List<MaybeDocument> docs =
         await result.timeout(const Duration(seconds: 2));
     expect(docs.map((MaybeDocument d) => d.key), <DocumentKey>[a, b]);
+  });
+
+  test(
+      'lookup does not cancel a call that the server closes after the last '
+      'document', () async {
+    // Cancelling resets the HTTP/2 stream. When the trailers of the call are
+    // already on their way, package:http2 answers them with a connection error
+    // that fails every other call on the channel (a commit that was applied
+    // then looks failed and its transaction is retried).
+    final Future<List<MaybeDocument>> result = client.lookup(<DocumentKey>[a]);
+    responses.add(_missing('rooms/a'));
+    await result.timeout(const Duration(seconds: 2));
+    expect(fakeClient.call.cancelCount, 0);
+
+    await responses.close();
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(fakeClient.call.cancelCount, 0);
+  });
+
+  test('lookup cancels a call that the server keeps open', () async {
+    final Future<List<MaybeDocument>> result = client.lookup(<DocumentKey>[a]);
+    responses.add(_missing('rooms/a'));
+    await result.timeout(const Duration(seconds: 2));
+
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    expect(fakeClient.call.cancelCount, 1);
   });
 
   test('lookup with a repeated key completes after one response per document',

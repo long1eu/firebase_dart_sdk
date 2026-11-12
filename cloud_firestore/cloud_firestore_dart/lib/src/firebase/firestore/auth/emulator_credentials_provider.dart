@@ -29,7 +29,9 @@ class EmulatorCredentialsProvider extends CredentialsProvider {
     }
     final Map<String, Object?> claims = mockUserToken as Map<String, Object?>;
     final String token = createMockUserToken(claims, projectId);
-    final String uid = (claims['sub'] ?? claims['user_id'])! as String;
+    // JS `sub || user_id`, as [createMockUserToken]: an empty sub falls back to user_id.
+    final String uid =
+        (_orDefault(claims['sub'], null) ?? claims['user_id'])! as String;
     return EmulatorCredentialsProvider(Token(token, User(uid)));
   }
 

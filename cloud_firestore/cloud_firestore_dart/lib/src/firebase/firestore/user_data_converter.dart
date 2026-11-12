@@ -316,6 +316,8 @@ class UserDataConverter {
     } else if (input is Timestamp) {
       final Timestamp timestamp = input;
       final int seconds = timestamp.seconds;
+      // The const constructor of [Timestamp] only checks its range with asserts, which a release build skips.
+      Timestamp.validateRange(seconds, timestamp.nanoseconds);
       // Firestore backend truncates precision down to microseconds. To ensure offline mode works the same with regards
       // to truncation, perform the truncation immediately without waiting for the backend to do that.
       final int truncatedNanoseconds = timestamp.nanoseconds ~/ 1000 * 1000;

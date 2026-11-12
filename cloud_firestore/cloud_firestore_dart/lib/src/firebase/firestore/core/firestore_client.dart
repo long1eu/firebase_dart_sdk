@@ -352,6 +352,7 @@ class FirestoreClient implements RemoteStoreCallback {
       backoff: ExponentialBackoff(
           TaskScheduler('transaction'), TaskId.retryTransaction),
       updateFunction: updateFunction,
+      isTerminated: () => _isShutdown,
     ).run();
   }
 

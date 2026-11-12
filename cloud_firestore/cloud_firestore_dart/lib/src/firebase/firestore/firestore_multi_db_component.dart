@@ -8,6 +8,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
+import 'package:firebase_app_dart/internal.dart' show Log;
 
 /// Multi-resource container for Firestore.
 class FirestoreMultiDbComponent {
@@ -38,7 +39,11 @@ class FirestoreMultiDbComponent {
     _deleteSubscriptions.remove(key)?.cancel();
     _deleteSubscriptions[key] = app.onDeleteApp.listen((_) {
       if (identical(instances[key], firestore)) {
-        firestore.shutdown();
+        // Nobody awaits this: report a failure instead of raising an unhandled error.
+        firestore.shutdown().catchError((Object e) {
+          Log.w('FirebaseFirestore',
+              'Shutting down the instance of the deleted app failed: $e');
+        });
       }
     });
   }
