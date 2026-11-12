@@ -84,7 +84,10 @@ class BundleSerializer {
     final dynamic queriesJson = bundledDocumentMetadata['queries'];
     if (queriesJson is List<dynamic>) {
       for (final dynamic query in queriesJson) {
-        queries.add(query as String);
+        if (query is! String) {
+          throw ArgumentError('Expected a query name but got: $query');
+        }
+        queries.add(query);
       }
     }
     return BundledDocumentMetadata(key, readTime, exists, queries);
@@ -241,9 +244,12 @@ class BundleSerializer {
     return result;
   }
 
-  void _decodeFilter(List<Filter> result, Map<String, dynamic> filter) {
+  void _decodeFilter(List<Filter> result, Map<String, dynamic> filter,
+      [int depth = 0]) {
+    _checkDepth(depth);
     if (filter.containsKey('compositeFilter')) {
-      _decodeCompositeFilter(result, _getObject(filter, 'compositeFilter'));
+      _decodeCompositeFilter(
+          result, _getObject(filter, 'compositeFilter'), depth);
     } else if (filter.containsKey('fieldFilter')) {
       _decodeFieldFilter(result, _getObject(filter, 'fieldFilter'));
     } else if (filter.containsKey('unaryFilter')) {
@@ -252,7 +258,7 @@ class BundleSerializer {
   }
 
   void _decodeCompositeFilter(
-      List<Filter> result, Map<String, dynamic> compositeFilter) {
+      List<Filter> result, Map<String, dynamic> compositeFilter, int depth) {
     final String op = _getString(compositeFilter, 'op');
     if (op == 'OR') {
       // PORTING NOTE: the Android SDK only supports 'AND' here. The port also reads disjunctions (as the JS SDK does),
@@ -261,9 +267,10 @@ class BundleSerializer {
       for (final dynamic filter
           in _optArray(compositeFilter, 'filters') ?? <dynamic>[]) {
         final List<Filter> decoded = <Filter>[];
-        _decodeFilter(decoded, _asObject(filter));
-        disjuncts.add(
-            decoded.length == 1 ? decoded.single : CompositeFilter.and(decoded));
+        _decodeFilter(decoded, _asObject(filter), depth + 1);
+        disjuncts.add(decoded.length == 1
+            ? decoded.single
+            : CompositeFilter.and(decoded));
       }
       result.add(CompositeFilter.or(disjuncts));
       return;
@@ -276,7 +283,7 @@ class BundleSerializer {
     final List<dynamic>? filters = _optArray(compositeFilter, 'filters');
     if (filters != null) {
       for (final dynamic filter in filters) {
-        _decodeFilter(result, _asObject(filter));
+        _decodeFilter(result, _asObject(filter), depth + 1);
       }
     }
   }
@@ -388,7 +395,19 @@ class BundleSerializer {
 
   // Values
 
-  proto_v1.Value _decodeValue(Map<String, dynamic> value) {
+  /// How deep arrays, maps and composite filters may be nested in a bundle. The backend allows 20 levels of values;
+  /// the limit only has to keep hostile input from overflowing the stack.
+  static const int maxNestingDepth = 100;
+
+  static void _checkDepth(int depth) {
+    if (depth > maxNestingDepth) {
+      throw ArgumentError(
+          'Invalid bundle: values or filters are nested deeper than $maxNestingDepth levels');
+    }
+  }
+
+  proto_v1.Value _decodeValue(Map<String, dynamic> value, [int depth = 0]) {
+    _checkDepth(depth);
     final proto_v1.Value builder = proto_v1.Value.create();
 
     if (value.containsKey('nullValue')) {
@@ -419,7 +438,7 @@ class BundleSerializer {
           _optArray(_getObject(value, 'arrayValue'), 'values');
       if (values != null) {
         for (final dynamic element in values) {
-          array.values.add(_decodeValue(_asObject(element)));
+          array.values.add(_decodeValue(_asObject(element), depth + 1));
         }
       }
       builder.arrayValue = array;
@@ -429,7 +448,8 @@ class BundleSerializer {
           _optObject(_getObject(value, 'mapValue'), 'fields');
       if (fields != null) {
         for (final MapEntry<String, dynamic> entry in fields.entries) {
-          map.fields[entry.key] = _decodeValue(_asObject(entry.value));
+          map.fields[entry.key] =
+              _decodeValue(_asObject(entry.value), depth + 1);
         }
       }
       builder.mapValue = map;

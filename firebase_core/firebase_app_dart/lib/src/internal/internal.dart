@@ -46,8 +46,10 @@ class InternalTokenResult {
 
   @override
   String toString() {
+    // The token is a credential: never part of the string form, which ends up
+    // in logs and error messages.
     return (ToStringHelper(runtimeType) //
-          ..add('token', token))
+          ..add('token', token.isEmpty ? '<empty>' : '<redacted>'))
         .toString();
   }
 }

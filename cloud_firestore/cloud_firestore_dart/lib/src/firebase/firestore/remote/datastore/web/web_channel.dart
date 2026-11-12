@@ -34,6 +34,15 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dar
 class WebChannelChunkParser {
   String _buffer = '';
 
+  /// The longest chunk that is accepted, in UTF-16 code units. The framing
+  /// comes from the network: a larger (or negative) length is not buffered
+  /// for but reported as a malformed body. Far above what the backend sends
+  /// (a chunk holds a few messages; a message is a document of at most 1 MiB
+  /// as JSON).
+  static const int maxChunkLength = 64 * 1024 * 1024;
+
+  static final RegExp _decimal = RegExp(r'^[0-9]+$');
+
   /// Adds [text] and returns the chunks that are complete, decoded.
   ///
   /// Throws a [FormatException] if the body is not chunked as expected.
@@ -48,7 +57,12 @@ class WebChannelChunkParser {
         }
         break;
       }
-      final int length = int.parse(_buffer.substring(0, newline).trim());
+      final String prefix = _buffer.substring(0, newline).trim();
+      final int? length =
+          _decimal.hasMatch(prefix) ? int.tryParse(prefix) : null;
+      if (length == null || length > maxChunkLength) {
+        throw FormatException('Invalid chunk length', prefix);
+      }
       final int end = newline + 1 + length;
       if (_buffer.length < end) {
         break;

@@ -26,6 +26,8 @@ production Firebase.
 - `FirebaseApp.persistenceKey` uses URL-safe base64 without padding; keys computed by older
   versions differ.
 - The Flutter example app is replaced by a command-line `example/main.dart`.
+- `GetTokenResult.toString()` and `InternalTokenResult.toString()` no longer contain the token
+  (or, for `GetTokenResult`, the claims); they print `<redacted>`.
 
 ### Added
 

@@ -90,9 +90,13 @@ class GetTokenResult {
 
   @override
   String toString() {
+    // The token is a credential and the claims are personal data (uid,
+    // email): neither is part of the string form, which ends up in logs and
+    // error messages.
     return (ToStringHelper(GetTokenResult) //
-          ..add('token', token)
-          ..add('claims', claims))
+          ..add('token', token.isEmpty ? '<empty>' : '<redacted>')
+          ..add('claims', '<${claims.length} claims>')
+          ..add('expirationTimestamp', expirationTimestamp))
         .toString();
   }
 }

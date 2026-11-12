@@ -116,6 +116,20 @@ Deprecated, still working:
   `documentChanges` (use `docs` / `docChanges`), `FieldPath.documentId()` (use
   `documentIdField`), `Source.defaultSource` (use `serverAndCache`). `FirebaseFirestore` and
   `Settings` are typedefs of `Firestore` and `FirestoreSettings`.
+- Security hardening (from a review of both packages):
+  - `FirestoreSettings` throws an `ArgumentError` for `sslEnabled: false` with the production
+    host in every build mode (it was an `assert`, which release builds drop, so the auth token
+    could be sent without TLS), whatever the case of the host or a trailing dot.
+  - `FirestoreSettings.host` must be a host name or IP address: an empty value or one with
+    `/`, `@`, `?`, `#`, `\` or whitespace is an `ArgumentError` (a value such as
+    `firestore.googleapis.com@other.example` made the web transport talk to the other host).
+  - Bundles are treated as untrusted input: a length prefix has to be at most 10 plain decimal
+    digits, an element is at most 64 MiB (`BundleReader.maxElementBytes`), values and filters
+    may be nested at most 100 levels, and fields of the wrong JSON type are reported as an
+    invalid bundle. A stream without a valid element is rejected at once instead of being
+    buffered, and elements that arrive in small chunks are no longer re-copied per chunk.
+  - WebChannel responses with a negative, non-decimal or larger than 64 MiB chunk length end
+    the stream with `unavailable`.
 
 ### Added
 

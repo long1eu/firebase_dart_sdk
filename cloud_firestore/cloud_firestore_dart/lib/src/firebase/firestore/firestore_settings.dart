@@ -32,23 +32,23 @@ class FirestoreSettings {
   /// [mockUserToken] is rejected without it, so that the unsigned token is
   /// never sent to a production host.
   FirestoreSettings._({
-    required this.host,
+    required String host,
     required this.port,
-    required this.sslEnabled,
+    required bool sslEnabled,
     required bool persistenceEnabled,
     required int cacheSizeBytes,
     required this.cacheSettings,
     required bool emulator,
     required Object? mockUserToken,
   })  : _emulator = emulator,
+        host = _checkHost(host),
+        sslEnabled = _checkSslEnabled(sslEnabled, host),
         mockUserToken =
             _checkMockUserToken(mockUserToken, emulator, host, sslEnabled),
         persistenceEnabled = _resolvePersistenceEnabled(
             persistenceEnabled, cacheSizeBytes, cacheSettings),
         cacheSizeBytes = _resolveCacheSizeBytes(
             persistenceEnabled, cacheSizeBytes, cacheSettings),
-        assert(!(!sslEnabled && host == defaultHost),
-            "You can't set the 'sslEnabled' setting unless you also set a non-default 'host'."),
         assert(
             !persistenceEnabled ||
                 cacheSizeBytes == cacheSizeUnlimited ||
@@ -124,12 +124,49 @@ class FirestoreSettings {
   /// changed afterwards).
   final bool _emulator;
 
+  static final RegExp _notHostCharacters = RegExp(r'[/@?#\\\s]');
+
+  /// [host] is used as the authority of the URLs and connections of the
+  /// transport. Anything that could change which server that is (a user info
+  /// part, a path, a scheme) is rejected: requests carry credentials.
+  static String _checkHost(String host) {
+    if (host.isEmpty || _notHostCharacters.hasMatch(host)) {
+      throw ArgumentError.value(host, 'host',
+          'Must be a host name or an IP address, without scheme, user info or path');
+    }
+    return host;
+  }
+
+  /// Whether [host] names the production Firestore service, however it is
+  /// spelled (host names are case insensitive and may end with a dot).
+  static bool _isProductionHost(String host) {
+    String normalized = host.trim().toLowerCase();
+    while (normalized.endsWith('.')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized == defaultHost;
+  }
+
+  /// TLS can be turned off only for another host than the production one (an
+  /// emulator or a proxy the caller configured). Checked in every build mode:
+  /// without TLS the auth token of every request would be sent in clear text.
+  static bool _checkSslEnabled(bool sslEnabled, String host) {
+    if (!sslEnabled && _isProductionHost(host)) {
+      throw ArgumentError.value(
+          sslEnabled,
+          'sslEnabled',
+          "You can't turn off SSL for the production host '$defaultHost'; "
+              "set a different 'host' (for example with withEmulator) first");
+    }
+    return sslEnabled;
+  }
+
   static Object? _checkMockUserToken(
       Object? mockUserToken, bool emulator, String host, bool sslEnabled) {
     if (mockUserToken == null) {
       return null;
     }
-    if (!emulator || host == defaultHost || sslEnabled) {
+    if (!emulator || _isProductionHost(host) || sslEnabled) {
       throw ArgumentError.value(
           host,
           'host',
@@ -192,7 +229,7 @@ class FirestoreSettings {
   /// ([defaultHost]).
   FirestoreSettings withEmulator(String host, int port,
       {Object? mockUserToken}) {
-    if (host == defaultHost) {
+    if (_isProductionHost(host)) {
       throw ArgumentError.value(
           host, 'host', 'The production host is not an emulator');
     }
