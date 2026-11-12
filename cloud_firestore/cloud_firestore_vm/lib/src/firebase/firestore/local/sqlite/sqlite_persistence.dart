@@ -66,7 +66,9 @@ class SQLitePersistence extends Persistence {
   SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName,
       StatsCollector statsCollector)
       : _statsCollector = statsCollector,
-        _semaphore = GlobalSemaphore('persistence') {
+        // One lock per database (not one for the whole process): instances on different databases never wait on
+        // each other, while two handles on the same file are serialized.
+        _semaphore = GlobalSemaphore('persistence:$databaseName') {
     indexManager = SqliteIndexManager(this);
   }
 
@@ -255,8 +257,8 @@ class SQLitePersistence extends Persistence {
   ///   * onCreate / onUpgrade (optional; if version already matches these aren't called)
   ///   * onOpen
   ///
-  /// This attempts to obtain exclusive access to the database and attempts to do so as early as possible.
-  /// ^^^ todo: this breaks flutter hot reload
+  /// Unlike the Android SDK this does NOT take exclusive access to the database (`PRAGMA locking_mode = EXCLUSIVE`),
+  /// because that makes a second open of the file fail after a Flutter hot restart (the old handle stays open).
   static Future<Database> _openDb(
       String databaseName, OpenDatabase openDatabase) async {
     bool configured = false;
@@ -265,8 +267,7 @@ class SQLitePersistence extends Persistence {
     Future<void> ensureConfigured(Database db) async {
       if (!configured) {
         configured = true;
-        // todo: this breaks flutter hot reload
-        // await db.query('PRAGMA locking_mode = EXCLUSIVE;');
+        // Intentionally no `PRAGMA locking_mode = EXCLUSIVE`: it breaks flutter hot restart.
       }
     }
 

@@ -53,7 +53,7 @@ class MemoryPersistence extends Persistence {
   MemoryPersistence._(StatsCollector statsCollector)
       : _statsCollector = statsCollector,
         mutationQueues = <User, MemoryMutationQueue>{},
-        _semaphore = GlobalSemaphore('persistence'),
+        _semaphore = LocalSemaphore(1),
         indexManager = MemoryIndexManager() {
     queryCache = MemoryQueryCache(this);
     remoteDocumentCache = MemoryRemoteDocumentCache(this, _statsCollector);

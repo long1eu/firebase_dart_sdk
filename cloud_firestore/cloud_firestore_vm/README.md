@@ -146,6 +146,26 @@ The public entry point is `package:cloud_firestore_vm/cloud_firestore_vm.dart` (
 `Firestore`). It needs a `FirebaseApp` from `firebase_core_vm`. To run the integration tests
 against the emulator set `FIRESTORE_EMULATOR_HOST` (see `test/util/integration_test_util.dart`).
 
+## Persistence and connectivity
+
+- The package does not open SQLite files itself: you pass an `OpenDatabase` function (the tests use
+  `package:sqlite3`, see `test/util/sqlite3_database.dart`). The persistence layer never switches
+  the connection to `PRAGMA locking_mode = EXCLUSIVE` (the Android SDK does, and fails with
+  "Failed to gain exclusive lock" when a second process opens the same file). This is deliberate:
+  after a Flutter hot restart the old isolate's handle is still open and the new isolate must be
+  able to open the same file (issue #1). SQLite's normal file locking keeps the file consistent
+  and is covered by `test/unit/firebase/firestore/local/sqlite_shared_file_test.dart`.
+  Two live clients on the same file do not share their in-memory state (target ids, mutation
+  batch ids), so do not run two active clients on one persistence key; use different app names
+  or databases. Handles inside one process are serialized per database name.
+- Instances are independent: each `Firestore` has its own scheduler and work queue, and the
+  persistence lock is per database, so an instance never waits for another one (issue #2).
+- Connectivity: `firebase_core_vm` has no built-in monitor on any OS. `FirebaseApp.onNetworkConnected`
+  is seeded with `true` and Firestore restarts its streams (resetting backoff) on every `true`
+  event. To react to real connectivity changes, subclass `PlatformDependencies`, override
+  `onNetworkConnected` and feed it from your own source (for example the `connectivity_plus`
+  plugin in a Flutter app, or a periodic reachability probe in a server process).
+
 ## Not supported or not done
 
 - BSON-specific value types (for example `MinKey`, `MaxKey`, `Decimal128`, `BsonObjectId`,
