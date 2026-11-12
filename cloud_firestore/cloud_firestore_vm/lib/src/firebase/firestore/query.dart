@@ -26,6 +26,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/filter.dart'
     as api show CompositeFilter, UnaryFilter;
 import 'package:cloud_firestore_vm/src/firebase/firestore/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
@@ -52,9 +53,27 @@ enum Direction { ascending, descending }
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
-class Query {
+class Query<T extends dynamic> {
   @internal
-  const Query(this.query, this.firestore);
+  const Query(this.query, this.firestore, [this.converter]);
+
+  /// The converter attached with [withConverter], or null for raw maps.
+  final FirestoreDataConverter<T>? converter;
+
+  /// Returns a query that converts documents with [converter] (type [U]).
+  /// Filters, ordering and limits are kept. Use [withoutConverter] to go
+  /// back to raw maps.
+  Query<U> withConverter<U extends Object?>(
+      FirestoreDataConverter<U> converter) {
+    return Query<U>(query, firestore, converter);
+  }
+
+  /// Returns a query over the same documents that yields raw
+  /// `Map<String, Object?>` values (the equivalent of `withConverter(null)` in
+  /// the JS SDK).
+  Query<Map<String, Object?>> withoutConverter() {
+    return Query<Map<String, Object?>>(query, firestore);
+  }
 
   final core.Query query;
   final Firestore firestore;
@@ -66,7 +85,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereEqualTo(String field, Object? value) {
+  Query<T> whereEqualTo(String field, Object? value) {
     return _whereHelper(
         FieldPath.fromDotSeparatedPath(field), FilterOperator.equal, value);
   }
@@ -78,7 +97,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereEqualToField(FieldPath fieldPath, Object? value) {
+  Query<T> whereEqualToField(FieldPath fieldPath, Object? value) {
     return _whereHelper(fieldPath, FilterOperator.equal, value);
   }
 
@@ -92,7 +111,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereNotEqualTo(String field, Object? value) {
+  Query<T> whereNotEqualTo(String field, Object? value) {
     return _whereHelper(
         FieldPath.fromDotSeparatedPath(field), FilterOperator.notEqual, value);
   }
@@ -107,7 +126,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereNotEqualToField(FieldPath fieldPath, Object? value) {
+  Query<T> whereNotEqualToField(FieldPath fieldPath, Object? value) {
     return _whereHelper(fieldPath, FilterOperator.notEqual, value);
   }
 
@@ -118,7 +137,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereLessThan(String field, Object? value) {
+  Query<T> whereLessThan(String field, Object? value) {
     return _whereHelper(
         FieldPath.fromDotSeparatedPath(field), FilterOperator.lessThan, value);
   }
@@ -130,7 +149,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereLessThanField(FieldPath fieldPath, Object? value) {
+  Query<T> whereLessThanField(FieldPath fieldPath, Object? value) {
     return _whereHelper(fieldPath, FilterOperator.lessThan, value);
   }
 
@@ -141,7 +160,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereLessThanOrEqualTo(String field, Object? value) {
+  Query<T> whereLessThanOrEqualTo(String field, Object? value) {
     return _whereHelper(FieldPath.fromDotSeparatedPath(field),
         FilterOperator.lessThanOrEqual, value);
   }
@@ -153,7 +172,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereLessThanOrEqualToField(FieldPath fieldPath, Object? value) {
+  Query<T> whereLessThanOrEqualToField(FieldPath fieldPath, Object? value) {
     return _whereHelper(fieldPath, FilterOperator.lessThanOrEqual, value);
   }
 
@@ -164,7 +183,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereGreaterThan(String field, Object? value) {
+  Query<T> whereGreaterThan(String field, Object? value) {
     return _whereHelper(FieldPath.fromDotSeparatedPath(field),
         FilterOperator.graterThan, value);
   }
@@ -176,7 +195,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereGreaterThanField(FieldPath fieldPath, Object? value) {
+  Query<T> whereGreaterThanField(FieldPath fieldPath, Object? value) {
     return _whereHelper(fieldPath, FilterOperator.graterThan, value);
   }
 
@@ -187,7 +206,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereGreaterThanOrEqualTo(String field, Object? value) {
+  Query<T> whereGreaterThanOrEqualTo(String field, Object? value) {
     return _whereHelper(FieldPath.fromDotSeparatedPath(field),
         FilterOperator.graterThanOrEqual, value);
   }
@@ -199,7 +218,7 @@ class Query {
   /// [value] The value for comparison
   ///
   /// Returns the created [Query].
-  Query whereGreaterThanOrEqualToField(FieldPath fieldPath, Object? value) {
+  Query<T> whereGreaterThanOrEqualToField(FieldPath fieldPath, Object? value) {
     return _whereHelper(fieldPath, FilterOperator.graterThanOrEqual, value);
   }
 
@@ -212,7 +231,7 @@ class Query {
   /// [value] The value that must be contained in the array
   ///
   /// Returns the created [Query].
-  Query whereArrayContains(String field, Object? value) {
+  Query<T> whereArrayContains(String field, Object? value) {
     return _whereHelper(FieldPath.fromDotSeparatedPath(field),
         FilterOperator.arrayContains, value);
   }
@@ -226,7 +245,7 @@ class Query {
   /// [value] The value that must be contained in the array
   ///
   /// Returns the created [Query].
-  Query whereArrayContainsField(FieldPath fieldPath, Object? value) {
+  Query<T> whereArrayContainsField(FieldPath fieldPath, Object? value) {
     return _whereHelper(fieldPath, FilterOperator.arrayContains, value);
   }
 
@@ -235,7 +254,7 @@ class Query {
   /// list must contain at least one value from the provided array.
   ///
   /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
-  Query whereArrayContainsAny(String field, List<Object?> value) {
+  Query<T> whereArrayContainsAny(String field, List<Object?> value) {
     return _whereHelper(FieldPath.fromDotSeparatedPath(field),
         FilterOperator.arrayContainsAny, value);
   }
@@ -245,7 +264,7 @@ class Query {
   /// array must contain at least one value from the provided array.
   ///
   /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
-  Query whereArrayContainsAnyField(FieldPath fieldPath, List<Object?> value) {
+  Query<T> whereArrayContainsAnyField(FieldPath fieldPath, List<Object?> value) {
     return _whereHelper(fieldPath, FilterOperator.arrayContainsAny, value);
   }
 
@@ -254,7 +273,7 @@ class Query {
   /// values from the provided array.
   ///
   /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
-  Query whereIn(String field, List<Object?> value) {
+  Query<T> whereIn(String field, List<Object?> value) {
     return _whereHelper(
         FieldPath.fromDotSeparatedPath(field), FilterOperator.IN, value);
   }
@@ -264,7 +283,7 @@ class Query {
   /// values from the provided array.
   ///
   /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
-  Query whereInField(FieldPath fieldPath, List<Object?> value) {
+  Query<T> whereInField(FieldPath fieldPath, List<Object?> value) {
     return _whereHelper(fieldPath, FilterOperator.IN, value);
   }
 
@@ -274,7 +293,7 @@ class Query {
   ///
   /// A Query can have only one [whereNotIn] filter, and it cannot be combined
   /// with [whereArrayContainsAny], [whereIn] or [whereNotEqualTo].
-  Query whereNotIn(String field, List<Object?> value) {
+  Query<T> whereNotIn(String field, List<Object?> value) {
     return _whereHelper(
         FieldPath.fromDotSeparatedPath(field), FilterOperator.NOT_IN, value);
   }
@@ -285,7 +304,7 @@ class Query {
   ///
   /// A Query can have only one [whereNotInField] filter, and it cannot be
   /// combined with [whereArrayContainsAny], [whereIn] or [whereNotEqualToField].
-  Query whereNotInField(FieldPath fieldPath, List<Object?> value) {
+  Query<T> whereNotInField(FieldPath fieldPath, List<Object?> value) {
     return _whereHelper(fieldPath, FilterOperator.NOT_IN, value);
   }
 
@@ -299,7 +318,7 @@ class Query {
   /// NOTE: a FlutterFire-style `where(field, isEqualTo: ...)` with named
   /// parameters is intentionally not provided here; it can be added later as
   /// an extension that builds the same [Filter]s.
-  Query where(Filter filter) {
+  Query<T> where(Filter filter) {
     final core_filter.Filter parsedFilter = _parseFilter(filter);
     if (parsedFilter.filters.isEmpty) {
       // Return the existing query if not adding any more filters (because the
@@ -307,13 +326,13 @@ class Query {
       return this;
     }
     _validateNewFilter(parsedFilter);
-    return Query(query.filter(parsedFilter), firestore);
+    return Query<T>(query.filter(parsedFilter), firestore, converter);
   }
 
   /// Creates and returns a new [Query] with the additional filter that
   /// documents must contain the specified field and the value should satisfy
   /// the relation constraint provided.
-  Query _whereHelper(FieldPath fieldPath, FilterOperator op, Object? value) {
+  Query<T> _whereHelper(FieldPath fieldPath, FilterOperator op, Object? value) {
     return where(api.UnaryFilter(fieldPath, op, value));
   }
 
@@ -518,7 +537,7 @@ class Query {
   /// [direction] the direction to sort.
   ///
   /// Returns the created Query.
-  Query orderBy(String field, [Direction direction = Direction.ascending]) {
+  Query<T> orderBy(String field, [Direction direction = Direction.ascending]) {
     return orderByField(FieldPath.fromDotSeparatedPath(field), direction);
   }
 
@@ -529,13 +548,13 @@ class Query {
   /// [direction] the direction to sort.
   ///
   /// Returns the created Query.
-  Query orderByField(FieldPath fieldPath,
+  Query<T> orderByField(FieldPath fieldPath,
       [Direction direction = Direction.ascending]) {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
     return _orderBy(fieldPath.internalPath, direction);
   }
 
-  Query _orderBy(core.FieldPath fieldPath, Direction direction) {
+  Query<T> _orderBy(core.FieldPath fieldPath, Direction direction) {
     checkNotNull(direction, 'Provided direction must not be null.');
     if (query.getStartAt() != null) {
       throw ArgumentError(
@@ -548,7 +567,7 @@ class Query {
     final OrderByDirection dir = direction == Direction.ascending
         ? OrderByDirection.ascending
         : OrderByDirection.descending;
-    return Query(query.orderBy(OrderBy.getInstance(dir, fieldPath)), firestore);
+    return Query<T>(query.orderBy(OrderBy.getInstance(dir, fieldPath)), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that's additionally limited to only return up to the specified number of
@@ -557,12 +576,12 @@ class Query {
   /// [limit] the maximum number of items to return.
   ///
   /// Returns the created Query.
-  Query limit(int limit) {
+  Query<T> limit(int limit) {
     if (limit <= 0) {
       throw ArgumentError(
           'Invalid Query. Query limit ($limit) is invalid. Limit must be positive.');
     }
-    return Query(query.limitToFirst(limit), firestore);
+    return Query<T>(query.limitToFirst(limit), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that only returns the last matching documents up to the specified number. This
@@ -574,12 +593,12 @@ class Query {
   /// [limit] the maximum number of items to return.
   ///
   /// Returns the created Query.
-  Query limitToLast(int limit) {
+  Query<T> limitToLast(int limit) {
     if (limit <= 0) {
       throw ArgumentError(
           'Invalid Query. Query limitToLast ($limit) is invalid. Limit must be positive.');
     }
-    return Query(query.limitToLast(limit), firestore);
+    return Query<T>(query.limitToLast(limit), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that starts at the provided document (inclusive). The starting position is
@@ -589,10 +608,10 @@ class Query {
   /// [snapshot] the snapshot of the document to start at.
   ///
   /// Returns the created Query.
-  Query startAtDocument(DocumentSnapshot snapshot) {
+  Query<T> startAtDocument(DocumentSnapshot<Object?> snapshot) {
     final Bound bound =
         _boundFromDocumentSnapshot('startAt', snapshot, /*before:*/ true);
-    return Query(query.startAt(bound), firestore);
+    return Query<T>(query.startAt(bound), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that starts at the provided fields relative to the order of the query. The order
@@ -601,10 +620,10 @@ class Query {
   /// [fieldValues] the field values to start this query at, in order of the query's order by.
   ///
   /// Returns the created Query.
-  Query startAt(List<Object?> fieldValues) {
+  Query<T> startAt(List<Object?> fieldValues) {
     final Bound bound =
         _boundFromFields('startAt', fieldValues, /*before:*/ true);
-    return Query(query.startAt(bound), firestore);
+    return Query<T>(query.startAt(bound), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that starts after the provided document (exclusive). The starting position is
@@ -614,10 +633,10 @@ class Query {
   /// [snapshot] the snapshot of the document to start after.
   ///
   /// Returns the created Query.
-  Query startAfterDocument(DocumentSnapshot snapshot) {
+  Query<T> startAfterDocument(DocumentSnapshot<Object?> snapshot) {
     final Bound bound =
         _boundFromDocumentSnapshot('startAfter', snapshot, /*before:*/ false);
-    return Query(query.startAt(bound), firestore);
+    return Query<T>(query.startAt(bound), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that starts after the provided fields relative to the order of the query. The
@@ -626,10 +645,10 @@ class Query {
   /// [fieldValues] the field values to start this query after, in order of the query's order by.
   ///
   /// Returns the created Query.
-  Query startAfter(List<Object?> fieldValues) {
+  Query<T> startAfter(List<Object?> fieldValues) {
     final Bound bound =
         _boundFromFields('startAfter', fieldValues, /*before:*/ false);
-    return Query(query.startAt(bound), firestore);
+    return Query<T>(query.startAt(bound), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that ends before the provided document (exclusive). The end position is relative
@@ -638,10 +657,10 @@ class Query {
   /// [snapshot] the snapshot of the document to end before.
   ///
   /// Returns the created Query.
-  Query endBeforeDocument(DocumentSnapshot snapshot) {
+  Query<T> endBeforeDocument(DocumentSnapshot<Object?> snapshot) {
     final Bound bound =
         _boundFromDocumentSnapshot('endBefore', snapshot, /*before:*/ true);
-    return Query(query.endAt(bound), firestore);
+    return Query<T>(query.endAt(bound), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that ends before the provided fields relative to the order of the query. The
@@ -650,10 +669,10 @@ class Query {
   /// [fieldValues] the field values to end this query before, in order of the query's order by.
   ///
   /// Returns the created Query.
-  Query endBefore(List<Object?> fieldValues) {
+  Query<T> endBefore(List<Object?> fieldValues) {
     final Bound bound =
         _boundFromFields('endBefore', fieldValues, /*before:*/ true);
-    return Query(query.endAt(bound), firestore);
+    return Query<T>(query.endAt(bound), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that ends at the provided document (inclusive). The end position is relative to
@@ -662,10 +681,10 @@ class Query {
   /// [snapshot] the snapshot of the document to end at.
   ///
   /// Returns the created Query.
-  Query endAtDocument(DocumentSnapshot snapshot) {
+  Query<T> endAtDocument(DocumentSnapshot<Object?> snapshot) {
     final Bound bound =
         _boundFromDocumentSnapshot('endAt', snapshot, /*before:*/ false);
-    return Query(query.endAt(bound), firestore);
+    return Query<T>(query.endAt(bound), firestore, converter);
   }
 
   /// Creates and returns a new [Query] that ends at the provided fields relative to the order of the query. The order
@@ -674,10 +693,10 @@ class Query {
   /// [fieldValues] the field values to end this query at, in order of the query's order by.
   ///
   /// Returns the created Query.
-  Query endAt(List<Object?> fieldValues) {
+  Query<T> endAt(List<Object?> fieldValues) {
     final Bound bound =
         _boundFromFields('endAt', fieldValues, /*before:*/ false);
-    return Query(query.endAt(bound), firestore);
+    return Query<T>(query.endAt(bound), firestore, converter);
   }
 
   /// Create a [Bound] from a query given the document.
@@ -688,8 +707,8 @@ class Query {
   /// Will throw if the document does not contain all fields of the order by of the query or if any of the fields in the
   /// order by are an uncommitted server timestamp.
   Bound _boundFromDocumentSnapshot(
-      String methodName, DocumentSnapshot snapshot, bool before) {
-    checkNotNull<DocumentSnapshot>(
+      String methodName, DocumentSnapshot<Object?> snapshot, bool before) {
+    checkNotNull<DocumentSnapshot<Object?>>(
         snapshot, 'Provided snapshot must not be null.');
     if (!snapshot.exists) {
       throw ArgumentError(
@@ -777,23 +796,24 @@ class Query {
   /// [source] a value to configure the get behavior.
   ///
   /// Returns a Future that will be resolved with the results of the [Query].
-  Future<QuerySnapshot> get([Source source = Source.defaultSource]) async {
+  Future<QuerySnapshot<T>> get([Source source = Source.defaultSource]) async {
     _validateHasExplicitOrderByForLimitToLast();
     if (source == Source.cache) {
       final ViewSnapshot viewSnap =
           await firestore.client.getDocumentsFromLocalCache(query);
 
-      return QuerySnapshot(Query(query, firestore), viewSnap, firestore);
+      return QuerySnapshot<T>(
+          Query<T>(query, firestore, converter), viewSnap, firestore);
     } else {
       return _getViaSnapshotListener(source);
     }
   }
 
-  Future<QuerySnapshot> _getViaSnapshotListener(Source source) {
+  Future<QuerySnapshot<T>> _getViaSnapshotListener(Source source) {
     const ListenOptions options = ListenOptions.all();
 
     return _firstAndCancel(
-        _getSnapshotsInternal(options).map((QuerySnapshot snapshot) {
+        _getSnapshotsInternal(options).map((QuerySnapshot<T> snapshot) {
       if (snapshot.metadata.isFromCache && source == Source.server) {
         throw FirestoreError(
             'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
@@ -874,14 +894,14 @@ class Query {
 
   /// Return cached results first and then queries the server with resume token
   /// to ensure unnecessary reads are not made.
-  Stream<QuerySnapshot> get snapshots {
+  Stream<QuerySnapshot<T>> get snapshots {
     final ListenOptions options = _internalOptions(MetadataChanges.exclude);
     return _getSnapshotsInternal(options);
   }
 
   /// Return cached results first and then queries the server with resume token
   /// to ensure unnecessary reads are not made.
-  Stream<QuerySnapshot> getSnapshots([MetadataChanges? changes]) {
+  Stream<QuerySnapshot<T>> getSnapshots([MetadataChanges? changes]) {
     final ListenOptions options =
         _internalOptions(changes ?? MetadataChanges.exclude);
     return _getSnapshotsInternal(options);
@@ -891,7 +911,7 @@ class Query {
   /// [ListenSource]: with [ListenSource.cache] the events are raised from the
   /// local cache only (local writes, cache updates) and the backend is not
   /// contacted for this listener.
-  Stream<QuerySnapshot> getSnapshotsWithOptions(SnapshotListenOptions options) {
+  Stream<QuerySnapshot<T>> getSnapshotsWithOptions(SnapshotListenOptions options) {
     return _getSnapshotsInternal(
         _internalOptions(options.metadataChanges, options.source));
   }
@@ -903,10 +923,10 @@ class Query {
     }
   }
 
-  Stream<QuerySnapshot> _getSnapshotsInternal(ListenOptions options) {
+  Stream<QuerySnapshot<T>> _getSnapshotsInternal(ListenOptions options) {
     _validateHasExplicitOrderByForLimitToLast();
     return listenToQuery(firestore.client, query, options).map(
-        (ViewSnapshot snapshot) => QuerySnapshot(this, snapshot, firestore));
+        (ViewSnapshot snapshot) => QuerySnapshot<T>(this, snapshot, firestore));
   }
 
   /// Converts the  API options object to the internal options object.
@@ -926,10 +946,12 @@ class Query {
       other is Query &&
           runtimeType == other.runtimeType &&
           query == other.query &&
-          firestore == other.firestore;
+          firestore == other.firestore &&
+          converter == other.converter;
 
   @override
-  int get hashCode => query.hashCode ^ firestore.hashCode;
+  int get hashCode =>
+      query.hashCode ^ firestore.hashCode ^ converter.hashCode;
 
   @override
   String toString() {

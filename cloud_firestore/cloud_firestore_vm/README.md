@@ -95,6 +95,38 @@ final near = await users
     .get();
 ```
 
+Typed data converters (model after the JS `withConverter`; this snippet compiles against the
+library):
+
+```dart
+class City {
+  const City(this.name, this.population);
+  factory City.fromMap(Map<String, Object?> m) =>
+      City(m['name']! as String, m['population']! as int);
+  final String name;
+  final int population;
+  Map<String, Object?> toMap() => {'name': name, 'population': population};
+}
+
+final converter = FirestoreDataConverter<City>.from(
+  fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
+  toFirestore: (city, options) => city.toMap(),
+);
+
+final cities = firestore.collection('cities').withConverter<City>(converter);
+await cities.doc('sf').set(const City('San Francisco', 870000));   // CollectionReference<City>
+final City sf = (await cities.doc('sf').get()).data!;               // DocumentSnapshot<City>
+final big = await cities.whereGreaterThan('population', 500000).get();
+final names = [for (final c in big.docs) c.data.name];              // QueryDocumentSnapshot<City>
+final raw = cities.withoutConverter();                              // back to Map<String, Object?>
+```
+
+`withConverter` exists on `DocumentReference`, `CollectionReference` and `Query`; `update` and
+`updateFromList` always take raw field maps. A bare `DocumentSnapshot` or `Query` annotation (no
+type argument) means `dynamic` data, so annotate as `DocumentSnapshot<Map<String, Object?>>`
+when you want static typing for raw maps (values returned by `firestore.collection(...)` etc. are
+already `Map<String, Object?>`).
+
 Cache settings, bundles, lifecycle:
 
 ```dart

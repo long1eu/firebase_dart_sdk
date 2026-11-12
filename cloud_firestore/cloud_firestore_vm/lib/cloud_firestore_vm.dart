@@ -15,6 +15,7 @@ export 'src/firebase/firestore/field_path.dart';
 export 'src/firebase/firestore/field_value.dart';
 export 'src/firebase/firestore/filter.dart' show Filter;
 export 'src/firebase/firestore/firestore.dart';
+export 'src/firebase/firestore/firestore_data_converter.dart';
 export 'src/firebase/firestore/firestore_error.dart';
 export 'src/firebase/firestore/firestore_settings.dart';
 export 'src/firebase/firestore/geo_point.dart';

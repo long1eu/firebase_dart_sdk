@@ -175,20 +175,20 @@ class Firestore {
 
   /// Gets a [CollectionReference] instance that refers to the collection at the specified path within the database.
   /// [collectionPath] is a slash-separated path to a collection.
-  CollectionReference collection(String collectionPath) {
+  CollectionReference<Map<String, Object?>> collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
     final ResourcePath resourcePath = ResourcePath.fromString(collectionPath);
-    return CollectionReference(resourcePath, this);
+    return CollectionReference<Map<String, Object?>>(resourcePath, this);
   }
 
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within the database.
   /// [documentPath] is a slash-separated path to a document.
-  DocumentReference doc(String documentPath) => document(documentPath);
+  DocumentReference<Map<String, Object?>> doc(String documentPath) => document(documentPath);
 
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within the database.
   /// [documentPath] is a slash-separated path to a document.
   @Deprecated('Use doc instead.')
-  DocumentReference document(String documentPath) {
+  DocumentReference<Map<String, Object?>> document(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
     return DocumentReference.forPath(
         ResourcePath.fromString(documentPath), this);
@@ -200,7 +200,7 @@ class Firestore {
   ///
   /// Every collection or subcollection with this [collectionId] as the last
   /// segment of its path will be included. Cannot contain a slash.
-  Query collectionGroup(String collectionId) {
+  Query<Map<String, Object?>> collectionGroup(String collectionId) {
     checkNotNull(collectionId, 'Provided collection ID must not be null.');
     if (collectionId.contains('/')) {
       throw ArgumentError(
@@ -380,7 +380,7 @@ class Firestore {
   /// The named queries are packaged into bundles on the server side (along with resulting documents) and loaded to
   /// local cache using [loadBundle]. Once in local cache, you can use this method to extract a query by name. Returns
   /// null if there is no query with this name.
-  Future<Query?> getNamedQuery(String name) async {
+  Future<Query<Map<String, Object?>>?> getNamedQuery(String name) async {
     final core.Query? query = await client.getNamedQuery(name);
     return query == null ? null : Query(query, this);
   }
@@ -396,7 +396,7 @@ class Firestore {
   }
 
   /// Helper to validate a [DocumentReference]. Used by [WriteBatch] and [Transaction].
-  void validateReference(DocumentReference docRef) {
+  void validateReference(DocumentReference<Object?> docRef) {
     checkNotNull(docRef, 'Provided DocumentReference must not be null.');
     if (docRef.firestore != this) {
       throw ArgumentError(

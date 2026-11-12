@@ -28,6 +28,14 @@ Firestore emulator only. **Nothing was run against production Firestore.**
 
 ### Added
 
+- Typed data converters: `FirestoreDataConverter<T>` (with `FirestoreDataConverter.from`),
+  `SnapshotOptions`, and `withConverter<T>` / `withoutConverter()` on `DocumentReference`,
+  `CollectionReference` and `Query`. `DocumentReference`, `CollectionReference`, `Query`,
+  `DocumentSnapshot`, `QueryDocumentSnapshot`, `QuerySnapshot` and `DocumentChange` are now
+  generic; `set` / `add` / `WriteBatch.set` / `Transaction.set` take `T`, `data` returns `T`.
+  Existing code that uses the references returned by `Firestore` keeps compiling (they are
+  `...<Map<String, Object?>>`); a bare type annotation such as `DocumentSnapshot` now means
+  `dynamic` data.
 - Read-only transactions: `TransactionOptions(readOnly: true)`, verified at commit with a `VerifyMutation`
   (new `verify` field in the vendored `write.proto`). Emulator-verified only.
 

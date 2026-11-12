@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/converter_util.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/user_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
@@ -48,15 +49,18 @@ class WriteBatch {
   /// [options] is an object to configure the set behavior.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch set(DocumentReference documentRef, Map<String, Object?> data,
+  WriteBatch set<T extends Object?>(DocumentReference<T> documentRef, T data,
       [SetOptions? options]) {
+    final SetOptions? userOptions = options;
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
-    checkNotNull(data, 'Provided data must not be null.');
+    checkNotNull<Object>(data, 'Provided data must not be null.');
     _verifyNotCommitted();
+    final Map<String, Object?> rawData =
+        toRawData<T>(data, documentRef.converter, userOptions);
     final UserDataParsedSetData parsed = options.merge
-        ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
-        : _firestore.dataConverter.parseSetData(data);
+        ? _firestore.dataConverter.parseMergeData(rawData, options.fieldMask)
+        : _firestore.dataConverter.parseSetData(rawData);
     _mutations.add(parsed.toMutation(documentRef.key, Precondition.none));
     return this;
   }
@@ -70,7 +74,7 @@ class WriteBatch {
   /// reference nested fields within the document.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch updateFromList(DocumentReference documentRef, List<Object?> data) {
+  WriteBatch updateFromList(DocumentReference<Object?> documentRef, List<Object?> data) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
 
@@ -89,7 +93,7 @@ class WriteBatch {
   /// fields within the document.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch update(DocumentReference documentRef, Map<String, Object?> data) {
+  WriteBatch update(DocumentReference<Object?> documentRef, Map<String, Object?> data) {
     final UserDataParsedUpdateData parsedData =
         _firestore.dataConverter.parseUpdateData(data);
 
@@ -105,7 +109,7 @@ class WriteBatch {
   /// [documentRef] The [DocumentReference] to delete.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch delete(DocumentReference documentRef) {
+  WriteBatch delete(DocumentReference<Object?> documentRef) {
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
     _mutations.add(DeleteMutation(documentRef.key, Precondition.none));

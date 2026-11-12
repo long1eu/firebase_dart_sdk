@@ -6,6 +6,7 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
@@ -14,6 +15,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dar
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart'
     as model;
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/snapshot_metadata.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
@@ -29,7 +31,7 @@ import 'package:meta/meta.dart';
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
-class DocumentSnapshot {
+class DocumentSnapshot<T extends dynamic> {
   @internal
   DocumentSnapshot(
     this._firestore,
@@ -37,7 +39,9 @@ class DocumentSnapshot {
     this.document, {
     required bool isFromCache,
     required bool hasPendingWrites,
-  }) : metadata = SnapshotMetadata(hasPendingWrites, isFromCache);
+    FirestoreDataConverter<T>? converter,
+  })  : _converter = converter,
+        metadata = SnapshotMetadata(hasPendingWrites, isFromCache);
 
   @internal
   factory DocumentSnapshot.fromDocument(
@@ -45,9 +49,12 @@ class DocumentSnapshot {
     Document doc, {
     required bool isFromCache,
     required bool hasPendingWrites,
+    FirestoreDataConverter<T>? converter,
   }) {
-    return DocumentSnapshot(firestore, doc.key, doc,
-        isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
+    return DocumentSnapshot<T>(firestore, doc.key, doc,
+        isFromCache: isFromCache,
+        hasPendingWrites: hasPendingWrites,
+        converter: converter);
   }
 
   @internal
@@ -56,12 +63,17 @@ class DocumentSnapshot {
     DocumentKey key, {
     required bool isFromCache,
     required bool hasPendingWrites,
+    FirestoreDataConverter<T>? converter,
   }) {
-    return DocumentSnapshot(firestore, key, null,
-        isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
+    return DocumentSnapshot<T>(firestore, key, null,
+        isFromCache: isFromCache,
+        hasPendingWrites: hasPendingWrites,
+        converter: converter);
   }
 
   final Firestore _firestore;
+
+  final FirestoreDataConverter<T>? _converter;
 
   final DocumentKey _key;
 
@@ -81,7 +93,7 @@ class DocumentSnapshot {
   /// to their native Dart representation.
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
-  Map<String, Object?>? get data => getData(ServerTimestampBehavior.none);
+  T? get data => getData(ServerTimestampBehavior.none);
 
   /// Returns the fields of the document as a Map or null if the document doesn't exist. Field values will be converted
   /// to their native Dart representation.
@@ -90,16 +102,34 @@ class DocumentSnapshot {
   /// value.
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
-  Map<String, Object?>? getData(
-      ServerTimestampBehavior serverTimestampBehavior) {
+  ///
+  /// If this snapshot comes from a reference or query with a converter (see
+  /// `withConverter`), the result is the converted value of type [T].
+  T? getData(ServerTimestampBehavior serverTimestampBehavior) {
     final Document? doc = document;
     if (doc == null) {
       return null;
-    } else {
-      final _FieldValueOptions fieldValueOptions =
-          _FieldValueOptions(serverTimestampBehavior: serverTimestampBehavior);
-      return _convertObject(doc.data, fieldValueOptions);
     }
+    final FirestoreDataConverter<T>? converter = _converter;
+    if (converter == null) {
+      return _rawData(doc, serverTimestampBehavior) as T;
+    }
+    final QueryDocumentSnapshot<Map<String, Object?>> raw =
+        QueryDocumentSnapshot<Map<String, Object?>>.fromDocument(
+      _firestore,
+      doc,
+      fromCache: metadata.isFromCache,
+      hasPendingWrites: metadata.hasPendingWrites,
+    );
+    return converter.fromFirestore(
+        raw, SnapshotOptions(serverTimestamps: serverTimestampBehavior));
+  }
+
+  Map<String, Object?> _rawData(
+      Document doc, ServerTimestampBehavior serverTimestampBehavior) {
+    final _FieldValueOptions fieldValueOptions =
+        _FieldValueOptions(serverTimestampBehavior: serverTimestampBehavior);
+    return _convertObject(doc.data, fieldValueOptions);
   }
 
   /// Returns whether or not the field exists in the document. Returns false if the document does not exist.
@@ -259,18 +289,19 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a [DocumentReference].
   /// Returns the value of the field
-  DocumentReference? getDocumentReference(String field) =>
+  DocumentReference<Map<String, Object?>>? getDocumentReference(String field) =>
       _getTypedValue(field);
 
   /// Gets the reference to the document.
   ///
   /// Returns the reference to the document.
   @Deprecated('Use ref instead.')
-  DocumentReference get reference => ref;
+  DocumentReference<T> get reference => ref;
 
   /// Gets the reference to the document. Same as [reference]; this is the name
   /// used by the current official Firestore API.
-  DocumentReference get ref => DocumentReference(_key, _firestore);
+  DocumentReference<T> get ref =>
+      DocumentReference<T>(_key, _firestore, _converter);
 
   T? _getTypedValue<T>(String field) {
     checkNotNull(field, 'Provided field must not be null.');
@@ -339,7 +370,7 @@ class DocumentSnapshot {
       Log.w('$DocumentSnapshot',
           'Document ${key.path} contains a document reference within a different database (${refDatabase.projectId}/${refDatabase.databaseId}) which is not supported. It will be treated as a reference in the current database (${database.projectId}/${database.databaseId}) instead.');
     }
-    return DocumentReference(key, _firestore);
+    return DocumentReference<Map<String, Object?>>(key, _firestore);
   }
 
   Map<String, Object?> _convertObject(

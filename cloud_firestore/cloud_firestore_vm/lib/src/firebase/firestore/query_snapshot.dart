@@ -20,13 +20,14 @@ import 'package:meta/meta.dart';
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
-class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
+class QuerySnapshot<T extends dynamic>
+    extends Iterable<QueryDocumentSnapshot<T>> {
   @internal
   QuerySnapshot(this.query, this.snapshot, this._firestore)
       : metadata =
             SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
 
-  final Query query;
+  final Query<T> query;
 
   /// Returns the metadata for this document snapshot.
   final SnapshotMetadata metadata;
@@ -34,7 +35,7 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   final ViewSnapshot snapshot;
   final Firestore _firestore;
 
-  List<DocumentChange>? _cachedChanges;
+  List<DocumentChange<T>>? _cachedChanges;
   MetadataChanges? _cachedChangesMetadataState;
 
   /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
@@ -44,11 +45,11 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   ///
   /// Returns the list of document changes since the last snapshot.
   @Deprecated('Use docChanges instead.')
-  List<DocumentChange> get documentChanges => docChanges;
+  List<DocumentChange<T>> get documentChanges => docChanges;
 
   /// Same as [documentChanges]; this is the name used by the current official
   /// Firestore API.
-  List<DocumentChange> get docChanges =>
+  List<DocumentChange<T>> get docChanges =>
       getDocumentChanges(MetadataChanges.exclude);
 
   /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
@@ -57,7 +58,7 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// [metadataChanges] Indicates whether metadata-only changes (i.e. only [Query.metadata] changed) should be included.
   ///
   /// Returns the list of document changes since the last snapshot.
-  List<DocumentChange> getDocumentChanges(MetadataChanges metadataChanges) {
+  List<DocumentChange<T>> getDocumentChanges(MetadataChanges metadataChanges) {
     if (metadataChanges == MetadataChanges.include &&
         snapshot.excludesMetadataChanges) {
       throw ArgumentError(
@@ -65,11 +66,11 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
           'MetadataChanges.include to getSnapshots().');
     }
 
-    List<DocumentChange>? cachedChanges = _cachedChanges;
+    List<DocumentChange<T>>? cachedChanges = _cachedChanges;
     if (cachedChanges == null ||
         _cachedChangesMetadataState != metadataChanges) {
-      cachedChanges = DocumentChange.changesFromSnapshot(
-              _firestore, metadataChanges, snapshot)
+      cachedChanges = DocumentChange.changesFromSnapshot<T>(
+              _firestore, metadataChanges, snapshot, query.converter)
           .toList(growable: false);
       _cachedChanges = cachedChanges;
       _cachedChangesMetadataState = metadataChanges;
@@ -81,8 +82,8 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   ///
   /// Returns the list of documents.
   @Deprecated('Use docs instead.')
-  List<DocumentSnapshot> get documents {
-    return <DocumentSnapshot>[
+  List<DocumentSnapshot<T>> get documents {
+    return <DocumentSnapshot<T>>[
       for (core.Document doc in snapshot.documents) _convertDocument(doc)
     ];
   }
@@ -90,7 +91,7 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Returns the documents in this [QuerySnapshot] as a List in order of the
   /// query. Same as [documents] but typed as [QueryDocumentSnapshot]; this is
   /// the name used by the current official Firestore API.
-  List<QueryDocumentSnapshot> get docs => toList(growable: false);
+  List<QueryDocumentSnapshot<T>> get docs => toList(growable: false);
 
   /// Returns true if there are no documents in the QuerySnapshot.
   @override
@@ -101,7 +102,7 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   int get length => snapshot.documents.length;
 
   @override
-  Iterator<QueryDocumentSnapshot> get iterator {
+  Iterator<QueryDocumentSnapshot<T>> get iterator {
     return () sync* {
       final Iterator<core.Document> it = snapshot.documents.iterator;
       while (it.moveNext()) {
@@ -111,12 +112,13 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
         .iterator;
   }
 
-  QueryDocumentSnapshot _convertDocument(Document document) {
-    return QueryDocumentSnapshot.fromDocument(
+  QueryDocumentSnapshot<T> _convertDocument(Document document) {
+    return QueryDocumentSnapshot<T>.fromDocument(
       _firestore,
       document,
       fromCache: snapshot.isFromCache,
       hasPendingWrites: snapshot.mutatedKeys.contains(document.key),
+      converter: query.converter,
     );
   }
 

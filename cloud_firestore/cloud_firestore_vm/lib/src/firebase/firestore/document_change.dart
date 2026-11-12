@@ -6,6 +6,7 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_set.dart';
@@ -31,7 +32,7 @@ enum DocumentChangeType {
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
-class DocumentChange {
+class DocumentChange<T extends dynamic> {
   @visibleForTesting
   @internal
   DocumentChange(this.document, this.type, this.oldIndex, this.newIndex);
@@ -44,7 +45,7 @@ class DocumentChange {
   ///
   /// Returns a snapshot of the new data (for [DocumentChangeType.added] or
   /// [DocumentChangeType.modified]) or the removed data (for [DocumentChangeType.removed]).
-  final QueryDocumentSnapshot document;
+  final QueryDocumentSnapshot<T> document;
 
   /// The index of the changed document in the result set immediately prior to this [DocumentChange]
   /// (i.e. supposing that all prior [DocumentChange] objects have been applied). Returns -1 for
@@ -62,9 +63,10 @@ class DocumentChange {
 
   /// Creates the list of DocumentChanges from a ViewSnapshot.
   @internal
-  static List<DocumentChange> changesFromSnapshot(Firestore firestore,
-      MetadataChanges metadataChanges, ViewSnapshot snapshot) {
-    final List<DocumentChange> documentChanges = <DocumentChange>[];
+  static List<DocumentChange<T>> changesFromSnapshot<T extends Object?>(
+      Firestore firestore, MetadataChanges metadataChanges, ViewSnapshot snapshot,
+      [FirestoreDataConverter<T>? converter]) {
+    final List<DocumentChange<T>> documentChanges = <DocumentChange<T>>[];
     if (snapshot.oldDocuments.isEmpty) {
       // Special case the first snapshot because index calculation is easy and fast. Also all
       // changes on the first snapshot are adds so there are also no metadata-only changes to filter
@@ -73,12 +75,13 @@ class DocumentChange {
       Document? lastDoc;
       for (DocumentViewChange change in snapshot.changes) {
         final Document document = change.document;
-        final QueryDocumentSnapshot documentSnapshot =
-            QueryDocumentSnapshot.fromDocument(
+        final QueryDocumentSnapshot<T> documentSnapshot =
+            QueryDocumentSnapshot<T>.fromDocument(
           firestore,
           document,
           fromCache: snapshot.isFromCache,
           hasPendingWrites: snapshot.mutatedKeys.contains(document.key),
+          converter: converter,
         );
 
         hardAssert(change.type == DocumentViewChangeType.added,
@@ -86,7 +89,7 @@ class DocumentChange {
         hardAssert(
             lastDoc == null || snapshot.query.comparator(lastDoc, document) < 0,
             'Got added events in wrong order');
-        documentChanges.add(DocumentChange(
+        documentChanges.add(DocumentChange<T>(
             documentSnapshot, DocumentChangeType.added, -1, index++));
         lastDoc = document;
       }
@@ -100,12 +103,13 @@ class DocumentChange {
           continue;
         }
         final Document document = change.document;
-        final QueryDocumentSnapshot documentSnapshot =
-            QueryDocumentSnapshot.fromDocument(
+        final QueryDocumentSnapshot<T> documentSnapshot =
+            QueryDocumentSnapshot<T>.fromDocument(
           firestore,
           document,
           fromCache: snapshot.isFromCache,
           hasPendingWrites: snapshot.mutatedKeys.contains(document.key),
+          converter: converter,
         );
         int oldIndex, newIndex;
         final DocumentChangeType type = _getType(change);
@@ -124,7 +128,7 @@ class DocumentChange {
           newIndex = -1;
         }
         documentChanges
-            .add(DocumentChange(documentSnapshot, type, oldIndex, newIndex));
+            .add(DocumentChange<T>(documentSnapshot, type, oldIndex, newIndex));
       }
     }
     return documentChanges;

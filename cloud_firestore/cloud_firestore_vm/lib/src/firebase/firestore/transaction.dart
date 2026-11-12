@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/converter_util.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/transaction.dart'
     as core;
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/user_data.dart';
@@ -45,14 +46,17 @@ class Transaction {
   /// [options] An object to configure the set behavior.
   ///
   /// Returns this Transaction instance. Used for chaining method calls.
-  Transaction set(DocumentReference documentRef, Map<String, Object?> data,
+  Transaction set<T extends Object?>(DocumentReference<T> documentRef, T data,
       [SetOptions? options]) {
+    final SetOptions? userOptions = options;
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
-    checkNotNull(data, 'Provided data must not be null.');
+    checkNotNull<Object>(data, 'Provided data must not be null.');
+    final Map<String, Object?> rawData =
+        toRawData<T>(data, documentRef.converter, userOptions);
     final UserDataParsedSetData parsed = options.merge
-        ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
-        : _firestore.dataConverter.parseSetData(data);
+        ? _firestore.dataConverter.parseMergeData(rawData, options.fieldMask)
+        : _firestore.dataConverter.parseSetData(rawData);
     _transaction.set(documentRef.key, parsed);
     return this;
   }
@@ -65,7 +69,7 @@ class Transaction {
   /// fields within the document.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  Transaction updateFromList(DocumentReference documentRef, List<Object?> data) {
+  Transaction updateFromList(DocumentReference<Object?> documentRef, List<Object?> data) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
     return _update(documentRef, parsedData);
@@ -79,14 +83,14 @@ class Transaction {
   /// fields within the document.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  Transaction update(DocumentReference documentRef, Map<String, Object?> data) {
+  Transaction update(DocumentReference<Object?> documentRef, Map<String, Object?> data) {
     final UserDataParsedUpdateData parsedData =
         _firestore.dataConverter.parseUpdateData(data);
     return _update(documentRef, parsedData);
   }
 
   Transaction _update(
-      DocumentReference documentRef, UserDataParsedUpdateData updateData) {
+      DocumentReference<Object?> documentRef, UserDataParsedUpdateData updateData) {
     _firestore.validateReference(documentRef);
     _transaction.update(documentRef.key, updateData);
     return this;
@@ -97,7 +101,7 @@ class Transaction {
   /// [documentRef] The [DocumentReference] to delete.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  Transaction delete(DocumentReference documentRef) {
+  Transaction delete(DocumentReference<Object?> documentRef) {
     _firestore.validateReference(documentRef);
     _transaction.delete(documentRef.key);
     return this;
@@ -109,7 +113,8 @@ class Transaction {
   ///
   /// Returns a Future that will be resolved with the contents of the [Document] at this
   /// [DocumentReference].
-  Future<DocumentSnapshot> get(DocumentReference documentRef) async {
+  Future<DocumentSnapshot<T>> get<T extends Object?>(
+      DocumentReference<T> documentRef) async {
     _firestore.validateReference(documentRef);
     final List<MaybeDocument> result =
         await _transaction.lookup(<DocumentKey>[documentRef.key]);
@@ -120,18 +125,20 @@ class Transaction {
 
     final MaybeDocument doc = result.first;
     if (doc is Document) {
-      return DocumentSnapshot.fromDocument(
+      return DocumentSnapshot<T>.fromDocument(
         _firestore,
         doc,
         isFromCache: false,
         hasPendingWrites: false,
+        converter: documentRef.converter,
       );
     } else if (doc is NoDocument) {
-      return DocumentSnapshot.fromNoDocument(
+      return DocumentSnapshot<T>.fromNoDocument(
         _firestore,
         doc.key,
         isFromCache: false,
         hasPendingWrites: false,
+        converter: documentRef.converter,
       );
     } else {
       throw fail('BatchGetDocumentsRequest returned unexpected document type: '

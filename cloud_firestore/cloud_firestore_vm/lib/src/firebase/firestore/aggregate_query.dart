@@ -26,7 +26,7 @@ class AggregateQuery {
       : aggregateFields = List<AggregateField>.unmodifiable(aggregateFields);
 
   /// The query whose result set is aggregated.
-  final Query query;
+  final Query<Object?> query;
 
   /// The aggregations requested by this query.
   final List<AggregateField> aggregateFields;

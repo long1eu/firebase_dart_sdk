@@ -71,7 +71,7 @@ class VectorQuery {
   }
 
   /// The query whose results are searched.
-  final Query query;
+  final Query<Object?> query;
 
   /// The field holding the vectors to search.
   final core.FieldPath vectorField;

@@ -4,6 +4,7 @@
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
@@ -21,19 +22,21 @@ import 'package:meta/meta.dart';
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
-class QueryDocumentSnapshot extends DocumentSnapshot {
+class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
   QueryDocumentSnapshot._(
     Firestore firestore,
     DocumentKey key,
     Document doc,
     bool isFromCache,
     bool hasPendingWrites,
+    FirestoreDataConverter<T>? converter,
   ) : super(
           firestore,
           key,
           doc,
           isFromCache: isFromCache,
           hasPendingWrites: hasPendingWrites,
+          converter: converter,
         );
 
   @internal
@@ -42,9 +45,10 @@ class QueryDocumentSnapshot extends DocumentSnapshot {
     Document doc, {
     required bool fromCache,
     required bool hasPendingWrites,
+    FirestoreDataConverter<T>? converter,
   }) {
-    return QueryDocumentSnapshot._(
-        firestore, doc.key, doc, fromCache, hasPendingWrites);
+    return QueryDocumentSnapshot<T>._(
+        firestore, doc.key, doc, fromCache, hasPendingWrites, converter);
   }
 
   /// Returns the fields of the document as a Map. Field values will be converted to their native
@@ -52,8 +56,8 @@ class QueryDocumentSnapshot extends DocumentSnapshot {
   ///
   /// Returns the fields of the document as a Map.
   @override
-  Map<String, Object?> get data {
-    final Map<String, Object?>? result = super.data;
+  T get data {
+    final T? result = super.data;
     hardAssert(
         result != null, 'Data in a QueryDocumentSnapshot should be non-null');
     return result!;
@@ -67,9 +71,8 @@ class QueryDocumentSnapshot extends DocumentSnapshot {
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
   @override
-  Map<String, Object?> getData(
-      ServerTimestampBehavior serverTimestampBehavior) {
-    final Map<String, Object?>? result = super.getData(serverTimestampBehavior);
+  T getData(ServerTimestampBehavior serverTimestampBehavior) {
+    final T? result = super.getData(serverTimestampBehavior);
     hardAssert(
         result != null, 'Data in a QueryDocumentSnapshot should be non-null');
     return result!;
