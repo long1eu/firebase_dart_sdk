@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:grpc/grpc.dart';
@@ -59,7 +61,8 @@ Future<(Server, Datastore, ClientChannel)> serve(bool closeImmediately) async {
     DatabaseInfo(DatabaseId.forDatabase('p', '(default)'), 'key', '127.0.0.1',
         sslEnabled: false, port: server.port!),
     EmptyCredentialsProvider(),
-    clientChannel: channel,
+    transportFactory: (ChannelOptionsProvider options) =>
+        GrpcTransport(channel, options),
   );
   return (server, datastore, channel);
 }
@@ -126,7 +129,8 @@ void main() {
       DatabaseInfo(DatabaseId.forDatabase('p', '(default)'), 'key', '127.0.0.1',
           sslEnabled: false, port: port),
       EmptyCredentialsProvider(),
-      clientChannel: channel,
+      transportFactory: (ChannelOptionsProvider options) =>
+          GrpcTransport(channel, options),
     );
   });
 

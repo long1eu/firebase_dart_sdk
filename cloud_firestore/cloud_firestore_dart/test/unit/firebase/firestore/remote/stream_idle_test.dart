@@ -21,6 +21,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:grpc/grpc.dart' hide ResponseStream;
 import 'package:test/test.dart';
+import 'unused_transport.dart';
 
 class _FakeResponse implements Response {
   @override
@@ -38,7 +39,7 @@ class _FakeResponse implements Response {
 class _FakeClient extends FirestoreClient {
   _FakeClient()
       : super(
-          ClientChannel('localhost', port: 1),
+          UnusedTransport(),
           ChannelOptionsProvider(
             databaseId: DatabaseId.forProject('p'),
             credentialsProvider: EmptyCredentialsProvider(),

@@ -30,6 +30,7 @@ import 'package:grpc/grpc.dart' hide ResponseStream;
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart' as util;
+import 'unused_transport.dart';
 
 // ignore_for_file: close_sinks
 
@@ -53,7 +54,7 @@ class _FakeResponse implements Response {
 class _FakeClient extends FirestoreClient {
   _FakeClient()
       : super(
-          ClientChannel('localhost', port: 1),
+          UnusedTransport(),
           ChannelOptionsProvider(
             databaseId: DatabaseId.forProject('p'),
             credentialsProvider: EmptyCredentialsProvider(),

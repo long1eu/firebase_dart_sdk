@@ -13,6 +13,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
@@ -44,7 +45,8 @@ class MockDatastore extends Datastore {
       databaseInfo,
       scheduler,
       serializer,
-      FirestoreClient(clientChannel, channelOptionsProvider),
+      FirestoreClient(GrpcTransport(clientChannel, channelOptionsProvider),
+          channelOptionsProvider),
     );
   }
 

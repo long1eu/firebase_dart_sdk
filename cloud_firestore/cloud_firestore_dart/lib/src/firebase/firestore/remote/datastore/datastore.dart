@@ -24,24 +24,26 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_versi
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/aggregation_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_channel.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/firestore_transport.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/transport_factory.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/vector_query_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/exponential_backoff.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/on_error_resume.dart.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:firebase_app_dart/internal.dart';
-import 'package:grpc/grpc.dart' as grpc show ResponseStream;
-import 'package:grpc/grpc.dart';
-import 'package:grpc/grpc_connection_interface.dart' show ClientChannelBase;
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:rxdart/rxdart.dart' hide OnErrorResumeStreamTransformer;
+
+export 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/firestore_transport.dart'
+    show ResponseFuture, ResponseStream;
 
 part 'aggregation_client.dart';
 part 'base_stream.dart';
@@ -66,24 +68,20 @@ class Datastore {
     DatabaseInfo databaseInfo,
     CredentialsProvider credentialsProvider, {
     AppCheckTokenProvider? appCheckProvider,
-    ClientChannelBase? clientChannel,
+    FirestoreTransport Function(ChannelOptionsProvider options)?
+        transportFactory,
   }) {
-    final ClientChannelBase channel = clientChannel ??
-        createGrpcChannel(
-          host: databaseInfo.host,
-          port: databaseInfo.port,
-          sslEnabled: databaseInfo.sslEnabled,
-        );
-
     final ChannelOptionsProvider optionsProvider = ChannelOptionsProvider(
       databaseId: databaseInfo.databaseId,
       credentialsProvider: credentialsProvider,
       appCheckProvider: appCheckProvider,
     );
-    final FirestoreClient client = FirestoreClient(channel, optionsProvider);
+    final FirestoreTransport transport = transportFactory != null
+        ? transportFactory(optionsProvider)
+        : createTransport(databaseInfo, optionsProvider);
+    final FirestoreClient client = FirestoreClient(transport, optionsProvider);
     final RemoteSerializer serializer =
         RemoteSerializer(databaseInfo.databaseId);
-    channel.onConnectionStateChanged.listen(client.onStateChanged);
     return Datastore.test(scheduler, databaseInfo, serializer, client);
   }
 

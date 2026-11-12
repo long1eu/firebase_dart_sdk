@@ -1,10 +1,10 @@
-/// The gRPC status types the whole client uses to describe RPC failures.
+/// The gRPC types the whole client uses to describe RPCs and their failures.
 ///
 /// `package:grpc/grpc.dart` only works where `dart:io` is available, while
-/// [GrpcError] and [StatusCode] are platform neutral. Import them from here so
-/// the libraries that only need the status types also compile for the web.
+/// these types are platform neutral. Import them from here so the libraries
+/// that only need them also compile for the web.
 library;
 
 export 'package:grpc/grpc.dart'
     if (dart.library.js_interop) 'package:grpc/grpc_web.dart'
-    show GrpcError, StatusCode;
+    show CallOptions, GrpcError, MetadataProvider, Response, StatusCode;

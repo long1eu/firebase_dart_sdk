@@ -34,6 +34,7 @@ import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart' as util;
 import '../test_util.dart' as unit;
+import 'unused_transport.dart';
 
 /// Tests for verified review findings in the remote area that are NOT being
 /// fixed by the `remote-fixes` / `chunk0-features` branches (see
@@ -55,7 +56,7 @@ class _FakeResponse implements Response {
 class _FakeClient extends FirestoreClient {
   _FakeClient(this.responses)
       : super(
-          ClientChannel('localhost', port: 1),
+          UnusedTransport(),
           ChannelOptionsProvider(
             databaseId: DatabaseId.forProject('p'),
             credentialsProvider: EmptyCredentialsProvider(),
