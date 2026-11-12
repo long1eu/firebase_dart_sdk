@@ -17,6 +17,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_colle
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 
@@ -68,17 +69,24 @@ const List<Type> _kLowCardinalityTypes = <Type>[
 /// A full collection scan is therefore only needed when no [filters] or
 /// [orderBy] constraints are specified.
 class IndexedQueryEngine implements QueryEngine {
-  const IndexedQueryEngine(this.localDocuments, this.collectionIndex);
+  IndexedQueryEngine(this.localDocuments, this.collectionIndex);
 
-  final LocalDocumentsView localDocuments;
+  LocalDocumentsView localDocuments;
   final SQLiteCollectionIndex collectionIndex;
+
+  @override
+  void setLocalDocumentsView(LocalDocumentsView localDocuments) {
+    this.localDocuments = localDocuments;
+  }
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
     Query query,
+    SnapshotVersion lastLimboFreeSnapshotVersion,
+    ImmutableSortedSet<DocumentKey> remoteKeys,
   ) {
     return query.isDocumentQuery
-        ? localDocuments.getDocumentsMatchingQuery(query)
+        ? localDocuments.getDocumentsMatchingQuery(query, SnapshotVersion.none)
         : _performCollectionQuery(query);
   }
 
@@ -108,7 +116,8 @@ class IndexedQueryEngine implements QueryEngine {
       // TODO(long1eu): Call overlay.getCollectionDocuments(query.path) and
       //  filter the results (there may still be startAt/endAt bounds that
       //  apply).
-      filteredResults = await localDocuments.getDocumentsMatchingQuery(query);
+      filteredResults = await localDocuments.getDocumentsMatchingQuery(
+          query, SnapshotVersion.none);
     }
 
     return filteredResults;

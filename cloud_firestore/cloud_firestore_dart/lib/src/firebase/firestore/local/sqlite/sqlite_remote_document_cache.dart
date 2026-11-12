@@ -12,8 +12,12 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   final StatsCollector _statsCollector;
 
   @override
-  Future<void> add(MaybeDocument maybeDocument) async {
+  Future<void> add(MaybeDocument maybeDocument, SnapshotVersion readTime) async {
+    hardAssert(readTime != SnapshotVersion.none,
+        'Cannot add document to the RemoteDocumentCache with a read time of zero');
+
     final String path = _pathForKey(maybeDocument.key);
+    final Timestamp timestamp = readTime.timestamp;
     final GeneratedMessage message =
         serializer.encodeMaybeDocument(maybeDocument);
 
@@ -22,11 +26,16 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         // @formatter:off
         '''
           INSERT
-          OR REPLACE INTO remote_documents (path, contents)
-          VALUES (?, ?);
+          OR REPLACE INTO remote_documents (path, read_time_seconds, read_time_nanos, contents)
+          VALUES (?, ?, ?, ?);
         ''',
         // @formatter:on
-        <dynamic>[path, message.writeToBuffer()]);
+        <dynamic>[
+          path,
+          timestamp.seconds,
+          timestamp.nanoseconds,
+          message.writeToBuffer()
+        ]);
 
     await db.indexManager
         .addToCollectionParentIndex(maybeDocument.key.path.popLast());
@@ -110,7 +119,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query) async {
+      getAllDocumentsMatchingQuery(
+          Query query, SnapshotVersion sinceReadTime) async {
     hardAssert(!query.isCollectionGroupQuery,
         'CollectionGroup queries should be handled in LocalDocumentsView');
 
@@ -123,16 +133,40 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     final Map<DocumentKey, Document> results = <DocumentKey, Document>{};
 
-    final List<Map<String, dynamic>> result = await db.query(
-        // @formatter:off
-        '''
-          SELECT path, contents
-          FROM remote_documents
-          WHERE path >= ?
-            AND path < ?;
-        ''',
-        // @formatter:on
-        <String>[prefixPath, prefixSuccessorPath]);
+    final List<Map<String, dynamic>> result;
+    if (sinceReadTime == SnapshotVersion.none) {
+      result = await db.query(
+          // @formatter:off
+          '''
+            SELECT path, contents
+            FROM remote_documents
+            WHERE path >= ?
+              AND path < ?;
+          ''',
+          // @formatter:on
+          <String>[prefixPath, prefixSuccessorPath]);
+    } else {
+      // Execute an index-free query and filter by read time. This is safe since all document changes to queries that
+      // have a lastLimboFreeSnapshotVersion (`sinceReadTime`) have a read time set.
+      final Timestamp readTime = sinceReadTime.timestamp;
+      result = await db.query(
+          // @formatter:off
+          '''
+            SELECT path, contents
+            FROM remote_documents
+            WHERE path >= ?
+              AND path < ?
+              AND (read_time_seconds > ? OR (read_time_seconds = ? AND read_time_nanos > ?));
+          ''',
+          // @formatter:on
+          <Object>[
+            prefixPath,
+            prefixSuccessorPath,
+            readTime.seconds,
+            readTime.seconds,
+            readTime.nanoseconds,
+          ]);
+    }
 
     for (Map<String, dynamic> row in result) {
       // TODO(long1eu): Actually implement a single-collection query

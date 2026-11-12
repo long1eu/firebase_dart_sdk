@@ -30,8 +30,11 @@ class QueryData {
     SnapshotVersion? snapshotVersion,
     Uint8List? resumeToken,
     this.expectedCount,
+    SnapshotVersion? lastLimboFreeSnapshotVersion,
   ])  : snapshotVersion = snapshotVersion ?? SnapshotVersion.none,
-        resumeToken = resumeToken ?? Uint8List(0);
+        resumeToken = resumeToken ?? Uint8List(0),
+        lastLimboFreeSnapshotVersion =
+            lastLimboFreeSnapshotVersion ?? SnapshotVersion.none;
 
   final Target target;
   final int targetId;
@@ -45,9 +48,14 @@ class QueryData {
   /// resume token or read time, otherwise it is `null`.
   final int? expectedCount;
 
+  /// The maximum snapshot version at which the associated view contained no limbo documents, or
+  /// [SnapshotVersion.none] if the view never was limbo free. Queries whose results were last synced at this version
+  /// can be executed from the target mapping plus the documents read after this version (index-free queries).
+  final SnapshotVersion lastLimboFreeSnapshotVersion;
+
   /// Creates a new query data instance with an updated snapshot version and
   /// resume token. The [expectedCount] is reset, as it only belongs to the
-  /// resume token it was computed for.
+  /// resume token it was computed for; the [lastLimboFreeSnapshotVersion] is kept.
   QueryData copyWith({
     required SnapshotVersion snapshotVersion,
     required Uint8List resumeToken,
@@ -60,6 +68,23 @@ class QueryData {
       purpose,
       snapshotVersion,
       resumeToken,
+      null,
+      lastLimboFreeSnapshotVersion,
+    );
+  }
+
+  /// Creates a new query data instance with an updated last limbo free snapshot version.
+  QueryData withLastLimboFreeSnapshotVersion(
+      SnapshotVersion lastLimboFreeSnapshotVersion) {
+    return QueryData(
+      target,
+      targetId,
+      sequenceNumber,
+      purpose,
+      snapshotVersion,
+      resumeToken,
+      expectedCount,
+      lastLimboFreeSnapshotVersion,
     );
   }
 
@@ -73,6 +98,7 @@ class QueryData {
       snapshotVersion,
       resumeToken,
       expectedCount,
+      lastLimboFreeSnapshotVersion,
     );
   }
 
@@ -87,7 +113,8 @@ class QueryData {
           purpose == other.purpose &&
           snapshotVersion == other.snapshotVersion &&
           const DeepCollectionEquality().equals(resumeToken, other.resumeToken) &&
-          expectedCount == other.expectedCount;
+          expectedCount == other.expectedCount &&
+          lastLimboFreeSnapshotVersion == other.lastLimboFreeSnapshotVersion;
 
   @override
   int get hashCode =>
@@ -97,7 +124,8 @@ class QueryData {
       purpose.hashCode ^
       snapshotVersion.hashCode ^
       const DeepCollectionEquality().hash(resumeToken) ^
-      expectedCount.hashCode;
+      expectedCount.hashCode ^
+      lastLimboFreeSnapshotVersion.hashCode;
 
   @override
   String toString() {
@@ -108,7 +136,8 @@ class QueryData {
           ..add('purpose', purpose)
           ..add('snapshotVersion', snapshotVersion)
           ..add('resumeToken', resumeToken)
-          ..add('expectedCount', expectedCount))
+          ..add('expectedCount', expectedCount)
+          ..add('lastLimboFreeSnapshotVersion', lastLimboFreeSnapshotVersion))
         .toString();
   }
 }

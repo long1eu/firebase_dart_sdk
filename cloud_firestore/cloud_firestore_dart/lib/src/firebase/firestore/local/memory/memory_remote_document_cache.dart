@@ -13,12 +13,19 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   /// Underlying cache of documents.
   ImmutableSortedMap<DocumentKey, MaybeDocument> documents;
 
+  /// The read time of every document in [documents].
+  final Map<DocumentKey, SnapshotVersion> _readTimes =
+      <DocumentKey, SnapshotVersion>{};
+
   final MemoryPersistence _persistence;
   final StatsCollector _statsCollector;
 
   @override
-  Future<void> add(MaybeDocument document) async {
+  Future<void> add(MaybeDocument document, SnapshotVersion readTime) async {
+    hardAssert(readTime != SnapshotVersion.none,
+        'Cannot add document to the RemoteDocumentCache with a read time of zero');
     documents = documents.insert(document.key, document);
+    _readTimes[document.key] = readTime;
     await _persistence.indexManager
         .addToCollectionParentIndex(document.key.path.popLast());
   }
@@ -27,6 +34,7 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   Future<void> remove(DocumentKey key) async {
     _statsCollector.recordRowsDeleted(RemoteDocumentCache.statsTag, 1);
     documents = documents.remove(key);
+    _readTimes.remove(key);
   }
 
   @override
@@ -49,7 +57,8 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query) async {
+      getAllDocumentsMatchingQuery(
+          Query query, SnapshotVersion sinceReadTime) async {
     hardAssert(!query.isCollectionGroupQuery,
         'CollectionGroup queries should be handled in LocalDocumentsView');
     ImmutableSortedMap<DocumentKey, Document> result =
@@ -73,6 +82,11 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
       final MaybeDocument maybeDoc = entry.value;
       if (maybeDoc is! Document) {
+        continue;
+      }
+
+      if (sinceReadTime != SnapshotVersion.none &&
+          _readTimes[entry.key]!.compareTo(sinceReadTime) <= 0) {
         continue;
       }
 

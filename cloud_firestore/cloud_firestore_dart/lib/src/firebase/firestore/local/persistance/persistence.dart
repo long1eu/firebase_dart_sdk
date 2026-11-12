@@ -7,7 +7,9 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/overlay_migration_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/reference_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
@@ -75,6 +77,16 @@ abstract class Persistence {
   /// extent possible (e.g. in the case of uid switching from
   /// sally=>jack=>sally, sally's mutation queue will be preserved).
   MutationQueue getMutationQueue(User user);
+
+  /// The name of the data migration that builds the document overlays from the mutation queues (pending after the
+  /// schema migration that adds the overlay table).
+  static const String dataMigrationBuildOverlays = 'BUILD_OVERLAYS';
+
+  /// Returns the [OverlayMigrationManager] that builds the document overlays of data written before they existed.
+  OverlayMigrationManager get overlayMigrationManager;
+
+  /// Returns a [DocumentOverlayCache] representing the persisted document overlays for the given user.
+  DocumentOverlayCache getDocumentOverlayCache(User user);
 
   /// Creates a [QueryCache] representing the persisted cache of queries.
   QueryCache get queryCache;

@@ -7,7 +7,9 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/default_query_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_write_result.dart';
@@ -16,6 +18,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/pe
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -25,6 +28,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
@@ -42,6 +47,7 @@ import 'package:test/test.dart';
 import '../../../../../util/test_util.dart';
 import '../../util/test_target_metadata_provider.dart' as t;
 import '../accumulating_stats_collector.dart';
+import '../counting_query_engine.dart';
 
 class LocalStoreTestCase {
   LocalStoreTestCase(this._persistence, this._statsCollector,
@@ -56,13 +62,18 @@ class LocalStoreTestCase {
   ImmutableSortedMap<DocumentKey, MaybeDocument>? _lastChanges;
   late int _lastTargetId;
   late LocalStore _localStore;
+  late CountingQueryEngine _queryEngine;
+  QueryResult? _lastQueryResult;
 
   Future<void> setUp() async {
     _batches = <MutationBatch>[];
     _lastChanges = null;
+    _lastQueryResult = null;
     _lastTargetId = 0;
 
-    _localStore = LocalStore(_persistence, User.unauthenticated);
+    _queryEngine = CountingQueryEngine(DefaultQueryEngine());
+    _localStore = LocalStore(_persistence, User.unauthenticated,
+        queryEngine: _queryEngine);
     await _localStore.start();
   }
 
@@ -123,7 +134,7 @@ class LocalStoreTestCase {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
     await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 0, map(<String>['it', 'changed']),
+        doc('foo/bar', 2, map(<String>['it', 'changed']),
             DocumentState.localMutations),
         <int>[targetId],
         <int>[]));
@@ -141,8 +152,8 @@ class LocalStoreTestCase {
     await _allocateQuery(query);
 
     await _writeMutation(setMutation('foo/bar', map(<String>['foo', 'bar'])));
-    await _notifyLocalViewChanges(
-        viewChanges(2, <String>['foo/bar'], <String>[]));
+    await _notifyLocalViewChanges(viewChanges(
+        2, /* fromCache= */ false, <String>['foo/bar'], <String>[]));
 
     _expectChanged(<Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']),
@@ -338,7 +349,7 @@ class LocalStoreTestCase {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
     await _applyRemoteEvent(addedRemoteEvent(
-        doc('foo/bar', 0, map(<String>['it', 'base']),
+        doc('foo/bar', 1, map(<String>['it', 'base']),
             DocumentState.localMutations),
         <int>[targetId],
         <int>[]));
@@ -528,7 +539,7 @@ class LocalStoreTestCase {
 
     final int targetId = await _allocateQuery(query);
     await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 0, map(<String>['it', 'base']),
+        doc('foo/bar', 1, map(<String>['it', 'base']),
             DocumentState.localMutations),
         <int>[targetId],
         <int>[]));
@@ -633,8 +644,8 @@ class LocalStoreTestCase {
 
     await _acknowledgeMutation(2); // delete mutation
     _expectRemoved(<String>['foo/bar']);
-    await _expectContains(
-        deletedDoc('foo/bar', 2, hasCommittedMutations: true));
+    // The overlay of the pending patch (largest batch 3) still holds the delete (as upstream with overlays).
+    await _expectContains(deletedDoc('foo/bar', 0));
 
     await _acknowledgeMutation(3); // patch mutation
     _expectChanged(<MaybeDocument>[unknownDoc('foo/bar', 3)]);
@@ -696,7 +707,7 @@ class LocalStoreTestCase {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
     await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 0, map(<String>['foo', 'old'])),
+        doc('foo/bar', 1, map(<String>['foo', 'old'])),
         <int>[targetId],
         <int>[]));
     await _writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
@@ -735,7 +746,7 @@ class LocalStoreTestCase {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
     await _applyRemoteEvent(updateRemoteEvent(
-        doc('foo/bar', 0, map(<String>['foo', 'old'])),
+        doc('foo/bar', 1, map(<String>['foo', 'old'])),
         <int>[targetId],
         <int>[]));
     await _writeMutation(patchMutation('foo/bar', map(<String>['foo', 'bar'])));
@@ -785,8 +796,8 @@ class LocalStoreTestCase {
     await _expectContains(doc('foo/baz', 0, map(<String>['foo', 'baz']),
         DocumentState.localMutations));
 
-    await _notifyLocalViewChanges(
-        viewChanges(2, <String>['foo/bar', 'foo/baz'], <String>[]));
+    await _notifyLocalViewChanges(viewChanges(
+        2, /* fromCache= */ false, <String>['foo/bar', 'foo/baz'], <String>[]));
     await _applyRemoteEvent(updateRemoteEvent(
         doc('foo/bar', 1, map(<String>['foo', 'bar'])), none, two));
     await _applyRemoteEvent(updateRemoteEvent(
@@ -795,8 +806,8 @@ class LocalStoreTestCase {
     await _expectContains(doc('foo/bar', 1, map(<String>['foo', 'bar'])));
     await _expectContains(doc('foo/baz', 2, map(<String>['foo', 'baz'])));
 
-    await _notifyLocalViewChanges(
-        viewChanges(2, <String>[], <String>['foo/bar', 'foo/baz']));
+    await _notifyLocalViewChanges(viewChanges(
+        2, /* fromCache= */ false, <String>[], <String>['foo/bar', 'foo/baz']));
     await _releaseQuery(query);
 
     await _expectNotContains('foo/bar');
@@ -827,7 +838,8 @@ class LocalStoreTestCase {
     final Query query =
         Query(ResourcePath.fromSegments(<String>['foo', 'bar']));
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        await _localStore.executeQuery(query);
+        (await _localStore.executeQuery(query, /* usePreviousResults= */ true))
+            .documents;
     expect(values(docs), <Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']),
           DocumentState.localMutations)
@@ -846,7 +858,8 @@ class LocalStoreTestCase {
 
     final Query query = Query(ResourcePath.fromString('foo'));
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        await _localStore.executeQuery(query);
+        (await _localStore.executeQuery(query, /* usePreviousResults= */ true))
+            .documents;
 
     expect(values(docs), <Document>[
       doc('foo/bar', 0, map(<String>['foo', 'bar']),
@@ -869,7 +882,8 @@ class LocalStoreTestCase {
     await _writeMutation(setMutation('foo/bonk', map(<String>['a', 'b'])));
 
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        await _localStore.executeQuery(query);
+        (await _localStore.executeQuery(query, /* usePreviousResults= */ true))
+            .documents;
 
     expect(values(docs), <Document>[
       doc('foo/bar', 20, map(<String>['a', 'b'])),
@@ -891,10 +905,12 @@ class LocalStoreTestCase {
 
     _resetPersistenceStats();
 
-    await _localStore.executeQuery(query);
+    await _localStore.executeQuery(query, /* usePreviousResults= */ true);
 
     _expectRemoteDocumentsRead(2);
-    _expectMutationsRead(1);
+    // With overlays, the mutation queue is not read for queries (upstream assertOverlaysRead).
+    _expectMutationsRead(0);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 1);
   }
 
   @testMethod
@@ -1220,8 +1236,9 @@ class LocalStoreTestCase {
           DocumentState.localMutations)
     ]);
 
-    // The sum transform is not idempotent and the backend's updated value is ignored. The
-    // ArrayUnion transform is recomputed and includes the backend value.
+    // The sum transform and array union transform make the SDK ignore the backend's updated value: both are part of
+    // the overlay (upstream testHoldsBackTransforms; before overlays the array union was recomputed on the backend
+    // value).
     await _applyRemoteEvent(addedRemoteEvent(
         doc(
             'foo/bar',
@@ -1242,7 +1259,7 @@ class LocalStoreTestCase {
             'sum',
             1,
             'array_union',
-            <String>['bar', 'foo']
+            <String>['foo']
           ]),
           DocumentState.localMutations)
     ]);
@@ -1384,8 +1401,418 @@ class LocalStoreTestCase {
     final Query q = query('foo').orderBy(orderBy('sort')).limitToLast(2);
     await _allocateQuery(q);
     final ImmutableSortedMap<DocumentKey, Document> docs =
-        await _localStore.executeQuery(q);
+        (await _localStore.executeQuery(q, /* usePreviousResults= */ true))
+            .documents;
     expect(docs.length, 3);
+  }
+
+  @testMethod
+  Future<void> testReadsAllDocumentsForInitialCollectionQueries() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    await _allocateQuery(query);
+
+    await _applyRemoteEvent(
+        updateRemoteEvent(doc('foo/baz', 10, map()), <int>[2], <int>[]));
+    await _applyRemoteEvent(
+        updateRemoteEvent(doc('foo/bar', 20, map()), <int>[2], <int>[]));
+    await _writeMutation(setMutation('foo/bonk', map()));
+
+    _resetPersistenceStats();
+
+    await _localStore.executeQuery(query, /* usePreviousResults= */ true);
+
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectMutationsReadByEngine(byKey: 0, byQuery: 0);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 1);
+  }
+
+  @testMethod
+  Future<void> testUsesTargetMappingToExecuteQueries() async {
+    if (_garbageCollectorIsEager) {
+      return;
+    }
+
+    // This test verifies that once a target mapping has been written, only documents that match the query are read
+    // from the RemoteDocumentCache.
+    final Query query = Query(ResourcePath.fromString('foo'))
+        .filter(filter('matches', '==', true));
+    final int targetId = await _allocateQuery(query);
+
+    await _writeMutation(setMutation('foo/a', map(<dynamic>['matches', true])));
+    await _writeMutation(setMutation('foo/b', map(<dynamic>['matches', true])));
+    await _writeMutation(
+        setMutation('foo/ignored', map(<dynamic>['matches', false])));
+    await _acknowledgeMutation(10);
+    await _acknowledgeMutation(10);
+    await _acknowledgeMutation(10);
+
+    // Execute the query, but note that we read all existing documents from the RemoteDocumentCache since we do not
+    // yet have target mapping.
+    await _executeQuery(query);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+
+    // Issue a RemoteEvent to persist the target mapping.
+    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
+      doc('foo/a', 10, map(<dynamic>['matches', true])),
+      doc('foo/b', 10, map(<dynamic>['matches', true])),
+    ], <int>[
+      targetId
+    ]));
+    await _applyRemoteEvent(_noChangeEvent(targetId, 10));
+    await _updateViews(targetId, fromCache: false);
+
+    // Execute the query again, this time verifying that we only read the two documents that match the query.
+    await _executeQuery(query);
+    _expectRemoteDocumentsReadByEngine(byKey: 2, byQuery: 0);
+    _expectQueryReturned(<String>['foo/a', 'foo/b']);
+  }
+
+  @testMethod
+  Future<void> testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing() async {
+    // This test verifies that the `lastLimboFreeSnapshot` version for QueryData is advanced when we compute a
+    // limbo-free free view and that the mapping is persisted when we release a target.
+    final Query query = Query(ResourcePath.fromString('foo'));
+    final Target target = query.toTarget();
+    final int targetId = await _allocateQuery(query);
+
+    // Advance the target snapshot.
+    await _applyRemoteEvent(_noChangeEvent(targetId, 10));
+
+    // At this point, we have not yet confirmed that the target is limbo free.
+    QueryData? cachedQueryData = await _localStore.getQueryData(target);
+    expect(cachedQueryData!.lastLimboFreeSnapshotVersion, SnapshotVersion.none);
+
+    // Mark the view synced, which updates the last limbo free snapshot version.
+    await _updateViews(targetId, fromCache: false);
+    cachedQueryData = await _localStore.getQueryData(target);
+    expect(cachedQueryData!.lastLimboFreeSnapshotVersion, version(10));
+
+    // The last limbo free snapshot version is persisted even if we release the target.
+    await _localStore.releaseTarget(targetId);
+
+    if (!_garbageCollectorIsEager) {
+      cachedQueryData = await _localStore.getQueryData(target);
+      expect(cachedQueryData!.lastLimboFreeSnapshotVersion, version(10));
+    }
+  }
+
+  @testMethod
+  Future<void> testQueriesIncludeLocallyModifiedDocuments() async {
+    if (_garbageCollectorIsEager) {
+      return;
+    }
+
+    // This test verifies that queries that have a persisted TargetMapping include documents that were modified by
+    // local edits after the target mapping was written.
+    final Query query = Query(ResourcePath.fromString('foo'))
+        .filter(filter('matches', '==', true));
+    final int targetId = await _allocateQuery(query);
+
+    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
+      doc('foo/a', 10, map(<dynamic>['matches', true]))
+    ], <int>[
+      targetId
+    ]));
+    await _applyRemoteEvent(_noChangeEvent(targetId, 10));
+    await _updateViews(targetId, fromCache: false);
+
+    // Execute the query based on the RemoteEvent.
+    await _executeQuery(query);
+    _expectQueryReturned(<String>['foo/a']);
+
+    // Write a document.
+    await _writeMutation(setMutation('foo/b', map(<dynamic>['matches', true])));
+
+    // Execute the query and make sure that the pending mutation is included in the result.
+    await _executeQuery(query);
+    _expectQueryReturned(<String>['foo/a', 'foo/b']);
+
+    await _acknowledgeMutation(11);
+
+    // Execute the query and make sure that the acknowledged mutation is included in the result.
+    await _executeQuery(query);
+    _expectQueryReturned(<String>['foo/a', 'foo/b']);
+  }
+
+  @testMethod
+  Future<void> testQueriesIncludeDocumentsFromOtherQueries() async {
+    if (_garbageCollectorIsEager) {
+      return;
+    }
+
+    // This test verifies that queries that have a persisted TargetMapping include documents that were modified by
+    // other queries after the target mapping was written.
+    final Query filteredQuery = Query(ResourcePath.fromString('foo'))
+        .filter(filter('matches', '==', true));
+    int targetId = await _allocateQuery(filteredQuery);
+
+    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
+      doc('foo/a', 10, map(<dynamic>['matches', true]))
+    ], <int>[
+      targetId
+    ]));
+    await _applyRemoteEvent(_noChangeEvent(targetId, 10));
+    await _updateViews(targetId, fromCache: false);
+    await _localStore.releaseTarget(targetId);
+
+    // Start another query and add more matching documents to the collection.
+    final Query fullQuery = Query(ResourcePath.fromString('foo'));
+    targetId = await _allocateQuery(fullQuery);
+    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
+      doc('foo/a', 10, map(<dynamic>['matches', true])),
+      doc('foo/b', 20, map(<dynamic>['matches', true])),
+    ], <int>[
+      targetId
+    ]));
+    await _localStore.releaseTarget(targetId);
+
+    // Run the original query again and ensure that both the original matches as well as all new matches are included
+    // in the result set.
+    await _allocateQuery(filteredQuery);
+    await _executeQuery(filteredQuery);
+    _expectQueryReturned(<String>['foo/a', 'foo/b']);
+  }
+
+  @testMethod
+  Future<void> testQueriesFilterDocumentsThatNoLongerMatch() async {
+    if (_garbageCollectorIsEager) {
+      return;
+    }
+
+    // This test verifies that documents that once matched a query are post-filtered if they no longer match the query
+    // filter.
+
+    // Add two document results for a simple filter query
+    final Query filteredQuery = Query(ResourcePath.fromString('foo'))
+        .filter(filter('matches', '==', true));
+    int targetId = await _allocateQuery(filteredQuery);
+
+    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
+      doc('foo/a', 10, map(<dynamic>['matches', true])),
+      doc('foo/b', 10, map(<dynamic>['matches', true])),
+    ], <int>[
+      targetId
+    ]));
+    await _applyRemoteEvent(_noChangeEvent(targetId, 10));
+    await _updateViews(targetId, fromCache: false);
+    await _localStore.releaseTarget(targetId);
+
+    // Modify one of the documents to no longer match while the filtered query is inactive.
+    final Query fullQuery = Query(ResourcePath.fromString('foo'));
+    targetId = await _allocateQuery(fullQuery);
+    await _applyRemoteEvent(_addedRemoteEvents(<MaybeDocument>[
+      doc('foo/a', 10, map(<dynamic>['matches', true])),
+      doc('foo/b', 20, map(<dynamic>['matches', false])),
+    ], <int>[
+      targetId
+    ]));
+    await _localStore.releaseTarget(targetId);
+
+    // Re-run the filtered query and verify that the modified document is no longer returned.
+    await _allocateQuery(filteredQuery);
+    await _executeQuery(filteredQuery);
+    _expectQueryReturned(<String>['foo/a']);
+  }
+
+  @testMethod
+  Future<void>
+      testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced() async {
+    if (_garbageCollectorIsEager) {
+      return;
+    }
+
+    // A bundled document is stored with the read time of the bundle, not its update time: a query that was synced
+    // before the bundle was loaded must see it even if the document was last updated before that.
+    final Query filteredQuery = Query(ResourcePath.fromString('foo'))
+        .filter(filter('matches', '==', true));
+    final int targetId = await _allocateQuery(filteredQuery);
+
+    await _applyRemoteEvent(_addedRemoteEvents(
+        <MaybeDocument>[doc('foo/a', 10, map(<dynamic>['matches', true]))],
+        <int>[targetId]));
+    await _applyRemoteEvent(_noChangeEvent(targetId, 10));
+    await _updateViews(targetId, fromCache: false);
+    await _localStore.releaseTarget(targetId);
+
+    final Document bundled = doc('foo/b', 5, map(<dynamic>['matches', true]));
+    await _localStore.applyBundledDocuments(
+        ImmutableSortedMap<DocumentKey, MaybeDocument>.emptyMap(
+                DocumentKey.comparator)
+            .insert(bundled.key, bundled),
+        'bundle',
+        readTimes: <DocumentKey, SnapshotVersion>{bundled.key: version(20)});
+
+    await _allocateQuery(filteredQuery);
+    await _executeQuery(filteredQuery);
+    _expectQueryReturned(<String>['foo/a', 'foo/b']);
+  }
+
+  @testMethod
+  Future<void>
+      testClearsLastLimboFreeSnapshotOnExistenceFilterMismatch() async {
+    // An existence filter mismatch invalidates the previous results of a target: the next execution must not reuse
+    // them (upstream LocalStore.applyRemoteEvent).
+    final Query query = Query(ResourcePath.fromString('foo'))
+        .filter(filter('matches', '==', true));
+    final Target target = query.toTarget();
+    final int targetId = await _allocateQuery(query);
+
+    await _applyRemoteEvent(_noChangeEvent(targetId, 10));
+    await _updateViews(targetId, fromCache: false);
+    expect(
+        (await _localStore.getQueryData(target))!.lastLimboFreeSnapshotVersion,
+        version(10));
+
+    await _applyRemoteEvent(RemoteEvent(
+      documentUpdates: <DocumentKey, MaybeDocument>{},
+      resolvedLimboDocuments: <DocumentKey>{},
+      snapshotVersion: version(20),
+      targetChanges: <int, TargetChange>{
+        targetId: TargetChange(
+          resumeToken: Uint8List(0),
+          current: false,
+          addedDocuments: DocumentKey.emptyKeySet,
+          modifiedDocuments: DocumentKey.emptyKeySet,
+          removedDocuments: DocumentKey.emptyKeySet,
+        )
+      },
+      targetMismatches: <int, QueryPurpose>{
+        targetId: QueryPurpose.existenceFilterMismatch
+      },
+    ));
+
+    expect(
+        (await _localStore.getQueryData(target))!.lastLimboFreeSnapshotVersion,
+        SnapshotVersion.none);
+  }
+
+  @testMethod
+  Future<void> testWritesOverlaysAndRemovesThemOnAck() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    final int targetId = await _allocateQuery(query);
+    await _applyRemoteEvent(_addedRemoteEvents(
+        <MaybeDocument>[doc('foo/remote', 1, map(<dynamic>['a', 1]))],
+        <int>[targetId]));
+
+    await _writeMutation(setMutation('foo/local', map(<dynamic>['a', 1])));
+    await _writeMutation(patchMutation('foo/remote', map(<dynamic>['b', 2])));
+
+    // A document without remote version gets a set overlay, a patched remote document a patch overlay.
+    expect(await _overlay('foo/local'),
+        Overlay(1, setMutation('foo/local', map(<dynamic>['a', 1]))));
+    final Overlay remoteOverlay = (await _overlay('foo/remote'))!;
+    expect(remoteOverlay.largestBatchId, 2);
+    expect(remoteOverlay.mutation, isA<PatchMutation>());
+
+    await _acknowledgeMutation(2);
+    expect(await _overlay('foo/local'), isNull);
+    expect(await _overlay('foo/remote'), isNotNull);
+
+    await _acknowledgeMutation(3);
+    expect(await _overlay('foo/remote'), isNull);
+  }
+
+  @testMethod
+  Future<void> testRejectRecalculatesOverlays() async {
+    await _writeMutation(setMutation('foo/bar', map(<dynamic>['a', 1])));
+    await _writeMutation(patchMutation('foo/bar', map(<dynamic>['b', 2])));
+    expect((await _overlay('foo/bar'))!.largestBatchId, 2);
+
+    // Reject the set: the overlay (of batch 2) is recalculated, and the remaining update no longer applies because the
+    // document does not exist. The overlay of batch 2 must not be kept.
+    await _rejectMutation();
+    _expectRemoved(<String>['foo/bar']);
+    expect(await _overlay('foo/bar'), isNull);
+    await _expectNotContains('foo/bar');
+  }
+
+  @testMethod
+  Future<void> testRemoteDeleteDropsPatchOverlay() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    final int targetId = await _allocateQuery(query);
+    await _applyRemoteEvent(_addedRemoteEvents(
+        <MaybeDocument>[doc('foo/bar', 1, map(<dynamic>['a', 1]))],
+        <int>[targetId]));
+    await _writeMutation(patchMutation('foo/bar', map(<dynamic>['b', 2])));
+    expect((await _overlay('foo/bar'))!.mutation, isA<PatchMutation>());
+
+    // The document is deleted remotely: the pending update no longer applies (its precondition fails), so the
+    // document must not come back from its old patch overlay.
+    await _applyRemoteEvent(updateRemoteEvent(
+        deletedDoc('foo/bar', 2), <int>[targetId], <int>[]));
+    _expectChanged(<MaybeDocument>[deletedDoc('foo/bar', 2)]);
+    expect(await _overlay('foo/bar'), isNull);
+    await _expectContains(deletedDoc('foo/bar', 2));
+  }
+
+  Future<Overlay?> _overlay(String path) {
+    return _persistence
+        .getDocumentOverlayCache(User.unauthenticated)
+        .getOverlay(key(path));
+  }
+
+  Future<void> _executeQuery(Query query) async {
+    _resetPersistenceStats();
+    _lastQueryResult =
+        await _localStore.executeQuery(query, /* usePreviousResults= */ true);
+  }
+
+  Future<void> _updateViews(int targetId, {required bool fromCache}) {
+    return _notifyLocalViewChanges(
+        viewChanges(targetId, fromCache, <String>[], <String>[]));
+  }
+
+  RemoteEvent _noChangeEvent(int targetId, int theVersion) {
+    final t.TestTargetMetadataProvider provider = t.testTargetMetadataProvider;
+    provider.setSyncedKeys(queryData(targetId, QueryPurpose.listen, 'foo/bar'),
+        DocumentKey.emptyKeySet);
+    final WatchChangeAggregator aggregator = WatchChangeAggregator(provider)
+      ..handleTargetChange(WatchChangeWatchTargetChange(
+          WatchTargetChangeType.noChange,
+          <int>[targetId],
+          resumeToken(theVersion)));
+    return aggregator.createRemoteEvent(version(theVersion));
+  }
+
+  void _expectQueryReturned(List<String> keys) {
+    expect(_lastQueryResult, isNotNull);
+    final ImmutableSortedMap<DocumentKey, Document> documents =
+        _lastQueryResult!.documents;
+    for (String k in keys) {
+      expect(documents.containsKey(key(k)), isTrue,
+          reason: 'Expected query to return: $k');
+    }
+    expect(documents.length, keys.length);
+  }
+
+  /// Asserts the expected numbers of mutations read by the query engine's [MutationQueue] since the last call to
+  /// [_resetPersistenceStats].
+  void _expectMutationsReadByEngine(
+      {required int byKey, required int byQuery}) {
+    expect(_queryEngine.mutationsReadByQuery, byQuery,
+        reason: 'Mutations read (by query)');
+    expect(_queryEngine.mutationsReadByKey, byKey,
+        reason: 'Mutations read (by key)');
+  }
+
+  /// Asserts the expected numbers of overlays read by the query engine's [DocumentOverlayCache] since the last call to
+  /// [_resetPersistenceStats].
+  void _expectOverlaysReadByEngine(
+      {required int byKey, required int byCollection}) {
+    expect(_queryEngine.overlaysReadByCollection, byCollection,
+        reason: 'Overlays read (by collection)');
+    expect(_queryEngine.overlaysReadByKey, byKey,
+        reason: 'Overlays read (by key)');
+  }
+
+  /// Asserts the expected numbers of documents read by the query engine's [RemoteDocumentCache] since the last call
+  /// to [_resetPersistenceStats].
+  void _expectRemoteDocumentsReadByEngine(
+      {required int byKey, required int byQuery}) {
+    expect(_queryEngine.documentsReadByQuery, byQuery,
+        reason: 'Remote documents read (by query)');
+    expect(_queryEngine.documentsReadByKey, byKey,
+        reason: 'Remote documents read (by key)');
   }
 
   Future<int> _allocateQuery(Query query) async {
@@ -1601,5 +2028,6 @@ class LocalStoreTestCase {
   /// [RemoteDocumentCache].
   void _resetPersistenceStats() {
     _statsCollector.reset();
+    _queryEngine.resetCounts();
   }
 }

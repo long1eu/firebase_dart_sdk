@@ -35,6 +35,7 @@ class Target extends $pb.GeneratedMessage {
     $fixnum.Int64? lastListenSequenceNumber,
     $0.Target_QueryTarget? query,
     $0.Target_DocumentsTarget? documents,
+    $3.Timestamp? lastLimboFreeSnapshotVersion,
   }) {
     final $result = create();
     if (targetId != null) {
@@ -55,6 +56,9 @@ class Target extends $pb.GeneratedMessage {
     if (documents != null) {
       $result.documents = documents;
     }
+    if (lastLimboFreeSnapshotVersion != null) {
+      $result.lastLimboFreeSnapshotVersion = lastLimboFreeSnapshotVersion;
+    }
     return $result;
   }
   Target._() : super();
@@ -74,6 +78,7 @@ class Target extends $pb.GeneratedMessage {
     ..aInt64(4, _omitFieldNames ? '' : 'lastListenSequenceNumber')
     ..aOM<$0.Target_QueryTarget>(5, _omitFieldNames ? '' : 'query', subBuilder: $0.Target_QueryTarget.create)
     ..aOM<$0.Target_DocumentsTarget>(6, _omitFieldNames ? '' : 'documents', subBuilder: $0.Target_DocumentsTarget.create)
+    ..aOM<$3.Timestamp>(7, _omitFieldNames ? '' : 'lastLimboFreeSnapshotVersion', subBuilder: $3.Timestamp.create)
     ..hasRequiredFields = false
   ;
 
@@ -195,6 +200,19 @@ class Target extends $pb.GeneratedMessage {
   void clearDocuments() => clearField(6);
   @$pb.TagNumber(6)
   $0.Target_DocumentsTarget ensureDocuments() => $_ensure(5);
+
+  /// Denotes the maximum snapshot version at which the associated query view
+  /// contained no limbo documents.
+  @$pb.TagNumber(7)
+  $3.Timestamp get lastLimboFreeSnapshotVersion => $_getN(6);
+  @$pb.TagNumber(7)
+  set lastLimboFreeSnapshotVersion($3.Timestamp v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasLastLimboFreeSnapshotVersion() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearLastLimboFreeSnapshotVersion() => clearField(7);
+  @$pb.TagNumber(7)
+  $3.Timestamp ensureLastLimboFreeSnapshotVersion() => $_ensure(6);
 }
 
 /// Global state tracked across all Targets, tracked separately to avoid the

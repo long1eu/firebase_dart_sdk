@@ -105,6 +105,18 @@ void main() {
       () => testCase.testCanExecuteMixedCollectionQueries());
   test('testReadsAllDocumentsForCollectionQueries',
       () => testCase.testReadsAllDocumentsForCollectionQueries());
+  test('testWritesOverlaysAndRemovesThemOnAck', () => testCase.testWritesOverlaysAndRemovesThemOnAck());
+  test('testRejectRecalculatesOverlays', () => testCase.testRejectRecalculatesOverlays());
+  test('testRemoteDeleteDropsPatchOverlay', () => testCase.testRemoteDeleteDropsPatchOverlay());
+  test('testReadsAllDocumentsForInitialCollectionQueries', () => testCase.testReadsAllDocumentsForInitialCollectionQueries());
+  test('testUsesTargetMappingToExecuteQueries', () => testCase.testUsesTargetMappingToExecuteQueries());
+  test('testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing', () => testCase.testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing());
+  test('testQueriesIncludeLocallyModifiedDocuments', () => testCase.testQueriesIncludeLocallyModifiedDocuments());
+  test('testQueriesIncludeDocumentsFromOtherQueries', () => testCase.testQueriesIncludeDocumentsFromOtherQueries());
+  test('testQueriesFilterDocumentsThatNoLongerMatch', () => testCase.testQueriesFilterDocumentsThatNoLongerMatch());
+  test('testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced',
+      () => testCase.testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced());
+  test('testClearsLastLimboFreeSnapshotOnExistenceFilterMismatch', () => testCase.testClearsLastLimboFreeSnapshotOnExistenceFilterMismatch());
   test('testPersistsResumeTokens', () => testCase.testPersistsResumeTokens());
   test('testDoesNotReplaceResumeTokenWithEmptyByteString',
       () => testCase.testDoesNotReplaceResumeTokenWithEmptyByteString());

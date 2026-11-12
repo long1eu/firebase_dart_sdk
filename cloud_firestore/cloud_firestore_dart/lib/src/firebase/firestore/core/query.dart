@@ -314,6 +314,15 @@ class Query {
         _matchesBounds(doc);
   }
 
+  /// Returns true if this query does not specify any query constraints that could remove results.
+  bool get matchesAllDocuments =>
+      filters.isEmpty &&
+      _limit == noLimit &&
+      _startAt == null &&
+      _endAt == null &&
+      (explicitSortOrder.isEmpty ||
+          (explicitSortOrder.length == 1 && firstOrderByField!.isKeyField));
+
   /// Returns a comparator that will sort documents according to this Query's
   /// sort order.
   Comparator<Document> get comparator =>

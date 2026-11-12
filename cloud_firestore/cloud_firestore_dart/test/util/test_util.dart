@@ -439,8 +439,8 @@ MutationResult mutationResult(int theVersion) {
   return MutationResult(version(theVersion));
 }
 
-LocalViewChanges viewChanges(
-    int targetId, List<String> addedKeys, List<String> removedKeys) {
+LocalViewChanges viewChanges(int targetId, bool fromCache,
+    List<String> addedKeys, List<String> removedKeys) {
   ImmutableSortedSet<DocumentKey> added = DocumentKey.emptyKeySet;
   for (String keyPath in addedKeys) {
     added = added.insert(key(keyPath));
@@ -449,7 +449,7 @@ LocalViewChanges viewChanges(
   for (String keyPath in removedKeys) {
     removed = removed.insert(key(keyPath));
   }
-  return LocalViewChanges(targetId, added, removed);
+  return LocalViewChanges(targetId, fromCache, added, removed);
 }
 
 /// Creates a resume token to match the given snapshot version.

@@ -20,8 +20,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializ
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/overlay_migration_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/reference_delegate.dart';
@@ -31,6 +33,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_bundle_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_database_files.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_document_overlay_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_overlay_migration_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -221,6 +225,15 @@ class SQLitePersistence extends Persistence {
   @override
   MutationQueue getMutationQueue(User user) {
     return SQLiteMutationQueue(this, serializer, _statsCollector, user);
+  }
+
+  @override
+  OverlayMigrationManager get overlayMigrationManager =>
+      SQLiteOverlayMigrationManager(this);
+
+  @override
+  DocumentOverlayCache getDocumentOverlayCache(User user) {
+    return SQLiteDocumentOverlayCache(this, serializer, user);
   }
 
   @override

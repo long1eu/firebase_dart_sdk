@@ -95,6 +95,7 @@ void main() {
     await d.localStore.notifyLocalViewChanges(<LocalViewChanges>[
       LocalViewChanges(
           released,
+          /* fromCache= */ false,
           DocumentKey.emptyKeySet.insert(key('foo/bar')),
           DocumentKey.emptyKeySet),
     ]);

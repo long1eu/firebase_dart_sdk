@@ -16,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 9;
+  static const int version = 11;
 
   // Remove this constant and increment version to enable indexing support
   static const int indexingSupportVersion = version + 1;
@@ -71,6 +71,29 @@ class SQLiteSchema {
     // rewrite) are not part of it.
     if (fromVersion < 9 && toVersion >= 9) {
       await _createV9BundleCache();
+    }
+
+    // Migration 10 corresponds to migrations 9 and 10 of the Android SDK (read time on remote documents for index-free
+    // queries, 47def6d / a744cb7 / d8ff6a5).
+    if (fromVersion < 10 && toVersion >= 10) {
+      if (!(await _hasReadTime())) {
+        await _addReadTime();
+      } else {
+        // Index-free queries rely on the fact that documents updated after a query's last limbo free snapshot version
+        // are persisted with their read time. If a client upgrades to schema version 10, downgrades and then upgrades
+        // again, some queries may have a last limbo free snapshot version despite the fact that not all updated
+        // documents have an associated read time.
+        await _dropLastLimboFreeSnapshotVersion();
+      }
+    }
+
+    // Migration 11 corresponds to migration 14 of the Android SDK (document overlays, final table shape of 1b8e6dd).
+    // The overlays themselves are built from the mutation queue by the [SQLiteOverlayMigrationManager] the next time
+    // the local store starts.
+    if (fromVersion < 11 && toVersion >= 11) {
+      await _createOverlays();
+      await _createDataMigrationTable();
+      await _addPendingDataMigration(Persistence.dataMigrationBuildOverlays);
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -523,6 +546,80 @@ class SQLiteSchema {
           // @formatter:on
           );
     });
+  }
+
+  Future<void> _createOverlays() async {
+    await _ifTablesDontExist(<String>['document_overlays'], () async {
+      await db.execute(
+          // @formatter:off
+          '''
+            CREATE TABLE document_overlays (
+              uid               TEXT,
+              collection_path   TEXT,
+              document_id       TEXT,
+              collection_group  TEXT,
+              largest_batch_id  INTEGER,
+              overlay_mutation  BLOB,
+              PRIMARY KEY (uid, collection_path, document_id)
+            );
+          '''
+          // @formatter:on
+          );
+      await db.execute(
+          'CREATE INDEX batch_id_overlay ON document_overlays (uid, largest_batch_id)');
+      await db.execute(
+          'CREATE INDEX collection_group_overlay ON document_overlays (uid, collection_group)');
+    });
+  }
+
+  Future<void> _createDataMigrationTable() async {
+    await _ifTablesDontExist(<String>['data_migrations'], () async {
+      await db.execute(
+          'CREATE TABLE data_migrations (migration_name TEXT, PRIMARY KEY (migration_name))');
+    });
+  }
+
+  Future<void> _addPendingDataMigration(String migration) async {
+    await db.execute(
+        'INSERT OR IGNORE INTO data_migrations (migration_name) VALUES (?)',
+        <Object>[migration]);
+  }
+
+  Future<bool> _hasReadTime() async {
+    final bool hasReadTimeSeconds =
+        await _tableContainsColumn('remote_documents', 'read_time_seconds');
+    final bool hasReadTimeNanos =
+        await _tableContainsColumn('remote_documents', 'read_time_nanos');
+
+    hardAssert(hasReadTimeSeconds == hasReadTimeNanos,
+        'Table contained just one of read_time_seconds or read_time_nanos');
+
+    return hasReadTimeSeconds && hasReadTimeNanos;
+  }
+
+  Future<void> _addReadTime() async {
+    await db.execute(
+        'ALTER TABLE remote_documents ADD COLUMN read_time_seconds INTEGER');
+    await db.execute(
+        'ALTER TABLE remote_documents ADD COLUMN read_time_nanos INTEGER');
+  }
+
+  Future<void> _dropLastLimboFreeSnapshotVersion() async {
+    final List<Map<String, dynamic>> rows =
+        await db.query('SELECT target_id, target_proto FROM targets');
+    for (Map<String, dynamic> row in rows) {
+      final int targetId = row['target_id'];
+      final Uint8List targetProtoBytes = row['target_proto'];
+      final proto.Target targetProto;
+      try {
+        targetProto = proto.Target.fromBuffer(targetProtoBytes);
+      } on InvalidProtocolBufferException catch (_) {
+        throw fail('Failed to decode Query data for target $targetId');
+      }
+      targetProto.clearLastLimboFreeSnapshotVersion();
+      await db.execute('UPDATE targets SET target_proto = ? WHERE target_id = ?',
+          <Object>[targetProto.writeToBuffer(), targetId]);
+    }
   }
 
   Future<bool> _tableContainsColumn(String table, String column) async {

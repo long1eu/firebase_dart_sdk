@@ -13,7 +13,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 /// These changes are sent to the [LocalStore] by the [View] (via the [SyncEngine]) and are used to
 /// pin / unpin documents as appropriate.
 class LocalViewChanges {
-  const LocalViewChanges(this.targetId, this.added, this.removed);
+  const LocalViewChanges(
+      this.targetId, this.fromCache, this.added, this.removed);
 
   factory LocalViewChanges.fromViewSnapshot(
       int targetId, ViewSnapshot snapshot) {
@@ -33,10 +34,16 @@ class LocalViewChanges {
       }
     }
 
-    return LocalViewChanges(targetId, addedKeys, removedKeys);
+    return LocalViewChanges(
+        targetId, snapshot.isFromCache, addedKeys, removedKeys);
   }
 
   final int targetId;
+
+  /// Whether the view snapshot these changes were computed from was served from cache. A snapshot that is not from
+  /// cache is free of limbo documents, which lets the [LocalStore] advance the target's last limbo free snapshot
+  /// version.
+  final bool fromCache;
   final ImmutableSortedSet<DocumentKey> added;
   final ImmutableSortedSet<DocumentKey> removed;
 }

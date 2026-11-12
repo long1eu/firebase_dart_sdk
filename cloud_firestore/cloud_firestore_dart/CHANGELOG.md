@@ -172,6 +172,16 @@ only. **Nothing was run against production Firestore.**
 - Test suite: unit tests, current-format upstream spec tests, a public API golden file, and an
   emulator integration suite. Protos resynced with current googleapis
   (`tool/gen_protos.sh`).
+- Index-free queries (upstream 21.3.0): queries that were synced before are executed from their
+  cached result plus the documents read since then, instead of a full collection scan. The SQLite
+  schema goes to version 10 (read time columns on `remote_documents`); older versions of the
+  port can still open the database, and a later upgrade discards the data they could not maintain.
+- Document overlays (upstream 24.0.0): the local view of documents with pending writes is stored
+  as one overlay per document instead of replaying the whole mutation queue on every read and
+  query. SQLite schema version 11 adds the overlay tables; existing pending writes are converted
+  the first time the client starts. As upstream, array transforms (`arrayUnion` / `arrayRemove`)
+  now keep their local result until the write is acknowledged instead of being re-applied on top
+  of newer server data.
 
 ### Documentation
 
@@ -180,8 +190,7 @@ only. **Nothing was run against production Firestore.**
 
 ### Not done
 
-Index-free queries / overlays / index engine, persistence clearing (API to be
-decided), Pipelines.
+Index engine, persistence clearing (API to be decided), Pipelines.
 
 ## Versions published as `cloud_firestore_vm`
 

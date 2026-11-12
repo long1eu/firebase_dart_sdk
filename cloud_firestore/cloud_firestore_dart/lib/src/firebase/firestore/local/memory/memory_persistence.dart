@@ -17,9 +17,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializ
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/memory/memory_bundle_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/memory/memory_document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/overlay_migration_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/reference_delegate.dart';
@@ -139,6 +142,18 @@ class MemoryPersistence extends Persistence {
   }
 
   Iterable<MemoryMutationQueue> getMutationQueues() => mutationQueues.values;
+
+  final Map<User, MemoryDocumentOverlayCache> _overlays =
+      <User, MemoryDocumentOverlayCache>{};
+
+  @override
+  OverlayMigrationManager get overlayMigrationManager =>
+      const NoOpOverlayMigrationManager();
+
+  @override
+  DocumentOverlayCache getDocumentOverlayCache(User user) {
+    return _overlays.putIfAbsent(user, () => MemoryDocumentOverlayCache());
+  }
 
   @override
   Future<void> runTransaction(

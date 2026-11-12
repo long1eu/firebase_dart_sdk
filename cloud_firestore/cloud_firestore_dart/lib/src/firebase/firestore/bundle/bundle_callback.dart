@@ -19,15 +19,19 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_metada
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/named_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 
 /// Interface implemented by components that can apply changes from a bundle to local storage.
 abstract class BundleCallback {
   /// Applies the documents from a bundle to the 'ground-state' (remote) documents.
   ///
   /// Local documents are re-calculated if there are remaining mutations in the queue.
+  ///
+  /// [readTimes] holds the read time of each document in the bundle (from its bundled document metadata); documents
+  /// without an entry use their version as read time.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyBundledDocuments(
-      ImmutableSortedMap<DocumentKey, MaybeDocument> documents,
-      String bundleId);
+      ImmutableSortedMap<DocumentKey, MaybeDocument> documents, String bundleId,
+      {Map<DocumentKey, SnapshotVersion>? readTimes});
 
   /// Saves the given [NamedQuery] to local persistence.
   Future<void> saveNamedQuery(

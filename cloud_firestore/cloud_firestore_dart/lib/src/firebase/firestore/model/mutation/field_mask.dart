@@ -18,6 +18,9 @@ import 'package:firebase_app_dart/internal.dart';
 class FieldMask {
   const FieldMask(this.mask);
 
+  /// A mask without any field; used for documents that are not mutated locally.
+  static const FieldMask empty = FieldMask(<FieldPath>{});
+
   final Set<FieldPath> mask;
 
   /// Verifies that [fieldPath] is included by at least one field in this field mask.

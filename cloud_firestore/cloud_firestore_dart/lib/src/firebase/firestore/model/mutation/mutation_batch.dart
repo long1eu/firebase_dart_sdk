@@ -5,6 +5,7 @@
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_result.dart';
@@ -110,6 +111,39 @@ class MutationBatch {
       }
     }
     return maybeDoc;
+  }
+
+  /// Like [applyToLocalView], but also returns the fields mutated locally once this batch is applied, starting from
+  /// [mutatedFields] (see [Mutation.applyToLocalViewWithMask]).
+  (MaybeDocument?, FieldMask?) applyToLocalViewWithMask(DocumentKey documentKey,
+      MaybeDocument? maybeDoc, FieldMask? mutatedFields) {
+    if (maybeDoc != null) {
+      hardAssertLazy(
+          maybeDoc.key == documentKey,
+          () =>
+              'applyToLocalView: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}');
+    }
+    // First, apply the base state. This allows us to apply non-idempotent transform against a consistent set of
+    // values.
+    for (int i = 0; i < baseMutations.length; i++) {
+      final Mutation mutation = baseMutations[i];
+      if (mutation.key == documentKey) {
+        (maybeDoc, mutatedFields) = mutation.applyToLocalViewWithMask(
+            maybeDoc, maybeDoc, mutatedFields, localWriteTime);
+      }
+    }
+
+    final MaybeDocument? baseDoc = maybeDoc;
+
+    // Second, apply all user-provided mutations.
+    for (int i = 0; i < mutations.length; i++) {
+      final Mutation mutation = mutations[i];
+      if (mutation.key == documentKey) {
+        (maybeDoc, mutatedFields) = mutation.applyToLocalViewWithMask(
+            maybeDoc, baseDoc, mutatedFields, localWriteTime);
+      }
+    }
+    return (maybeDoc, mutatedFields);
   }
 
   /// Computes the local view for all provided documents given the mutations in

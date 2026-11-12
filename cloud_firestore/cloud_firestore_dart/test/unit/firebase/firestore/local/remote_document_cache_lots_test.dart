@@ -54,7 +54,7 @@ void main() {
                 doc('foo/$i', 42, map(<dynamic>['data', 2]));
             keys.add(k);
             expected[k] = document;
-            await cache.add(document);
+            await cache.add(document, document.version);
           }
         });
 

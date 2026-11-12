@@ -23,6 +23,7 @@ const Target$json = {
     {'1': 'last_listen_sequence_number', '3': 4, '4': 1, '5': 3, '10': 'lastListenSequenceNumber'},
     {'1': 'query', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1.Target.QueryTarget', '9': 0, '10': 'query'},
     {'1': 'documents', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1.Target.DocumentsTarget', '9': 0, '10': 'documents'},
+    {'1': 'last_limbo_free_snapshot_version', '3': 7, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'lastLimboFreeSnapshotVersion'},
   ],
   '8': [
     {'1': 'target_type'},
@@ -31,13 +32,15 @@ const Target$json = {
 
 /// Descriptor for `Target`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List targetDescriptor = $convert.base64Decode(
-    'CgZUYXJnZXQSGwoJdGFyZ2V0X2lkGAEgASgFUgh0YXJnZXRJZBJFChBzbmFwc2hvdF92ZXJzaW'
-    '9uGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIPc25hcHNob3RWZXJzaW9uEiEK'
-    'DHJlc3VtZV90b2tlbhgDIAEoDFILcmVzdW1lVG9rZW4SPQobbGFzdF9saXN0ZW5fc2VxdWVuY2'
-    'VfbnVtYmVyGAQgASgDUhhsYXN0TGlzdGVuU2VxdWVuY2VOdW1iZXISPwoFcXVlcnkYBSABKAsy'
-    'Jy5nb29nbGUuZmlyZXN0b3JlLnYxLlRhcmdldC5RdWVyeVRhcmdldEgAUgVxdWVyeRJLCglkb2'
-    'N1bWVudHMYBiABKAsyKy5nb29nbGUuZmlyZXN0b3JlLnYxLlRhcmdldC5Eb2N1bWVudHNUYXJn'
-    'ZXRIAFIJZG9jdW1lbnRzQg0KC3RhcmdldF90eXBl');
+    'CgZUYXJnZXQSGwoJdGFyZ2V0X2lkGAEgASgFUgh0YXJnZXRJZBJFChBzbmFwc2hvdF92ZXJzaW9u'
+    'GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIPc25hcHNob3RWZXJzaW9uEiEKDHJl'
+    'c3VtZV90b2tlbhgDIAEoDFILcmVzdW1lVG9rZW4SPQobbGFzdF9saXN0ZW5fc2VxdWVuY2VfbnVt'
+    'YmVyGAQgASgDUhhsYXN0TGlzdGVuU2VxdWVuY2VOdW1iZXISPwoFcXVlcnkYBSABKAsyJy5nb29n'
+    'bGUuZmlyZXN0b3JlLnYxLlRhcmdldC5RdWVyeVRhcmdldEgAUgVxdWVyeRJLCglkb2N1bWVudHMY'
+    'BiABKAsyKy5nb29nbGUuZmlyZXN0b3JlLnYxLlRhcmdldC5Eb2N1bWVudHNUYXJnZXRIAFIJZG9j'
+    'dW1lbnRzEmIKIGxhc3RfbGltYm9fZnJlZV9zbmFwc2hvdF92ZXJzaW9uGAcgASgLMhouZ29vZ2xl'
+    'LnByb3RvYnVmLlRpbWVzdGFtcFIcbGFzdExpbWJvRnJlZVNuYXBzaG90VmVyc2lvbkINCgt0YXJn'
+    'ZXRfdHlwZQ==');
 
 @$core.Deprecated('Use targetGlobalDescriptor instead')
 const TargetGlobal$json = {

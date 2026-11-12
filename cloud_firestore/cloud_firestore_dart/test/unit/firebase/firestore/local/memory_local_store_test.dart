@@ -11,6 +11,10 @@ import 'accumulating_stats_collector.dart';
 import 'cases/local_store_test_case.dart';
 import 'persistence_test_helpers.dart';
 
+/// Upstream runs these with `assumeFalse(garbageCollectorIsEager())`: eager GC removes the documents the test relies on.
+const String _needsLruGc =
+    'Needs a non-eager garbage collector (upstream assumeFalse(garbageCollectorIsEager())); covered by sqlite_local_store_test.';
+
 void main() {
   late LocalStoreTestCase testCase;
 
@@ -98,6 +102,23 @@ void main() {
       () => testCase.testCanExecuteMixedCollectionQueries());
   test('testReadsAllDocumentsForCollectionQueries',
       () => testCase.testReadsAllDocumentsForCollectionQueries());
+  test('testWritesOverlaysAndRemovesThemOnAck', () => testCase.testWritesOverlaysAndRemovesThemOnAck());
+  test('testRejectRecalculatesOverlays', () => testCase.testRejectRecalculatesOverlays());
+  test('testRemoteDeleteDropsPatchOverlay', () => testCase.testRemoteDeleteDropsPatchOverlay());
+  test('testReadsAllDocumentsForInitialCollectionQueries', () => testCase.testReadsAllDocumentsForInitialCollectionQueries());
+  test('testUsesTargetMappingToExecuteQueries', () => testCase.testUsesTargetMappingToExecuteQueries(),
+      skip: _needsLruGc);
+  test('testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing', () => testCase.testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing());
+  test('testQueriesIncludeLocallyModifiedDocuments', () => testCase.testQueriesIncludeLocallyModifiedDocuments(),
+      skip: _needsLruGc);
+  test('testQueriesIncludeDocumentsFromOtherQueries', () => testCase.testQueriesIncludeDocumentsFromOtherQueries(),
+      skip: _needsLruGc);
+  test('testQueriesFilterDocumentsThatNoLongerMatch', () => testCase.testQueriesFilterDocumentsThatNoLongerMatch(),
+      skip: _needsLruGc);
+  test('testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced',
+      () => testCase.testQueriesIncludeBundledDocumentsReadAfterTheTargetWasSynced(),
+      skip: _needsLruGc);
+  test('testClearsLastLimboFreeSnapshotOnExistenceFilterMismatch', () => testCase.testClearsLastLimboFreeSnapshotOnExistenceFilterMismatch());
   test('testPersistsResumeTokens', () => testCase.testPersistsResumeTokens());
   test('testDoesNotReplaceResumeTokenWithEmptyByteString',
       () => testCase.testDoesNotReplaceResumeTokenWithEmptyByteString());

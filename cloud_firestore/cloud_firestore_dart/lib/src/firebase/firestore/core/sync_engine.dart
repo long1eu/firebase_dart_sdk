@@ -29,6 +29,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_view_cha
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_write_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -47,6 +48,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:firebase_app_dart/internal.dart';
+import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 
 /// [SyncEngine] is the central controller in the client SDK architecture. It is the glue code between the
@@ -168,13 +170,12 @@ class SyncEngine implements RemoteStoreCallback {
 
   Future<ViewSnapshot> initializeViewAndComputeSnapshot(
       Query query, QueryData queryData) async {
-    final ImmutableSortedMap<DocumentKey, Document> docs =
-        await _localStore.executeQuery(query);
-    final ImmutableSortedSet<DocumentKey> remoteKeys =
-        await _localStore.getRemoteDocumentKeys(queryData.targetId);
+    final QueryResult queryResult = await _localStore.executeQuery(
+        query, /* usePreviousResults= */ true);
 
-    final View view = View(query, remoteKeys);
-    final ViewDocumentChanges viewDocChanges = view.computeDocChanges(docs);
+    final View view = View(query, queryResult.remoteKeys);
+    final ViewDocumentChanges viewDocChanges =
+        view.computeDocChanges(queryResult.documents);
 
     // The initial snapshot carries the resume token of the target so that an empty result of a target that has been
     // synced before can be raised from the cache. If there are already queries mapped to the target, the sync state of
@@ -596,7 +597,9 @@ class SyncEngine implements RemoteStoreCallback {
         // The query has a limit and some docs were removed/updated, so we need to re-run the query against the local
         // store to make sure we didn't lose any good docs that had been past the limit.
         final ImmutableSortedMap<DocumentKey, Document> docs =
-            await _localStore.executeQuery(queryView.query);
+            (await _localStore.executeQuery(
+                    queryView.query, /* usePreviousResults= */ false))
+                .documents;
         viewDocChanges = view.computeDocChanges(docs, viewDocChanges);
         if (!identical(_queryViewsByQuery[queryView.query], queryView)) {
           continue;

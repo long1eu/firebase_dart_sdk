@@ -12,6 +12,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:test/test.dart';
 
 import '../../../../../util/test_util.dart';
@@ -98,7 +99,7 @@ class RemoteDocumentCacheTestCase {
   Future<void> testSetAndReadDeletedDocument() async {
     const String path = 'a/b';
     final NoDocument deletedDocument = deletedDoc(path, 42);
-    await _add(deletedDocument);
+    await _add(deletedDocument, version(42));
     expect(await _get(path), deletedDocument);
   }
 
@@ -108,7 +109,7 @@ class RemoteDocumentCacheTestCase {
     final Document written = await _addTestDocumentAtPath(path);
 
     final Document newDoc = doc(path, 57, map(<dynamic>['data', 5]));
-    await _add(newDoc);
+    await _add(newDoc, version(57));
 
     expect(newDoc, isNot(written));
     expect(await _get(path), newDoc);
@@ -144,7 +145,8 @@ class RemoteDocumentCacheTestCase {
 
     final Query query = Query(path('b'));
     final ImmutableSortedMap<DocumentKey, Document> results =
-        await _remoteDocumentCache.getAllDocumentsMatchingQuery(query);
+        await _remoteDocumentCache.getAllDocumentsMatchingQuery(
+            query, SnapshotVersion.none);
     final List<Document> expected = <Document>[
       doc('b/1', 42, docData),
       doc('b/2', 42, docData)
@@ -153,15 +155,51 @@ class RemoteDocumentCacheTestCase {
     expect(values(results), expected);
   }
 
-  Future<Document> _addTestDocumentAtPath(String path) async {
-    final Document document = doc(path, 42, map(<dynamic>['data', 2]));
-    await _add(document);
+  @testMethod
+  Future<void> testDocumentsMatchingQuerySinceReadTime() async {
+    final Map<String, Object> docData = map(<dynamic>['data', 2]);
+    await _addTestDocumentAtPath('b/old', updateTime: 1, readTime: 11);
+    await _addTestDocumentAtPath('b/current', updateTime: 2, readTime: 12);
+    await _addTestDocumentAtPath('b/new', updateTime: 3, readTime: 13);
+
+    final Query query = Query(path('b'));
+    final ImmutableSortedMap<DocumentKey, Document> results =
+        await _remoteDocumentCache.getAllDocumentsMatchingQuery(
+            query, version(12));
+    expect(values(results), <Document>[doc('b/new', 3, docData)]);
+  }
+
+  @testMethod
+  Future<void> testDocumentsMatchingUsesReadTimeNotUpdateTime() async {
+    final Map<String, Object> docData = map(<dynamic>['data', 2]);
+    await _addTestDocumentAtPath('b/old', updateTime: 1, readTime: 2);
+    await _addTestDocumentAtPath('b/new', updateTime: 2, readTime: 1);
+
+    final Query query = Query(path('b'));
+    final ImmutableSortedMap<DocumentKey, Document> results =
+        await _remoteDocumentCache.getAllDocumentsMatchingQuery(
+            query, version(1));
+    expect(values(results), <Document>[doc('b/old', 1, docData)]);
+  }
+
+  @testMethod
+  Future<void> testAddingDocumentWithReadTimeOfZeroFails() async {
+    await expectLater(
+        _add(doc('a/b', 1, map(<dynamic>['data', 2])), SnapshotVersion.none),
+        throwsA(anything));
+  }
+
+  Future<Document> _addTestDocumentAtPath(String path,
+      {int updateTime = 42, int readTime = 42}) async {
+    final Document document =
+        doc(path, updateTime, map(<dynamic>['data', 2]));
+    await _add(document, version(readTime));
     return document;
   }
 
-  Future<void> _add(MaybeDocument doc) async {
+  Future<void> _add(MaybeDocument doc, SnapshotVersion readTime) async {
     await _persistence.runTransaction(
-        'add entry', () => _remoteDocumentCache.add(doc));
+        'add entry', () => _remoteDocumentCache.add(doc, readTime));
   }
 
   Future<MaybeDocument?> _get(String path) {

@@ -10,6 +10,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 
 /// Represents cached documents received from the remote backend.
 ///
@@ -24,7 +25,11 @@ abstract class RemoteDocumentCache {
   ///
   /// The cache key is extracted from [MaybeDocument.key]. If there is already a
   /// cache entry for the key, it will be replaced.
-  Future<void> add(MaybeDocument maybeDocument);
+  ///
+  /// [readTime] is the time at which the document was read or committed. It must not be [SnapshotVersion.none]:
+  /// index-free queries rely on every cache write after a target's last limbo free snapshot version carrying a read
+  /// time.
+  Future<void> add(MaybeDocument maybeDocument, SnapshotVersion readTime);
 
   /// Removes the cached entry for the given key (no-op if no entry exists).
   Future<void> remove(DocumentKey documentKey);
@@ -49,6 +54,9 @@ abstract class RemoteDocumentCache {
   /// should be re-filtered by the consumer before presenting them to the user.
   ///
   /// Cached [NoDocument] entries have no bearing on query results.
+  ///
+  /// If [sinceReadTime] is not [SnapshotVersion.none], only documents that have been read after this snapshot version
+  /// (exclusive) are returned.
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query);
+      getAllDocumentsMatchingQuery(Query query, SnapshotVersion sinceReadTime);
 }

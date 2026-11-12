@@ -6,10 +6,15 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/delete_mutation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/transform_operation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
@@ -90,6 +95,102 @@ abstract class Mutation {
   /// null and the mutation would not create a new document.
   MaybeDocument? applyToLocalView(MaybeDocument? maybeDoc,
       MaybeDocument? baseDoc, Timestamp localWriteTime);
+
+  /// Applies this mutation to [maybeDoc] like [applyToLocalView] and also returns the fields of the document that are
+  /// mutated locally after this mutation (the port's version of the upstream `applyToLocalView` that returns a
+  /// [FieldMask], 9815e45).
+  ///
+  /// [previousMask] are the fields mutated by the mutations applied before this one, [FieldMask.empty] if there were
+  /// none, or null if a set or a delete was applied (the whole document is mutated). The returned mask follows the
+  /// same rules: a set or delete returns null, a patch adds its mask and the paths of its field transforms, and a
+  /// mutation whose precondition does not hold leaves the document and the mask unchanged.
+  (MaybeDocument?, FieldMask?) applyToLocalViewWithMask(MaybeDocument? maybeDoc,
+      MaybeDocument? baseDoc, FieldMask? previousMask, Timestamp localWriteTime) {
+    verifyKeyMatches(maybeDoc);
+    if (!precondition.isValidFor(maybeDoc)) {
+      return (maybeDoc, previousMask);
+    }
+
+    final MaybeDocument? result =
+        applyToLocalView(maybeDoc, baseDoc, localWriteTime);
+    final Mutation mutation = this;
+    if (mutation is PatchMutation) {
+      // PORTING NOTE: a patch that creates the document (there was no document before) mutates the whole document,
+      // as a set would. Upstream keeps the patch mask here, which loses the document when the mask is empty (a merge
+      // of no fields on a deleted document).
+      if (previousMask == null || maybeDoc is! Document) {
+        return (result, null);
+      }
+      final FieldMask mask = FieldMask(<FieldPath>{
+        ...previousMask.mask,
+        ...mutation.mask.mask,
+        for (FieldTransform transform in fieldTransforms) transform.fieldPath,
+      });
+      // PORTING NOTE: an empty mask means "not mutated locally", but a patch of no fields (a merge of `{}`) still
+      // marks the document as having pending writes; keep that by treating it as a set of the current document.
+      return (result, mask.mask.isEmpty ? null : mask);
+    } else if (mutation is SetMutation || mutation is DeleteMutation) {
+      return (result, null);
+    } else {
+      // Verify mutations do not change the local view.
+      return (result, previousMask);
+    }
+  }
+
+  /// Creates a mutation that, applied to the remote version of the document, results in [maybeDoc] (the local view of
+  /// the document), or null if the document has no local mutations.
+  ///
+  /// [mask] is the result of [applyToLocalViewWithMask] for all the pending mutations of the document: null if a set
+  /// or delete was applied, which creates a set or delete overlay; otherwise a patch overlay with the values of the
+  /// mutated fields. An empty mask means no mutation was applied.
+  static Mutation? calculateOverlayMutation(
+      MaybeDocument? maybeDoc, FieldMask? mask) {
+    if (mask != null && mask.mask.isEmpty) {
+      return null;
+    }
+    hardAssert(maybeDoc != null,
+        'A document with local mutations must have a local view');
+    final MaybeDocument doc = maybeDoc!;
+
+    // mask == null when there are Set or Delete being applied to get to the current document.
+    if (mask == null) {
+      if (doc is Document) {
+        return SetMutation(doc.key, doc.data, Precondition.none);
+      } else {
+        hardAssert(doc is NoDocument,
+            'A local delete must result in a NoDocument, got $doc');
+        return DeleteMutation(doc.key, Precondition.none);
+      }
+    }
+
+    final ObjectValue docValue =
+        doc is Document ? doc.data : ObjectValue.empty;
+    ObjectValue patchValue = ObjectValue.empty;
+    final Set<FieldPath> maskSet = <FieldPath>{};
+    for (FieldPath path in mask.mask) {
+      if (maskSet.contains(path)) {
+        continue;
+      }
+      FieldPath fieldPath = path;
+      // If we are deleting a nested field, we take the immediate parent as the mask used to construct resulting
+      // mutation.
+      // Justification: Nested fields can create parent fields implicitly. If only a leaf entry is deleted in later
+      // mutations, the parent field should still remain, but we may have lost this information.
+      // Consider mutation (foo.bar 1), then mutation (foo.bar delete()). This leaves the final result (foo, {}).
+      // Despite the fact that `doc` has the correct result, `foo` is not in `mask`, and the resulting mutation would
+      // miss `foo`.
+      if (docValue.get(fieldPath) == null && fieldPath.length > 1) {
+        fieldPath = fieldPath.popLast();
+      }
+      final FieldValue? value = docValue.get(fieldPath);
+      if (value != null) {
+        patchValue = patchValue.set(fieldPath, value);
+      }
+      maskSet.add(fieldPath);
+    }
+    return PatchMutation(
+        doc.key, patchValue, FieldMask(maskSet), Precondition.none);
+  }
 
   /// Helper for derived classes to implement .equals.
   bool hasSameKeyAndPrecondition(Mutation other) {

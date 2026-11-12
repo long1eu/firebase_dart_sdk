@@ -313,6 +313,7 @@ void main() {
     const int targetId = 42;
     const int sequenceNumber = 10;
     final SnapshotVersion _version = version(1039);
+    final SnapshotVersion limboFreeVersion = version(1000);
     final Uint8List _resumeToken = resumeToken(1039)!;
 
     final QueryData queryData = QueryData(
@@ -322,6 +323,8 @@ void main() {
       QueryPurpose.listen,
       _version,
       _resumeToken,
+      null,
+      limboFreeVersion,
     );
 
     // Let the RPC serializer test various permutations of query serialization.
@@ -337,7 +340,10 @@ void main() {
       ..resumeToken = _resumeToken
       ..query = (proto.Target_QueryTarget.create()
         ..parent = queryTarget.parent
-        ..structuredQuery = queryTarget.structuredQuery))
+        ..structuredQuery = queryTarget.structuredQuery)
+      ..lastLimboFreeSnapshotVersion = (proto.Timestamp.create()
+        ..seconds = Int64()
+        ..nanos = 1000000))
       ..freeze();
 
     expect(serializer.encodeQueryData(queryData), expected);

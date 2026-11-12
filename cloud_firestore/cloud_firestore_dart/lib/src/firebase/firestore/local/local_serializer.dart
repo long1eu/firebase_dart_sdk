@@ -4,6 +4,7 @@
 
 import 'dart:typed_data';
 
+import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundled_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
@@ -14,6 +15,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/unknown_document.dart';
@@ -146,6 +149,92 @@ class LocalSerializer {
     return result..freeze();
   }
 
+  /// Encodes the mutation of a document overlay for local storage.
+  ///
+  /// Unlike the mutations of a batch, overlay mutations hold the local view of the document, which can contain
+  /// pending server timestamps ([ServerTimestampValue]). They are stored in the shape the Android SDK uses for them
+  /// (a map with `__type__: 'server_timestamp'`, `__local_write_time__` and `__previous_value__`); overlays are never
+  /// sent to the backend.
+  proto.Write encodeOverlayMutation(Mutation mutation) {
+    return rpcSerializer.encodeMutation(
+        _mapOverlayValues(mutation, _encodeServerTimestamps));
+  }
+
+  /// Decodes the mutation of a document overlay, see [encodeOverlayMutation].
+  Mutation decodeOverlayMutation(proto.Write write) {
+    return _mapOverlayValues(
+        rpcSerializer.decodeMutation(write), _decodeServerTimestamps);
+  }
+
+  static const String _typeKey = '__type__';
+  static const String _serverTimestampType = 'server_timestamp';
+  static const String _localWriteTimeKey = '__local_write_time__';
+  static const String _previousValueKey = '__previous_value__';
+
+  Mutation _mapOverlayValues(
+      Mutation mutation, FieldValue Function(FieldValue) convert) {
+    if (mutation is SetMutation) {
+      return SetMutation(mutation.key, convert(mutation.value) as ObjectValue,
+          mutation.precondition, mutation.fieldTransforms);
+    } else if (mutation is PatchMutation) {
+      return PatchMutation(
+          mutation.key,
+          convert(mutation.value) as ObjectValue,
+          mutation.mask,
+          mutation.precondition,
+          mutation.fieldTransforms);
+    }
+    return mutation;
+  }
+
+  static FieldValue _encodeServerTimestamps(FieldValue value) {
+    if (value is ServerTimestampValue) {
+      final FieldValue? previousValue = value.previousFieldValue;
+      return ObjectValue.fromMap(<String, FieldValue>{
+        _typeKey: StringValue.valueOf(_serverTimestampType),
+        _localWriteTimeKey: TimestampValue.valueOf(value.localWriteTime),
+        if (previousValue != null)
+          _previousValueKey: _encodeServerTimestamps(previousValue),
+      });
+    } else if (value is ObjectValue) {
+      return ObjectValue.fromMap(<String, FieldValue>{
+        for (MapEntry<String, FieldValue> entry in value.internalValue)
+          entry.key: _encodeServerTimestamps(entry.value),
+      });
+    } else if (value is ArrayValue) {
+      return ArrayValue.fromList(
+          value.internalValue.map(_encodeServerTimestamps).toList());
+    }
+    return value;
+  }
+
+  static FieldValue _decodeServerTimestamps(FieldValue value) {
+    if (value is ObjectValue) {
+      final ImmutableSortedMap<String, FieldValue> fields =
+          value.internalValue;
+      final FieldValue? type = fields[_typeKey];
+      final FieldValue? localWriteTime = fields[_localWriteTimeKey];
+      if (type is StringValue &&
+          type.value == _serverTimestampType &&
+          localWriteTime is TimestampValue) {
+        final FieldValue? previousValue = fields[_previousValueKey];
+        return ServerTimestampValue(
+            localWriteTime.value,
+            previousValue == null
+                ? null
+                : _decodeServerTimestamps(previousValue));
+      }
+      return ObjectValue.fromMap(<String, FieldValue>{
+        for (MapEntry<String, FieldValue> entry in fields)
+          entry.key: _decodeServerTimestamps(entry.value),
+      });
+    } else if (value is ArrayValue) {
+      return ArrayValue.fromList(
+          value.internalValue.map(_decodeServerTimestamps).toList());
+    }
+    return value;
+  }
+
   /// Decodes the writes of a persisted batch. Batches written before field transforms were folded
   /// into set/patch writes (`Write.update_transforms`) contain a separate `transform` write after
   /// the set or patch it belongs to. Those are squashed into the preceding write so that the
@@ -216,6 +305,8 @@ class LocalSerializer {
       ..targetId = queryData.targetId
       ..lastListenSequenceNumber = Int64(queryData.sequenceNumber)
       ..snapshotVersion = rpcSerializer.encodeVersion(queryData.snapshotVersion)
+      ..lastLimboFreeSnapshotVersion =
+          rpcSerializer.encodeVersion(queryData.lastLimboFreeSnapshotVersion)
       ..resumeToken = queryData.resumeToken;
 
     final Target target = queryData.target;
@@ -233,6 +324,8 @@ class LocalSerializer {
 
     final SnapshotVersion version =
         rpcSerializer.decodeVersion(target.snapshotVersion);
+    final SnapshotVersion lastLimboFreeSnapshotVersion =
+        rpcSerializer.decodeVersion(target.lastLimboFreeSnapshotVersion);
     final Uint8List resumeToken = Uint8List.fromList(target.resumeToken);
     final int sequenceNumber = target.lastListenSequenceNumber.toInt();
 
@@ -253,6 +346,8 @@ class LocalSerializer {
       QueryPurpose.listen,
       version,
       resumeToken,
+      null,
+      lastLimboFreeSnapshotVersion,
     );
   }
 

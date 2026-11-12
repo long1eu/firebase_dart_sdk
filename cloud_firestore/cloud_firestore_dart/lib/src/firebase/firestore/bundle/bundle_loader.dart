@@ -24,6 +24,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_colle
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 
 /// A class to process the elements from a bundle, load them into local storage and provide progress update while
 /// loading.
@@ -101,7 +102,12 @@ class BundleLoader {
 
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
         await _bundleCallback.applyBundledDocuments(
-            _documents, _bundleMetadata.bundleId);
+            _documents, _bundleMetadata.bundleId,
+            readTimes: <DocumentKey, SnapshotVersion>{
+          for (final MapEntry<DocumentKey, BundledDocumentMetadata> entry
+              in _documentsMetadata.entries)
+            entry.key: entry.value.readTime,
+        });
 
     final Map<String, ImmutableSortedSet<DocumentKey>> queryDocumentMap =
         _getQueryDocumentMapping();

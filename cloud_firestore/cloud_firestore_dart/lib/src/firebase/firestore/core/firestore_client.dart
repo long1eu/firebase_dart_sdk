@@ -31,6 +31,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/memory/memory_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -52,6 +53,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:firebase_app_dart/internal.dart';
+import 'package:grpc/grpc.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// [FirestoreClient] is a top-level class that constructs and owns all of the pieces of the client SDK architecture.
@@ -266,12 +268,12 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<ViewSnapshot> getDocumentsFromLocalCache(Query query) async {
     _verifyNotShutdown();
 
-    final ImmutableSortedMap<DocumentKey, Document> docs =
-        await _enqueue<ImmutableSortedMap<DocumentKey, Document>>(
-            () => localStore.executeQuery(query));
+    final QueryResult queryResult = await _enqueue<QueryResult>(() =>
+        localStore.executeQuery(query, /* usePreviousResults= */ true));
 
-    final View view = View(query, ImmutableSortedSet<DocumentKey>());
-    final ViewDocumentChanges viewDocChanges = view.computeDocChanges(docs);
+    final View view = View(query, queryResult.remoteKeys);
+    final ViewDocumentChanges viewDocChanges =
+        view.computeDocChanges(queryResult.documents);
     return view.applyChanges(viewDocChanges).snapshot!;
   }
 

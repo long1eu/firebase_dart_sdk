@@ -42,4 +42,10 @@ void main() {
       () => testCase.testRemoveNonExistentDocument());
   test('testDocumentsMatchingQuery',
       () => testCase.testDocumentsMatchingQuery());
+  test('testDocumentsMatchingQuerySinceReadTime',
+      () => testCase.testDocumentsMatchingQuerySinceReadTime());
+  test('testDocumentsMatchingUsesReadTimeNotUpdateTime',
+      () => testCase.testDocumentsMatchingUsesReadTimeNotUpdateTime());
+  test('testAddingDocumentWithReadTimeOfZeroFails',
+      () => testCase.testAddingDocumentWithReadTimeOfZeroFails());
 }

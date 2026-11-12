@@ -40,8 +40,8 @@ class _RecordingBundleCallback implements BundleCallback {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyBundledDocuments(
-      ImmutableSortedMap<DocumentKey, MaybeDocument> documents,
-      String bundleId) async {
+      ImmutableSortedMap<DocumentKey, MaybeDocument> documents, String bundleId,
+      {Map<DocumentKey, SnapshotVersion>? readTimes}) async {
     for (final MapEntry<DocumentKey, MaybeDocument> entry in documents) {
       lastDocuments.add(entry.key);
       lastDocumentValues[entry.key] = entry.value;
