@@ -8,6 +8,9 @@ Firestore emulator only. **Nothing was run against production Firestore.**
 
 - Dart 3 (`sdk: ^3.0.0`) with sound null safety; dependencies updated (`grpc`, `protobuf`,
   `rxdart`, `sqlite3`, ...).
+- Read-write transactions no longer fail with "Every document read in a transaction must also be written":
+  documents that were read but not written are sent as `VerifyMutation`s at commit (upstream ef38ef7), so
+  the transaction retries if they changed.
 - Default transaction attempts changed from 6 to 5 (now `TransactionOptions.defaultMaxAttempts`).
 - Idle stream timeout changed from 10 seconds to 1 minute (as Android).
 - `FirebaseApp.setDataCollectionDefaultEnabled` (`firebase_core_vm`) now takes a required

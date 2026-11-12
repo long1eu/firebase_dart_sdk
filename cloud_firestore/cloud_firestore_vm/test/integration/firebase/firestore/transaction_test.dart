@@ -30,24 +30,6 @@ void main() {
     await IntegrationTestUtil.tearDown();
   });
 
-  test('testGetDocuments', () async {
-    final DocumentReference doc = firestore.collection('spaces').document();
-    final Map<String, Object?> value =
-        map(<dynamic>['foo', 1, 'desc', 'Stuff', 'owner', 'Jonny']);
-    await doc.set(value);
-
-    try {
-      await firestore
-          .runTransaction((Transaction transaction) => transaction.get(doc));
-    } on FirestoreError catch (e) {
-      // We currently require every document read to also be written.
-      // TODO(long1eu): Fix this check once we drop that requirement.
-      expect(e.code, FirestoreErrorCode.invalidArgument);
-      expect(e.message,
-          'Every document read in a transaction must also be written.');
-    }
-  });
-
   test('testReadOnlyTransactionReadsWithoutWriting', () async {
     final DocumentReference doc = firestore.collection('spaces').document();
     await doc.set(map(<dynamic>['foo', 1]));
@@ -659,35 +641,28 @@ void main() {
         ]));
   });
 
-  test('testHandleReadingOneDocAndWritingAnother', () async {
+  test('testRetriesWhenDocumentThatWasReadWithoutBeingWrittenChanges',
+      () async {
     final DocumentReference doc1 = firestore.collection('counters').document();
     final DocumentReference doc2 = firestore.collection('counters').document();
+    int attempts = 0;
     await doc1.set(map(<dynamic>['count', 15]));
 
-    try {
-      await firestore.runTransaction<void>((Transaction transaction) async {
-        // Get the first doc.
-        await transaction.get(doc1);
-        // Do a write outside of the transaction. The first time the transaction is tried, this will bump the version,
-        // which will cause the write to doc2 to fail. The second time, it will be a no-op and not bump the version.
-        await doc1.set(map(<dynamic>['count', 1234]));
-        // Now try to update the other doc from within the transaction. This should fail once, because we read 15
-        // earlier.
-        transaction.set(doc2, map(<dynamic>['count', 16]));
-        return null;
-      });
-    } on FirestoreError catch (e) {
-      // We currently require every document read to also be written.
-      // TODO(long1eu): Add this check back once we drop that.
-      // Document snapshot = await doc1.get();
-      // expect(tries.getCount(), 0);
-      // expect(snapshot.getDouble('count'), 1234);
-      // snapshot = await doc2.get();
-      // expect(snapshot.getDouble('count'), 16);
-      expect(e.code, FirestoreErrorCode.invalidArgument);
-      expect(e.message,
-          'Every document read in a transaction must also be written.');
-    }
+    await firestore.runTransaction<void>((Transaction transaction) async {
+      attempts++;
+      // Get the first doc.
+      await transaction.get(doc1);
+      // Do a write outside of the transaction. The first time the transaction is tried, this will bump the version,
+      // which will cause the write to doc2 to fail. The second time, it will be a no-op and not bump the version.
+      await doc1.set(map(<dynamic>['count', 1234]));
+      // Now try to update the other doc from within the transaction. This should fail once, because we read 15
+      // earlier.
+      transaction.set(doc2, map(<dynamic>['count', 16]));
+    });
+    final DocumentSnapshot snapshot = await doc1.get();
+    expect(attempts, 2);
+    expect(snapshot.exists, isTrue);
+    expect(snapshot.data!['count'], 1234);
   });
 
   test('testReadingADocTwiceWithDifferentVersions', () async {
@@ -752,23 +727,6 @@ void main() {
     }
   });
 
-  test('testCannotHaveAGetWithoutMutations', () async {
-    final DocumentReference doc = firestore.collection('foo').document();
-    await doc.set(map(<String>['foo', 'bar']));
-
-    try {
-      await firestore.runTransaction<void>(
-          (Transaction transaction) => transaction.get(doc));
-    } on FirestoreError catch (e) {
-      // We currently require every document read to also be written.
-      // TODO(long1eu): Add this check back once we drop that.
-      // expect(snapshot.getString('foo'), 'bar');
-      expect(e.code, FirestoreErrorCode.invalidArgument);
-      expect(e.message,
-          'Every document read in a transaction must also be written.');
-    }
-  });
-
   test('testDoesNotRetryOnPermanentError', () async {
     final Firestore firestore = await testFirestore();
     int count = 0;
@@ -811,29 +769,6 @@ void main() {
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isFalse);
   });
-  test('testRetriesWhenDocumentThatWasReadWithoutBeingWrittenChanges',
-      () async {
-    final DocumentReference doc1 = firestore.collection('counters').document();
-    final DocumentReference doc2 = firestore.collection('counters').document();
-    int attempts = 0;
-    await doc1.set(map<dynamic>(<dynamic>['count', 15]));
-    await firestore.runTransaction<void>((Transaction transaction) async {
-      attempts++;
-      // Get the first doc.
-      await transaction.get(doc1);
-      // Write outside of the transaction. The first time the transaction runs this bumps the version, which makes the
-      // write to doc2 fail; the second time it is a no-op and does not bump the version.
-      await doc1.set(map<dynamic>(<dynamic>['count', 1234]));
-      // This must fail once, because the transaction read 15 earlier.
-      transaction.set(doc2, map<dynamic>(<dynamic>['count', 16]));
-    });
-    final DocumentSnapshot snapshot = await doc1.get();
-    expect(attempts, 2);
-    expect(snapshot.exists, isTrue);
-    expect(snapshot.data!['count'], 1234);
-  },
-      skip:
-          'Needs upstream ef38ef7 (VerifyMutation for documents that were read but not written, analysis_0.md): core/transaction.dart still fails read-without-write transactions with "Every document read in a transaction must also be written."');
 
   test('testCanHaveGetsWithoutMutations', () async {
     final DocumentReference doc = firestore.collection('foo').document();
@@ -847,9 +782,7 @@ void main() {
     final DocumentSnapshot snapshot = await doc.get();
     expect(snapshot.exists, isTrue);
     expect(snapshot.data, map<String>(<String>['foo', 'bar']));
-  },
-      skip:
-          'Needs upstream ef38ef7 (VerifyMutation for documents that were read but not written, analysis_0.md): core/transaction.dart still fails read-without-write transactions with "Every document read in a transaction must also be written."');
+  });
 
   test('testTransactionOptionsZeroMaxAttemptsThrows', () {
     expect(() => TransactionOptions(maxAttempts: 0), throwsArgumentError);

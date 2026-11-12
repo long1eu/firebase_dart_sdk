@@ -22,6 +22,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_m
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/verify_mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_converter.dart';
 import 'package:test/test.dart';
@@ -171,23 +172,40 @@ void main() {
     expect(client.committed[2].precondition, Precondition.none);
   });
 
-  test('every document that was read must be written', () async {
+  test('documents that were read but not written are verified at commit',
+      () async {
     final _FakeTransactionClient client =
         _FakeTransactionClient(<MaybeDocument>[
       doc('foo/bar', 7, map(<String>['a', 'b']))
     ]);
     final Transaction tx = Transaction(client);
     await tx.lookup(<DocumentKey>[docKey]);
+    await tx.commit();
 
-    await expectLater(
-        tx.commit(),
-        throwsA(firestoreError(FirestoreErrorCode.invalidArgument,
-            'Every document read in a transaction must also be written')));
-    expect(client.commits, 0);
-    expect(tx.committed, isFalse);
+    expect(client.commits, 1);
+    expect(tx.committed, isTrue);
+    expect(client.committed.single, isA<VerifyMutation>());
+    expect(client.committed.single.key, docKey);
+    expect(
+        client.committed.single.precondition, Precondition(updateTime: version(7)));
   });
 
-  test('reading and writing different documents is rejected', () async {
+  test('a document read that does not exist is verified with exists: false',
+      () async {
+    final _FakeTransactionClient client =
+        _FakeTransactionClient(<MaybeDocument>[
+      NoDocument(docKey, version(0), hasCommittedMutations: false)
+    ]);
+    final Transaction tx = Transaction(client);
+    await tx.lookup(<DocumentKey>[docKey]);
+    await tx.commit();
+
+    expect(client.committed.single, isA<VerifyMutation>());
+    expect(client.committed.single.precondition, Precondition(exists: false));
+  });
+
+  test('reading one document and writing another verifies the one read',
+      () async {
     final _FakeTransactionClient client =
         _FakeTransactionClient(<MaybeDocument>[
       doc('foo/bar', 7, map(<String>['a', 'b']))
@@ -195,9 +213,28 @@ void main() {
     final Transaction tx = Transaction(client);
     await tx.lookup(<DocumentKey>[docKey]);
     tx.set(key('foo/other'), converter.parseSetData(<String, Object?>{'a': 1}));
+    await tx.commit();
 
-    await expectLater(tx.commit(),
-        throwsA(firestoreError(FirestoreErrorCode.invalidArgument)));
+    expect(client.committed.length, 2);
+    expect(client.committed[0], isA<SetMutation>());
+    expect(client.committed[0].key, key('foo/other'));
+    expect(client.committed[1], isA<VerifyMutation>());
+    expect(client.committed[1].key, docKey);
+    expect(
+        client.committed[1].precondition, Precondition(updateTime: version(7)));
+  });
+
+  test('a document that was read and written is not also verified', () async {
+    final _FakeTransactionClient client =
+        _FakeTransactionClient(<MaybeDocument>[
+      doc('foo/bar', 7, map(<String>['a', 'b']))
+    ]);
+    final Transaction tx = Transaction(client);
+    await tx.lookup(<DocumentKey>[docKey]);
+    tx.delete(docKey);
+    await tx.commit();
+
+    expect(client.committed.single, isA<DeleteMutation>());
   });
 
   test('lookups after writes are rejected', () async {

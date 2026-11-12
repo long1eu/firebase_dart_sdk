@@ -114,10 +114,9 @@ class Transaction {
     for (Mutation mutation in mutations) {
       unwritten.remove(mutation.key);
     }
-    if (unwritten.isNotEmpty) {
-      return Future<void>.error(FirestoreError(
-          'Every document read in a transaction must also be written.',
-          FirestoreErrorCode.invalidArgument));
+    // For each document that was read but not written, verify that its version is unchanged.
+    for (DocumentKey key in unwritten) {
+      mutations.add(VerifyMutation(key, _precondition(key)));
     }
     committed = true;
 
