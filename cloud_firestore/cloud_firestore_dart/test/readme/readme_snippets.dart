@@ -64,8 +64,8 @@ Future<void> rootReadmeLine11() async {
       .listen((snapshot) => print(snapshot.docs.length));
 }
 
-// README.md:78
-Future<void> firestoreReadmeLine78() async {
+// README.md:84
+Future<void> firestoreReadmeLine84() async {
   // `app` is a FirebaseApp created with firebase_app_dart.
   final firestore = await Firestore.instanceFor(app: app);
   final users = firestore.collection('users');
@@ -73,16 +73,16 @@ Future<void> firestoreReadmeLine78() async {
   final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
 }
 
-// README.md:94
-Future<void> firestoreReadmeLine94() async {
+// README.md:100
+Future<void> firestoreReadmeLine100() async {
   final firestore = await Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
   );
 }
 
-// README.md:111
-Future<void> firestoreReadmeLine111() async {
+// README.md:117
+Future<void> firestoreReadmeLine117() async {
   final count = await users.count().get();                 // AggregateQuerySnapshot
   final agg = await users.aggregate([
     AggregateField.sum('age'),
@@ -101,8 +101,8 @@ Future<void> firestoreReadmeLine111() async {
       .get();
 }
 
-// README.md:133
-Future<void> firestoreReadmeLine133() async {
+// README.md:139
+Future<void> firestoreReadmeLine139() async {
   final converter = FirestoreDataConverter<City>.from(
     fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
     toFirestore: (city, options) => city.toMap(),
@@ -116,8 +116,8 @@ Future<void> firestoreReadmeLine133() async {
   final raw = cities.withoutConverter();                              // back to Map<String, Object?>
 }
 
-// README.md:164
-Future<void> firestoreReadmeLine164() async {
+// README.md:170
+Future<void> firestoreReadmeLine170() async {
   final settings = FirestoreSettings(
       cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024));
   final task = firestore.loadBundle(bundleBytes);          // LoadBundleTask
@@ -129,8 +129,8 @@ Future<void> firestoreReadmeLine164() async {
   await firestore.terminate();
 }
 
-// README.md:196
-Future<void> firestoreReadmeLine196() async {
+// README.md:202
+Future<void> firestoreReadmeLine202() async {
   final PipelineSnapshot snapshot = await firestore
       .pipeline()
       .collection('books')

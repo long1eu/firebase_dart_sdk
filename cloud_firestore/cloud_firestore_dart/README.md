@@ -39,9 +39,15 @@ supply, for example with `package:sqlite3`). Targets Dart `^3.0.0`. Developed an
 macOS; Linux and Windows are expected to work but are not tested. Flutter apps (Android, iOS,
 desktop) can use it as a plain Dart package.
 
-Web is not supported yet: the transport uses native gRPC over HTTP/2 from `dart:io`, which
-browsers do not offer. Web support is planned and needs a different transport (gRPC-Web or
-the REST/WebChannel protocol).
+Web support is experimental. Browsers have no sockets, so there the client talks to
+Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChannel for the
+listen and write streams, over `fetch`. What to know:
+
+- The cache is in memory only on the web (no SQLite persistence there yet).
+- It was verified against the emulator only, in Chrome, with a small smoke test
+  (`dart test -p chrome -c dart2wasm test/browser`). Other browsers and the production
+  backend are untested.
+- Prefer dart2wasm. Compiled to JavaScript, integers above 2^53 lose precision.
 
 ## Features
 

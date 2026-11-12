@@ -19,6 +19,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart'
+    show Datastore;
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_channel_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
@@ -28,6 +32,7 @@ import 'package:rxdart/subjects.dart';
 import 'package:test/test.dart';
 
 import '../unit/firebase/firestore/local/mock/database_mock.dart';
+import 'io_web_http_client.dart';
 import 'prod_provider/firestore_provider.dart';
 import 'test_backend.dart';
 
@@ -98,9 +103,23 @@ class IntegrationTestUtil {
   static final ApplicationDefaultTokenSource _realProjectTokens =
       ApplicationDefaultTokenSource();
 
+  /// With `FIRESTORE_TEST_TRANSPORT=webchannel` every client of the test run
+  /// uses the web transport (REST and WebChannel, over `dart:io` HTTP) instead
+  /// of gRPC. Returns whether it is in use.
+  static bool useWebTransportIfRequested() {
+    if (Platform.environment['FIRESTORE_TEST_TRANSPORT'] != 'webchannel') {
+      return false;
+    }
+    Datastore.transportOverride =
+        (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
+            WebChannelTransport(IoWebHttpClient(), databaseInfo, options);
+    return true;
+  }
+
   /// The emulator the low-level tests talk to: the one of
   /// `FIRESTORE_EMULATOR_HOST`, or 127.0.0.1:8080 when it is not set.
   static DatabaseInfo testEnvDatabaseInfo() {
+    useWebTransportIfRequested();
     final String? emulator = emulatorHost;
     final EmulatorAddress address = emulator == null
         ? const EmulatorAddress('127.0.0.1', 8080)
@@ -206,6 +225,7 @@ class IntegrationTestUtil {
 
     final BehaviorSubject<bool> onNetworkConnected =
         BehaviorSubject<bool>.seeded(true);
+    useWebTransportIfRequested();
     final FirestoreClient client = await FirestoreClient.initialize(
       databaseInfo,
       settings,

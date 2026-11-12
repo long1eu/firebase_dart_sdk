@@ -9,6 +9,9 @@ version 0.0.4); it is the same code base, revived as part of the Firestore port.
 - `_firebase_internal_vm` is folded into this package. Its utilities are reachable through
   `package:firebase_app_dart/internal.dart`, which exists for `cloud_firestore_dart` and is
   **not public API**.
+- `FirebaseApp.withOptions` no longer throws `UnimplementedError` on the web, so that
+  `cloud_firestore_dart` can run there. Only creating an app and using it with Firestore was
+  tried in a browser (Chrome).
 - Migrated to Dart 3 (`sdk: ^3.0.0`) with sound null safety.
 - Breaking: `FirebaseApp.setDataCollectionDefaultEnabled` takes a required named `enabled`;
   `persistenceKey` uses URL-safe base64 without padding.

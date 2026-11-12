@@ -29,10 +29,6 @@ class FirebaseApp with _PlatformDependenciesMixin {
     PlatformDependencies? dependencies,
     String name = defaultAppName,
   }) {
-    if (isWeb) {
-      throw UnimplementedError(
-          'This library doesn\'t work on the web. Try the official Firebase Web SDK.');
-    }
     final String normalizedName = _normalize(name);
 
     Preconditions.checkState(!_instances.containsKey(normalizedName),

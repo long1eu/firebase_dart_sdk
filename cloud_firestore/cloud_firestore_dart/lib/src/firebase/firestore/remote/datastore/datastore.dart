@@ -80,12 +80,19 @@ class Datastore {
     );
     final FirestoreTransport transport = transportFactory != null
         ? transportFactory(optionsProvider)
-        : createTransport(databaseInfo, optionsProvider);
+        : (transportOverride ?? createTransport)(databaseInfo, optionsProvider);
     final FirestoreClient client = FirestoreClient(transport, optionsProvider);
     final RemoteSerializer serializer =
         RemoteSerializer(databaseInfo.databaseId);
     return Datastore.test(scheduler, databaseInfo, serializer, client);
   }
+
+  /// Replaces the transport of the platform for every [Datastore] created
+  /// afterwards, so that tests can run a whole client over another transport.
+  @visibleForTesting
+  static FirestoreTransport Function(
+          DatabaseInfo databaseInfo, ChannelOptionsProvider options)?
+      transportOverride;
 
   @visibleForTesting
   Datastore.test(

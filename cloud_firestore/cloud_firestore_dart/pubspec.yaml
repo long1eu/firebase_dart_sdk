@@ -12,12 +12,14 @@ topics:
   - database
   - offline
 
-# Not web: the Firestore transport uses native gRPC over HTTP/2 (dart:io).
+# The VM uses native gRPC over HTTP/2 (dart:io). The web uses REST and
+# WebChannel over fetch, with a memory cache only; it is experimental.
 platforms:
   android:
   ios:
   linux:
   macos:
+  web:
   windows:
 
 environment:
@@ -38,6 +40,7 @@ dependencies:
   protobuf: ^3.1.0
   rxdart: ^0.28.0
   semaphore: ^1.0.1
+  web: ^1.1.0
 
 dev_dependencies:
   mockito: ^5.4.0

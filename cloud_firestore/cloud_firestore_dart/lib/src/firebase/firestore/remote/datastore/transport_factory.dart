@@ -3,4 +3,6 @@
 library;
 
 export 'transport_factory_unsupported.dart'
-    if (dart.library.io) 'grpc_transport.dart' show createTransport;
+    if (dart.library.io) 'grpc_transport.dart'
+    if (dart.library.js_interop) 'web/web_transport_factory.dart'
+    show createTransport;

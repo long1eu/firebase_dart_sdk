@@ -83,6 +83,19 @@ only. **Nothing was run against production Firestore.**
   `toArrayExpression`, `toScalarExpression`), lambda functions (`arrayFilter`,
   `arrayTransform`), `switchOn`, `nor`, and explain options (not verified against a backend).
 
+- **Experimental web support.** Where `dart:io` is missing (browsers) the client uses a second
+  network transport, picked by a conditional import: REST/JSON for `Commit`,
+  `BatchGetDocuments`, `RunQuery`, `RunAggregationQuery` and `ExecutePipeline`, and a
+  WebChannel client for the `Listen` and `Write` streams, over `fetch` (`package:web`, a new
+  dependency). This is what the JS SDK does; neither the backend nor the emulator accept
+  gRPC-Web. The VM keeps using gRPC. Limits:
+  - The cache is in memory only on the web; there is no SQLite persistence there yet.
+  - Verified against the emulator only: on the VM (the integration tests can run over the web
+    transport with `FIRESTORE_TEST_TRANSPORT=webchannel`) and in Chrome with a small smoke test
+    (`dart test -p chrome -c dart2wasm test/browser`, also passing with `-c dart2js`). No other
+    browser and no production backend was tried.
+  - Compile with dart2wasm to keep 64 bit integers exact. Compiled with dart2js, integers
+    above 2^53 lose precision.
 - BSON value types for Enterprise edition databases: `MinKey`, `MaxKey`, `Int32Value`,
   `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue`, and BSON binary data as a
   `Blob` with a subtype (`Blob.bsonBinary`, `Blob.subtype`). They can be written, read (with
