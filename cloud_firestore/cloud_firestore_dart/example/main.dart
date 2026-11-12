@@ -15,18 +15,21 @@ Future<void> main() async {
   // offline_persistence.dart for a cache on disk.
   final Firestore firestore = await connect();
 
-  final CollectionReference<Map<String, Object?>> users =
-      firestore.collection(scratch('users'));
+  final CollectionReference<Map<String, Object?>> users = firestore.collection(
+    scratch('users'),
+  );
 
   await users.doc('ada').set(<String, Object?>{'name': 'Ada', 'age': 36});
   await users.doc('alan').set(<String, Object?>{'name': 'Alan', 'age': 41});
 
-  final DocumentSnapshot<Map<String, Object?>> ada =
-      await users.doc('ada').get();
+  final DocumentSnapshot<Map<String, Object?>> ada = await users
+      .doc('ada')
+      .get();
   print('ada: ${ada.data}');
 
-  final QuerySnapshot<Map<String, Object?>> older =
-      await users.where('age', isGreaterThan: 40).get();
+  final QuerySnapshot<Map<String, Object?>> older = await users
+      .where('age', isGreaterThan: 40)
+      .get();
   for (final QueryDocumentSnapshot<Map<String, Object?>> doc in older.docs) {
     print('older than 40: ${doc.id} ${doc.data}');
   }

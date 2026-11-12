@@ -4,6 +4,10 @@ First release under the new name. This package was published as `cloud_firestore
 version 0.0.7, April 2020); it is the same code base, revived and brought forward to roughly
 the behaviour of the current Android and JS SDKs. One entry covers the whole revival.
 
+The published package contains `lib/` and `example/`. Tests, tooling and design notes (the
+`test/`, `tool/` and `docs/` paths mentioned below) are in the
+[repository](https://github.com/long1eu/firebase_dart_sdk).
+
 How this was verified:
 
 - Unit tests, the spec tests shared with the JS and Android SDKs, and integration tests against

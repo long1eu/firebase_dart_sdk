@@ -19,21 +19,26 @@ Future<void> main() async {
   final String? emulator =
       Platform.environment['FIRESTORE_ENTERPRISE_EMULATOR_HOST'];
   if (emulator == null || emulator.isEmpty) {
-    print('Skipped: pipelines need an Enterprise edition database. Start an '
-        'Enterprise edition emulator and set '
-        'FIRESTORE_ENTERPRISE_EMULATOR_HOST (host:port) to run this example.');
+    print(
+      'Skipped: pipelines need an Enterprise edition database. Start an '
+      'Enterprise edition emulator and set '
+      'FIRESTORE_ENTERPRISE_EMULATOR_HOST (host:port) to run this example.',
+    );
     return;
   }
   final int colon = emulator.lastIndexOf(':');
   final Firestore firestore = await Firestore.instanceFor(
     app: exampleApp(),
     settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings())
-        .withEmulator(emulator.substring(0, colon),
-            int.parse(emulator.substring(colon + 1))),
+        .withEmulator(
+          emulator.substring(0, colon),
+          int.parse(emulator.substring(colon + 1)),
+        ),
   );
 
-  final CollectionReference<Map<String, Object?>> books =
-      firestore.collection(scratch('books'));
+  final CollectionReference<Map<String, Object?>> books = firestore.collection(
+    scratch('books'),
+  );
   final WriteBatch batch = firestore.batch();
   <String, Map<String, Object?>>{
     'dune': {
@@ -74,14 +79,18 @@ Future<void> main() async {
   PipelineSnapshot snapshot = await firestore
       .pipeline()
       .collection(books)
-      .where(field('rating')
-          .greaterThan(4.4)
-          .and(field('published').greaterThan(1900)))
-      .sort([field('rating').descending()]).select([
-    'title',
-    field('title').charLength().as('titleLength'),
-    field('tags').arrayLength().as('tagCount'),
-  ]).execute();
+      .where(
+        field(
+          'rating',
+        ).greaterThan(4.4).and(field('published').greaterThan(1900)),
+      )
+      .sort([field('rating').descending()])
+      .select([
+        'title',
+        field('title').charLength().as('titleLength'),
+        field('tags').arrayLength().as('tagCount'),
+      ])
+      .execute();
   for (final PipelineResult result in snapshot.results) {
     print('well rated: ${result.data()}');
   }
@@ -92,17 +101,26 @@ Future<void> main() async {
       .collection(books)
       .where(field('tags').arrayContains('space'))
       .execute();
-  print('about space: ${snapshot.results.single.id} '
-      '(${snapshot.results.single.ref!.path == books.doc('hitchhiker').path})');
+  print(
+    'about space: ${snapshot.results.single.id} '
+    '(${snapshot.results.single.ref!.path == books.doc('hitchhiker').path})',
+  );
 
   // Grouped aggregation: one row per genre.
-  snapshot = await firestore.pipeline().collection(books).aggregate(
-    [countAll().as('books'), field('rating').average().as('rating')],
-    groups: ['genre'],
-  ).sort([field('genre').ascending()]).execute();
+  snapshot = await firestore
+      .pipeline()
+      .collection(books)
+      .aggregate(
+        [countAll().as('books'), field('rating').average().as('rating')],
+        groups: ['genre'],
+      )
+      .sort([field('genre').ascending()])
+      .execute();
   for (final PipelineResult result in snapshot.results) {
-    print('${result.get('genre')}: ${result.get('books')} book(s), '
-        'average ${(result.get('rating')! as double).toStringAsFixed(2)}');
+    print(
+      '${result.get('genre')}: ${result.get('books')} book(s), '
+      'average ${(result.get('rating')! as double).toStringAsFixed(2)}',
+    );
   }
 
   // One row per array element, and a lambda over an array.
@@ -111,8 +129,11 @@ Future<void> main() async {
       .collection(books)
       .where(field('title').equal('Dune'))
       .select([
-    field('tags').arrayTransform((Expression tag) => tag.toUpper()).as('tags'),
-  ]).execute();
+        field(
+          'tags',
+        ).arrayTransform((Expression tag) => tag.toUpper()).as('tags'),
+      ])
+      .execute();
   print('upper case tags: ${snapshot.results.single.get('tags')}');
 
   // An existing query can be converted; it returns the same documents.
@@ -120,24 +141,30 @@ Future<void> main() async {
       .where('genre', isEqualTo: 'Science Fiction')
       .orderBy('published', Direction.descending);
   snapshot = await firestore.pipeline().createFrom(query).execute();
-  print('query: ${[for (final doc in (await query.get()).docs) doc.id]}, '
-      'pipeline: ${[for (final result in snapshot.results) result.id]}');
+  print(
+    'query: ${[for (final doc in (await query.get()).docs) doc.id]}, '
+    'pipeline: ${[for (final result in snapshot.results) result.id]}',
+  );
 
   // A subquery: for every genre, the titles of its books.
   snapshot = await firestore
       .pipeline()
       .collection(books)
-      .distinct(['genre']).define([field('genre').as('genre')]).select([
-    'genre',
-    firestore
-        .pipeline()
-        .collection(books)
-        .where(field('genre').equal(variable('genre')))
-        .sort([field('title').ascending()])
-        .select(['title'])
-        .toArrayExpression()
-        .as('titles'),
-  ]).sort([field('genre').ascending()]).execute();
+      .distinct(['genre'])
+      .define([field('genre').as('genre')])
+      .select([
+        'genre',
+        firestore
+            .pipeline()
+            .collection(books)
+            .where(field('genre').equal(variable('genre')))
+            .sort([field('title').ascending()])
+            .select(['title'])
+            .toArrayExpression()
+            .as('titles'),
+      ])
+      .sort([field('genre').ascending()])
+      .execute();
   for (final PipelineResult result in snapshot.results) {
     print('${result.get('genre')}: ${result.get('titles')}');
   }
@@ -148,10 +175,11 @@ Future<void> main() async {
       .pipeline()
       .collection(books)
       .where(field('published').lessThan(1900))
-      .update(transformedFields: [constant(true).as('classic')]).execute(
-          atomic: true);
+      .update(transformedFields: [constant(true).as('classic')])
+      .execute(atomic: true);
   print(
-      'marked as classic: ${snapshot.results.single.get('documents_modified')}');
+    'marked as classic: ${snapshot.results.single.get('documents_modified')}',
+  );
 
   await firestore.terminate();
 }

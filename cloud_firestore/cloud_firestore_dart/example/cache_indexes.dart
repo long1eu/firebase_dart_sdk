@@ -17,8 +17,9 @@ import 'common.dart';
 import 'sqlite_database.dart';
 
 Future<void> main() async {
-  final Directory directory =
-      Directory.systemTemp.createTempSync('firestore_example_');
+  final Directory directory = Directory.systemTemp.createTempSync(
+    'firestore_example_',
+  );
 
   final Firestore firestore = await Firestore.instanceFor(
     app: exampleApp(),
@@ -37,8 +38,9 @@ Future<void> main() async {
   await indexes.enableIndexAutoCreation();
 
   // 150 cities, 5 of them in the country we will ask for.
-  final CollectionReference<Map<String, Object?>> cities =
-      firestore.collection(scratch('cities'));
+  final CollectionReference<Map<String, Object?>> cities = firestore.collection(
+    scratch('cities'),
+  );
   final WriteBatch batch = firestore.batch();
   for (int i = 0; i < 150; i++) {
     batch.set(cities.doc('city$i'), <String, Object?>{
@@ -51,13 +53,15 @@ Future<void> main() async {
   // backend has them.
   await cities.get(Source.server);
 
-  final Query<Map<String, Object?>> romanian =
-      cities.whereEqualTo('country', 'RO').orderBy('population');
+  final Query<Map<String, Object?>> romanian = cities
+      .whereEqualTo('country', 'RO')
+      .orderBy('population');
 
   // The first cache query scans the 150 cached documents; the SDK notices
   // that an index would help and creates one.
-  QuerySnapshot<Map<String, Object?>> snapshot =
-      await romanian.get(Source.cache);
+  QuerySnapshot<Map<String, Object?>> snapshot = await romanian.get(
+    Source.cache,
+  );
   print('first run: ${snapshot.docs.length} cities (collection scan)');
 
   // The index is filled in the background, 50 documents per run: a first run
@@ -65,8 +69,10 @@ Future<void> main() async {
   // the index as far as it is filled and read the rest of the collection, so
   // the result is the same at every moment.
   snapshot = await romanian.get(Source.cache);
-  print('second run: ${snapshot.docs.length} cities '
-      '(index, plus the documents that are not indexed yet)');
+  print(
+    'second run: ${snapshot.docs.length} cities '
+    '(index, plus the documents that are not indexed yet)',
+  );
 
   // Stop creating new indexes; the ones that exist keep being used.
   await indexes.disableIndexAutoCreation();

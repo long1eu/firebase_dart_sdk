@@ -26,20 +26,23 @@ Future<void> main() async {
     app: exampleApp('alice'),
     settings: FirestoreSettings(cacheSettings: const MemoryCacheSettings())
         .withEmulator(
-      host,
-      port,
-      mockUserToken: <String, Object?>{
-        'sub': 'alice',
-        'email': 'alice@example.com',
-        'admin': true,
-      },
-    ),
+          host,
+          port,
+          mockUserToken: <String, Object?>{
+            'sub': 'alice',
+            'email': 'alice@example.com',
+            'admin': true,
+          },
+        ),
   );
-  print('connected to ${asAlice.projectId} / ${asAlice.databaseName} '
-      'on $host:$port');
+  print(
+    'connected to ${asAlice.projectId} / ${asAlice.databaseName} '
+    'on $host:$port',
+  );
 
-  final DocumentReference<Map<String, Object?>> profile =
-      asAlice.doc('${scratch('profiles')}/alice');
+  final DocumentReference<Map<String, Object?>> profile = asAlice.doc(
+    '${scratch('profiles')}/alice',
+  );
   await profile.set(<String, Object?>{'displayName': 'Alice'});
   print('alice wrote: ${(await profile.get(Source.server)).data}');
 

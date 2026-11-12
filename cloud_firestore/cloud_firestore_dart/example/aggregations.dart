@@ -9,8 +9,9 @@ import 'common.dart';
 
 Future<void> main() async {
   final Firestore firestore = await connect();
-  final CollectionReference<Map<String, Object?>> orders =
-      firestore.collection(scratch('orders'));
+  final CollectionReference<Map<String, Object?>> orders = firestore.collection(
+    scratch('orders'),
+  );
 
   final WriteBatch batch = firestore.batch();
   for (final (String customer, int total) in <(String, int)>[
@@ -35,17 +36,20 @@ Future<void> main() async {
   final AggregateField average = AggregateField.average('total');
   final AggregateQuerySnapshot totals = await orders
       .where('customer', isEqualTo: 'ada')
-      .aggregate(<AggregateField>[AggregateField.count(), sum, average]).get();
-  print('ada: ${totals.getCount()} orders, sum ${totals.getInt(sum)}, '
-      'average ${totals.getDouble(average)}');
+      .aggregate(<AggregateField>[AggregateField.count(), sum, average])
+      .get();
+  print(
+    'ada: ${totals.getCount()} orders, sum ${totals.getInt(sum)}, '
+    'average ${totals.getDouble(average)}',
+  );
 
   // With aliases the result is a map keyed by the names you chose.
   final AggregateQuerySnapshot named =
       await orders.aggregateWithAliases(<String, AggregateField>{
-    'revenue': AggregateField.sum('total'),
-    'orders': AggregateField.count(),
-    'averageOrder': AggregateField.average('total'),
-  }).get();
+        'revenue': AggregateField.sum('total'),
+        'orders': AggregateField.count(),
+        'averageOrder': AggregateField.average('total'),
+      }).get();
   print('all: ${named.data()}');
 
   await firestore.terminate();

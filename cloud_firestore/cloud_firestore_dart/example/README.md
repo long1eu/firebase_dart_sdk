@@ -28,6 +28,7 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/main.dart
 project and emulator settings). Every example ends with `firestore.terminate()`; without it
 the open gRPC channel keeps the process alive.
 
+In the [repository](https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart),
 `test/integration/firebase/firestore/examples_smoke_test.dart` runs all of them against the
 emulator. `test/integration_enterprise/examples_enterprise_smoke_test.dart` runs
 `pipelines.dart` against the Enterprise edition emulator.

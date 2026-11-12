@@ -21,6 +21,6 @@ res/
 firebase.json
 firestore.rules
 
-# Large test fixtures (spec JSON ~7.8 MB, bloom filter goldens ~0.7 MB). Test
-# sources are published; the tests that read these fixtures need a checkout.
-test/res/
+# Tests are not published: a dependency does not need them, they are most of the archive, and
+# they need the repository anyway (fixtures in test/res, scripts in tool/, the emulators).
+test/

@@ -113,7 +113,8 @@ final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
 
 (Filters are the Java-style `whereEqualTo`, `whereGreaterThan`, ... family, plus
 `where('age', isGreaterThanOrEqualTo: 18)` with named arguments and `where(Filter)`. See
-`example/` and `test/integration/` for working calls of every feature below.)
+`example/` and, in the repository,
+[`test/integration/`](https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart/test/integration) for working calls of every feature below.)
 
 Emulator (the settings must be passed when the instance is created):
 
@@ -463,8 +464,11 @@ are listed in `docs/ARCHITECTURE.md` in the repository.
 
 ## Testing
 
-Run everything from this directory. The scripts are in `tool/` at the repository root (see
-`tool/README.md`).
+The tests are not part of the published package: every `test/`, `tool/` and `docs/` path in
+this README refers to a checkout of the
+[repository](https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart) (`tool/` and `docs/` are at its
+root). Run everything from this directory of the checkout. The scripts are in `tool/` at the
+repository root (see `tool/README.md`).
 
 | Tests | Command | Backend |
 | --- | --- | --- |

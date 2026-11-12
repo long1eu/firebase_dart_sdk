@@ -42,7 +42,8 @@ List<int> buildBundle() {
     for (final String element in elements)
       '${utf8.encode(element).length}$element',
   ].join();
-  final String metadata = '{"metadata":{"id":"example-bundle",'
+  final String metadata =
+      '{"metadata":{"id":"example-bundle",'
       '"createTime":{"seconds":1001,"nanos":0},"version":1,'
       '"totalDocuments":2,"totalBytes":${utf8.encode(body).length}}}';
   return utf8.encode('${utf8.encode(metadata).length}$metadata$body');
@@ -55,23 +56,30 @@ Future<void> main() async {
   // (for example the body of an HTTP response).
   final LoadBundleTask task = firestore.loadBundle(buildBundle());
   task.stream.listen((LoadBundleTaskProgress progress) {
-    print('progress: ${progress.taskState.name} '
-        '${progress.documentsLoaded}/${progress.totalDocuments} documents');
+    print(
+      'progress: ${progress.taskState.name} '
+      '${progress.documentsLoaded}/${progress.totalDocuments} documents',
+    );
   });
   final LoadBundleTaskProgress result = await task.future;
-  print('loaded ${result.documentsLoaded} documents, '
-      '${result.bytesLoaded} bytes');
+  print(
+    'loaded ${result.documentsLoaded} documents, '
+    '${result.bytesLoaded} bytes',
+  );
 
   // The documents are now in the cache.
-  final QuerySnapshot<Map<String, Object?>> cached =
-      await firestore.collection('bundled-stories').get(Source.cache);
+  final QuerySnapshot<Map<String, Object?>> cached = await firestore
+      .collection('bundled-stories')
+      .get(Source.cache);
   print('cached: ${<Object?>[for (final doc in cached.docs) doc['title']]}');
 
   // A named query is a query the server stored in the bundle with its result.
-  final Query<Map<String, Object?>>? latest =
-      await firestore.getNamedQuery('latest-stories');
-  final QuerySnapshot<Map<String, Object?>> latestStories =
-      await latest!.get(Source.cache);
+  final Query<Map<String, Object?>>? latest = await firestore.getNamedQuery(
+    'latest-stories',
+  );
+  final QuerySnapshot<Map<String, Object?>> latestStories = await latest!.get(
+    Source.cache,
+  );
   print('latest: ${latestStories.docs.single['title']}');
 
   await firestore.terminate();

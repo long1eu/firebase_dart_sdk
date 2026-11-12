@@ -32,8 +32,10 @@ OpenDatabase sqliteOpener(Directory directory) {
     final bool isNew = !file.existsSync();
     file.parent.createSync(recursive: true);
 
-    final SqliteDatabase db =
-        SqliteDatabase._(sqlite.sqlite3.open(file.path), file.path);
+    final SqliteDatabase db = SqliteDatabase._(
+      sqlite.sqlite3.open(file.path),
+      file.path,
+    );
     try {
       // The callbacks run Firestore's schema setup and migrations. They must
       // be called in this order and awaited before the database is returned.
@@ -79,10 +81,14 @@ class SqliteDatabase implements Database {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> query(String statement,
-      [List<Object?>? arguments]) async {
-    final sqlite.ResultSet rows =
-        _database.select(statement, arguments ?? const <Object?>[]);
+  Future<List<Map<String, dynamic>>> query(
+    String statement, [
+    List<Object?>? arguments,
+  ]) async {
+    final sqlite.ResultSet rows = _database.select(
+      statement,
+      arguments ?? const <Object?>[],
+    );
     return <Map<String, dynamic>>[
       for (final sqlite.Row row in rows) Map<String, dynamic>.of(row),
     ];

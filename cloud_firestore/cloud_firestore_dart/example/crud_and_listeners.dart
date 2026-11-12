@@ -10,18 +10,19 @@ import 'common.dart';
 
 Future<void> main() async {
   final Firestore firestore = await connect();
-  final CollectionReference<Map<String, Object?>> cities =
-      firestore.collection(scratch('cities'));
+  final CollectionReference<Map<String, Object?>> cities = firestore.collection(
+    scratch('cities'),
+  );
 
   // A listener gets the current result first and then every change. Local
   // writes are delivered immediately with `hasPendingWrites: true`.
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
       cities.snapshots.listen((QuerySnapshot<Map<String, Object?>> snapshot) {
-    for (final DocumentChange<Map<String, Object?>> change
-        in snapshot.docChanges) {
-      print('listener: ${change.type.name} ${change.document.id}');
-    }
-  });
+        for (final DocumentChange<Map<String, Object?>> change
+            in snapshot.docChanges) {
+          print('listener: ${change.type.name} ${change.document.id}');
+        }
+      });
 
   // Create: `set` with an id of your choice, or `add` for a generated id.
   final DocumentReference<Map<String, Object?>> rome = cities.doc('rome');
@@ -31,14 +32,17 @@ Future<void> main() async {
     'tags': <String>['capital'],
     'updatedAt': FieldValue.serverTimestamp(),
   });
-  final DocumentReference<Map<String, Object?>> generated =
-      await cities.add(<String, Object?>{'name': 'Paris'});
+  final DocumentReference<Map<String, Object?>> generated = await cities.add(
+    <String, Object?>{'name': 'Paris'},
+  );
   print('generated id has ${generated.id.length} characters');
 
   // Read.
   final DocumentSnapshot<Map<String, Object?>> snapshot = await rome.get();
-  print('exists: ${snapshot.exists}, name: ${snapshot.getString('name')}, '
-      'population: ${snapshot['population']}');
+  print(
+    'exists: ${snapshot.exists}, name: ${snapshot.getString('name')}, '
+    'population: ${snapshot['population']}',
+  );
 
   // Update: only the given fields change. Field transforms run on the server.
   await rome.update(<String, Object?>{
@@ -47,20 +51,17 @@ Future<void> main() async {
   });
 
   // `set` with merge creates the document or merges into the existing one.
-  await rome.set(
-    <String, Object?>{
-      'geo': const GeoPoint(41.9, 12.5),
-    },
-    SetOptions.mergeAllFields,
-  );
+  await rome.set(<String, Object?>{
+    'geo': const GeoPoint(41.9, 12.5),
+  }, SetOptions.mergeAllFields);
   print('after update: ${(await rome.get()).data?['tags']}');
 
   // Listen to one document, including metadata-only changes.
   final Completer<void> sawServerData = Completer<void>();
   final StreamSubscription<DocumentSnapshot<Map<String, Object?>>>
-      documentSubscription = rome
-          .getSnapshots(MetadataChanges.include)
-          .listen((DocumentSnapshot<Map<String, Object?>> doc) {
+  documentSubscription = rome.getSnapshots(MetadataChanges.include).listen((
+    DocumentSnapshot<Map<String, Object?>> doc,
+  ) {
     if (!doc.metadata.hasPendingWrites &&
         !doc.metadata.isFromCache &&
         !sawServerData.isCompleted) {

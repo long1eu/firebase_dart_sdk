@@ -17,8 +17,9 @@ Future<void> main() async {
   // instances.
   Firestore.setLogLevel(LogLevel.silent);
 
-  final Directory directory =
-      Directory.systemTemp.createTempSync('firestore_example_');
+  final Directory directory = Directory.systemTemp.createTempSync(
+    'firestore_example_',
+  );
   final FirebaseApp app = exampleApp();
   Future<Firestore> open() {
     return Firestore.instanceFor(
@@ -36,8 +37,9 @@ Future<void> main() async {
   // waitForPendingWrites completes when the backend has acknowledged every
   // write that was pending when it was called.
   await firestore.disableNetwork();
-  final Future<void> write =
-      firestore.doc(path).set(<String, Object?>{'dark': true});
+  final Future<void> write = firestore.doc(path).set(<String, Object?>{
+    'dark': true,
+  });
   await firestore.enableNetwork();
   await firestore.waitForPendingWrites();
   await write;

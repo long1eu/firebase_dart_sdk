@@ -11,3 +11,6 @@ doc/api/
 .metadata
 pubspec.lock
 pubspec_overrides.yaml
+
+# Tests are not published: a dependency does not need them (see the GitHub repository).
+test/

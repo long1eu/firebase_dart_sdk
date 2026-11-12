@@ -16,14 +16,17 @@ Future<void> main() async {
   final Firestore server = await connect('server');
   final Firestore client = await connect('client');
 
-  final CollectionReference<Map<String, Object?>> scores =
-      server.collection(scratch('scores'));
+  final CollectionReference<Map<String, Object?>> scores = server.collection(
+    scratch('scores'),
+  );
   await scores.doc('ada').set(<String, Object?>{'points': 10});
   await scores.doc('alan').set(<String, Object?>{'points': 7});
 
   // "Server": query, and send the snapshot as a JSON string.
-  final Query<Map<String, Object?>> query =
-      scores.orderBy('points', Direction.descending);
+  final Query<Map<String, Object?>> query = scores.orderBy(
+    'points',
+    Direction.descending,
+  );
   final String wire = jsonEncode((await query.get()).toJson());
   print('JSON: ${wire.length} characters');
 
@@ -37,31 +40,38 @@ Future<void> main() async {
   // JSON and then follows the query on the backend.
   final Completer<void> sawUpdate = Completer<void>();
   final StreamSubscription<QuerySnapshot<Map<String, Object?>>> subscription =
-      client
-          .querySnapshotsFromJson<Map<String, Object?>>(json)
-          .listen((QuerySnapshot<Map<String, Object?>> snapshot) {
-    final String first = snapshot.docs.first.id;
-    print('listener: first is $first (from cache: '
-        '${snapshot.metadata.isFromCache})');
-    if (first == 'alan' && !sawUpdate.isCompleted) {
-      sawUpdate.complete();
-    }
-  });
+      client.querySnapshotsFromJson<Map<String, Object?>>(json).listen((
+        QuerySnapshot<Map<String, Object?>> snapshot,
+      ) {
+        final String first = snapshot.docs.first.id;
+        print(
+          'listener: first is $first (from cache: '
+          '${snapshot.metadata.isFromCache})',
+        );
+        if (first == 'alan' && !sawUpdate.isCompleted) {
+          sawUpdate.complete();
+        }
+      });
 
   await scores.doc('alan').update(<String, Object?>{'points': 12});
   await sawUpdate.future;
   await subscription.cancel();
 
   // Single documents and references work the same way.
-  final DocumentSnapshot<Map<String, Object?>> ada =
-      await scores.doc('ada').get();
+  final DocumentSnapshot<Map<String, Object?>> ada = await scores
+      .doc('ada')
+      .get();
   final DocumentSnapshot<Map<String, Object?>> adaOnClient =
       DocumentSnapshot<Map<String, Object?>>.fromJson(
-          client, jsonDecode(jsonEncode(ada.toJson())) as Map<String, Object?>);
+        client,
+        jsonDecode(jsonEncode(ada.toJson())) as Map<String, Object?>,
+      );
   print('document: ${adaOnClient.id} ${adaOnClient.data}');
   final DocumentReference<Map<String, Object?>> reference =
       DocumentReference<Map<String, Object?>>.fromJson(
-          client, scores.doc('ada').toJson());
+        client,
+        scores.doc('ada').toJson(),
+      );
   print('reference: ${reference.path == ada.ref.path}');
 
   await server.terminate();

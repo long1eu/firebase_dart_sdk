@@ -155,8 +155,9 @@ Issues and pull requests are welcome. Before opening a pull request, run `./tool
 and, for changes that touch networking or the local store, the emulator integration tests. Do not
 weaken or remove assertions to get a test passing; report flaky tests instead.
 
-`lib` of both packages is kept formatted with `dart format lib` (run it in the package directory;
-CI checks it with `dart format --output=none --set-exit-if-changed lib` on a pinned Dart SDK,
+`lib` and `example` of both packages are kept formatted with `dart format lib example` (run it in
+the package directory; CI checks it with
+`dart format --output=none --set-exit-if-changed lib example` on a pinned Dart SDK,
 currently 3.8.0, the lowest supported one). Do not format
 `test/readme/readme_snippets.dart`, which is generated from the README.
 

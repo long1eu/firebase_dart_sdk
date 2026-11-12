@@ -42,8 +42,9 @@ FirestoreSettings emulatorSettings({
   final int colon = emulator.lastIndexOf(':');
   final String host = emulator.substring(0, colon);
   final int port = int.parse(emulator.substring(colon + 1));
-  return FirestoreSettings(cacheSettings: cacheSettings)
-      .withEmulator(host, port, mockUserToken: mockUserToken);
+  return FirestoreSettings(
+    cacheSettings: cacheSettings,
+  ).withEmulator(host, port, mockUserToken: mockUserToken);
 }
 
 /// A [Firestore] instance with an in-memory cache, connected to the emulator.
