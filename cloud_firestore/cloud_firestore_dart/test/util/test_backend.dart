@@ -6,6 +6,10 @@
 //    can never reach a real project.
 //  * `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (`host:port`): a second emulator in
 //    Enterprise edition, used only by the tests in `test/integration_enterprise`.
+//  * `FIRESTORE_EMULATOR_EDITION` (`standard` or `enterprise`): the edition of
+//    the emulator named by `FIRESTORE_EMULATOR_HOST`, to run the standard
+//    suite against an Enterprise edition emulator (`tool/test_integration.sh
+//    enterprise`). Tests whose expectations differ there are skipped.
 //  * `FIRESTORE_TEST_PROJECT_ID` (and optionally `FIRESTORE_TEST_DATABASE_ID`):
 //    opt in to running against a real Firebase project. Requests are
 //    authenticated with Application Default Credentials: the service-account
@@ -50,6 +54,7 @@ class TestBackend {
   static const String emulatorHostVariable = 'FIRESTORE_EMULATOR_HOST';
   static const String enterpriseEmulatorHostVariable =
       'FIRESTORE_ENTERPRISE_EMULATOR_HOST';
+  static const String emulatorEditionVariable = 'FIRESTORE_EMULATOR_EDITION';
   static const String projectIdVariable = 'FIRESTORE_TEST_PROJECT_ID';
   static const String databaseIdVariable = 'FIRESTORE_TEST_DATABASE_ID';
 
@@ -73,6 +78,32 @@ class TestBackend {
 
   /// The `host:port` of the Enterprise edition emulator, or null.
   String? get enterpriseEmulatorHost => _value(enterpriseEmulatorHostVariable);
+
+  /// Whether the emulator of [emulatorHost] (the one the standard suite runs
+  /// against) is an Enterprise edition emulator. The emulator cannot be asked
+  /// for its edition, so this comes from `FIRESTORE_EMULATOR_EDITION`
+  /// (`standard` or `enterprise`, set by `tool/test_integration.sh`); without
+  /// it the edition is Enterprise exactly when both host variables name the
+  /// same emulator.
+  ///
+  /// Throws an [ArgumentError] for another value of the variable.
+  bool get isEnterpriseEdition {
+    final String? edition = _value(emulatorEditionVariable)?.toLowerCase();
+    if (edition == null) {
+      return emulatorHost != null && emulatorHost == enterpriseEmulatorHost;
+    }
+    if (edition != 'standard' && edition != 'enterprise') {
+      throw ArgumentError.value(edition, emulatorEditionVariable,
+          "must be 'standard' or 'enterprise'");
+    }
+    return edition == 'enterprise';
+  }
+
+  /// The reason to skip a test of the standard suite whose expectations only
+  /// hold for the Standard edition, or null when the suite does not run
+  /// against an Enterprise edition emulator. [reason] says what differs.
+  String? skipOnEnterprise(String reason) =>
+      isEnterpriseEdition ? 'Enterprise edition: $reason' : null;
 
   /// The reason to skip tests that need the Enterprise edition emulator, or
   /// null when it is configured. Pass it to `skip:`.

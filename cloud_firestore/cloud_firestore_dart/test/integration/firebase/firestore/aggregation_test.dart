@@ -219,7 +219,9 @@ void main() {
       expect(s.getCount(), 2);
     });
 
-    test('testCannotPerformMoreThanMaxAggregations', () async {
+    test('testCannotPerformMoreThanMaxAggregations',
+        skip: IntegrationTestUtil.skipOnEnterprise(
+            'no limit of 5 aggregations per query'), () async {
       final CollectionReference c = await testCollectionWithDocs(books);
       await expectLater(
           run(c, <AggregateField>[
@@ -305,7 +307,10 @@ void main() {
       expect(doubleSum, 1.0);
     });
 
-    test('testPerformsSumThatOverflowsMaxLong', () async {
+    test('testPerformsSumThatOverflowsMaxLong',
+        skip: IntegrationTestUtil.skipOnEnterprise(
+            'the emulator fails an integer sum that overflows with "Long overflow" instead of returning a double'),
+        () async {
       final CollectionReference c =
           await testCollectionWithDocs(ratings(<Object?>[maxLong, maxLong]));
       final Object? sum =
@@ -326,7 +331,10 @@ void main() {
       expect(sum, maxLong - 100);
     });
 
-    test('testPerformsSumThatIsNegative', () async {
+    test('testPerformsSumThatIsNegative',
+        skip: IntegrationTestUtil.skipOnEnterprise(
+            'the emulator fails an integer sum that overflows during accumulation with "Long overflow"'),
+        () async {
       final CollectionReference c = await testCollectionWithDocs(
           ratings(<Object?>[maxLong, -maxLong, -101, -10000]));
       final AggregateQuerySnapshot s =
@@ -370,7 +378,9 @@ void main() {
       expect(s.get(AggregateField.sum('rating')), 5e-324);
     });
 
-    test('testPerformsSumAndAverageOverZeroDocuments', () async {
+    test('testPerformsSumAndAverageOverZeroDocuments',
+        skip: IntegrationTestUtil.skipOnEnterprise(
+            'the sum over no documents is null instead of 0'), () async {
       final CollectionReference c = await testCollectionWithDocs(books);
       final AggregateQuerySnapshot s =
           await c.whereGreaterThan('pages', 200).aggregate(<AggregateField>[

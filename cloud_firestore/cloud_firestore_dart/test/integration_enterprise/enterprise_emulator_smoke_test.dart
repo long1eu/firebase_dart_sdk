@@ -53,7 +53,10 @@ void main() {
       skip: skipReason ??
           (IntegrationTestUtil.emulatorHost == null
               ? 'FIRESTORE_EMULATOR_HOST is not set: needs both emulators'
-              : null), () async {
+              : IntegrationTestUtil.emulatorHost ==
+                      IntegrationTestUtil.enterpriseEmulatorHost
+                  ? 'both variables name the same emulator: needs both emulators'
+                  : null), () async {
     final String path = 'enterprise-smoke-${autoId()}/doc';
     final Firestore enterprise =
         await IntegrationTestUtil.testEnterpriseFirestore();

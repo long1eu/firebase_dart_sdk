@@ -539,7 +539,9 @@ void main() {
     await listener.cancel();
   });
 
-  test('testQueriesCanUseArrayContainsFilters', () async {
+  test('testQueriesCanUseArrayContainsFilters',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+          'array-contains matches null and NaN'), () async {
     final Map<String, Object?> docA = map(<dynamic>[
       'array',
       <int>[42]
@@ -601,7 +603,9 @@ void main() {
     expect(querySnapshotToValues(snapshot), <Map<String, Object?>>[]);
   });
 
-  test('testQueriesCanUseInFilters', () async {
+  test('testQueriesCanUseInFilters',
+      skip: IntegrationTestUtil.skipOnEnterprise('in matches null and NaN'),
+      () async {
     final Map<String, Object?> docA = map(<dynamic>['zip', 98101]);
     final Map<String, Object?> docB = map(<dynamic>['zip', 91102]);
     final Map<String, Object?> docC = map(<dynamic>['zip', 98103]);
@@ -747,7 +751,10 @@ void main() {
         docsExcept(all, <String>['a', 'i', 'j']));
   });
 
-  test('testQueriesCanUseNotEqualFiltersWithDocIds', () async {
+  test('testQueriesCanUseNotEqualFiltersWithDocIds',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+          'emulator bug (v1.22.0): a listen with != on the document id fails with "__key__ filter value must be a Key"; the same query works with RunQuery'),
+      () async {
     final Map<String, Object?> docA = map(<dynamic>['key', 'aa']);
     final Map<String, Object?> docB = map(<dynamic>['key', 'ab']);
     final Map<String, Object?> docC = map(<dynamic>['key', 'ba']);
@@ -803,7 +810,10 @@ void main() {
         docsExcept(all, <String>['a', 'c', 'i', 'j']));
   });
 
-  test('testQueriesCanUseNotInFiltersWithDocIds', () async {
+  test('testQueriesCanUseNotInFiltersWithDocIds',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+          'emulator bug (v1.22.0): a listen with not-in on the document id fails with "__key__ filter value must be a Key"; the same query works with RunQuery'),
+      () async {
     final Map<String, Object?> docA = map(<dynamic>['key', 'aa']);
     final Map<String, Object?> docB = map(<dynamic>['key', 'ab']);
     final Map<String, Object?> docC = map(<dynamic>['key', 'ba']);
@@ -881,7 +891,9 @@ void main() {
     expect(querySnapshotToValues(snapshot), <dynamic>[docB]);
   });
 
-  test('testQueriesCanUseArrayContainsAnyFilters', () async {
+  test('testQueriesCanUseArrayContainsAnyFilters',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+          'array-contains-any matches null and NaN'), () async {
     final Map<String, Object?> docA = map(<dynamic>[
       'array',
       <dynamic>[42]

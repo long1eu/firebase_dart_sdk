@@ -53,14 +53,16 @@ jobs:
             sleep 1
           done
           echo "emulator did not start"; cat "$RUNNER_TEMP/emulator.log"; exit 1
+      - name: Install the JS interop harness
+        # js_interop_test.dart is skipped (with a reason) without tool/interop/node_modules.
+        working-directory: tool/interop
+        run: npm ci
       - name: Run integration tests
-        working-directory: cloud_firestore/cloud_firestore_dart
         env:
-          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+          TEST_LOG_DIR: ${{ runner.temp }}
         run: |
-          dart pub get
-          dart test test/integration 2>&1 | tee "$RUNNER_TEMP/integration.log"
-          exit "${PIPESTATUS[0]}"
+          (cd cloud_firestore/cloud_firestore_dart && dart pub get)
+          ./tool/test_integration.sh standard
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v4.6.2
@@ -127,4 +129,48 @@ jobs:
         uses: actions/upload-artifact@v4.6.2
         with:
           name: enterprise-log
+          path: ${{ runner.temp }}/emulator/*.log
+
+  # The standard integration suite (test/integration) against the Enterprise edition emulator:
+  # shows whether the client behaves the same on both editions. The tests whose expectations
+  # only hold for the Standard edition are skipped with a reason (see the "Enterprise edition"
+  # section of the package README). Allowed to fail, like the jobs above.
+  standard-suite-on-enterprise:
+    name: Standard suite on the Enterprise emulator (allowed to fail)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: stable
+      - uses: actions/setup-java@v4.7.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '20'
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+      - name: Download the Firestore emulator JAR
+        # Puts cloud-firestore-emulator-v*.jar in ~/.cache/firebase/emulators.
+        run: firebase setup:emulators:firestore
+      - name: Start Enterprise Firestore emulator
+        run: ./tool/start_enterprise_emulator.sh
+      - name: Run the standard suite against the Enterprise emulator
+        run: |
+          (cd cloud_firestore/cloud_firestore_dart && dart pub get)
+          TEST_LOG_DIR="$EMULATOR_DIR" ./tool/test_integration.sh enterprise test/integration
+      - name: Stop Enterprise Firestore emulator
+        if: always()
+        run: ./tool/stop_enterprise_emulator.sh
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: standard-suite-on-enterprise-log
           path: ${{ runner.temp }}/emulator/*.log

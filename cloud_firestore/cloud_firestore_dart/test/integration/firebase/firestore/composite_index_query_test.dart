@@ -195,7 +195,9 @@ void main() {
     expect(snapshot.get(AggregateField.sum('rating')), isA<double>());
   });
 
-  test('testPerformsAggregationWhenUsingArrayContainsAnyOperator', () async {
+  test('testPerformsAggregationWhenUsingArrayContainsAnyOperator',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+          'the sum over no documents is null instead of 0'), () async {
     final CollectionReference collection =
         await withTestDocs(<String, Map<String, Object?>>{
       'a': <String, Object?>{

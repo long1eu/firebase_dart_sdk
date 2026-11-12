@@ -93,19 +93,22 @@ CLI locally once:
 
 Then:
 
-    ./tool/start_emulator.sh        # emulator on 127.0.0.1:8080, project demo-test
-    cd cloud_firestore/cloud_firestore_dart
-    FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration
-    cd ../..
+    ./tool/start_emulator.sh              # emulator on 127.0.0.1:8080, project demo-test
+    ./tool/test_integration.sh standard   # dart test test/integration against it
     ./tool/stop_emulator.sh
 
-Tests that need the Enterprise edition of Firestore use a second emulator on port 8181:
+Tests that need the Enterprise edition of Firestore use a second emulator on port 8181. The
+same command also runs the standard suite against it:
 
     ./tool/start_enterprise_emulator.sh
-    cd cloud_firestore/cloud_firestore_dart
-    FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise
-    cd ../..
+    ./tool/test_integration.sh enterprise # test/integration, then test/integration_enterprise
     ./tool/stop_enterprise_emulator.sh
+
+`./tool/test_integration.sh both` runs the two when both emulators are up. To run tests by
+hand, from `cloud_firestore/cloud_firestore_dart`:
+
+    FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration
+    FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise
 
 See `tool/README.md` for details, and the Testing section of
 `cloud_firestore/cloud_firestore_dart/README.md` for the opt-in run against a real project.

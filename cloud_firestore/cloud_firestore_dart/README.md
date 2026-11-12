@@ -334,6 +334,7 @@ Run everything from this directory. The scripts are in `tool/` at the repository
 | Unit | `dart test test/unit` | none |
 | Integration | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration` | standard emulator (`tool/start_emulator.sh`) |
 | Enterprise | `FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise` | Enterprise edition emulator (`tool/start_enterprise_emulator.sh`) |
+| Standard suite on Enterprise | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8181 FIRESTORE_EMULATOR_EDITION=enterprise dart test test/integration` | Enterprise edition emulator |
 
 The environment variables are read by `test/util/test_backend.dart`:
 
@@ -345,6 +346,39 @@ The environment variables are read by `test/util/test_backend.dart`:
   `IntegrationTestUtil.testEnterpriseFirestore()` and are skipped with a reason
   (`skip: IntegrationTestUtil.enterpriseEmulatorSkipReason`) while the variable is not set. Both
   emulators can run at the same time and both variables can be set together.
+
+`tool/test_integration.sh [standard|enterprise|both]` (repository root) runs these against
+emulators that are already up; `enterprise` runs `test/integration` against the Enterprise
+edition emulator first and then `test/integration_enterprise`.
+
+### Enterprise edition
+
+The whole standard suite also runs against the Enterprise edition emulator
+(`tool/test_integration.sh enterprise`). With emulator v1.22.0 the client behaves the same on
+both editions except for the points below; the ten tests that expect the Standard behaviour are
+skipped there with a reason, and `test/integration_enterprise/edition_differences_test.dart`
+pins the Enterprise behaviour. These were observed with the emulator only, not with a production
+Enterprise database.
+
+- **`null` and `NaN` in equality filters.** `whereIn`, `whereArrayContains` and
+  `whereArrayContainsAny` match fields (or array elements) that are `null` or `NaN` when the
+  filter value is `null` or `NaN`. On Standard they never match.
+- **`sum` over no documents** is `null` on Enterprise and `0` on Standard (`average` is `null`
+  on both).
+- **Number of aggregations.** Standard rejects more than 5 aggregations in one query;
+  Enterprise accepts them.
+- **Integer `sum` overflow.** When an integer sum leaves the 64-bit range, also only while
+  accumulating, the Enterprise emulator fails with `invalid-argument` ("Long overflow"); Standard
+  returns a double.
+- **Emulator bug:** a listener (and so `get()`, which listens) on a query with `!=` or `not-in`
+  on the document id fails with "`__key__` filter value must be a Key" on the Enterprise
+  emulator. The request is correct: the same query succeeds through RunQuery on that emulator
+  and through Listen on the Standard one.
+
+No test failed because of index requirements, result ordering or size limits: the emulator
+does not require indexes in either edition, and it orders document ids the same way in both.
+(The JS SDK notes that a production Enterprise database does not sort numeric document ids
+before string ids; the emulator does not show that.)
 
 ### Against a real Firebase project (opt-in)
 

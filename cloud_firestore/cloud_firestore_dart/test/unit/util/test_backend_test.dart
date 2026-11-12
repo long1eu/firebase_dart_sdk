@@ -111,6 +111,49 @@ void main() {
     });
   });
 
+  group('edition of the emulator', () {
+    test('is Standard by default', () {
+      expect(TestBackend(<String, String>{}).isEnterpriseEdition, isFalse);
+      final TestBackend backend = TestBackend(<String, String>{
+        'FIRESTORE_EMULATOR_HOST': '127.0.0.1:8080',
+        'FIRESTORE_ENTERPRISE_EMULATOR_HOST': '127.0.0.1:8181',
+      });
+      expect(backend.isEnterpriseEdition, isFalse);
+      expect(backend.skipOnEnterprise('x'), isNull);
+    });
+
+    test('is Enterprise when both variables name the same emulator', () {
+      final TestBackend backend = TestBackend(<String, String>{
+        'FIRESTORE_EMULATOR_HOST': '127.0.0.1:8181',
+        'FIRESTORE_ENTERPRISE_EMULATOR_HOST': '127.0.0.1:8181',
+      });
+      expect(backend.isEnterpriseEdition, isTrue);
+      expect(backend.skipOnEnterprise('sums differ'),
+          'Enterprise edition: sums differ');
+    });
+
+    test('FIRESTORE_EMULATOR_EDITION decides when it is set', () {
+      expect(
+          TestBackend(<String, String>{
+            'FIRESTORE_EMULATOR_HOST': '127.0.0.1:8181',
+            'FIRESTORE_EMULATOR_EDITION': 'Enterprise',
+          }).isEnterpriseEdition,
+          isTrue);
+      expect(
+          TestBackend(<String, String>{
+            'FIRESTORE_EMULATOR_HOST': '127.0.0.1:8181',
+            'FIRESTORE_ENTERPRISE_EMULATOR_HOST': '127.0.0.1:8181',
+            'FIRESTORE_EMULATOR_EDITION': 'standard',
+          }).isEnterpriseEdition,
+          isFalse);
+      expect(
+          () => TestBackend(<String, String>{
+                'FIRESTORE_EMULATOR_EDITION': 'premium',
+              }).isEnterpriseEdition,
+          throwsArgumentError);
+    });
+  });
+
   group('ApplicationDefaultTokenSource', () {
     test('returns the bearer token and resolves the credentials once',
         () async {

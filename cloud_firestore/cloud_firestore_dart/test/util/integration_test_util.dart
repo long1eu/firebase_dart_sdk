@@ -73,6 +73,19 @@ class IntegrationTestUtil {
   static String? get enterpriseEmulatorSkipReason =>
       TestBackend().enterpriseEmulatorSkipReason;
 
+  /// Whether the standard suite runs against an Enterprise edition emulator
+  /// (`tool/test_integration.sh enterprise`).
+  static bool get isEnterpriseEdition => TestBackend().isEnterpriseEdition;
+
+  /// The reason to skip a test whose expectations only hold for the Standard
+  /// edition, or null when the suite runs against a Standard edition
+  /// backend: `test('...', skip: skipOnEnterprise('what differs'), ...)`.
+  /// The differences are listed in the "Enterprise edition" section of the
+  /// package README and pinned by
+  /// `test/integration_enterprise/edition_differences_test.dart`.
+  static String? skipOnEnterprise(String reason) =>
+      TestBackend().skipOnEnterprise(reason);
+
   /// The project of the Enterprise edition emulator.
   static const String enterpriseProjectId = FirestoreProvider.fallbackProjectId;
 
@@ -85,12 +98,18 @@ class IntegrationTestUtil {
   static final ApplicationDefaultTokenSource _realProjectTokens =
       ApplicationDefaultTokenSource();
 
+  /// The emulator the low-level tests talk to: the one of
+  /// `FIRESTORE_EMULATOR_HOST`, or 127.0.0.1:8080 when it is not set.
   static DatabaseInfo testEnvDatabaseInfo() {
+    final String? emulator = emulatorHost;
+    final EmulatorAddress address = emulator == null
+        ? const EmulatorAddress('127.0.0.1', 8080)
+        : EmulatorAddress.parse(emulator);
     return DatabaseInfo(
       DatabaseId.forProject(provider.projectId),
       'test-persistenceKey',
-      '127.0.0.1',
-      port: 8080,
+      address.host,
+      port: address.port,
       sslEnabled: false,
     );
   }
