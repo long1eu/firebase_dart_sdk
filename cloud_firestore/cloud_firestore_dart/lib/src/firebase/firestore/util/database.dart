@@ -5,6 +5,25 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:meta/meta.dart';
+
+/// Opens (creating it if needed) the SQLite database called [path] for the
+/// offline cache. Pass one to `Firestore.instanceFor(openDatabase: ...)`; this
+/// package does not depend on a SQLite binding itself. Without it the cache is
+/// kept in memory only.
+///
+/// [path] is a database name chosen by Firestore (unique per app and
+/// database), not a full file path: the opener decides where the file lives.
+///
+/// The opener must, in this order: call [onConfigure]; if the file is new, call
+/// [onCreate] with [version] and store [version] as the schema version
+/// (`PRAGMA user_version`); otherwise call [onUpgrade] or [onDowngrade] when the
+/// stored version is lower or higher than [version] and then store [version];
+/// finally call [onOpen]. The callbacks run Firestore's own schema migrations,
+/// so they must be awaited before the returned future completes.
+///
+/// See `test/util/sqlite3_database.dart` in the package repository for an
+/// implementation on top of `package:sqlite3`.
 typedef OpenDatabase = Future<Database> Function(String path,
     {int version,
     OnConfigure onConfigure,
@@ -13,13 +32,26 @@ typedef OpenDatabase = Future<Database> Function(String path,
     OnVersionChange onDowngrade,
     OnOpen onOpen});
 
+/// Called by an [OpenDatabase] implementation when the stored schema version
+/// differs from the requested one.
 typedef OnVersionChange = Future<void> Function(
     Database db, int oldVersion, int newVersion);
+/// Called by an [OpenDatabase] implementation when the database file is new.
 typedef OnCreate = Future<void> Function(Database db, int version);
+/// Called by an [OpenDatabase] implementation once the database is ready.
 typedef OnOpen = Future<void> Function(Database db);
+/// Called by an [OpenDatabase] implementation first, before any migration.
 typedef OnConfigure = Future<void> Function(Database db);
 
+/// A connection to one SQLite database, returned by an [OpenDatabase]
+/// function. This is the only part of the SQLite layer that is public: you
+/// implement it over the SQLite binding of your choice; Firestore runs its own
+/// SQL through it.
+///
+/// Statements use `?` positional placeholders; [arguments] may contain `null`,
+/// [int], [double], [String] and `Uint8List` values.
 abstract class Database {
+  /// The file backing this database.
   File get file;
 
   /// Runs SQLite statement without return values
@@ -33,9 +65,12 @@ abstract class Database {
   /// Returns the number of changes made
   Future<int> delete(String statement, [List<Object?>? arguments]);
 
+  /// Closes the connection. Firestore calls it when the instance terminates.
   void close();
 }
 
+/// Not used by the SDK; kept out of the public API.
+@internal
 enum ConflictAlgorithm {
   /// When a constraint violation occurs, an immediate ROLLBACK occurs, thus ending the current transaction, and the
   /// command aborts with a return code of SQLITE_CONSTRAINT. If no transaction is active (other than the implied

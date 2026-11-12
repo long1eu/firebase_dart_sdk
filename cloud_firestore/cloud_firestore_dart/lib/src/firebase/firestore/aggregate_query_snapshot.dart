@@ -16,9 +16,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:collection/collection.dart';
+import 'package:meta/meta.dart';
 
 /// The results of executing an [AggregateQuery].
 class AggregateQuerySnapshot {
+  @internal
   AggregateQuerySnapshot(this.query, Map<String, FieldValue> data)
       : _data = Map<String, FieldValue>.unmodifiable(data);
 

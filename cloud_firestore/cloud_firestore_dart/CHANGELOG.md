@@ -39,6 +39,26 @@ only. **Nothing was run against production Firestore.**
   `documentChanges` (use `docs` / `docChanges`), `FieldPath.documentId()` (use
   `documentIdField`), `Source.defaultSource` (use `serverAndCache`). `FirebaseFirestore` and
   `Settings` are typedefs of `Firestore` and `FirestoreSettings`.
+- Narrowed public API (internals that leaked through the barrel or as public members):
+  - No longer exported: `ConflictAlgorithm`, `maxVectorQueryLimit`, `maxVectorQueryDimensions`.
+    From `util/database.dart` only the SQLite opener contract stays public: `Database`,
+    `OpenDatabase`, `OnConfigure`, `OnCreate`, `OnOpen`, `OnVersionChange` (now documented).
+    `UnaryFilter` / `CompositeFilter` were already not exported; the API golden listed them by
+    mistake.
+  - Marked `@internal` (the analyzer reports any use outside this package; they will be made
+    private or removed later): `Firestore(...)` constructor, `Firestore.newInstance`, `client`,
+    `scheduler`, `dataConverter`, `databaseId` (use the new `Firestore.projectId` and
+    `Firestore.databaseName` getters), `validateReference`; `Query.query`;
+    `QuerySnapshot.snapshot`; `DocumentSnapshot.document`; `DocumentReference.key`;
+    `SetOptions.fieldMask`; `FieldPath(...)` unnamed constructor, `internalPath`, `reserved`,
+    `documentIdInstance` (use `FieldPath.documentIdField`); `FieldValue.elements`, `methodName`
+    and the `isDelete` / `isServerTimestamp` / `isArrayUnion` / `isArrayRemove` /
+    `isIncrement` / `isMinimum` / `isMaximum` getters; `AggregateField.alias`; the
+    `AggregateQuery` and `AggregateQuerySnapshot` constructors; the `LoadBundleTask`
+    constructor, `setResult`, `setException`, `updateProgress`;
+    `LoadBundleTaskProgress.forInitial` / `forSuccess`; `FirestoreErrorCode.fromValue`;
+    `Timestamp.validateRange`.
+  - Deprecated, still working: `Firestore.shutdown` (use `terminate`).
 
 ### Added
 

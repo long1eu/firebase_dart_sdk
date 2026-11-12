@@ -55,6 +55,7 @@ class DocumentReference<T extends dynamic> {
         DocumentKey.fromPath(path), firestore, converter);
   }
 
+  @internal
   final DocumentKey key;
 
   /// Gets the Firestore instance associated with this document reference.

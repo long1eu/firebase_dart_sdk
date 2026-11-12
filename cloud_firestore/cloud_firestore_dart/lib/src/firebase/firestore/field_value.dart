@@ -3,6 +3,7 @@
 // on 20/09/2018
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
+import 'package:meta/meta.dart';
 
 /// Sentinel values that can be used when writing document fields with [set] or [update].
 abstract class FieldValue {
@@ -76,24 +77,33 @@ abstract class FieldValue {
   /// Unlike the other factories this is a plain value, not a sentinel.
   static VectorValue vector(List<double> values) => VectorValue(values);
 
+  @internal
   final List<Object?> elements;
 
   /// Returns the method name (e.g. 'FieldValue.delete') that was used to create this FieldValue
   /// instance, for use in error messages, etc.
+  @internal
   String get methodName;
 
+  @internal
   bool get isDelete => this is _DeleteFieldValue;
 
+  @internal
   bool get isServerTimestamp => this is _ServerTimestampFieldValue;
 
+  @internal
   bool get isArrayUnion => this is _ArrayUnionFieldValue;
 
+  @internal
   bool get isArrayRemove => this is _ArrayRemoveFieldValue;
 
+  @internal
   bool get isIncrement => this is _NumericIncrementFieldValue;
 
+  @internal
   bool get isMinimum => this is _NumericMinimumFieldValue;
 
+  @internal
   bool get isMaximum => this is _NumericMaximumFieldValue;
 
   static const _DeleteFieldValue _deleteInstance = _DeleteFieldValue._();

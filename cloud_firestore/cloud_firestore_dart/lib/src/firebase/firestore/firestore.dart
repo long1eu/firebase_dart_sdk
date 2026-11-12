@@ -40,14 +40,26 @@ import 'package:meta/meta.dart';
 /// not supported in production code and new SDK releases may break code that does so.
 class Firestore {
   @visibleForTesting
+  @internal
   Firestore(this.databaseId, this.firebaseApp, this.client, this._scheduler)
       : dataConverter = UserDataConverter(databaseId);
 
   static const String _tag = 'FirebaseFirestore';
 
+  @internal
   final DatabaseId databaseId;
+
+  /// The id of the Google Cloud project this instance talks to.
+  String get projectId => databaseId.projectId;
+
+  /// The name of the database inside the project, `(default)` unless another
+  /// one was passed to [instanceFor].
+  String get databaseName => databaseId.databaseId;
+
   final FirebaseApp? firebaseApp;
+  @internal
   final UserDataConverter dataConverter;
+  @internal
   final FirestoreClient client;
   final TaskScheduler _scheduler;
 
@@ -70,6 +82,7 @@ class Firestore {
   }
 
   @visibleForTesting
+  @internal
   TaskScheduler get scheduler => _scheduler;
 
   /// Gets the instance for [app] and [database]. Same as [getInstance]; this is
@@ -102,6 +115,7 @@ class Firestore {
     return firestore;
   }
 
+  @internal
   static Future<Firestore> newInstance(
     FirebaseApp app,
     String database, {
@@ -323,6 +337,7 @@ class Firestore {
   /// Note: Under normal circumstances, calling [shutdown] is not required. This
   /// method is useful only when you want to force this instance to release all
   /// of its resources.
+  @Deprecated('Use terminate instead.')
   Future<void> shutdown() async {
     // The client must be initialized to ensure that all subsequent API usage
     // throws an exception.
@@ -393,6 +408,7 @@ class Firestore {
   }
 
   /// Helper to validate a [DocumentReference]. Used by [WriteBatch] and [Transaction].
+  @internal
   void validateReference(DocumentReference<Object?> docRef) {
     checkNotNull(docRef, 'Provided DocumentReference must not be null.');
     if (docRef.firestore != this) {

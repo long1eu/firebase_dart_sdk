@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
+import 'package:meta/meta.dart';
 
 /// Represents an aggregation that can be performed by Firestore.
 ///
@@ -29,6 +30,7 @@ abstract class AggregateField {
 
   /// The client-side alias under which the result is stored in an
   /// [AggregateQuerySnapshot]. The alias sent to the server is different.
+  @internal
   final String alias;
 
   /// The canonical string of the field this aggregation operates on, or the

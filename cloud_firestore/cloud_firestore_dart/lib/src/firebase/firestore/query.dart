@@ -75,6 +75,7 @@ class Query<T extends dynamic> {
     return Query<Map<String, Object?>>(query, firestore);
   }
 
+  @internal
   final core.Query query;
   final Firestore firestore;
 

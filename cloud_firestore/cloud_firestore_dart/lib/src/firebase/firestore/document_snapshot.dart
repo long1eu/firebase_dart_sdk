@@ -78,6 +78,7 @@ class DocumentSnapshot<T extends dynamic> {
   final DocumentKey _key;
 
   /// Is null if the document doesn't exist
+  @internal
   final Document? document;
 
   /// The metadata for this document snapshot.

@@ -32,6 +32,7 @@ class QuerySnapshot<T extends dynamic>
   /// Returns the metadata for this document snapshot.
   final SnapshotMetadata metadata;
 
+  @internal
   final ViewSnapshot snapshot;
   final Firestore _firestore;
 

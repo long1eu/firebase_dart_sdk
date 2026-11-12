@@ -28,6 +28,7 @@ class FirestoreErrorCode {
   static const FirestoreErrorCode dataLoss = FirestoreErrorCode._(15);
   static const FirestoreErrorCode unauthenticated = FirestoreErrorCode._(16);
 
+  @internal
   static FirestoreErrorCode fromValue(GrpcError error) {
     // Unknown (e.g. forward-compatible or custom) codes map to `unknown`.
     return error.code >= 0 && error.code < values.length

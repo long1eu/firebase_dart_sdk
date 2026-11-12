@@ -34,8 +34,9 @@ export 'src/firebase/firestore/snapshot_metadata.dart';
 export 'src/firebase/firestore/source.dart';
 export 'src/firebase/firestore/transaction.dart';
 export 'src/firebase/firestore/transaction_options.dart';
-export 'src/firebase/firestore/util/database.dart';
-export 'src/firebase/firestore/vector_query.dart';
+export 'src/firebase/firestore/util/database.dart'
+    show Database, OnConfigure, OnCreate, OnOpen, OnVersionChange, OpenDatabase;
+export 'src/firebase/firestore/vector_query.dart' show VectorQuery;
 export 'src/firebase/firestore/vector_query_snapshot.dart';
 export 'src/firebase/firestore/vector_value.dart';
 export 'src/firebase/firestore/write_batch.dart';

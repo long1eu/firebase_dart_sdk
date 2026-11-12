@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_metadata.dart';
+import 'package:meta/meta.dart';
 
 /// Represents the state of bundle loading tasks.
 ///
@@ -38,6 +39,7 @@ class LoadBundleTaskProgress {
   );
 
   /// Creates an 'initial' status update from a bundle's metadata. The initial status sets all loading indicators to 0.
+  @internal
   factory LoadBundleTaskProgress.forInitial(BundleMetadata bundleMetadata) {
     return LoadBundleTaskProgress(
       0,
@@ -51,6 +53,7 @@ class LoadBundleTaskProgress {
 
   /// Creates a 'success' status update from a bundle's metadata. The success status sets all loading indicators to
   /// their maximum values.
+  @internal
   factory LoadBundleTaskProgress.forSuccess(BundleMetadata bundleMetadata) {
     return LoadBundleTaskProgress(
       bundleMetadata.totalDocuments,

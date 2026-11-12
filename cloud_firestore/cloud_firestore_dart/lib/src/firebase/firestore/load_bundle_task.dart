@@ -16,6 +16,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_progress.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:meta/meta.dart';
 
 /// A listener that is called periodically during execution of a [LoadBundleTask].
 typedef OnProgressListener = void Function(LoadBundleTaskProgress snapshot);
@@ -26,6 +27,7 @@ typedef OnProgressListener = void Function(LoadBundleTaskProgress snapshot);
 /// PORTING NOTE: the Android class extends `Task<LoadBundleTaskProgress>`. Here the task completion is exposed as
 /// [future] and the progress updates as [stream] / [addOnProgressListener].
 class LoadBundleTask {
+  @internal
   LoadBundleTask() {
     // Failures are reported to every consumer of [future]. Do not turn a failure nobody asked about into an
     // unhandled error.
@@ -74,6 +76,7 @@ class LoadBundleTask {
   // Called by the library.
 
   /// Completes the task successfully with the given final [result].
+  @internal
   void setResult(LoadBundleTaskProgress result) {
     hardAssert(result.taskState == LoadBundleTaskState.success,
         'Expected success, but was ${result.taskState}');
@@ -85,6 +88,7 @@ class LoadBundleTask {
   }
 
   /// Completes the task with the given [exception].
+  @internal
   void setException(Object exception) {
     final LoadBundleTaskProgress snapshot = LoadBundleTaskProgress(
       _snapshot.documentsLoaded,
@@ -102,6 +106,7 @@ class LoadBundleTask {
   }
 
   /// Reports a progress update.
+  @internal
   void updateProgress(LoadBundleTaskProgress progressUpdate) {
     _snapshot = progressUpdate;
     _progress.add(progressUpdate);

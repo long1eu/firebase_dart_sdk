@@ -5,11 +5,13 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:meta/meta.dart';
 
 /// A [FieldPath] refers to a field in a document. The path may consist of a single field name
 /// (referring to a top level field in the document), or a list of field names (referring to a
 /// nested field in the document).
 class FieldPath {
+  @internal
   const FieldPath(this.internalPath);
 
   factory FieldPath.fromSegments(List<String> segments) {
@@ -49,10 +51,13 @@ class FieldPath {
   }
 
   /// Matches any characters in a field path string that are reserved.
+  @internal
   static final RegExp reserved = RegExp('[~*/\\[\\]]');
 
+  @internal
   final model.FieldPath internalPath;
 
+  @internal
   static final FieldPath documentIdInstance =
       FieldPath(model.FieldPath.keyPath);
 

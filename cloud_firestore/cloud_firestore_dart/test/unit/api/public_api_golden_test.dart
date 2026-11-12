@@ -7,7 +7,8 @@
 //
 // The listing is built with dart:mirrors from the `cloud_firestore_dart` barrel,
 // so it works under `dart test` (JIT), not in AOT. Mirrors do not expose
-// nullability, so `T` and `T?` look the same in the listing.
+// nullability, so `T` and `T?` look the same in the listing. Typedefs are not
+// listed by mirrors; they are read from the source text (nullability kept).
 
 import 'dart:io';
 import 'dart:mirrors';
@@ -17,7 +18,26 @@ import 'package:test/test.dart';
 
 bool _isPublic(Symbol symbol) => !MirrorSystem.getName(symbol).startsWith('_');
 
+final RegExp _typedef =
+    RegExp(r'^typedef (\w+)(?:<[^=]*>)? = ([^;]+);', multiLine: true);
+
 String _name(Symbol symbol) => MirrorSystem.getName(symbol);
+
+/// Whether the `show` / `hide` combinators of the export [dep] let [symbol]
+/// through, so names hidden in the barrel do not appear in the listing.
+///
+/// Mirrors report `show A, B` as one combinator per name, so the shown names
+/// are the union of all `show` combinators.
+bool _isExportedBy(LibraryDependencyMirror dep, Symbol symbol) {
+  final Iterable<CombinatorMirror> shows =
+      dep.combinators.where((CombinatorMirror c) => c.isShow);
+  if (shows.isNotEmpty &&
+      !shows.any((CombinatorMirror c) => c.identifiers.contains(symbol))) {
+    return false;
+  }
+  return !dep.combinators
+      .any((CombinatorMirror c) => c.isHide && c.identifiers.contains(symbol));
+}
 
 String _type(TypeMirror type) {
   if (type is ClassMirror && type.typeArguments.isNotEmpty) {
@@ -111,7 +131,7 @@ String describePublicApi() {
       continue;
     }
     for (final DeclarationMirror d in dep.targetLibrary!.declarations.values) {
-      if (!_isPublic(d.simpleName)) {
+      if (!_isPublic(d.simpleName) || !_isExportedBy(dep, d.simpleName)) {
         continue;
       }
       final String name = _name(d.simpleName);
@@ -128,6 +148,20 @@ String describePublicApi() {
       } else if (d is VariableMirror) {
         entries[name] = <String>['var $name: ${_type(d.type)}${_flags(d)}'];
       }
+    }
+    // dart:mirrors does not list typedefs in `declarations`, so they are read
+    // from the source of the exported library (tests run in the package root).
+    final String source =
+        File('lib/${dep.targetLibrary!.uri.pathSegments.skip(1).join('/')}')
+            .readAsStringSync();
+    for (final RegExpMatch m in _typedef.allMatches(source)) {
+      final String name = m.group(1)!;
+      if (name.startsWith('_') || !_isExportedBy(dep, Symbol(name))) {
+        continue;
+      }
+      entries[name] = <String>[
+        'typedef $name = ${m.group(2)!.replaceAll(RegExp(r'\s+'), ' ')}'
+      ];
     }
   }
   final List<String> names = entries.keys.toList()..sort();

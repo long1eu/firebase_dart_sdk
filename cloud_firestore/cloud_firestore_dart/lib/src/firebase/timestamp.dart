@@ -3,6 +3,7 @@
 // on 17/09/2018
 
 import 'package:firebase_app_dart/internal.dart';
+import 'package:meta/meta.dart';
 
 /// A Timestamp represents a point in time independent of any time zone or calendar, represented as
 /// seconds and fractions of seconds at nanosecond resolution in UTC Epoch time. It is encoded using
@@ -106,6 +107,7 @@ class Timestamp implements Comparable<Timestamp> {
     }
   }
 
+  @internal
   static void validateRange(int seconds, int nanoseconds) {
     Preconditions.checkArgument(
         nanoseconds >= 0, 'Timestamp nanoseconds out of range: $nanoseconds');

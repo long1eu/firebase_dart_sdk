@@ -6,6 +6,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:meta/meta.dart';
 
 /// An options object that configures the behavior of set() calls. By providing one of the
 /// [SetOptions] objects returned by [merge], [mergeField] and [mergeFieldPaths], the set() calls in
@@ -58,5 +59,6 @@ class SetOptions {
   static const SetOptions mergeAllFields = SetOptions._mergeAll();
 
   final bool merge;
+  @internal
   final FieldMask? fieldMask;
 }

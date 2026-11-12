@@ -18,10 +18,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_source.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:collection/collection.dart';
+import 'package:meta/meta.dart';
 
 /// A query that calculates aggregations over the documents of a [Query]
 /// without downloading the documents themselves.
 class AggregateQuery {
+  @internal
   AggregateQuery(this.query, List<AggregateField> aggregateFields)
       : aggregateFields = List<AggregateField>.unmodifiable(aggregateFields);
 

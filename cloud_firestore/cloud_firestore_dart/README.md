@@ -156,6 +156,10 @@ firestore.snapshotsInSync.listen((_) {});
 await firestore.terminate();
 ```
 
+Members marked `@internal` in the golden listing are implementation details that are still
+reachable for technical reasons; the analyzer warns when you use them and they may change or
+disappear in any release.
+
 The exact signatures are pinned in `test/unit/api/public_api.golden.txt`; if a snippet above
 disagrees with the golden file, the golden file is right (the snippets are illustrative and were
 not compiled).
@@ -167,8 +171,13 @@ against the emulator set `FIRESTORE_EMULATOR_HOST` (see `test/util/integration_t
 
 ## Persistence and connectivity
 
-- The package does not open SQLite files itself: you pass an `OpenDatabase` function (the tests use
-  `package:sqlite3`, see `test/util/sqlite3_database.dart`). The persistence layer never switches
+- The package does not open SQLite files itself: you pass an `OpenDatabase` function to
+  `Firestore.instanceFor(openDatabase: ...)` (without one the cache is in memory only). This is
+  the only public part of the SQLite layer: implement `Database` (`execute`, `query`, `delete`,
+  `close`, `file`) over the binding of your choice, and make the opener call `onConfigure`, then
+  `onCreate` (new file) or `onUpgrade` / `onDowngrade` (stored `user_version` differs), store the
+  requested version, then call `onOpen` (see the doc comment on `OpenDatabase`). The tests use
+  `package:sqlite3`, see `test/util/sqlite3_database.dart`. The persistence layer never switches
   the connection to `PRAGMA locking_mode = EXCLUSIVE` (the Android SDK does, and fails with
   "Failed to gain exclusive lock" when a second process opens the same file). This is deliberate:
   after a Flutter hot restart the old isolate's handle is still open and the new isolate must be
