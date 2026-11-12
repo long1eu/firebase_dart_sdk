@@ -180,17 +180,21 @@ class SyncEngine implements RemoteStoreCallback {
     // synced before can be raised from the cache. If there are already queries mapped to the target, the sync state of
     // those queries is applied to the new query as well.
     bool targetIsCurrent = false;
+    SnapshotVersion? mirrorReadTime;
     final List<Query>? mirrorQueries = _queriesByTarget[queryData.targetId];
     if (mirrorQueries != null && mirrorQueries.isNotEmpty) {
       final QueryView? mirrorView = _queryViewsByQuery[mirrorQueries.first];
       targetIsCurrent = mirrorView != null &&
           mirrorView.view.syncState == ViewSnapshotSyncState.synced;
+      if (targetIsCurrent) {
+        mirrorReadTime = mirrorView.view.readTime;
+      }
     }
     final TargetChange synthesizedCurrentChange =
         TargetChange.createSynthesizedTargetChangeForCurrentChange(
             targetIsCurrent, queryData.resumeToken);
-    final ViewChange viewChange =
-        view.applyChanges(viewDocChanges, synthesizedCurrentChange);
+    final ViewChange viewChange = view.applyChanges(
+        viewDocChanges, synthesizedCurrentChange, false, mirrorReadTime);
     hardAssert(view.limboDocuments.isEmpty,
         'View returned limbo docs before target ack from the server');
 
@@ -603,8 +607,8 @@ class SyncEngine implements RemoteStoreCallback {
           : remoteEvent.targetChanges[queryView.targetId];
       final bool targetIsPendingReset = remoteEvent != null &&
           remoteEvent.targetMismatches.containsKey(queryView.targetId);
-      final ViewChange viewChange = queryView.view
-          .applyChanges(viewDocChanges, targetChange, targetIsPendingReset);
+      final ViewChange viewChange = queryView.view.applyChanges(viewDocChanges,
+          targetChange, targetIsPendingReset, remoteEvent?.snapshotVersion);
       await _updateTrackedLimboDocuments(
           viewChange.limboChanges, queryView.targetId);
 

@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 26/09/2018
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_json.dart'
+    as snapshot_json;
 import 'package:cloud_firestore_dart/src/firebase/firestore/blob.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
@@ -71,6 +73,21 @@ class DocumentSnapshot<T extends dynamic> {
         converter: converter);
   }
 
+  /// Builds a [DocumentSnapshot] from the JSON object written by [toJson], for the [firestore] instance.
+  ///
+  /// The snapshot is not from cache and has no pending writes. Pass the [converter] of the original snapshot to get
+  /// typed data back. Throws a [FirestoreError] if [json] is not a valid document snapshot JSON object, for example
+  /// one of a different project or database.
+  ///
+  /// This is the JS SDK `documentSnapshotFromJSON()`.
+  factory DocumentSnapshot.fromJson(
+    Firestore firestore,
+    Map<String, Object?> json, {
+    FirestoreDataConverter<T>? converter,
+  }) {
+    return snapshot_json.documentSnapshotFromJson<T>(firestore, json, converter);
+  }
+
   final Firestore _firestore;
 
   final FirestoreDataConverter<T>? _converter;
@@ -83,6 +100,19 @@ class DocumentSnapshot<T extends dynamic> {
 
   /// The metadata for this document snapshot.
   final SnapshotMetadata metadata;
+
+  /// The value of the `type` field written by [toJson].
+  static const String jsonType = 'firestore/documentSnapshot/1.0';
+
+  /// Returns a JSON-serializable representation of this snapshot, which [DocumentSnapshot.fromJson] reads back and
+  /// `Firestore.documentSnapshotsFromJson` listens from.
+  ///
+  /// The `bundle` field holds the document as a Firestore bundle (empty when the document does not exist). Throws a
+  /// [FirestoreError] (failed-precondition) if the snapshot has pending writes: await `waitForPendingWrites()` first.
+  ///
+  /// This is the JS SDK `DocumentSnapshot.toJSON()`; the JSON is interchangeable with the one of the JS SDK (Node).
+  Map<String, Object?> toJson() => snapshot_json.documentSnapshotToJson(
+      _firestore, _key, document, metadata.hasPendingWrites);
 
   /// The id of the document.
   String get id => _key.path.last;

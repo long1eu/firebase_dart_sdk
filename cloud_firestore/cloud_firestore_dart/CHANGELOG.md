@@ -89,6 +89,12 @@ only. **Nothing was run against production Firestore.**
   Existing code that uses the references returned by `Firestore` keeps compiling (they are
   `...<Map<String, Object?>>`); a bare type annotation such as `DocumentSnapshot` now means
   `dynamic` data.
+- Snapshot serialization (JS SDK `toJSON()` / `documentSnapshotFromJSON()` / `querySnapshotFromJSON()` /
+  `onSnapshotResume()`): `DocumentSnapshot.toJson()`, `QuerySnapshot.toJson()`, `DocumentSnapshot.fromJson()`,
+  `QuerySnapshot.fromJson()`, `Firestore.documentSnapshotsFromJson()` and `Firestore.querySnapshotsFromJson()`. The
+  JSON holds the snapshot as a bundle string; resuming a query listen sends the snapshot's read time to the backend.
+  Also `DocumentReference.toJson()` / `DocumentReference.fromJson()`. Bundles with `OR` composite filters can now be
+  loaded. Emulator-verified only.
 - Read-only transactions: `TransactionOptions(readOnly: true)`, verified at commit with a `VerifyMutation`
   (new `verify` field in the vendored `write.proto`). Emulator-verified only.
 - `Firestore.clearPersistence()`: deletes the local SQLite database (and its `-journal`, `-wal`,

@@ -179,6 +179,7 @@ class QueryStream extends Stream<ViewSnapshot> {
       isFromCache: snapshot.isFromCache,
       excludesMetadataChanges: snapshot.excludesMetadataChanges,
       hasCachedResults: snapshot.hasCachedResults,
+      readTime: snapshot.readTime,
     ));
   }
 

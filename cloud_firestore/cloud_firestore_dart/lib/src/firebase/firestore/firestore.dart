@@ -4,6 +4,12 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_listen_options.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_json.dart'
+    as snapshot_json;
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/app_check_token_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
@@ -424,6 +430,41 @@ class Firestore {
   Future<Query<Map<String, Object?>>?> getNamedQuery(String name) async {
     final core.Query? query = await client.getNamedQuery(name);
     return query == null ? null : Query(query, this);
+  }
+
+  /// Listens to the document of a [DocumentSnapshot.toJson] result, starting from that snapshot.
+  ///
+  /// The document in [json] is loaded into the local cache (as with [loadBundle]) and the document is then listened
+  /// to with [options], so the first event can be raised from the cache. Pass the [converter] of the original
+  /// reference to get typed snapshots. Throws a [FirestoreError] if [json] is not a document snapshot JSON object;
+  /// errors loading the bundle are delivered on the stream.
+  ///
+  /// This is the JS SDK `onSnapshotResume()` for a `DocumentSnapshot`.
+  Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
+    Map<String, Object?> json, {
+    SnapshotListenOptions options = const SnapshotListenOptions(),
+    FirestoreDataConverter<T>? converter,
+  }) {
+    return snapshot_json.documentSnapshotsFromJson<T>(
+        this, json, options, converter);
+  }
+
+  /// Listens to the query of a [QuerySnapshot.toJson] result, resuming from that snapshot.
+  ///
+  /// The query and documents in [json] are loaded into the local cache (as with [loadBundle]) and the query is then
+  /// listened to with [options]. The listen is resumed from the read time of the snapshot, so the backend only sends
+  /// what changed since then. Pass the [converter] of the original query to get typed snapshots. Throws a
+  /// [FirestoreError] if [json] is not a query snapshot JSON object; errors loading the bundle are delivered on the
+  /// stream.
+  ///
+  /// This is the JS SDK `onSnapshotResume()` for a `QuerySnapshot`.
+  Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
+    Map<String, Object?> json, {
+    SnapshotListenOptions options = const SnapshotListenOptions(),
+    FirestoreDataConverter<T>? converter,
+  }) {
+    return snapshot_json.querySnapshotsFromJson<T>(
+        this, json, options, converter);
   }
 
   /// Globally enables / disables Firestore logging for the SDK.

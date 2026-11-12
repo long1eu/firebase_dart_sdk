@@ -19,6 +19,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundled_docum
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundled_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/named_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/bound.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/geo_point.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
@@ -496,12 +497,42 @@ void main() {
               .filter(filter('f2', '==', 'bar')));
     });
 
-    test('testRejectsOrCompositeFilters', () {
+    // PORTING NOTE: the Android SDK rejects 'OR' composite filters. The port reads them (as the JS SDK does) so that
+    // the bundle of `QuerySnapshot.toJson()` for an OR query can be read back; unknown operators are still rejected.
+    test('testDecodesOrCompositeFilters', () {
+      assertDecodesNamedQuery(
+          collQuery(where: <String, dynamic>{
+            'compositeFilter': <String, dynamic>{
+              'op': 'OR',
+              'filters': <Object?>[
+                fieldFilter('EQUAL', 'f1', stringValue('foo')),
+                <String, dynamic>{
+                  'compositeFilter': <String, dynamic>{
+                    'op': 'AND',
+                    'filters': <Object?>[
+                      fieldFilter('EQUAL', 'f2', stringValue('bar')),
+                      fieldFilter('EQUAL', 'f3', stringValue('baz')),
+                    ],
+                  },
+                },
+              ],
+            },
+          }),
+          query('coll').filter(CompositeFilter.or(<Filter>[
+            filter('f1', '==', 'foo'),
+            CompositeFilter.and(<Filter>[
+              filter('f2', '==', 'bar'),
+              filter('f3', '==', 'baz'),
+            ]),
+          ])));
+    });
+
+    test('testRejectsUnknownCompositeFilters', () {
       expect(
           () => assertDecodesNamedQuery(
               collQuery(where: <String, dynamic>{
                 'compositeFilter': <String, dynamic>{
-                  'op': 'OR',
+                  'op': 'OPERATOR_UNSPECIFIED',
                   'filters': <Object?>[
                     fieldFilter('EQUAL', 'f1', stringValue('foo')),
                   ],

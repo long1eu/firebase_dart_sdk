@@ -55,8 +55,43 @@ class DocumentReference<T extends dynamic> {
         DocumentKey.fromPath(path), firestore, converter);
   }
 
+  /// Builds a [DocumentReference] of [firestore] from a JSON map created by [toJson], optionally with a [converter].
+  ///
+  /// Throws an [ArgumentError] if [json] does not have that shape or `referencePath` is not a document path. This is
+  /// the JS SDK `DocumentReference.fromJSON()`.
+  factory DocumentReference.fromJson(
+    Firestore firestore,
+    Map<String, Object?> json, {
+    FirestoreDataConverter<T>? converter,
+  }) {
+    final Object? referencePath = json['referencePath'];
+    if (json['type'] != jsonType || referencePath is! String) {
+      throw ArgumentError.value(
+          json, 'json', 'Not a JSON representation of a DocumentReference');
+    }
+    final ResourcePath path = ResourcePath.fromString(referencePath);
+    if (path.length == 0) {
+      throw ArgumentError.value(
+          json, 'json', 'The referencePath must be a document path');
+    }
+    return DocumentReference<T>.forPath(path, firestore, converter);
+  }
+
+  /// The value of the `type` field written by [toJson].
+  static const String jsonType = 'firestore/documentReference/1.0';
+
   @internal
   final DocumentKey key;
+
+  /// Returns a JSON-serializable representation of this reference: its `type` ([jsonType]) and `referencePath`, like
+  /// the JS SDK's `DocumentReference.toJSON()`. The Firestore instance and the converter are not part of it; read it
+  /// back with [DocumentReference.fromJson].
+  Map<String, Object> toJson() {
+    return <String, Object>{
+      'type': jsonType,
+      'referencePath': key.path.canonicalString,
+    };
+  }
 
   /// Gets the Firestore instance associated with this document reference.
   final Firestore firestore;

@@ -112,7 +112,10 @@ class DocumentReference
   getSnapshotsWithOptions(SnapshotListenOptions options): Stream<DocumentSnapshot<X0>>
   new DocumentReference(DocumentKey key, Firestore firestore, [FirestoreDataConverter<X0> converter]) @internal
   new DocumentReference.forPath(ResourcePath path, Firestore firestore, [FirestoreDataConverter<X0> converter]) @internal
+  new DocumentReference.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<X0> converter})
   set(X0 data, [SetOptions options]): Future<void>
+  static final jsonType: String
+  toJson(): Map<String, Object>
   update(Map<String, Object> data): Future<void>
   updateFromList(List<Object> data): Future<void>
   withConverter(FirestoreDataConverter<dynamic> converter): DocumentReference<dynamic>
@@ -145,7 +148,10 @@ class DocumentSnapshot
   getVectorValue(String field): VectorValue
   new DocumentSnapshot(Firestore _firestore, DocumentKey _key, Document document, {bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<X0> converter}) @internal
   new DocumentSnapshot.fromDocument(Firestore firestore, Document doc, {bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<X0> converter}) @internal
+  new DocumentSnapshot.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<X0> converter})
   new DocumentSnapshot.fromNoDocument(Firestore firestore, DocumentKey key, {bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<X0> converter}) @internal
+  static final jsonType: String
+  toJson(): Map<String, Object>
   toString(): String
 class FieldPath
   ==(Object other): bool
@@ -212,6 +218,7 @@ class Firestore
   disableNetwork(): Future<void>
   doc(String documentPath): DocumentReference<Map<String, Object>>
   document(String documentPath): DocumentReference<Map<String, Object>> @deprecated
+  documentSnapshotsFromJson(Map<String, Object> json, {SnapshotListenOptions options, FirestoreDataConverter<dynamic> converter}): Stream<DocumentSnapshot<dynamic>>
   enableNetwork(): Future<void>
   final client: FirestoreClient @internal
   final dataConverter: UserDataConverter @internal
@@ -225,6 +232,7 @@ class Firestore
   loadBundle(List<int> bundleData): LoadBundleTask
   loadBundleStream(Stream<List<int>> bundleData): LoadBundleTask
   new Firestore(DatabaseId databaseId, FirebaseApp firebaseApp, FirestoreClient client, TaskScheduler _scheduler) @internal
+  querySnapshotsFromJson(Map<String, Object> json, {SnapshotListenOptions options, FirestoreDataConverter<dynamic> converter}): Stream<QuerySnapshot<dynamic>>
   runBatch((.WriteBatch) -> dart.async.Future batchFunction): Future<void>
   runTransaction((.Transaction) -> dart.async.Future updateFunction, {TransactionOptions options}): Future<dynamic>
   shutdown(): Future<void> @deprecated
@@ -454,6 +462,9 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot<C1X0>>
   get length: int
   getDocumentChanges(MetadataChanges metadataChanges): List<DocumentChange<C1X0>>
   new QuerySnapshot(Query<C1X0> query, ViewSnapshot snapshot, Firestore _firestore) @internal
+  new QuerySnapshot.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<C1X0> converter})
+  static final jsonType: String
+  toJson(): Map<String, Object>
   toString(): String
 enum ServerTimestampBehavior
   new ServerTimestampBehavior(int #index, String #name)

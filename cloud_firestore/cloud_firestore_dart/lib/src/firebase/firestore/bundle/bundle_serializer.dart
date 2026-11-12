@@ -249,9 +249,24 @@ class BundleSerializer {
 
   void _decodeCompositeFilter(
       List<Filter> result, Map<String, dynamic> compositeFilter) {
-    if (_getString(compositeFilter, 'op') != 'AND') {
+    final String op = _getString(compositeFilter, 'op');
+    if (op == 'OR') {
+      // PORTING NOTE: the Android SDK only supports 'AND' here. The port also reads disjunctions (as the JS SDK does),
+      // so that the bundle written by `QuerySnapshot.toJson()` for an OR query can be read back.
+      final List<Filter> disjuncts = <Filter>[];
+      for (final dynamic filter
+          in _optArray(compositeFilter, 'filters') ?? <dynamic>[]) {
+        final List<Filter> decoded = <Filter>[];
+        _decodeFilter(decoded, _asObject(filter));
+        disjuncts.add(
+            decoded.length == 1 ? decoded.single : CompositeFilter.and(decoded));
+      }
+      result.add(CompositeFilter.or(disjuncts));
+      return;
+    }
+    if (op != 'AND') {
       throw ArgumentError(
-          'The Dart SDK only supports composite filters of type \'AND\'');
+          'The Dart SDK only supports composite filters of type \'AND\' and \'OR\'');
     }
 
     final List<dynamic>? filters = _optArray(compositeFilter, 'filters');

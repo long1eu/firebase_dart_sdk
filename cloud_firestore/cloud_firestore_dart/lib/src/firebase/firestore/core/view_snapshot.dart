@@ -8,6 +8,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_set.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/internal.dart';
 
@@ -29,6 +30,7 @@ class ViewSnapshot {
     required this.didSyncStateChange,
     required this.excludesMetadataChanges,
     required this.hasCachedResults,
+    this.readTime = SnapshotVersion.none,
   });
 
   /// Returns a view snapshot as if all documents in the snapshot were added.
@@ -39,6 +41,7 @@ class ViewSnapshot {
     required bool isFromCache,
     required bool excludesMetadataChanges,
     required bool hasCachedResults,
+    SnapshotVersion readTime = SnapshotVersion.none,
   }) {
     final List<DocumentViewChange> viewChanges = <DocumentViewChange>[];
     for (Document doc in documents) {
@@ -54,6 +57,7 @@ class ViewSnapshot {
       didSyncStateChange: true,
       excludesMetadataChanges: excludesMetadataChanges,
       hasCachedResults: hasCachedResults,
+      readTime: readTime,
     );
   }
 
@@ -70,6 +74,14 @@ class ViewSnapshot {
   /// token), so that even an empty result is a meaningful cached result.
   final bool hasCachedResults;
 
+  /// The backend snapshot version at which the documents of this snapshot are known to be consistent with the
+  /// server, or [SnapshotVersion.none] when unknown (for example when the snapshot is from cache).
+  ///
+  /// It is a lower bound: the view may still be consistent at later versions. It is used as the read time of the
+  /// bundle written by `QuerySnapshot.toJson()`, so that resuming the listen does not miss changes. It is not part of
+  /// [operator ==] or [hashCode].
+  final SnapshotVersion readTime;
+
   bool get hasPendingWrites => mutatedKeys.isNotEmpty;
 
   ViewSnapshot copyWith({
@@ -82,6 +94,7 @@ class ViewSnapshot {
     bool? didSyncStateChange,
     bool? excludesMetadataChanges,
     bool? hasCachedResults,
+    SnapshotVersion? readTime,
   }) {
     return ViewSnapshot(
       query ?? this.query,
@@ -94,6 +107,7 @@ class ViewSnapshot {
       excludesMetadataChanges:
           excludesMetadataChanges ?? this.excludesMetadataChanges,
       hasCachedResults: hasCachedResults ?? this.hasCachedResults,
+      readTime: readTime ?? this.readTime,
     );
   }
 
@@ -141,7 +155,8 @@ class ViewSnapshot {
           ..add('mutatedKeys', mutatedKeys)
           ..add('didSyncStateChange', didSyncStateChange)
           ..add('excludesMetadataChanges', excludesMetadataChanges)
-          ..add('hasCachedResults', hasCachedResults))
+          ..add('hasCachedResults', hasCachedResults)
+          ..add('readTime', readTime))
         .toString();
   }
 }

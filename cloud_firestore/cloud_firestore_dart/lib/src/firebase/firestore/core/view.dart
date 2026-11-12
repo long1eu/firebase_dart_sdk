@@ -14,6 +14,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/target_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_app_dart/internal.dart';
@@ -37,6 +38,11 @@ class View {
   /// flag from the backend and did not lose consistency within the watch stream (e.g. because of an existence filter
   /// mismatch).
   bool _current = false;
+
+  /// The snapshot version of the last remote event applied to this view (see [ViewSnapshot.readTime]).
+  SnapshotVersion _readTime = SnapshotVersion.none;
+
+  SnapshotVersion get readTime => _readTime;
 
   DocumentSet documentSet;
 
@@ -214,10 +220,18 @@ class View {
   ///
   /// [targetIsPendingReset] is true if the target is going to be reset because of an existence filter mismatch. While
   /// it is pending, no limbo documents are computed and the view is not reported as synced.
+  ///
+  /// [snapshotVersion] is the version of the remote event the changes come from, if any. Synced snapshots report the
+  /// last one as their [ViewSnapshot.readTime].
   ViewChange applyChanges(ViewDocumentChanges docChanges,
-      [TargetChange? targetChange, bool targetIsPendingReset = false]) {
+      [TargetChange? targetChange,
+      bool targetIsPendingReset = false,
+      SnapshotVersion? snapshotVersion]) {
     hardAssert(
         !docChanges.needsRefill, 'Cannot apply changes that need a refill');
+    if (snapshotVersion != null && snapshotVersion.compareTo(_readTime) > 0) {
+      _readTime = snapshotVersion;
+    }
 
     final DocumentSet oldDocumentSet = documentSet;
     documentSet = docChanges.documentSet;
@@ -268,6 +282,7 @@ class View {
         didSyncStateChange: syncStatedChanged,
         excludesMetadataChanges: false,
         hasCachedResults: hasCachedResults,
+        readTime: fromCache ? SnapshotVersion.none : _readTime,
       );
     }
     return ViewChange(snapshot, limboDocumentChanges);

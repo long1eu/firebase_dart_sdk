@@ -2,6 +2,9 @@
 // Lung Razvan <long1eu>
 // on 25/09/2018
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_json.dart'
+    as snapshot_json;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
@@ -26,6 +29,21 @@ class QuerySnapshot<T extends dynamic>
   QuerySnapshot(this.query, this.snapshot, this._firestore)
       : metadata =
             SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
+
+  /// Builds a [QuerySnapshot] from the JSON object written by [toJson], for the [firestore] instance.
+  ///
+  /// The snapshot is not from cache and has no pending writes; its [query] is the one of the original snapshot. Pass
+  /// the [converter] of the original query to get typed data back. Throws a [FirestoreError] if [json] is not a valid
+  /// query snapshot JSON object, for example one of a different project or database.
+  ///
+  /// This is the JS SDK `querySnapshotFromJSON()`.
+  factory QuerySnapshot.fromJson(
+    Firestore firestore,
+    Map<String, Object?> json, {
+    FirestoreDataConverter<T>? converter,
+  }) {
+    return snapshot_json.querySnapshotFromJson<T>(firestore, json, converter);
+  }
 
   final Query<T> query;
 
@@ -112,6 +130,20 @@ class QuerySnapshot<T extends dynamic>
     }()
         .iterator;
   }
+
+  /// The value of the `type` field written by [toJson].
+  static const String jsonType = 'firestore/querySnapshot/1.0';
+
+  /// Returns a JSON-serializable representation of this snapshot, which [QuerySnapshot.fromJson] reads back and
+  /// `Firestore.querySnapshotsFromJson` listens from.
+  ///
+  /// The `bundle` field holds the query and its documents as a Firestore bundle, with the query under the name in
+  /// `bundleName`. Throws a [FirestoreError] (failed-precondition) if the snapshot has pending writes: await
+  /// `waitForPendingWrites()` first.
+  ///
+  /// This is the JS SDK `QuerySnapshot.toJSON()`; the JSON is interchangeable with the one of the JS SDK (Node).
+  Map<String, Object?> toJson() =>
+      snapshot_json.querySnapshotToJson(_firestore, snapshot);
 
   QueryDocumentSnapshot<T> _convertDocument(Document document) {
     return QueryDocumentSnapshot<T>.fromDocument(

@@ -159,6 +159,9 @@ Cache settings, bundles, lifecycle:
 final settings = FirestoreSettings(
     cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024));
 final task = firestore.loadBundle(bundleBytes);          // LoadBundleTask
+final json = (await query.get()).toJson();               // e.g. sent from a server to a client
+final snapshot = QuerySnapshot.fromJson(firestore, json);
+firestore.querySnapshotsFromJson(json).listen((_) {});   // resumes listening from that snapshot
 await firestore.waitForPendingWrites();
 firestore.snapshotsInSync.listen((_) {});
 await firestore.terminate();
