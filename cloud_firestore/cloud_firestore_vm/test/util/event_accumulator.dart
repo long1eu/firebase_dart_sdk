@@ -75,6 +75,14 @@ class EventAccumulator<T> {
     }
   }
 
+  /// Fails if more events than the ones already waited for arrive within [wait].
+  Future<void> assertNoAdditionalEvents(
+      [Duration wait = const Duration(milliseconds: 500)]) async {
+    await Future<void>.delayed(wait);
+    hardAssert(_events.length == _maxEvents,
+        'Received ${_events.length - _maxEvents} unexpected additional event(s): ${_events.sublist(_maxEvents)}');
+  }
+
   void _checkFulfilled() {
     if (_completion != null && _events.length >= _maxEvents) {
       _completion!.complete();

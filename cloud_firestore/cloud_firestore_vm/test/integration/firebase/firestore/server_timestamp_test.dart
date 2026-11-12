@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
@@ -291,6 +292,28 @@ void main() {
       assert(false, 'This should not happen.');
     }
     expect(hadError, isTrue);
+  });
+
+  test('testServerTimestampBehaviorOverloadsOfDocumentSnapshotGet', () async {
+    await writeInitialData();
+    await docRef.update(updateData);
+    final DocumentSnapshot snap = await accumulator.awaitLocalEvent();
+
+    // The default behavior returns a null timestamp (via any accessor).
+    expect(snap.get('when'), isNull);
+    expect(snap.getField(FieldPath.of(<String>['when'])), isNull);
+    expect(snap['when'], isNull);
+    expect(snap.getTimestamp('when'), isNull);
+
+    // Estimate returns a Timestamp (via any accessor).
+    expect(
+        snap.get('when', ServerTimestampBehavior.estimate), isA<Timestamp>());
+    expect(
+        snap.getField(
+            FieldPath.of(<String>['when']), ServerTimestampBehavior.estimate),
+        isA<Timestamp>());
+    expect(snap.getTimestamp('when', ServerTimestampBehavior.estimate),
+        isA<Timestamp>());
   });
 }
 

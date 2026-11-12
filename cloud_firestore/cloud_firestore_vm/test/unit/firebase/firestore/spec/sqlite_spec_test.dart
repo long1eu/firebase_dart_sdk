@@ -11,7 +11,9 @@ import 'spec_skip_list.dart';
 void main() {
   registerSpecTests(
     variant: 'sqlite',
-    getPersistence: (_, String name) => createSQLitePersistence(
+    // The bundle specs carry documents of project 'test-project', which the persistence must be able to decode.
+    getPersistence: (_, String name) => createSQLitePersistenceForProject(
+      'test-project',
       'firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}',
     ),
     excludedTags: sqliteExcludedTags,

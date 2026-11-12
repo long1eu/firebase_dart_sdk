@@ -35,25 +35,22 @@ const Map<String, String?> skippedSpecFeatures = <String, String?>{
       'Benchmark spec (upstream RUN_BENCHMARK_TESTS=false); thousands of steps, not a functional test.',
 
   // --- Features the port lacks ---
-  'bundles':
-      'Bundles (loadBundle, BundleReader/BundleSerializer, named queries) are not ported.',
+  'bundles': null,
   'indexing':
-      'Local indexing (setIndexConfiguration, index-backed queries, expectedState.indexes) is not ported.',
+      'Local indexing (setIndexConfiguration, index-backed queries, expectedState.indexes) is not ported; both specs using it are also multi-client.',
   // Landed (ListenSource.cache): enabled again, kept as a null entry to show how a feature is switched on.
   'listen-source-cache': null,
-  'limit-to-last':
-      'Query.limitToLast / LimitType.LIMIT_TO_LAST is not ported (Query only has limit-to-first).',
+  'limit-to-last': null,
   // Landed (EventManager snapshots-in-sync listeners, SyncEngine.registerPendingWritesTask): enabled.
   'snapshots-in-sync': null,
   'wait-for-pending-writes': null,
   'decimal128':
-      'Decimal128 values and numeric increment with them (and the _methodName/_operand FieldValue encoding in specs) are not ported.',
+      'Decimal128 values (__decimal128__ / _methodName encoding) are not ported (no Decimal128 type in the model or serializer).',
   'fail-database':
-      'failDatabase needs a fault-injecting persistence layer (recovery from IndexedDB/SQLite errors, "recovery" specs); not ported.',
+      'failDatabase needs a fault-injecting persistence layer (recovery specs); all 25 specs are also tagged no-android upstream (Android has no persistence recovery).',
   'clear-persistence':
-      'clearPersistence step needs a way to wipe the persistence of a (shutdown) client; not available in the harness/port.',
-  'write-ack-transform-results':
-      'writeAck.transformResults is proto-JSON Value (BundleSerializer.decodeValue upstream); the harness can not decode it yet.',
+      'clearPersistence step shuts down other clients of a shared persistence; the only spec is multi-client.',
+  'write-ack-transform-results': null,
 };
 
 /// Tags that exclude a spec for one persistence variant only (not a missing feature: the spec simply does not apply to

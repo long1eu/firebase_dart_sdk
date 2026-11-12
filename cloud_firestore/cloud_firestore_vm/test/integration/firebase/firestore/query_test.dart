@@ -12,7 +12,9 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/source.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/write_batch.dart';
 import 'package:test/test.dart';
 
 import '../../../util/await_helper.dart';
@@ -978,6 +980,160 @@ void main() {
         .whereArrayContainsAny('array', <Object?>[double.nan, 43]).get();
     expect(querySnapshotToValues(snapshot), <dynamic>[docE]);
   });
+
+  /// Writes a document with `{x: 1}` for each of [docPaths] (with `${collectionGroup}` replaced) and returns the
+  /// collection group name, which starts with 'b' for a predictable ordering.
+  Future<String> writeCollectionGroupDocs(
+      Firestore db, List<String> docPaths) async {
+    final String collectionGroup = 'b${db.collection('foo').document().id}';
+    final WriteBatch batch = db.batch();
+    for (final String path in docPaths) {
+      batch.set(
+        db.document(path.replaceAll(r'${collectionGroup}', collectionGroup)),
+        <String, Object?>{'x': 1},
+      );
+    }
+    await batch.commit();
+    return collectionGroup;
+  }
+
+  test('testCollectionGroupQueries', () async {
+    final Firestore db = await testFirestore();
+    final String group = await writeCollectionGroupDocs(db, <String>[
+      r'abc/123/${collectionGroup}/cg-doc1',
+      r'abc/123/${collectionGroup}/cg-doc2',
+      r'${collectionGroup}/cg-doc3',
+      r'${collectionGroup}/cg-doc4',
+      r'def/456/${collectionGroup}/cg-doc5',
+      r'${collectionGroup}/virtual-doc/nested-coll/not-cg-doc',
+      r'x${collectionGroup}/not-cg-doc',
+      r'${collectionGroup}x/not-cg-doc',
+      r'abc/123/${collectionGroup}x/not-cg-doc',
+      r'abc/123/x${collectionGroup}/not-cg-doc',
+      r'abc/${collectionGroup}',
+    ]);
+
+    final QuerySnapshot querySnapshot = await db.collectionGroup(group).get();
+    expect(
+      IntegrationTestUtil.querySnapshotToIds(querySnapshot),
+      <String>['cg-doc1', 'cg-doc2', 'cg-doc3', 'cg-doc4', 'cg-doc5'],
+    );
+  });
+
+  test('testCollectionGroupQueriesWithStartAtEndAtWithArbitraryDocumentIds',
+      () async {
+    final Firestore db = await testFirestore();
+    final String group = await writeCollectionGroupDocs(db, <String>[
+      r'a/a/${collectionGroup}/cg-doc1',
+      r'a/b/a/b/${collectionGroup}/cg-doc2',
+      r'a/b/${collectionGroup}/cg-doc3',
+      r'a/b/c/d/${collectionGroup}/cg-doc4',
+      r'a/c/${collectionGroup}/cg-doc5',
+      r'${collectionGroup}/cg-doc6',
+      r'a/b/nope/nope',
+    ]);
+
+    QuerySnapshot querySnapshot = await db
+        .collectionGroup(group)
+        .orderByField(FieldPath.documentId())
+        .startAt(<Object?>['a/b']).endAt(<Object?>['a/b0']).get();
+    expect(IntegrationTestUtil.querySnapshotToIds(querySnapshot),
+        <String>['cg-doc2', 'cg-doc3', 'cg-doc4']);
+
+    querySnapshot = await db
+        .collectionGroup(group)
+        .orderByField(FieldPath.documentId())
+        .startAfter(<Object?>['a/b']).endBefore(
+            <Object?>['a/b/$group/cg-doc3']).get();
+    expect(IntegrationTestUtil.querySnapshotToIds(querySnapshot),
+        <String>['cg-doc2']);
+  });
+
+  test('testCollectionGroupQueriesWithWhereFiltersOnArbitraryDocumentIds',
+      () async {
+    final Firestore db = await testFirestore();
+    final String group = await writeCollectionGroupDocs(db, <String>[
+      r'a/a/${collectionGroup}/cg-doc1',
+      r'a/b/a/b/${collectionGroup}/cg-doc2',
+      r'a/b/${collectionGroup}/cg-doc3',
+      r'a/b/c/d/${collectionGroup}/cg-doc4',
+      r'a/c/${collectionGroup}/cg-doc5',
+      r'${collectionGroup}/cg-doc6',
+      r'a/b/nope/nope',
+    ]);
+
+    QuerySnapshot querySnapshot = await db
+        .collectionGroup(group)
+        .whereGreaterThanOrEqualToField(FieldPath.documentId(), 'a/b')
+        .whereLessThanOrEqualToField(FieldPath.documentId(), 'a/b0')
+        .get();
+    expect(IntegrationTestUtil.querySnapshotToIds(querySnapshot),
+        <String>['cg-doc2', 'cg-doc3', 'cg-doc4']);
+
+    querySnapshot = await db
+        .collectionGroup(group)
+        .whereGreaterThanField(FieldPath.documentId(), 'a/b')
+        .whereLessThanField(FieldPath.documentId(), 'a/b/$group/cg-doc3')
+        .get();
+    expect(IntegrationTestUtil.querySnapshotToIds(querySnapshot),
+        <String>['cg-doc2']);
+  });
+
+  // See https://github.com/firebase/firebase-android-sdk/issues/3528
+  test('testAddThenUpdatesWhileOffline', () async {
+    final CollectionReference collection = await testCollection();
+    await collection.firestore.disableNetwork();
+
+    unawaited(collection.add(<String, Object?>{'foo': 'zzyzx', 'bar': '1'}));
+
+    final QuerySnapshot snapshot1 = await collection.get(Source.cache);
+    expect(querySnapshotToValues(snapshot1), <Map<String, Object?>>[
+      <String, Object?>{'foo': 'zzyzx', 'bar': '1'}
+    ]);
+    final DocumentReference doc = snapshot1.documents.first.reference;
+
+    unawaited(doc.update(<String, Object?>{'bar': '2'}));
+
+    final QuerySnapshot snapshot2 = await collection.get(Source.cache);
+    expect(querySnapshotToValues(snapshot2), <Map<String, Object?>>[
+      <String, Object?>{'foo': 'zzyzx', 'bar': '2'}
+    ]);
+  });
+
+  test('testMultipleUpdatesWhileOffline', () async {
+    final CollectionReference collection = await testCollection();
+    await collection.firestore.disableNetwork();
+
+    final DocumentReference doc = collection.document();
+    unawaited(doc.set(<String, Object?>{'foo': 'zzyzx', 'bar': '1'},
+        SetOptions.mergeFields(<String>['foo', 'bar'])));
+
+    final QuerySnapshot snapshot1 = await collection.get(Source.cache);
+    expect(querySnapshotToValues(snapshot1), <Map<String, Object?>>[
+      <String, Object?>{'foo': 'zzyzx', 'bar': '1'}
+    ]);
+
+    unawaited(doc.update(<String, Object?>{'bar': '2'}));
+
+    final QuerySnapshot snapshot2 = await collection.get(Source.cache);
+    expect(querySnapshotToValues(snapshot2), <Map<String, Object?>>[
+      <String, Object?>{'foo': 'zzyzx', 'bar': '2'}
+    ]);
+  });
+
+  // These two upstream tests count existence filter mismatches through TestingHooks (a test-only hook of the Android
+  // SDK that the port does not have) against a backend that sends bloom filters, which the emulator does not.
+  test('resumingAQueryShouldUseBloomFilterToAvoidFullRequery', () {},
+      skip:
+          'NOT PORTABLE: needs the upstream TestingHooks (existence filter mismatch capture) and a production '
+          'backend that sends bloom filters; the bloom filter logic itself is covered by the existence_filter spec '
+          'tests.');
+
+  test('bloomFilterShouldCorrectlyEncodeComplexUnicodeCharacters', () {},
+      skip:
+          'NOT PORTABLE: needs the upstream TestingHooks (existence filter mismatch capture) and a production '
+          'backend that sends bloom filters; the bloom filter logic itself is covered by the existence_filter spec '
+          'tests.');
 }
 
 // ignore: always_specify_types, type_annotate_public_apis

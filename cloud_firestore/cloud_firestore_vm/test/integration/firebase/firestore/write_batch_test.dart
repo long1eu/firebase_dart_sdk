@@ -13,6 +13,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/write_batch.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
@@ -324,6 +326,38 @@ void main() {
     expect(when, isNotNull);
     expect(
         serverSnap.data, map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', when]));
+  });
+  test('testCanWriteVeryLargeBatches', () async {
+    // Create a map containing nearly 1 MB of data (1024 would make the document larger than 1 MB, which the backend
+    // rejects).
+    final String kb = 'a' * 1000;
+    final Map<String, Object?> values = <String, Object?>{
+      for (int j = 0; j < 1000; j++) autoId(): kb,
+    };
+
+    final DocumentReference doc = await testDocument();
+    final WriteBatch batch = doc.firestore.batch().set(doc, values);
+
+    // A batch with 3 copies of the data (~3 MB). Writing to the same document in a batch is allowed as long as the net
+    // size of the document stays under 1 MB.
+    for (int i = 0; i < 2; i++) {
+      batch.update(doc, values);
+    }
+
+    await batch.commit();
+    final DocumentSnapshot snap = await doc.get();
+    expect(snap.data, values);
+  });
+
+  test('testRunBatch', () async {
+    final DocumentReference doc = await testDocument();
+    await doc.set(map<String>(<String>['foo', 'bar']));
+    await doc.firestore.runBatch((WriteBatch batch) async {
+      batch.update(doc, map<dynamic>(<dynamic>['baz', 42]));
+    });
+    final DocumentSnapshot snapshot = await doc.get();
+    expect(snapshot.exists, isTrue);
+    expect(snapshot.data, map<dynamic>(<dynamic>['foo', 'bar', 'baz', 42]));
   });
 }
 

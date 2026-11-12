@@ -19,6 +19,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/aggregate_source.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:test/test.dart';
 
 import '../../../util/integration_test_util.dart';
@@ -124,8 +125,8 @@ void main() {
         'd': <String, Object?>{'k': 'd'},
       });
       expect((await c.orderBy('k').limitToLast(2).count().get()).getCount(), 2);
-      expect((await c.orderBy('k').limitToLast(1000).count().get()).getCount(),
-          4);
+      expect(
+          (await c.orderBy('k').limitToLast(1000).count().get()).getCount(), 4);
       expect(
           (await c
                   .whereGreaterThan('k', 'a')
@@ -476,6 +477,157 @@ void main() {
       final AggregateQuerySnapshot s =
           await run(c, <AggregateField>[AggregateField.sum(field)]);
       expect(s.get(AggregateField.sum(field)), 3);
+    });
+  });
+
+  group('Upstream CountTest / AggregationTest leftovers', () {
+    test('testCountQueryEquals', () async {
+      final CollectionReference coll1 = await testCollection('foo');
+      final CollectionReference coll1Same =
+          coll1.firestore.collection(coll1.path);
+      final AggregateQuery query1 = coll1.count();
+      final AggregateQuery query1Same = coll1Same.count();
+      AggregateQuery query2() => coll1
+          .document('bar')
+          .collection('baz')
+          .whereEqualTo('a', 1)
+          .limit(100)
+          .count();
+      AggregateQuery query3() => coll1
+          .document('bar')
+          .collection('baz')
+          .whereEqualTo('b', 1)
+          .orderBy('c')
+          .count();
+
+      expect(query1, query1Same);
+      expect(query2(), query2());
+      expect(query3(), query3());
+      expect(query1.hashCode, query1Same.hashCode);
+      expect(query2().hashCode, query2().hashCode);
+      expect(query3().hashCode, query3().hashCode);
+
+      expect(query1, isNot('string'));
+      expect(query1, isNot(query2()));
+      expect(query2(), isNot(query3()));
+      expect(query1.hashCode, isNot(query2().hashCode));
+      expect(query2().hashCode, isNot(query3().hashCode));
+    });
+
+    test('testAggregateQueryNotEquals', () async {
+      final CollectionReference coll = await testCollection('foo');
+
+      final AggregateQuery query1 =
+          coll.aggregate(<AggregateField>[AggregateField.count()]);
+      final AggregateQuery query2 =
+          coll.aggregate(<AggregateField>[AggregateField.sum('baz')]);
+      final AggregateQuery query3 =
+          coll.aggregate(<AggregateField>[AggregateField.average('baz')]);
+      expect(query1, isNot(query2));
+      expect(query2, isNot(query3));
+      expect(query3, isNot(query1));
+      expect(query1.hashCode, isNot(query2.hashCode));
+      expect(query2.hashCode, isNot(query3.hashCode));
+      expect(query3.hashCode, isNot(query1.hashCode));
+
+      final Query base = coll
+          .document('bar')
+          .collection('baz')
+          .whereEqualTo('a', 1)
+          .limit(100);
+      final AggregateQuery query4 =
+          base.aggregate(<AggregateField>[AggregateField.count()]);
+      final AggregateQuery query5 =
+          base.aggregate(<AggregateField>[AggregateField.sum('baz')]);
+      final AggregateQuery query6 =
+          base.aggregate(<AggregateField>[AggregateField.average('baz')]);
+      expect(query4, isNot(query5));
+      expect(query5, isNot(query6));
+      expect(query6, isNot(query4));
+      expect(query4.hashCode, isNot(query5.hashCode));
+      expect(query5.hashCode, isNot(query6.hashCode));
+      expect(query6.hashCode, isNot(query4.hashCode));
+    });
+
+    test('testCountSnapshotEquals', () async {
+      final CollectionReference collection =
+          await testCollectionWithDocs(<String, Map<String, Object?>>{
+        'a': <String, Object?>{'k': 'a'},
+        'b': <String, Object?>{'k': 'b'},
+        'c': <String, Object?>{'k': 'c'},
+      });
+
+      final AggregateQuerySnapshot snapshot1 = await collection
+          .whereEqualTo('k', 'b')
+          .count()
+          .get(AggregateSource.server);
+      final AggregateQuerySnapshot snapshot1Same = await collection
+          .whereEqualTo('k', 'b')
+          .count()
+          .get(AggregateSource.server);
+
+      final AggregateQuerySnapshot snapshot2 = await collection
+          .whereEqualTo('k', 'a')
+          .count()
+          .get(AggregateSource.server);
+      await collection.document('d').set(<String, Object?>{'k': 'a'});
+      final AggregateQuerySnapshot snapshot2Different = await collection
+          .whereEqualTo('k', 'a')
+          .count()
+          .get(AggregateSource.server);
+
+      expect(snapshot1, snapshot1Same);
+      expect(snapshot1.hashCode, snapshot1Same.hashCode);
+      expect(snapshot1.query, collection.whereEqualTo('k', 'b').count());
+
+      expect(snapshot1, isNot('string'));
+      expect(snapshot1, isNot(snapshot2));
+      expect(snapshot1.hashCode, isNot(snapshot2.hashCode));
+      expect(snapshot2, isNot(snapshot2Different));
+      expect(snapshot2.hashCode, isNot(snapshot2Different.hashCode));
+    });
+
+    test('testTerminateDoesNotCrashWithFlyingCountQuery', () async {
+      final CollectionReference collection =
+          await testCollectionWithDocs(<String, Map<String, Object?>>{
+        'a': <String, Object?>{'k': 'a'},
+        'b': <String, Object?>{'k': 'b'},
+        'c': <String, Object?>{'k': 'c'},
+      });
+
+      // The result is intentionally not awaited: terminating with the query in flight must not crash.
+      collection
+          .orderBy('k')
+          .count()
+          .get(AggregateSource.server)
+          .then<void>((_) {}, onError: (Object _) {});
+      await collection.firestore.terminate();
+    });
+
+    test('testTerminateDoesNotCrashWithFlyingAggregateQuery', () async {
+      final CollectionReference collection =
+          await testCollectionWithDocs(books);
+
+      collection
+          .aggregate(<AggregateField>[
+            AggregateField.count(),
+            AggregateField.sum('pages'),
+            AggregateField.average('pages'),
+          ])
+          .get(AggregateSource.server)
+          .then<void>((_) {}, onError: (Object _) {});
+      await collection.firestore.terminate();
+    });
+
+    test('testCanGetCorrectTypeForAvg', () async {
+      final CollectionReference collection =
+          await testCollectionWithDocs(books);
+
+      final AggregateQuerySnapshot snapshot = await collection
+          .aggregate(<AggregateField>[AggregateField.average('pages')]).get(
+              AggregateSource.server);
+
+      expect(snapshot.get(AggregateField.average('pages')), isA<double>());
     });
   });
 }

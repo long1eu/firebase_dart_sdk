@@ -683,4 +683,19 @@ void main() {
       expect(metadata.queries, isEmpty);
     });
   });
+
+  group('decodeValue', () {
+    test('decodesScalarAndNestedValues', () {
+      expect(serializer.decodeValue(stringValue('a')), wrap('a'));
+      expect(serializer.decodeValue(<String, dynamic>{'integerValue': '42'}),
+          wrap(42));
+      expect(
+          serializer.decodeValue(<String, dynamic>{
+            'arrayValue': <String, dynamic>{
+              'values': <dynamic>[stringValue('x')],
+            },
+          }),
+          wrap(<dynamic>['x']));
+    });
+  });
 }

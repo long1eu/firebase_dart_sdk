@@ -20,9 +20,17 @@ Future<SQLitePersistence> createSQLitePersistence([
   String? name,
   LruGarbageCollectorParams params = const LruGarbageCollectorParams(),
   StatsCollector statsCollector = StatsCollector.noOp,
+]) =>
+    createSQLitePersistenceForProject('projectId', name, params, statsCollector);
+
+Future<SQLitePersistence> createSQLitePersistenceForProject(
+  String projectId, [
+  String? name,
+  LruGarbageCollectorParams params = const LruGarbageCollectorParams(),
+  StatsCollector statsCollector = StatsCollector.noOp,
 ]) async {
   name ??= 'test-${const Uuid().v4()}';
-  final DatabaseId databaseId = DatabaseId.forProject('projectId');
+  final DatabaseId databaseId = DatabaseId.forProject(projectId);
   final LocalSerializer serializer =
       LocalSerializer(RemoteSerializer(databaseId));
 

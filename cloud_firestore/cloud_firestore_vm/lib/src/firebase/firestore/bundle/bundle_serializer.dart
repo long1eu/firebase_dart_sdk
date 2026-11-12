@@ -47,6 +47,10 @@ class BundleSerializer {
 
   final RemoteSerializer remoteSerializer;
 
+  /// Decodes a proto3 JSON `Value` into a model [FieldValue].
+  FieldValue decodeValue(Map<String, dynamic> value) =>
+      remoteSerializer.decodeValue(_decodeValue(value));
+
   NamedQuery decodeNamedQuery(Map<String, dynamic> namedQuery) {
     final String name = _getString(namedQuery, 'name');
     final BundledQuery bundledQuery =

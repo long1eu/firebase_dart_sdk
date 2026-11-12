@@ -3,10 +3,14 @@
 // on 10/10/2018
 
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/blob.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
@@ -163,6 +167,63 @@ void main() {
     final List<Object> refs = <Object>[docRef];
     final Map<String, Object?> data = map(<dynamic>['a', 42, 'refs', refs]);
     await verifySuccessfulWriteReadCycle(data, docRef);
+  });
+
+  // The BSON types of the upstream test (MinKey, Int32, Decimal128, BsonTimestamp, BsonBinary, BsonObjectId, regex,
+  // MaxKey) are not ported: this covers the others.
+  test('snapshotListenerSortsDifferentTypesSameAsServer', () async {
+    final CollectionReference colRef = await testCollection();
+    // The reference is created first to make sure it uses the same Firestore instance.
+    final DocumentReference docRef = colRef.document('testDocRef');
+
+    final Map<String, Map<String, Object?>> testDocs =
+        <String, Map<String, Object?>>{
+      'null': <String, Object?>{'value': null},
+      'boolean': <String, Object?>{'value': true},
+      'nan': <String, Object?>{'value': double.nan},
+      'double': <String, Object?>{'value': 1.0},
+      'int': <String, Object?>{'value': 1},
+      'timestamp': <String, Object?>{'value': const Timestamp(100, 123000000)},
+      'string': <String, Object?>{'value': 'a'},
+      'bytes': <String, Object?>{
+        'value': Blob(Uint8List.fromList(<int>[1, 2, 3]))
+      },
+      'reference': <String, Object?>{'value': docRef},
+      'geoPoint': <String, Object?>{'value': GeoPoint(1.23, 4.56)},
+      'array': <String, Object?>{
+        'value': <Object?>[
+          1.0,
+          'foo',
+          <String, Object?>{'key': true},
+          null
+        ]
+      },
+      'vector': <String, Object?>{
+        'value': FieldValue.vector(<double>[1, 2, 3])
+      },
+      'map': <String, Object?>{
+        'value': <String, Object?>{'key': true}
+      },
+    };
+    await IntegrationTestUtil.writeAllDocs(colRef, testDocs);
+
+    // The SDK sorts a listener the same way the backend sorts Query.get().
+    await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
+        colRef, colRef.orderBy('value'), testDocs, <String>[
+      'null',
+      'boolean',
+      'nan',
+      'double',
+      'int',
+      'timestamp',
+      'string',
+      'bytes',
+      'reference',
+      'geoPoint',
+      'array',
+      'vector',
+      'map',
+    ]);
   });
 }
 

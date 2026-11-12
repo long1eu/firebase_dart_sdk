@@ -9,6 +9,8 @@ import 'dart:typed_data';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/bundle/bundle_reader.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/bundle/bundle_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/event_manager.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/online_state.dart';
@@ -18,6 +20,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/sync_engine.dart'
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/listen_source.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/load_bundle_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
@@ -25,6 +28,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/pers
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
@@ -32,6 +36,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/existence_filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
@@ -96,6 +102,8 @@ class SpecTestCase implements RemoteStoreCallback {
   late MockDatastore _datastore;
   late RemoteStore _remoteStore;
   late SyncEngine _syncEngine;
+  final BundleSerializer _bundleSerializer =
+      BundleSerializer(RemoteSerializer(DatabaseId.forProject('test-project')));
   late EventManager _eventManager;
 
   /// The 'snapshots in sync' listeners that the spec added, and how often a listener fired since the last step.
@@ -288,12 +296,14 @@ class SpecTestCase implements RemoteStoreCallback {
         collectionGroup: collectionGroup,
       );
       if (queryDict.containsKey('limit')) {
-        // The spec files carry the limit type; the port only knows limit-to-first.
         final String limitType = queryDict['limitType'] ?? 'LimitToFirst';
-        if (limitType != 'LimitToFirst') {
-          throw UnsupportedSpecFeature('limit type $limitType');
+        if (limitType == 'LimitToFirst') {
+          query = query.limit(queryDict['limit']);
+        } else if (limitType == 'LimitToLast') {
+          query = query.limitToLast(queryDict['limit']);
+        } else {
+          throw asserts.fail('Unknown limit type: $limitType');
         }
-        query = query.limit(queryDict['limit']);
       }
       if (queryDict.containsKey('filters')) {
         final List<dynamic> array = queryDict['filters'];
@@ -675,9 +685,6 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   Future<void> _doWriteAck(Map<String, dynamic> writeAckSpec) async {
-    if (writeAckSpec.containsKey('transformResults')) {
-      throw UnsupportedSpecFeature('writeAck transformResults');
-    }
     final int _version = writeAckSpec['version'];
     final bool keepInQueue = writeAckSpec['keepInQueue'] ?? false;
     assert(
@@ -688,7 +695,14 @@ class SpecTestCase implements RemoteStoreCallback {
         _getCurrentOutstandingWrites().removeAt(0);
     _validateNextWriteSent(write.first);
 
-    final MutationResult mutationResult = MutationResult(version(_version));
+    final List<FieldValue> transformResults = <FieldValue>[
+      for (final dynamic value
+          in (writeAckSpec['transformResults'] as List<dynamic>?) ??
+              const <dynamic>[])
+        _bundleSerializer.decodeValue(value as Map<String, dynamic>),
+    ];
+    final MutationResult mutationResult =
+        MutationResult(version(_version), transformResults);
     await _datastore.ackWrite(version(_version), <MutationResult>[
       mutationResult,
     ]);
@@ -802,8 +816,18 @@ class SpecTestCase implements RemoteStoreCallback {
     'failDatabase',
     'clearPersistence',
     'setIndexConfiguration',
-    'loadBundle',
   };
+
+  Future<void> _doLoadBundle(String json) async {
+    final BundleReader bundleReader =
+        BundleReader.fromBytes(_bundleSerializer, utf8.encode(json));
+    final LoadBundleTask bundleTask = LoadBundleTask();
+    await _syncEngine.loadBundle(bundleReader, bundleTask);
+    // Let the resulting snapshots be delivered to the listeners.
+    await Future<void>.delayed(_delayDuration);
+    expect(bundleTask.isSuccessful, isTrue,
+        reason: 'Loading bundle failed with ${bundleTask.exception}');
+  }
 
   Future<void> _doTriggerLruGc(int cacheThreshold) async {
     final Object delegate = _localPersistence.referenceDelegate;
@@ -834,9 +858,8 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _doWaitForPendingWrites() async {
     final Completer<void> task = Completer<void>();
-    unawaited(task.future.then(
-        (_) => _waitForPendingWritesEvents += 1,
-        onError: (Object _) {}));
+    unawaited(task.future
+        .then((_) => _waitForPendingWritesEvents += 1, onError: (Object _) {}));
     await _syncEngine.registerPendingWritesTask(task);
   }
 
@@ -905,6 +928,8 @@ class SpecTestCase implements RemoteStoreCallback {
       // user is represented as having a null uid as a value for 'changeUser'.
       final String? uid = step['changeUser'];
       await _doChangeUser(uid);
+    } else if (step.containsKey('loadBundle')) {
+      await _doLoadBundle(step['loadBundle']);
     } else if (step.containsKey('restart')) {
       await _doRestart();
     } else {

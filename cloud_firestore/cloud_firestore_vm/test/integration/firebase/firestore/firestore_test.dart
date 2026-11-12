@@ -4,6 +4,12 @@
 
 import 'dart:async';
 
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart' show LogLevel;
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_settings.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local_cache_settings.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/transaction.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/write_batch.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
@@ -22,6 +28,7 @@ import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
 import '../../../util/await_helper.dart';
+import '../../../unit/firebase/firestore/local/mock/database_mock.dart';
 import '../../../util/event_accumulator.dart';
 import '../../../util/integration_test_util.dart';
 import '../../../util/test_util.dart';
@@ -1222,6 +1229,368 @@ void main() {
     await firestore.shutdown();
     expectError(
         firestore.disableNetwork, 'The client has already been shutdown');
+  });
+
+  test('testUpdateWithEmptyObjectReplacesAllFields', () async {
+    final DocumentReference documentReference = await testDocument();
+    await documentReference.set(<String, Object?>{'a': 'a'});
+
+    await documentReference.update(<String, Object?>{'a': <String, Object?>{}});
+    final DocumentSnapshot snapshot = await documentReference.get();
+    expect(snapshot.data, <String, Object?>{'a': <String, Object?>{}});
+  });
+
+  test('testMergeWithEmptyObjectReplacesAllFields', () async {
+    final DocumentReference documentReference = await testDocument();
+    await documentReference.set(<String, Object?>{'a': 'a'});
+
+    await documentReference.set(
+        <String, Object?>{'a': <String, Object?>{}}, SetOptions.mergeAllFields);
+    final DocumentSnapshot snapshot = await documentReference.get();
+    expect(snapshot.data, <String, Object?>{'a': <String, Object?>{}});
+  });
+
+  test('testMaintainsPersistenceAfterRestarting', () async {
+    // A fixed database file: the second instance must see what the first one persisted.
+    const String dbName = 'integration/firestore_restart_persistence.db';
+    DatabaseMock.deleteDatabaseFiles(dbName);
+
+    final Firestore firestore = await IntegrationTestUtil.testFirestoreInstance(
+        IntegrationTestUtil.provider.projectId,
+        LogLevel.w,
+        IntegrationTestUtil.newTestSettings(),
+        'integration/firestore',
+        fixedDbName: dbName);
+    final DocumentReference docRef =
+        firestore.collection('col1').document('doc1');
+    await docRef.set(<String, Object?>{'foo': 'bar'});
+    await firestore.terminate();
+
+    // Restart with the same database file to check that the persisted data is still there.
+    final Firestore firestore2 =
+        await IntegrationTestUtil.testFirestoreInstance(
+            IntegrationTestUtil.provider.projectId,
+            LogLevel.w,
+            IntegrationTestUtil.newTestSettings(),
+            'integration/firestore',
+            fixedDbName: dbName);
+    final DocumentSnapshot doc =
+        await firestore2.document(docRef.path).get(Source.cache);
+    expect(doc.exists, isTrue);
+    expect(doc.data, <String, Object?>{'foo': 'bar'});
+  });
+
+  // The message of errors that are wrapped into a FirestoreError by the document operations is prefixed with the type
+  // of the original error ("Invalid argument(s): ..."), so only check that it contains the expected text.
+  Future<void> expectErrorContaining(
+      FutureOr<dynamic> Function() runnable, String text) async {
+    await expectLater(
+        () async => runnable(),
+        throwsA(predicate(
+            (Object? e) => (e as dynamic).message.toString().contains(text))));
+  }
+
+  test('testNewOperationThrowsAfterFirestoreTerminate', () async {
+    final Firestore instance = await testFirestore();
+    final DocumentReference reference = instance.document('abc/123');
+    await reference.set(<String, Object?>{'Field': 100});
+
+    await instance.terminate();
+
+    const String expectedMessage = 'The client has already been shutdown';
+    await expectErrorContaining(reference.get, expectedMessage);
+    await expectErrorContaining(
+        () => reference.update(<String, Object?>{'Field': 1}), expectedMessage);
+    await expectErrorContaining(
+        () => reference.set(<String, Object?>{'Field': 1}), expectedMessage);
+    await expectErrorContaining(
+        () => instance.runBatch((WriteBatch batch) async {
+              batch.update(reference, <String, Object?>{'Field': 1});
+            }),
+        expectedMessage);
+    await expectErrorContaining(
+        () => instance.runTransaction<DocumentSnapshot>(
+            (Transaction transaction) => transaction.get(reference)),
+        expectedMessage);
+  });
+
+  test('testTerminateCalledMultipleTimes', () async {
+    final Firestore instance = await testFirestore();
+    final DocumentReference reference = instance.document('abc/123');
+    await reference.set(<String, Object?>{'Field': 100});
+
+    await instance.terminate();
+
+    const String expectedMessage = 'The client has already been shutdown';
+    await expectErrorContaining(reference.get, expectedMessage);
+
+    // Calling a second time should go through and change nothing.
+    await instance.terminate();
+
+    await expectErrorContaining(reference.get, expectedMessage);
+  });
+
+  test('testNamedDbHaveDifferentPersistence', () async {
+    final String projectId = IntegrationTestUtil.provider.projectId;
+    final Firestore db1 = await IntegrationTestUtil.testFirestoreInstance(
+        projectId,
+        LogLevel.w,
+        IntegrationTestUtil.newTestSettings(),
+        'integration/firestore',
+        databaseName: 'db1');
+    final Firestore db2 = await IntegrationTestUtil.testFirestoreInstance(
+        projectId,
+        LogLevel.w,
+        IntegrationTestUtil.newTestSettings(),
+        'integration/firestore',
+        databaseName: 'db2');
+
+    final DocumentReference docRef = db1.collection('col1').document(autoId());
+    await docRef.set(<String, Object?>{'foo': 'bar'});
+    expect((await docRef.get(Source.server)).get('foo'), 'bar');
+
+    final DocumentReference docRef2 = db2.document(docRef.path);
+
+    // db2 never saw the document: it is neither in its cache nor on the server (a different named database).
+    await expectLater(
+        docRef2.get(Source.cache),
+        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+            'code', FirestoreErrorCode.unavailable)));
+    expect((await docRef2.get(Source.server)).exists, isFalse);
+    expect((await docRef2.get()).exists, isFalse);
+  });
+
+  test('testCanGetDocumentWithMemoryLruGCEnabled', () async {
+    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
+    final Firestore db = await testFirestore(FirestoreSettings(
+      host: base.host,
+      port: base.port,
+      sslEnabled: base.sslEnabled,
+      cacheSettings: MemoryCacheSettings(gcSettings: MemoryLruGcSettings()),
+    ));
+
+    final DocumentReference doc = db.collection('abc').document('123');
+    await doc.set(<String, Object?>{'key': 'value'});
+
+    final DocumentSnapshot snapshot = await doc.get(Source.cache);
+    expect(snapshot.exists, isTrue);
+    expect(snapshot.metadata.isFromCache, isTrue);
+    expect(snapshot.data, <String, Object?>{'key': 'value'});
+  });
+
+  test('testCannotGetDocumentWithMemoryEagerGcEnabled', () async {
+    final FirestoreSettings base = IntegrationTestUtil.newTestSettings();
+    final Firestore db = await testFirestore(FirestoreSettings(
+      host: base.host,
+      port: base.port,
+      sslEnabled: base.sslEnabled,
+      cacheSettings:
+          const MemoryCacheSettings(gcSettings: MemoryEagerGcSettings()),
+    ));
+
+    final DocumentReference doc = db.collection('abc').document('123');
+    await doc.set(<String, Object?>{'key': 'value'});
+
+    await expectLater(
+        doc.get(Source.cache),
+        throwsA(isA<FirestoreError>().having((FirestoreError e) => e.code,
+            'code', FirestoreErrorCode.unavailable)));
+  });
+
+  group('SDK ordering is consistent with the backend', () {
+    final Map<String, Map<String, Object?>> idDocs =
+        <String, Map<String, Object?>>{
+      for (final String id in <String>[
+        'A',
+        'a',
+        'Aa',
+        '7',
+        '12',
+        '__id7__',
+        '__id12__',
+        '__id-2__',
+        '__id1_',
+        '_id1__',
+        '__id',
+        '__id9223372036854775807__',
+        '__id-9223372036854775808__',
+      ])
+        id: <String, Object?>{'a': 1},
+    };
+    const List<String> idsInOrder = <String>[
+      '__id-9223372036854775808__',
+      '__id-2__',
+      '__id7__',
+      '__id12__',
+      '__id9223372036854775807__',
+      '12',
+      '7',
+      'A',
+      'Aa',
+      '__id',
+      '__id1_',
+      '_id1__',
+      'a',
+    ];
+
+    // Values in the order of the backend (also used as map values, array elements and map keys).
+    const List<String> unicodeValuesByDocId = <String>[
+      'Łukasiewicz', // a
+      'Sierpiński', // b
+      '岩澤', // c
+      '🄟', // d
+      'Ｐ', // e
+      '︒', // f
+      '🐵', // g
+      '你好', // h
+      '你顥', // i
+      '😁', // j
+      '😀', // k
+    ];
+    const List<String> unicodeDocIds = <String>[
+      'b', 'a', 'h', 'i', 'c', 'f', 'e', 'd', 'g', 'k', 'j', //
+    ];
+
+    Map<String, Map<String, Object?>> unicodeDocs(
+        Object? Function(String value) wrap) {
+      return <String, Map<String, Object?>>{
+        for (int i = 0; i < unicodeValuesByDocId.length; i++)
+          String.fromCharCode('a'.codeUnitAt(0) + i): <String, Object?>{
+            'value': wrap(unicodeValuesByDocId[i]),
+          },
+      };
+    }
+
+    test('snapshotListenerSortsQueryByDocumentIdsSameAsGetQuery', () async {
+      final CollectionReference colRef = await testCollectionWithDocs(idDocs);
+      await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
+          colRef,
+          colRef.orderByField(FieldPath.documentId()),
+          idDocs,
+          idsInOrder);
+    });
+
+    test('snapshotListenerSortsFilteredQueryByDocumentIdsSameAsGetQuery',
+        () async {
+      final CollectionReference colRef = await testCollectionWithDocs(idDocs);
+      final Query filtered = colRef
+          .whereGreaterThanField(FieldPath.documentId(), '__id7__')
+          .whereLessThanOrEqualToField(FieldPath.documentId(), 'A')
+          .orderByField(FieldPath.documentId());
+      await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
+          colRef, filtered, idDocs, <String>[
+        '__id12__',
+        '__id9223372036854775807__',
+        '12',
+        '7',
+        'A',
+      ]);
+    });
+
+    test('sdkOrdersQueryByDocumentIdTheSameWayOnlineAndOffline', () async {
+      final CollectionReference colRef = await testCollectionWithDocs(idDocs);
+      await IntegrationTestUtil.checkOnlineAndOfflineResultsMatch(
+          colRef, colRef.orderByField(FieldPath.documentId()), idsInOrder);
+    });
+
+    test('snapshotListenerSortsUnicodeStringsAsServer', () async {
+      final Map<String, Map<String, Object?>> docs =
+          unicodeDocs((String v) => v);
+      final CollectionReference colRef = await testCollectionWithDocs(docs);
+      await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
+          colRef, colRef.orderBy('value'), docs, unicodeDocIds);
+    });
+
+    test('snapshotListenerSortsUnicodeStringsInArrayAsServer', () async {
+      final Map<String, Map<String, Object?>> docs =
+          unicodeDocs((String v) => <Object?>[v]);
+      final CollectionReference colRef = await testCollectionWithDocs(docs);
+      await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
+          colRef, colRef.orderBy('value'), docs, unicodeDocIds);
+    });
+
+    test('snapshotListenerSortsUnicodeStringsInMapAsServer', () async {
+      final Map<String, Map<String, Object?>> docs =
+          unicodeDocs((String v) => <String, Object?>{'foo': v});
+      final CollectionReference colRef = await testCollectionWithDocs(docs);
+      await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
+          colRef, colRef.orderBy('value'), docs, unicodeDocIds);
+    });
+
+    test('snapshotListenerSortsUnicodeStringsInMapKeyAsServer', () async {
+      final Map<String, Map<String, Object?>> docs =
+          unicodeDocs((String v) => <String, Object?>{v: 'foo'});
+      final CollectionReference colRef = await testCollectionWithDocs(docs);
+      await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
+          colRef, colRef.orderBy('value'), docs, unicodeDocIds);
+    });
+
+    test('snapshotListenerSortsUnicodeStringsInDocumentKeyAsServer', () async {
+      final List<String> keys = <String>[
+        'Łukasiewicz',
+        'Sierpiński',
+        '岩澤',
+        '🄟',
+        'Ｐ',
+        '︒',
+        '🐵',
+        '你好',
+        '你顥',
+        '😁',
+        '😀',
+      ];
+      final Map<String, Map<String, Object?>> docs =
+          <String, Map<String, Object?>>{
+        for (final String key in keys) key: <String, Object?>{'value': 'foo'},
+      };
+      final CollectionReference colRef = await testCollectionWithDocs(docs);
+      await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
+          colRef, colRef.orderByField(FieldPath.documentId()), docs, <String>[
+        'Sierpiński',
+        'Łukasiewicz',
+        '你好',
+        '你顥',
+        '岩澤',
+        '︒',
+        'Ｐ',
+        '🄟',
+        '🐵',
+        '😀',
+        '😁',
+      ]);
+    });
+
+    test('snapshotListenerSortsInvalidUnicodeStringsAsServer', () async {
+      final Map<String, Map<String, Object?>> testDocs =
+          <String, Map<String, Object?>>{
+        'a': <String, Object?>{'value': 'Z'},
+        'b': <String, Object?>{'value': '你好'},
+        'c': <String, Object?>{'value': '😀'},
+        'd': <String, Object?>{'value': 'ab\uD800'}, // Lone high surrogate.
+        'e': <String, Object?>{'value': 'ab\uDC00'}, // Lone low surrogate.
+        'f': <String, Object?>{'value': 'ab\uD800\uD800'}, // Unpaired high.
+        'g': <String, Object?>{'value': 'ab\uDC00\uDC00'}, // Unpaired low.
+      };
+      final CollectionReference colRef = await testCollectionWithDocs(testDocs);
+
+      // Invalid surrogates do not survive the UTF-8 encoding of the wire: upstream (Java protobuf) gets "?", Dart's UTF-8
+      // encoder substitutes U+FFFD. Server, cache and listener agree on that, which is what this test checks.
+      final Map<String, Map<String, Object?>> actualDocs =
+          <String, Map<String, Object?>>{
+        'a': <String, Object?>{'value': 'Z'},
+        'b': <String, Object?>{'value': '你好'},
+        'c': <String, Object?>{'value': '😀'},
+        'd': <String, Object?>{'value': 'ab\uFFFD'},
+        'e': <String, Object?>{'value': 'ab\uFFFD'},
+        'f': <String, Object?>{'value': 'ab\uFFFD\uFFFD'},
+        'g': <String, Object?>{'value': 'ab\uFFFD\uFFFD'},
+      };
+      await IntegrationTestUtil.assertSDKQueryResultsConsistentWithBackend(
+          colRef,
+          colRef.orderBy('value'),
+          actualDocs,
+          <String>['a', 'd', 'e', 'f', 'g', 'b', 'c']);
+    });
   });
 }
 

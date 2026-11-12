@@ -9,6 +9,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
@@ -146,6 +147,57 @@ void main() {
     expect(
         snap.getDouble('sum'), moreOrLessEquals(0.111, epsilon: doubleEpsilon));
     */
+  });
+  test('mergeOnExistingDocumentWithIncrement', () async {
+    await docRef.set(map(<dynamic>['sum', 1]));
+    await _expectLocalAndRemoteValueInt(1);
+    await docRef.set(map(<dynamic>['sum', FieldValue.increment(1337)]),
+        SetOptions.mergeAllFields);
+    await _expectLocalAndRemoteValueInt(1338);
+  });
+
+  test('incrementTwiceInABatch', () async {
+    await _writeInitialData(map(<dynamic>['sum', 'overwrite']));
+    await docRef.firestore.batch().updateFromList(docRef, <Object?>[
+      'sum',
+      FieldValue.increment(1)
+    ]).updateFromList(
+        docRef, <Object?>['sum', FieldValue.increment(1)]).commit();
+    await _expectLocalAndRemoteValueInt(2);
+  });
+
+  test('incrementDeleteIncrementInABatch', () async {
+    await _writeInitialData(map(<dynamic>['sum', 'overwrite']));
+    await docRef.firestore.batch().updateFromList(docRef, <Object?>[
+      'sum',
+      FieldValue.increment(1)
+    ]).updateFromList(docRef, <Object?>[
+      'sum',
+      FieldValue.delete()
+    ]).updateFromList(
+        docRef, <Object?>['sum', FieldValue.increment(3)]).commit();
+    await _expectLocalAndRemoteValueInt(3);
+  });
+
+  test('serverTimestampAndIncrement', () async {
+    // Stacks two pending transforms (a ServerTimestamp and an Increment), the setup of upstream issue
+    // firebase-android-sdk#491: decoding the ServerTimestamp as part of a PatchMutation used to fail an assertion.
+    await docRef.firestore.disableNetwork();
+
+    unawaited(docRef.set(map(<dynamic>['val', FieldValue.serverTimestamp()])));
+    unawaited(docRef.set(map(<dynamic>['val', FieldValue.increment(1)])));
+
+    DocumentSnapshot snap = await accumulator.awaitLocalEvent();
+    expect(
+        snap.getTimestamp('val', ServerTimestampBehavior.estimate), isNotNull);
+
+    snap = await accumulator.awaitLocalEvent();
+    expect(snap.getInt('val'), 1);
+
+    await docRef.firestore.enableNetwork();
+
+    snap = await accumulator.awaitRemoteEvent();
+    expect(snap.getInt('val'), 1);
   });
 }
 

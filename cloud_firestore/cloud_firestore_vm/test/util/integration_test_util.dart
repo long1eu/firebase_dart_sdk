@@ -18,7 +18,9 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_settings.dar
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
@@ -153,8 +155,13 @@ class IntegrationTestUtil {
 
   /// Initializes a new Firestore instance that can be used in testing. It is guaranteed to not share state with other
   /// instances returned from this call.
+  ///
+  /// With [fixedDbName] the instance uses exactly that database file and does not delete it, so that a later instance
+  /// created with the same name sees the persisted data (restart). Use [databaseName] to address a named database.
   static Future<Firestore> testFirestoreInstance(String projectId,
-      LogLevel logLevel, FirestoreSettings settings, String dbPath) async {
+      LogLevel logLevel, FirestoreSettings settings, String dbPath,
+      {String? fixedDbName,
+      String databaseName = DatabaseId.defaultDatabaseId}) async {
     // This unfortunately is a global setting that affects existing Firestore clients.
     Log.level = logLevel;
 
@@ -162,14 +169,16 @@ class IntegrationTestUtil {
     Persistence.indexingSupportEnabled = true;
 
     final DatabaseId databaseId =
-        DatabaseId.forDatabase(projectId, DatabaseId.defaultDatabaseId);
+        DatabaseId.forDatabase(projectId, databaseName);
     final String persistenceKey = 'db${firestoreStatus.length}';
 
     print('index: $dbIndex');
     // A name relative to build/test: DatabaseMock resolves it to a path itself.
-    final String dbName = '$dbPath\_${dbIndex++}.db';
+    final String dbName = fixedDbName ?? '$dbPath\_${dbIndex++}.db';
 
-    DatabaseMock.deleteDatabaseFiles(dbName);
+    if (fixedDbName == null) {
+      DatabaseMock.deleteDatabaseFiles(dbName);
+    }
 
     final TaskScheduler scheduler = TaskScheduler('');
     final MockCredentialsProvider credentialsProvider =
@@ -243,6 +252,70 @@ class IntegrationTestUtil {
     for (MapEntry<String, Map<String, Object?>> doc in docs.entries) {
       await collection.document(doc.key).set(doc.value);
     }
+  }
+
+  /// Checks that the SDK's local results for [query] agree with the backend (port of the upstream
+  /// `checkOnlineAndOfflineResultsMatch`). [collection] is read first to populate the cache; the order of the steps
+  /// matters. When [expectedDocs] is not empty the server result must be exactly that list of ids.
+  static Future<void> checkOnlineAndOfflineResultsMatch(
+      Query collection, Query query, List<String> expectedDocs) async {
+    // 1- Pre-populate the cache with the entire collection.
+    await collection.get(Source.server);
+    // 2- Query the cache with a full collection scan.
+    final QuerySnapshot fromCacheFullScan = await query.get(Source.cache);
+    // 3- Query the backend.
+    final QuerySnapshot fromServer = await query.get(Source.server);
+    // 4- Query the cache using the remote keys of the query.
+    final QuerySnapshot fromCacheRemoteKeys = await query.get(Source.cache);
+
+    expect(
+        querySnapshotToIds(fromCacheFullScan), querySnapshotToIds(fromServer));
+    expect(querySnapshotToIds(fromCacheRemoteKeys),
+        querySnapshotToIds(fromServer));
+    if (expectedDocs.isNotEmpty) {
+      expect(querySnapshotToIds(fromServer), expectedDocs);
+    }
+  }
+
+  /// Port of the upstream `assertSDKQueryResultsConsistentWithBackend`: the cache round trip, then a listener must
+  /// first raise the cached and then the server snapshot, both with [expectedDocIds] and the data of [allData].
+  static Future<void> assertSDKQueryResultsConsistentWithBackend(
+      Query collection,
+      Query query,
+      Map<String, Map<String, Object?>> allData,
+      List<String> expectedDocIds) async {
+    // Check the cache round trip first so that the listener below can not return partial results of a previous call.
+    await checkOnlineAndOfflineResultsMatch(collection, query, expectedDocIds);
+
+    final List<QuerySnapshot> snapshots = <QuerySnapshot>[];
+    final Completer<void> done = Completer<void>();
+    final StreamSubscription<QuerySnapshot> registration =
+        query.getSnapshots(MetadataChanges.include).listen(
+      (QuerySnapshot snapshot) {
+        snapshots.add(snapshot);
+        if (snapshots.length == 2 && !done.isCompleted) {
+          done.complete();
+        }
+      },
+      onError: done.completeError,
+    );
+    try {
+      await done.future.timeout(const Duration(seconds: 20));
+    } finally {
+      await registration.cancel();
+    }
+
+    void verifySnapshot(QuerySnapshot snapshot) {
+      expect(querySnapshotToIds(snapshot), expectedDocIds);
+      for (final DocumentSnapshot doc in snapshot) {
+        expect(doc.data, allData[doc.id]);
+      }
+    }
+
+    expect(snapshots[0].metadata.isFromCache, isTrue);
+    verifySnapshot(snapshots[0]);
+    expect(snapshots[1].metadata.isFromCache, isFalse);
+    verifySnapshot(snapshots[1]);
   }
 
   static Future<void> waitForOnlineSnapshot(DocumentReference doc) {
