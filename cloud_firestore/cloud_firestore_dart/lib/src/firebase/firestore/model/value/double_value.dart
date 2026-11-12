@@ -54,18 +54,21 @@ class DoubleValue extends NumberValue {
     if (other is! NumberValue) {
       return defaultCompareTo(other);
     }
+    if (other is Int32FieldValue || other is Decimal128FieldValue) {
+      return -other.compareTo(this);
+    }
 
-    final NumberValue otherValue = other;
-    if (value.isNaN && otherValue.value.isNaN) {
+    final num otherValue = other.value as num;
+    if (value.isNaN && otherValue.isNaN) {
       return 0;
     } else if (value.isNaN) {
       return -1;
-    } else if (otherValue.value is double && otherValue.value.isNaN) {
+    } else if (otherValue is double && otherValue.isNaN) {
       return 1;
-    } else if (otherValue.value == value) {
+    } else if (otherValue == value) {
       return 0;
     }
 
-    return value.compareTo(other.value);
+    return value.compareTo(otherValue);
   }
 }

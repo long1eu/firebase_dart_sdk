@@ -45,8 +45,8 @@ const Map<String, String?> skippedSpecFeatures = <String, String?>{
   // Landed (EventManager snapshots-in-sync listeners, SyncEngine.registerPendingWritesTask): enabled.
   'snapshots-in-sync': null,
   'wait-for-pending-writes': null,
-  'decimal128':
-      'Decimal128 values (__decimal128__ / _methodName encoding) are not ported (no Decimal128 type in the model or serializer).',
+  // Landed (Decimal128Value and the other BSON types): enabled.
+  'decimal128': null,
   'fail-database':
       'failDatabase needs a fault-injecting persistence layer (recovery specs); all 25 specs are also tagged no-android upstream (Android has no persistence recovery).',
   'clear-persistence':

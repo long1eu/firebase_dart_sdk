@@ -65,6 +65,12 @@ only. **Nothing was run against production Firestore.**
 
 ### Added
 
+- BSON value types for Enterprise edition databases: `MinKey`, `MaxKey`, `Int32Value`,
+  `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue`, and BSON binary data as a
+  `Blob` with a subtype (`Blob.bsonBinary`, `Blob.subtype`). They can be written, read (with
+  typed `DocumentSnapshot` getters such as `getInt32Value`), filtered and ordered, and the local
+  cache sorts them like the backend. `Blob.fromJson` now accepts a `subtype`. Until now a
+  document with such a field was read as a map like `{'__int__': 5}`.
 - Value helpers from the JS SDK: `Timestamp.fromMillis` / `toMillis`, `Blob.fromBase64String` /
   `toBase64`, `AggregateQuerySnapshot.data()` (results keyed by alias), and `toJson` /
   `fromJson` on `Timestamp`, `GeoPoint` and `Blob` in the JS `toJSON()` shape (so `jsonEncode`
@@ -142,7 +148,7 @@ only. **Nothing was run against production Firestore.**
 
 ### Not done
 
-BSON value types, index-free queries / overlays / index engine, persistence clearing (API to be
+Index-free queries / overlays / index engine, persistence clearing (API to be
 decided), Pipelines.
 
 ## Versions published as `cloud_firestore_vm`

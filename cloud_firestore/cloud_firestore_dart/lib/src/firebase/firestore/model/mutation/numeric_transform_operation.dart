@@ -40,6 +40,10 @@ abstract class NumericTransformOperation implements TransformOperation {
       return operand.value;
     } else if (operand is IntegerValue) {
       return operand.value.toDouble();
+    } else if (operand is Int32FieldValue) {
+      return operand.intValue.toDouble();
+    } else if (operand is Decimal128FieldValue) {
+      return operand.doubleValue;
     } else {
       throw fail(
           "Expected 'operand' to be of Number type, but was ${operand.runtimeType}");
@@ -52,6 +56,10 @@ abstract class NumericTransformOperation implements TransformOperation {
       return operand.value.toInt();
     } else if (operand is IntegerValue) {
       return operand.value;
+    } else if (operand is Int32FieldValue) {
+      return operand.intValue;
+    } else if (operand is Decimal128FieldValue) {
+      return operand.doubleValue.toInt();
     } else {
       throw fail(
           "Expected 'operand' to be of Number type, but was ${operand.runtimeType}");

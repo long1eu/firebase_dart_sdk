@@ -17,6 +17,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query_stream.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/sync_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
@@ -31,9 +32,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/numeric_increment_transform_operation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
@@ -368,6 +372,17 @@ class SpecTestCase implements RemoteStoreCallback {
     if (obj is List<dynamic>) {
       return _parseList(obj);
     } else if (obj is Map<String, dynamic>) {
+      if (obj.containsKey('__decimal128__')) {
+        final Object? decimal = obj['__decimal128__'];
+        if (decimal is Map<String, dynamic> && decimal['stringValue'] != null) {
+          return Decimal128Value(decimal['stringValue'] as String);
+        } else if (decimal is String) {
+          return Decimal128Value(decimal);
+        }
+      }
+      if (obj['_methodName'] == 'increment') {
+        return _SpecIncrement(_parseObject(obj['_operand']));
+      }
       return _parseMap(obj);
     } else {
       return obj;
@@ -506,7 +521,21 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   Future<void> _doPatch(List<dynamic> patchSpec) async {
-    await _doMutation(patchMutation(patchSpec[0], _parseMap(patchSpec[1])));
+    final Map<String, Object?> values = _parseMap(patchSpec[1]);
+    // An increment is a field transform, it is neither part of the patched
+    // data nor of the field mask.
+    final List<FieldTransform> transforms = <FieldTransform>[
+      for (final MapEntry<String, Object?> entry in values.entries)
+        if (entry.value is _SpecIncrement)
+          FieldTransform(field(entry.key),
+              (entry.value! as _SpecIncrement).toOperation()),
+    ];
+    values.removeWhere((String key, Object? value) => value is _SpecIncrement);
+    final PatchMutation patch = patchMutation(patchSpec[0], values);
+    await _doMutation(transforms.isEmpty
+        ? patch
+        : PatchMutation(
+            patch.key, patch.value, patch.mask, patch.precondition, transforms));
   }
 
   Future<void> _doDelete(String key) async {
@@ -1390,4 +1419,23 @@ class Pair<F, S> {
 
   final F first;
   final S second;
+}
+
+/// A `FieldValue.increment()` in the data of a spec.
+class _SpecIncrement {
+  const _SpecIncrement(this.operand);
+
+  final Object? operand;
+
+  NumericIncrementTransformOperation toOperation() {
+    final Object? operand = this.operand;
+    // PORTING NOTE: like the public API of the Android SDK, the operand of an
+    // increment is an integer or a double.
+    final num number = operand is Decimal128Value
+        ? double.parse(operand.stringValue)
+        : operand is String
+            ? double.parse(operand)
+            : operand! as num;
+    return NumericIncrementTransformOperation(wrap(number) as NumberValue);
+  }
 }

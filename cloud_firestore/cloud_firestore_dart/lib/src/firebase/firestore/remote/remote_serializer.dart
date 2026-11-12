@@ -5,12 +5,16 @@
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/blob.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/bson_object_id.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/bson_timestamp.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/bound.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
@@ -36,6 +40,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/regex_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/existence_filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
@@ -199,7 +204,47 @@ class RemoteSerializer {
     } else if (value is GeoPointValue) {
       builder.geoPointValue = _encodeGeoPoint(value.value);
     } else if (value is BlobValue) {
-      builder.bytesValue = value.value.bytes;
+      final Blob blob = value.value;
+      if (blob.subtype == 0) {
+        builder.bytesValue = blob.bytes;
+      } else {
+        // BSON binary data is a map with the subtype in front of the bytes.
+        builder.mapValue = _encodeSingleFieldMap(
+            BsonKeys.binary,
+            proto_v1.Value.create()
+              ..bytesValue = <int>[blob.subtype, ...blob.bytes]);
+      }
+    } else if (value is MinKeyValue) {
+      builder.mapValue = _encodeSingleFieldMap(BsonKeys.minKey,
+          proto_v1.Value.create()..nullValue = proto.NullValue.NULL_VALUE);
+    } else if (value is MaxKeyValue) {
+      builder.mapValue = _encodeSingleFieldMap(BsonKeys.maxKey,
+          proto_v1.Value.create()..nullValue = proto.NullValue.NULL_VALUE);
+    } else if (value is Int32FieldValue) {
+      builder.mapValue = _encodeSingleFieldMap(BsonKeys.int32,
+          proto_v1.Value.create()..integerValue = Int64(value.intValue));
+    } else if (value is Decimal128FieldValue) {
+      builder.mapValue = _encodeSingleFieldMap(BsonKeys.decimal128,
+          proto_v1.Value.create()..stringValue = value.value.stringValue);
+    } else if (value is BsonObjectIdValue) {
+      builder.mapValue = _encodeSingleFieldMap(BsonKeys.objectId,
+          proto_v1.Value.create()..stringValue = value.value.value);
+    } else if (value is BsonTimestampValue) {
+      final proto.MapValue inner = proto.MapValue.create();
+      inner.fields[BsonKeys.timestampSeconds] = proto_v1.Value.create()
+        ..integerValue = Int64(value.value.seconds);
+      inner.fields[BsonKeys.timestampIncrement] = proto_v1.Value.create()
+        ..integerValue = Int64(value.value.increment);
+      builder.mapValue = _encodeSingleFieldMap(
+          BsonKeys.timestamp, proto_v1.Value.create()..mapValue = inner);
+    } else if (value is RegexFieldValue) {
+      final proto.MapValue inner = proto.MapValue.create();
+      inner.fields[BsonKeys.regexPattern] = proto_v1.Value.create()
+        ..stringValue = value.value.pattern;
+      inner.fields[BsonKeys.regexOptions] = proto_v1.Value.create()
+        ..stringValue = value.value.options;
+      builder.mapValue = _encodeSingleFieldMap(
+          BsonKeys.regex, proto_v1.Value.create()..mapValue = inner);
     } else if (value is ReferenceValue) {
       final DatabaseId id = value.databaseId;
       final DocumentKey key = value.value;
@@ -318,7 +363,115 @@ class RemoteSerializer {
     return VectorFieldValue.fromList(doubles);
   }
 
+  proto.MapValue _encodeSingleFieldMap(String key, proto_v1.Value value) {
+    final proto.MapValue builder = proto.MapValue.create();
+    builder.fields[key] = value;
+    return builder..freeze();
+  }
+
+  /// Returns the BSON value encoded by [value], or null if it is a regular map.
+  ///
+  /// A BSON value is a map with a single reserved key whose value has the
+  /// expected type. Any other shape is a regular map.
+  FieldValue? _tryDecodeBson(proto.MapValue value) {
+    if (value.fields.length != 1) {
+      return null;
+    }
+    final String key = value.fields.keys.first;
+    final proto_v1.Value field = value.fields.values.first;
+    final proto_v1.Value_ValueType type = field.whichValueType();
+    switch (key) {
+      case BsonKeys.minKey:
+        return type == proto_v1.Value_ValueType.nullValue
+            ? MinKeyValue.instance()
+            : null;
+      case BsonKeys.maxKey:
+        return type == proto_v1.Value_ValueType.nullValue
+            ? MaxKeyValue.instance()
+            : null;
+      case BsonKeys.int32:
+        if (type != proto_v1.Value_ValueType.integerValue) {
+          return null;
+        }
+        final int int32 = field.integerValue.toInt();
+        if (int32 < Int32Value.minValue || int32 > Int32Value.maxValue) {
+          return null;
+        }
+        return Int32FieldValue.valueOf(Int32Value(int32));
+      case BsonKeys.decimal128:
+        if (type != proto_v1.Value_ValueType.stringValue) {
+          return null;
+        }
+        try {
+          return Decimal128FieldValue.valueOf(
+              Decimal128Value(field.stringValue));
+        } on FormatException {
+          return null;
+        }
+      case BsonKeys.objectId:
+        return type == proto_v1.Value_ValueType.stringValue
+            ? BsonObjectIdValue.valueOf(BsonObjectId(field.stringValue))
+            : null;
+      case BsonKeys.binary:
+        // A subtype of 0 is a regular blob, which is never encoded as a map.
+        if (type != proto_v1.Value_ValueType.bytesValue ||
+            field.bytesValue.isEmpty ||
+            field.bytesValue[0] == 0) {
+          return null;
+        }
+        return BlobValue.valueOf(Blob.bsonBinary(field.bytesValue[0] & 0xff,
+            Uint8List.fromList(field.bytesValue.sublist(1))));
+      case BsonKeys.timestamp:
+        if (type != proto_v1.Value_ValueType.mapValue) {
+          return null;
+        }
+        final Map<String, proto_v1.Value> inner = field.mapValue.fields;
+        final proto_v1.Value? seconds = inner[BsonKeys.timestampSeconds];
+        final proto_v1.Value? increment = inner[BsonKeys.timestampIncrement];
+        if (inner.length != 2 ||
+            seconds == null ||
+            increment == null ||
+            seconds.whichValueType() != proto_v1.Value_ValueType.integerValue ||
+            increment.whichValueType() !=
+                proto_v1.Value_ValueType.integerValue) {
+          return null;
+        }
+        final int secondsValue = seconds.integerValue.toInt();
+        final int incrementValue = increment.integerValue.toInt();
+        if (secondsValue < 0 ||
+            secondsValue > BsonTimestamp.maxValue ||
+            incrementValue < 0 ||
+            incrementValue > BsonTimestamp.maxValue) {
+          return null;
+        }
+        return BsonTimestampValue.valueOf(
+            BsonTimestamp(secondsValue, incrementValue));
+      case BsonKeys.regex:
+        if (type != proto_v1.Value_ValueType.mapValue) {
+          return null;
+        }
+        final Map<String, proto_v1.Value> inner = field.mapValue.fields;
+        final proto_v1.Value? pattern = inner[BsonKeys.regexPattern];
+        final proto_v1.Value? options = inner[BsonKeys.regexOptions];
+        if (inner.length != 2 ||
+            pattern == null ||
+            options == null ||
+            pattern.whichValueType() != proto_v1.Value_ValueType.stringValue ||
+            options.whichValueType() != proto_v1.Value_ValueType.stringValue) {
+          return null;
+        }
+        return RegexFieldValue.valueOf(
+            RegexValue(pattern.stringValue, options.stringValue));
+      default:
+        return null;
+    }
+  }
+
   FieldValue _decodeMapValue(proto.MapValue value) {
+    final FieldValue? bson = _tryDecodeBson(value);
+    if (bson != null) {
+      return bson;
+    }
     final VectorFieldValue? vector = _tryDecodeVector(value);
     if (vector != null) {
       return vector;

@@ -41,13 +41,29 @@ class Blob
   ==(Object other): bool
   compareTo(Blob other): int
   final bytes: Uint8List
+  final subtype: int
   get hashCode: int
   new Blob(Uint8List bytes)
+  new Blob.bsonBinary(int subtype, Uint8List bytes)
   new Blob.fromBase64String(String base64String)
   new Blob.fromJson(Map<String, Object> json)
   static final jsonType: String
   toBase64(): String
   toJson(): Map<String, Object>
+  toString(): String
+class BsonObjectId
+  ==(Object other): bool
+  final value: String
+  get hashCode: int
+  new BsonObjectId(String value)
+  toString(): String
+class BsonTimestamp
+  ==(Object other): bool
+  final increment: int
+  final seconds: int
+  get hashCode: int
+  new BsonTimestamp(int seconds, int increment)
+  static final maxValue: int
   toString(): String
 class CollectionReference extends Query<X0>
   add(X0 data): Future<DocumentReference<X0>>
@@ -68,6 +84,12 @@ abstract class Database
   get path: String
   new Database()
   query(String statement, [List<Object> arguments]): Future<List<Map<String, dynamic>>>
+class Decimal128Value
+  ==(Object other): bool
+  final stringValue: String
+  get hashCode: int
+  new Decimal128Value(String stringValue)
+  toString(): String
 enum Direction
   new Direction(int #index, String #name)
   static final ascending: Direction
@@ -136,13 +158,20 @@ class DocumentSnapshot
   get(String field, [ServerTimestampBehavior serverTimestampBehavior]): Object
   getBlob(String field): Blob
   getBool(String field): bool
+  getBsonObjectId(String field): BsonObjectId
+  getBsonTimestamp(String field): BsonTimestamp
   getData(ServerTimestampBehavior serverTimestampBehavior): X0
   getDate(String field, [ServerTimestampBehavior serverTimestampBehavior]): DateTime
+  getDecimal128Value(String field): Decimal128Value
   getDocumentReference(String field): DocumentReference<Map<String, Object>>
   getDouble(String field): double
   getField(FieldPath fieldPath, [ServerTimestampBehavior serverTimestampBehavior]): Object
   getGeoPoint(String field): GeoPoint
   getInt(String field): int
+  getInt32Value(String field): Int32Value
+  getMaxKey(String field): MaxKey
+  getMinKey(String field): MinKey
+  getRegexValue(String field): RegexValue
   getString(String field): String
   getTimestamp(String field, [ServerTimestampBehavior serverTimestampBehavior]): Timestamp
   getVectorValue(String field): VectorValue
@@ -309,6 +338,14 @@ class GeoPoint
   static final jsonType: String
   toJson(): Map<String, Object>
   toString(): String
+class Int32Value
+  ==(Object other): bool
+  final value: int
+  get hashCode: int
+  new Int32Value(int value)
+  static final maxValue: int
+  static final minValue: int
+  toString(): String
 enum ListenSource
   new ListenSource(int #index, String #name)
   static final cache: ListenSource
@@ -354,6 +391,10 @@ enum LogLevel
   static final error: LogLevel
   static final silent: LogLevel
   static final values: List<LogLevel>
+class MaxKey
+  new MaxKey._()
+  static final instance: MaxKey
+  toString(): String
 class MemoryCacheSettings extends LocalCacheSettings
   ==(Object other): bool
   final gcSettings: MemoryGarbageCollectorSettings
@@ -378,6 +419,10 @@ enum MetadataChanges
   static final exclude: MetadataChanges
   static final include: MetadataChanges
   static final values: List<MetadataChanges>
+class MinKey
+  new MinKey._()
+  static final instance: MinKey
+  toString(): String
 typedef OnConfigure = Future<void> Function(Database db)
 typedef OnCreate = Future<void> Function(Database db, int version)
 typedef OnOpen = Future<void> Function(Database db)
@@ -465,6 +510,13 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot<C1X0>>
   new QuerySnapshot.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<C1X0> converter})
   static final jsonType: String
   toJson(): Map<String, Object>
+  toString(): String
+class RegexValue
+  ==(Object other): bool
+  final options: String
+  final pattern: String
+  get hashCode: int
+  new RegexValue(String pattern, String options)
   toString(): String
 enum ServerTimestampBehavior
   new ServerTimestampBehavior(int #index, String #name)

@@ -94,7 +94,7 @@ void main() {
         value);
   });
 
-  test('fromJson rejects malformed input and BSON subtypes', () {
+  test('fromJson rejects malformed input', () {
     final Matcher throwsArgumentError = throwsA(isA<ArgumentError>());
     expect(() => Blob.fromJson(<String, Object?>{'bytes': 'AQID'}),
         throwsArgumentError);
@@ -106,8 +106,29 @@ void main() {
         () => Blob.fromJson(<String, Object?>{
               'type': 'firestore/bytes/1.0',
               'bytes': 'AQID',
-              'subtype': 4
+              'subtype': 256
             }),
         throwsArgumentError);
+    expect(
+        () => Blob.fromJson(<String, Object?>{
+              'type': 'firestore/bytes/1.0',
+              'bytes': 'AQID',
+              'subtype': '4'
+            }),
+        throwsArgumentError);
+  });
+
+  test('toJson and fromJson keep the subtype of BSON binary data', () {
+    final Blob value = Blob.bsonBinary(4, Uint8List.fromList(<int>[1, 2, 3]));
+    expect(value.toJson(), <String, Object>{
+      'type': 'firestore/bytes/1.0',
+      'bytes': 'AQID',
+      'subtype': 4,
+    });
+    expect(Blob.fromJson(value.toJson()), value);
+    expect(Blob.fromJson(value.toJson()).subtype, 4);
+    // A subtype of 0 is a regular blob and is left out.
+    expect(Blob.bsonBinary(0, Uint8List.fromList(<int>[1])).toJson(),
+        Blob(Uint8List.fromList(<int>[1])).toJson());
   });
 }

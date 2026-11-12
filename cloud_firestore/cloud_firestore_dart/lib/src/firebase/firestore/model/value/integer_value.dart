@@ -38,13 +38,18 @@ class IntegerValue extends NumberValue {
   /// Comparing 0 with 0.0 should return 0;
   @override
   int compareTo(FieldValue other) {
-    if (other is NumberValue) {
-      if (other.value.isNaN) {
+    if (other is Int32FieldValue) {
+      return value.compareTo(other.intValue);
+    } else if (other is Decimal128FieldValue) {
+      return -other.compareTo(this);
+    } else if (other is NumberValue) {
+      final num otherValue = other.value as num;
+      if (otherValue.isNaN) {
         return 1;
-      } else if (other.value is double && other.value == 0.0) {
+      } else if (otherValue is double && otherValue == 0.0) {
         return value.compareTo(0);
       } else {
-        return value.compareTo(other.value);
+        return value.compareTo(otherValue);
       }
     } else {
       return defaultCompareTo(other);

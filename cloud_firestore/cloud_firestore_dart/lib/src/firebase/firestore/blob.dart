@@ -11,10 +11,27 @@ import 'package:collection/collection.dart';
 
 /// An immutable sequence of bytes, the value of a `bytes` field in a document.
 ///
-/// Two blobs are equal when their bytes are equal, and blobs are ordered byte by byte.
+/// Two blobs are equal when their bytes and their [subtype] are equal, and blobs are ordered by
+/// subtype and then byte by byte.
 class Blob implements Comparable<Blob> {
   /// Creates a blob holding a copy of [bytes].
-  Blob(Uint8List bytes) : bytes = Uint8List.fromList(bytes);
+  Blob(Uint8List bytes)
+      : bytes = Uint8List.fromList(bytes),
+        subtype = 0;
+
+  /// Creates BSON binary data, a blob with a [subtype].
+  ///
+  /// A [subtype] of 0 creates the same value as the default constructor. Only
+  /// databases of the Enterprise edition store blobs with another subtype.
+  ///
+  /// Throws an [ArgumentError] if [subtype] is not in the range `[0, 255]`.
+  Blob.bsonBinary(this.subtype, Uint8List bytes)
+      : bytes = Uint8List.fromList(bytes) {
+    if (subtype < 0 || subtype > 255) {
+      throw ArgumentError.value(subtype, 'subtype',
+          'The subtype for Blob must be a value in the inclusive [0, 255] range.');
+    }
+  }
 
   /// Creates a blob from a base64-encoded string.
   ///
@@ -26,18 +43,18 @@ class Blob implements Comparable<Blob> {
   /// Builds a blob from a JSON map created by [toJson].
   ///
   /// Throws an [ArgumentError] if [json] does not have that shape, or carries a
-  /// non-zero `subtype` (BSON binary data, which this SDK does not support),
-  /// and a [FormatException] if `bytes` is not valid base64.
+  /// `subtype` that is not an integer in the range `[0, 255]`, and a
+  /// [FormatException] if `bytes` is not valid base64.
   factory Blob.fromJson(Map<String, Object?> json) {
     final Object? data = json['bytes'];
     final Object? subtype = json['subtype'];
     if (json['type'] != jsonType ||
         data is! String ||
-        (subtype != null && subtype != 0)) {
+        (subtype != null && subtype is! int)) {
       throw ArgumentError.value(
           json, 'json', 'Not a JSON representation of a Blob');
     }
-    return Blob.fromBase64String(data);
+    return Blob.bsonBinary(subtype as int? ?? 0, base64Decode(data));
   }
 
   /// The value of the `type` field written by [toJson].
@@ -46,17 +63,31 @@ class Blob implements Comparable<Blob> {
   /// The bytes of this blob.
   final Uint8List bytes;
 
+  /// The subtype of BSON binary data, 0 for a regular blob.
+  final int subtype;
+
   /// The bytes of this blob, base64-encoded.
   String toBase64() => base64Encode(bytes);
 
   /// A JSON-serializable representation of this blob, in the same shape as the
   /// JS SDK's `Bytes.toJSON()`. Read it back with [Blob.fromJson].
   Map<String, Object> toJson() {
-    return <String, Object>{'type': jsonType, 'bytes': toBase64()};
+    return <String, Object>{
+      'type': jsonType,
+      'bytes': toBase64(),
+      // The backend rejects a subtype of 0, so it is left out like the JS SDK
+      // does.
+      if (subtype != 0) 'subtype': subtype,
+    };
   }
 
   @override
   int compareTo(Blob other) {
+    // Blobs sort by subtype first, a regular blob has the subtype 0.
+    if (subtype != other.subtype) {
+      return subtype.compareTo(other.subtype);
+    }
+
     final int size = min(bytes.length, other.bytes.length);
 
     for (int i = 0; i < size; i++) {
@@ -79,11 +110,18 @@ class Blob implements Comparable<Blob> {
       identical(this, other) ||
       other is Blob &&
           runtimeType == other.runtimeType &&
+          subtype == other.subtype &&
           const ListEquality<int>().equals(bytes, other.bytes);
 
   @override
-  int get hashCode => const ListEquality<int>().hash(bytes);
+  int get hashCode => subtype == 0
+      ? const ListEquality<int>().hash(bytes)
+      : Object.hash(subtype, const ListEquality<int>().hash(bytes));
 
+  // The string of a regular blob is part of the canonical id of a query, which
+  // is persisted, so it must not change.
   @override
-  String toString() => 'Blob { bytes= ${toDebugString(bytes)} }';
+  String toString() => subtype == 0
+      ? 'Blob { bytes= ${toDebugString(bytes)} }'
+      : 'Blob { bytes= ${toDebugString(bytes)}, subtype= $subtype }';
 }

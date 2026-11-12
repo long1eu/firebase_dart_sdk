@@ -3,13 +3,19 @@
 // on 20/09/2018
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/blob.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/bson_object_id.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/bson_timestamp.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/user_data.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart'
     as firestore;
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart'
     as firestore;
 import 'package:cloud_firestore_dart/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/max_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/min_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/array_transform_operation.dart';
@@ -18,6 +24,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/numer
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/numeric_increment_transform_operation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/regex_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
@@ -319,6 +326,20 @@ class UserDataConverter {
       return BlobValue.valueOf(input);
     } else if (input is VectorValue) {
       return VectorFieldValue.fromList(input.toArray());
+    } else if (input is MinKey) {
+      return MinKeyValue.instance();
+    } else if (input is MaxKey) {
+      return MaxKeyValue.instance();
+    } else if (input is Int32Value) {
+      return Int32FieldValue.valueOf(input);
+    } else if (input is Decimal128Value) {
+      return Decimal128FieldValue.valueOf(input);
+    } else if (input is BsonObjectId) {
+      return BsonObjectIdValue.valueOf(input);
+    } else if (input is BsonTimestamp) {
+      return BsonTimestampValue.valueOf(input);
+    } else if (input is RegexValue) {
+      return RegexFieldValue.valueOf(input);
     } else if (input is DocumentReference) {
       final DocumentReference ref = input;
       final DatabaseId otherDb = ref.firestore.databaseId;

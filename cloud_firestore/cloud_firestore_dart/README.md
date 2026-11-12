@@ -51,6 +51,8 @@ the REST/WebChannel protocol).
   cache only.
 - Aggregations: `Query.count()`, `Query.aggregate([...])` with `AggregateField.count/sum/average`.
 - Vector values (`FieldValue.vector`) and `Query.findNearest` (server only; no local evaluation).
+- BSON value types of Enterprise edition databases: `MinKey`, `MaxKey`, `Int32Value`,
+  `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue` and `Blob.bsonBinary`.
 - Transactions with `TransactionOptions(maxAttempts)` and retry with exponential backoff; write
   batches.
 - Field transforms: server timestamp, increment, `FieldValue.maximum` / `minimum`, array union
@@ -207,8 +209,12 @@ against the emulator set `FIRESTORE_EMULATOR_HOST` (see `test/util/integration_t
 
 ## Not supported or not done
 
-- BSON-specific value types (for example `MinKey`, `MaxKey`, `Decimal128`, `BsonObjectId`,
-  `BsonTimestamp`, `BsonBinaryData`, regex, int32): not implemented.
+- BSON value types (`MinKey`, `MaxKey`, `Int32Value`, `Decimal128Value`, `BsonObjectId`,
+  `BsonTimestamp`, `RegexValue`, `Blob.bsonBinary`) are supported, with two known gaps. `in`,
+  `not-in`, `array-contains` and `array-contains-any` match a number against the local cache
+  only if it has the same type (`Int32Value(5)` does not match `5`), while the backend compares
+  numbers by value; the JS SDK has the same gap. A plain `Map` written with one of the reserved
+  keys (for example `{'__int__': 5}`) is treated as a map locally until the server sends it back.
 - Index-free queries, document overlays, the client-side index engine and persistent-cache
   auto-indexing: not implemented. Queries run against the local cache as in the 2019 design
   (SQLite schema version 8 lineage, plus the changes listed in the CHANGELOG).

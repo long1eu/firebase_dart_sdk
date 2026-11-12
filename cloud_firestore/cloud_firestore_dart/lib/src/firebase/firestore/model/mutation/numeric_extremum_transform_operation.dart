@@ -43,11 +43,26 @@ abstract class _NumericExtremumTransformOperation
       return operand;
     }
 
+    if (_isBsonNumber(previousValue) || _isBsonNumber(operand)) {
+      // NaN wins over any other number, otherwise the numbers are compared by
+      // their exact value and the winner keeps its own type.
+      if (_isNaN(previousValue)) {
+        return previousValue;
+      }
+      if (_isNaN(operand)) {
+        return operand;
+      }
+      final int cmp = operand.compareTo(previousValue);
+      return cmp == 0 || _choosePrevious(0, cmp.toDouble())
+          ? previousValue
+          : operand;
+    }
+
     if (previousValue is IntegerValue && operand is IntegerValue) {
       return IntegerValue.valueOf(_pickInt(previousValue.value, operandAsInt()));
     }
 
-    final double prevDouble = previousValue.value.toDouble();
+    final double prevDouble = (previousValue.value as num).toDouble();
     final double operDouble = operandAsDouble();
 
     if (prevDouble.isNaN) {
@@ -61,6 +76,13 @@ abstract class _NumericExtremumTransformOperation
     }
     return _choosePrevious(prevDouble, operDouble) ? previousValue : operand;
   }
+
+  static bool _isBsonNumber(NumberValue value) =>
+      value is Int32FieldValue || value is Decimal128FieldValue;
+
+  static bool _isNaN(NumberValue value) =>
+      value is DoubleValue && value.value.isNaN ||
+      value is Decimal128FieldValue && value.isNaN;
 }
 
 /// Implements the backend semantics for locally computed NUMERIC_MIN (minimum)

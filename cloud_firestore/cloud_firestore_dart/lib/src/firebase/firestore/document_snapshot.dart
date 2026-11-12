@@ -5,11 +5,17 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_json.dart'
     as snapshot_json;
 import 'package:cloud_firestore_dart/src/firebase/firestore/blob.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/bson_object_id.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/bson_timestamp.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/max_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/min_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -17,6 +23,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dar
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_document_snapshot.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/regex_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_metadata.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
@@ -317,6 +324,41 @@ class DocumentSnapshot<T extends dynamic> {
   ///
   /// Throws [StateError] if the value is not a [VectorValue].
   VectorValue? getVectorValue(String field) => _getTypedValue(field);
+
+  /// Returns the value of the field as a [MinKey], or null if the field does not exist.
+  ///
+  /// Throws [StateError] if the value is not a [MinKey].
+  MinKey? getMinKey(String field) => _getTypedValue(field);
+
+  /// Returns the value of the field as a [MaxKey], or null if the field does not exist.
+  ///
+  /// Throws [StateError] if the value is not a [MaxKey].
+  MaxKey? getMaxKey(String field) => _getTypedValue(field);
+
+  /// Returns the value of the field as a [RegexValue], or null if the field does not exist.
+  ///
+  /// Throws [StateError] if the value is not a [RegexValue].
+  RegexValue? getRegexValue(String field) => _getTypedValue(field);
+
+  /// Returns the value of the field as an [Int32Value], or null if the field does not exist.
+  ///
+  /// Throws [StateError] if the value is not an [Int32Value].
+  Int32Value? getInt32Value(String field) => _getTypedValue(field);
+
+  /// Returns the value of the field as a [Decimal128Value], or null if the field does not exist.
+  ///
+  /// Throws [StateError] if the value is not a [Decimal128Value].
+  Decimal128Value? getDecimal128Value(String field) => _getTypedValue(field);
+
+  /// Returns the value of the field as a [BsonObjectId], or null if the field does not exist.
+  ///
+  /// Throws [StateError] if the value is not a [BsonObjectId].
+  BsonObjectId? getBsonObjectId(String field) => _getTypedValue(field);
+
+  /// Returns the value of the field as a [BsonTimestamp], or null if the field does not exist.
+  ///
+  /// Throws [StateError] if the value is not a [BsonTimestamp].
+  BsonTimestamp? getBsonTimestamp(String field) => _getTypedValue(field);
 
   /// Returns the value of the field as a [DocumentReference].
   ///
