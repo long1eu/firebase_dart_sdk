@@ -1,0 +1,92 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/expression.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_source.dart';
+
+/// Adds [pipeline] to [Firestore]. Importing
+/// `package:cloud_firestore_dart/pipelines.dart` makes it available.
+extension FirestorePipelines on Firestore {
+  /// Starts a pipeline query: choose a source on the returned
+  /// [PipelineSource], add stages and call `execute()`.
+  ///
+  /// ```dart
+  /// final snapshot = await firestore
+  ///     .pipeline()
+  ///     .collection('books')
+  ///     .where(field('rating').greaterThan(4))
+  ///     .execute();
+  /// ```
+  ///
+  /// Pipelines need a Firestore **Enterprise edition** database and are
+  /// always executed by the server (no cache, no offline support, no
+  /// listeners).
+  ///
+  /// **Preview**: the Pipelines API is experimental and may change.
+  PipelineSource pipeline() => PipelineSource(this);
+}
+
+/// A reference to the field [nameOrPath]: a dot-separated `String` or a
+/// `FieldPath`.
+Field field(Object nameOrPath) => Field.of(nameOrPath);
+
+/// The fixed [value]: `null`, `bool`, `int`, `double`, `String`, `DateTime`,
+/// `Timestamp`, `GeoPoint`, `Blob`, `VectorValue`, `DocumentReference`, or
+/// lists and maps of those.
+Constant constant(Object? value) => Constant(value);
+
+/// Whether all of the conditions hold.
+BooleanExpression and(BooleanExpression first, BooleanExpression second,
+        [List<BooleanExpression> more = const <BooleanExpression>[]]) =>
+    first.and(second, more);
+
+/// Whether at least one of the conditions holds.
+BooleanExpression or(BooleanExpression first, BooleanExpression second,
+        [List<BooleanExpression> more = const <BooleanExpression>[]]) =>
+    first.or(second, more);
+
+/// Whether an odd number of the conditions hold.
+BooleanExpression xor(BooleanExpression first, BooleanExpression second,
+        [List<BooleanExpression> more = const <BooleanExpression>[]]) =>
+    first.xor(second, more);
+
+/// The negation of [condition].
+BooleanExpression not(BooleanExpression condition) => condition.not();
+
+/// [thenValue] if [condition] holds, [elseValue] otherwise.
+FunctionExpression conditional(
+        BooleanExpression condition, Object? thenValue, Object? elseValue) =>
+    condition.conditional(thenValue, elseValue);
+
+/// Counts all inputs of an aggregation.
+AggregateFunction countAll() => AggregateFunction('count');
+
+/// Counts the inputs for which [condition] holds.
+AggregateFunction countIf(BooleanExpression condition) => condition.countIf();
+
+/// An array built from [elements], which may be values or expressions.
+FunctionExpression array(List<Object?> elements) =>
+    FunctionExpression('array', elements);
+
+/// A map built from [entries], whose values may be values or expressions.
+FunctionExpression map(Map<String, Object?> entries) =>
+    toExpression(entries) as FunctionExpression;
+
+/// The time at which the server evaluates the pipeline.
+FunctionExpression currentTimestamp() =>
+    FunctionExpression('current_timestamp');
+
+/// A random number between 0 (inclusive) and 1 (exclusive).
+FunctionExpression rand() => FunctionExpression('rand');

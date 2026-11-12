@@ -1,0 +1,252 @@
+class AggregateFunction
+  as(String alias): AliasedAggregate
+  final args: List<Expression>
+  final name: String
+  new AggregateFunction(String name, [List<Object> args])
+  toProto(PipelineEncoder encoder): Value @internal
+  toString(): String
+class AliasedAggregate
+  final aggregate: AggregateFunction
+  final alias: String
+  new AliasedAggregate(AggregateFunction aggregate, String alias)
+  toString(): String
+class AliasedExpression
+  final alias: String
+  final expression: Expression
+  new AliasedExpression(Expression expression, String alias)
+  toString(): String
+class BooleanExpression extends Expression
+  and(BooleanExpression other, [List<BooleanExpression> others]): BooleanExpression
+  conditional(Object thenValue, Object elseValue): FunctionExpression
+  countIf(): AggregateFunction
+  final expression: Expression
+  new BooleanExpression(Expression expression)
+  not(): BooleanExpression
+  or(BooleanExpression other, [List<BooleanExpression> others]): BooleanExpression
+  toProto(PipelineEncoder encoder): Value
+  toString(): String
+  xor(BooleanExpression other, [List<BooleanExpression> others]): BooleanExpression
+class Constant extends Expression
+  final value: Object
+  new Constant(Object value)
+  new Constant.fromModel(FieldValue value) @internal
+  toProto(PipelineEncoder encoder): Value
+  toString(): String
+abstract class Expression
+  abs(): FunctionExpression
+  add(Object other): FunctionExpression
+  arrayAgg(): AggregateFunction
+  arrayAggDistinct(): AggregateFunction
+  arrayConcat(List<Object> others): FunctionExpression
+  arrayContains(Object element): BooleanExpression
+  arrayContainsAll(Object values): BooleanExpression
+  arrayContainsAny(Object values): BooleanExpression
+  arrayFirst(): FunctionExpression
+  arrayFirstN(Object n): FunctionExpression
+  arrayGet(Object index): FunctionExpression
+  arrayIndexOf(Object search): FunctionExpression
+  arrayIndexOfAll(Object search): FunctionExpression
+  arrayLast(): FunctionExpression
+  arrayLastIndexOf(Object search): FunctionExpression
+  arrayLastN(Object n): FunctionExpression
+  arrayLength(): FunctionExpression
+  arrayReverse(): FunctionExpression
+  arraySlice(Object offset, [Object length]): FunctionExpression
+  as(String alias): AliasedExpression
+  asBoolean(): BooleanExpression
+  ascending(): Ordering
+  average(): AggregateFunction
+  byteLength(): FunctionExpression
+  ceil(): FunctionExpression
+  charLength(): FunctionExpression
+  coalesce(Object replacement, [List<Object> others]): FunctionExpression
+  collectionId(): FunctionExpression
+  concat(List<Object> others): FunctionExpression
+  cosineDistance(Object other): FunctionExpression
+  count(): AggregateFunction
+  countDistinct(): AggregateFunction
+  descending(): Ordering
+  divide(Object other): FunctionExpression
+  documentId(): FunctionExpression
+  dotProduct(Object other): FunctionExpression
+  endsWith(Object suffix): BooleanExpression
+  equal(Object other): BooleanExpression
+  equalAny(Object values): BooleanExpression
+  euclideanDistance(Object other): FunctionExpression
+  exists(): BooleanExpression
+  exp(): FunctionExpression
+  first(): AggregateFunction
+  floor(): FunctionExpression
+  geoDistance(Object location): FunctionExpression
+  greaterThan(Object other): BooleanExpression
+  greaterThanOrEqual(Object other): BooleanExpression
+  ifAbsent(Object elseValue): FunctionExpression
+  ifError(Object catchValue): FunctionExpression
+  ifNull(Object elseValue): FunctionExpression
+  isAbsent(): BooleanExpression
+  isError(): BooleanExpression
+  isType(String type): BooleanExpression
+  join(Object delimiter): FunctionExpression
+  last(): AggregateFunction
+  length(): FunctionExpression
+  lessThan(Object other): BooleanExpression
+  lessThanOrEqual(Object other): BooleanExpression
+  like(Object pattern): BooleanExpression
+  ln(): FunctionExpression
+  log(Object base): FunctionExpression
+  logicalMaximum(List<Object> others): FunctionExpression
+  logicalMinimum(List<Object> others): FunctionExpression
+  ltrim([Object characters]): FunctionExpression
+  mapEntries(): FunctionExpression
+  mapGet(String key): FunctionExpression
+  mapKeys(): FunctionExpression
+  mapMerge(Object second, [List<Object> others]): FunctionExpression
+  mapRemove(Object key): FunctionExpression
+  mapSet(Object key, Object value): FunctionExpression
+  mapValues(): FunctionExpression
+  maximum(): AggregateFunction
+  minimum(): AggregateFunction
+  mod(Object other): FunctionExpression
+  multiply(Object other): FunctionExpression
+  new Expression()
+  notEqual(Object other): BooleanExpression
+  notEqualAny(Object values): BooleanExpression
+  parent(): FunctionExpression
+  pow(Object exponent): FunctionExpression
+  regexContains(Object pattern): BooleanExpression
+  regexFind(Object pattern): FunctionExpression
+  regexFindAll(Object pattern): FunctionExpression
+  regexMatch(Object pattern): BooleanExpression
+  reverse(): FunctionExpression
+  round([Object decimalPlaces]): FunctionExpression
+  rtrim([Object characters]): FunctionExpression
+  split(Object delimiter): FunctionExpression
+  sqrt(): FunctionExpression
+  startsWith(Object prefix): BooleanExpression
+  stringConcat(List<Object> others): FunctionExpression
+  stringContains(Object substring): BooleanExpression
+  stringIndexOf(Object search): FunctionExpression
+  stringRepeat(Object repetitions): FunctionExpression
+  stringReplaceAll(Object find, Object replacement): FunctionExpression
+  stringReplaceOne(Object find, Object replacement): FunctionExpression
+  stringReverse(): FunctionExpression
+  substring(Object position, [Object length]): FunctionExpression
+  subtract(Object other): FunctionExpression
+  sum(): AggregateFunction
+  timestampAdd(Object unit, Object amount): FunctionExpression
+  timestampDiff(Object start, Object unit): FunctionExpression
+  timestampExtract(Object part, [Object timezone]): FunctionExpression
+  timestampSubtract(Object unit, Object amount): FunctionExpression
+  timestampToUnixMicros(): FunctionExpression
+  timestampToUnixMillis(): FunctionExpression
+  timestampToUnixSeconds(): FunctionExpression
+  timestampTruncate(Object granularity, [Object timezone]): FunctionExpression
+  toLower(): FunctionExpression
+  toProto(PipelineEncoder encoder): Value @internal
+  toUpper(): FunctionExpression
+  trim([Object characters]): FunctionExpression
+  trunc([Object decimalPlaces]): FunctionExpression
+  type(): FunctionExpression
+  unixMicrosToTimestamp(): FunctionExpression
+  unixMillisToTimestamp(): FunctionExpression
+  unixSecondsToTimestamp(): FunctionExpression
+  vectorLength(): FunctionExpression
+class Field extends Expression
+  ==(Object other): bool
+  final path: FieldPath @internal
+  get alias: String
+  get expression: Expression
+  get fieldName: String
+  get hashCode: int
+  new Field(FieldPath path) @internal
+  new Field.of(Object nameOrPath)
+  static final documentIdName: String
+  toProto(PipelineEncoder encoder): Value
+  toString(): String
+FirestorePipelines.pipeline(Firestore #this): PipelineSource
+class FunctionExpression extends Expression
+  final args: List<Expression>
+  final name: String
+  new FunctionExpression(String name, [List<Object> args])
+  toProto(PipelineEncoder encoder): Value
+  toString(): String
+class Ordering
+  final direction: OrderingDirection
+  final expression: Expression
+  new Ordering(Expression expression, OrderingDirection direction)
+  toProto(PipelineEncoder encoder): Value @internal
+  toString(): String
+enum OrderingDirection
+  final serverName: String @internal
+  new OrderingDirection(int #index, String #name, String serverName)
+  static final ascending: OrderingDirection
+  static final descending: OrderingDirection
+  static final values: List<OrderingDirection>
+class Pipeline
+  addFields(List<Selectable> fields, {Map<String, Object> rawOptions}): Pipeline
+  aggregate(List<AliasedAggregate> accumulators, {List<Object> groups, Map<String, Object> rawOptions}): Pipeline
+  distinct(List<Object> groups, {Map<String, Object> rawOptions}): Pipeline
+  execute({PipelineIndexMode indexMode, Map<String, Object> rawOptions}): Future<PipelineSnapshot>
+  final firestore: Firestore
+  final stages: List<Stage> @internal
+  findNearest(Object field, Object vector, DistanceMeasure distanceMeasure, {int limit, String distanceField, Map<String, Object> rawOptions}): Pipeline
+  limit(int limit, {Map<String, Object> rawOptions}): Pipeline
+  new Pipeline(Firestore firestore, List<Stage> stages) @internal
+  offset(int offset, {Map<String, Object> rawOptions}): Pipeline
+  rawStage(String name, List<Object> args, {Map<String, Object> options}): Pipeline
+  removeFields(List<Object> fields, {Map<String, Object> rawOptions}): Pipeline
+  replaceWith(Object fieldOrExpression, {Map<String, Object> rawOptions}): Pipeline
+  sample({int documents, double percentage, Map<String, Object> rawOptions}): Pipeline
+  select(List<Object> selections, {Map<String, Object> rawOptions}): Pipeline
+  sort(List<Ordering> orderings, {Map<String, Object> rawOptions}): Pipeline
+  toExecuteRequest(PipelineEncoder encoder, {PipelineIndexMode indexMode, Map<String, Object> rawOptions}): ExecutePipelineRequest @internal
+  toProto(PipelineEncoder encoder): Pipeline @internal
+  toString(): String
+  union(Pipeline other, {Map<String, Object> rawOptions}): Pipeline
+  unnest(Selectable selectable, {String indexField, Map<String, Object> rawOptions}): Pipeline
+  where(BooleanExpression condition, {Map<String, Object> rawOptions}): Pipeline
+enum PipelineIndexMode
+  final serverName: String @internal
+  new PipelineIndexMode(int #index, String #name, String serverName)
+  static final recommended: PipelineIndexMode
+  static final values: List<PipelineIndexMode>
+class PipelineResult
+  data(): Map<String, Object>
+  final createTime: Timestamp
+  final updateTime: Timestamp
+  get id: String
+  get ref: DocumentReference<Map<String, Object>>
+  get(Object field): Object
+  new PipelineResult(Firestore _firestore, ObjectValue _fields, {DocumentKey key, Timestamp createTime, Timestamp updateTime}) @internal
+  toString(): String
+class PipelineSnapshot
+  final executionTime: Timestamp
+  final pipeline: Pipeline
+  final results: List<PipelineResult>
+  new PipelineSnapshot(Pipeline pipeline, List<PipelineResult> results, {Timestamp executionTime}) @internal
+  toString(): String
+class PipelineSource
+  collection(Object collection, {String forceIndex, Map<String, Object> rawOptions}): Pipeline
+  collectionGroup(String collectionId, {String forceIndex, Map<String, Object> rawOptions}): Pipeline
+  createFrom(Query<Object> query): Pipeline
+  database({Map<String, Object> rawOptions}): Pipeline
+  documents(List<Object> documents, {Map<String, Object> rawOptions}): Pipeline
+  literals(List<Map<String, Object>> documents, {Map<String, Object> rawOptions}): Pipeline
+  new PipelineSource(Firestore _firestore) @internal
+abstract class Selectable
+  get alias: String
+  get expression: Expression
+  new Selectable()
+and(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression
+array(List<Object> elements): FunctionExpression
+conditional(BooleanExpression condition, Object thenValue, Object elseValue): FunctionExpression
+constant(Object value): Constant
+countAll(): AggregateFunction
+countIf(BooleanExpression condition): AggregateFunction
+currentTimestamp(): FunctionExpression
+field(Object nameOrPath): Field
+map(Map<String, Object> entries): FunctionExpression
+not(BooleanExpression condition): BooleanExpression
+or(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression
+rand(): FunctionExpression
+xor(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression

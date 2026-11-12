@@ -41,6 +41,11 @@ class FirestoreRpc<Req extends GeneratedMessage, Res extends GeneratedMessage> {
           proto.RunAggregationQueryResponse>._(
       'RunAggregationQuery', proto.RunAggregationQueryResponse.create);
 
+  static const FirestoreRpc<proto.ExecutePipelineRequest,
+      proto.ExecutePipelineResponse> executePipeline = FirestoreRpc<
+          proto.ExecutePipelineRequest, proto.ExecutePipelineResponse>._(
+      'ExecutePipeline', proto.ExecutePipelineResponse.create);
+
   static const FirestoreRpc<proto.CommitRequest, proto.CommitResponse> commit =
       FirestoreRpc<proto.CommitRequest, proto.CommitResponse>._(
           'Commit', proto.CommitResponse.create);

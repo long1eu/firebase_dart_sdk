@@ -35,6 +35,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
+import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:firebase_app_dart/internal.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
@@ -824,6 +825,18 @@ class RemoteStore implements TargetMetadataProvider {
       return _datastore.runVectorQuery(query, vectorQuery);
     }
     return Future<List<Document>>.error(FirestoreError(
+        'Failed to get result from server.', FirestoreErrorCode.unavailable));
+  }
+
+  /// Executes a pipeline on the server. Fails with an `unavailable` error when
+  /// the network is disabled, since pipelines are never answered from the
+  /// local cache.
+  Future<List<proto.ExecutePipelineResponse>> executePipeline(
+      proto.ExecutePipelineRequest request) {
+    if (_canUseNetwork) {
+      return _datastore.executePipeline(request);
+    }
+    return Future<List<proto.ExecutePipelineResponse>>.error(FirestoreError(
         'Failed to get result from server.', FirestoreErrorCode.unavailable));
   }
 

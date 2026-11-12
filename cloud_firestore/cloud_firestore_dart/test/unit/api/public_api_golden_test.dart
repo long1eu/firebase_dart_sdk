@@ -14,6 +14,9 @@ import 'dart:io';
 import 'dart:mirrors';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+// Loaded so that the pipelines library can be found by the mirror system.
+// ignore: unused_import
+import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:test/test.dart';
 
 bool _isPublic(Symbol symbol) => !MirrorSystem.getName(symbol).startsWith('_');
@@ -122,9 +125,8 @@ List<String> _describeClass(ClassMirror cls) {
   return <String>[...lines, ...members];
 }
 
-String describePublicApi() {
-  final LibraryMirror barrel =
-      currentMirrorSystem().findLibrary(#cloud_firestore_dart);
+String describePublicApi([Symbol library = #cloud_firestore_dart]) {
+  final LibraryMirror barrel = currentMirrorSystem().findLibrary(library);
   final Map<String, List<String>> entries = <String, List<String>>{};
   for (final LibraryDependencyMirror dep in barrel.libraryDependencies) {
     if (!dep.isExport) {
@@ -182,5 +184,20 @@ void main() {
         reason: 'The public API changed. If intended, regenerate with '
             'UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart '
             'and review the diff of test/unit/api/public_api.golden.txt.');
+  });
+
+  test('exported pipelines API matches the golden listing', () {
+    final File golden = File('test/unit/api/pipelines_api.golden.txt');
+    final String actual = describePublicApi(#cloud_firestore_dart.pipelines);
+    if (Platform.environment['UPDATE_GOLDEN'] == '1') {
+      golden.writeAsStringSync(actual);
+      return;
+    }
+    expect(golden.existsSync(), isTrue,
+        reason: 'Missing golden file. Run with UPDATE_GOLDEN=1.');
+    expect(actual, golden.readAsStringSync(),
+        reason: 'The pipelines API changed. If intended, regenerate with '
+            'UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart '
+            'and review the diff of test/unit/api/pipelines_api.golden.txt.');
   });
 }

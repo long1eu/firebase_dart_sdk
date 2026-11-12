@@ -54,6 +54,19 @@ class FirestoreClient {
         call, _buildStream(call));
   }
 
+  /// Executes a pipeline query. The server streams the results back.
+  ResponseStream<proto.ExecutePipelineResponse> executePipeline(
+    proto.ExecutePipelineRequest request, {
+    CallOptions? options,
+  }) {
+    final ResponseStream<proto.ExecutePipelineResponse> call =
+        _transport.startCall(FirestoreRpc.executePipeline,
+            Stream<proto.ExecutePipelineRequest>.value(request),
+            options: options);
+    return ResponseStream<proto.ExecutePipelineResponse>(
+        call, _buildStream(call));
+  }
+
   /// Commits a transaction, while optionally updating documents.
   ResponseFuture<proto.CommitResponse> commit(proto.CommitRequest request,
       {CallOptions? options}) {

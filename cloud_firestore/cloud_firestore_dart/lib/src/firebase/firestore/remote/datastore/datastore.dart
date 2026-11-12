@@ -48,6 +48,7 @@ export 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/fir
 part 'aggregation_client.dart';
 part 'base_stream.dart';
 part 'firestore_client.dart';
+part 'pipeline_client.dart';
 part 'transaction_client.dart';
 part 'vector_query_client.dart';
 part 'watch_stream.dart';

@@ -53,6 +53,8 @@ the REST/WebChannel protocol).
 - Vector values (`FieldValue.vector`) and `Query.findNearest` (server only; no local evaluation).
 - BSON value types of Enterprise edition databases: `MinKey`, `MaxKey`, `Int32Value`,
   `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue` and `Blob.bsonBinary`.
+- Pipelines (**preview**, Enterprise edition databases, server only): see
+  [Pipelines](#pipelines-preview).
 - Transactions with `TransactionOptions(maxAttempts)` and retry with exponential backoff; write
   batches.
 - Field transforms: server timestamp, increment, `FieldValue.maximum` / `minimum`, array union
@@ -182,6 +184,74 @@ The public entry point is `package:cloud_firestore_dart/cloud_firestore_dart.dar
 `example/main.dart`. To run the integration tests
 against the emulator set `FIRESTORE_EMULATOR_HOST` (see `test/util/integration_test_util.dart`).
 
+## Pipelines (preview)
+
+Pipeline queries are in a separate library, `package:cloud_firestore_dart/pipelines.dart`. The
+API is **experimental**: it follows the JS and Android SDKs, which are still changing, and it may
+change in any release.
+
+```dart
+import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/pipelines.dart';
+
+final PipelineSnapshot snapshot = await firestore
+    .pipeline()
+    .collection('books')
+    .where(field('rating').greaterThan(4).and(field('genre').equal('Fantasy')))
+    .addFields([field('title').toUpper().as('upperTitle')])
+    .sort([field('rating').descending()])
+    .limit(10)
+    .execute();
+
+for (final PipelineResult result in snapshot.results) {
+  print('${result.id}: ${result.data()}');
+}
+
+// One row per genre.
+await firestore
+    .pipeline()
+    .collection('books')
+    .aggregate([countAll().as('count'), field('rating').average().as('avg')],
+        groups: ['genre'])
+    .execute();
+```
+
+- **Requirements**: a Firestore **Enterprise edition** database. A Standard edition database
+  (and the emulator in its default edition) answers `invalid-argument: ExecutePipeline requires
+  the Database Edition to be enterprise`. The emulator supports pipelines when it is started
+  with `--database-edition enterprise`.
+- **Server only**: a pipeline is sent to the server with the `ExecutePipeline` RPC. It does not
+  read or update the local cache, does not see pending writes, fails with `unavailable` while
+  offline and cannot be listened to.
+- **Sources**: `collection`, `collectionGroup`, `database`, `documents`, `literals`, and
+  `createFrom(query)`, which converts an existing `Query`.
+- **Stages**: `where`, `select`, `addFields`, `removeFields`, `sort`, `limit`, `offset`,
+  `aggregate` (with `groups`), `distinct`, `findNearest`, `sample`, `union`, `unnest`,
+  `replaceWith`.
+- **Expressions**: `field(...)`, `constant(...)`, `array(...)`, `map(...)` and methods on them for
+  comparisons, `and` / `or` / `not` / `xor` / `conditional`, arithmetic and math, strings and
+  regular expressions, arrays, maps, timestamps, vector distances, types and missing values
+  (`ifAbsent`, `ifError`, `ifNull`, `coalesce`), and the aggregates `count`, `countAll`,
+  `countIf`, `countDistinct`, `sum`, `average`, `minimum`, `maximum`, `first`, `last`, `arrayAgg`,
+  `arrayAggDistinct`. `test/unit/api/pipelines_api.golden.txt` has the full list.
+- **Anything else**: `FunctionExpression('server_name', [args])`,
+  `AggregateFunction('server_name', [args])`, `Pipeline.rawStage(name, args)` and the `rawOptions`
+  parameter of every stage send functions, stages and options this package has no helper for yet.
+- **Not done yet**: functions that take a lambda (`arrayFilter`, `arrayTransform`), `switchOn`,
+  full-text search, subqueries, window functions, the write stages
+  (`insert`, `update`, `upsert`, `delete`), pipelines inside transactions, explain, and
+  evaluation against the local cache or real-time pipelines.
+- A result is a document (`ref`, `id`, `createTime`, `updateTime`) only while the pipeline filters,
+  sorts and limits; after `select`, `aggregate`, `distinct`, `unnest` and similar it is a plain
+  map. Values of types this package has no class for (the BSON types) come back in their map
+  encoding.
+- The helper functions have short names (`field`, `and`, `or`, `not`, ...); import the library
+  with a prefix if they clash with yours.
+
+To run `test/integration/firebase/firestore/pipeline_test.dart`, start a second emulator in
+Enterprise edition and set `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (host:port); without it the tests
+are skipped.
+
 ## Persistence and connectivity
 
 - The package does not open SQLite files itself: you pass an `OpenDatabase` function to
@@ -219,7 +289,9 @@ against the emulator set `FIRESTORE_EMULATOR_HOST` (see `test/util/integration_t
   auto-indexing: not implemented. Queries run against the local cache as in the 2019 design
   (SQLite schema version 8 lineage, plus the changes listed in the CHANGELOG).
 - Clearing persistence (`clearPersistence`): not available; the API shape is still to be decided.
-- Pipelines, `Query.findNearest` evaluation against the local cache, Android-specific pieces.
+- Pipelines beyond the [preview](#pipelines-preview) described above (no local evaluation, no
+  real-time pipelines), `Query.findNearest` evaluation against the local cache, Android-specific
+  pieces.
 - Auth, Storage, Realtime Database: see
   [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart).
 

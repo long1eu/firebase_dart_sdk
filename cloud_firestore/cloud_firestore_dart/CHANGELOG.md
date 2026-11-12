@@ -65,6 +65,16 @@ only. **Nothing was run against production Firestore.**
 
 ### Added
 
+- Firestore Pipelines as a **preview** in a separate library,
+  `package:cloud_firestore_dart/pipelines.dart`: `firestore.pipeline()` with the sources
+  `collection`, `collectionGroup`, `database`, `documents`, `literals` and `createFrom(query)`, the
+  stages `where`, `select`, `addFields`, `removeFields`, `sort`, `limit`, `offset`, `aggregate`,
+  `distinct`, `findNearest`, `sample`, `union`, `unnest`, `replaceWith` and `rawStage`, and
+  expressions for comparisons, logic, math, strings, arrays, maps, timestamps and vectors.
+  Pipelines need an Enterprise edition database and are always executed by the server (no
+  cache, no offline support, no listeners). The API is experimental and may change. Tested
+  with the unit suite and an Enterprise edition emulator only.
+
 - BSON value types for Enterprise edition databases: `MinKey`, `MaxKey`, `Int32Value`,
   `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue`, and BSON binary data as a
   `Blob` with a subtype (`Blob.bsonBinary`, `Blob.subtype`). They can be written, read (with

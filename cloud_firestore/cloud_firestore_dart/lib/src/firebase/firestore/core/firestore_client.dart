@@ -50,6 +50,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/exponential_bac
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
+import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:firebase_app_dart/internal.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -325,6 +326,16 @@ class FirestoreClient implements RemoteStoreCallback {
 
     return _enqueue<List<Document>>(
         () => syncEngine.runVectorQuery(query, vectorQuery));
+  }
+
+  /// Executes a pipeline on the server. Fails with an `unavailable` error when
+  /// offline.
+  Future<List<proto.ExecutePipelineResponse>> executePipeline(
+      proto.ExecutePipelineRequest request) {
+    _verifyNotShutdown();
+
+    return _enqueue<List<proto.ExecutePipelineResponse>>(
+        () => remoteStore.executePipeline(request));
   }
 
   /// Executes the transaction in [updateFunction], with up to [maxAttempts] attempts (with a backoff in between).
