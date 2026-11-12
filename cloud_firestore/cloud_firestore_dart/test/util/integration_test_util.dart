@@ -134,6 +134,7 @@ class IntegrationTestUtil {
   }
 
   static FirestoreSettings newTestSettings() {
+    useWebTransportIfRequested();
     final String? emulator = emulatorHost;
     if (emulator == null) {
       return FirestoreSettings();

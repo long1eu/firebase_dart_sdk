@@ -3,7 +3,8 @@
 # both editions. The emulators must already run (start_emulator.sh,
 # start_enterprise_emulator.sh); this script never starts or stops them.
 #
-# Usage: tool/test_integration.sh [standard|enterprise|both] [dart test arguments...]
+# Usage: tool/test_integration.sh [standard|enterprise|both] [--transport=grpc|webchannel]
+#                                 [dart test arguments...]
 #
 #   standard    (default) test/integration against the Standard edition emulator.
 #   enterprise  test/integration against the Enterprise edition emulator (tests whose
@@ -12,8 +13,12 @@
 #               test/integration_enterprise.
 #   both        standard, then enterprise.
 #
+# --transport=webchannel runs the same tests over the web transport (REST and WebChannel,
+# through dart:io HTTP) instead of gRPC; the default, grpc, is what the VM uses.
+#
 # Extra arguments replace the default test paths and are passed to `dart test`, for example:
 #   tool/test_integration.sh enterprise test/integration/firebase/firestore/query_test.dart
+#   tool/test_integration.sh standard --transport=webchannel
 #
 # Environment:
 #   FIRESTORE_EMULATOR_HOST             Standard edition emulator (default 127.0.0.1:8080)
@@ -28,7 +33,17 @@ PKG="$ROOT/cloud_firestore/cloud_firestore_dart"
 MODE="standard"
 case "${1:-}" in
   standard|enterprise|both) MODE="$1"; shift;;
-  -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+  -h|--help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+esac
+
+TRANSPORT="${FIRESTORE_TEST_TRANSPORT:-grpc}"
+case "${1:-}" in
+  --transport=*) TRANSPORT="${1#--transport=}"; shift;;
+esac
+case "$TRANSPORT" in
+  grpc) TRANSPORT_ENV="FIRESTORE_TEST_TRANSPORT="; SUFFIX="";;
+  webchannel) TRANSPORT_ENV="FIRESTORE_TEST_TRANSPORT=webchannel"; SUFFIX="_webchannel";;
+  *) echo "Unknown transport '$TRANSPORT' (grpc or webchannel)"; exit 2;;
 esac
 
 STANDARD_HOST="${FIRESTORE_EMULATOR_HOST:-127.0.0.1:8080}"
@@ -46,10 +61,10 @@ reachable() {
 # run <label> <log name> <dart test arguments...>; the environment of the run is taken from
 # RUN_ENV (an array of NAME=value).
 run() {
-  local label="$1" log="$LOG_DIR/$2.log"
+  local label="$1$([ -n "$SUFFIX" ] && echo " [$TRANSPORT]")" log="$LOG_DIR/$2$SUFFIX.log"
   shift 2
   echo "=== $label: dart test $*"
-  (cd "$PKG" && env "${RUN_ENV[@]}" dart test "$@") >"$log" 2>&1
+  (cd "$PKG" && env "${RUN_ENV[@]}" "$TRANSPORT_ENV" dart test "$@") >"$log" 2>&1
   local rc=$?
   # The final progress line looks like "00:05 +42 ~3 -2: Some tests failed."
   local last

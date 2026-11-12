@@ -70,6 +70,104 @@ jobs:
           name: integration-log
           path: ${{ runner.temp }}/*.log
 
+  # The same standard suite over the web transport (REST and WebChannel instead of gRPC),
+  # still on the VM: tool/test_integration.sh --transport=webchannel. Allowed to fail for the
+  # same reason as the job above.
+  integration-webchannel:
+    name: Standard emulator integration tests over the web transport (allowed to fail)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: stable
+      - uses: actions/setup-java@v4.7.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '20'
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+      - name: Start Firestore emulator
+        working-directory: cloud_firestore/cloud_firestore_dart
+        run: |
+          firebase emulators:start --only firestore --project demo-test \
+            --config firebase.json > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          for i in $(seq 1 120); do
+            if curl -s -o /dev/null http://127.0.0.1:8080; then echo "emulator up"; exit 0; fi
+            sleep 1
+          done
+          echo "emulator did not start"; cat "$RUNNER_TEMP/emulator.log"; exit 1
+      - name: Install the JS interop harness
+        working-directory: tool/interop
+        run: npm ci
+      - name: Run integration tests over the web transport
+        env:
+          TEST_LOG_DIR: ${{ runner.temp }}
+        run: |
+          (cd cloud_firestore/cloud_firestore_dart && dart pub get)
+          ./tool/test_integration.sh standard --transport=webchannel
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: integration-webchannel-log
+          path: ${{ runner.temp }}/*.log
+
+  # The browser tests (test/browser) in headless Chrome against the emulator, compiled with
+  # dart2wasm and with dart2js. They are the only tests that run the client in a browser.
+  # Allowed to fail: web support is experimental.
+  browser:
+    name: Browser tests in Chrome (allowed to fail)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: stable
+      - uses: actions/setup-java@v4.7.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '20'
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+      - name: Start Firestore emulator
+        working-directory: cloud_firestore/cloud_firestore_dart
+        run: |
+          firebase emulators:start --only firestore --project demo-test \
+            --config firebase.json > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          for i in $(seq 1 120); do
+            if curl -s -o /dev/null http://127.0.0.1:8080; then echo "emulator up"; exit 0; fi
+            sleep 1
+          done
+          echo "emulator did not start"; cat "$RUNNER_TEMP/emulator.log"; exit 1
+      - name: Run browser tests (dart2wasm)
+        # Chrome is preinstalled on the ubuntu-latest image.
+        working-directory: cloud_firestore/cloud_firestore_dart
+        run: |
+          dart pub get
+          dart test -p chrome -c dart2wasm test/browser 2>&1 | tee "$RUNNER_TEMP/browser_dart2wasm.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Run browser tests (dart2js)
+        if: always()
+        working-directory: cloud_firestore/cloud_firestore_dart
+        run: |
+          dart test -p chrome -c dart2js test/browser 2>&1 | tee "$RUNNER_TEMP/browser_dart2js.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: browser-log
+          path: ${{ runner.temp }}/*.log
+
   # Tests that need the Enterprise edition of Firestore (test/integration_enterprise). They run
   # against a second emulator started from the emulator JAR with `--database-edition enterprise`
   # on port 8181 (tool/start_enterprise_emulator.sh); the standard emulator runs next to it on
