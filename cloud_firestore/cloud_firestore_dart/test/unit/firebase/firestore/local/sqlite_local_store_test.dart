@@ -191,4 +191,5 @@ void main() {
   test('testDeleteAllIndexesWorksWithManualAddedIndexes', () => testCase.testDeleteAllIndexesWorksWithManualAddedIndexes());
   test('testIndexAutoCreationWorksWithMutation', () => testCase.testIndexAutoCreationWorksWithMutation());
   test('testIndexAutoCreationDoesnotWorkWithMultipleInequality', () => testCase.testIndexAutoCreationDoesnotWorkWithMultipleInequality());
+  test('testDeeplyNestedServerTimestamps', () => testCase.testDeeplyNestedServerTimestamps());
 }

@@ -3,6 +3,7 @@
 // limitToLast, with and without pending writes. See test/util/index_engine_harness.dart.
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:test/test.dart';
 
@@ -292,5 +293,60 @@ void main() {
         'c == 1 (no index)',
       ],
     );
+  });
+
+  // The steps of example/cache_indexes.dart, with the internals the example cannot show: the first cache query really
+  // creates an index, and the later ones are served by it.
+  test('automatic index creation, as in example/cache_indexes.dart', () async {
+    final LocalStore localStore = firestore.client.localStore;
+    final PersistentCacheIndexManager indexes =
+        firestore.persistentCacheIndexManager!;
+    await indexes.enableIndexAutoCreation();
+
+    final CollectionReference<Map<String, Object?>> cities = testCollection();
+    final WriteBatch batch = firestore.batch();
+    for (int i = 0; i < 150; i++) {
+      batch.set(cities.doc('city$i'), <String, Object?>{
+        'country': i < 5 ? 'RO' : 'other',
+        'population': 1000 * i,
+      });
+    }
+    await batch.commit();
+    await cities.get(Source.server);
+
+    final Query<Map<String, Object?>> romanian = cities
+        .whereEqualTo('country', 'RO')
+        .orderBy('population');
+    IndexType indexType() => localStore.indexManagerForCurrentUser.getIndexType(
+      romanian.query.toTarget(),
+    );
+    final List<String> expected = <String>[
+      for (int i = 0; i < 5; i++) 'city$i',
+    ];
+    List<String> ids(QuerySnapshot<Map<String, Object?>> snapshot) =>
+        <String>[for (final doc in snapshot.docs) doc.id];
+
+    expect(localStore.getFieldIndexes(), isEmpty);
+    expect(indexType(), IndexType.none);
+
+    // The first run scans, and creates the index.
+    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(localStore.getFieldIndexes(), hasLength(1));
+    expect(indexType(), IndexType.full);
+
+    // Before the backfill, halfway, and when the index is complete.
+    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(await firestore.client.backfillIndexes(), 50);
+    expect(ids(await romanian.get(Source.cache)), expected);
+    expect(await backfillAllIndexes(firestore), 100);
+    expect(ids(await romanian.get(Source.cache)), expected);
+
+    await indexes.disableIndexAutoCreation();
+    expect(localStore.getFieldIndexes(), hasLength(1));
+
+    await indexes.deleteAllIndexes();
+    expect(localStore.getFieldIndexes(), isEmpty);
+    expect(indexType(), IndexType.none);
+    expect(ids(await romanian.get(Source.cache)), expected);
   });
 }

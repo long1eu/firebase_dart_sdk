@@ -78,6 +78,9 @@ List<int> _emptyBundle() {
   return utf8.encode('${utf8.encode(metadata).length}$metadata');
 }
 
+const String _indexConfiguration = '{"indexes":[{"collectionGroup":"terminated",'
+    '"fields":[{"fieldPath":"a","order":"ASCENDING"}]}]}';
+
 final List<Entry> entries = <Entry>[
   // Documents.
   Entry('DocumentReference.get', <String>{'DocumentReference.get'},
@@ -224,6 +227,33 @@ final List<Entry> entries = <Entry>[
       After.futureFails, (Fixture f) => f.firestore.disableNetwork()),
   Entry('Firestore.enableNetwork', <String>{'Firestore.enableNetwork'},
       After.futureFails, (Fixture f) => f.firestore.enableNetwork()),
+
+  // Persistent cache indexes. The getter of the manager keeps working after
+  // terminate (see the test below); its methods fail.
+  Entry(
+      'Firestore.setIndexConfiguration',
+      <String>{'Firestore.setIndexConfiguration'},
+      After.futureFails,
+      // ignore: deprecated_member_use_from_same_package
+      (Fixture f) => f.firestore.setIndexConfiguration(_indexConfiguration)),
+  Entry(
+      'PersistentCacheIndexManager.enableIndexAutoCreation',
+      <String>{'PersistentCacheIndexManager.enableIndexAutoCreation'},
+      After.futureFails,
+      (Fixture f) =>
+          f.firestore.persistentCacheIndexManager!.enableIndexAutoCreation()),
+  Entry(
+      'PersistentCacheIndexManager.disableIndexAutoCreation',
+      <String>{'PersistentCacheIndexManager.disableIndexAutoCreation'},
+      After.futureFails,
+      (Fixture f) =>
+          f.firestore.persistentCacheIndexManager!.disableIndexAutoCreation()),
+  Entry(
+      'PersistentCacheIndexManager.deleteAllIndexes',
+      <String>{'PersistentCacheIndexManager.deleteAllIndexes'},
+      After.futureFails,
+      (Fixture f) =>
+          f.firestore.persistentCacheIndexManager!.deleteAllIndexes()),
 ];
 
 /// Public members that return a Future, Stream or LoadBundleTask and are not
@@ -454,6 +484,25 @@ void main() {
 
     test('clearPersistence completes', () async {
       await fixture.firestore.clearPersistence();
+    });
+
+    test('persistentCacheIndexManager is still the manager of the instance',
+        () async {
+      final Fixture running = await newFixture();
+      final PersistentCacheIndexManager? manager =
+          running.firestore.persistentCacheIndexManager;
+      expect(manager, isNotNull);
+      await running.firestore.terminate();
+      expect(running.firestore.persistentCacheIndexManager, same(manager));
+      await expectLater(manager!.deleteAllIndexes(), throwsTerminated);
+    });
+
+    test('setIndexConfiguration reports termination before a bad definition',
+        () async {
+      await expectLater(
+          // ignore: deprecated_member_use_from_same_package
+          fixture.firestore.setIndexConfiguration('not json'),
+          throwsTerminated);
     });
 
     test('builders that do no I/O keep working', () {

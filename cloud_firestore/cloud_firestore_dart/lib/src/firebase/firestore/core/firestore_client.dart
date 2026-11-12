@@ -482,6 +482,10 @@ class FirestoreClient implements RemoteStoreCallback {
     await remoteStore.start();
   }
 
+  /// Throws the error of a terminated client, see [_verifyNotShutdown]. For the entry points of `Firestore` that
+  /// check something else before they reach the client.
+  void verifyNotTerminated() => _verifyNotShutdown();
+
   /// Throws the error every client call fails with once [shutdown] was called: a [FirestoreError] with
   /// [FirestoreErrorCode.failedPrecondition], as the JS SDK (Android throws an IllegalStateException with the same
   /// message). The methods that call it are `async`, so callers get it through the returned future.

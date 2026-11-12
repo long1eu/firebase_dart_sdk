@@ -39,6 +39,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
@@ -46,6 +48,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
@@ -4287,5 +4290,42 @@ class LocalStoreTestCase {
     await _executeQuery(qry);
     _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
     _expectQueryReturned(<String>['coll/a', 'coll/e']);
+  }
+
+  /// Upstream runs this on a thread with a small stack to prove that 1000 server timestamp transforms on one field do
+  /// not nest 1000 deep. Dart has no way to limit the stack, so the port checks the cause directly: the previous
+  /// value of the pending timestamp is never itself a pending timestamp.
+  ///
+  /// PORTING NOTE: upstream also puts a nested server timestamp into the value of the patch. A pending server
+  /// timestamp is not a value the port can write (the serializer rejects it), and its constructor cannot nest, so the
+  /// patch here only carries the transform, which sees the pending timestamp of the previous mutation.
+  @testMethod
+  Future<void> testDeeplyNestedServerTimestamps() async {
+    final FieldPath path = FieldPath.fromSingleSegment('timestamp');
+    final List<FieldTransform> fieldTransforms = <FieldTransform>[
+      FieldTransform(path, ServerTimestampOperation()),
+    ];
+    final DocumentKey key = DocumentKey.fromPathString('some/object/for/test');
+    await _writeMutation(setMutation(key.path.toString(), map(<Object>['timestamp', 42])));
+
+    for (int i = 0; i < 1000; ++i) {
+      await _writeMutation(
+        PatchMutation(
+          key,
+          model.ObjectValue.empty,
+          FieldMask.empty,
+          Precondition.none,
+          fieldTransforms,
+        ),
+      );
+    }
+
+    final MaybeDocument? document = await _localStore.readDocument(key);
+    final model.FieldValue? value = (document! as Document).getField(path);
+    expect(value, isA<model.ServerTimestampValue>());
+    expect(
+      (value! as model.ServerTimestampValue).previousFieldValue,
+      model.IntegerValue.valueOf(42),
+    );
   }
 }
