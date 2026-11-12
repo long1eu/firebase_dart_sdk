@@ -19,6 +19,15 @@ jobs:
           sdk: stable
       - name: Analyze and run unit tests
         run: ./tool/test_all.sh
+      # After test_all.sh, which runs `dart pub get`: the formatter takes the language version
+      # (and so the style) from the resolved package. Generated protos are included; the
+      # plugin and tool/gen_protos.sh emit formatted code.
+      - name: Check formatting (firebase_app_dart)
+        working-directory: firebase_core/firebase_app_dart
+        run: dart format --output=none --set-exit-if-changed lib
+      - name: Check formatting (cloud_firestore_dart)
+        working-directory: cloud_firestore/cloud_firestore_dart
+        run: dart format --output=none --set-exit-if-changed lib
 
   # The emulator suite has 1-2 known flaky tests (event ordering in the emulator, e.g.
   # write_batch_test testWriteTheSameServerTimestampAcrossWrites).

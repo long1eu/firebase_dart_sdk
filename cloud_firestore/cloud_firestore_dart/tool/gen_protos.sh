@@ -39,4 +39,6 @@ WKT=package:protobuf/well_known_types/google/protobuf
     echo "export '$WKT/$t.pbjson.dart';"
   done
 } > "$OUT/google/protobuf/index.dart"
-dart format "$OUT/google/protobuf/index.dart" >/dev/null
+# The barrels are hand-written by this script: format them so that the output is what
+# `dart format lib` leaves (the generated .pb files are already formatted by the plugin).
+find "$OUT" -name index.dart -print0 | xargs -0 dart format >/dev/null

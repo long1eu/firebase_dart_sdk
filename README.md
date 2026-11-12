@@ -155,6 +155,10 @@ Issues and pull requests are welcome. Before opening a pull request, run `./tool
 and, for changes that touch networking or the local store, the emulator integration tests. Do not
 weaken or remove assertions to get a test passing; report flaky tests instead.
 
+`lib` of both packages is kept formatted with `dart format lib` (run it in the package directory;
+CI checks it with `dart format --output=none --set-exit-if-changed lib`). Do not format
+`test/readme/readme_snippets.dart`, which is generated from the README.
+
 ## License
 
 Apache License 2.0, as upstream. See the `LICENSE` file in each package.
