@@ -242,8 +242,7 @@ await firestore
   evaluation against the local cache or real-time pipelines.
 - A result is a document (`ref`, `id`, `createTime`, `updateTime`) only while the pipeline filters,
   sorts and limits; after `select`, `aggregate`, `distinct`, `unnest` and similar it is a plain
-  map. Values of types this package has no class for (the BSON types) come back in their map
-  encoding.
+  map. BSON values come back as their value classes.
 - The helper functions have short names (`field`, `and`, `or`, `not`, ...); import the library
   with a prefix if they clash with yours.
 

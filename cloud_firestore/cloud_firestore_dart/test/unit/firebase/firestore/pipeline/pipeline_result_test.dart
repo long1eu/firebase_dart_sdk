@@ -17,6 +17,7 @@
 import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
@@ -125,7 +126,7 @@ void main() {
               '__type__': str('__vector__'),
               'value': arrayValue(<pb.Value>[dbl(1), dbl(2)]),
             }),
-            // A type this SDK has no class for is surfaced as a plain map.
+            // BSON types decode to their value classes.
             'unknown': mapValue(<String, pb.Value>{'__int__': integer(7)}),
           })),
     ]).results.single;
@@ -140,7 +141,7 @@ void main() {
     expect(result.get('when'), const Timestamp(5, 0));
     expect((result.get('ref')! as DocumentReference<Object?>).path, 'c/d');
     expect(result.get('vector'), VectorValue(<double>[1, 2]));
-    expect(result.get('unknown'), <String, Object?>{'__int__': 7});
+    expect(result.get('unknown'), Int32Value(7));
     expect(result.data().keys,
         containsAll(<String>['null', 'list', 'map', 'when', 'ref', 'vector']));
     expect(() => result.get(1), throwsArgumentError);

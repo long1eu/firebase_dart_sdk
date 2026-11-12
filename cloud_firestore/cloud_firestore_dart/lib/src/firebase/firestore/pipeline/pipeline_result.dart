@@ -33,8 +33,8 @@ import 'package:meta/meta.dart';
 /// builds new rows (`select`, `aggregate`, `distinct`, `unnest`, ...) a result
 /// is a plain map and those are null.
 ///
-/// Values of types this SDK has no class for yet (for example the BSON types
-/// of Enterprise edition databases) are returned in their map encoding.
+/// The BSON types of Enterprise edition databases are returned as their value
+/// classes (`Int32Value`, `Decimal128Value`, ...).
 ///
 /// **Preview**: the Pipelines API is experimental and may change.
 class PipelineResult {
