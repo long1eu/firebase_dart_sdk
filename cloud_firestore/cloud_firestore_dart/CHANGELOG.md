@@ -13,7 +13,11 @@ only. **Nothing was run against production Firestore.**
   their names).
 - `_firebase_database_collection_vm` is folded into this package and `_firebase_internal_vm`
   into `firebase_app_dart`; neither is a separate dependency any more.
-- The Flutter example app is replaced by a command-line `example/main.dart`.
+- The Flutter example app is replaced by command-line examples, one per topic, in `example/`
+  (including a complete `package:sqlite3` opener for offline persistence); they run against the
+  Firestore emulator.
+- Migration guide with before/after code:
+  [docs/migrating_from_vm_packages.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/migrating_from_vm_packages.md).
 
 ### Breaking changes
 

@@ -16,6 +16,8 @@ version 0.0.4); it is the same code base, revived as part of the Firestore port.
   `FirebaseOptions` equality and `fromJson`.
 - The Flutter example app is replaced by a command-line `example/main.dart`.
 - Every exported class and member has a doc comment; `dart doc` runs without warnings.
+- Migration guide:
+  [docs/migrating_from_vm_packages.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/migrating_from_vm_packages.md).
 - Verified with unit tests, and through `cloud_firestore_dart`'s emulator suite.
 
 ## Versions published as `firebase_core_vm`

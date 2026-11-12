@@ -52,7 +52,8 @@ SDK's behaviour up to late 2026 on Dart 3 with sound null safety.
   Treat it as untested there, and test against your own project before relying on it.
 - Version 0.1.0 is prepared for pub.dev as `cloud_firestore_dart` and `firebase_app_dart`. They
   replace the packages published as `cloud_firestore_vm` and `firebase_core_vm` (and the internal
-  `_firebase_internal_vm` and `_firebase_database_collection_vm`, now folded in).
+  `_firebase_internal_vm` and `_firebase_database_collection_vm`, now folded in). See
+  [docs/migrating_from_vm_packages.md](docs/migrating_from_vm_packages.md).
 - Not implemented: BSON value types, index-free queries and overlays, the client-side index engine,
   clearing persistence (API undecided), Pipelines. Web is not supported yet (the transport uses native gRPC from `dart:io`; web
   support is planned).

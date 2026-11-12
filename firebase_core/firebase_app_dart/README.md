@@ -43,7 +43,9 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 If you already have a Firebase project for you mobile/web apps you can skip this step.
 
 ### 4. Initialize the FirebaseApp
- ```dart
+```dart
+import 'dart:io';
+
 FirebaseOptions options;
 if (Platform.isLinux) {
   options = const FirebaseOptions(
@@ -79,10 +81,13 @@ if (Platform.isLinux) {
     applicationId:
         '<YOUR_APP_ID>',
   );
+} else {
+  throw UnsupportedError('No Firebase options for this platform.');
 }
 
 FirebaseApp.withOptions(options);
- ``` 
+```
+
 This initializes the default `FirebaseApp` which can be accessed using `FirebaseApp.instance`. For platforms that 
 Firebase does not support by default like `Windows`, `Linux`, `macOS` and others, you need to generate a unique 
 `applicationId` and an `apiKey`.

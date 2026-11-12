@@ -16,7 +16,9 @@ Renamed: this package was published as
 `cloud_firestore_dart` and `firebase_app_dart` and the imports with
 `package:cloud_firestore_dart/cloud_firestore_dart.dart` and
 `package:firebase_app_dart/firebase_app_dart.dart`; class names did not change. See the
-CHANGELOG for the API changes since 0.0.7.
+CHANGELOG for the API changes since 0.0.7 and the
+[migration guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/migrating_from_vm_packages.md)
+for before/after code.
 
 ## Status
 
@@ -175,13 +177,15 @@ Members marked `@internal` in the golden listing are implementation details that
 reachable for technical reasons; the analyzer warns when you use them and they may change or
 disappear in any release.
 
-The exact signatures are pinned in `test/unit/api/public_api.golden.txt`; if a snippet above
-disagrees with the golden file, the golden file is right (the snippets are illustrative and were
-not compiled).
+The exact signatures are pinned in `test/unit/api/public_api.golden.txt`. The snippets above are
+compiled against the library by `test/unit/api/readme_snippets_test.dart` (they assume an `app`,
+`firestore`, `users`, `query` and `bundleBytes` in scope).
 
 The public entry point is `package:cloud_firestore_dart/cloud_firestore_dart.dart` (class
-`Firestore`). It needs a `FirebaseApp` from `firebase_app_dart`. A runnable program is in
-`example/main.dart`. See [Testing](#testing) for how to run the tests.
+`Firestore`). It needs a `FirebaseApp` from `firebase_app_dart`. Runnable programs, one per topic
+(queries, aggregations, converters, transactions, bundles, snapshot JSON, offline persistence,
+emulator, lifecycle), are in [`example/`](example/README.md). See [Testing](#testing) for how
+to run the tests.
 
 ## Pipelines (preview)
 
@@ -255,10 +259,11 @@ are skipped.
 - The package does not open SQLite files itself: you pass an `OpenDatabase` function to
   `Firestore.instanceFor(openDatabase: ...)` (without one the cache is in memory only). This is
   the only public part of the SQLite layer: implement `Database` (`execute`, `query`, `delete`,
-  `close`, `file`) over the binding of your choice, and make the opener call `onConfigure`, then
+  `close`, `path`) over the binding of your choice, and make the opener call `onConfigure`, then
   `onCreate` (new file) or `onUpgrade` / `onDowngrade` (stored `user_version` differs), store the
   requested version, then call `onOpen` (see the doc comment on `OpenDatabase`). The tests use
-  `package:sqlite3`, see `test/util/sqlite3_database.dart`. The persistence layer never switches
+  `package:sqlite3`; a complete opener you can copy is `example/sqlite_database.dart`, used by
+  `example/offline_persistence.dart`. The persistence layer never switches
   the connection to `PRAGMA locking_mode = EXCLUSIVE` (the Android SDK does, and fails with
   "Failed to gain exclusive lock" when a second process opens the same file). This is deliberate:
   after a Flutter hot restart the old isolate's handle is still open and the new isolate must be

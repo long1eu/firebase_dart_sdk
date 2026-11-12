@@ -1,0 +1,358 @@
+# Migrating from `cloud_firestore_vm` / `firebase_core_vm`
+
+`cloud_firestore_vm` 0.0.7 and `firebase_core_vm` 0.0.4 (April 2020) continue as
+`cloud_firestore_dart` 0.1.0 and `firebase_app_dart` 0.1.0. It is the same code base, moved to
+Dart 3 with null safety and synced with newer versions of the official SDKs. This guide lists
+what you have to change, in the order you will hit it. Each item is a breaking change from the
+0.1.0 CHANGELOG of one of the two packages.
+
+The code blocks marked "after" are compiled by
+`cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`. They assume an
+`app` (`FirebaseApp`), a `firestore` (`Firestore`) and a `users` collection in scope.
+
+Runnable programs for everything mentioned here are in
+[`cloud_firestore/cloud_firestore_dart/example/`](../cloud_firestore/cloud_firestore_dart/example/README.md).
+
+## 1. Packages and imports
+
+| Before | After |
+|---|---|
+| `cloud_firestore_vm` | `cloud_firestore_dart` |
+| `firebase_core_vm` | `firebase_app_dart` |
+| `_firebase_internal_vm` | part of `firebase_app_dart` (`package:firebase_app_dart/internal.dart`, not public API) |
+| `_firebase_database_collection_vm` | part of `cloud_firestore_dart` (not exported) |
+
+`pubspec.yaml`, before:
+
+```yaml
+environment:
+  sdk: ">=2.7.0 <3.0.0"
+dependencies:
+  cloud_firestore_vm: ^0.0.7
+  firebase_core_vm: ^0.0.4
+```
+
+After:
+
+```yaml
+environment:
+  sdk: ^3.0.0
+dependencies:
+  cloud_firestore_dart: ^0.1.0
+  firebase_app_dart: ^0.1.0
+```
+
+Imports, before:
+
+```dart before
+import 'package:cloud_firestore_vm/cloud_firestore_vm.dart';
+import 'package:firebase_core_vm/firebase_core_vm.dart';
+```
+
+After:
+
+```dart
+import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:firebase_app_dart/firebase_app_dart.dart';
+```
+
+Class names are unchanged (`Firestore`, `FirebaseApp`, `FirebaseOptions`,
+`PlatformDependencies`, ...). If you imported files under `src/` of the old packages, the paths
+moved with the package name; most of what was reachable that way is now internal (section 8).
+
+## 2. Dart 3 and null safety
+
+Both packages need Dart `^3.0.0` and are null safe. Values that could always be missing are now
+typed as nullable:
+
+- `DocumentSnapshot.data` is `null` for a document that does not exist, and field values are
+  `Object?`.
+- `FirebaseOptions.projectId`, `databaseUrl`, `storageBucket`, `gcmSenderId`, `gaTrackingId`
+  are nullable; `apiKey` and `applicationId` are required.
+
+Before:
+
+```dart before
+final DocumentSnapshot snapshot = await users.document('ada').get();
+final Map<String, Object> data = snapshot.data;
+final int age = data['age'];
+```
+
+After:
+
+```dart
+final DocumentSnapshot<Map<String, Object?>> snapshot =
+    await users.doc('ada').get();
+final Map<String, Object?>? data = snapshot.data; // null if it does not exist
+final int? age = data?['age'] as int?;
+```
+
+## 3. Creating the app
+
+`FirebaseApp.withOptions` is unchanged. Two members of `FirebaseApp` changed:
+
+- `setDataCollectionDefaultEnabled` takes a required named `enabled` (it had a default of
+  `false`).
+- `persistenceKey` is now URL-safe base64 without padding. If you used it to name your own
+  files, files named by the old version are not found under the new key.
+
+Before:
+
+```dart before
+app.setDataCollectionDefaultEnabled();              // meant "disable"
+```
+
+After:
+
+```dart
+app.setDataCollectionDefaultEnabled(enabled: false);
+```
+
+## 4. Creating the Firestore instance
+
+`Firestore.getInstance` still works but is deprecated; use `Firestore.instanceFor`, where the
+app is a named argument.
+
+Before:
+
+```dart before
+final Firestore firestore = await Firestore.getInstance(
+  app,
+  openDatabase: myOpener,
+  settings: FirestoreSettings(persistenceEnabled: true),
+);
+```
+
+After:
+
+```dart
+final Firestore firestore = await Firestore.instanceFor(
+  app: app,
+  settings: FirestoreSettings(cacheSettings: PersistentCacheSettings()),
+  // openDatabase: yourOpener, see section 5
+);
+```
+
+`persistenceEnabled` and `cacheSizeBytes` still exist; `cacheSettings`
+(`PersistentCacheSettings` or `MemoryCacheSettings`) is the newer way to say the same and cannot
+be combined with non-default values of the other two.
+
+For the emulator, build the settings with `withEmulator` instead of setting `host` and
+`sslEnabled` by hand:
+
+```dart
+final Firestore emulated = await Firestore.instanceFor(
+  app: app,
+  settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+);
+```
+
+## 5. The SQLite opener (`OpenDatabase` / `Database`)
+
+You still pass your own opener. The contract is now documented on the `OpenDatabase` typedef,
+and one member of `Database` changed: the `File get file` getter is replaced by
+`String get path`, so the interface no longer needs `dart:io`. Arguments are typed
+`List<Object?>?` instead of `List<dynamic>`.
+
+Before:
+
+```dart before
+class MyDatabase extends Database {
+  @override
+  File get file => _file;
+
+  @override
+  Future<void> execute(String statement, [List<dynamic> arguments]) async { /* ... */ }
+  // ...
+}
+```
+
+After:
+
+```dart
+class MyDatabase implements Database {
+  MyDatabase(this.path);
+
+  @override
+  final String path; // the file Firestore.clearPersistence() deletes
+
+  @override
+  Future<void> execute(String statement, [List<Object?>? arguments]) async {}
+
+  @override
+  Future<List<Map<String, dynamic>>> query(String statement,
+          [List<Object?>? arguments]) async =>
+      <Map<String, dynamic>>[];
+
+  @override
+  Future<int> delete(String statement, [List<Object?>? arguments]) async => 0;
+
+  @override
+  void close() {}
+}
+```
+
+A complete implementation on top of `package:sqlite3` that you can copy is
+[`example/sqlite_database.dart`](../cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart).
+
+The database name passed to the opener is built the same way as in 0.0.7
+(`firestore.<app name>.<project id>.<database>`), so an opener that maps names to files the same
+way finds the existing cache. The schema version went from 8 to 9; the migration runs through
+your opener's `onUpgrade` callback on the first open.
+
+`ConflictAlgorithm` is no longer exported; nothing in the SDK used it.
+
+## 6. Renamed members (old names deprecated, still working)
+
+| Before | After |
+|---|---|
+| `Firestore.getInstance(app, ...)` | `Firestore.instanceFor(app: app, ...)` |
+| `firestore.document(path)`, `collection.document(id)` | `firestore.doc(path)`, `collection.doc(id)` |
+| `snapshot.reference` | `snapshot.ref` |
+| `querySnapshot.documents` | `querySnapshot.docs` |
+| `querySnapshot.documentChanges` | `querySnapshot.docChanges` |
+| `FieldPath.documentId()` | `FieldPath.documentIdField` |
+| `Source.defaultSource` | `Source.serverAndCache` |
+| `firestore.shutdown()` | `firestore.terminate()` |
+
+Before:
+
+```dart before
+final QuerySnapshot result = await firestore
+    .collection('users')
+    .whereEqualTo(FieldPath.documentId(), 'ada')
+    .get(Source.defaultSource);
+for (final DocumentSnapshot doc in result.documents) {
+  print(doc.reference.path);
+}
+await firestore.shutdown();
+```
+
+After:
+
+```dart
+final QuerySnapshot<Map<String, Object?>> result = await firestore
+    .collection('users')
+    .where(FieldPath.documentIdField, isEqualTo: 'ada')
+    .get(Source.serverAndCache);
+for (final QueryDocumentSnapshot<Map<String, Object?>> doc in result.docs) {
+  print(doc.ref.path);
+}
+await firestore.terminate();
+```
+
+The `whereEqualTo`, `whereGreaterThan`, ... methods are unchanged and not deprecated; `where`
+with named arguments and `where(Filter)` are additions.
+
+## 7. Generic references and snapshots
+
+`DocumentReference`, `CollectionReference`, `Query`, `DocumentSnapshot`,
+`QueryDocumentSnapshot`, `QuerySnapshot` and `DocumentChange` have a type parameter for the
+document data. What `Firestore` returns is typed `<Map<String, Object?>>`, so code that lets the
+types be inferred keeps compiling. A type annotation without the type argument now means
+`dynamic` data, which silently turns off type checking for `data`.
+
+Before:
+
+```dart before
+final DocumentReference ref = firestore.collection('users').document('ada');
+final DocumentSnapshot snapshot = await ref.get();
+```
+
+After:
+
+```dart
+final DocumentReference<Map<String, Object?>> ref =
+    firestore.collection('users').doc('ada');
+final DocumentSnapshot<Map<String, Object?>> snapshot = await ref.get();
+```
+
+## 8. Members that are no longer public
+
+These were reachable in 0.0.7 only because nothing hid them. They are now either not exported
+or marked `@internal`, in which case the analyzer reports every use outside the package.
+
+| Before | After |
+|---|---|
+| `firestore.databaseId.projectId` | `firestore.projectId` |
+| `firestore.databaseId.databaseId` | `firestore.databaseName` |
+| `Firestore.newInstance(...)`, `Firestore(...)` | `Firestore.instanceFor(...)`; an auth or App Check provider comes from the `FirebaseApp` (`PlatformDependencies.authProvider` / `appCheckProvider`) |
+| `firestore.client`, `scheduler`, `dataConverter`, `validateReference` | no replacement (implementation) |
+| `query.query`, `querySnapshot.snapshot`, `snapshot.document`, `reference.key` | no replacement (core model types); use `path`, `id`, `data`, `metadata` |
+| `FieldPath(...)` unnamed constructor, `internalPath`, `documentIdInstance` | `FieldPath.of([...])`, `FieldPath.fromDotSeparatedPath('a.b')`, `FieldPath.documentIdField` |
+| `fieldValue.isDelete`, `isServerTimestamp`, ..., `elements`, `methodName` | no replacement (implementation) |
+| `SetOptions.fieldMask` | no replacement; `SetOptions.merge` stays |
+| `LoadBundleTask()` constructor, `setResult`, `setException`, `updateProgress` | tasks come from `firestore.loadBundle(...)` |
+| `FirestoreErrorCode.fromValue(grpcError)` | no replacement; `FirestoreError.code` |
+| `Timestamp.validateRange` | no replacement |
+| `maxVectorQueryLimit`, `maxVectorQueryDimensions`, `ConflictAlgorithm` | not exported |
+
+Before:
+
+```dart before
+print(firestore.databaseId.projectId);
+```
+
+After:
+
+```dart
+print('${firestore.projectId} / ${firestore.databaseName}');
+```
+
+## 9. Behaviour changes without a compile error
+
+- **Transactions that only read a document.** 0.0.7 failed with "Every document read in a
+  transaction must also be written". Now a document that was read but not written is verified
+  at commit, and the transaction is retried if it changed. Code that wrote a document back
+  unchanged only to satisfy the old rule can stop doing so.
+
+  Before:
+
+  ```dart before
+  await firestore.runTransaction((Transaction tx) async {
+    final DocumentSnapshot config = await tx.get(configRef);
+    tx.set(configRef, config.data); // only to satisfy the rule
+    tx.update(userRef, <String, Object>{'plan': config.data['plan']});
+  });
+  ```
+
+  After:
+
+  ```dart
+  final configRef = firestore.doc('config/plans');
+  final userRef = users.doc('ada');
+  await firestore.runTransaction<void>((Transaction tx) async {
+    final config = await tx.get(configRef);
+    tx.update(userRef, <String, Object?>{'plan': config.data!['plan']});
+  });
+  ```
+
+- **Transaction attempts.** The default went from 6 to 5
+  (`TransactionOptions.defaultMaxAttempts`). To keep 6:
+
+  ```dart
+  await firestore.runTransaction<void>(
+    (Transaction tx) async {},
+    options: TransactionOptions(maxAttempts: 6),
+  );
+  ```
+
+- **Idle streams.** The listen and write streams are closed after 1 minute without activity
+  (was 10 seconds), as in the Android SDK. Nothing to change.
+- **Server closing a stream.** A clean close of a stream by the server is reported as
+  `unavailable` and retried, instead of being ignored. Nothing to change; a start-up hang is
+  gone.
+- **Field transforms.** `FieldValue.serverTimestamp()`, `increment`, `arrayUnion` and
+  `arrayRemove` are sent inside the set or update write instead of a separate transform write.
+  The public API is the same. Pending writes stored by 0.0.7 in an existing SQLite cache are
+  converted when they are loaded.
+- **Locally changed documents** have no version until the backend acknowledges the write. This
+  is not visible through the public API.
+- **`Timestamp.fromDate` / `toDate`** keep microseconds (they truncated to milliseconds).
+  Results for millisecond inputs are unchanged.
+
+## 10. The example app
+
+The Flutter example app of `cloud_firestore_vm` is gone. The package now ships command-line
+examples that run against the Firestore emulator, including offline persistence with
+`package:sqlite3`.

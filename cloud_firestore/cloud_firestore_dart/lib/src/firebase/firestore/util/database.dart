@@ -21,7 +21,7 @@ import 'package:meta/meta.dart';
 /// finally call [onOpen]. The callbacks run Firestore's own schema migrations,
 /// so they must be awaited before the returned future completes.
 ///
-/// See `test/util/sqlite3_database.dart` in the package repository for an
+/// See `example/sqlite_database.dart` in this package for a complete
 /// implementation on top of `package:sqlite3`.
 typedef OpenDatabase = Future<Database> Function(String path,
     {int version,
