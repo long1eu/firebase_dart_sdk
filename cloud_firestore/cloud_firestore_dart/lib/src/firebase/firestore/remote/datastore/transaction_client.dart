@@ -6,15 +6,7 @@ part of 'datastore.dart';
 
 /// Wrapper class for transaction specific gRPC methods
 class TransactionClient {
-  const TransactionClient(
-    this._client,
-    this._serializer, {
-    this.lookupCloseGracePeriod = const Duration(seconds: 10),
-  });
-
-  /// How long [lookup] lets the backend close the call by itself after the last document arrived, before it cancels
-  /// the call.
-  final Duration lookupCloseGracePeriod;
+  const TransactionClient(this._client, this._serializer);
 
   final FirestoreClient _client;
   final RemoteSerializer _serializer;
@@ -53,19 +45,9 @@ class TransactionClient {
     final ResponseStream<proto.BatchGetDocumentsResponse> call =
         _client.batchGetDocuments(builder);
     late final StreamSubscription<proto.BatchGetDocumentsResponse> subscription;
-    Timer? closeTimer;
 
-    // The call is NOT cancelled as soon as the last document arrived. Normally the backend closes it right after,
-    // and cancelling (an HTTP/2 RST_STREAM) while its trailers are on their way makes package:http2 treat the late
-    // HEADERS frame as a protocol error and terminate the whole connection. Every other call on the channel then
-    // fails with UNKNOWN, including commits that the backend already applied, which the transaction runner retries.
-    // Only a call that the backend really keeps open is cancelled, after [lookupCloseGracePeriod].
-    void finish() {
-      closeTimer = Timer(lookupCloseGracePeriod, () {
-        subscription.cancel();
-        call.cancel();
-      });
-    }
+    // The call is not cancelled once the last document arrived, see [CallReleaser].
+    void finish() => _client.callReleaser.release(subscription, call.cancel);
 
     subscription = call.listen(
       (proto.BatchGetDocumentsResponse response) {
@@ -83,13 +65,11 @@ class TransactionClient {
         }
       },
       onError: (Object error, StackTrace stackTrace) {
-        closeTimer?.cancel();
         if (!completer.isCompleted) {
           completer.completeError(error, stackTrace);
         }
       },
       onDone: () {
-        closeTimer?.cancel();
         if (!completer.isCompleted) {
           // The server closed the stream early: report what was received (in
           // key order) instead of an empty result.

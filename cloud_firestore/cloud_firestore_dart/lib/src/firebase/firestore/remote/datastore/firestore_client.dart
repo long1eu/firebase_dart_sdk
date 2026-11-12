@@ -8,8 +8,13 @@ part of 'datastore.dart';
 /// for both the [Future]s and the [Stream]s.
 class FirestoreClient {
   @visibleForTesting
-  FirestoreClient(FirestoreTransport transport, this._optionsProvider)
-      : _transport = transport;
+  FirestoreClient(FirestoreTransport transport, this._optionsProvider,
+      {CallReleaser? callReleaser})
+      : _transport = transport,
+        callReleaser = callReleaser ?? CallReleaser();
+
+  /// Lets go of the calls this client is done with, see [CallReleaser].
+  final CallReleaser callReleaser;
 
   final ChannelOptionsProvider _optionsProvider;
   final FirestoreTransport _transport;
@@ -100,7 +105,10 @@ class FirestoreClient {
   /// Terminates this connection.
   ///
   /// All open calls are terminated immediately, and no further calls may be made on this connection.
-  Future<void> shutdown() => _transport.shutdown();
+  Future<void> shutdown() {
+    callReleaser.cancelAll();
+    return _transport.shutdown();
+  }
 
   Stream<R> _buildStream<R>(Stream<R> response) {
     return response.transform(DoStreamTransformer<R>(

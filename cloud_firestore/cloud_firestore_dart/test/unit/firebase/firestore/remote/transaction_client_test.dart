@@ -4,6 +4,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentia
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/call_release.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
@@ -39,6 +40,8 @@ class _FakeClient extends FirestoreClient {
             databaseId: DatabaseId.forProject('p'),
             credentialsProvider: EmptyCredentialsProvider(),
           ),
+          callReleaser:
+              CallReleaser(gracePeriod: const Duration(milliseconds: 200)),
         );
 
   final StreamController<proto.BatchGetDocumentsResponse> responses;
@@ -72,8 +75,7 @@ void main() {
     responses = StreamController<proto.BatchGetDocumentsResponse>();
     fakeClient = _FakeClient(responses);
     client = TransactionClient(
-        fakeClient, RemoteSerializer(DatabaseId.forProject('p')),
-        lookupCloseGracePeriod: const Duration(milliseconds: 200));
+        fakeClient, RemoteSerializer(DatabaseId.forProject('p')));
   });
 
   tearDown(() => responses.close());

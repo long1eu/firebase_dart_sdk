@@ -156,6 +156,9 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
   Future<ResponseStream<Res>> _buildCall(Stream<Req> requests);
 
+  /// Lets go of the call of a stream that the client closed, see [CallReleaser].
+  CallReleaser get _callReleaser;
+
   @mustCallSuper
   void _onData(Res response) {
     if (_state != State.closing) {
@@ -290,8 +293,18 @@ abstract class BaseStream<Req extends GeneratedMessage,
       // Not awaited: the future of a buffering controller only completes once
       // gRPC consumed the requests, which never happens if it never connected.
       unawaited(requestsController?.close());
-      await responseSub?.cancel();
-      await writeResponse?.cancel();
+      if (state != State.error && responseSub != null && writeResponse != null) {
+        // A close by the client: closing the requests (above) is the half-close that tells the backend to finish
+        // the call, as upstream does. The call is not reset, see [CallReleaser]; what it still delivers is ignored.
+        _callReleaser.release(responseSub, writeResponse.cancel);
+        // The close stays asynchronous, as it is when the call is cancelled: a listener that subscribes right after
+        // calling stop() still receives the [CloseEvent].
+        await Future<void>.value();
+      } else {
+        // The call already failed or ended.
+        await responseSub?.cancel();
+        await writeResponse?.cancel();
+      }
     } finally {
       _closeFuture = null;
       closing.complete();

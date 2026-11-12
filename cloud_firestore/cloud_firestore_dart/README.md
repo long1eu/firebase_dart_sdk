@@ -274,6 +274,30 @@ To run `test/integration_enterprise/pipeline_test.dart`, start the Enterprise ed
 (`tool/start_enterprise_emulator.sh`) and set `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (host:port);
 without it the tests are skipped.
 
+## Transactions
+
+Transactions are optimistic, as in the Android and JS SDKs: `transaction.get` reads the current
+version of a document, and the commit sends every write with a precondition on the version that was
+read (documents that were only read are verified). When a precondition fails the whole callback is
+run again, up to `TransactionOptions.maxAttempts` times (5 by default), so the callback must not
+have side effects of its own.
+
+**A commit whose answer is lost can be applied twice.** A commit is retried when it fails with
+`aborted`, `failedPrecondition` or `alreadyExists`, which the backend only returns when nothing was
+applied, but also on connection-level errors (`unavailable`, `unknown`, `cancelled`,
+`deadlineExceeded`, `internal`, `resourceExhausted`), the same rule as upstream. If the connection
+breaks after the backend applied the commit but before the client received the answer, the client
+cannot tell, runs the callback again, reads the result of its own first attempt and applies the
+change a second time (a counter is incremented twice). This is rare, and the Android and JS SDKs
+have the same exposure. If a transaction must not be applied twice, make it idempotent: write a
+value that identifies the operation (for example an operation id that the callback checks before
+writing) instead of relying on a relative change.
+
+Writes outside transactions (`set`, `update`, `delete`, `WriteBatch`) go through the write stream.
+When the stream breaks, the writes that were not acknowledged are sent again on the new stream, as
+upstream does. Overwrites and deletes are harmless to repeat; whether the backend recognises a
+repeated write that carries a relative transform such as `FieldValue.increment` was not verified.
+
 ## Persistence and connectivity
 
 - The package does not open SQLite files itself: you pass an `OpenDatabase` function to

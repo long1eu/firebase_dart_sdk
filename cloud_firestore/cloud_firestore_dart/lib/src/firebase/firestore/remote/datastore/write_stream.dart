@@ -34,6 +34,9 @@ class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
   final FirestoreClient _client;
   final RemoteSerializer _serializer;
 
+  @override
+  CallReleaser get _callReleaser => _client.callReleaser;
+
   /// Last received stream token from the server.
   ///
   /// Used to acknowledge which responses the client has processed. Stream

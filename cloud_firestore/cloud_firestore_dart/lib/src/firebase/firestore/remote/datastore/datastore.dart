@@ -23,6 +23,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/aggregation_serializer.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/call_release.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/firestore_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/transport_factory.dart';

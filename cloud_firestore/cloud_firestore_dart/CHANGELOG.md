@@ -138,6 +138,10 @@ only. **Nothing was run against production Firestore.**
   reset could make the HTTP/2 connection fail every call in flight, so a commit that the backend had
   applied looked failed and was retried (a counter incremented twice). Transactions are also no longer
   retried once the instance is terminated.
+- The client no longer resets a call that the backend may be finishing (aggregate queries, stopped or
+  idle listen and write streams, transaction lookups): it closes its side and lets the call end, and
+  cancels it only if it is still open after 10 seconds. A reset that raced the end of a call made
+  `package:http2` terminate the whole connection and fail every call in flight.
 - `Blob.bytes` returns a copy; out-of-range `Timestamp`s are rejected with an `ArgumentError` when written,
   also in builds without asserts; `FirestoreSettings.copyWith(cacheSettings: ...)` on settings that set
   `persistenceEnabled` or `cacheSizeBytes` throws instead of dropping them; a `mockUserToken` with an

@@ -36,13 +36,12 @@ extension DatastoreAggregation on Datastore {
         _client.runAggregationQuery(request);
     final proto.RunAggregationQueryResponse response;
     try {
-      response = await call.first;
+      // The first response carries the whole result. The call is not cancelled (which `call.first` would do), see
+      // [CallReleaser].
+      response = await _client.callReleaser.first(call, call.cancel);
     } on StateError {
       throw FirestoreError(
           'No responses received', FirestoreErrorCode.unimplemented);
-    } finally {
-      // The first response carries the whole result.
-      call.cancel().ignore();
     }
 
     return _serializer.decodeAggregationResult(

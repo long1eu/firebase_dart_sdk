@@ -36,6 +36,9 @@ class WatchStream
   final RemoteSerializer _serializer;
 
   @override
+  CallReleaser get _callReleaser => _client.callReleaser;
+
+  @override
   Future<ResponseStream<proto.ListenResponse>> _buildCall(
       Stream<proto.ListenRequest> requests) async {
     return _client.listen(requests);
