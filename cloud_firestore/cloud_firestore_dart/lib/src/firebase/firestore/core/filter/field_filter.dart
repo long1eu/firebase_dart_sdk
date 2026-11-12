@@ -69,6 +69,27 @@ class FieldFilter extends Filter {
           other is! NullValue &&
           _matchesComparison(other.compareTo(value));
     }
+    // Null and NaN have a place in the order of values (null before
+    // everything, NaN before the other numbers), but the backend does not
+    // order by them in a filter: `a < 1` does not match a NaN, `a > null`
+    // matches nothing, and `a >= NaN` matches no number.
+    //
+    // PORTING NOTE: the JS and Android SDKs evaluate these with the order of
+    // values, and then match documents that the backend does not return.
+    final bool special = _isNaN(other) ||
+        _isNaN(value) ||
+        other is NullValue ||
+        value is NullValue;
+    if (special && operator != FilterOperator.equal) {
+      // `<=` and `>=` hold for a null with null and for a NaN with NaN, as in
+      // the other SDKs and in an Enterprise edition database (a Standard
+      // edition database matches nothing here either).
+      final bool same = other is NullValue && value is NullValue ||
+          _isNaN(other) && _isNaN(value);
+      return same &&
+          (operator == FilterOperator.lessThanOrEqual ||
+              operator == FilterOperator.graterThanOrEqual);
+    }
     // Only compare types with matching backend order (such as double and int).
     return other != null &&
         value.typeOrder == other.typeOrder &&

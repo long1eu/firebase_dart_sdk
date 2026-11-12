@@ -13,6 +13,7 @@ class InFilter extends FieldFilter {
   bool matches(Document doc) {
     final ArrayValue arrayValue = value as ArrayValue;
     final FieldValue? other = doc.getField(field);
-    return other != null && arrayValue.internalValue.contains(other);
+    return other != null &&
+        _containsForBackend(arrayValue.internalValue, other);
   }
 }

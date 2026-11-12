@@ -44,13 +44,10 @@ class IntegerValue extends NumberValue {
       return -other.compareTo(this);
     } else if (other is NumberValue) {
       final num otherValue = other.value as num;
-      if (otherValue.isNaN) {
-        return 1;
-      } else if (otherValue is double && otherValue == 0.0) {
-        return value.compareTo(0);
-      } else {
-        return value.compareTo(otherValue);
+      if (otherValue is double) {
+        return -compareDoubleWithInt(otherValue, _value);
       }
+      return value.compareTo(otherValue);
     } else {
       return defaultCompareTo(other);
     }

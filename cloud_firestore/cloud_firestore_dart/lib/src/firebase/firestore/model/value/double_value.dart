@@ -58,6 +58,10 @@ class DoubleValue extends NumberValue {
       return -other.compareTo(this);
     }
 
+    if (other is IntegerValue) {
+      return compareDoubleWithInt(_value, other._value);
+    }
+
     final num otherValue = other.value as num;
     if (value.isNaN && otherValue.isNaN) {
       return 0;
@@ -71,4 +75,31 @@ class DoubleValue extends NumberValue {
 
     return value.compareTo(otherValue);
   }
+}
+
+/// Compares a double with a 64-bit integer by their exact numeric values.
+///
+/// Converting the integer to a double first is not enough: from 2^53 on
+/// several integers become the same double. NaN sorts before every number.
+/// (`Util.compareMixed` of the Android SDK.)
+int compareDoubleWithInt(double doubleValue, int intValue) {
+  if (doubleValue.isNaN || doubleValue < -9223372036854775808.0) {
+    return -1;
+  }
+  if (doubleValue >= 9223372036854775808.0) {
+    return 1;
+  }
+  // Exact: the double is in the range of the 64-bit integers.
+  final int truncated = doubleValue.toInt();
+  if (truncated != intValue) {
+    return truncated < intValue ? -1 : 1;
+  }
+  // The integer parts are equal; the double can only differ by its fraction
+  // (and `truncated`, which came from a double, converts back exactly).
+  final double integral = truncated.toDouble();
+  return doubleValue < integral
+      ? -1
+      : doubleValue > integral
+          ? 1
+          : 0;
 }

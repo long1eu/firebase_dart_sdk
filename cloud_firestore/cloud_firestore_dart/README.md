@@ -502,6 +502,16 @@ Enterprise database.
 - **`null` and `NaN` in equality filters.** `whereIn`, `whereArrayContains` and
   `whereArrayContainsAny` match fields (or array elements) that are `null` or `NaN` when the
   filter value is `null` or `NaN`. On Standard they never match.
+  The client evaluates these filters like Enterprise (as the JS and Android SDKs do: null is
+  null, NaN is NaN; the same holds for `<=` and `>=` with a `null` or `NaN` operand). On
+  Standard this means that a cached `null` or `NaN` document stays in the local result of such
+  a query although the backend does not return it: it stays in limbo, the listener keeps
+  reporting `isFromCache` and `get(Source.server)` does not complete.
+  `test/integration/firebase/firestore/property_query_test.dart` pins both sides.
+- **`!=` and `not-in`** also return documents in which the field is `null` or missing on
+  Enterprise (seen with RunQuery). The client drops them, as on Standard, but a `limit` counts
+  them on the backend, so a page can come back with fewer documents than the limit although
+  more match.
 - **`sum` over no documents** is `null` on Enterprise and `0` on Standard (`average` is `null`
   on both).
 - **Number of aggregations.** Standard rejects more than 5 aggregations in one query;

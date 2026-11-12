@@ -64,6 +64,16 @@ abstract class ArrayTransformOperation implements TransformOperation {
   }
 }
 
+/// Whether the backend treats [a] and [b] as the same array element in
+/// `arrayUnion` and `arrayRemove`: numbers are the same if they have the same
+/// numeric value, whatever their type (1 is 1.0, 0.0 is -0.0).
+///
+/// PORTING NOTE: the JS and Android SDKs use the strict equality of values.
+/// The result of an array transform is computed by the client (the backend
+/// does not send it back), so with the strict equality the cached document
+/// differs from the stored one until it is read from the backend again.
+bool _sameElement(FieldValue a, FieldValue b) => a.compareTo(b) == 0;
+
 /// An array union transform operation.
 class ArrayTransformOperationUnion extends ArrayTransformOperation {
   ArrayTransformOperationUnion(List<FieldValue> elements) : super(elements);
@@ -73,7 +83,7 @@ class ArrayTransformOperationUnion extends ArrayTransformOperation {
     final List<FieldValue> result =
         ArrayTransformOperation.coercedFieldValuesArray(previousValue);
     for (FieldValue element in elements) {
-      if (!result.contains(element)) {
+      if (!result.any((FieldValue value) => _sameElement(value, element))) {
         result.add(element);
       }
     }
@@ -89,7 +99,8 @@ class ArrayTransformOperationRemove extends ArrayTransformOperation {
   ArrayValue apply(FieldValue? previousValue) {
     final List<FieldValue> result =
         ArrayTransformOperation.coercedFieldValuesArray(previousValue)
-          ..removeWhere(elements.contains);
+          ..removeWhere((FieldValue value) => elements
+              .any((FieldValue element) => _sameElement(value, element)));
     return ArrayValue.fromList(result);
   }
 }

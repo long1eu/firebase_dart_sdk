@@ -32,6 +32,6 @@ class NotInFilter extends FieldFilter {
     final FieldValue? other = doc.getField(field);
     return other != null &&
         other is! NullValue &&
-        !arrayValue.internalValue.contains(other);
+        !_containsForBackend(arrayValue.internalValue, other);
   }
 }

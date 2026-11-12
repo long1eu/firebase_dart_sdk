@@ -313,14 +313,17 @@ void main() {
           isTrue);
     });
 
-    // KNOWN DIVERGENCE from the backend, the same the JS SDK has: `in`,
-    // `not-in` and the array filters use equality, which is strict about the
-    // type of a number, while the backend matches numbers by value. The same is
-    // true for an integer and a double.
-    test('membership filters are strict about the type of a number', () {
+    // `in`, `not-in` and the array filters match numbers by value, like the
+    // backend, whatever the type of the number. (The JS SDK uses the strict
+    // equality of values here; a cached document that only the SDK matches
+    // then never leaves limbo. See the query property tests.)
+    test('membership filters match numbers by value', () {
       final Document int32Doc =
           doc('c/d', 0, <String, Object?>{'v': Int32Value(5)});
-      expect(filter('v', 'in', <Object>[5]).matches(int32Doc), isFalse);
+      expect(filter('v', 'in', <Object>[5]).matches(int32Doc), isTrue);
+      expect(filter('v', 'in', <Object>[5.0]).matches(int32Doc), isTrue);
+      expect(filter('v', 'in', <Object>[6]).matches(int32Doc), isFalse);
+      expect(filter('v', 'not-in', <Object>[5.0]).matches(int32Doc), isFalse);
       expect(
           filter('v', 'in', <Object>[Int32Value(5)]).matches(int32Doc), isTrue);
       expect(
@@ -328,7 +331,7 @@ void main() {
               .matches(doc('c/d', 0, <String, Object?>{
             'v': <Object>[5]
           })),
-          isFalse);
+          isTrue);
       expect(
           filter('v', 'array-contains', Decimal128Value('5.0'))
               .matches(doc('c/d', 0, <String, Object?>{

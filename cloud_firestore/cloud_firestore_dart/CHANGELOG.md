@@ -285,6 +285,16 @@ Documentation and tests:
 
 ### Fixed
 
+- The local evaluation of filters follows the backend in three places where the JS and Android
+  SDKs do not: `whereIn`, `whereNotIn`, `arrayContains` and `arrayContainsAny` match numbers by
+  value (`1` is `1.0`, `0.0` is `-0.0`); `<`, `<=`, `>` and `>=` do not order `null` and `NaN`
+  (`a < 1` does not match a `NaN`, `a >= NaN` matches no number); `arrayUnion` and
+  `arrayRemove` compare numbers by value. Before, a cached document that only the client
+  matched stayed in limbo (the listener never left `isFromCache`, `get(Source.server)` did not
+  complete), and after an array transform the cached document differed from the stored one.
+  Found by the seeded property tests (`test/util/property.dart`).
+- A double and an integer beyond 2^53 are compared by their exact values (the order used to
+  depend on the side of the operands).
 - Fixes from the upstream sync (UTF-8 string ordering, limbo handling, limbo-resolution
   document removal, transaction precondition, listener lifecycle and others); see
   `docs/upstream_sync/UPSTREAM_PLAN.md`.
