@@ -38,8 +38,10 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   /// Otherwise will return a new path with the current path's first [count] segments removed.
   B popFirst([int count = 1]) {
     final int length = this.length;
-    hardAssertLazy(length >= count,
-        () => 'Can\'t call popFirst with count > length() ($count > $length)');
+    hardAssertLazy(
+      length >= count,
+      () => 'Can\'t call popFirst with count > length() ($count > $length)',
+    );
     return createPathWithSegments(segments.sublist(count, length));
   }
 

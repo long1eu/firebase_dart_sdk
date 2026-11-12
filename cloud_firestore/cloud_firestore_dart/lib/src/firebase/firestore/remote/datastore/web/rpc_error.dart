@@ -80,8 +80,10 @@ int codeFromHttpStatus(int status) {
 /// The status name wins; without one the numeric code is used, which is an
 /// HTTP status ([httpCode] true, the REST and stream error envelopes) or
 /// already a gRPC code.
-GrpcError grpcErrorFromJson(Map<String, Object?> error,
-    {bool httpCode = true}) {
+GrpcError grpcErrorFromJson(
+  Map<String, Object?> error, {
+  bool httpCode = true,
+}) {
   final Object? message = error['message'];
   final Object? status = error['status'];
   final Object? code = error['code'];
@@ -91,7 +93,8 @@ GrpcError grpcErrorFromJson(Map<String, Object?> error,
   }
   if (grpcCode == null) {
     return GrpcError.internal(
-        'Unknown error status: $status with message $message');
+      'Unknown error status: $status with message $message',
+    );
   }
   return GrpcError.custom(grpcCode, message is String ? message : null);
 }

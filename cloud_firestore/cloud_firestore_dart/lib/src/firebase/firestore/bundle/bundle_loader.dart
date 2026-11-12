@@ -46,7 +46,9 @@ class BundleLoader {
   ///
   /// Returns a new progress if adding the element leads to a new progress, otherwise returns null.
   LoadBundleTaskProgress? addElement(
-      BundleElement bundleElement, int byteSize) {
+    BundleElement bundleElement,
+    int byteSize,
+  ) {
     if (bundleElement is BundleMetadata) {
       throw ArgumentError('Unexpected bundle metadata element.');
     }
@@ -61,15 +63,19 @@ class BundleLoader {
       if (!bundleElement.exists) {
         _documents = _documents.insert(
           bundleElement.key,
-          NoDocument(bundleElement.key, bundleElement.readTime,
-              hasCommittedMutations: false),
+          NoDocument(
+            bundleElement.key,
+            bundleElement.readTime,
+            hasCommittedMutations: false,
+          ),
         );
         _currentDocument = null;
       }
     } else if (bundleElement is BundleDocument) {
       if (bundleElement.key != _currentDocument) {
         throw ArgumentError(
-            'The document being added does not match the stored metadata.');
+          'The document being added does not match the stored metadata.',
+        );
       }
       _documents = _documents.insert(bundleElement.key, bundleElement.document);
       _currentDocument = null;
@@ -93,27 +99,33 @@ class BundleLoader {
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyChanges() async {
     if (_currentDocument != null) {
       throw ArgumentError(
-          'Bundled documents end with a document metadata element instead of a document.');
+        'Bundled documents end with a document metadata element instead of a document.',
+      );
     }
     if (_documents.length != _bundleMetadata.totalDocuments) {
       throw ArgumentError(
-          'Expected ${_bundleMetadata.totalDocuments} documents, but loaded ${_documents.length}.');
+        'Expected ${_bundleMetadata.totalDocuments} documents, but loaded ${_documents.length}.',
+      );
     }
 
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
         await _bundleCallback.applyBundledDocuments(
-            _documents, _bundleMetadata.bundleId,
-            readTimes: <DocumentKey, SnapshotVersion>{
-          for (final MapEntry<DocumentKey, BundledDocumentMetadata> entry
-              in _documentsMetadata.entries)
-            entry.key: entry.value.readTime,
-        });
+          _documents,
+          _bundleMetadata.bundleId,
+          readTimes: <DocumentKey, SnapshotVersion>{
+            for (final MapEntry<DocumentKey, BundledDocumentMetadata> entry
+                in _documentsMetadata.entries)
+              entry.key: entry.value.readTime,
+          },
+        );
 
     final Map<String, ImmutableSortedSet<DocumentKey>> queryDocumentMap =
         _getQueryDocumentMapping();
     for (final NamedQuery namedQuery in _queries) {
       await _bundleCallback.saveNamedQuery(
-          namedQuery, queryDocumentMap[namedQuery.name]!);
+        namedQuery,
+        queryDocumentMap[namedQuery.name]!,
+      );
     }
 
     await _bundleCallback.saveBundle(_bundleMetadata);

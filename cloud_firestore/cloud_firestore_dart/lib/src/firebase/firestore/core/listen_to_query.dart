@@ -13,7 +13,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.d
 /// (not when it is created) and removed again when the subscription is
 /// cancelled, even if that happens before the registration finished.
 Stream<ViewSnapshot> listenToQuery(
-    FirestoreClient client, Query query, ListenOptions options) {
+  FirestoreClient client,
+  Query query,
+  ListenOptions options,
+) {
   late final StreamController<ViewSnapshot> controller;
   StreamSubscription<ViewSnapshot>? subscription;
   bool cancelled = false;
@@ -21,27 +24,30 @@ Stream<ViewSnapshot> listenToQuery(
   controller = StreamController<ViewSnapshot>(
     onListen: () {
       final Future<QueryStream> pending = client.listen(query, options);
-      pending.then((QueryStream queryStream) {
-        if (cancelled) {
-          // Cancelled while registering: listening and cancelling removes the
-          // listener through the QueryStream's own cancel hook.
-          queryStream.listen(null).cancel();
-          return;
-        }
-        final StreamSubscription<ViewSnapshot> sub = queryStream.listen(
-          controller.add,
-          onError: controller.addError,
-        );
-        subscription = sub;
-        if (controller.isPaused) {
-          sub.pause();
-        }
-      }, onError: (Object error, StackTrace stackTrace) {
-        if (!cancelled) {
-          controller.addError(error, stackTrace);
-          controller.close();
-        }
-      });
+      pending.then(
+        (QueryStream queryStream) {
+          if (cancelled) {
+            // Cancelled while registering: listening and cancelling removes the
+            // listener through the QueryStream's own cancel hook.
+            queryStream.listen(null).cancel();
+            return;
+          }
+          final StreamSubscription<ViewSnapshot> sub = queryStream.listen(
+            controller.add,
+            onError: controller.addError,
+          );
+          subscription = sub;
+          if (controller.isPaused) {
+            sub.pause();
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!cancelled) {
+            controller.addError(error, stackTrace);
+            controller.close();
+          }
+        },
+      );
     },
     onPause: () => subscription?.pause(),
     onResume: () => subscription?.resume(),

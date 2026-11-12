@@ -44,7 +44,7 @@ class BloomFilter {
   /// [hashCount] must be greater than zero unless [bitmap] is empty, in which
   /// case it may be zero. Throws an [ArgumentError] otherwise.
   BloomFilter(this._bitmap, int padding, this._hashCount)
-      : _bitCount = _bitmap.length * 8 - padding {
+    : _bitCount = _bitmap.length * 8 - padding {
     final String? error = _validate(_bitmap, padding, _hashCount);
     if (error != null) {
       throw ArgumentError(error);
@@ -100,7 +100,8 @@ class BloomFilter {
     final List<int> digest = crypto.md5.convert(utf8.encode(value)).bytes;
     if (digest.length != 16) {
       throw StateError(
-          'Invalid md5 hash array length: ${digest.length} (expected 16)');
+        'Invalid md5 hash array length: ${digest.length} (expected 16)',
+      );
     }
 
     final Int64 hash1 = Int64.fromBytes(digest.sublist(0, 8));

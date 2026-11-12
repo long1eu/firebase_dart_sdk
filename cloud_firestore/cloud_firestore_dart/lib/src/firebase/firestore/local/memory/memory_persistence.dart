@@ -56,10 +56,10 @@ part 'memory_remote_document_cache.dart';
 class MemoryPersistence extends Persistence {
   /// Use factory constructors to instantiate
   MemoryPersistence._(StatsCollector statsCollector)
-      : _statsCollector = statsCollector,
-        mutationQueues = <User, MemoryMutationQueue>{},
-        _semaphore = LocalSemaphore(1),
-        indexManager = MemoryIndexManager() {
+    : _statsCollector = statsCollector,
+      mutationQueues = <User, MemoryMutationQueue>{},
+      _semaphore = LocalSemaphore(1),
+      indexManager = MemoryIndexManager() {
     queryCache = MemoryQueryCache(this);
     remoteDocumentCache = MemoryRemoteDocumentCache(this, _statsCollector);
   }
@@ -73,11 +73,16 @@ class MemoryPersistence extends Persistence {
   }
 
   factory MemoryPersistence.createLruGcMemoryPersistence(
-      LruGarbageCollectorParams params, LocalSerializer serializer,
-      [StatsCollector statsCollector = StatsCollector.noOp]) {
+    LruGarbageCollectorParams params,
+    LocalSerializer serializer, [
+    StatsCollector statsCollector = StatsCollector.noOp,
+  ]) {
     final MemoryPersistence persistence = MemoryPersistence._(statsCollector);
-    persistence.referenceDelegate =
-        MemoryLruReferenceDelegate(persistence, params, serializer);
+    persistence.referenceDelegate = MemoryLruReferenceDelegate(
+      persistence,
+      params,
+      serializer,
+    );
     return persistence;
   }
 
@@ -166,13 +171,17 @@ class MemoryPersistence extends Persistence {
 
   @override
   Future<void> runTransaction(
-      String action, Transaction<void> operation) async {
+    String action,
+    Transaction<void> operation,
+  ) async {
     return runTransactionAndReturn(action, operation);
   }
 
   @override
   Future<T> runTransactionAndReturn<T>(
-      String action, Transaction<T> operation) async {
+    String action,
+    Transaction<T> operation,
+  ) async {
     await _semaphore.acquire();
 
     try {

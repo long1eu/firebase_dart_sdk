@@ -7,12 +7,14 @@ import 'package:cloud_firestore_dart/src/database_collection/standard_compartor.
 
 class ImmutableSortedSet<T> extends Iterable<T> {
   factory ImmutableSortedSet([List<T>? elements, Comparator<T>? comparator]) {
-    return ImmutableSortedSet<T>._(ImmutableSortedMap.buildFrom(
-      elements ?? <T>[],
-      <T, void>{},
-      ImmutableSortedMap.identityTranslator(),
-      comparator ?? naturalComparator<T>(),
-    ));
+    return ImmutableSortedSet<T>._(
+      ImmutableSortedMap.buildFrom(
+        elements ?? <T>[],
+        <T, void>{},
+        ImmutableSortedMap.identityTranslator(),
+        comparator ?? naturalComparator<T>(),
+      ),
+    );
   }
 
   ImmutableSortedSet._(this._map);

@@ -179,9 +179,10 @@ class KeepAliveTransportConnection implements ClientTransportConnection {
   bool get isOpen => _inner.isOpen;
 
   @override
-  ClientTransportStream makeRequest(List<Header> headers,
-          {bool endStream = false}) =>
-      _inner.makeRequest(headers, endStream: endStream);
+  ClientTransportStream makeRequest(
+    List<Header> headers, {
+    bool endStream = false,
+  }) => _inner.makeRequest(headers, endStream: endStream);
 
   @override
   Future<void> ping() => _inner.ping();

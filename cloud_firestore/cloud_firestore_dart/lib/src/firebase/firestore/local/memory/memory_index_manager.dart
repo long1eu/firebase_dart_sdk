@@ -7,7 +7,7 @@ part of 'memory_persistence.dart';
 /// An in-memory implementation of IndexManager.
 class MemoryIndexManager extends IndexManager {
   MemoryIndexManager()
-      : _collectionParentsIndex = MemoryCollectionParentIndex();
+    : _collectionParentsIndex = MemoryCollectionParentIndex();
   final MemoryCollectionParentIndex _collectionParentsIndex;
 
   @override
@@ -46,7 +46,9 @@ class MemoryIndexManager extends IndexManager {
 
   @override
   Future<void> updateCollectionGroup(
-      String collectionGroup, IndexOffset offset) async {}
+    String collectionGroup,
+    IndexOffset offset,
+  ) async {}
 
   @override
   List<FieldIndex> getFieldIndexes([String? collectionGroup]) =>
@@ -63,5 +65,6 @@ class MemoryIndexManager extends IndexManager {
 
   @override
   Future<void> updateIndexEntries(
-      Map<DocumentKey, MaybeDocument?> documents) async {}
+    Map<DocumentKey, MaybeDocument?> documents,
+  ) async {}
 }

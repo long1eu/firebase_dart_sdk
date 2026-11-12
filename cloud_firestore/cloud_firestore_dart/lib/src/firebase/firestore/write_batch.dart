@@ -50,15 +50,21 @@ class WriteBatch {
   /// [options] is an object to configure the set behavior.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch set<T extends Object?>(DocumentReference<T> documentRef, T data,
-      [SetOptions? options]) {
+  WriteBatch set<T extends Object?>(
+    DocumentReference<T> documentRef,
+    T data, [
+    SetOptions? options,
+  ]) {
     final SetOptions? userOptions = options;
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
     checkNotNull<Object>(data, 'Provided data must not be null.');
     _verifyNotCommitted();
-    final Map<String, Object?> rawData =
-        toRawData<T>(data, documentRef.converter, userOptions);
+    final Map<String, Object?> rawData = toRawData<T>(
+      data,
+      documentRef.converter,
+      userOptions,
+    );
     final UserDataParsedSetData parsed = options.merge
         ? _firestore.dataConverter.parseMergeData(rawData, options.fieldMask)
         : _firestore.dataConverter.parseSetData(rawData);
@@ -75,14 +81,18 @@ class WriteBatch {
   /// reference nested fields within the document.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch updateFromList(DocumentReference<Object?> documentRef, List<Object?> data) {
+  WriteBatch updateFromList(
+    DocumentReference<Object?> documentRef,
+    List<Object?> data,
+  ) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
     _mutations.add(
-        parsedData.toMutation(documentRef.key, Precondition(exists: true)));
+      parsedData.toMutation(documentRef.key, Precondition(exists: true)),
+    );
     return this;
   }
 
@@ -94,14 +104,18 @@ class WriteBatch {
   /// fields within the document.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch update(DocumentReference<Object?> documentRef, Map<String, Object?> data) {
-    final UserDataParsedUpdateData parsedData =
-        _firestore.dataConverter.parseUpdateData(data);
+  WriteBatch update(
+    DocumentReference<Object?> documentRef,
+    Map<String, Object?> data,
+  ) {
+    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
+        .parseUpdateData(data);
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
     _mutations.add(
-        parsedData.toMutation(documentRef.key, Precondition(exists: true)));
+      parsedData.toMutation(documentRef.key, Precondition(exists: true)),
+    );
     return this;
   }
 
@@ -129,7 +143,8 @@ class WriteBatch {
   void _verifyNotCommitted() {
     if (_committed) {
       throw StateError(
-          'A write batch can no longer be used after commit() has been called.');
+        'A write batch can no longer be used after commit() has been called.',
+      );
     }
   }
 }

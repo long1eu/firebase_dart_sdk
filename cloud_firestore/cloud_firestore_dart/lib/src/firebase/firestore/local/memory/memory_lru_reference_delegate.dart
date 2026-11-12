@@ -7,11 +7,14 @@ part of 'memory_persistence.dart';
 /// Provides LRU garbage collection functionality for [MemoryPersistence].
 class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   MemoryLruReferenceDelegate(
-      this.persistence, LruGarbageCollectorParams params, this.serializer)
-      : orphanedSequenceNumbers = <DocumentKey, int>{},
-        listenSequence =
-            ListenSequence(persistence.queryCache.highestListenSequenceNumber),
-        _currentSequenceNumber = ListenSequence.invalid {
+    this.persistence,
+    LruGarbageCollectorParams params,
+    this.serializer,
+  ) : orphanedSequenceNumbers = <DocumentKey, int>{},
+      listenSequence = ListenSequence(
+        persistence.queryCache.highestListenSequenceNumber,
+      ),
+      _currentSequenceNumber = ListenSequence.invalid {
     garbageCollector = LruGarbageCollector(this, params);
   }
 
@@ -30,8 +33,10 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   void onTransactionStarted() {
-    hardAssert(_currentSequenceNumber == ListenSequence.invalid,
-        'Starting a transaction without committing the previous one');
+    hardAssert(
+      _currentSequenceNumber == ListenSequence.invalid,
+      'Starting a transaction without committing the previous one',
+    );
     _currentSequenceNumber = listenSequence.next;
   }
 
@@ -42,15 +47,19 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
 
   @override
   Future<void> onTransactionCommitted() async {
-    hardAssert(_currentSequenceNumber != ListenSequence.invalid,
-        'Committing a transaction without having started one');
+    hardAssert(
+      _currentSequenceNumber != ListenSequence.invalid,
+      'Committing a transaction without having started one',
+    );
     _currentSequenceNumber = ListenSequence.invalid;
   }
 
   @override
   int get currentSequenceNumber {
-    hardAssert(_currentSequenceNumber != ListenSequence.invalid,
-        'Attempting to get a sequence number outside of a transaction');
+    hardAssert(
+      _currentSequenceNumber != ListenSequence.invalid,
+      'Attempting to get a sequence number outside of a transaction',
+    );
     return _currentSequenceNumber;
   }
 
@@ -64,13 +73,15 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
     final int targetCount = persistence.queryCache.targetCount;
     int orphanedCount = 0;
     await forEachOrphanedDocumentSequenceNumber(
-        (int sequenceNumber) => orphanedCount++);
+      (int sequenceNumber) => orphanedCount++,
+    );
     return targetCount + orphanedCount;
   }
 
   @override
   Future<void> forEachOrphanedDocumentSequenceNumber(
-      Consumer<int> consumer) async {
+    Consumer<int> consumer,
+  ) async {
     for (MapEntry<DocumentKey, int> entry in orphanedSequenceNumbers.entries) {
       // Pass in the exact sequence number as the upper bound so we know it won't be pinned by being too recent.
       final bool isPinned = await _isPinned(entry.key, entry.value);

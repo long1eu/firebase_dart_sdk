@@ -20,7 +20,7 @@ import 'package:collection/collection.dart';
 class VectorValue {
   /// Creates a vector holding a copy of [values].
   VectorValue(List<double> values)
-      : _values = List<double>.unmodifiable(values);
+    : _values = List<double>.unmodifiable(values);
 
   /// Builds a vector from a JSON map created by [toJson].
   ///
@@ -31,7 +31,10 @@ class VectorValue {
         values is! List<Object?> ||
         values.any((Object? value) => value is! num)) {
       throw ArgumentError.value(
-          json, 'json', 'Not a JSON representation of a VectorValue');
+        json,
+        'json',
+        'Not a JSON representation of a VectorValue',
+      );
     }
     return VectorValue(<double>[
       for (final Object? value in values) (value! as num).toDouble(),

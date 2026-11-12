@@ -52,8 +52,9 @@ class VectorFieldValue extends FieldValue {
         return lengthCmp;
       }
       for (int i = 0; i < _value.length; i++) {
-        final int cmp =
-            DoubleValue(_value[i]).compareTo(DoubleValue(other._value[i]));
+        final int cmp = DoubleValue(
+          _value[i],
+        ).compareTo(DoubleValue(other._value[i]));
         if (cmp != 0) {
           return cmp;
         }

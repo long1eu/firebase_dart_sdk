@@ -93,7 +93,9 @@ class FirestoreIndexValueWriter {
   }
 
   void _writeIndexValueAux(
-      FieldValue indexValue, DirectionalIndexByteEncoder encoder) {
+    FieldValue indexValue,
+    DirectionalIndexByteEncoder encoder,
+  ) {
     if (indexValue is NullValue) {
       _writeValueTypeLabel(encoder, indexTypeNull);
     } else if (indexValue is BoolValue) {
@@ -178,7 +180,9 @@ class FirestoreIndexValueWriter {
   }
 
   void _writeIndexString(
-      String stringIndexValue, DirectionalIndexByteEncoder encoder) {
+    String stringIndexValue,
+    DirectionalIndexByteEncoder encoder,
+  ) {
     _writeValueTypeLabel(encoder, indexTypeString);
     encoder.writeString(stringIndexValue);
   }
@@ -210,7 +214,9 @@ class FirestoreIndexValueWriter {
   }
 
   void _writeIndexTimestamp(
-      Timestamp timestamp, DirectionalIndexByteEncoder encoder) {
+    Timestamp timestamp,
+    DirectionalIndexByteEncoder encoder,
+  ) {
     _writeValueTypeLabel(encoder, indexTypeTimestamp);
     encoder
       ..writeLong(timestamp.seconds)
@@ -220,7 +226,9 @@ class FirestoreIndexValueWriter {
   /// Writes a pending server timestamp as the map upstream keeps for it:
   /// `{__local_write_time__, __previous_value__, __type__}`.
   void _writeIndexServerTimestamp(
-      ServerTimestampValue value, DirectionalIndexByteEncoder encoder) {
+    ServerTimestampValue value,
+    DirectionalIndexByteEncoder encoder,
+  ) {
     _writeValueTypeLabel(encoder, indexTypeMap);
     _writeIndexString(_serverTimestampLocalWriteTimeKey, encoder);
     _writeIndexTimestamp(value.localWriteTime, encoder);
@@ -238,7 +246,9 @@ class FirestoreIndexValueWriter {
   }
 
   void _writeIndexVector(
-      List<double> vector, DirectionalIndexByteEncoder encoder) {
+    List<double> vector,
+    DirectionalIndexByteEncoder encoder,
+  ) {
     _writeValueTypeLabel(encoder, indexTypeVector);
 
     // Vectors sort first by length
@@ -255,7 +265,9 @@ class FirestoreIndexValueWriter {
   }
 
   void _writeIndexEntityRef(
-      ResourcePath path, DirectionalIndexByteEncoder encoder) {
+    ResourcePath path,
+    DirectionalIndexByteEncoder encoder,
+  ) {
     _writeValueTypeLabel(encoder, indexTypeReference);
     for (int index = 0; index < path.length; ++index) {
       _writeValueTypeLabel(encoder, indexTypeReferenceSegment);
@@ -272,7 +284,9 @@ class FirestoreIndexValueWriter {
   }
 
   void _writeValueTypeLabel(
-      DirectionalIndexByteEncoder encoder, int typeOrder) {
+    DirectionalIndexByteEncoder encoder,
+    int typeOrder,
+  ) {
     encoder.writeLong(typeOrder);
   }
 

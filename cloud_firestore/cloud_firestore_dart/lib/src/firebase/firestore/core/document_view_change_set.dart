@@ -30,31 +30,41 @@ class DocumentViewChangeSet {
       changes[key] = change;
     } else if (newType == DocumentViewChangeType.metadata &&
         oldType != DocumentViewChangeType.removed) {
-      final DocumentViewChange newChange =
-          DocumentViewChange(oldType, change.document);
+      final DocumentViewChange newChange = DocumentViewChange(
+        oldType,
+        change.document,
+      );
       changes[key] = newChange;
     } else if (newType == DocumentViewChangeType.modified &&
         oldType == DocumentViewChangeType.modified) {
-      final DocumentViewChange newChange =
-          DocumentViewChange(DocumentViewChangeType.modified, change.document);
+      final DocumentViewChange newChange = DocumentViewChange(
+        DocumentViewChangeType.modified,
+        change.document,
+      );
       changes[key] = newChange;
     } else if (newType == DocumentViewChangeType.modified &&
         oldType == DocumentViewChangeType.added) {
-      final DocumentViewChange newChange =
-          DocumentViewChange(DocumentViewChangeType.added, change.document);
+      final DocumentViewChange newChange = DocumentViewChange(
+        DocumentViewChangeType.added,
+        change.document,
+      );
       changes[key] = newChange;
     } else if (newType == DocumentViewChangeType.removed &&
         oldType == DocumentViewChangeType.added) {
       changes.remove(key);
     } else if (newType == DocumentViewChangeType.removed &&
         oldType == DocumentViewChangeType.modified) {
-      final DocumentViewChange newChange =
-          DocumentViewChange(DocumentViewChangeType.removed, old.document);
+      final DocumentViewChange newChange = DocumentViewChange(
+        DocumentViewChangeType.removed,
+        old.document,
+      );
       changes[key] = newChange;
     } else if (newType == DocumentViewChangeType.added &&
         oldType == DocumentViewChangeType.removed) {
-      final DocumentViewChange newChange =
-          DocumentViewChange(DocumentViewChangeType.modified, change.document);
+      final DocumentViewChange newChange = DocumentViewChange(
+        DocumentViewChangeType.modified,
+        change.document,
+      );
 
       changes[key] = newChange;
     } else {

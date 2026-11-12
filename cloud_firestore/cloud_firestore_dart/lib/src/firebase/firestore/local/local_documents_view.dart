@@ -62,8 +62,11 @@ class LocalDocumentsView {
     final Overlay? overlay = await documentOverlayCache.getOverlay(key);
     MaybeDocument? document = await _getBaseDocument(key, overlay);
     if (overlay != null) {
-      document = overlay.mutation
-          .applyToLocalView(document, document, Timestamp.now());
+      document = overlay.mutation.applyToLocalView(
+        document,
+        document,
+        Timestamp.now(),
+      );
     }
     return document;
   }
@@ -73,9 +76,10 @@ class LocalDocumentsView {
   /// If we don't have cached state for a document in [keys], a [NoDocument] will be stored for that key in the
   /// resulting set.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> getDocuments(
-      Iterable<DocumentKey> keys) async {
-    final Map<DocumentKey, MaybeDocument?> docs =
-        await remoteDocumentCache.getAll(keys);
+    Iterable<DocumentKey> keys,
+  ) async {
+    final Map<DocumentKey, MaybeDocument?> docs = await remoteDocumentCache
+        .getAll(keys);
     return getLocalViewOfDocuments(docs);
   }
 
@@ -86,21 +90,29 @@ class LocalDocumentsView {
   /// created or deleted them). Their overlays are recalculated, since the preconditions of their pending patches may
   /// hold (or fail) now.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>>
-      getLocalViewOfDocuments(Map<DocumentKey, MaybeDocument?> baseDocs,
-          [Set<DocumentKey> existenceStateChanged =
-              const <DocumentKey>{}]) async {
-    final Map<DocumentKey, Overlay> overlays =
-        await documentOverlayCache.getOverlays(baseDocs.keys);
-    final Map<DocumentKey, OverlayedDocument> views =
-        await _computeViews(baseDocs, overlays, existenceStateChanged);
+  getLocalViewOfDocuments(
+    Map<DocumentKey, MaybeDocument?> baseDocs, [
+    Set<DocumentKey> existenceStateChanged = const <DocumentKey>{},
+  ]) async {
+    final Map<DocumentKey, Overlay> overlays = await documentOverlayCache
+        .getOverlays(baseDocs.keys);
+    final Map<DocumentKey, OverlayedDocument> views = await _computeViews(
+      baseDocs,
+      overlays,
+      existenceStateChanged,
+    );
 
     ImmutableSortedMap<DocumentKey, MaybeDocument> results =
         DocumentCollections.emptyMaybeDocumentMap();
     for (MapEntry<DocumentKey, OverlayedDocument> entry in views.entries) {
       // TODO(long1eu): Don't conflate missing / deleted.
-      final MaybeDocument maybeDoc = entry.value.document ??
-          NoDocument(entry.key, SnapshotVersion.none,
-              hasCommittedMutations: false);
+      final MaybeDocument maybeDoc =
+          entry.value.document ??
+          NoDocument(
+            entry.key,
+            SnapshotVersion.none,
+            hasCommittedMutations: false,
+          );
       results = results.insert(entry.key, maybeDoc);
     }
     return results;
@@ -109,9 +121,10 @@ class LocalDocumentsView {
   /// Gets the overlayed documents for the given document map, which will include the local view of those documents and
   /// a [FieldMask] indicating which fields are mutated locally, null if overlay is a Set or Delete mutation.
   Future<Map<DocumentKey, OverlayedDocument>> getOverlayedDocuments(
-      Map<DocumentKey, MaybeDocument?> docs) async {
-    final Map<DocumentKey, Overlay> overlays =
-        await documentOverlayCache.getOverlays(docs.keys);
+    Map<DocumentKey, MaybeDocument?> docs,
+  ) async {
+    final Map<DocumentKey, Overlay> overlays = await documentOverlayCache
+        .getOverlays(docs.keys);
     return _computeViews(docs, overlays, const <DocumentKey>{});
   }
 
@@ -121,9 +134,10 @@ class LocalDocumentsView {
   /// and [existenceStateChanged] the documents whose existence state might have changed, which need their overlays
   /// recalculated from the mutation queue.
   Future<Map<DocumentKey, OverlayedDocument>> _computeViews(
-      Map<DocumentKey, MaybeDocument?> docs,
-      Map<DocumentKey, Overlay> overlays,
-      Set<DocumentKey> existenceStateChanged) async {
+    Map<DocumentKey, MaybeDocument?> docs,
+    Map<DocumentKey, Overlay> overlays,
+    Set<DocumentKey> existenceStateChanged,
+  ) async {
     final Map<DocumentKey, MaybeDocument?> recalculateDocuments =
         <DocumentKey, MaybeDocument?>{};
     final Map<DocumentKey, OverlayedDocument> result =
@@ -147,8 +161,9 @@ class LocalDocumentsView {
       } else if (overlay != null) {
         final Mutation mutation = overlay.mutation;
         result[key] = OverlayedDocument(
-            mutation.applyToLocalView(doc, doc, now),
-            mutation is PatchMutation ? mutation.mask : null);
+          mutation.applyToLocalView(doc, doc, now),
+          mutation is PatchMutation ? mutation.mask : null,
+        );
       } else {
         // Using empty to indicate there is no overlay for the document.
         result[key] = OverlayedDocument(doc, FieldMask.empty);
@@ -169,7 +184,10 @@ class LocalDocumentsView {
   ///
   /// Only supported with SQLite persistence (it is used to backfill the field indexes).
   Future<LocalDocumentsResult> getNextDocuments(
-      String collectionGroup, IndexOffset offset, int count) async {
+    String collectionGroup,
+    IndexOffset offset,
+    int count,
+  ) async {
     final Map<DocumentKey, ReadDocument> remoteDocs = await remoteDocumentCache
         .getAllForCollectionGroup(collectionGroup, offset, count);
     final Map<DocumentKey, MaybeDocument?> docs = <DocumentKey, MaybeDocument?>{
@@ -179,14 +197,17 @@ class LocalDocumentsView {
     };
     final Map<DocumentKey, SnapshotVersion> readTimes =
         <DocumentKey, SnapshotVersion>{
-      for (final MapEntry<DocumentKey, ReadDocument> entry
-          in remoteDocs.entries)
-        entry.key: entry.value.readTime,
-    };
+          for (final MapEntry<DocumentKey, ReadDocument> entry
+              in remoteDocs.entries)
+            entry.key: entry.value.readTime,
+        };
 
     final Map<DocumentKey, Overlay> overlays = count - docs.length > 0
         ? await documentOverlayCache.getOverlaysForCollectionGroup(
-            collectionGroup, offset.largestBatchId, count - docs.length)
+            collectionGroup,
+            offset.largestBatchId,
+            count - docs.length,
+          )
         : <DocumentKey, Overlay>{};
 
     int largestBatchId = FieldIndex.initialLargestBatchId;
@@ -210,21 +231,22 @@ class LocalDocumentsView {
     ];
     overlays.addAll(await documentOverlayCache.getOverlays(missingOverlays));
 
-    final Map<DocumentKey, OverlayedDocument> localDocs =
-        await _computeViews(docs, overlays, const <DocumentKey>{});
-    return LocalDocumentsResult(
-        largestBatchId,
-        <DocumentKey, MaybeDocument?>{
-          for (final MapEntry<DocumentKey, OverlayedDocument> entry
-              in localDocs.entries)
-            entry.key: entry.value.document,
-        },
-        readTimes);
+    final Map<DocumentKey, OverlayedDocument> localDocs = await _computeViews(
+      docs,
+      overlays,
+      const <DocumentKey>{},
+    );
+    return LocalDocumentsResult(largestBatchId, <DocumentKey, MaybeDocument?>{
+      for (final MapEntry<DocumentKey, OverlayedDocument> entry
+          in localDocs.entries)
+        entry.key: entry.value.document,
+    }, readTimes);
   }
 
   /// Applies the pending mutations to [docs], saves the resulting overlays and returns the local views.
   Future<Map<DocumentKey, OverlayedDocument>> _recalculateAndSaveOverlays(
-      Map<DocumentKey, MaybeDocument?> docs) async {
+    Map<DocumentKey, MaybeDocument?> docs,
+  ) async {
     if (docs.isEmpty) {
       return <DocumentKey, OverlayedDocument>{};
     }
@@ -246,10 +268,11 @@ class LocalDocumentsView {
           continue;
         }
 
-        final FieldMask? mask =
-            masks.containsKey(key) ? masks[key] : FieldMask.empty;
-        final (MaybeDocument?, FieldMask?) applied =
-            batch.applyToLocalViewWithMask(key, views[key], mask);
+        final FieldMask? mask = masks.containsKey(key)
+            ? masks[key]
+            : FieldMask.empty;
+        final (MaybeDocument?, FieldMask?) applied = batch
+            .applyToLocalViewWithMask(key, views[key], mask);
         views[key] = applied.$1;
         masks[key] = applied.$2;
         documentsByBatchId
@@ -265,8 +288,10 @@ class LocalDocumentsView {
       final Map<DocumentKey, Mutation> overlays = <DocumentKey, Mutation>{};
       for (DocumentKey key in documentsByBatchId[batchId]!) {
         if (processed.add(key)) {
-          final Mutation? mutation =
-              Mutation.calculateOverlayMutation(views[key], masks[key]);
+          final Mutation? mutation = Mutation.calculateOverlayMutation(
+            views[key],
+            masks[key],
+          );
           if (mutation != null) {
             overlays[key] = mutation;
           } else {
@@ -279,15 +304,20 @@ class LocalDocumentsView {
 
     // PORTING NOTE: upstream keeps the previous overlay of a document whose mutations no longer apply; that overlay
     // would still be applied on the next read.
-    final Set<DocumentKey> noMutations =
-        docs.keys.toSet().difference(processed);
-    await documentOverlayCache
-        .removeOverlays(<DocumentKey>{...withoutOverlay, ...noMutations});
+    final Set<DocumentKey> noMutations = docs.keys.toSet().difference(
+      processed,
+    );
+    await documentOverlayCache.removeOverlays(<DocumentKey>{
+      ...withoutOverlay,
+      ...noMutations,
+    });
 
     return <DocumentKey, OverlayedDocument>{
       for (MapEntry<DocumentKey, MaybeDocument?> entry in views.entries)
-        entry.key: OverlayedDocument(entry.value,
-            masks.containsKey(entry.key) ? masks[entry.key] : FieldMask.empty),
+        entry.key: OverlayedDocument(
+          entry.value,
+          masks.containsKey(entry.key) ? masks[entry.key] : FieldMask.empty,
+        ),
     };
   }
 
@@ -297,8 +327,8 @@ class LocalDocumentsView {
     if (documentKeys.isEmpty) {
       return;
     }
-    final Map<DocumentKey, MaybeDocument?> docs =
-        await remoteDocumentCache.getAll(documentKeys);
+    final Map<DocumentKey, MaybeDocument?> docs = await remoteDocumentCache
+        .getAll(documentKeys);
     await _recalculateAndSaveOverlays(docs);
   }
 
@@ -307,8 +337,10 @@ class LocalDocumentsView {
   /// [offset] is the read time and document key to start scanning the remote documents at (exclusive);
   /// [IndexOffset.none] considers all of them. Documents with local mutations are always included.
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      Query query, IndexOffset offset,
-      [QueryContext? context]) async {
+    Query query,
+    IndexOffset offset, [
+    QueryContext? context,
+  ]) async {
     final ResourcePath path = query.path;
     if (query.isDocumentQuery) {
       return _getDocumentsMatchingDocumentQuery(path);
@@ -321,7 +353,7 @@ class LocalDocumentsView {
 
   /// Performs a simple document lookup for the given path.
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      _getDocumentsMatchingDocumentQuery(ResourcePath path) async {
+  _getDocumentsMatchingDocumentQuery(ResourcePath path) async {
     ImmutableSortedMap<DocumentKey, Document> result =
         DocumentCollections.emptyDocumentMap();
     // Just do a simple document lookup.
@@ -333,24 +365,34 @@ class LocalDocumentsView {
   }
 
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      _getDocumentsMatchingCollectionGroupQuery(
-          Query query, IndexOffset offset, QueryContext? context) async {
-    hardAssert(query.path.isEmpty,
-        'Currently we only support collection group queries at the root.');
+  _getDocumentsMatchingCollectionGroupQuery(
+    Query query,
+    IndexOffset offset,
+    QueryContext? context,
+  ) async {
+    hardAssert(
+      query.path.isEmpty,
+      'Currently we only support collection group queries at the root.',
+    );
     final String collectionId = query.collectionGroup!;
     ImmutableSortedMap<DocumentKey, Document> results =
         DocumentCollections.emptyDocumentMap();
-    final List<ResourcePath> parents =
-        await indexManager.getCollectionParents(collectionId);
+    final List<ResourcePath> parents = await indexManager.getCollectionParents(
+      collectionId,
+    );
 
     // Perform a collection query against each parent that contains the
     // collectionId and aggregate the results.
     for (ResourcePath parent in parents) {
-      final Query collectionQuery =
-          query.asCollectionQueryAtPath(parent.appendSegment(collectionId));
+      final Query collectionQuery = query.asCollectionQueryAtPath(
+        parent.appendSegment(collectionId),
+      );
       final ImmutableSortedMap<DocumentKey, Document> collectionResults =
           await _getDocumentsMatchingCollectionQuery(
-              collectionQuery, offset, context);
+            collectionQuery,
+            offset,
+            context,
+          );
       for (MapEntry<DocumentKey, Document> docEntry in collectionResults) {
         results = results.insert(docEntry.key, docEntry.value);
       }
@@ -360,8 +402,11 @@ class LocalDocumentsView {
 
   /// Queries the remote documents and applies the overlays of the collection.
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      _getDocumentsMatchingCollectionQuery(
-          Query query, IndexOffset offset, QueryContext? context) async {
+  _getDocumentsMatchingCollectionQuery(
+    Query query,
+    IndexOffset offset,
+    QueryContext? context,
+  ) async {
     // With an offset that comes from a field index only the overlays of the batches after the offset are read: the
     // documents of the earlier batches are in the index with their overlay applied.
     final bool overlaysSinceBatch =
@@ -375,15 +420,17 @@ class LocalDocumentsView {
     // that case and looks their overlays up by key.
     final ImmutableSortedMap<DocumentKey, Document> remoteDocuments =
         await remoteDocumentCache.getAllDocumentsMatchingQuery(
-            overlaysSinceBatch ? Query(query.path) : query, offset, context);
+          overlaysSinceBatch ? Query(query.path) : query,
+          offset,
+          context,
+        );
     if (overlaysSinceBatch) {
       final List<DocumentKey> withoutOverlay = <DocumentKey>[
         for (final MapEntry<DocumentKey, Document> entry in remoteDocuments)
           if (!overlays.containsKey(entry.key)) entry.key,
       ];
       if (withoutOverlay.isNotEmpty) {
-        overlays
-            .addAll(await documentOverlayCache.getOverlays(withoutOverlay));
+        overlays.addAll(await documentOverlayCache.getOverlays(withoutOverlay));
       }
     }
 
@@ -403,8 +450,8 @@ class LocalDocumentsView {
     ];
     final Map<DocumentKey, MaybeDocument?> patchBases =
         missingPatchBases.isEmpty
-            ? const <DocumentKey, MaybeDocument?>{}
-            : await remoteDocumentCache.getAll(missingPatchBases);
+        ? const <DocumentKey, MaybeDocument?>{}
+        : await remoteDocumentCache.getAll(missingPatchBases);
 
     // Apply the overlays and match against the query. Only the documents with an overlay are touched: the others were
     // matched by the remote document cache.
@@ -413,8 +460,11 @@ class LocalDocumentsView {
     for (Overlay overlay in overlays.values) {
       final DocumentKey key = overlay.key;
       final MaybeDocument? base = remoteDocuments[key] ?? patchBases[key];
-      final MaybeDocument? doc =
-          overlay.mutation.applyToLocalView(base, base, now);
+      final MaybeDocument? doc = overlay.mutation.applyToLocalView(
+        base,
+        base,
+        now,
+      );
       if (doc is Document && query.matches(doc)) {
         results = results.insert(key, doc);
       } else {
@@ -427,7 +477,9 @@ class LocalDocumentsView {
 
   /// Returns a base document that can be used to apply [overlay].
   Future<MaybeDocument?> _getBaseDocument(
-      DocumentKey key, Overlay? overlay) async {
+    DocumentKey key,
+    Overlay? overlay,
+  ) async {
     // A set or delete overlay replaces the whole document: there is no need to read the remote version (712e5b8).
     return (overlay == null || overlay.mutation is PatchMutation)
         ? remoteDocumentCache.get(key)

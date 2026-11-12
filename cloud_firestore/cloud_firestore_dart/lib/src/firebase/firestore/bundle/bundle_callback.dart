@@ -30,12 +30,16 @@ abstract class BundleCallback {
   /// [readTimes] holds the read time of each document in the bundle (from its bundled document metadata); documents
   /// without an entry use their version as read time.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyBundledDocuments(
-      ImmutableSortedMap<DocumentKey, MaybeDocument> documents, String bundleId,
-      {Map<DocumentKey, SnapshotVersion>? readTimes});
+    ImmutableSortedMap<DocumentKey, MaybeDocument> documents,
+    String bundleId, {
+    Map<DocumentKey, SnapshotVersion>? readTimes,
+  });
 
   /// Saves the given [NamedQuery] to local persistence.
   Future<void> saveNamedQuery(
-      NamedQuery namedQuery, ImmutableSortedSet<DocumentKey> documentKeys);
+    NamedQuery namedQuery,
+    ImmutableSortedSet<DocumentKey> documentKeys,
+  );
 
   /// Saves the given [BundleMetadata] to local persistence.
   Future<void> saveBundle(BundleMetadata bundleMetadata);

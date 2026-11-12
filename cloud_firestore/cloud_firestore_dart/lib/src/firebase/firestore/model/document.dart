@@ -23,7 +23,7 @@ enum DocumentState {
   committedMutations,
 
   /// No mutations applied. Document was sent to us by Watch.
-  synced
+  synced,
 }
 
 class Document extends MaybeDocument implements Comparable<Document> {
@@ -32,9 +32,9 @@ class Document extends MaybeDocument implements Comparable<Document> {
     SnapshotVersion version,
     this.documentState,
     this._objectValue,
-  )   : proto = null,
-        converter = null,
-        super(key, version);
+  ) : proto = null,
+      converter = null,
+      super(key, version);
 
   Document.fromProto(
     DocumentKey key,
@@ -42,8 +42,8 @@ class Document extends MaybeDocument implements Comparable<Document> {
     this.documentState,
     this.proto,
     this.converter,
-  )   : _objectValue = null,
-        super(key, version);
+  ) : _objectValue = null,
+      super(key, version);
 
   final DocumentState documentState;
   final pb.Document? proto;
@@ -58,8 +58,10 @@ class Document extends MaybeDocument implements Comparable<Document> {
     if (objectValue == null) {
       final pb.Document? proto = this.proto;
       final Converter? converter = this.converter;
-      hardAssert(proto != null && converter != null,
-          'Expected proto and converter to be non-null');
+      hardAssert(
+        proto != null && converter != null,
+        'Expected proto and converter to be non-null',
+      );
 
       ObjectValue result = ObjectValue.empty;
       for (MapEntry<String, Value> entry in proto!.fields.entries) {
@@ -84,13 +86,15 @@ class Document extends MaybeDocument implements Comparable<Document> {
     } else {
       final pb.Document? proto = this.proto;
       final Converter? converter = this.converter;
-      hardAssert(proto != null && converter != null,
-          'Expected proto and converter to be non-null');
+      hardAssert(
+        proto != null && converter != null,
+        'Expected proto and converter to be non-null',
+      );
 
       // TODO(b-136090445): Remove the cache when `getField` is no longer called
       //  during Query ordering.
-      final Map<FieldPath, FieldValue> cache =
-          _fieldValueCache ??= <FieldPath, FieldValue>{};
+      final Map<FieldPath, FieldValue> cache = _fieldValueCache ??=
+          <FieldPath, FieldValue>{};
       FieldValue? fieldValue = cache[path];
       if (fieldValue == null) {
         // Instead of deserializing the full Document proto, we only deserialize

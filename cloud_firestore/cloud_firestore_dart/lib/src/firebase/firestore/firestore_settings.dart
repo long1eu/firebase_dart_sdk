@@ -18,15 +18,15 @@ class FirestoreSettings {
     int cacheSizeBytes = defaultCacheSizeBytes,
     LocalCacheSettings? cacheSettings,
   }) : this._(
-          host: host,
-          port: port,
-          sslEnabled: sslEnabled,
-          persistenceEnabled: persistenceEnabled,
-          cacheSizeBytes: cacheSizeBytes,
-          cacheSettings: cacheSettings,
-          emulator: false,
-          mockUserToken: null,
-        );
+         host: host,
+         port: port,
+         sslEnabled: sslEnabled,
+         persistenceEnabled: persistenceEnabled,
+         cacheSizeBytes: cacheSizeBytes,
+         cacheSettings: cacheSettings,
+         emulator: false,
+         mockUserToken: null,
+       );
 
   /// [emulator] is true only for settings made by [withEmulator]; a
   /// [mockUserToken] is rejected without it, so that the unsigned token is
@@ -40,20 +40,31 @@ class FirestoreSettings {
     required this.cacheSettings,
     required bool emulator,
     required Object? mockUserToken,
-  })  : _emulator = emulator,
-        host = _checkHost(host),
-        sslEnabled = _checkSslEnabled(sslEnabled, host),
-        mockUserToken =
-            _checkMockUserToken(mockUserToken, emulator, host, sslEnabled),
-        persistenceEnabled = _resolvePersistenceEnabled(
-            persistenceEnabled, cacheSizeBytes, cacheSettings),
-        cacheSizeBytes = _resolveCacheSizeBytes(
-            persistenceEnabled, cacheSizeBytes, cacheSettings),
-        assert(
-            !persistenceEnabled ||
-                cacheSizeBytes == cacheSizeUnlimited ||
-                cacheSizeBytes >= _minimumCacheBytes,
-            'Cache size must be set to at least $_minimumCacheBytes bytes');
+  }) : _emulator = emulator,
+       host = _checkHost(host),
+       sslEnabled = _checkSslEnabled(sslEnabled, host),
+       mockUserToken = _checkMockUserToken(
+         mockUserToken,
+         emulator,
+         host,
+         sslEnabled,
+       ),
+       persistenceEnabled = _resolvePersistenceEnabled(
+         persistenceEnabled,
+         cacheSizeBytes,
+         cacheSettings,
+       ),
+       cacheSizeBytes = _resolveCacheSizeBytes(
+         persistenceEnabled,
+         cacheSizeBytes,
+         cacheSettings,
+       ),
+       assert(
+         !persistenceEnabled ||
+             cacheSizeBytes == cacheSizeUnlimited ||
+             cacheSizeBytes >= _minimumCacheBytes,
+         'Cache size must be set to at least $_minimumCacheBytes bytes',
+       );
 
   /// The host of the production Firestore service.
   static const String defaultHost = 'firestore.googleapis.com';
@@ -131,8 +142,11 @@ class FirestoreSettings {
   /// part, a path, a scheme) is rejected: requests carry credentials.
   static String _checkHost(String host) {
     if (host.isEmpty || _notHostCharacters.hasMatch(host)) {
-      throw ArgumentError.value(host, 'host',
-          'Must be a host name or an IP address, without scheme, user info or path');
+      throw ArgumentError.value(
+        host,
+        'host',
+        'Must be a host name or an IP address, without scheme, user info or path',
+      );
     }
     return host;
   }
@@ -153,26 +167,32 @@ class FirestoreSettings {
   static bool _checkSslEnabled(bool sslEnabled, String host) {
     if (!sslEnabled && _isProductionHost(host)) {
       throw ArgumentError.value(
-          sslEnabled,
-          'sslEnabled',
-          "You can't set the 'sslEnabled' setting unless you also set a "
-              "non-default 'host'.");
+        sslEnabled,
+        'sslEnabled',
+        "You can't set the 'sslEnabled' setting unless you also set a "
+            "non-default 'host'.",
+      );
     }
     return sslEnabled;
   }
 
   static Object? _checkMockUserToken(
-      Object? mockUserToken, bool emulator, String host, bool sslEnabled) {
+    Object? mockUserToken,
+    bool emulator,
+    String host,
+    bool sslEnabled,
+  ) {
     if (mockUserToken == null) {
       return null;
     }
     if (!emulator || _isProductionHost(host) || sslEnabled) {
       throw ArgumentError.value(
-          host,
-          'host',
-          'mockUserToken can only be used with the Firestore emulator: set it '
-              'with withEmulator(host, port, mockUserToken: ...) and do not '
-              'change the host, port or SSL setting afterwards');
+        host,
+        'host',
+        'mockUserToken can only be used with the Firestore emulator: set it '
+            'with withEmulator(host, port, mockUserToken: ...) and do not '
+            'change the host, port or SSL setting afterwards',
+      );
     }
     if (mockUserToken is String) {
       return mockUserToken;
@@ -183,12 +203,18 @@ class FirestoreSettings {
       createMockUserToken(mockUserToken);
       return Map<String, Object?>.unmodifiable(mockUserToken);
     }
-    throw ArgumentError.value(mockUserToken, 'mockUserToken',
-        'Must be a String or a Map<String, Object?> of token claims');
+    throw ArgumentError.value(
+      mockUserToken,
+      'mockUserToken',
+      'Must be a String or a Map<String, Object?> of token claims',
+    );
   }
 
-  static bool _resolvePersistenceEnabled(bool persistenceEnabled,
-      int cacheSizeBytes, LocalCacheSettings? cacheSettings) {
+  static bool _resolvePersistenceEnabled(
+    bool persistenceEnabled,
+    int cacheSizeBytes,
+    LocalCacheSettings? cacheSettings,
+  ) {
     if (cacheSettings == null) {
       return persistenceEnabled;
     }
@@ -196,8 +222,11 @@ class FirestoreSettings {
     return cacheSettings is PersistentCacheSettings;
   }
 
-  static int _resolveCacheSizeBytes(bool persistenceEnabled, int cacheSizeBytes,
-      LocalCacheSettings? cacheSettings) {
+  static int _resolveCacheSizeBytes(
+    bool persistenceEnabled,
+    int cacheSizeBytes,
+    LocalCacheSettings? cacheSettings,
+  ) {
     if (cacheSettings == null) {
       return cacheSizeBytes;
     }
@@ -210,8 +239,9 @@ class FirestoreSettings {
   static void _checkNotMixed(bool persistenceEnabled, int cacheSizeBytes) {
     if (!persistenceEnabled || cacheSizeBytes != defaultCacheSizeBytes) {
       throw StateError(
-          'Given settings mix both cache config APIs: cacheSettings together '
-          'with persistenceEnabled or cacheSizeBytes. Use only one of them.');
+        'Given settings mix both cache config APIs: cacheSettings together '
+        'with persistenceEnabled or cacheSizeBytes. Use only one of them.',
+      );
     }
   }
 
@@ -227,18 +257,25 @@ class FirestoreSettings {
   ///
   /// Throws an [ArgumentError] when [host] is the production host
   /// ([defaultHost]).
-  FirestoreSettings withEmulator(String host, int port,
-      {Object? mockUserToken}) {
+  FirestoreSettings withEmulator(
+    String host,
+    int port, {
+    Object? mockUserToken,
+  }) {
     if (_isProductionHost(host)) {
       throw ArgumentError.value(
-          host, 'host', 'The production host is not an emulator');
+        host,
+        'host',
+        'The production host is not an emulator',
+      );
     }
     return _copy(
-        host: host,
-        port: port,
-        sslEnabled: false,
-        emulator: true,
-        mockUserToken: mockUserToken);
+      host: host,
+      port: port,
+      sslEnabled: false,
+      emulator: true,
+      mockUserToken: mockUserToken,
+    );
   }
 
   /// A copy of these settings with the given values replaced.
@@ -253,7 +290,8 @@ class FirestoreSettings {
     // The settings stay emulator settings (and keep their mock user token)
     // only while they point at the same emulator. Changing the host of
     // settings that have a token is an error: see [_checkMockUserToken].
-    final bool emulator = _emulator &&
+    final bool emulator =
+        _emulator &&
         (host ?? this.host) == this.host &&
         (port ?? this.port) == this.port &&
         !(sslEnabled ?? this.sslEnabled);
@@ -289,9 +327,11 @@ class FirestoreSettings {
       sslEnabled: sslEnabled ?? this.sslEnabled,
       // Flags that these settings derived from their own cache settings are not forwarded. Flags that were set
       // directly are, so that adding cache settings to them is reported as mixing both APIs, as in the constructor.
-      persistenceEnabled: persistenceEnabled ??
+      persistenceEnabled:
+          persistenceEnabled ??
           (this.cacheSettings != null || this.persistenceEnabled),
-      cacheSizeBytes: cacheSizeBytes ??
+      cacheSizeBytes:
+          cacheSizeBytes ??
           (this.cacheSettings == null
               ? this.cacheSizeBytes
               : defaultCacheSizeBytes),
@@ -312,8 +352,10 @@ class FirestoreSettings {
           persistenceEnabled == other.persistenceEnabled &&
           cacheSizeBytes == other.cacheSizeBytes &&
           cacheSettings == other.cacheSettings &&
-          const DeepCollectionEquality()
-              .equals(mockUserToken, other.mockUserToken);
+          const DeepCollectionEquality().equals(
+            mockUserToken,
+            other.mockUserToken,
+          );
 
   @override
   int get hashCode =>

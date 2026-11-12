@@ -23,22 +23,28 @@ import 'package:meta/meta.dart';
 ///
 /// See `example/sqlite_database.dart` in this package for a complete
 /// implementation on top of `package:sqlite3`.
-typedef OpenDatabase = Future<Database> Function(String path,
-    {int version,
-    OnConfigure onConfigure,
-    OnCreate onCreate,
-    OnVersionChange onUpgrade,
-    OnVersionChange onDowngrade,
-    OnOpen onOpen});
+typedef OpenDatabase =
+    Future<Database> Function(
+      String path, {
+      int version,
+      OnConfigure onConfigure,
+      OnCreate onCreate,
+      OnVersionChange onUpgrade,
+      OnVersionChange onDowngrade,
+      OnOpen onOpen,
+    });
 
 /// Called by an [OpenDatabase] implementation when the stored schema version
 /// differs from the requested one.
-typedef OnVersionChange = Future<void> Function(
-    Database db, int oldVersion, int newVersion);
+typedef OnVersionChange =
+    Future<void> Function(Database db, int oldVersion, int newVersion);
+
 /// Called by an [OpenDatabase] implementation when the database file is new.
 typedef OnCreate = Future<void> Function(Database db, int version);
+
 /// Called by an [OpenDatabase] implementation once the database is ready.
 typedef OnOpen = Future<void> Function(Database db);
+
 /// Called by an [OpenDatabase] implementation first, before any migration.
 typedef OnConfigure = Future<void> Function(Database db);
 
@@ -58,8 +64,10 @@ abstract class Database {
   Future<void> execute(String statement, [List<Object?>? arguments]);
 
   /// SELECT query
-  Future<List<Map<String, dynamic>>> query(String statement,
-      [List<Object?>? arguments]);
+  Future<List<Map<String, dynamic>>> query(
+    String statement, [
+    List<Object?>? arguments,
+  ]);
 
   /// DELETE query
   /// Returns the number of changes made

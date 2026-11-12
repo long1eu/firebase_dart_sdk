@@ -109,8 +109,9 @@ class Filter {
   /// Creates a new filter for checking that the given array field path
   /// contains any of the given values.
   static Filter arrayContainsAnyField(
-          FieldPath fieldPath, List<Object?> values) =>
-      UnaryFilter(fieldPath, core.FilterOperator.arrayContainsAny, values);
+    FieldPath fieldPath,
+    List<Object?> values,
+  ) => UnaryFilter(fieldPath, core.FilterOperator.arrayContainsAny, values);
 
   /// Creates a new filter for checking that the given field equals any of the
   /// given values.
@@ -176,8 +177,8 @@ class UnaryFilter extends Filter {
 @internal
 class CompositeFilter extends Filter {
   CompositeFilter._(List<Filter> filters, this.operator)
-      : filters = List<Filter>.unmodifiable(filters),
-        super._();
+    : filters = List<Filter>.unmodifiable(filters),
+      super._();
 
   final List<Filter> filters;
   final core.CompositeFilterOperator operator;
@@ -190,7 +191,8 @@ class CompositeFilter extends Filter {
           const ListEquality<Filter>().equals(filters, other.filters);
 
   @override
-  int get hashCode => Object.hash(operator, const ListEquality<Filter>().hash(filters));
+  int get hashCode =>
+      Object.hash(operator, const ListEquality<Filter>().hash(filters));
 
   @override
   String toString() => 'Filter.$operator($filters)';

@@ -30,13 +30,13 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
     bool hasPendingWrites,
     FirestoreDataConverter<T>? converter,
   ) : super(
-          firestore,
-          key,
-          doc,
-          isFromCache: isFromCache,
-          hasPendingWrites: hasPendingWrites,
-          converter: converter,
-        );
+        firestore,
+        key,
+        doc,
+        isFromCache: isFromCache,
+        hasPendingWrites: hasPendingWrites,
+        converter: converter,
+      );
 
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
@@ -48,7 +48,13 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
     FirestoreDataConverter<T>? converter,
   }) {
     return QueryDocumentSnapshot<T>._(
-        firestore, doc.key, doc, fromCache, hasPendingWrites, converter);
+      firestore,
+      doc.key,
+      doc,
+      fromCache,
+      hasPendingWrites,
+      converter,
+    );
   }
 
   /// Returns the fields of the document as a Map. Field values will be converted to their native

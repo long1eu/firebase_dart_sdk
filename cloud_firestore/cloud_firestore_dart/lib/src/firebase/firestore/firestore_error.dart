@@ -97,7 +97,7 @@ class FirestoreErrorCode {
     internal,
     unavailable,
     dataLoss,
-    unauthenticated
+    unauthenticated,
   ];
 
   static const List<String> _names = <String>[

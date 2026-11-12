@@ -90,11 +90,14 @@ class LocalSerializer {
 
   /// Decodes a Document proto to the equivalent model.
   Document _decodeDocument(
-      proto.Document document, bool hasCommittedMutations) {
+    proto.Document document,
+    bool hasCommittedMutations,
+  ) {
     final DocumentKey key = rpcSerializer.decodeKey(document.name);
 
-    final SnapshotVersion version =
-        rpcSerializer.decodeVersion(document.updateTime);
+    final SnapshotVersion version = rpcSerializer.decodeVersion(
+      document.updateTime,
+    );
     return Document.fromProto(
       key,
       version,
@@ -116,11 +119,16 @@ class LocalSerializer {
 
   /// Decodes a NoDocument proto to the equivalent model.
   NoDocument _decodeNoDocument(
-      proto.NoDocument proto, bool hasCommittedMutations) {
+    proto.NoDocument proto,
+    bool hasCommittedMutations,
+  ) {
     final DocumentKey key = rpcSerializer.decodeKey(proto.name);
     final SnapshotVersion version = rpcSerializer.decodeVersion(proto.readTime);
-    return NoDocument(key, version,
-        hasCommittedMutations: hasCommittedMutations);
+    return NoDocument(
+      key,
+      version,
+      hasCommittedMutations: hasCommittedMutations,
+    );
   }
 
   /// Encodes a [UnknownDocument] value to the equivalent proto.
@@ -161,13 +169,16 @@ class LocalSerializer {
   /// sent to the backend.
   proto.Write encodeOverlayMutation(Mutation mutation) {
     return rpcSerializer.encodeMutation(
-        _mapOverlayValues(mutation, _encodeServerTimestamps));
+      _mapOverlayValues(mutation, _encodeServerTimestamps),
+    );
   }
 
   /// Decodes the mutation of a document overlay, see [encodeOverlayMutation].
   Mutation decodeOverlayMutation(proto.Write write) {
     return _mapOverlayValues(
-        rpcSerializer.decodeMutation(write), _decodeServerTimestamps);
+      rpcSerializer.decodeMutation(write),
+      _decodeServerTimestamps,
+    );
   }
 
   static const String _typeKey = '__type__';
@@ -176,17 +187,24 @@ class LocalSerializer {
   static const String _previousValueKey = '__previous_value__';
 
   Mutation _mapOverlayValues(
-      Mutation mutation, FieldValue Function(FieldValue) convert) {
+    Mutation mutation,
+    FieldValue Function(FieldValue) convert,
+  ) {
     if (mutation is SetMutation) {
-      return SetMutation(mutation.key, convert(mutation.value) as ObjectValue,
-          mutation.precondition, mutation.fieldTransforms);
+      return SetMutation(
+        mutation.key,
+        convert(mutation.value) as ObjectValue,
+        mutation.precondition,
+        mutation.fieldTransforms,
+      );
     } else if (mutation is PatchMutation) {
       return PatchMutation(
-          mutation.key,
-          convert(mutation.value) as ObjectValue,
-          mutation.mask,
-          mutation.precondition,
-          mutation.fieldTransforms);
+        mutation.key,
+        convert(mutation.value) as ObjectValue,
+        mutation.mask,
+        mutation.precondition,
+        mutation.fieldTransforms,
+      );
     }
     return mutation;
   }
@@ -207,15 +225,15 @@ class LocalSerializer {
       });
     } else if (value is ArrayValue) {
       return ArrayValue.fromList(
-          value.internalValue.map(_encodeServerTimestamps).toList());
+        value.internalValue.map(_encodeServerTimestamps).toList(),
+      );
     }
     return value;
   }
 
   static FieldValue _decodeServerTimestamps(FieldValue value) {
     if (value is ObjectValue) {
-      final ImmutableSortedMap<String, FieldValue> fields =
-          value.internalValue;
+      final ImmutableSortedMap<String, FieldValue> fields = value.internalValue;
       final FieldValue? type = fields[_typeKey];
       final FieldValue? localWriteTime = fields[_localWriteTimeKey];
       if (type is StringValue &&
@@ -223,10 +241,9 @@ class LocalSerializer {
           localWriteTime is TimestampValue) {
         final FieldValue? previousValue = fields[_previousValueKey];
         return ServerTimestampValue(
-            localWriteTime.value,
-            previousValue == null
-                ? null
-                : _decodeServerTimestamps(previousValue));
+          localWriteTime.value,
+          previousValue == null ? null : _decodeServerTimestamps(previousValue),
+        );
       }
       return ObjectValue.fromMap(<String, FieldValue>{
         for (MapEntry<String, FieldValue> entry in fields)
@@ -234,7 +251,8 @@ class LocalSerializer {
       });
     } else if (value is ArrayValue) {
       return ArrayValue.fromList(
-          value.internalValue.map(_decodeServerTimestamps).toList());
+        value.internalValue.map(_decodeServerTimestamps).toList(),
+      );
     }
     return value;
   }
@@ -254,13 +272,13 @@ class LocalSerializer {
         continue;
       }
 
-      final bool nextIsTransform = write.hasUpdate() &&
+      final bool nextIsTransform =
+          write.hasUpdate() &&
           i + 1 < writes.length &&
           writes[i + 1].hasTransform();
       if (nextIsTransform) {
         final proto.Write joined = write.clone()
-          ..updateTransforms
-              .addAll(writes[i + 1].transform.fieldTransforms);
+          ..updateTransforms.addAll(writes[i + 1].transform.fieldTransforms);
         mutations.add(rpcSerializer.decodeMutation(joined));
         i++;
       } else {
@@ -285,11 +303,11 @@ class LocalSerializer {
   /// Decodes a [WriteBatch] proto into a MutationBatch model. */
   MutationBatch decodeMutationBatch(proto.WriteBatch batch) {
     final int batchId = batch.batchId;
-    final Timestamp localWriteTime =
-        rpcSerializer.decodeTimestamp(batch.localWriteTime);
+    final Timestamp localWriteTime = rpcSerializer.decodeTimestamp(
+      batch.localWriteTime,
+    );
 
-    final List<Mutation> baseMutations =
-        _decodeWrites(batch.baseWrites);
+    final List<Mutation> baseMutations = _decodeWrites(batch.baseWrites);
     final List<Mutation> mutations = _decodeWrites(batch.writes);
     return MutationBatch(
       batchId: batchId,
@@ -301,16 +319,19 @@ class LocalSerializer {
 
   proto.Target encodeQueryData(QueryData queryData) {
     hardAssertLazy(
-        queryData.purpose == QueryPurpose.listen,
-        () => 'Only queries with purpose ${QueryPurpose.listen} '
-            'may be stored, got ${queryData.purpose}');
+      queryData.purpose == QueryPurpose.listen,
+      () =>
+          'Only queries with purpose ${QueryPurpose.listen} '
+          'may be stored, got ${queryData.purpose}',
+    );
 
     final proto.Target result = proto.Target.create()
       ..targetId = queryData.targetId
       ..lastListenSequenceNumber = Int64(queryData.sequenceNumber)
       ..snapshotVersion = rpcSerializer.encodeVersion(queryData.snapshotVersion)
-      ..lastLimboFreeSnapshotVersion =
-          rpcSerializer.encodeVersion(queryData.lastLimboFreeSnapshotVersion)
+      ..lastLimboFreeSnapshotVersion = rpcSerializer.encodeVersion(
+        queryData.lastLimboFreeSnapshotVersion,
+      )
       ..resumeToken = queryData.resumeToken;
 
     final Target target = queryData.target;
@@ -326,10 +347,11 @@ class LocalSerializer {
   QueryData decodeQueryData(proto.Target target) {
     final int targetId = target.targetId;
 
-    final SnapshotVersion version =
-        rpcSerializer.decodeVersion(target.snapshotVersion);
-    final SnapshotVersion lastLimboFreeSnapshotVersion =
-        rpcSerializer.decodeVersion(target.lastLimboFreeSnapshotVersion);
+    final SnapshotVersion version = rpcSerializer.decodeVersion(
+      target.snapshotVersion,
+    );
+    final SnapshotVersion lastLimboFreeSnapshotVersion = rpcSerializer
+        .decodeVersion(target.lastLimboFreeSnapshotVersion);
     final Uint8List resumeToken = Uint8List.fromList(target.resumeToken);
     final int sequenceNumber = target.lastListenSequenceNumber.toInt();
 
@@ -357,8 +379,8 @@ class LocalSerializer {
 
   /// Encodes a [BundledQuery] to the equivalent protocol buffer for local storage.
   proto.BundledQuery encodeBundledQuery(BundledQuery bundledQuery) {
-    final proto.Target_QueryTarget queryTarget =
-        rpcSerializer.encodeQueryTarget(bundledQuery.query.toTarget());
+    final proto.Target_QueryTarget queryTarget = rpcSerializer
+        .encodeQueryTarget(bundledQuery.query.toTarget());
 
     final proto.BundledQuery result = proto.BundledQuery.create()
       ..limitType = bundledQuery.limitType == BundledQueryLimitType.first
@@ -374,12 +396,13 @@ class LocalSerializer {
   BundledQuery decodeBundledQuery(proto.BundledQuery bundledQuery) {
     final BundledQueryLimitType limitType =
         bundledQuery.limitType == proto.BundledQuery_LimitType.FIRST
-            ? BundledQueryLimitType.first
-            : BundledQueryLimitType.last;
+        ? BundledQueryLimitType.first
+        : BundledQueryLimitType.last;
     final Target target = rpcSerializer.decodeQueryTarget(
-        proto.Target_QueryTarget.create()
-          ..parent = bundledQuery.parent
-          ..structuredQuery = bundledQuery.structuredQuery);
+      proto.Target_QueryTarget.create()
+        ..parent = bundledQuery.parent
+        ..structuredQuery = bundledQuery.structuredQuery,
+    );
     // The stored target keeps the order constraints as the user wrote them (not flipped for limitToLast).
     final Query query = Query(
       target.path,
@@ -421,12 +444,12 @@ class LocalSerializer {
     final List<IndexSegment> result = <IndexSegment>[];
     for (final admin.Index_IndexField field in index.fields) {
       final FieldPath fieldPath = FieldPath.fromServerFormat(field.fieldPath);
-      final SegmentKind kind = field.whichValueMode() ==
-              admin.Index_IndexField_ValueMode.arrayConfig
+      final SegmentKind kind =
+          field.whichValueMode() == admin.Index_IndexField_ValueMode.arrayConfig
           ? SegmentKind.contains
           : (field.order == admin.Index_IndexField_Order.ASCENDING
-              ? SegmentKind.ascending
-              : SegmentKind.descending);
+                ? SegmentKind.ascending
+                : SegmentKind.descending);
       result.add(IndexSegment(fieldPath, kind));
     }
     return result;

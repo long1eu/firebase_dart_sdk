@@ -9,12 +9,13 @@ class ObjectValue extends FieldValue {
 
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
     return ObjectValue.fromImmutableMap(
-        ImmutableSortedMap<String, FieldValue>.fromMap(
-            value, compareUtf8Strings));
+      ImmutableSortedMap<String, FieldValue>.fromMap(value, compareUtf8Strings),
+    );
   }
 
   factory ObjectValue.fromImmutableMap(
-      ImmutableSortedMap<String, FieldValue> value) {
+    ImmutableSortedMap<String, FieldValue> value,
+  ) {
     if (value.isEmpty) {
       return empty;
     } else {
@@ -23,7 +24,8 @@ class ObjectValue extends FieldValue {
   }
 
   static final ObjectValue empty = ObjectValue(
-      ImmutableSortedMap<String, FieldValue>.emptyMap(compareUtf8Strings));
+    ImmutableSortedMap<String, FieldValue>.emptyMap(compareUtf8Strings),
+  );
 
   final ImmutableSortedMap<String, FieldValue> _value;
 
@@ -100,7 +102,9 @@ class ObjectValue extends FieldValue {
   /// Returns a new ObjectValue with the field at the named path set to value.
   ObjectValue set(FieldPath path, FieldValue value) {
     hardAssert(
-        path.isNotEmpty, 'Cannot set field for empty path on ObjectValue');
+      path.isNotEmpty,
+      'Cannot set field for empty path on ObjectValue',
+    );
 
     final String childName = path.first;
     if (path.length == 1) {
@@ -123,7 +127,9 @@ class ObjectValue extends FieldValue {
   /// nothing is changed.
   ObjectValue delete(FieldPath path) {
     hardAssert(
-        path.isNotEmpty, 'Cannot delete field for empty path on ObjectValue');
+      path.isNotEmpty,
+      'Cannot delete field for empty path on ObjectValue',
+    );
 
     final String childName = path.first;
     if (path.length == 1) {

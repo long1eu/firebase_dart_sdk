@@ -54,8 +54,11 @@ class BundleBuilder {
   /// Adds [document] to the bundle, read at [readTime] (the document version when null).
   ///
   /// [queryName] is the name of the named query the document belongs to, if any.
-  void addDocument(Document document,
-      {SnapshotVersion? readTime, String? queryName}) {
+  void addDocument(
+    Document document, {
+    SnapshotVersion? readTime,
+    String? queryName,
+  }) {
     final String path = document.key.path.canonicalString;
     final SnapshotVersion docReadTime = readTime ?? document.version;
     final _BundledDocument? original = _documents[path];
@@ -80,15 +83,22 @@ class BundleBuilder {
   /// Adds the named query [name] for [query] with its result [documents], read at [readTime].
   ///
   /// The documents are read at [readTime] too, or at their own version when [readTime] is [SnapshotVersion.none].
-  void addNamedQuery(String name, Query query, Iterable<Document> documents,
-      SnapshotVersion readTime) {
+  void addNamedQuery(
+    String name,
+    Query query,
+    Iterable<Document> documents,
+    SnapshotVersion readTime,
+  ) {
     if (_namedQueries.containsKey(name)) {
       throw ArgumentError('Query name conflict: $name has already been added.');
     }
     final bool hasReadTime = readTime.compareTo(SnapshotVersion.none) > 0;
     for (final Document document in documents) {
-      addDocument(document,
-          readTime: hasReadTime ? readTime : null, queryName: name);
+      addDocument(
+        document,
+        readTime: hasReadTime ? readTime : null,
+        queryName: name,
+      );
     }
 
     // A limit-to-last query is stored as written by the user (orders not inverted) with the 'LAST' limit type, which
@@ -99,8 +109,9 @@ class BundleBuilder {
     final Query firstQuery = isLimitToLast
         ? query.copyWith(limitType: LimitType.limitToFirst)
         : query;
-    final proto.Target_QueryTarget queryTarget =
-        _serializer.encodeQueryTarget(firstQuery.toTarget());
+    final proto.Target_QueryTarget queryTarget = _serializer.encodeQueryTarget(
+      firstQuery.toTarget(),
+    );
     _namedQueries[name] = <String, Object?>{
       'name': name,
       'bundledQuery': <String, Object?>{
@@ -117,21 +128,25 @@ class BundleBuilder {
   String build() {
     final StringBuffer elements = StringBuffer();
     for (final Map<String, Object?> namedQuery in _namedQueries.values) {
-      elements
-          .write(_lengthPrefixed(<String, Object?>{'namedQuery': namedQuery}));
+      elements.write(
+        _lengthPrefixed(<String, Object?>{'namedQuery': namedQuery}),
+      );
     }
     _documents.forEach((String path, _BundledDocument bundled) {
       elements
-        ..write(_lengthPrefixed(<String, Object?>{
-          'documentMetadata': <String, Object?>{
-            'name': bundled.document['name'],
-            'readTime': _encodeVersion(bundled.readTime),
-            'exists': true,
-            if (bundled.queries.isNotEmpty) 'queries': bundled.queries,
-          },
-        }))
         ..write(
-            _lengthPrefixed(<String, Object?>{'document': bundled.document}));
+          _lengthPrefixed(<String, Object?>{
+            'documentMetadata': <String, Object?>{
+              'name': bundled.document['name'],
+              'readTime': _encodeVersion(bundled.readTime),
+              'exists': true,
+              if (bundled.queries.isNotEmpty) 'queries': bundled.queries,
+            },
+          }),
+        )
+        ..write(
+          _lengthPrefixed(<String, Object?>{'document': bundled.document}),
+        );
     });
     final String body = elements.toString();
 
@@ -148,8 +163,10 @@ class BundleBuilder {
   }
 
   Map<String, Object?> _encodeDocument(Document document) {
-    final proto.Document encoded =
-        _serializer.encodeDocument(document.key, document.data);
+    final proto.Document encoded = _serializer.encodeDocument(
+      document.key,
+      document.data,
+    );
     final Map<String, Object?> result = <String, Object?>{
       'name': encoded.name,
       'fields': <String, Object?>{
@@ -184,19 +201,24 @@ class BundleBuilder {
   }
 
   void _fixFilterValues(
-      proto.StructuredQuery_Filter filter, Map<String, Object?> json) {
+    proto.StructuredQuery_Filter filter,
+    Map<String, Object?> json,
+  ) {
     if (filter.hasCompositeFilter()) {
       final List<proto.StructuredQuery_Filter> filters =
           filter.compositeFilter.filters;
       final Object? jsonFilters =
           (json['compositeFilter']! as Map<String, Object?>)['filters'];
       for (int i = 0; i < filters.length; i++) {
-        _fixFilterValues(filters[i],
-            (jsonFilters! as List<Object?>)[i]! as Map<String, Object?>);
+        _fixFilterValues(
+          filters[i],
+          (jsonFilters! as List<Object?>)[i]! as Map<String, Object?>,
+        );
       }
     } else if (filter.hasFieldFilter()) {
-      (json['fieldFilter']! as Map<String, Object?>)['value'] =
-          _encodeValue(filter.fieldFilter.value);
+      (json['fieldFilter']! as Map<String, Object?>)['value'] = _encodeValue(
+        filter.fieldFilter.value,
+      );
     }
   }
 
@@ -233,7 +255,7 @@ class BundleBuilder {
       return <String, Object?>{'doubleValue': encoded};
     } else if (type == proto_v1.Value_ValueType.timestampValue) {
       return <String, Object?>{
-        'timestampValue': value.timestampValue.toProto3Json()
+        'timestampValue': value.timestampValue.toProto3Json(),
       };
     } else if (type == proto_v1.Value_ValueType.stringValue) {
       return <String, Object?>{'stringValue': value.stringValue};

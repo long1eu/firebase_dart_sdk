@@ -15,9 +15,7 @@ import 'package:collection/collection.dart';
 /// subtype and then byte by byte.
 class Blob implements Comparable<Blob> {
   /// Creates a blob holding a copy of [bytes].
-  Blob(Uint8List bytes)
-      : _bytes = Uint8List.fromList(bytes),
-        subtype = 0;
+  Blob(Uint8List bytes) : _bytes = Uint8List.fromList(bytes), subtype = 0;
 
   /// Creates BSON binary data, a blob with a [subtype].
   ///
@@ -26,10 +24,13 @@ class Blob implements Comparable<Blob> {
   ///
   /// Throws an [ArgumentError] if [subtype] is not in the range `[0, 255]`.
   Blob.bsonBinary(this.subtype, Uint8List bytes)
-      : _bytes = Uint8List.fromList(bytes) {
+    : _bytes = Uint8List.fromList(bytes) {
     if (subtype < 0 || subtype > 255) {
-      throw ArgumentError.value(subtype, 'subtype',
-          'The subtype for Blob must be a value in the inclusive [0, 255] range.');
+      throw ArgumentError.value(
+        subtype,
+        'subtype',
+        'The subtype for Blob must be a value in the inclusive [0, 255] range.',
+      );
     }
   }
 
@@ -52,7 +53,10 @@ class Blob implements Comparable<Blob> {
         data is! String ||
         (subtype != null && subtype is! int)) {
       throw ArgumentError.value(
-          json, 'json', 'Not a JSON representation of a Blob');
+        json,
+        'json',
+        'Not a JSON representation of a Blob',
+      );
     }
     return Blob.bsonBinary(subtype as int? ?? 0, base64Decode(data));
   }

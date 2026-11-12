@@ -53,30 +53,41 @@ class BundleSerializer {
 
   NamedQuery decodeNamedQuery(Map<String, dynamic> namedQuery) {
     final String name = _getString(namedQuery, 'name');
-    final BundledQuery bundledQuery =
-        _decodeBundledQuery(_getObject(namedQuery, 'bundledQuery'));
-    final SnapshotVersion readTime =
-        _decodeSnapshotVersion(_get(namedQuery, 'readTime'));
+    final BundledQuery bundledQuery = _decodeBundledQuery(
+      _getObject(namedQuery, 'bundledQuery'),
+    );
+    final SnapshotVersion readTime = _decodeSnapshotVersion(
+      _get(namedQuery, 'readTime'),
+    );
     return NamedQuery(name, bundledQuery, readTime);
   }
 
   BundleMetadata decodeBundleMetadata(Map<String, dynamic> bundleMetadata) {
     final String bundleId = _getString(bundleMetadata, 'id');
     final int version = _asInt(_get(bundleMetadata, 'version'));
-    final SnapshotVersion createTime =
-        _decodeSnapshotVersion(_get(bundleMetadata, 'createTime'));
+    final SnapshotVersion createTime = _decodeSnapshotVersion(
+      _get(bundleMetadata, 'createTime'),
+    );
     final int totalDocuments = _asInt(_get(bundleMetadata, 'totalDocuments'));
     final int totalBytes = _asInt(_get(bundleMetadata, 'totalBytes'));
     return BundleMetadata(
-        bundleId, version, createTime, totalDocuments, totalBytes);
+      bundleId,
+      version,
+      createTime,
+      totalDocuments,
+      totalBytes,
+    );
   }
 
   BundledDocumentMetadata decodeBundledDocumentMetadata(
-      Map<String, dynamic> bundledDocumentMetadata) {
+    Map<String, dynamic> bundledDocumentMetadata,
+  ) {
     final DocumentKey key = DocumentKey.fromPath(
-        _decodeName(_getString(bundledDocumentMetadata, 'name')));
-    final SnapshotVersion readTime =
-        _decodeSnapshotVersion(_get(bundledDocumentMetadata, 'readTime'));
+      _decodeName(_getString(bundledDocumentMetadata, 'name')),
+    );
+    final SnapshotVersion readTime = _decodeSnapshotVersion(
+      _get(bundledDocumentMetadata, 'readTime'),
+    );
     final bool exists = _optBool(bundledDocumentMetadata, 'exists', false);
     final List<String> queries = <String>[];
     // Technically, the queries array should never be missing, but we treat a missing and empty array the same to avoid
@@ -96,8 +107,9 @@ class BundleSerializer {
   BundleDocument decodeDocument(Map<String, dynamic> document) {
     final String name = _getString(document, 'name');
     final DocumentKey key = DocumentKey.fromPath(_decodeName(name));
-    final SnapshotVersion updateTime =
-        _decodeSnapshotVersion(_get(document, 'updateTime'));
+    final SnapshotVersion updateTime = _decodeSnapshotVersion(
+      _get(document, 'updateTime'),
+    );
 
     final proto.Document documentProto = proto.Document.create()
       ..name = remoteSerializer.encodeKey(key)
@@ -109,13 +121,15 @@ class BundleSerializer {
       }
     }
 
-    return BundleDocument(Document.fromProto(
-      key,
-      updateTime,
-      DocumentState.synced,
-      documentProto..freeze(),
-      remoteSerializer.decodeValue,
-    ));
+    return BundleDocument(
+      Document.fromProto(
+        key,
+        updateTime,
+        DocumentState.synced,
+        documentProto..freeze(),
+        remoteSerializer.decodeValue,
+      ),
+    );
   }
 
   // Names
@@ -124,7 +138,8 @@ class BundleSerializer {
     final ResourcePath resourcePath = ResourcePath.fromString(name);
     if (!_isLocalResourceName(resourcePath)) {
       throw ArgumentError(
-          'Resource name is not valid for current instance: $name');
+        'Resource name is not valid for current instance: $name',
+      );
     }
     return resourcePath.popFirst(5);
   }
@@ -143,32 +158,44 @@ class BundleSerializer {
   // Queries
 
   BundledQuery _decodeBundledQuery(Map<String, dynamic> bundledQuery) {
-    final Map<String, dynamic> structuredQuery =
-        _getObject(bundledQuery, 'structuredQuery');
+    final Map<String, dynamic> structuredQuery = _getObject(
+      bundledQuery,
+      'structuredQuery',
+    );
     _verifyNoSelect(structuredQuery);
 
     ResourcePath parent = _decodeName(_getString(bundledQuery, 'parent'));
     final List<dynamic> from = _getArray(structuredQuery, 'from');
     _verifyCollectionSelector(from);
     final Map<String, dynamic> collectionSelector = _asObject(from[0]);
-    final bool allDescendants =
-        _optBool(collectionSelector, 'allDescendants', false);
+    final bool allDescendants = _optBool(
+      collectionSelector,
+      'allDescendants',
+      false,
+    );
     String? collectionGroup;
     if (allDescendants) {
       collectionGroup = _getString(collectionSelector, 'collectionId');
     } else {
-      parent =
-          parent.appendSegment(_getString(collectionSelector, 'collectionId'));
+      parent = parent.appendSegment(
+        _getString(collectionSelector, 'collectionId'),
+      );
     }
 
-    final List<Filter> filters =
-        _decodeWhere(_optObject(structuredQuery, 'where'));
-    final List<OrderBy> orderBys =
-        _decodeOrderBy(_optArray(structuredQuery, 'orderBy'));
-    final Bound? startAt =
-        _decodeBound(_optObject(structuredQuery, 'startAt'), isStart: true);
-    final Bound? endAt =
-        _decodeBound(_optObject(structuredQuery, 'endAt'), isStart: false);
+    final List<Filter> filters = _decodeWhere(
+      _optObject(structuredQuery, 'where'),
+    );
+    final List<OrderBy> orderBys = _decodeOrderBy(
+      _optArray(structuredQuery, 'orderBy'),
+    );
+    final Bound? startAt = _decodeBound(
+      _optObject(structuredQuery, 'startAt'),
+      isStart: true,
+    );
+    final Bound? endAt = _decodeBound(
+      _optObject(structuredQuery, 'endAt'),
+      isStart: false,
+    );
 
     _verifyNoOffset(structuredQuery);
     final int limit = _decodeLimit(structuredQuery);
@@ -211,8 +238,9 @@ class BundleSerializer {
     final List<dynamic>? values = _optArray(bound, 'values');
     if (values != null) {
       for (final dynamic value in values) {
-        cursor
-            .add(remoteSerializer.decodeValue(_decodeValue(_asObject(value))));
+        cursor.add(
+          remoteSerializer.decodeValue(_decodeValue(_asObject(value))),
+        );
       }
     }
     return Bound(position: cursor, inclusive: isStart ? before : !before);
@@ -223,10 +251,14 @@ class BundleSerializer {
     if (orderBys != null) {
       for (final dynamic entry in orderBys) {
         final Map<String, dynamic> orderBy = _asObject(entry);
-        final FieldPath fieldPath =
-            _decodeFieldReference(_getObject(orderBy, 'field'));
-        final String directionString =
-            _optString(orderBy, 'direction', 'ASCENDING');
+        final FieldPath fieldPath = _decodeFieldReference(
+          _getObject(orderBy, 'field'),
+        );
+        final String directionString = _optString(
+          orderBy,
+          'direction',
+          'ASCENDING',
+        );
         final OrderByDirection direction = directionString == 'ASCENDING'
             ? OrderByDirection.ascending
             : OrderByDirection.descending;
@@ -244,12 +276,18 @@ class BundleSerializer {
     return result;
   }
 
-  void _decodeFilter(List<Filter> result, Map<String, dynamic> filter,
-      [int depth = 0]) {
+  void _decodeFilter(
+    List<Filter> result,
+    Map<String, dynamic> filter, [
+    int depth = 0,
+  ]) {
     _checkDepth(depth);
     if (filter.containsKey('compositeFilter')) {
       _decodeCompositeFilter(
-          result, _getObject(filter, 'compositeFilter'), depth);
+        result,
+        _getObject(filter, 'compositeFilter'),
+        depth,
+      );
     } else if (filter.containsKey('fieldFilter')) {
       _decodeFieldFilter(result, _getObject(filter, 'fieldFilter'));
     } else if (filter.containsKey('unaryFilter')) {
@@ -258,7 +296,10 @@ class BundleSerializer {
   }
 
   void _decodeCompositeFilter(
-      List<Filter> result, Map<String, dynamic> compositeFilter, int depth) {
+    List<Filter> result,
+    Map<String, dynamic> compositeFilter,
+    int depth,
+  ) {
     final String op = _getString(compositeFilter, 'op');
     if (op == 'OR') {
       // PORTING NOTE: the Android SDK only supports 'AND' here. The port also reads disjunctions (as the JS SDK does),
@@ -268,16 +309,17 @@ class BundleSerializer {
           in _optArray(compositeFilter, 'filters') ?? <dynamic>[]) {
         final List<Filter> decoded = <Filter>[];
         _decodeFilter(decoded, _asObject(filter), depth + 1);
-        disjuncts.add(decoded.length == 1
-            ? decoded.single
-            : CompositeFilter.and(decoded));
+        disjuncts.add(
+          decoded.length == 1 ? decoded.single : CompositeFilter.and(decoded),
+        );
       }
       result.add(CompositeFilter.or(disjuncts));
       return;
     }
     if (op != 'AND') {
       throw ArgumentError(
-          'The Dart SDK only supports composite filters of type \'AND\' and \'OR\'');
+        'The Dart SDK only supports composite filters of type \'AND\' and \'OR\'',
+      );
     }
 
     final List<dynamic>? filters = _optArray(compositeFilter, 'filters');
@@ -289,41 +331,59 @@ class BundleSerializer {
   }
 
   void _decodeFieldFilter(
-      List<Filter> result, Map<String, dynamic> fieldFilter) {
-    final FieldPath fieldPath =
-        _decodeFieldReference(_getObject(fieldFilter, 'field'));
-    final FilterOperator filterOperator =
-        _decodeFieldFilterOperator(_getString(fieldFilter, 'op'));
-    result.add(FieldFilter(
-      fieldPath,
-      filterOperator,
-      remoteSerializer
-          .decodeValue(_decodeValue(_getObject(fieldFilter, 'value'))),
-    ));
+    List<Filter> result,
+    Map<String, dynamic> fieldFilter,
+  ) {
+    final FieldPath fieldPath = _decodeFieldReference(
+      _getObject(fieldFilter, 'field'),
+    );
+    final FilterOperator filterOperator = _decodeFieldFilterOperator(
+      _getString(fieldFilter, 'op'),
+    );
+    result.add(
+      FieldFilter(
+        fieldPath,
+        filterOperator,
+        remoteSerializer.decodeValue(
+          _decodeValue(_getObject(fieldFilter, 'value')),
+        ),
+      ),
+    );
   }
 
   void _decodeUnaryFilter(
-      List<Filter> result, Map<String, dynamic> unaryFilter) {
-    final FieldPath fieldPath =
-        _decodeFieldReference(_getObject(unaryFilter, 'field'));
+    List<Filter> result,
+    Map<String, dynamic> unaryFilter,
+  ) {
+    final FieldPath fieldPath = _decodeFieldReference(
+      _getObject(unaryFilter, 'field'),
+    );
     final String operator = _getString(unaryFilter, 'op');
 
     switch (operator) {
       case 'IS_NAN':
-        result
-            .add(FieldFilter(fieldPath, FilterOperator.equal, DoubleValue.nan));
+        result.add(
+          FieldFilter(fieldPath, FilterOperator.equal, DoubleValue.nan),
+        );
         break;
       case 'IS_NULL':
-        result.add(FieldFilter(
-            fieldPath, FilterOperator.equal, NullValue.nullValue()));
+        result.add(
+          FieldFilter(fieldPath, FilterOperator.equal, NullValue.nullValue()),
+        );
         break;
       case 'IS_NOT_NAN':
         result.add(
-            FieldFilter(fieldPath, FilterOperator.notEqual, DoubleValue.nan));
+          FieldFilter(fieldPath, FilterOperator.notEqual, DoubleValue.nan),
+        );
         break;
       case 'IS_NOT_NULL':
-        result.add(FieldFilter(
-            fieldPath, FilterOperator.notEqual, NullValue.nullValue()));
+        result.add(
+          FieldFilter(
+            fieldPath,
+            FilterOperator.notEqual,
+            NullValue.nullValue(),
+          ),
+        );
         break;
       default:
         throw ArgumentError('Unexpected unary filter: $operator');
@@ -375,21 +435,24 @@ class BundleSerializer {
   void _verifyCollectionSelector(List<dynamic> from) {
     if (from.length != 1) {
       throw ArgumentError(
-          'Only queries with a single \'from\' clause are supported by the Dart SDK');
+        'Only queries with a single \'from\' clause are supported by the Dart SDK',
+      );
     }
   }
 
   void _verifyNoOffset(Map<String, dynamic> structuredQuery) {
     if (structuredQuery.containsKey('offset')) {
       throw ArgumentError(
-          'Queries with offsets are not supported by the Dart SDK');
+        'Queries with offsets are not supported by the Dart SDK',
+      );
     }
   }
 
   void _verifyNoSelect(Map<String, dynamic> structuredQuery) {
     if (structuredQuery.containsKey('select')) {
       throw ArgumentError(
-          'Queries with \'select\' statements are not supported by the Dart SDK');
+        'Queries with \'select\' statements are not supported by the Dart SDK',
+      );
     }
   }
 
@@ -402,7 +465,8 @@ class BundleSerializer {
   static void _checkDepth(int depth) {
     if (depth > maxNestingDepth) {
       throw ArgumentError(
-          'Invalid bundle: values or filters are nested deeper than $maxNestingDepth levels');
+        'Invalid bundle: values or filters are nested deeper than $maxNestingDepth levels',
+      );
     }
   }
 
@@ -419,8 +483,9 @@ class BundleSerializer {
     } else if (value.containsKey('doubleValue')) {
       builder.doubleValue = _asDouble(value['doubleValue']);
     } else if (value.containsKey('timestampValue')) {
-      builder.timestampValue =
-          _encodeTimestamp(_decodeTimestamp(value['timestampValue']));
+      builder.timestampValue = _encodeTimestamp(
+        _decodeTimestamp(value['timestampValue']),
+      );
     } else if (value.containsKey('stringValue')) {
       builder.stringValue = _optString(value, 'stringValue', '');
     } else if (value.containsKey('bytesValue')) {
@@ -434,8 +499,10 @@ class BundleSerializer {
         ..longitude = _optDouble(geoPoint, 'longitude', 0);
     } else if (value.containsKey('arrayValue')) {
       final proto.ArrayValue array = proto.ArrayValue.create();
-      final List<dynamic>? values =
-          _optArray(_getObject(value, 'arrayValue'), 'values');
+      final List<dynamic>? values = _optArray(
+        _getObject(value, 'arrayValue'),
+        'values',
+      );
       if (values != null) {
         for (final dynamic element in values) {
           array.values.add(_decodeValue(_asObject(element), depth + 1));
@@ -444,12 +511,16 @@ class BundleSerializer {
       builder.arrayValue = array;
     } else if (value.containsKey('mapValue')) {
       final proto.MapValue map = proto.MapValue.create();
-      final Map<String, dynamic>? fields =
-          _optObject(_getObject(value, 'mapValue'), 'fields');
+      final Map<String, dynamic>? fields = _optObject(
+        _getObject(value, 'mapValue'),
+        'fields',
+      );
       if (fields != null) {
         for (final MapEntry<String, dynamic> entry in fields.entries) {
-          map.fields[entry.key] =
-              _decodeValue(_asObject(entry.value), depth + 1);
+          map.fields[entry.key] = _decodeValue(
+            _asObject(entry.value),
+            depth + 1,
+          );
         }
       }
       builder.mapValue = map;
@@ -484,12 +555,14 @@ class BundleSerializer {
       );
     } else {
       throw ArgumentError(
-          'Timestamps must be either ISO 8601-formatted strings or JSON objects');
+        'Timestamps must be either ISO 8601-formatted strings or JSON objects',
+      );
     }
   }
 
   static final RegExp _timestampPattern = RegExp(
-      r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d*))?(Z|[+-]\d+:\d+)$');
+    r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d*))?(Z|[+-]\d+:\d+)$',
+  );
 
   /// Parses an RFC 3339 timestamp such as `2021-01-01T10:20:30.123456789Z` or `2021-01-01T10:20:30+01:00`, using the
   /// proleptic Gregorian calendar. Only the first nine fractional digits are used.
@@ -505,8 +578,15 @@ class BundleSerializer {
     final int hour = int.parse(match.group(4)!);
     final int minute = int.parse(match.group(5)!);
     final int second = int.parse(match.group(6)!);
-    int seconds = DateTime.utc(year, month, day, hour, minute, second)
-            .millisecondsSinceEpoch ~/
+    int seconds =
+        DateTime.utc(
+          year,
+          month,
+          day,
+          hour,
+          minute,
+          second,
+        ).millisecondsSinceEpoch ~/
         1000;
 
     int nanos = 0;

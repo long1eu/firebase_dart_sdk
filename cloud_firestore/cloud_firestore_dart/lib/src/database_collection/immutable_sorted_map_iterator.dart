@@ -9,8 +9,11 @@ import 'package:cloud_firestore_dart/src/database_collection/lltb_value_node.dar
 
 class ImmutableSortedMapIterator<K, V> implements Iterator<MapEntry<K, V>> {
   ImmutableSortedMapIterator(
-      LLRBNode<K, V> root, K? startKey, Comparator<K> comparator, this.isReverse)
-      : nodeStack = Queue<LLRBValueNode<K, V>>() {
+    LLRBNode<K, V> root,
+    K? startKey,
+    Comparator<K> comparator,
+    this.isReverse,
+  ) : nodeStack = Queue<LLRBValueNode<K, V>>() {
     LLRBNode<K, V> node = root;
     while (!node.isEmpty) {
       final int cmp;

@@ -16,7 +16,9 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
   }
 
   factory ImmutableSortedMap.fromMap(
-      Map<K, V> values, Comparator<K> comparator) {
+    Map<K, V> values,
+    Comparator<K> comparator,
+  ) {
     if (values.length < arrayToRbTreeSizeThreshold) {
       return ArraySortedMap<K, V>.fromMap(values, comparator);
     } else {
@@ -33,10 +35,11 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
   static const int arrayToRbTreeSizeThreshold = 25;
 
   static ImmutableSortedMap<A, C> buildFrom<A, B, C>(
-      List<A> keys,
-      Map<B, C> values,
-      KeyTranslator<A, B> translator,
-      Comparator<A> comparator) {
+    List<A> keys,
+    Map<B, C> values,
+    KeyTranslator<A, B> translator,
+    Comparator<A> comparator,
+  ) {
     if (keys.length < arrayToRbTreeSizeThreshold) {
       return ArraySortedMap.buildFrom(keys, values, translator, comparator);
     } else {
@@ -44,7 +47,8 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
     }
   }
 
-  static KeyTranslator<A, A> identityTranslator<A>() => (A key) => key;
+  static KeyTranslator<A, A> identityTranslator<A>() =>
+      (A key) => key;
 
   bool containsKey(K key);
 
@@ -133,7 +137,9 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
   @override
   String toString() {
-    final StringBuffer b = StringBuffer()..write(runtimeType)..write('{');
+    final StringBuffer b = StringBuffer()
+      ..write(runtimeType)
+      ..write('{');
     bool first = true;
     for (MapEntry<K, V> entry in this) {
       if (first) {

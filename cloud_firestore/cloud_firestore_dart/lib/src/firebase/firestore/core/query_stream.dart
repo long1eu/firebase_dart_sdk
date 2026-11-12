@@ -34,11 +34,7 @@ class QueryStream extends Stream<ViewSnapshot> {
     );
   }
 
-  QueryStream._(
-    this._query,
-    this._options,
-    this._sink,
-  );
+  QueryStream._(this._query, this._options, this._sink);
 
   final Query _query;
   final ListenOptions _options;
@@ -60,23 +56,29 @@ class QueryStream extends Stream<ViewSnapshot> {
   /// Handles a new view snapshot. Returns true if this raised an event to the listener.
   Future<bool> onViewSnapshot(ViewSnapshot newSnapshot) async {
     bool raisedEvent = false;
-    hardAssert(newSnapshot.changes.isNotEmpty || newSnapshot.didSyncStateChange,
-        'We got a new snapshot with no changes?');
+    hardAssert(
+      newSnapshot.changes.isNotEmpty || newSnapshot.didSyncStateChange,
+      'We got a new snapshot with no changes?',
+    );
 
     if (!options.includeDocumentMetadataChanges) {
       // Remove the metadata only changes
       newSnapshot = newSnapshot.copyWith(
         excludesMetadataChanges: true,
         changes: newSnapshot.changes
-            .where((DocumentViewChange change) =>
-                change.type != DocumentViewChangeType.metadata)
+            .where(
+              (DocumentViewChange change) =>
+                  change.type != DocumentViewChangeType.metadata,
+            )
             .toList(),
       );
     }
 
     if (!_raisedInitialEvent) {
-      final bool shouldRaiseInitialEvent =
-          _shouldRaiseInitialEvent(newSnapshot, _onlineState);
+      final bool shouldRaiseInitialEvent = _shouldRaiseInitialEvent(
+        newSnapshot,
+        _onlineState,
+      );
 
       if (shouldRaiseInitialEvent) {
         _raiseInitialEvent(newSnapshot);
@@ -117,8 +119,10 @@ class QueryStream extends Stream<ViewSnapshot> {
     ViewSnapshot snapshot,
     OnlineState onlineState,
   ) {
-    hardAssert(!_raisedInitialEvent,
-        'Determining whether to raise first event but already had first event.');
+    hardAssert(
+      !_raisedInitialEvent,
+      'Determining whether to raise first event but already had first event.',
+    );
 
     // Always raise the first event when we're synced
     if (!snapshot.isFromCache) {
@@ -137,8 +141,10 @@ class QueryStream extends Stream<ViewSnapshot> {
     // Don't raise the event if we're online, aren't synced yet (checked above)
     // and are waiting for a sync.
     if (options.waitForSyncWhenOnline && maybeOnline) {
-      hardAssert(snapshot.isFromCache,
-          'Waiting for sync, but snapshot is not from cache');
+      hardAssert(
+        snapshot.isFromCache,
+        'Waiting for sync, but snapshot is not from cache',
+      );
       return false;
     }
 
@@ -156,7 +162,8 @@ class QueryStream extends Stream<ViewSnapshot> {
       return true;
     }
 
-    final bool hasPendingWritesChanged = _snapshot != null &&
+    final bool hasPendingWritesChanged =
+        _snapshot != null &&
         _snapshot!.hasPendingWrites != snapshot.hasPendingWrites;
     if (snapshot.didSyncStateChange || hasPendingWritesChanged) {
       return options.includeQueryMetadataChanges;
@@ -169,27 +176,36 @@ class QueryStream extends Stream<ViewSnapshot> {
 
   void _raiseInitialEvent(ViewSnapshot snapshot) {
     hardAssert(
-        !_raisedInitialEvent, 'Trying to raise initial event for second time');
+      !_raisedInitialEvent,
+      'Trying to raise initial event for second time',
+    );
 
     _raisedInitialEvent = true;
-    _sink.add(ViewSnapshot.fromInitialDocuments(
-      snapshot.query,
-      snapshot.documents,
-      snapshot.mutatedKeys,
-      isFromCache: snapshot.isFromCache,
-      excludesMetadataChanges: snapshot.excludesMetadataChanges,
-      hasCachedResults: snapshot.hasCachedResults,
-      readTime: snapshot.readTime,
-    ));
+    _sink.add(
+      ViewSnapshot.fromInitialDocuments(
+        snapshot.query,
+        snapshot.documents,
+        snapshot.mutatedKeys,
+        isFromCache: snapshot.isFromCache,
+        excludesMetadataChanges: snapshot.excludesMetadataChanges,
+        hasCachedResults: snapshot.hasCachedResults,
+        readTime: snapshot.readTime,
+      ),
+    );
   }
 
   @override
   StreamSubscription<ViewSnapshot> listen(
-      void Function(ViewSnapshot event)? onData,
-      {Function? onError,
-      void Function()? onDone,
-      bool? cancelOnError}) {
-    return _sink.stream.listen(onData,
-        onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+    void Function(ViewSnapshot event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    return _sink.stream.listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
   }
 }

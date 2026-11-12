@@ -8,10 +8,12 @@ part of 'datastore.dart';
 /// for both the [Future]s and the [Stream]s.
 class FirestoreClient {
   @visibleForTesting
-  FirestoreClient(FirestoreTransport transport, this._optionsProvider,
-      {CallReleaser? callReleaser})
-      : _transport = transport,
-        callReleaser = callReleaser ?? CallReleaser();
+  FirestoreClient(
+    FirestoreTransport transport,
+    this._optionsProvider, {
+    CallReleaser? callReleaser,
+  }) : _transport = transport,
+       callReleaser = callReleaser ?? CallReleaser();
 
   /// Lets go of the calls this client is done with, see [CallReleaser].
   final CallReleaser callReleaser;
@@ -27,12 +29,16 @@ class FirestoreClient {
     proto.BatchGetDocumentsRequest request, {
     CallOptions? options,
   }) {
-    final ResponseStream<proto.BatchGetDocumentsResponse> call =
-        _transport.startCall(FirestoreRpc.batchGetDocuments,
-            Stream<proto.BatchGetDocumentsRequest>.value(request),
-            options: options);
+    final ResponseStream<proto.BatchGetDocumentsResponse> call = _transport
+        .startCall(
+          FirestoreRpc.batchGetDocuments,
+          Stream<proto.BatchGetDocumentsRequest>.value(request),
+          options: options,
+        );
     return ResponseStream<proto.BatchGetDocumentsResponse>(
-        call, _buildStream(call));
+      call,
+      _buildStream(call),
+    );
   }
 
   /// Runs a query. The server streams the matching documents back.
@@ -41,8 +47,10 @@ class FirestoreClient {
     CallOptions? options,
   }) {
     final ResponseStream<proto.RunQueryResponse> call = _transport.startCall(
-        FirestoreRpc.runQuery, Stream<proto.RunQueryRequest>.value(request),
-        options: options);
+      FirestoreRpc.runQuery,
+      Stream<proto.RunQueryRequest>.value(request),
+      options: options,
+    );
     return ResponseStream<proto.RunQueryResponse>(call, _buildStream(call));
   }
 
@@ -51,12 +59,16 @@ class FirestoreClient {
     proto.RunAggregationQueryRequest request, {
     CallOptions? options,
   }) {
-    final ResponseStream<proto.RunAggregationQueryResponse> call =
-        _transport.startCall(FirestoreRpc.runAggregationQuery,
-            Stream<proto.RunAggregationQueryRequest>.value(request),
-            options: options);
+    final ResponseStream<proto.RunAggregationQueryResponse> call = _transport
+        .startCall(
+          FirestoreRpc.runAggregationQuery,
+          Stream<proto.RunAggregationQueryRequest>.value(request),
+          options: options,
+        );
     return ResponseStream<proto.RunAggregationQueryResponse>(
-        call, _buildStream(call));
+      call,
+      _buildStream(call),
+    );
   }
 
   /// Executes a pipeline query. The server streams the results back.
@@ -64,20 +76,28 @@ class FirestoreClient {
     proto.ExecutePipelineRequest request, {
     CallOptions? options,
   }) {
-    final ResponseStream<proto.ExecutePipelineResponse> call =
-        _transport.startCall(FirestoreRpc.executePipeline,
-            Stream<proto.ExecutePipelineRequest>.value(request),
-            options: options);
+    final ResponseStream<proto.ExecutePipelineResponse> call = _transport
+        .startCall(
+          FirestoreRpc.executePipeline,
+          Stream<proto.ExecutePipelineRequest>.value(request),
+          options: options,
+        );
     return ResponseStream<proto.ExecutePipelineResponse>(
-        call, _buildStream(call));
+      call,
+      _buildStream(call),
+    );
   }
 
   /// Commits a transaction, while optionally updating documents.
-  ResponseFuture<proto.CommitResponse> commit(proto.CommitRequest request,
-      {CallOptions? options}) {
+  ResponseFuture<proto.CommitResponse> commit(
+    proto.CommitRequest request, {
+    CallOptions? options,
+  }) {
     final ResponseStream<proto.CommitResponse> call = _transport.startCall(
-        FirestoreRpc.commit, Stream<proto.CommitRequest>.value(request),
-        options: options);
+      FirestoreRpc.commit,
+      Stream<proto.CommitRequest>.value(request),
+      options: options,
+    );
     return _buildFuture<proto.CommitResponse>(call);
   }
 
@@ -88,17 +108,23 @@ class FirestoreClient {
   /// connection is reported as an error on the response stream (which lets the
   /// stream back off and the online state tracker count the failure).
   Future<ResponseStream<proto.ListenResponse>> listen(
-      Stream<proto.ListenRequest> request) async {
-    final ResponseStream<proto.ListenResponse> call =
-        _transport.startCall(FirestoreRpc.listen, request);
+    Stream<proto.ListenRequest> request,
+  ) async {
+    final ResponseStream<proto.ListenResponse> call = _transport.startCall(
+      FirestoreRpc.listen,
+      request,
+    );
     return ResponseStream<proto.ListenResponse>(call, _buildStream(call));
   }
 
   /// Streams batches of document updates and deletes, in order.
   Future<ResponseStream<proto.WriteResponse>> write(
-      Stream<proto.WriteRequest> request) async {
-    final ResponseStream<proto.WriteResponse> call =
-        _transport.startCall(FirestoreRpc.write, request);
+    Stream<proto.WriteRequest> request,
+  ) async {
+    final ResponseStream<proto.WriteResponse> call = _transport.startCall(
+      FirestoreRpc.write,
+      request,
+    );
     return ResponseStream<proto.WriteResponse>(call, _buildStream(call));
   }
 
@@ -111,30 +137,45 @@ class FirestoreClient {
   }
 
   Stream<R> _buildStream<R>(Stream<R> response) {
-    return response.transform(DoStreamTransformer<R>(
-      onError: (Object error, StackTrace stackTrace) {
-        if (error is GrpcError && error.code == StatusCode.unauthenticated) {
-          Log.d('FirestoreClient',
-              'Received status ${error.code}. Invalidating the token.');
-          _optionsProvider.invalidateToken();
-        }
-      },
-    ))
+    return response
+        .transform(
+          DoStreamTransformer<R>(
+            onError: (Object error, StackTrace stackTrace) {
+              if (error is GrpcError &&
+                  error.code == StatusCode.unauthenticated) {
+                Log.d(
+                  'FirestoreClient',
+                  'Received status ${error.code}. Invalidating the token.',
+                );
+                _optionsProvider.invalidateToken();
+              }
+            },
+          ),
+        )
         // TODO(long1eu): OnErrorResumeStreamTransformer doesn't provide the stacktrace
-        .transform(OnErrorResumeStreamTransformer<R>(
+        .transform(
+          OnErrorResumeStreamTransformer<R>(
             (dynamic error, [StackTrace? stackTrace]) => Stream<R>.error(
-                error is GrpcError
-                    ? FirestoreError(error.message ?? '',
-                        FirestoreErrorCode.fromValue(error))
-                    : FirestoreError(
-                        error.toString(), FirestoreErrorCode.unknown),
-                stackTrace)));
+              error is GrpcError
+                  ? FirestoreError(
+                      error.message ?? '',
+                      FirestoreErrorCode.fromValue(error),
+                    )
+                  : FirestoreError(
+                      error.toString(),
+                      FirestoreErrorCode.unknown,
+                    ),
+              stackTrace,
+            ),
+          ),
+        );
   }
 
   ResponseFuture<R> _buildFuture<R>(ResponseStream<R> call) {
-    final Future<R> future = _buildStream(call) //
-        .fold<R?>(null, _ensureOnlyOneResponse)
-        .then<R>(_ensureOneResponse);
+    final Future<R> future =
+        _buildStream(call) //
+            .fold<R?>(null, _ensureOnlyOneResponse)
+            .then<R>(_ensureOneResponse);
 
     return ResponseFuture<R>(call, future);
   }

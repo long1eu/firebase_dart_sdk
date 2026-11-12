@@ -22,7 +22,9 @@ class ServerTimestampValue extends FieldValue {
   ///     previous: 42, add: t1, result: t1 -> 42
   ///     previous: t1, add: t2, result: t2 -> 42 (NOT t2 -> t1 -> 42)
   factory ServerTimestampValue(
-      Timestamp localWriteTime, FieldValue? previousValue) {
+    Timestamp localWriteTime,
+    FieldValue? previousValue,
+  ) {
     return ServerTimestampValue._(
       localWriteTime,
       previousValue is ServerTimestampValue

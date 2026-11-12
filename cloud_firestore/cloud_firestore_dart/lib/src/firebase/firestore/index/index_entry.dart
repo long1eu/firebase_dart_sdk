@@ -20,7 +20,11 @@ int compareByteArrays(List<int> left, List<int> right) {
 /// `IndexEntry` of the Android SDK.
 class IndexEntry implements Comparable<IndexEntry> {
   const IndexEntry(
-      this.indexId, this.documentKey, this.arrayValue, this.directionalValue);
+    this.indexId,
+    this.documentKey,
+    this.arrayValue,
+    this.directionalValue,
+  );
 
   final int indexId;
   final DocumentKey documentKey;
@@ -56,17 +60,21 @@ class IndexEntry implements Comparable<IndexEntry> {
           indexId == other.indexId &&
           documentKey == other.documentKey &&
           const ListEquality<int>().equals(arrayValue, other.arrayValue) &&
-          const ListEquality<int>()
-              .equals(directionalValue, other.directionalValue);
+          const ListEquality<int>().equals(
+            directionalValue,
+            other.directionalValue,
+          );
 
   @override
   int get hashCode => Object.hash(
-      indexId,
-      documentKey,
-      const ListEquality<int>().hash(arrayValue),
-      const ListEquality<int>().hash(directionalValue));
+    indexId,
+    documentKey,
+    const ListEquality<int>().hash(arrayValue),
+    const ListEquality<int>().hash(directionalValue),
+  );
 
   @override
-  String toString() => 'IndexEntry{indexId=$indexId, documentKey=$documentKey, '
+  String toString() =>
+      'IndexEntry{indexId=$indexId, documentKey=$documentKey, '
       'arrayValue=$arrayValue, directionalValue=$directionalValue}';
 }

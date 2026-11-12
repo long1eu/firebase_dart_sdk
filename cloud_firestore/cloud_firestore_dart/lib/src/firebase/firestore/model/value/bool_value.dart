@@ -29,8 +29,8 @@ class BoolValue extends FieldValue {
       return _value == other._value
           ? 0
           : _value
-              ? 1
-              : -1;
+          ? 1
+          : -1;
     } else {
       return defaultCompareTo(other);
     }

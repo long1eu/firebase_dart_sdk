@@ -36,8 +36,9 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   @override
   Future<void> removeTarget(QueryData queryData) async {
     final MemoryQueryCache queryCache = persistence.queryCache;
-    (await queryCache.getMatchingKeysForTargetId(queryData.targetId))
-        .forEach(orphanedDocuments!.add);
+    (await queryCache.getMatchingKeysForTargetId(
+      queryData.targetId,
+    )).forEach(orphanedDocuments!.add);
 
     await queryCache.removeQueryData(queryData);
   }

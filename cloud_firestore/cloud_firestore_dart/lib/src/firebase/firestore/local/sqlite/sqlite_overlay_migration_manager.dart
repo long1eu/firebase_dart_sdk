@@ -50,8 +50,8 @@ class SQLiteOverlayMigrationManager implements OverlayMigrationManager {
 
         // Get all document keys that have local mutations
         final Set<DocumentKey> allDocumentKeys = <DocumentKey>{};
-        final List<MutationBatch> batches =
-            await mutationQueue.getAllMutationBatches();
+        final List<MutationBatch> batches = await mutationQueue
+            .getAllMutationBatches();
         for (MutationBatch batch in batches) {
           allDocumentKeys.addAll(batch.keys);
         }
@@ -72,21 +72,25 @@ class SQLiteOverlayMigrationManager implements OverlayMigrationManager {
 
   /// The users that have pending mutations.
   Future<Set<String>> _getAllUserIds() async {
-    final List<Map<String, dynamic>> rows =
-        await _db.query('SELECT DISTINCT uid FROM mutations');
+    final List<Map<String, dynamic>> rows = await _db.query(
+      'SELECT DISTINCT uid FROM mutations',
+    );
     return rows.map((Map<String, dynamic> row) => row['uid'] as String).toSet();
   }
 
   @visibleForTesting
   Future<bool> hasPendingOverlayMigration() async {
     final List<Map<String, dynamic>> rows = await _db.query(
-        'SELECT migration_name FROM data_migrations WHERE migration_name = ?',
-        <Object>[Persistence.dataMigrationBuildOverlays]);
+      'SELECT migration_name FROM data_migrations WHERE migration_name = ?',
+      <Object>[Persistence.dataMigrationBuildOverlays],
+    );
     return rows.isNotEmpty;
   }
 
   Future<void> _removePendingOverlayMigrations() async {
-    await _db.execute('DELETE FROM data_migrations WHERE migration_name = ?',
-        <Object>[Persistence.dataMigrationBuildOverlays]);
+    await _db.execute(
+      'DELETE FROM data_migrations WHERE migration_name = ?',
+      <Object>[Persistence.dataMigrationBuildOverlays],
+    );
   }
 }

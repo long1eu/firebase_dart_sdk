@@ -26,13 +26,16 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.collection] or
   /// [DocumentReference.collection].
   @internal
-  CollectionReference(ResourcePath path, Firestore firestore,
-      [FirestoreDataConverter<T>? converter])
-      : assert(
-            path.length.remainder(2) == 1,
-            'Invalid collection reference. Collection references must have an odd number of '
-            'segments, but ${path.canonicalString} has ${path.length}'),
-        super(core.Query(path), firestore, converter);
+  CollectionReference(
+    ResourcePath path,
+    Firestore firestore, [
+    FirestoreDataConverter<T>? converter,
+  ]) : assert(
+         path.length.remainder(2) == 1,
+         'Invalid collection reference. Collection references must have an odd number of '
+         'segments, but ${path.canonicalString} has ${path.length}',
+       ),
+       super(core.Query(path), firestore, converter);
 
   /// Return The id of the collection.
   String get id => query.path.last;
@@ -48,7 +51,9 @@ class CollectionReference<T extends dynamic> extends Query<T> {
       return null;
     } else {
       return DocumentReference<Map<String, Object?>>(
-          DocumentKey.fromPath(parentPath), firestore);
+        DocumentKey.fromPath(parentPath),
+        firestore,
+      );
     }
   }
 
@@ -72,9 +77,10 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   DocumentReference<T> document([String? documentPath]) {
     final String path = documentPath ?? autoId();
     return DocumentReference<T>.forPath(
-        query.path.appendField(ResourcePath.fromString(path)),
-        firestore,
-        converter);
+      query.path.appendField(ResourcePath.fromString(path)),
+      firestore,
+      converter,
+    );
   }
 
   /// Adds a new document to this collection with the specified data, assigning it a document ID
@@ -96,7 +102,8 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// [withoutConverter] to go back to raw maps.
   @override
   CollectionReference<U> withConverter<U extends Object?>(
-      FirestoreDataConverter<U> converter) {
+    FirestoreDataConverter<U> converter,
+  ) {
     return CollectionReference<U>(query.path, firestore, converter);
   }
 

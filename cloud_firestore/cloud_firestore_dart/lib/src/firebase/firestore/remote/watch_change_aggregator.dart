@@ -63,7 +63,10 @@ class WatchChangeAggregator {
 
     for (int targetId in documentChange.removedTargetIds) {
       _removeDocumentFromTarget(
-          targetId, documentKey, documentChange.newDocument);
+        targetId,
+        documentKey,
+        documentChange.newDocument,
+      );
     }
   }
 
@@ -97,8 +100,10 @@ class WatchChangeAggregator {
           if (!targetState.isPending()) {
             removeTarget(targetId);
           }
-          hardAssert(targetChange.cause == null,
-              'WatchChangeAggregator does not handle errored targets');
+          hardAssert(
+            targetChange.cause == null,
+            'WatchChangeAggregator does not handle errored targets',
+          );
           break;
         case WatchTargetChangeType.current:
           if (_isActiveTarget(targetId)) {
@@ -133,7 +138,8 @@ class WatchChangeAggregator {
   /// Handles existence filters and synthesizes deletes for filter mismatches. Targets that are
   /// invalidated by filter mismatches are added to [pendingTargetResets].
   void handleExistenceFilter(
-      WatchChangeExistenceFilterWatchChange watchChange) {
+    WatchChangeExistenceFilterWatchChange watchChange,
+  ) {
     final int targetId = watchChange.targetId;
     final int expectedCount = watchChange.existenceFilter.count;
 
@@ -150,17 +156,13 @@ class WatchChangeAggregator {
           _removeDocumentFromTarget(
             targetId,
             key,
-            NoDocument(
-              key,
-              SnapshotVersion.none,
-              hasCommittedMutations: false,
-            ),
+            NoDocument(key, SnapshotVersion.none, hasCommittedMutations: false),
           );
         } else {
           hardAssertLazy(
-              expectedCount == 1,
-              () =>
-                  'Single document existence filter with count: $expectedCount');
+            expectedCount == 1,
+            () => 'Single document existence filter with count: $expectedCount',
+          );
         }
       } else {
         final int currentSize = _getCurrentDocumentCountForTarget(targetId);
@@ -178,8 +180,8 @@ class WatchChangeAggregator {
 
             final QueryPurpose purpose =
                 status == _BloomFilterApplicationStatus.falsePositive
-                    ? QueryPurpose.existenceFilterMismatchBloom
-                    : QueryPurpose.existenceFilterMismatch;
+                ? QueryPurpose.existenceFilterMismatchBloom
+                : QueryPurpose.existenceFilterMismatch;
             _pendingTargetResets[targetId] = purpose;
           }
         }
@@ -190,7 +192,8 @@ class WatchChangeAggregator {
   /// Parses the bloom filter from the `unchanged_names` field of an existence filter. Returns `null` if there is none
   /// or if it is not usable, in which case the caller falls back to a full re-query.
   BloomFilter? _parseBloomFilter(
-      WatchChangeExistenceFilterWatchChange watchChange) {
+    WatchChangeExistenceFilterWatchChange watchChange,
+  ) {
     final proto.BloomFilter? unchangedNames =
         watchChange.existenceFilter.unchangedNames;
 
@@ -207,9 +210,10 @@ class WatchChangeAggregator {
       );
     } on BloomFilterCreateException catch (e) {
       Log.w(
-          _tag,
-          'Applying bloom filter failed: (${e.message}); ignoring the bloom filter and falling back to full '
-          're-query.');
+        _tag,
+        'Applying bloom filter failed: (${e.message}); ignoring the bloom filter and falling back to full '
+        're-query.',
+      );
       return null;
     }
 
@@ -227,8 +231,10 @@ class WatchChangeAggregator {
     int currentCount,
   ) {
     final int expectedCount = watchChange.existenceFilter.count;
-    final int removedDocumentCount =
-        _filterRemovedDocuments(bloomFilter, watchChange.targetId);
+    final int removedDocumentCount = _filterRemovedDocuments(
+      bloomFilter,
+      watchChange.targetId,
+    );
 
     return expectedCount != currentCount - removedDocumentCount
         ? _BloomFilterApplicationStatus.falsePositive
@@ -238,12 +244,13 @@ class WatchChangeAggregator {
   /// Filters out removed documents based on the bloom filter membership result and returns the number of documents
   /// removed.
   int _filterRemovedDocuments(BloomFilter bloomFilter, int targetId) {
-    final ImmutableSortedSet<DocumentKey> existingKeys =
-        _targetMetadataProvider.getRemoteKeysForTarget(targetId);
+    final ImmutableSortedSet<DocumentKey> existingKeys = _targetMetadataProvider
+        .getRemoteKeysForTarget(targetId);
     final DatabaseId databaseId = _targetMetadataProvider.getDatabaseId();
     int removalCount = 0;
     for (DocumentKey key in existingKeys) {
-      final String documentPath = 'projects/${databaseId.projectId}'
+      final String documentPath =
+          'projects/${databaseId.projectId}'
           '/databases/${databaseId.databaseId}'
           '/documents/${key.path.canonicalString}';
       if (!bloomFilter.mightContain(documentPath)) {
@@ -276,11 +283,7 @@ class WatchChangeAggregator {
             _removeDocumentFromTarget(
               targetId,
               key,
-              NoDocument(
-                key,
-                snapshotVersion,
-                hasCommittedMutations: false,
-              ),
+              NoDocument(key, snapshotVersion, hasCommittedMutations: false),
             );
           }
         }
@@ -321,8 +324,9 @@ class WatchChangeAggregator {
       snapshotVersion: snapshotVersion,
       targetChanges: Map<int, TargetChange>.from(targetChanges),
       targetMismatches: Map<int, QueryPurpose>.from(_pendingTargetResets),
-      documentUpdates:
-          Map<DocumentKey, MaybeDocument>.from(_pendingDocumentUpdates),
+      documentUpdates: Map<DocumentKey, MaybeDocument>.from(
+        _pendingDocumentUpdates,
+      ),
       resolvedLimboDocuments: Set<DocumentKey>.from(resolvedLimboDocuments),
     );
 
@@ -343,8 +347,8 @@ class WatchChangeAggregator {
 
     final DocumentViewChangeType changeType =
         _targetContainsDocument(targetId, document.key)
-            ? DocumentViewChangeType.modified
-            : DocumentViewChangeType.added;
+        ? DocumentViewChangeType.modified
+        : DocumentViewChangeType.added;
 
     final TargetState targetState = _ensureTargetState(targetId);
     targetState.addDocumentChange(document.key, changeType);
@@ -359,7 +363,10 @@ class WatchChangeAggregator {
   /// we received the change that caused the filter mismatch), the new document can be provided to
   /// update the remote document cache.
   void _removeDocumentFromTarget(
-      int targetId, DocumentKey key, MaybeDocument? updatedDocument) {
+    int targetId,
+    DocumentKey key,
+    MaybeDocument? updatedDocument,
+  ) {
     if (!_isActiveTarget(targetId)) {
       return;
     }
@@ -428,14 +435,16 @@ class WatchChangeAggregator {
   /// clears the resume token and removes its target mapping from all documents).
   void _resetTarget(int targetId) {
     final TargetState? currentState = _targetStates[targetId];
-    hardAssert(currentState != null && !currentState.isPending(),
-        'Should only reset active targets');
+    hardAssert(
+      currentState != null && !currentState.isPending(),
+      'Should only reset active targets',
+    );
     _targetStates[targetId] = TargetState();
 
     // Trigger removal for any documents currently mapped to this target. These removals will be
     // part of the initial snapshot if [Watch] does not resend these documents.
-    final ImmutableSortedSet<DocumentKey> existingKeys =
-        _targetMetadataProvider.getRemoteKeysForTarget(targetId);
+    final ImmutableSortedSet<DocumentKey> existingKeys = _targetMetadataProvider
+        .getRemoteKeysForTarget(targetId);
     for (DocumentKey key in existingKeys) {
       _removeDocumentFromTarget(targetId, key, null);
     }
@@ -443,8 +452,8 @@ class WatchChangeAggregator {
 
   /// Returns whether the LocalStore considers the document to be part of the specified target.
   bool _targetContainsDocument(int targetId, DocumentKey key) {
-    final ImmutableSortedSet<DocumentKey> existingKeys =
-        _targetMetadataProvider.getRemoteKeysForTarget(targetId);
+    final ImmutableSortedSet<DocumentKey> existingKeys = _targetMetadataProvider
+        .getRemoteKeysForTarget(targetId);
     return existingKeys.contains(key);
   }
 }
@@ -460,7 +469,7 @@ class TargetMetadataProvider {
   /// Returns the set of remote document keys for the given target id as of the last raised snapshot
   /// or an empty set of document keys for unknown targets.
   final ImmutableSortedSet<DocumentKey> Function(int targetId)
-      getRemoteKeysForTarget;
+  getRemoteKeysForTarget;
 
   /// Returns the [QueryData] for an active target id or 'null' if this query is unknown or has
   /// become inactive.

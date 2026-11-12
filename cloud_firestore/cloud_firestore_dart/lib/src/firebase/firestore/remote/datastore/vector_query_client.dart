@@ -19,15 +19,20 @@ extension DatastoreVectorQuery on Datastore {
   /// Runs [vectorQuery] over [query] on the server and returns the documents
   /// in the order the server produced them (nearest first).
   Future<List<Document>> runVectorQuery(
-      Query query, VectorQuery vectorQuery) async {
-    final proto.Target_QueryTarget target =
-        _serializer.encodeVectorQueryTarget(query, vectorQuery);
+    Query query,
+    VectorQuery vectorQuery,
+  ) async {
+    final proto.Target_QueryTarget target = _serializer.encodeVectorQueryTarget(
+      query,
+      vectorQuery,
+    );
     final proto.RunQueryRequest request = proto.RunQueryRequest()
       ..parent = target.parent
       ..structuredQuery = target.structuredQuery;
 
-    final ResponseStream<proto.RunQueryResponse> call =
-        _client.runQuery(request);
+    final ResponseStream<proto.RunQueryResponse> call = _client.runQuery(
+      request,
+    );
     final List<Document> result = <Document>[];
     await for (final proto.RunQueryResponse response in call) {
       if (response.hasDocument()) {

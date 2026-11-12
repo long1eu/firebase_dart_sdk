@@ -90,19 +90,26 @@ import 'lru_garbage_collector.dart';
 class LocalStore implements BundleCallback {
   /// Creates a local store on top of [persistence] for [initialUser]. Queries are executed by [queryEngine], which
   /// defaults to a [DefaultQueryEngine].
-  factory LocalStore(Persistence persistence, User initialUser,
-      {QueryEngine? queryEngine}) {
-    hardAssert(persistence.started,
-        'LocalStore was passed an unstarted persistence implementation');
+  factory LocalStore(
+    Persistence persistence,
+    User initialUser, {
+    QueryEngine? queryEngine,
+  }) {
+    hardAssert(
+      persistence.started,
+      'LocalStore was passed an unstarted persistence implementation',
+    );
 
     final QueryCache queryCache = persistence.queryCache;
-    final TargetIdGenerator targetIdGenerator =
-        TargetIdGenerator.forQueryCache(queryCache.highestTargetId);
-    final MutationQueue mutationQueue =
-        persistence.getMutationQueue(initialUser);
+    final TargetIdGenerator targetIdGenerator = TargetIdGenerator.forQueryCache(
+      queryCache.highestTargetId,
+    );
+    final MutationQueue mutationQueue = persistence.getMutationQueue(
+      initialUser,
+    );
     final RemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
-    final DocumentOverlayCache documentOverlayCache =
-        persistence.getDocumentOverlayCache(initialUser);
+    final DocumentOverlayCache documentOverlayCache = persistence
+        .getDocumentOverlayCache(initialUser);
     final IndexManager indexManager = persistence.getIndexManager(initialUser);
     final LocalDocumentsView localDocuments = LocalDocumentsView(
       remoteDocumentCache: remoteDocuments,
@@ -155,8 +162,9 @@ class LocalStore implements BundleCallback {
   /// This value is arbitrary: it's long enough to avoid several writes (possibly indefinitely if updates come more
   /// frequently than this) but short enough that restarting after crashing will still have a pretty recent resume
   /// token.
-  static final int _resultTokenMaxAgeSeconds =
-      const Duration(minutes: 5).inSeconds;
+  static final int _resultTokenMaxAgeSeconds = const Duration(
+    minutes: 5,
+  ).inSeconds;
 
   /// Manages our in-memory or durable persistence.
   final Persistence _persistence;
@@ -206,7 +214,9 @@ class LocalStore implements BundleCallback {
 
   Future<void> startIndexManager() {
     return _persistence.runTransaction(
-        'Start IndexManager', _indexManager.start);
+      'Start IndexManager',
+      _indexManager.start,
+    );
   }
 
   /// The index manager of the current user. It is replaced when the user changes.
@@ -222,12 +232,12 @@ class LocalStore implements BundleCallback {
   /// their entries, the ones that are new are added (and filled by the index backfiller), the others are kept.
   Future<void> configureFieldIndexes(List<FieldIndex> newFieldIndexes) {
     return _persistence.runTransaction('Configure indexes', () async {
-      final SplayTreeSet<FieldIndex> existing =
-          SplayTreeSet<FieldIndex>(FieldIndex.semanticCompare)
-            ..addAll(_indexManager.getFieldIndexes());
-      final SplayTreeSet<FieldIndex> wanted =
-          SplayTreeSet<FieldIndex>(FieldIndex.semanticCompare)
-            ..addAll(newFieldIndexes);
+      final SplayTreeSet<FieldIndex> existing = SplayTreeSet<FieldIndex>(
+        FieldIndex.semanticCompare,
+      )..addAll(_indexManager.getFieldIndexes());
+      final SplayTreeSet<FieldIndex> wanted = SplayTreeSet<FieldIndex>(
+        FieldIndex.semanticCompare,
+      )..addAll(newFieldIndexes);
       for (final FieldIndex index in existing) {
         if (!wanted.contains(index)) {
           await _indexManager.deleteFieldIndex(index);
@@ -244,7 +254,9 @@ class LocalStore implements BundleCallback {
   /// Removes all field indexes and their entries.
   Future<void> deleteAllFieldIndexes() {
     return _persistence.runTransaction(
-        'Delete All Indexes', _indexManager.deleteAllFieldIndexes);
+      'Delete All Indexes',
+      _indexManager.deleteAllFieldIndexes,
+    );
   }
 
   /// Lets the query engine create field indexes for the queries it would have served faster with one.
@@ -255,15 +267,18 @@ class LocalStore implements BundleCallback {
 
   Future<void> startMutationQueue() {
     return _persistence.runTransaction(
-        'Start MutationQueue', _mutationQueue.start);
+      'Start MutationQueue',
+      _mutationQueue.start,
+    );
   }
 
   // PORTING NOTE: no shutdown for [LocalStore] or persistence components on Android.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> handleUserChange(
-      User user) async {
+    User user,
+  ) async {
     // Swap out the mutation queue, grabbing the pending mutation batches before and after.
-    final List<MutationBatch> oldBatches =
-        await _mutationQueue.getAllMutationBatches();
+    final List<MutationBatch> oldBatches = await _mutationQueue
+        .getAllMutationBatches();
 
     _mutationQueue = _persistence.getMutationQueue(user);
     _documentOverlayCache = _persistence.getDocumentOverlayCache(user);
@@ -272,8 +287,8 @@ class LocalStore implements BundleCallback {
     _remoteDocuments.indexManager = _indexManager;
     await startMutationQueue();
 
-    final List<MutationBatch> newBatches =
-        await _mutationQueue.getAllMutationBatches();
+    final List<MutationBatch> newBatches = await _mutationQueue
+        .getAllMutationBatches();
 
     // Recreate our LocalDocumentsView using the new MutationQueue.
     _localDocuments = LocalDocumentsView(
@@ -288,7 +303,7 @@ class LocalStore implements BundleCallback {
     ImmutableSortedSet<DocumentKey> changedKeys = DocumentKey.emptyKeySet;
     for (List<MutationBatch> batches in <List<MutationBatch>>[
       oldBatches,
-      newBatches
+      newBatches,
     ]) {
       for (MutationBatch batch in batches) {
         for (Mutation mutation in batch.mutations) {
@@ -307,75 +322,90 @@ class LocalStore implements BundleCallback {
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
 
     final Set<DocumentKey> keys = mutations.map((Mutation e) => e.key).toSet();
-    return _persistence.runTransactionAndReturn(
-      'Locally write mutations',
-      () async {
-        // Figure out which keys do not have a remote version in the cache, this is needed to create the right overlay
-        // mutation: if no remote version presents, we do not need to create overlays as patch mutations.
-        final Map<DocumentKey, MaybeDocument?> remoteDocs =
-            await _remoteDocuments.getAll(keys);
-        final Set<DocumentKey> docsWithoutRemoteVersion = <DocumentKey>{
-          for (MapEntry<DocumentKey, MaybeDocument?> entry
-              in remoteDocs.entries)
-            if (entry.value == null) entry.key,
-        };
+    return _persistence.runTransactionAndReturn('Locally write mutations', () async {
+      // Figure out which keys do not have a remote version in the cache, this is needed to create the right overlay
+      // mutation: if no remote version presents, we do not need to create overlays as patch mutations.
+      final Map<DocumentKey, MaybeDocument?> remoteDocs = await _remoteDocuments
+          .getAll(keys);
+      final Set<DocumentKey> docsWithoutRemoteVersion = <DocumentKey>{
+        for (MapEntry<DocumentKey, MaybeDocument?> entry in remoteDocs.entries)
+          if (entry.value == null) entry.key,
+      };
 
-        // Load and apply all existing mutations. This lets us compute the
-        // current base state for all non-idempotent transforms before applying
-        // any additional user-provided writes.
-        final Map<DocumentKey, OverlayedDocument> overlayedDocuments =
-            await _localDocuments.getOverlayedDocuments(remoteDocs);
+      // Load and apply all existing mutations. This lets us compute the
+      // current base state for all non-idempotent transforms before applying
+      // any additional user-provided writes.
+      final Map<DocumentKey, OverlayedDocument> overlayedDocuments =
+          await _localDocuments.getOverlayedDocuments(remoteDocs);
 
-        // For non-idempotent mutations (such as `FieldValue.increment()`), we
-        // record the base state in a separate patch mutation. This is later
-        // used to guarantee consistent values and prevents flicker even if the
-        // backend sends us an update that already includes our transform.
-        final List<Mutation> baseMutations = <Mutation>[];
-        for (Mutation mutation in mutations) {
-          final ObjectValue? baseValue = mutation.extractTransformBaseValue(
-              overlayedDocuments[mutation.key]!.document);
-          if (baseValue != null) {
-            // NOTE: The base state should only be applied if there's some existing
-            // document to override, so use a Precondition of exists=true
-            baseMutations.add(PatchMutation(mutation.key, baseValue,
-                baseValue.fieldMask, Precondition(exists: true)));
-          }
+      // For non-idempotent mutations (such as `FieldValue.increment()`), we
+      // record the base state in a separate patch mutation. This is later
+      // used to guarantee consistent values and prevents flicker even if the
+      // backend sends us an update that already includes our transform.
+      final List<Mutation> baseMutations = <Mutation>[];
+      for (Mutation mutation in mutations) {
+        final ObjectValue? baseValue = mutation.extractTransformBaseValue(
+          overlayedDocuments[mutation.key]!.document,
+        );
+        if (baseValue != null) {
+          // NOTE: The base state should only be applied if there's some existing
+          // document to override, so use a Precondition of exists=true
+          baseMutations.add(
+            PatchMutation(
+              mutation.key,
+              baseValue,
+              baseValue.fieldMask,
+              Precondition(exists: true),
+            ),
+          );
         }
+      }
 
-        final MutationBatch batch = await _mutationQueue.addMutationBatch(
-            localWriteTime, baseMutations, mutations);
-        // Apply the new batch on top of the current local view and save the resulting overlays.
-        ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
-            DocumentCollections.emptyMaybeDocumentMap();
-        final Map<DocumentKey, Mutation> overlays = <DocumentKey, Mutation>{};
-        for (DocumentKey key in keys) {
-          final OverlayedDocument overlayed = overlayedDocuments[key]!;
-          final (MaybeDocument? document, FieldMask? mutatedFields) = batch
-              .applyToLocalViewWithMask(
-                  key, overlayed.document, overlayed.mutatedFields);
-          // Set mutatedFields to null if the document is only from local mutations, this creates a Set (or Delete)
-          // mutation, instead of trying to create a patch mutation as the overlay (unless no mutation applied).
-          final bool hasLocalMutations = mutatedFields == null ||
-              mutatedFields.mask.isNotEmpty ||
-              (document is Document && document.hasLocalMutations);
-          final Mutation? overlay = Mutation.calculateOverlayMutation(
-              document,
-              hasLocalMutations && docsWithoutRemoteVersion.contains(key)
-                  ? null
-                  : mutatedFields);
-          if (overlay != null) {
-            overlays[key] = overlay;
-          }
-          changedDocuments = changedDocuments.insert(
+      final MutationBatch batch = await _mutationQueue.addMutationBatch(
+        localWriteTime,
+        baseMutations,
+        mutations,
+      );
+      // Apply the new batch on top of the current local view and save the resulting overlays.
+      ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
+          DocumentCollections.emptyMaybeDocumentMap();
+      final Map<DocumentKey, Mutation> overlays = <DocumentKey, Mutation>{};
+      for (DocumentKey key in keys) {
+        final OverlayedDocument overlayed = overlayedDocuments[key]!;
+        final (MaybeDocument? document, FieldMask? mutatedFields) = batch
+            .applyToLocalViewWithMask(
               key,
-              document ??
-                  NoDocument(key, SnapshotVersion.none,
-                      hasCommittedMutations: false));
+              overlayed.document,
+              overlayed.mutatedFields,
+            );
+        // Set mutatedFields to null if the document is only from local mutations, this creates a Set (or Delete)
+        // mutation, instead of trying to create a patch mutation as the overlay (unless no mutation applied).
+        final bool hasLocalMutations =
+            mutatedFields == null ||
+            mutatedFields.mask.isNotEmpty ||
+            (document is Document && document.hasLocalMutations);
+        final Mutation? overlay = Mutation.calculateOverlayMutation(
+          document,
+          hasLocalMutations && docsWithoutRemoteVersion.contains(key)
+              ? null
+              : mutatedFields,
+        );
+        if (overlay != null) {
+          overlays[key] = overlay;
         }
-        await _documentOverlayCache.saveOverlays(batch.batchId, overlays);
-        return LocalWriteResult(batch.batchId, changedDocuments);
-      },
-    );
+        changedDocuments = changedDocuments.insert(
+          key,
+          document ??
+              NoDocument(
+                key,
+                SnapshotVersion.none,
+                hasCommittedMutations: false,
+              ),
+        );
+      }
+      await _documentOverlayCache.saveOverlays(batch.batchId, overlays);
+      return LocalWriteResult(batch.batchId, changedDocuments);
+    });
   }
 
   /// Acknowledges the given batch.
@@ -388,18 +418,20 @@ class LocalStore implements BundleCallback {
   ///     haven't been acknowledged yet); and
   ///   * give the changed documents back the sync engine
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> acknowledgeBatch(
-      MutationBatchResult batchResult) {
+    MutationBatchResult batchResult,
+  ) {
     return _persistence.runTransactionAndReturn<
-            ImmutableSortedMap<DocumentKey, MaybeDocument>>('Acknowledge batch',
-        () async {
+      ImmutableSortedMap<DocumentKey, MaybeDocument>
+    >('Acknowledge batch', () async {
       final MutationBatch batch = batchResult.batch;
       await _mutationQueue.acknowledgeBatch(batch, batchResult.streamToken);
       await _applyWriteToRemoteDocuments(batchResult);
       await _mutationQueue.performConsistencyCheck();
 
       await _documentOverlayCache.removeOverlaysForBatchId(batch.batchId);
-      await _localDocuments
-          .recalculateAndSaveOverlays(_getKeysWithTransformResults(batchResult));
+      await _localDocuments.recalculateAndSaveOverlays(
+        _getKeysWithTransformResults(batchResult),
+      );
 
       return _localDocuments.getDocuments(batch.keys);
     });
@@ -407,13 +439,14 @@ class LocalStore implements BundleCallback {
 
   /// Removes mutations from the [MutationQueue] for the specified batch. LocalDocuments will be recalculated.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> rejectBatch(
-      int batchId) {
+    int batchId,
+  ) {
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
     return _persistence.runTransactionAndReturn<
-            ImmutableSortedMap<DocumentKey, MaybeDocument>>('Reject batch',
-        () async {
-      final MutationBatch? foundBatch =
-          await _mutationQueue.lookupMutationBatch(batchId);
+      ImmutableSortedMap<DocumentKey, MaybeDocument>
+    >('Reject batch', () async {
+      final MutationBatch? foundBatch = await _mutationQueue
+          .lookupMutationBatch(batchId);
       hardAssert(foundBatch != null, 'Attempt to reject nonexistent batch!');
       final MutationBatch toReject = foundBatch!;
 
@@ -430,7 +463,8 @@ class LocalStore implements BundleCallback {
   /// Returns the keys of the documents whose mutations in the acknowledged batch had transform results: their
   /// overlays hold the local estimates of the transforms and are recalculated on top of the server values.
   static Set<DocumentKey> _getKeysWithTransformResults(
-      MutationBatchResult batchResult) {
+    MutationBatchResult batchResult,
+  ) {
     final Set<DocumentKey> result = <DocumentKey>{};
     for (int i = 0; i < batchResult.mutationResults.length; ++i) {
       if (batchResult.mutationResults[i].transformResults.isNotEmpty) {
@@ -448,8 +482,10 @@ class LocalStore implements BundleCallback {
   ///
   /// Use [WriteStream.emptyStreamToken] to clear the current value.
   Future<void> setLastStreamToken(Uint8List streamToken) async {
-    await _persistence.runTransaction('Set stream token',
-        () => _mutationQueue.setLastStreamToken(streamToken));
+    await _persistence.runTransaction(
+      'Set stream token',
+      () => _mutationQueue.setLastStreamToken(streamToken),
+    );
   }
 
   /// Returns the last consistent snapshot processed (used by the [RemoteStore] to determine whether to buffer incoming
@@ -463,11 +499,12 @@ class LocalStore implements BundleCallback {
   ///
   /// [LocalDocuments] are re-calculated if there are remaining mutations in the queue.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyRemoteEvent(
-      RemoteEvent remoteEvent) {
+    RemoteEvent remoteEvent,
+  ) {
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
     return _persistence.runTransactionAndReturn<
-            ImmutableSortedMap<DocumentKey, MaybeDocument>>(
-        'Apply remote event', () async {
+      ImmutableSortedMap<DocumentKey, MaybeDocument>
+    >('Apply remote event', () async {
       final int sequenceNumber =
           _persistence.referenceDelegate.currentSequenceNumber;
 
@@ -491,7 +528,9 @@ class LocalStore implements BundleCallback {
           resumeToken: queryData.resumeToken,
           sequenceNumber: sequenceNumber,
         );
-        final bool isMismatch = remoteEvent.targetMismatches.containsKey(targetId);
+        final bool isMismatch = remoteEvent.targetMismatches.containsKey(
+          targetId,
+        );
         if (isMismatch) {
           // An existence filter mismatch invalidates the target: forget its resume token so that the next listen
           // (also after a restart) gets a full update. The previous results can no longer be trusted either.
@@ -553,15 +592,18 @@ class LocalStore implements BundleCallback {
             doc.version.compareTo(existingDoc.version) > 0 ||
             (doc.version.compareTo(existingDoc.version) == 0 &&
                 existingDoc.hasPendingWrites)) {
-          hardAssert(remoteEvent.snapshotVersion != SnapshotVersion.none,
-              'Cannot add a document when the remote version is zero');
+          hardAssert(
+            remoteEvent.snapshotVersion != SnapshotVersion.none,
+            'Cannot add a document when the remote version is zero',
+          );
           await _remoteDocuments.add(doc, remoteEvent.snapshotVersion);
           changedDocs[key] = doc;
         } else {
           Log.d(
-              'LocalStore',
-              'Ignoring outdated watch update for $key. Current version: ${existingDoc.version}  Watch version: '
-                  '${doc.version}');
+            'LocalStore',
+            'Ignoring outdated watch update for $key. Current version: ${existingDoc.version}  Watch version: '
+                '${doc.version}',
+          );
         }
 
         if (limboDocuments.contains(key)) {
@@ -576,14 +618,17 @@ class LocalStore implements BundleCallback {
       final SnapshotVersion remoteVersion = remoteEvent.snapshotVersion;
       if (remoteVersion != SnapshotVersion.none) {
         hardAssertLazy(
-            remoteVersion.compareTo(lastRemoteVersion) >= 0,
-            () =>
-                'Watch stream reverted to previous snapshot?? ($remoteVersion < $lastRemoteVersion)');
+          remoteVersion.compareTo(lastRemoteVersion) >= 0,
+          () =>
+              'Watch stream reverted to previous snapshot?? ($remoteVersion < $lastRemoteVersion)',
+        );
         await _queryCache.setLastRemoteSnapshotVersion(remoteVersion);
       }
 
       return _localDocuments.getLocalViewOfDocuments(
-          changedDocs, existenceChangedKeys);
+        changedDocs,
+        existenceChangedKeys,
+      );
     });
   }
 
@@ -594,7 +639,10 @@ class LocalStore implements BundleCallback {
   /// metadata like the resume token or snapshot version. Occasionally it's worth the extra write to prevent these
   /// values from getting too stale after a crash, but this doesn't have to be too frequent.
   static bool _shouldPersistQueryData(
-      QueryData oldQueryData, QueryData newQueryData, TargetChange? change) {
+    QueryData oldQueryData,
+    QueryData newQueryData,
+    TargetChange? change,
+  ) {
     // Any resume token is interesting if there isn't one already.
     if (oldQueryData.resumeToken.isEmpty) {
       return true;
@@ -626,7 +674,8 @@ class LocalStore implements BundleCallback {
     if (change == null) {
       return false;
     }
-    final int changes = change.addedDocuments.length +
+    final int changes =
+        change.addedDocuments.length +
         change.modifiedDocuments.length +
         change.removedDocuments.length;
     return changes > 0;
@@ -634,7 +683,8 @@ class LocalStore implements BundleCallback {
 
   /// Notify the local store of the changed views to locally pin / unpin documents.
   Future<void> notifyLocalViewChanges(
-      List<LocalViewChanges> viewChanges) async {
+    List<LocalViewChanges> viewChanges,
+  ) async {
     await _persistence.runTransaction('notifyLocalViewChanges', () async {
       for (LocalViewChanges viewChange in viewChanges) {
         if (!_targetIds.containsKey(viewChange.targetId)) {
@@ -643,7 +693,9 @@ class LocalStore implements BundleCallback {
           continue;
         }
         _localViewReferences.addReferences(
-            viewChange.added, viewChange.targetId);
+          viewChange.added,
+          viewChange.targetId,
+        );
         final ImmutableSortedSet<DocumentKey> removed = viewChange.removed;
         for (DocumentKey key in removed) {
           await _persistence.referenceDelegate.removeReference(key);
@@ -744,8 +796,10 @@ class LocalStore implements BundleCallback {
   Future<void> releaseTarget(int targetId) {
     return _persistence.runTransaction('Release target', () async {
       final QueryData? cachedQueryData = _targetIds[targetId];
-      hardAssertLazy(cachedQueryData != null,
-          () => 'Tried to release nonexistent target: $targetId');
+      hardAssertLazy(
+        cachedQueryData != null,
+        () => 'Tried to release nonexistent target: $targetId',
+      );
       final QueryData queryData = cachedQueryData!;
 
       // References for documents sent via Watch are automatically removed when we delete a query's target data from the
@@ -775,17 +829,19 @@ class LocalStore implements BundleCallback {
 
     if (queryData != null) {
       lastLimboFreeSnapshotVersion = queryData.lastLimboFreeSnapshotVersion;
-      remoteKeys =
-          await _queryCache.getMatchingKeysForTargetId(queryData.targetId);
+      remoteKeys = await _queryCache.getMatchingKeysForTargetId(
+        queryData.targetId,
+      );
     }
 
     final ImmutableSortedMap<DocumentKey, Document> documents =
         await _queryEngine.getDocumentsMatchingQuery(
-            query,
-            usePreviousResults
-                ? lastLimboFreeSnapshotVersion
-                : SnapshotVersion.none,
-            usePreviousResults ? remoteKeys : DocumentKey.emptyKeySet);
+          query,
+          usePreviousResults
+              ? lastLimboFreeSnapshotVersion
+              : SnapshotVersion.none,
+          usePreviousResults ? remoteKeys : DocumentKey.emptyKeySet,
+        );
     return QueryResult(documents, remoteKeys);
   }
 
@@ -795,23 +851,27 @@ class LocalStore implements BundleCallback {
   }
 
   Future<void> _applyWriteToRemoteDocuments(
-      MutationBatchResult batchResult) async {
+    MutationBatchResult batchResult,
+  ) async {
     final MutationBatch batch = batchResult.batch;
     final Set<DocumentKey> docKeys = batch.keys;
     for (DocumentKey docKey in docKeys) {
       final MaybeDocument? remoteDoc = await _remoteDocuments.get(docKey);
       MaybeDocument? doc = remoteDoc;
       final SnapshotVersion? ackVersion = batchResult.docVersions[docKey];
-      hardAssert(ackVersion != null,
-          'docVersions should contain every doc in the write.');
+      hardAssert(
+        ackVersion != null,
+        'docVersions should contain every doc in the write.',
+      );
 
       if (doc == null || doc.version.compareTo(ackVersion!) < 0) {
         doc = batch.applyToRemoteDocument(docKey, doc, batchResult);
         if (doc == null) {
           hardAssertLazy(
-              remoteDoc == null,
-              () =>
-                  'Mutation batch $batch applied to document $remoteDoc resulted in null.');
+            remoteDoc == null,
+            () =>
+                'Mutation batch $batch applied to document $remoteDoc resulted in null.',
+          );
         } else {
           await _remoteDocuments.add(doc, batchResult.commitVersion);
         }
@@ -822,41 +882,51 @@ class LocalStore implements BundleCallback {
   }
 
   Future<LruGarbageCollectorResults> collectGarbage(
-      LruGarbageCollector garbageCollector) {
-    return _persistence.runTransactionAndReturn('Collect garbage',
-        () => garbageCollector.collect(_targetIds.keys.toSet()));
+    LruGarbageCollector garbageCollector,
+  ) {
+    return _persistence.runTransactionAndReturn(
+      'Collect garbage',
+      () => garbageCollector.collect(_targetIds.keys.toSet()),
+    );
   }
 
   /// Returns whether the given bundle has already been loaded and its create time is newer or equal to the currently
   /// loading bundle.
   Future<bool> hasNewerBundle(BundleMetadata bundleMetadata) {
-    return _persistence.runTransactionAndReturn<bool>('Has newer bundle',
-        () async {
-      final BundleMetadata? cachedMetadata =
-          await _bundleCache.getBundleMetadata(bundleMetadata.bundleId);
-      return cachedMetadata != null &&
-          cachedMetadata.createTime.compareTo(bundleMetadata.createTime) >= 0;
-    });
+    return _persistence.runTransactionAndReturn<bool>(
+      'Has newer bundle',
+      () async {
+        final BundleMetadata? cachedMetadata = await _bundleCache
+            .getBundleMetadata(bundleMetadata.bundleId);
+        return cachedMetadata != null &&
+            cachedMetadata.createTime.compareTo(bundleMetadata.createTime) >= 0;
+      },
+    );
   }
 
   @override
   Future<void> saveBundle(BundleMetadata bundleMetadata) {
     return _persistence.runTransaction(
-        'Save bundle', () => _bundleCache.saveBundleMetadata(bundleMetadata));
+      'Save bundle',
+      () => _bundleCache.saveBundleMetadata(bundleMetadata),
+    );
   }
 
   @override
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyBundledDocuments(
-      ImmutableSortedMap<DocumentKey, MaybeDocument> documents, String bundleId,
-      {Map<DocumentKey, SnapshotVersion>? readTimes}) async {
+    ImmutableSortedMap<DocumentKey, MaybeDocument> documents,
+    String bundleId, {
+    Map<DocumentKey, SnapshotVersion>? readTimes,
+  }) async {
     // Allocates a target to hold all document keys from the bundle, such that they will not get garbage collected right
     // away.
-    final QueryData umbrellaQueryData =
-        await allocateTarget(_newUmbrellaQuery(bundleId).toTarget());
+    final QueryData umbrellaQueryData = await allocateTarget(
+      _newUmbrellaQuery(bundleId).toTarget(),
+    );
 
     return _persistence.runTransactionAndReturn<
-            ImmutableSortedMap<DocumentKey, MaybeDocument>>(
-        'Apply bundle documents', () async {
+      ImmutableSortedMap<DocumentKey, MaybeDocument>
+    >('Apply bundle documents', () async {
       ImmutableSortedSet<DocumentKey> documentKeys = DocumentKey.emptyKeySet;
       final Map<DocumentKey, MaybeDocument> documentMap =
           <DocumentKey, MaybeDocument>{};
@@ -871,17 +941,25 @@ class LocalStore implements BundleCallback {
         documentMap[documentKey] = document;
       }
 
-      await _queryCache
-          .removeMatchingKeysForTargetId(umbrellaQueryData.targetId);
+      await _queryCache.removeMatchingKeysForTargetId(
+        umbrellaQueryData.targetId,
+      );
       await _queryCache.addMatchingKeys(
-          documentKeys, umbrellaQueryData.targetId);
+        documentKeys,
+        umbrellaQueryData.targetId,
+      );
 
       final Set<DocumentKey> existenceChangedKeys = <DocumentKey>{};
       final Map<DocumentKey, MaybeDocument> changedDocs =
           await _populateBundledDocumentChanges(
-              documentMap, readTimes, existenceChangedKeys);
+            documentMap,
+            readTimes,
+            existenceChangedKeys,
+          );
       return _localDocuments.getLocalViewOfDocuments(
-          changedDocs, existenceChangedKeys);
+        changedDocs,
+        existenceChangedKeys,
+      );
     });
   }
 
@@ -891,16 +969,17 @@ class LocalStore implements BundleCallback {
   /// Each document is stored with its read time from [readTimes] (the bundle's document metadata, as the Android SDK
   /// does since the MutableDocument refactor), or with its version if there is none.
   Future<Map<DocumentKey, MaybeDocument>> _populateBundledDocumentChanges(
-      Map<DocumentKey, MaybeDocument> documents,
-      Map<DocumentKey, SnapshotVersion>? readTimes,
-      Set<DocumentKey> existenceChangedKeys) async {
+    Map<DocumentKey, MaybeDocument> documents,
+    Map<DocumentKey, SnapshotVersion>? readTimes,
+    Set<DocumentKey> existenceChangedKeys,
+  ) async {
     final Map<DocumentKey, MaybeDocument> changedDocs =
         <DocumentKey, MaybeDocument>{};
 
     // Each loop iteration only affects its 'own' doc, so it's safe to get all the remote documents in advance in a
     // single call.
-    final Map<DocumentKey, MaybeDocument?> existingDocs =
-        await _remoteDocuments.getAll(documents.keys);
+    final Map<DocumentKey, MaybeDocument?> existingDocs = await _remoteDocuments
+        .getAll(documents.keys);
 
     for (final MapEntry<DocumentKey, MaybeDocument> entry
         in documents.entries) {
@@ -922,29 +1001,35 @@ class LocalStore implements BundleCallback {
           doc.version.compareTo(existingDoc.version) > 0 ||
           (doc.version.compareTo(existingDoc.version) == 0 &&
               existingDoc.hasPendingWrites)) {
-        hardAssert(doc.version != SnapshotVersion.none,
-            'Cannot add a document when the remote version is zero');
+        hardAssert(
+          doc.version != SnapshotVersion.none,
+          'Cannot add a document when the remote version is zero',
+        );
         await _remoteDocuments.add(doc, readTimes?[key] ?? doc.version);
         changedDocs[key] = doc;
       } else {
         Log.d(
-            'LocalStore',
-            'Ignoring outdated bundle document for $key. Current version: ${existingDoc.version}  Bundle version: '
-                '${doc.version}');
+          'LocalStore',
+          'Ignoring outdated bundle document for $key. Current version: ${existingDoc.version}  Bundle version: '
+              '${doc.version}',
+        );
       }
     }
     return changedDocs;
   }
 
   @override
-  Future<void> saveNamedQuery(NamedQuery namedQuery,
-      ImmutableSortedSet<DocumentKey> documentKeys) async {
+  Future<void> saveNamedQuery(
+    NamedQuery namedQuery,
+    ImmutableSortedSet<DocumentKey> documentKeys,
+  ) async {
     // Allocate a target for the named query such that it can be resumed from associated read time if users use it to
     // listen.
     // NOTE: this also means if no corresponding target exists, the new target will remain active and will not get
     // collected, unless users happen to unlisten the query somehow.
-    final QueryData existingQueryData =
-        await allocateTarget(namedQuery.bundledQuery.toQuery().toTarget());
+    final QueryData existingQueryData = await allocateTarget(
+      namedQuery.bundledQuery.toQuery().toTarget(),
+    );
     final int targetId = existingQueryData.targetId;
 
     await _persistence.runTransaction('Saved named query', () async {
@@ -971,7 +1056,9 @@ class LocalStore implements BundleCallback {
   /// Returns the [NamedQuery] associated with [queryName] or null if not found.
   Future<NamedQuery?> getNamedQuery(String queryName) {
     return _persistence.runTransactionAndReturn<NamedQuery?>(
-        'Get named query', () => _bundleCache.getNamedQuery(queryName));
+      'Get named query',
+      () => _bundleCache.getNamedQuery(queryName),
+    );
   }
 
   /// Creates a new query using the given bundle name, which will be used to hold the keys of all documents from the

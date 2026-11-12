@@ -22,14 +22,14 @@ class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
     TaskScheduler scheduler,
     RemoteSerializer serializer,
     StreamController<StreamEvent> eventsController,
-  )   : _client = client,
-        _serializer = serializer,
-        super(
-          eventsController,
-          scheduler,
-          TaskId.writeStreamIdle,
-          TaskId.writeStreamConnectionBackoff,
-        );
+  ) : _client = client,
+      _serializer = serializer,
+      super(
+        eventsController,
+        scheduler,
+        TaskId.writeStreamIdle,
+        TaskId.writeStreamConnectionBackoff,
+      );
 
   final FirestoreClient _client;
   final RemoteSerializer _serializer;
@@ -54,7 +54,8 @@ class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
 
   @override
   Future<ResponseStream<proto.WriteResponse>> _buildCall(
-      Stream<proto.WriteRequest> requests) {
+    Stream<proto.WriteRequest> requests,
+  ) {
     return _client.write(requests);
   }
 
@@ -82,11 +83,14 @@ class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
         // the write itself might be causing an error we want to back off from.
         _backoff.reset();
 
-        final SnapshotVersion commitVersion =
-            _serializer.decodeVersion(response.commitTime);
+        final SnapshotVersion commitVersion = _serializer.decodeVersion(
+          response.commitTime,
+        );
         final List<MutationResult> results = response.writeResults
-            .map((proto.WriteResult proto) =>
-                _serializer.decodeMutationResult(proto, commitVersion))
+            .map(
+              (proto.WriteResult proto) =>
+                  _serializer.decodeMutationResult(proto, commitVersion),
+            )
             .toList();
 
         addEvent(OnWriteResponse(commitVersion, results));
@@ -118,8 +122,10 @@ class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
   /// Sends a list of mutations to the Firestore backend to apply
   void writeMutations(List<Mutation> mutations) {
     assert(isOpen, 'Writing mutations requires an opened stream');
-    assert(handshakeComplete,
-        'Handshake must be complete before writing mutations');
+    assert(
+      handshakeComplete,
+      'Handshake must be complete before writing mutations',
+    );
 
     final proto.WriteRequest request = proto.WriteRequest.create()
       ..streamToken = lastStreamToken

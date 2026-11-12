@@ -24,9 +24,9 @@ class Transaction {
   /// Creates a transaction. A [readOnly] transaction rejects every write and, when committed, only verifies that the
   /// documents it read did not change.
   Transaction(this._transactionClient, {this.readOnly = false})
-      : readVersions = <DocumentKey, SnapshotVersion>{},
-        mutations = <Mutation>[],
-        committed = false;
+    : readVersions = <DocumentKey, SnapshotVersion>{},
+      mutations = <Mutation>[],
+      committed = false;
 
   final TransactionClient _transactionClient;
 
@@ -52,9 +52,12 @@ class Transaction {
     _ensureCommitNotCalled();
 
     if (mutations.isNotEmpty) {
-      return Future<List<MaybeDocument>>.error(FirestoreError(
+      return Future<List<MaybeDocument>>.error(
+        FirestoreError(
           'Transactions lookups are invalid after writes.',
-          FirestoreErrorCode.invalidArgument));
+          FirestoreErrorCode.invalidArgument,
+        ),
+      );
     }
 
     final List<MaybeDocument> result = await _transactionClient.lookup(keys);
@@ -105,7 +108,7 @@ class Transaction {
       }
       return _transactionClient.commit(<Mutation>[
         for (DocumentKey key in readVersions.keys)
-          VerifyMutation(key, _precondition(key))
+          VerifyMutation(key, _precondition(key)),
       ]);
     }
 
@@ -139,8 +142,10 @@ class Transaction {
       final SnapshotVersion? existingVersion = readVersions[doc.key];
       if (existingVersion != docVersion) {
         // This transaction will fail no matter what.
-        throw FirestoreError('Document version changed between two reads.',
-            FirestoreErrorCode.aborted);
+        throw FirestoreError(
+          'Document version changed between two reads.',
+          FirestoreErrorCode.aborted,
+        );
       }
     } else {
       readVersions[doc.key] = docVersion;
@@ -181,8 +186,10 @@ class Transaction {
         //
         // Note: this can change once we can send separate verify writes in the
         // transaction.
-        throw FirestoreError("Can't update a document that doesn't exist.",
-            FirestoreErrorCode.invalidArgument);
+        throw FirestoreError(
+          "Can't update a document that doesn't exist.",
+          FirestoreErrorCode.invalidArgument,
+        );
       }
       // Document exists, base precondition on document update time.
       return Precondition(updateTime: version);
@@ -195,8 +202,10 @@ class Transaction {
 
   void _ensureWritable() {
     if (readOnly) {
-      throw FirestoreError('Read-only transactions cannot write.',
-          FirestoreErrorCode.invalidArgument);
+      throw FirestoreError(
+        'Read-only transactions cannot write.',
+        FirestoreErrorCode.invalidArgument,
+      );
     }
   }
 
@@ -208,7 +217,9 @@ class Transaction {
   }
 
   void _ensureCommitNotCalled() {
-    hardAssert(!committed,
-        'A transaction object cannot be used after its update callback has been invoked.');
+    hardAssert(
+      !committed,
+      'A transaction object cannot be used after its update callback has been invoked.',
+    );
   }
 }

@@ -43,8 +43,11 @@ abstract class MutationQueue {
   /// mutation is applied locally. These mutations are used to locally overwrite
   /// values that are persisted in the remote document cache. [mutations] The
   /// user-provided mutations in this mutation batch.
-  Future<MutationBatch> addMutationBatch(Timestamp localWriteTime,
-      List<Mutation> baseMutations, List<Mutation> mutations);
+  Future<MutationBatch> addMutationBatch(
+    Timestamp localWriteTime,
+    List<Mutation> baseMutations,
+    List<Mutation> mutations,
+  );
 
   /// Loads the mutation batch with the given [batchId].
   Future<MutationBatch?> lookupMutationBatch(int batchId);
@@ -75,7 +78,8 @@ abstract class MutationQueue {
   ///
   /// Batches are guaranteed to be sorted by batch ID.
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
-      DocumentKey documentKey);
+    DocumentKey documentKey,
+  );
 
   /// Finds all mutation batches that could possibly affect the given set of
   /// document keys. Not all mutations in a batch will necessarily affect each
@@ -88,7 +92,8 @@ abstract class MutationQueue {
   ///
   /// Batches are guaranteed to be sorted by batch ID.
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
-      Iterable<DocumentKey> documentKeys);
+    Iterable<DocumentKey> documentKeys,
+  );
 
   /// Finds all mutation batches that could affect the results for the given
   /// query. Not all mutations in a batch will necessarily affect the query, so

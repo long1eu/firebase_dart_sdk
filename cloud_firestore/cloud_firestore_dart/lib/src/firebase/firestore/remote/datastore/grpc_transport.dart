@@ -15,7 +15,9 @@ import 'package:protobuf/protobuf.dart';
 
 /// Creates the transport of this platform: gRPC over HTTP/2.
 FirestoreTransport createTransport(
-    DatabaseInfo databaseInfo, ChannelOptionsProvider optionsProvider) {
+  DatabaseInfo databaseInfo,
+  ChannelOptionsProvider optionsProvider,
+) {
   return GrpcTransport(
     createGrpcChannel(
       host: databaseInfo.host,
@@ -29,10 +31,11 @@ FirestoreTransport createTransport(
 /// A [FirestoreTransport] on top of a `package:grpc` channel.
 class GrpcTransport extends Client implements FirestoreTransport {
   GrpcTransport(ClientChannelBase channel, ChannelOptionsProvider options)
-      : _channel = channel,
-        super(channel, options: options.callOptions) {
+    : _channel = channel,
+      super(channel, options: options.callOptions) {
     _stateSub = channel.onConnectionStateChanged.listen(
-        (ConnectionState state) => Log.d('FirestoreClient', state.toString()));
+      (ConnectionState state) => Log.d('FirestoreClient', state.toString()),
+    );
   }
 
   final ClientChannelBase _channel;
@@ -42,19 +45,23 @@ class GrpcTransport extends Client implements FirestoreTransport {
       <String, ClientMethod<dynamic, dynamic>>{};
 
   @override
-  ResponseStream<Res>
-      startCall<Req extends GeneratedMessage, Res extends GeneratedMessage>(
-          FirestoreRpc<Req, Res> rpc, Stream<Req> requests,
-          {CallOptions? options}) {
+  ResponseStream<Res> startCall<
+    Req extends GeneratedMessage,
+    Res extends GeneratedMessage
+  >(FirestoreRpc<Req, Res> rpc, Stream<Req> requests, {CallOptions? options}) {
     final ClientMethod<Req, Res> method =
         (_methods[rpc.name] ??= ClientMethod<Req, Res>(
-      rpc.path,
-      (Req value) => value.writeToBuffer(),
-      (List<int> bytes) => rpc.newResponse()..mergeFromBuffer(bytes),
-    )) as ClientMethod<Req, Res>;
+              rpc.path,
+              (Req value) => value.writeToBuffer(),
+              (List<int> bytes) => rpc.newResponse()..mergeFromBuffer(bytes),
+            ))
+            as ClientMethod<Req, Res>;
 
-    final grpc.ResponseStream<Res> call =
-        $createStreamingCall(method, requests, options: options);
+    final grpc.ResponseStream<Res> call = $createStreamingCall(
+      method,
+      requests,
+      options: options,
+    );
     return ResponseStream<Res>(call, call);
   }
 

@@ -3,7 +3,7 @@
 const List<String> sqliteSideFileSuffixes = <String>[
   '-journal',
   '-wal',
-  '-shm'
+  '-shm',
 ];
 
 /// There is no file system on the web, so there is nothing to delete: a

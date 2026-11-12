@@ -38,8 +38,10 @@ List<FieldIndex> parseIndexConfigurationMap(Object? configuration) {
 
   for (final Object? indexObject in _array(indexes, 'indexes')) {
     final Map<String, Object?> definition = _object(indexObject, 'index');
-    final String collectionGroup =
-        _string(definition['collectionGroup'], 'collectionGroup');
+    final String collectionGroup = _string(
+      definition['collectionGroup'],
+      'collectionGroup',
+    );
 
     final List<IndexSegment> segments = <IndexSegment>[];
     final Object? fields = definition['fields'];
@@ -47,7 +49,8 @@ List<FieldIndex> parseIndexConfigurationMap(Object? configuration) {
       for (final Object? fieldObject in _array(fields, 'fields')) {
         final Map<String, Object?> field = _object(fieldObject, 'field');
         final FieldPath fieldPath = FieldPath.fromServerFormat(
-            _string(field['fieldPath'], 'fieldPath'));
+          _string(field['fieldPath'], 'fieldPath'),
+        );
         if (field['arrayConfig'] == 'CONTAINS') {
           segments.add(IndexSegment(fieldPath, SegmentKind.contains));
         } else if (field['order'] == 'ASCENDING') {
@@ -58,8 +61,14 @@ List<FieldIndex> parseIndexConfigurationMap(Object? configuration) {
       }
     }
 
-    parsedIndexes.add(FieldIndex(FieldIndex.unknownId, collectionGroup,
-        segments, FieldIndex.initialState));
+    parsedIndexes.add(
+      FieldIndex(
+        FieldIndex.unknownId,
+        collectionGroup,
+        segments,
+        FieldIndex.initialState,
+      ),
+    );
   }
   return parsedIndexes;
 }
@@ -69,7 +78,8 @@ Map<String, Object?> _object(Object? value, String name) {
     return value;
   }
   throw ArgumentError(
-      'Failed to parse index configuration: "$name" is not an object');
+    'Failed to parse index configuration: "$name" is not an object',
+  );
 }
 
 List<Object?> _array(Object? value, String name) {
@@ -77,7 +87,8 @@ List<Object?> _array(Object? value, String name) {
     return value;
   }
   throw ArgumentError(
-      'Failed to parse index configuration: "$name" is not an array');
+    'Failed to parse index configuration: "$name" is not an array',
+  );
 }
 
 String _string(Object? value, String name) {
@@ -85,5 +96,6 @@ String _string(Object? value, String name) {
     return value;
   }
   throw ArgumentError(
-      'Failed to parse index configuration: "$name" is missing or not a string');
+    'Failed to parse index configuration: "$name" is missing or not a string',
+  );
 }

@@ -39,9 +39,13 @@ import 'package:meta/meta.dart';
 /// **Preview**: the Pipelines API is experimental and may change.
 class PipelineResult {
   @internal
-  PipelineResult(this._firestore, this._fields,
-      {DocumentKey? key, this.createTime, this.updateTime})
-      : _key = key;
+  PipelineResult(
+    this._firestore,
+    this._fields, {
+    DocumentKey? key,
+    this.createTime,
+    this.updateTime,
+  }) : _key = key;
 
   final Firestore _firestore;
   final ObjectValue _fields;
@@ -81,7 +85,8 @@ class PipelineResult {
       path = FieldPath.fromDotSeparatedPath(field).internalPath;
     } else {
       throw ArgumentError(
-          'A field must be a String, a FieldPath or a Field, but got: $field');
+        'A field must be a String, a FieldPath or a Field, but got: $field',
+      );
     }
     final FieldValue? value = _fields.get(path);
     return value == null ? null : _convertValue(value);
@@ -115,9 +120,12 @@ class PipelineResult {
 /// **Preview**: the Pipelines API is experimental and may change.
 class PipelineSnapshot {
   @internal
-  PipelineSnapshot(this.pipeline, List<PipelineResult> results,
-      {this.executionTime, this.explainStats})
-      : results = List<PipelineResult>.unmodifiable(results);
+  PipelineSnapshot(
+    this.pipeline,
+    List<PipelineResult> results, {
+    this.executionTime,
+    this.explainStats,
+  }) : results = List<PipelineResult>.unmodifiable(results);
 
   /// The pipeline that produced these results.
   final Pipeline pipeline;
@@ -150,7 +158,7 @@ class PipelineExplainStats {
   /// Wraps the `Any` message of the response.
   @internal
   PipelineExplainStats(this.typeUrl, List<int> value)
-      : value = List<int>.unmodifiable(value);
+    : value = List<int>.unmodifiable(value);
 
   /// The type of the message in [value], for example
   /// `type.googleapis.com/google.protobuf.StringValue`.
@@ -191,22 +199,32 @@ PipelineSnapshot decodePipelineResponses(
     }
     if (response.hasExplainStats() && response.explainStats.hasData()) {
       explainStats = PipelineExplainStats(
-          response.explainStats.data.typeUrl, response.explainStats.data.value);
+        response.explainStats.data.typeUrl,
+        response.explainStats.data.value,
+      );
     }
     for (final proto.Document document in response.results) {
-      results.add(PipelineResult(
-        firestore,
-        serializer.decodeMapFields(document.fields),
-        key: document.name.isEmpty ? null : serializer.decodeKey(document.name),
-        createTime: document.hasCreateTime()
-            ? serializer.decodeTimestamp(document.createTime)
-            : null,
-        updateTime: document.hasUpdateTime()
-            ? serializer.decodeTimestamp(document.updateTime)
-            : null,
-      ));
+      results.add(
+        PipelineResult(
+          firestore,
+          serializer.decodeMapFields(document.fields),
+          key: document.name.isEmpty
+              ? null
+              : serializer.decodeKey(document.name),
+          createTime: document.hasCreateTime()
+              ? serializer.decodeTimestamp(document.createTime)
+              : null,
+          updateTime: document.hasUpdateTime()
+              ? serializer.decodeTimestamp(document.updateTime)
+              : null,
+        ),
+      );
     }
   }
-  return PipelineSnapshot(pipeline, results,
-      executionTime: executionTime, explainStats: explainStats);
+  return PipelineSnapshot(
+    pipeline,
+    results,
+    executionTime: executionTime,
+    explainStats: explainStats,
+  );
 }

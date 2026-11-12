@@ -19,7 +19,8 @@ extension DatastorePipeline on Datastore {
   /// Sends [request] and collects every response of the stream. The results
   /// are spread over the responses, in order.
   Future<List<proto.ExecutePipelineResponse>> executePipeline(
-      proto.ExecutePipelineRequest request) {
+    proto.ExecutePipelineRequest request,
+  ) {
     return _client.executePipeline(request).toList();
   }
 }

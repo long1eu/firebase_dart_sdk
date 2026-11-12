@@ -79,12 +79,15 @@ part 'sqlite_schema.dart';
 /// In addition to implementations of the methods in the Persistence interface, also contains helper
 /// routines that make dealing with SQLite much more pleasant.
 class SQLitePersistence extends Persistence {
-  SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName,
-      StatsCollector statsCollector)
-      : _statsCollector = statsCollector,
-        // One lock per database (not one for the whole process): instances on different databases never wait on
-        // each other, while two handles on the same file are serialized.
-        _semaphore = GlobalSemaphore('persistence:$databaseName') {
+  SQLitePersistence._(
+    this.serializer,
+    this.openDatabase,
+    this.databaseName,
+    StatsCollector statsCollector,
+  ) : _statsCollector = statsCollector,
+      // One lock per database (not one for the whole process): instances on different databases never wait on
+      // each other, while two handles on the same file are serialized.
+      _semaphore = GlobalSemaphore('persistence:$databaseName') {
     indexManager = SqliteIndexManager(this);
   }
 
@@ -143,19 +146,26 @@ class SQLitePersistence extends Persistence {
   }
 
   static Future<SQLitePersistence> create(
-      String persistenceKey,
-      DatabaseId databaseId,
-      LocalSerializer serializer,
-      OpenDatabase openDatabase,
-      LruGarbageCollectorParams params,
-      [StatsCollector statsCollector = StatsCollector.noOp]) async {
+    String persistenceKey,
+    DatabaseId databaseId,
+    LocalSerializer serializer,
+    OpenDatabase openDatabase,
+    LruGarbageCollectorParams params, [
+    StatsCollector statsCollector = StatsCollector.noOp,
+  ]) async {
     final String databaseName = sDatabaseName(persistenceKey, databaseId);
 
     final SQLitePersistence persistence = SQLitePersistence._(
-        serializer, openDatabase, databaseName, statsCollector);
+      serializer,
+      openDatabase,
+      databaseName,
+      statsCollector,
+    );
 
-    final SQLiteQueryCache queryCache =
-        SQLiteQueryCache(persistence, serializer);
+    final SQLiteQueryCache queryCache = SQLiteQueryCache(
+      persistence,
+      serializer,
+    );
     final SQLiteRemoteDocumentCache remoteDocumentCache =
         SQLiteRemoteDocumentCache(persistence, serializer, statsCollector);
     final SQLiteLruReferenceDelegate referenceDelegate =
@@ -254,13 +264,17 @@ class SQLitePersistence extends Persistence {
 
   @override
   Future<void> runTransaction(
-      String action, Transaction<void> operation) async {
+    String action,
+    Transaction<void> operation,
+  ) async {
     return runTransactionAndReturn(action, operation);
   }
 
   @override
   Future<T> runTransactionAndReturn<T>(
-      String action, Transaction<T> operation) async {
+    String action,
+    Transaction<T> operation,
+  ) async {
     await _semaphore.acquire();
     Log.d(tag, 'Starting transaction: $action');
 
@@ -294,8 +308,10 @@ class SQLitePersistence extends Persistence {
     return _db.execute(statement, args);
   }
 
-  Future<List<Map<String, dynamic>>> query(String statement,
-      [List<Object?>? args]) {
+  Future<List<Map<String, dynamic>>> query(
+    String statement, [
+    List<Object?>? args,
+  ]) {
     return _db.query(statement, args);
   }
 
@@ -315,7 +331,9 @@ class SQLitePersistence extends Persistence {
   /// Unlike the Android SDK this does NOT take exclusive access to the database (`PRAGMA locking_mode = EXCLUSIVE`),
   /// because that makes a second open of the file fail after a Flutter hot restart (the old handle stays open).
   static Future<Database> _openDb(
-      String databaseName, OpenDatabase openDatabase) async {
+    String databaseName,
+    OpenDatabase openDatabase,
+  ) async {
     bool configured = false;
 
     /// Ensures that onConfigure has been called. This should be called first from all methods.
@@ -403,11 +421,15 @@ class LongQuery {
   /// subqueries take the form:
   ///
   /// [_head][_argsHead][an auto-generated comma-separated list of '?' placeholders][_tail]
-  LongQuery(this._db, this._head, List<Object?>? argsHead,
-      List<Object?> argsIter, this._tail)
-      : _argsIter = argsIter,
-        _argsHead = argsHead ?? <Object?>[],
-        _subqueriesPerformed = 0;
+  LongQuery(
+    this._db,
+    this._head,
+    List<Object?>? argsHead,
+    List<Object?> argsIter,
+    this._tail,
+  ) : _argsIter = argsIter,
+      _argsHead = argsHead ?? <Object?>[],
+      _subqueriesPerformed = 0;
 
   final SQLitePersistence _db;
 
@@ -442,9 +464,11 @@ class LongQuery {
     final List<Object?> subqueryArgs = List<Object?>.from(_argsHead);
     final StringBuffer placeholdersBuilder = StringBuffer();
 
-    for (int i = 0;
-        j < _argsIter.length && i < _limit - _argsHead.length;
-        i++) {
+    for (
+      int i = 0;
+      j < _argsIter.length && i < _limit - _argsHead.length;
+      i++
+    ) {
       if (i > 0) {
         placeholdersBuilder.write(', ');
       }

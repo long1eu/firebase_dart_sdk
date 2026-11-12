@@ -14,5 +14,7 @@ void applyLogLevel(LogLevel level) {
 /// before [LogLevel] existed: debug when enabled, warnings and errors
 /// otherwise (the default).
 void applyLoggingEnabled(bool enabled) {
-  internal.Log.level = enabled ? internal.InternalLogLevel.d : internal.InternalLogLevel.w;
+  internal.Log.level = enabled
+      ? internal.InternalLogLevel.d
+      : internal.InternalLogLevel.w;
 }

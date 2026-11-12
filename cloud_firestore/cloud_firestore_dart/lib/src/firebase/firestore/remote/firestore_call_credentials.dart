@@ -10,8 +10,10 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
 
 class FirestoreCallCredentials {
-  const FirestoreCallCredentials(this.credentialsProvider,
-      {this.appCheckProvider});
+  const FirestoreCallCredentials(
+    this.credentialsProvider, {
+    this.appCheckProvider,
+  });
 
   static const String tag = 'FirestoreCallCredentials';
 
@@ -22,7 +24,9 @@ class FirestoreCallCredentials {
   final AppCheckTokenProvider? appCheckProvider;
 
   Future<void> getRequestMetadata(
-      Map<String, String> metadata, String uri) async {
+    Map<String, String> metadata,
+    String uri,
+  ) async {
     // Both tokens are requested at the same time, like upstream. The auth
     // error wins over the App Check error.
     await Future.wait<void>(<Future<void>>[

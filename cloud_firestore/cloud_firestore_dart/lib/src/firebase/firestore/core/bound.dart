@@ -57,8 +57,10 @@ class Bound {
   }
 
   int _compareToDocument(List<OrderBy> orderBy, Document document) {
-    hardAssert(position.length <= orderBy.length,
-        'Bound has more components than query\'s orderBy');
+    hardAssert(
+      position.length <= orderBy.length,
+      'Bound has more components than query\'s orderBy',
+    );
     int comparison = 0;
     for (int i = 0; i < position.length; i++) {
       final OrderBy orderByComponent = orderBy[i];
@@ -66,16 +68,19 @@ class Bound {
       if (orderByComponent.field == FieldPath.keyPath) {
         final Object? refValue = component.value;
         hardAssertLazy(
-            refValue is DocumentKey,
-            () =>
-                'Bound has a non-key value where the key path is being used $component');
+          refValue is DocumentKey,
+          () =>
+              'Bound has a non-key value where the key path is being used $component',
+        );
 
         final DocumentKey documentKey = refValue as DocumentKey;
         comparison = documentKey.compareTo(document.key);
       } else {
         final FieldValue? docValue = document.getField(orderByComponent.field);
-        hardAssert(docValue != null,
-            'Field should exist since document matched the orderBy already.');
+        hardAssert(
+          docValue != null,
+          'Field should exist since document matched the orderBy already.',
+        );
         comparison = component.compareTo(docValue!);
       }
 

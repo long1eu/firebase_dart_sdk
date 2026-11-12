@@ -21,7 +21,7 @@ import 'package:meta/meta.dart';
 /// [AggregateField.average] and pass them to `Query.aggregate`.
 abstract class AggregateField {
   AggregateField._(this._fieldPath, this.operator)
-      : alias = _fieldPath == null ? operator : '${operator}_$_fieldPath';
+    : alias = _fieldPath == null ? operator : '${operator}_$_fieldPath';
 
   final FieldPath? _fieldPath;
 

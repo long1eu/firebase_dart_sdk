@@ -23,7 +23,10 @@ class Int32Value {
   Int32Value(this.value) {
     if (value < minValue || value > maxValue) {
       throw ArgumentError.value(
-          value, 'value', 'Int32Value must be a signed 32-bit integer');
+        value,
+        'value',
+        'Int32Value must be a signed 32-bit integer',
+      );
     }
   }
 

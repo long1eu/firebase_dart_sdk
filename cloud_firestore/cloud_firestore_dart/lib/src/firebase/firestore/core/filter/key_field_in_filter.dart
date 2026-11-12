@@ -7,11 +7,13 @@ part of 'filter.dart';
 /// A Filter that implements the array-contains-any operator.
 class KeyFieldInFilter extends FieldFilter {
   KeyFieldInFilter(FieldPath field, FieldValue value)
-      : super._(field, FilterOperator.IN, value) {
+    : super._(field, FilterOperator.IN, value) {
     final ArrayValue arrayValue = value as ArrayValue;
     for (FieldValue refValue in arrayValue.internalValue) {
-      hardAssert(refValue is ReferenceValue,
-          'Comparing on key with IN, but an array value was not a ReferenceValue');
+      hardAssert(
+        refValue is ReferenceValue,
+        'Comparing on key with IN, but an array value was not a ReferenceValue',
+      );
     }
   }
 

@@ -29,8 +29,8 @@ import 'package:meta/meta.dart';
 @internal
 class PipelineEncoder {
   PipelineEncoder(DatabaseId databaseId)
-      : serializer = RemoteSerializer(databaseId),
-        _converter = UserDataConverter(databaseId);
+    : serializer = RemoteSerializer(databaseId),
+      _converter = UserDataConverter(databaseId);
 
   final RemoteSerializer serializer;
   final UserDataConverter _converter;
@@ -38,8 +38,9 @@ class PipelineEncoder {
   /// Encodes a plain user value (number, string, `Timestamp`, `GeoPoint`,
   /// `VectorValue`, `DocumentReference`, list, map, ...).
   pb.Value encodeUserValue(Object? value) {
-    return serializer
-        .encodeValue(_converter.parseQueryValue(value, allowArrays: true));
+    return serializer.encodeValue(
+      _converter.parseQueryValue(value, allowArrays: true),
+    );
   }
 
   /// Encodes a value that is already in the internal model.
@@ -70,7 +71,9 @@ Expression toExpression(Object? value) {
     return FunctionExpression('map', args);
   } else if (value is List) {
     return FunctionExpression(
-        'array', value.map(toExpression).toList(growable: false));
+      'array',
+      value.map(toExpression).toList(growable: false),
+    );
   } else {
     return Constant(value);
   }
@@ -94,7 +97,8 @@ Expression _listArgument(Object values, String method) {
     return _ListOfExpressions(values.map(toExpression).toList(growable: false));
   }
   throw ArgumentError(
-      '$method() expects a List or an Expression, but got: $values');
+    '$method() expects a List or an Expression, but got: $values',
+  );
 }
 
 Expression _vectorArgument(Object vector) {
@@ -106,8 +110,9 @@ Expression _vectorArgument(Object vector) {
     return Constant(VectorValue(vector));
   }
   throw ArgumentError(
-      'A vector must be a VectorValue, a List<double> or an Expression, but '
-      'got: $vector');
+    'A vector must be a VectorValue, a List<double> or an Expression, but '
+    'got: $vector',
+  );
 }
 
 /// A value computed by the server while it runs a pipeline: a [Field]
@@ -139,14 +144,20 @@ abstract class Expression {
     return self is BooleanExpression ? self : BooleanExpression(self);
   }
 
-  FunctionExpression _function(String name,
-      [List<Object?> others = const <Object?>[]]) {
-    return FunctionExpression(
-        name, <Expression>[this, ...others.map(toExpression)]);
+  FunctionExpression _function(
+    String name, [
+    List<Object?> others = const <Object?>[],
+  ]) {
+    return FunctionExpression(name, <Expression>[
+      this,
+      ...others.map(toExpression),
+    ]);
   }
 
-  BooleanExpression _condition(String name,
-      [List<Object?> others = const <Object?>[]]) {
+  BooleanExpression _condition(
+    String name, [
+    List<Object?> others = const <Object?>[],
+  ]) {
     return BooleanExpression(_function(name, others));
   }
 
@@ -178,15 +189,21 @@ abstract class Expression {
 
   /// Whether this expression is equal to any of [values], a `List` of values
   /// or expressions, or an [Expression] that evaluates to an array.
-  BooleanExpression equalAny(Object values) =>
-      BooleanExpression(FunctionExpression(
-          'equal_any', <Expression>[this, _listArgument(values, 'equalAny')]));
+  BooleanExpression equalAny(Object values) => BooleanExpression(
+    FunctionExpression('equal_any', <Expression>[
+      this,
+      _listArgument(values, 'equalAny'),
+    ]),
+  );
 
   /// Whether this expression is equal to none of [values], a `List` of values
   /// or expressions, or an [Expression] that evaluates to an array.
-  BooleanExpression notEqualAny(Object values) =>
-      BooleanExpression(FunctionExpression('not_equal_any',
-          <Expression>[this, _listArgument(values, 'notEqualAny')]));
+  BooleanExpression notEqualAny(Object values) => BooleanExpression(
+    FunctionExpression('not_equal_any', <Expression>[
+      this,
+      _listArgument(values, 'notEqualAny'),
+    ]),
+  );
 
   // Existence and errors
 
@@ -227,15 +244,21 @@ abstract class Expression {
 
   /// Whether this array contains at least one of [values], a `List` of values
   /// or expressions, or an [Expression] that evaluates to an array.
-  BooleanExpression arrayContainsAny(Object values) =>
-      BooleanExpression(FunctionExpression('array_contains_any',
-          <Expression>[this, _listArgument(values, 'arrayContainsAny')]));
+  BooleanExpression arrayContainsAny(Object values) => BooleanExpression(
+    FunctionExpression('array_contains_any', <Expression>[
+      this,
+      _listArgument(values, 'arrayContainsAny'),
+    ]),
+  );
 
   /// Whether this array contains all of [values], a `List` of values or
   /// expressions, or an [Expression] that evaluates to an array.
-  BooleanExpression arrayContainsAll(Object values) =>
-      BooleanExpression(FunctionExpression('array_contains_all',
-          <Expression>[this, _listArgument(values, 'arrayContainsAll')]));
+  BooleanExpression arrayContainsAll(Object values) => BooleanExpression(
+    FunctionExpression('array_contains_all', <Expression>[
+      this,
+      _listArgument(values, 'arrayContainsAll'),
+    ]),
+  );
 
   /// The number of elements of this array.
   FunctionExpression arrayLength() => _function('array_length');
@@ -413,21 +436,29 @@ abstract class Expression {
   /// The number of whole [unit]s from [start] (a field name or an
   /// expression) to this timestamp.
   FunctionExpression timestampDiff(Object start, Object unit) =>
-      FunctionExpression(
-          'timestamp_diff', <Object?>[this, fieldOrExpression(start), unit]);
+      FunctionExpression('timestamp_diff', <Object?>[
+        this,
+        fieldOrExpression(start),
+        unit,
+      ]);
 
   /// This timestamp truncated to [granularity] (for example `'day'`),
   /// optionally in [timezone].
-  FunctionExpression timestampTruncate(Object granularity,
-          [Object? timezone]) =>
-      _function('timestamp_trunc',
-          <Object?>[granularity, if (timezone != null) timezone]);
+  FunctionExpression timestampTruncate(
+    Object granularity, [
+    Object? timezone,
+  ]) => _function('timestamp_trunc', <Object?>[
+    granularity,
+    if (timezone != null) timezone,
+  ]);
 
   /// The [part] (for example `'year'` or `'dayofweek'`) of this timestamp,
   /// optionally in [timezone].
   FunctionExpression timestampExtract(Object part, [Object? timezone]) =>
-      _function(
-          'timestamp_extract', <Object?>[part, if (timezone != null) timezone]);
+      _function('timestamp_extract', <Object?>[
+        part,
+        if (timezone != null) timezone,
+      ]);
 
   /// This timestamp as microseconds since the Unix epoch.
   FunctionExpression timestampToUnixMicros() =>
@@ -527,10 +558,13 @@ abstract class Expression {
   /// [alias] is the name of the server-side variable that holds the element;
   /// change it when lambdas are nested.
   FunctionExpression arrayFilter(
-      BooleanExpression Function(Expression element) filter,
-      {String alias = 'element'}) {
-    return _function(
-        'array_filter', <Object?>[alias, filter(VariableExpression(alias))]);
+    BooleanExpression Function(Expression element) filter, {
+    String alias = 'element',
+  }) {
+    return _function('array_filter', <Object?>[
+      alias,
+      filter(VariableExpression(alias)),
+    ]);
   }
 
   /// This array with every element replaced by the result of [transform].
@@ -544,23 +578,31 @@ abstract class Expression {
   ///
   /// [alias] is the name of the server-side variable that holds the element.
   FunctionExpression arrayTransform(
-      Object? Function(Expression element) transform,
-      {String alias = 'element'}) {
-    return _function('array_transform',
-        <Object?>[alias, toExpression(transform(VariableExpression(alias)))]);
+    Object? Function(Expression element) transform, {
+    String alias = 'element',
+  }) {
+    return _function('array_transform', <Object?>[
+      alias,
+      toExpression(transform(VariableExpression(alias))),
+    ]);
   }
 
   /// Like [arrayTransform], but [transform] also receives an expression for
   /// the position of the element in the array.
   FunctionExpression arrayTransformWithIndex(
-      Object? Function(Expression element, Expression index) transform,
-      {String elementAlias = 'element',
-      String indexAlias = 'index'}) {
+    Object? Function(Expression element, Expression index) transform, {
+    String elementAlias = 'element',
+    String indexAlias = 'index',
+  }) {
     return _function('array_transform', <Object?>[
       elementAlias,
       indexAlias,
-      toExpression(transform(
-          VariableExpression(elementAlias), VariableExpression(indexAlias))),
+      toExpression(
+        transform(
+          VariableExpression(elementAlias),
+          VariableExpression(indexAlias),
+        ),
+      ),
     ]);
   }
 
@@ -581,9 +623,10 @@ abstract class Expression {
   // More maps
 
   /// This map merged with [second] and [others]; later maps win.
-  FunctionExpression mapMerge(Object second,
-          [List<Object> others = const <Object>[]]) =>
-      _function('map_merge', <Object?>[second, ...others]);
+  FunctionExpression mapMerge(
+    Object second, [
+    List<Object> others = const <Object>[],
+  ]) => _function('map_merge', <Object?>[second, ...others]);
 
   /// This map without the entry for [key].
   FunctionExpression mapRemove(Object key) =>
@@ -630,9 +673,10 @@ abstract class Expression {
 
   /// The first of this value, [replacement] and [others] that is neither
   /// null nor absent.
-  FunctionExpression coalesce(Object? replacement,
-          [List<Object?> others = const <Object?>[]]) =>
-      _function('coalesce', <Object?>[replacement, ...others]);
+  FunctionExpression coalesce(
+    Object? replacement, [
+    List<Object?> others = const <Object?>[],
+  ]) => _function('coalesce', <Object?>[replacement, ...others]);
 
   // References and locations
 
@@ -712,7 +756,8 @@ class Field extends Expression implements Selectable {
       return Field(FieldPath.fromDotSeparatedPath(nameOrPath).internalPath);
     }
     throw ArgumentError(
-        'A field must be a String or a FieldPath, but got: $nameOrPath');
+      'A field must be a String or a FieldPath, but got: $nameOrPath',
+    );
   }
 
   /// The field name that refers to the document name (key).
@@ -754,8 +799,8 @@ class Constant extends Expression {
 
   @internal
   Constant.fromModel(model.FieldValue value)
-      : value = value.value,
-        _modelValue = value;
+    : value = value.value,
+      _modelValue = value;
 
   /// The user value of this constant.
   final Object? value;
@@ -835,7 +880,7 @@ class FunctionExpression extends Expression {
   /// Creates a call of the server function [name] (snake case) with [args].
   /// Arguments that are not expressions are treated as constants.
   FunctionExpression(this.name, [List<Object?> args = const <Object?>[]])
-      : args = List<Expression>.unmodifiable(args.map(toExpression));
+    : args = List<Expression>.unmodifiable(args.map(toExpression));
 
   /// The server name of the function.
   final String name;
@@ -871,24 +916,28 @@ class BooleanExpression extends Expression {
   BooleanExpression not() => _condition('not');
 
   /// Whether this condition and all of [others] hold.
-  BooleanExpression and(BooleanExpression other,
-          [List<BooleanExpression> others = const <BooleanExpression>[]]) =>
-      _condition('and', <Object?>[other, ...others]);
+  BooleanExpression and(
+    BooleanExpression other, [
+    List<BooleanExpression> others = const <BooleanExpression>[],
+  ]) => _condition('and', <Object?>[other, ...others]);
 
   /// Whether this condition or any of [others] holds.
-  BooleanExpression or(BooleanExpression other,
-          [List<BooleanExpression> others = const <BooleanExpression>[]]) =>
-      _condition('or', <Object?>[other, ...others]);
+  BooleanExpression or(
+    BooleanExpression other, [
+    List<BooleanExpression> others = const <BooleanExpression>[],
+  ]) => _condition('or', <Object?>[other, ...others]);
 
   /// Whether neither this condition nor any of [others] holds.
-  BooleanExpression nor(BooleanExpression other,
-          [List<BooleanExpression> others = const <BooleanExpression>[]]) =>
-      _condition('nor', <Object?>[other, ...others]);
+  BooleanExpression nor(
+    BooleanExpression other, [
+    List<BooleanExpression> others = const <BooleanExpression>[],
+  ]) => _condition('nor', <Object?>[other, ...others]);
 
   /// Whether an odd number of this condition and [others] hold.
-  BooleanExpression xor(BooleanExpression other,
-          [List<BooleanExpression> others = const <BooleanExpression>[]]) =>
-      _condition('xor', <Object?>[other, ...others]);
+  BooleanExpression xor(
+    BooleanExpression other, [
+    List<BooleanExpression> others = const <BooleanExpression>[],
+  ]) => _condition('xor', <Object?>[other, ...others]);
 
   /// [thenValue] if this condition holds, [elseValue] otherwise.
   FunctionExpression conditional(Object? thenValue, Object? elseValue) =>
@@ -957,7 +1006,7 @@ class Ordering {
 class AggregateFunction {
   /// Creates a call of the server aggregate [name] (snake case) with [args].
   AggregateFunction(this.name, [List<Object?> args = const <Object?>[]])
-      : args = List<Expression>.unmodifiable(args.map(toExpression));
+    : args = List<Expression>.unmodifiable(args.map(toExpression));
 
   /// The server name of the aggregate.
   final String name;

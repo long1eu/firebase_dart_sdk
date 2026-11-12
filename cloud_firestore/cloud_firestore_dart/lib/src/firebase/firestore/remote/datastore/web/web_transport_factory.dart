@@ -8,6 +8,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web
 
 /// Creates the transport of this platform: REST and WebChannel over `fetch`.
 FirestoreTransport createTransport(
-    DatabaseInfo databaseInfo, ChannelOptionsProvider optionsProvider) {
+  DatabaseInfo databaseInfo,
+  ChannelOptionsProvider optionsProvider,
+) {
   return WebChannelTransport(FetchHttpClient(), databaseInfo, optionsProvider);
 }

@@ -7,8 +7,8 @@ part of 'memory_persistence.dart';
 /// In-memory cache of remote documents.
 class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   MemoryRemoteDocumentCache(MemoryPersistence persistence, this._statsCollector)
-      : documents = DocumentCollections.emptyMaybeDocumentMap(),
-        _persistence = persistence;
+    : documents = DocumentCollections.emptyMaybeDocumentMap(),
+      _persistence = persistence;
 
   /// Underlying cache of documents.
   ImmutableSortedMap<DocumentKey, MaybeDocument> documents;
@@ -27,8 +27,10 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<void> add(MaybeDocument document, SnapshotVersion readTime) async {
-    hardAssert(readTime != SnapshotVersion.none,
-        'Cannot add document to the RemoteDocumentCache with a read time of zero');
+    hardAssert(
+      readTime != SnapshotVersion.none,
+      'Cannot add document to the RemoteDocumentCache with a read time of zero',
+    );
     documents = documents.insert(document.key, document);
     _readTimes[document.key] = readTime;
     await (_indexManager ?? _persistence.indexManager)
@@ -50,40 +52,57 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<Map<DocumentKey, MaybeDocument?>> getAll(
-      Iterable<DocumentKey> documentKeys) async {
+    Iterable<DocumentKey> documentKeys,
+  ) async {
     final List<MapEntry<DocumentKey, MaybeDocument?>> entries =
-        await Future.wait(documentKeys.map((DocumentKey key) async =>
-            MapEntry<DocumentKey, MaybeDocument?>(key, await get(key))));
+        await Future.wait(
+          documentKeys.map(
+            (DocumentKey key) async =>
+                MapEntry<DocumentKey, MaybeDocument?>(key, await get(key)),
+          ),
+        );
 
     _statsCollector.recordRowsRead(
-        RemoteDocumentCache.statsTag, entries.length);
+      RemoteDocumentCache.statsTag,
+      entries.length,
+    );
     return Map<DocumentKey, MaybeDocument?>.fromEntries(entries);
   }
 
   @override
   Future<Map<DocumentKey, ReadDocument>> getAllForCollectionGroup(
-      String collectionGroup, IndexOffset offset, int limit) {
+    String collectionGroup,
+    IndexOffset offset,
+    int limit,
+  ) {
     // This method should only be called from the IndexBackfiller if SQLite is enabled.
     throw UnsupportedError(
-        'getAllForCollectionGroup(String, IndexOffset, int) is not supported.');
+      'getAllForCollectionGroup(String, IndexOffset, int) is not supported.',
+    );
   }
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query, IndexOffset offset,
-          [QueryContext? context]) async {
-    hardAssert(!query.isCollectionGroupQuery,
-        'CollectionGroup queries should be handled in LocalDocumentsView');
+  getAllDocumentsMatchingQuery(
+    Query query,
+    IndexOffset offset, [
+    QueryContext? context,
+  ]) async {
+    hardAssert(
+      !query.isCollectionGroupQuery,
+      'CollectionGroup queries should be handled in LocalDocumentsView',
+    );
     ImmutableSortedMap<DocumentKey, Document> result =
         DocumentCollections.emptyDocumentMap();
 
     // Documents are ordered by key, so we can use a prefix scan to narrow down the documents we need to match the query
     // against.
     final ResourcePath queryPath = query.path;
-    final DocumentKey prefix =
-        DocumentKey.fromPath(queryPath.appendSegment(''));
-    final Iterator<MapEntry<DocumentKey, MaybeDocument>> iterator =
-        documents.iteratorFrom(prefix);
+    final DocumentKey prefix = DocumentKey.fromPath(
+      queryPath.appendSegment(''),
+    );
+    final Iterator<MapEntry<DocumentKey, MaybeDocument>> iterator = documents
+        .iteratorFrom(prefix);
     int rowsRead = 0;
     while (iterator.moveNext()) {
       final MapEntry<DocumentKey, MaybeDocument> entry = iterator.current;
@@ -99,9 +118,11 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
       }
 
       if (offset != IndexOffset.none &&
-          IndexOffset(_readTimes[entry.key]!, entry.key,
-                      FieldIndex.initialLargestBatchId)
-                  .compareTo(offset) <=
+          IndexOffset(
+                _readTimes[entry.key]!,
+                entry.key,
+                FieldIndex.initialLargestBatchId,
+              ).compareTo(offset) <=
               0) {
         continue;
       }
@@ -132,8 +153,10 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
     int count = 0;
     for (MapEntry<DocumentKey, MaybeDocument> entry in documents) {
       count += _getKeySize(entry.key);
-      count +=
-          serializer.encodeMaybeDocument(entry.value).writeToBuffer().length;
+      count += serializer
+          .encodeMaybeDocument(entry.value)
+          .writeToBuffer()
+          .length;
     }
     return count;
   }

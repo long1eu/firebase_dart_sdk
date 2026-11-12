@@ -47,16 +47,23 @@ class DocumentReference<T extends dynamic> {
   /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.doc] or
   /// [CollectionReference.doc].
   @internal
-  factory DocumentReference.forPath(ResourcePath path, Firestore firestore,
-      [FirestoreDataConverter<T>? converter]) {
+  factory DocumentReference.forPath(
+    ResourcePath path,
+    Firestore firestore, [
+    FirestoreDataConverter<T>? converter,
+  ]) {
     if (path.length.remainder(2) != 0) {
       throw ArgumentError(
-          'Invalid document reference. Document references must have an even number of segments, but '
-          '${path.canonicalString} has ${path.length}');
+        'Invalid document reference. Document references must have an even number of segments, but '
+        '${path.canonicalString} has ${path.length}',
+      );
     }
 
     return DocumentReference<T>(
-        DocumentKey.fromPath(path), firestore, converter);
+      DocumentKey.fromPath(path),
+      firestore,
+      converter,
+    );
   }
 
   /// Builds a [DocumentReference] of [firestore] from a JSON map created by [toJson], optionally with a [converter].
@@ -71,12 +78,18 @@ class DocumentReference<T extends dynamic> {
     final Object? referencePath = json['referencePath'];
     if (json['type'] != jsonType || referencePath is! String) {
       throw ArgumentError.value(
-          json, 'json', 'Not a JSON representation of a DocumentReference');
+        json,
+        'json',
+        'Not a JSON representation of a DocumentReference',
+      );
     }
     final ResourcePath path = ResourcePath.fromString(referencePath);
     if (path.length == 0) {
       throw ArgumentError.value(
-          json, 'json', 'The referencePath must be a document path');
+        json,
+        'json',
+        'The referencePath must be a document path',
+      );
     }
     return DocumentReference<T>.forPath(path, firestore, converter);
   }
@@ -108,7 +121,8 @@ class DocumentReference<T extends dynamic> {
   /// [converter] (type [U]) when reading and writing. Use [withoutConverter]
   /// to go back to raw maps.
   DocumentReference<U> withConverter<U extends Object?>(
-      FirestoreDataConverter<U> converter) {
+    FirestoreDataConverter<U> converter,
+  ) {
     return DocumentReference<U>(key, firestore, converter);
   }
 
@@ -127,7 +141,9 @@ class DocumentReference<T extends dynamic> {
   /// Returns the [CollectionReference] that contains this document.
   CollectionReference<Map<String, Object?>> get parent {
     return CollectionReference<Map<String, Object?>>(
-        key.path.popLast(), firestore);
+      key.path.popLast(),
+      firestore,
+    );
   }
 
   /// Gets the path of this document (relative to the root of the database) as a slash-separated  string.
@@ -144,8 +160,9 @@ class DocumentReference<T extends dynamic> {
   CollectionReference<Map<String, Object?>> collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
     return CollectionReference<Map<String, Object?>>(
-        key.path.appendField(ResourcePath.fromString(collectionPath)),
-        firestore);
+      key.path.appendField(ResourcePath.fromString(collectionPath)),
+      firestore,
+    );
   }
 
   /// Writes to the document referred to by this DocumentReference. If the document does not yet exist, it will be
@@ -158,15 +175,16 @@ class DocumentReference<T extends dynamic> {
   Future<void> set(T data, [SetOptions? options]) async {
     final SetOptions setOptions = options ?? SetOptions.overwrite;
     checkNotNull<Object>(data, 'Provided data must not be null.');
-    final Map<String, Object?> rawData =
-        toRawData<T>(data, converter, options);
+    final Map<String, Object?> rawData = toRawData<T>(data, converter, options);
     final UserDataParsedSetData parsed = setOptions.merge
         ? firestore.dataConverter.parseMergeData(rawData, setOptions.fieldMask)
         : firestore.dataConverter.parseSetData(rawData);
 
-    await voidErrorTransformer(() =>
-        firestore.client
-        .write(<Mutation>[parsed.toMutation(key, Precondition.none)]));
+    await voidErrorTransformer(
+      () => firestore.client.write(<Mutation>[
+        parsed.toMutation(key, Precondition.none),
+      ]),
+    );
   }
 
   /// Updates fields in the document referred to by this DocumentReference. If no document exists yet, the update will
@@ -181,10 +199,11 @@ class DocumentReference<T extends dynamic> {
   Future<void> updateFromList(List<Object?> data) async {
     final UserDataParsedUpdateData parsedData = firestore.dataConverter
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
-    await voidErrorTransformer(() => firestore.client
-        .write(<Mutation>[
-      parsedData.toMutation(key, Precondition(exists: true))
-    ]));
+    await voidErrorTransformer(
+      () => firestore.client.write(<Mutation>[
+        parsedData.toMutation(key, Precondition(exists: true)),
+      ]),
+    );
   }
 
   /// Updates fields in the document referred to by this [DocumentReference]. If no document exists yet, the update will
@@ -195,20 +214,24 @@ class DocumentReference<T extends dynamic> {
   ///
   /// Returns a Future that will be resolved when the write finishes.
   Future<void> update(Map<String, Object?> data) async {
-    final UserDataParsedUpdateData parsedData =
-        firestore.dataConverter.parseUpdateData(data);
-    await voidErrorTransformer(() => firestore.client
-        .write(<Mutation>[
-      parsedData.toMutation(key, Precondition(exists: true))
-    ]));
+    final UserDataParsedUpdateData parsedData = firestore.dataConverter
+        .parseUpdateData(data);
+    await voidErrorTransformer(
+      () => firestore.client.write(<Mutation>[
+        parsedData.toMutation(key, Precondition(exists: true)),
+      ]),
+    );
   }
 
   /// Deletes the document referred to by this [DocumentReference].
   ///
   /// Returns a Future that will be resolved when the delete completes.
   Future<void> delete() {
-    return voidErrorTransformer(() => firestore.client
-        .write(<DeleteMutation>[DeleteMutation(key, Precondition.none)]));
+    return voidErrorTransformer(
+      () => firestore.client.write(<DeleteMutation>[
+        DeleteMutation(key, Precondition.none),
+      ]),
+    );
   }
 
   /// Reads the document referenced by this [DocumentReference].
@@ -224,8 +247,9 @@ class DocumentReference<T extends dynamic> {
     source ??= Source.defaultSource;
 
     if (source == Source.cache) {
-      final Document? doc =
-          await firestore.client.getDocumentFromLocalCache(key);
+      final Document? doc = await firestore.client.getDocumentFromLocalCache(
+        key,
+      );
       final bool hasPendingWrites = doc != null && doc.hasLocalMutations;
 
       return DocumentSnapshot<T>(
@@ -242,28 +266,33 @@ class DocumentReference<T extends dynamic> {
   }
 
   Future<DocumentSnapshot<T>> _getViaSnapshotListener(Source source) {
-    return _firstAndCancel(_getSnapshotsInternal(const ListenOptions.all())
-        .map((DocumentSnapshot<T> snapshot) {
-      if (!snapshot.exists && snapshot.metadata.isFromCache) {
-        // TODO(long1eu): Reconsider how to raise missing documents when offline.
-        //  If we're online and the document doesn't exist then we set the result of the Future with a document with
-        //  document.exists set to false. If we're offline however, we set the Error on the Task. Two options:
-        //    1. Cache the negative response from the server so we can deliver that even when you're offline.
-        //    2. Actually set the Error of the Task if the document doesn't exist when you are offline.
-        throw FirestoreError(
+    return _firstAndCancel(
+      _getSnapshotsInternal(const ListenOptions.all()).map((
+        DocumentSnapshot<T> snapshot,
+      ) {
+        if (!snapshot.exists && snapshot.metadata.isFromCache) {
+          // TODO(long1eu): Reconsider how to raise missing documents when offline.
+          //  If we're online and the document doesn't exist then we set the result of the Future with a document with
+          //  document.exists set to false. If we're offline however, we set the Error on the Task. Two options:
+          //    1. Cache the negative response from the server so we can deliver that even when you're offline.
+          //    2. Actually set the Error of the Task if the document doesn't exist when you are offline.
+          throw FirestoreError(
             'Failed to get document because the client is offline.',
-            FirestoreErrorCode.unavailable);
-      } else if (snapshot.exists &&
-          snapshot.metadata.isFromCache &&
-          source == Source.server) {
-        throw FirestoreError(
+            FirestoreErrorCode.unavailable,
+          );
+        } else if (snapshot.exists &&
+            snapshot.metadata.isFromCache &&
+            source == Source.server) {
+          throw FirestoreError(
             'Failed to get document from server. (However, this document does exist in the local cache. Run again '
             'without setting source to Source.SERVER to retrieve the cached document.)',
-            FirestoreErrorCode.unavailable);
-      } else {
-        return snapshot;
-      }
-    }));
+            FirestoreErrorCode.unavailable,
+          );
+        } else {
+          return snapshot;
+        }
+      }),
+    );
   }
 
   /// A stream of snapshots of this document: the current contents first, then a new snapshot every
@@ -277,8 +306,9 @@ class DocumentReference<T extends dynamic> {
   /// A stream of snapshots of this document, like [snapshots]. Pass [MetadataChanges.include] as
   /// [changes] to also get a snapshot when only the [DocumentSnapshot.metadata] changed.
   Stream<DocumentSnapshot<T>> getSnapshots([MetadataChanges? changes]) {
-    final ListenOptions options =
-        _internalOptions(changes ?? MetadataChanges.exclude);
+    final ListenOptions options = _internalOptions(
+      changes ?? MetadataChanges.exclude,
+    );
     return _getSnapshotsInternal(options);
   }
 
@@ -286,22 +316,30 @@ class DocumentReference<T extends dynamic> {
   /// [ListenSource]: with [ListenSource.cache] the events are raised from the
   /// local cache only (local writes, cache updates) and the backend is not
   /// contacted for this listener.
-  Stream<DocumentSnapshot<T>> getSnapshotsWithOptions(SnapshotListenOptions options) {
+  Stream<DocumentSnapshot<T>> getSnapshotsWithOptions(
+    SnapshotListenOptions options,
+  ) {
     return _getSnapshotsInternal(
-        _internalOptions(options.metadataChanges, options.source));
+      _internalOptions(options.metadataChanges, options.source),
+    );
   }
 
   Stream<DocumentSnapshot<T>> _getSnapshotsInternal(ListenOptions options) {
     final core.Query query = core.Query(key.path);
 
-    return listenToQuery(firestore.client, query, options).map((ViewSnapshot snapshot) {
-      hardAssert(snapshot.documents.length <= 1,
-          'Too many documents returned on a document query');
+    return listenToQuery(firestore.client, query, options).map((
+      ViewSnapshot snapshot,
+    ) {
+      hardAssert(
+        snapshot.documents.length <= 1,
+        'Too many documents returned on a document query',
+      );
       final Document? document = snapshot.documents.getDocument(key);
 
       if (document != null) {
-        final bool hasPendingWrites =
-            snapshot.mutatedKeys.contains(document.key);
+        final bool hasPendingWrites = snapshot.mutatedKeys.contains(
+          document.key,
+        );
         return DocumentSnapshot<T>.fromDocument(
           firestore,
           document,
@@ -324,8 +362,10 @@ class DocumentReference<T extends dynamic> {
   }
 
   /// Converts the  API [MetadataChanges] object to the internal options object.
-  static ListenOptions _internalOptions(MetadataChanges metadataChanges,
-      [ListenSource source = ListenSource.defaultSource]) {
+  static ListenOptions _internalOptions(
+    MetadataChanges metadataChanges, [
+    ListenSource source = ListenSource.defaultSource,
+  ]) {
     return ListenOptions(
       source: source,
       includeDocumentMetadataChanges:
@@ -344,7 +384,8 @@ class DocumentReference<T extends dynamic> {
           converter == other.converter;
 
   @override
-  int get hashCode => key.hashCode * 31 ^ firestore.hashCode * 31 ^ converter.hashCode;
+  int get hashCode =>
+      key.hashCode * 31 ^ firestore.hashCode * 31 ^ converter.hashCode;
 }
 
 /// Returns the first event of [stream] and waits for the subscription to be

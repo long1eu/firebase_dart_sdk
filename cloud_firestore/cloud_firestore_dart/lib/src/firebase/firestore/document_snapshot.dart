@@ -50,8 +50,8 @@ class DocumentSnapshot<T extends dynamic> {
     required bool isFromCache,
     required bool hasPendingWrites,
     FirestoreDataConverter<T>? converter,
-  })  : _converter = converter,
-        metadata = SnapshotMetadata(hasPendingWrites, isFromCache);
+  }) : _converter = converter,
+       metadata = SnapshotMetadata(hasPendingWrites, isFromCache);
 
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
@@ -62,10 +62,14 @@ class DocumentSnapshot<T extends dynamic> {
     required bool hasPendingWrites,
     FirestoreDataConverter<T>? converter,
   }) {
-    return DocumentSnapshot<T>(firestore, doc.key, doc,
-        isFromCache: isFromCache,
-        hasPendingWrites: hasPendingWrites,
-        converter: converter);
+    return DocumentSnapshot<T>(
+      firestore,
+      doc.key,
+      doc,
+      isFromCache: isFromCache,
+      hasPendingWrites: hasPendingWrites,
+      converter: converter,
+    );
   }
 
   /// Implementation detail of the SDK; not part of the supported API.
@@ -77,10 +81,14 @@ class DocumentSnapshot<T extends dynamic> {
     required bool hasPendingWrites,
     FirestoreDataConverter<T>? converter,
   }) {
-    return DocumentSnapshot<T>(firestore, key, null,
-        isFromCache: isFromCache,
-        hasPendingWrites: hasPendingWrites,
-        converter: converter);
+    return DocumentSnapshot<T>(
+      firestore,
+      key,
+      null,
+      isFromCache: isFromCache,
+      hasPendingWrites: hasPendingWrites,
+      converter: converter,
+    );
   }
 
   /// Builds a [DocumentSnapshot] from the JSON object written by [toJson], for the [firestore] instance.
@@ -95,7 +103,11 @@ class DocumentSnapshot<T extends dynamic> {
     Map<String, Object?> json, {
     FirestoreDataConverter<T>? converter,
   }) {
-    return snapshot_json.documentSnapshotFromJson<T>(firestore, json, converter);
+    return snapshot_json.documentSnapshotFromJson<T>(
+      firestore,
+      json,
+      converter,
+    );
   }
 
   final Firestore _firestore;
@@ -122,7 +134,11 @@ class DocumentSnapshot<T extends dynamic> {
   ///
   /// This is the JS SDK `DocumentSnapshot.toJSON()`; the JSON is interchangeable with the one of the JS SDK (Node).
   Map<String, Object?> toJson() => snapshot_json.documentSnapshotToJson(
-      _firestore, _key, document, metadata.hasPendingWrites);
+    _firestore,
+    _key,
+    document,
+    metadata.hasPendingWrites,
+  );
 
   /// The id of the document.
   String get id => _key.path.last;
@@ -157,19 +173,24 @@ class DocumentSnapshot<T extends dynamic> {
     }
     final QueryDocumentSnapshot<Map<String, Object?>> raw =
         QueryDocumentSnapshot<Map<String, Object?>>.fromDocument(
-      _firestore,
-      doc,
-      fromCache: metadata.isFromCache,
-      hasPendingWrites: metadata.hasPendingWrites,
-    );
+          _firestore,
+          doc,
+          fromCache: metadata.isFromCache,
+          hasPendingWrites: metadata.hasPendingWrites,
+        );
     return converter.fromFirestore(
-        raw, SnapshotOptions(serverTimestamps: serverTimestampBehavior));
+      raw,
+      SnapshotOptions(serverTimestamps: serverTimestampBehavior),
+    );
   }
 
   Map<String, Object?> _rawData(
-      Document doc, ServerTimestampBehavior serverTimestampBehavior) {
-    final _FieldValueOptions fieldValueOptions =
-        _FieldValueOptions(serverTimestampBehavior: serverTimestampBehavior);
+    Document doc,
+    ServerTimestampBehavior serverTimestampBehavior,
+  ) {
+    final _FieldValueOptions fieldValueOptions = _FieldValueOptions(
+      serverTimestampBehavior: serverTimestampBehavior,
+    );
     return _convertObject(doc.data, fieldValueOptions);
   }
 
@@ -202,10 +223,14 @@ class DocumentSnapshot<T extends dynamic> {
   /// value.
   ///
   /// Returns the value at the given field or null.
-  Object? get(String field,
-      [ServerTimestampBehavior? serverTimestampBehavior]) {
-    return getField(FieldPath.fromDotSeparatedPath(field),
-        serverTimestampBehavior ?? ServerTimestampBehavior.none);
+  Object? get(
+    String field, [
+    ServerTimestampBehavior? serverTimestampBehavior,
+  ]) {
+    return getField(
+      FieldPath.fromDotSeparatedPath(field),
+      serverTimestampBehavior ?? ServerTimestampBehavior.none,
+    );
   }
 
   /// Returns the value at the field or null if the field or document doesn't exist.
@@ -215,13 +240,16 @@ class DocumentSnapshot<T extends dynamic> {
   /// value.
   ///
   /// Returns the value at the given field or null.
-  Object? getField(FieldPath fieldPath,
-      [ServerTimestampBehavior? serverTimestampBehavior]) {
+  Object? getField(
+    FieldPath fieldPath, [
+    ServerTimestampBehavior? serverTimestampBehavior,
+  ]) {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
 
     final _FieldValueOptions fieldValueOptions = _FieldValueOptions(
-        serverTimestampBehavior:
-            serverTimestampBehavior ?? ServerTimestampBehavior.none);
+      serverTimestampBehavior:
+          serverTimestampBehavior ?? ServerTimestampBehavior.none,
+    );
     return _getInternal(fieldPath.internalPath, fieldValueOptions);
   }
 
@@ -270,8 +298,10 @@ class DocumentSnapshot<T extends dynamic> {
   ///
   /// Throws [StateError] if the value is not a Date.
   /// Returns the value of the field
-  DateTime? getDate(String field,
-      [ServerTimestampBehavior? serverTimestampBehavior]) {
+  DateTime? getDate(
+    String field, [
+    ServerTimestampBehavior? serverTimestampBehavior,
+  ]) {
     checkNotNull(field, 'Provided field path must not be null.');
     final Object? maybeDate = _getInternal(
       FieldPath.fromDotSeparatedPath(field).internalPath,
@@ -292,14 +322,17 @@ class DocumentSnapshot<T extends dynamic> {
   ///
   /// Throws [StateError] if the value is not a timestamp field.
   /// Returns the value of the field
-  Timestamp? getTimestamp(String field,
-      [ServerTimestampBehavior? serverTimestampBehavior]) {
+  Timestamp? getTimestamp(
+    String field, [
+    ServerTimestampBehavior? serverTimestampBehavior,
+  ]) {
     checkNotNull(field, 'Provided field path must not be null.');
     final Object? maybeTimestamp = _getInternal(
       FieldPath.fromDotSeparatedPath(field).internalPath,
       _FieldValueOptions(
-          serverTimestampBehavior:
-              serverTimestampBehavior ?? ServerTimestampBehavior.none),
+        serverTimestampBehavior:
+            serverTimestampBehavior ?? ServerTimestampBehavior.none,
+      ),
     );
     return _castTypedValue(maybeTimestamp, field);
   }
@@ -396,7 +429,8 @@ class DocumentSnapshot<T extends dynamic> {
       return result;
     } on TypeError catch (_) {
       throw StateError(
-          'Field \'$field\' is not a $V, but it is ${value.runtimeType}');
+        'Field \'$field\' is not a $V, but it is ${value.runtimeType}',
+      );
     }
   }
 
@@ -417,7 +451,9 @@ class DocumentSnapshot<T extends dynamic> {
   }
 
   Object? _convertServerTimestamp(
-      ServerTimestampValue value, _FieldValueOptions options) {
+    ServerTimestampValue value,
+    _FieldValueOptions options,
+  ) {
     switch (options.serverTimestampBehavior) {
       case ServerTimestampBehavior.previous:
         final FieldValue? previous = value.previousFieldValue;
@@ -444,14 +480,18 @@ class DocumentSnapshot<T extends dynamic> {
     final DatabaseId database = _firestore.databaseId;
     if (refDatabase != database) {
       // TODO(long1eu): Somehow support foreign references.
-      Log.w('$DocumentSnapshot',
-          'Document ${key.path} contains a document reference within a different database (${refDatabase.projectId}/${refDatabase.databaseId}) which is not supported. It will be treated as a reference in the current database (${database.projectId}/${database.databaseId}) instead.');
+      Log.w(
+        '$DocumentSnapshot',
+        'Document ${key.path} contains a document reference within a different database (${refDatabase.projectId}/${refDatabase.databaseId}) which is not supported. It will be treated as a reference in the current database (${database.projectId}/${database.databaseId}) instead.',
+      );
     }
     return DocumentReference<Map<String, Object?>>(key, _firestore);
   }
 
   Map<String, Object?> _convertObject(
-      ObjectValue objectValue, _FieldValueOptions options) {
+    ObjectValue objectValue,
+    _FieldValueOptions options,
+  ) {
     final Map<String, Object?> result = <String, Object?>{};
     for (MapEntry<String, FieldValue> entry in objectValue.internalValue) {
       result[entry.key] = _convertValue(entry.value, options);
@@ -460,7 +500,9 @@ class DocumentSnapshot<T extends dynamic> {
   }
 
   List<Object?> _convertArray(
-      ArrayValue arrayValue, _FieldValueOptions options) {
+    ArrayValue arrayValue,
+    _FieldValueOptions options,
+  ) {
     return arrayValue.internalValue
         .map((FieldValue v) => _convertValue(v, options))
         .toList();

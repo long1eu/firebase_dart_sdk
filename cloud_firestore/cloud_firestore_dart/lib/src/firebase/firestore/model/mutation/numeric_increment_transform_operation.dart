@@ -17,7 +17,9 @@ class NumericIncrementTransformOperation extends NumericTransformOperation {
 
   @override
   FieldValue applyToLocalView(
-      FieldValue? previousValue, Timestamp localWriteTime) {
+    FieldValue? previousValue,
+    Timestamp localWriteTime,
+  ) {
     final NumberValue baseValue = computeBaseValue(previousValue);
 
     final NumberValue operand = this.operand;
@@ -28,10 +30,11 @@ class NumericIncrementTransformOperation extends NumericTransformOperation {
       final double base = baseValue is Decimal128FieldValue
           ? baseValue.doubleValue
           : baseValue is Int32FieldValue
-              ? baseValue.intValue.toDouble()
-              : (baseValue.value as num).toDouble();
+          ? baseValue.intValue.toDouble()
+          : (baseValue.value as num).toDouble();
       return Decimal128FieldValue.valueOf(
-          Decimal128Value(_decimalString(base + operandAsDouble())));
+        Decimal128Value(_decimalString(base + operandAsDouble())),
+      );
     }
 
     if (baseValue is Int32FieldValue) {
@@ -39,12 +42,15 @@ class NumericIncrementTransformOperation extends NumericTransformOperation {
         return DoubleValue.valueOf(baseValue.intValue + operand.value);
       } else if (operand is Int32FieldValue) {
         // The sum of two 32-bit integers is a 32-bit integer, which saturates.
-        final int sum = (baseValue.intValue + operand.intValue)
-            .clamp(Int32Value.minValue, Int32Value.maxValue);
+        final int sum = (baseValue.intValue + operand.intValue).clamp(
+          Int32Value.minValue,
+          Int32Value.maxValue,
+        );
         return Int32FieldValue.valueOf(Int32Value(sum));
       } else {
         return IntegerValue.valueOf(
-            _safeIncrement(baseValue.intValue, operandAsInt()));
+          _safeIncrement(baseValue.intValue, operandAsInt()),
+        );
       }
     }
 
@@ -62,9 +68,10 @@ class NumericIncrementTransformOperation extends NumericTransformOperation {
       return DoubleValue.valueOf(sum);
     } else {
       hardAssertLazy(
-          baseValue is DoubleValue,
-          () =>
-              'Expected NumberValue to be of type DoubleValue, but was $previousValue');
+        baseValue is DoubleValue,
+        () =>
+            'Expected NumberValue to be of type DoubleValue, but was $previousValue',
+      );
 
       final double sum = (baseValue.value as num) + operandAsDouble();
       return DoubleValue.valueOf(sum);

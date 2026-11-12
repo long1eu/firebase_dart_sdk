@@ -12,7 +12,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 /// positionally: for each entry in the array of [Mutations], there's a corresponding entry in the
 /// array of [MutationResults].
 class MutationResult {
-  const MutationResult(this.version, [this.transformResults = const <FieldValue>[]]);
+  const MutationResult(
+    this.version, [
+    this.transformResults = const <FieldValue>[],
+  ]);
 
   /// The version at which the mutation was committed.
   ///   * For most operations, this is the [updateTime] in the [WriteResult].

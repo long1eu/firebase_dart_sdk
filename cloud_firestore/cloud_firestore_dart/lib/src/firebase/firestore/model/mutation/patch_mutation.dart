@@ -26,9 +26,12 @@ import 'package:firebase_app_dart/internal.dart';
 ///   * When a field is not in the mask but is in the values, the values map is ignored.
 class PatchMutation extends Mutation {
   const PatchMutation(
-      DocumentKey key, this.value, this.mask, Precondition precondition,
-      [List<FieldTransform> fieldTransforms = const <FieldTransform>[]])
-      : super(key, precondition, fieldTransforms);
+    DocumentKey key,
+    this.value,
+    this.mask,
+    Precondition precondition, [
+    List<FieldTransform> fieldTransforms = const <FieldTransform>[],
+  ]) : super(key, precondition, fieldTransforms);
 
   /// Returns the fields and associated values to use when patching the document.
   final ObjectValue value;
@@ -39,7 +42,9 @@ class PatchMutation extends Mutation {
 
   @override
   MaybeDocument applyToRemoteDocument(
-      MaybeDocument? maybeDoc, MutationResult mutationResult) {
+    MaybeDocument? maybeDoc,
+    MutationResult mutationResult,
+  ) {
     verifyKeyMatches(maybeDoc);
 
     if (!precondition.isValidFor(maybeDoc)) {
@@ -53,18 +58,27 @@ class PatchMutation extends Mutation {
     ObjectValue newData = patchDocument(maybeDoc);
     if (fieldTransforms.isNotEmpty) {
       // The transforms are applied by the backend on top of the patched data.
-      final Document patched =
-          Document(key, version, DocumentState.committedMutations, newData);
-      final List<FieldValue> transformResults =
-          serverTransformResults(patched, mutationResult.transformResults);
+      final Document patched = Document(
+        key,
+        version,
+        DocumentState.committedMutations,
+        newData,
+      );
+      final List<FieldValue> transformResults = serverTransformResults(
+        patched,
+        mutationResult.transformResults,
+      );
       newData = transformObject(newData, transformResults);
     }
     return Document(key, version, DocumentState.committedMutations, newData);
   }
 
   @override
-  MaybeDocument? applyToLocalView(MaybeDocument? maybeDoc,
-      MaybeDocument? baseDoc, Timestamp localWriteTime) {
+  MaybeDocument? applyToLocalView(
+    MaybeDocument? maybeDoc,
+    MaybeDocument? baseDoc,
+    Timestamp localWriteTime,
+  ) {
     verifyKeyMatches(maybeDoc);
 
     if (!precondition.isValidFor(maybeDoc)) {
@@ -76,10 +90,17 @@ class PatchMutation extends Mutation {
     const SnapshotVersion version = SnapshotVersion.none;
     ObjectValue newData = patchDocument(maybeDoc);
     if (fieldTransforms.isNotEmpty) {
-      final Document patched =
-          Document(key, version, DocumentState.localMutations, newData);
-      final List<FieldValue> transformResults =
-          localTransformResults(localWriteTime, patched, baseDoc);
+      final Document patched = Document(
+        key,
+        version,
+        DocumentState.localMutations,
+        newData,
+      );
+      final List<FieldValue> transformResults = localTransformResults(
+        localWriteTime,
+        patched,
+        baseDoc,
+      );
       newData = transformObject(newData, transformResults);
     }
     return Document(key, version, DocumentState.localMutations, newData);
@@ -119,8 +140,10 @@ class PatchMutation extends Mutation {
           hasSameKeyAndPrecondition(other) &&
           value == other.value &&
           mask == other.mask &&
-          const ListEquality<FieldTransform>()
-              .equals(fieldTransforms, other.fieldTransforms);
+          const ListEquality<FieldTransform>().equals(
+            fieldTransforms,
+            other.fieldTransforms,
+          );
 
   @override
   int get hashCode =>

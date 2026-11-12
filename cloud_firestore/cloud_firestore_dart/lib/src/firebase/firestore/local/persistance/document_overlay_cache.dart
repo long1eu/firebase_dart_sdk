@@ -34,7 +34,9 @@ abstract class DocumentOverlayCache {
   /// Saves the given document key to mutation map to persistence as overlays. All overlays will have their largest
   /// batch id set to [largestBatchId].
   Future<void> saveOverlays(
-      int largestBatchId, Map<DocumentKey, Mutation> overlays);
+    int largestBatchId,
+    Map<DocumentKey, Mutation> overlays,
+  );
 
   /// Removes the overlays whose largest batch id equals [batchId].
   Future<void> removeOverlaysForBatchId(int batchId);
@@ -50,10 +52,15 @@ abstract class DocumentOverlayCache {
   ///
   /// [sinceBatchId] is the batch id after which we are interested in overlays (exclusive).
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollection(
-      ResourcePath collection, int sinceBatchId);
+    ResourcePath collection,
+    int sinceBatchId,
+  );
 
   /// Returns [count] overlays with a batch id higher than [sinceBatchId] for the provided [collectionGroup], processed
   /// by ascending batch id. The method always returns all overlays for a batch even if [count] is exceeded.
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollectionGroup(
-      String collectionGroup, int sinceBatchId, int count);
+    String collectionGroup,
+    int sinceBatchId,
+    int count,
+  );
 }

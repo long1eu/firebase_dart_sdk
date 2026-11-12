@@ -16,14 +16,16 @@ const User mockUser = User('mock-user');
 /// `EmulatorAuthCredentialsProvider` of the JS SDK.
 class EmulatorCredentialsProvider extends CredentialsProvider {
   EmulatorCredentialsProvider(this._token)
-      : _onChange = BehaviorSubject<User>.seeded(_token.user);
+    : _onChange = BehaviorSubject<User>.seeded(_token.user);
 
   /// The provider for the `mockUserToken` emulator setting: [mockUserToken]
   /// is either a token string (used as is, for [mockUser]) or the claims of
   /// a Firebase ID token, which are encoded with [createMockUserToken] for
   /// [projectId].
   factory EmulatorCredentialsProvider.forMockUserToken(
-      Object mockUserToken, String? projectId) {
+    Object mockUserToken,
+    String? projectId,
+  ) {
     if (mockUserToken is String) {
       return EmulatorCredentialsProvider(Token(mockUserToken, mockUser));
     }
@@ -61,8 +63,9 @@ class EmulatorCredentialsProvider extends CredentialsProvider {
 String createMockUserToken(Map<String, Object?> token, [String? projectId]) {
   if (token['uid'] != null) {
     throw ArgumentError(
-        'The "uid" field is no longer supported by mockUserToken. Please use '
-        '"sub" instead for Firebase Auth User ID.');
+      'The "uid" field is no longer supported by mockUserToken. Please use '
+      '"sub" instead for Firebase Auth User ID.',
+    );
   }
   // Unsecured JWTs use "none" as the algorithm.
   const Map<String, Object?> header = <String, Object?>{
@@ -70,8 +73,9 @@ String createMockUserToken(Map<String, Object?> token, [String? projectId]) {
     'type': 'JWT',
   };
 
-  final String project =
-      projectId == null || projectId.isEmpty ? 'demo-project' : projectId;
+  final String project = projectId == null || projectId.isEmpty
+      ? 'demo-project'
+      : projectId;
   final Object iat = _orDefault(token['iat'], 0)!;
   final Object? sub = _orDefault(token['sub'], null) ?? token['user_id'];
   if (sub == null || sub == '') {
@@ -79,11 +83,17 @@ String createMockUserToken(Map<String, Object?> token, [String? projectId]) {
   }
   if (sub is! String) {
     throw ArgumentError.value(
-        sub, 'mockUserToken', "The 'sub' or 'user_id' field must be a String");
+      sub,
+      'mockUserToken',
+      "The 'sub' or 'user_id' field must be a String",
+    );
   }
   if (iat is! num) {
     throw ArgumentError.value(
-        iat, 'mockUserToken', "The 'iat' field must be a number");
+      iat,
+      'mockUserToken',
+      "The 'iat' field must be a number",
+    );
   }
 
   final Map<String, Object?> payload = <String, Object?>{

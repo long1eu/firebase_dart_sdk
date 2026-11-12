@@ -59,10 +59,13 @@ class EventManager implements SyncEngineCallback {
 
     queryInfo.listeners.add(queryListener);
 
-    final bool raisedEventOnOnlineState =
-        queryListener.onOnlineStateChanged(_onlineState);
-    hardAssert(!raisedEventOnOnlineState,
-        'onOnlineStateChanged() shouldn\'t raise an event for brand-new listeners.');
+    final bool raisedEventOnOnlineState = queryListener.onOnlineStateChanged(
+      _onlineState,
+    );
+    hardAssert(
+      !raisedEventOnOnlineState,
+      'onOnlineStateChanged() shouldn\'t raise an event for brand-new listeners.',
+    );
 
     final ViewSnapshot? viewSnapshot = queryInfo.viewSnapshot;
     if (viewSnapshot != null) {
@@ -73,8 +76,10 @@ class EventManager implements SyncEngineCallback {
 
     try {
       if (listenLocally) {
-        queryInfo.targetId = await _syncEngine.listen(query,
-            shouldListenToRemote: listenRemotely);
+        queryInfo.targetId = await _syncEngine.listen(
+          query,
+          shouldListenToRemote: listenRemotely,
+        );
       } else if (listenRemotely) {
         await _syncEngine.listenToRemoteStore(query);
       }
@@ -102,8 +107,10 @@ class EventManager implements SyncEngineCallback {
       }
       if (queryInfo.listeners.isEmpty) {
         _queries.remove(query);
-        await _syncEngine.stopListening(query,
-            shouldUnlistenToRemote: listener.listensToRemoteStore);
+        await _syncEngine.stopListening(
+          query,
+          shouldUnlistenToRemote: listener.listensToRemoteStore,
+        );
       } else if (listener.listensToRemoteStore &&
           !queryInfo.hasRemoteListeners) {
         // The removed listener was the last one sourced from the backend.
@@ -202,10 +209,10 @@ class ListenOptions {
   });
 
   const ListenOptions.all()
-      : includeDocumentMetadataChanges = true,
-        includeQueryMetadataChanges = true,
-        waitForSyncWhenOnline = true,
-        source = ListenSource.defaultSource;
+    : includeDocumentMetadataChanges = true,
+      includeQueryMetadataChanges = true,
+      waitForSyncWhenOnline = true,
+      source = ListenSource.defaultSource;
 
   /// Raise events when only metadata of documents changes
   final bool includeDocumentMetadataChanges;

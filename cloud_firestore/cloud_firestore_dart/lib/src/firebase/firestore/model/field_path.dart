@@ -41,8 +41,9 @@ class FieldPath extends BasePath<FieldPath> {
           final String elem = buffer.toString();
           if (elem.isEmpty) {
             throw ArgumentError(
-                'Invalid field path ($path). Paths must not be empty, begin '
-                'with \'.\', end with \'.\', or contain \'..\'');
+              'Invalid field path ($path). Paths must not be empty, begin '
+              'with \'.\', end with \'.\', or contain \'..\'',
+            );
           }
           buffer = StringBuffer();
           res.add(elem);
@@ -62,8 +63,9 @@ class FieldPath extends BasePath<FieldPath> {
     final String lastElem = buffer.toString();
     if (lastElem.isEmpty) {
       throw ArgumentError(
-          'Invalid field path ($path). Paths must not be empty, begin with \'.\', '
-          'end with \'.\', or contain \'..\'');
+        'Invalid field path ($path). Paths must not be empty, begin with \'.\', '
+        'end with \'.\', or contain \'..\'',
+      );
     }
     res.add(lastElem);
     return FieldPath._(res);
@@ -74,8 +76,9 @@ class FieldPath extends BasePath<FieldPath> {
     return segments.isEmpty ? FieldPath.emptyPath : FieldPath._(segments);
   }
 
-  static final FieldPath keyPath =
-      FieldPath.fromSingleSegment(DocumentKey.keyFieldName);
+  static final FieldPath keyPath = FieldPath.fromSingleSegment(
+    DocumentKey.keyFieldName,
+  );
 
   static const FieldPath emptyPath = FieldPath._(<String>[]);
 
@@ -93,17 +96,17 @@ class FieldPath extends BasePath<FieldPath> {
 
     final int first = identifier.codeUnitAt(0);
     if (first != 0x5F /* _ */ &&
-        (first < 0x61 /* a */ || first > 0x7A /* z */) &&
-        (first < 0x41 /* A */ || first > 0x5A /* Z */)) {
+        (first < 0x61 /* a */ || first > 0x7A /* z */ ) &&
+        (first < 0x41 /* A */ || first > 0x5A /* Z */ )) {
       return false;
     }
 
     for (int i = 1; i < identifier.length; i++) {
       final int c = identifier.codeUnitAt(i);
       if (c != 0x5F /* _ */ &&
-          (c < 0x61 /* a */ || c > 0x7A /* z */) &&
-          (c < 0x41 /* A */ || c > 0x5A /* Z */) &&
-          (c < 0x30 /* 0 */ || c > 0x39 /* 9 */)) {
+          (c < 0x61 /* a */ || c > 0x7A /* z */ ) &&
+          (c < 0x41 /* A */ || c > 0x5A /* Z */ ) &&
+          (c < 0x30 /* 0 */ || c > 0x39 /* 9 */ )) {
         return false;
       }
     }

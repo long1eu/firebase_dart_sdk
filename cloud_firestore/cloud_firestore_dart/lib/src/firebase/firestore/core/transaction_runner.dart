@@ -18,11 +18,11 @@ class TransactionRunner<TResult> {
     required ExponentialBackoff backoff,
     required Future<TResult> Function(Transaction) updateFunction,
     bool Function()? isTerminated,
-  })  : _createTransaction = createTransaction,
-        _isTerminated = isTerminated,
-        _attemptsRemaining = maxAttempts,
-        _backoff = backoff,
-        _updateFunction = updateFunction;
+  }) : _createTransaction = createTransaction,
+       _isTerminated = isTerminated,
+       _attemptsRemaining = maxAttempts,
+       _backoff = backoff,
+       _updateFunction = updateFunction;
 
   final Transaction Function() _createTransaction;
   final ExponentialBackoff _backoff;

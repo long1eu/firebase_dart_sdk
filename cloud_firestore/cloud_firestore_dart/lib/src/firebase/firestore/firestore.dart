@@ -55,7 +55,7 @@ class Firestore {
   @visibleForTesting
   @internal
   Firestore(this.databaseId, this.firebaseApp, this.client, this._scheduler)
-      : dataConverter = UserDataConverter(databaseId);
+    : dataConverter = UserDataConverter(databaseId);
 
   static const String _tag = 'FirebaseFirestore';
 
@@ -73,9 +73,11 @@ class Firestore {
 
   /// The [FirebaseApp] this instance belongs to.
   final FirebaseApp? firebaseApp;
+
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final UserDataConverter dataConverter;
+
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final FirestoreClient client;
@@ -89,14 +91,18 @@ class Firestore {
 
     final Firestore? firestore =
         FirestoreMultiDbComponent.instances[FirestoreMultiDbComponent.keyFor(
-            app.name, DatabaseId.defaultDatabaseId)];
+          app.name,
+          DatabaseId.defaultDatabaseId,
+        )];
     if (firestore == null) {
       throw StateError('You must call [Firestore.getInstance] first.');
     }
 
     if (app == app.authProvider) {
-      Log.w(_tag,
-          'In case you are using FirebaseAuth make sure to first call [FirebaseAuth.instance] to register the auth provider with other Firebase Services.');
+      Log.w(
+        _tag,
+        'In case you are using FirebaseAuth make sure to first call [FirebaseAuth.instance] to register the auth provider with other Firebase Services.',
+      );
     }
 
     return firestore;
@@ -115,8 +121,12 @@ class Firestore {
     OpenDatabase? openDatabase,
     FirestoreSettings? settings,
   }) {
-    return getInstance(app,
-        database: database, openDatabase: openDatabase, settings: settings);
+    return getInstance(
+      app,
+      database: database,
+      openDatabase: openDatabase,
+      settings: settings,
+    );
   }
 
   /// Gets the instance for [app] and [database], creating it on the first call.
@@ -130,8 +140,11 @@ class Firestore {
     checkNotNull(app, 'Provided FirebaseApp must not be null.');
 
     final FirestoreMultiDbComponent component = FirestoreMultiDbComponent(
-        app, app.authProvider, settings,
-        appCheckProvider: app.appCheckProvider);
+      app,
+      app.authProvider,
+      settings,
+      appCheckProvider: app.appCheckProvider,
+    );
     checkNotNull(component, 'Firestore component is not present.');
 
     final Firestore firestore = await component.get(database, openDatabase);
@@ -161,24 +174,31 @@ class Firestore {
     if (mockUserToken != null) {
       Log.d(_tag, 'Using the mockUserToken of the emulator settings.');
       provider = EmulatorCredentialsProvider.forMockUserToken(
-          mockUserToken, projectId);
+        mockUserToken,
+        projectId,
+      );
     } else if (authProvider != null && authProvider != app) {
       provider = FirebaseAuthCredentialsProvider(authProvider);
     } else if (app.authProvider != app) {
       Log.d(
-          _tag, 'Using ${app.authProvider.runtimeType} as the auth provider.');
+        _tag,
+        'Using ${app.authProvider.runtimeType} as the auth provider.',
+      );
       provider = FirebaseAuthCredentialsProvider(app.authProvider);
     } else {
-      Log.d(_tag,
-          'Firebase Auth not available, falling back to unauthenticated usage.');
+      Log.d(
+        _tag,
+        'Firebase Auth not available, falling back to unauthenticated usage.',
+      );
       provider = EmptyCredentialsProvider();
     }
 
     // No provider on the call and none on the app: no App Check header at all.
     final InternalAppCheckTokenProvider? appCheckSource =
         appCheckProvider ?? app.appCheckProvider;
-    final AppCheckTokenProvider? appCheck =
-        appCheckSource == null ? null : AppCheckTokenProvider(appCheckSource);
+    final AppCheckTokenProvider? appCheck = appCheckSource == null
+        ? null
+        : AppCheckTokenProvider(appCheckSource);
 
     // Firestore uses a different database for each app name. Note that we
     // don't use app.getPersistenceKey() here because it includes the
@@ -225,7 +245,8 @@ class Firestore {
 
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within the database.
   /// [documentPath] is a slash-separated path to a document.
-  DocumentReference<Map<String, Object?>> doc(String documentPath) => document(documentPath);
+  DocumentReference<Map<String, Object?>> doc(String documentPath) =>
+      document(documentPath);
 
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within the database.
   /// [documentPath] is a slash-separated path to a document.
@@ -233,7 +254,9 @@ class Firestore {
   DocumentReference<Map<String, Object?>> document(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
     return DocumentReference.forPath(
-        ResourcePath.fromString(documentPath), this);
+      ResourcePath.fromString(documentPath),
+      this,
+    );
   }
 
   /// Creates and returns a new [Query] that includes all documents in the
@@ -246,14 +269,12 @@ class Firestore {
     checkNotNull(collectionId, 'Provided collection ID must not be null.');
     if (collectionId.contains('/')) {
       throw ArgumentError(
-          'Invalid collectionId \'$collectionId\'. Collection IDs must not contain \'/\'.');
+        'Invalid collectionId \'$collectionId\'. Collection IDs must not contain \'/\'.',
+      );
     }
 
     return Query(
-      core.Query(
-        ResourcePath.empty,
-        collectionGroup: collectionId,
-      ),
+      core.Query(ResourcePath.empty, collectionGroup: collectionId),
       this,
     );
   }
@@ -284,8 +305,11 @@ class Firestore {
       return updateFunction(Transaction(internalTransaction, this));
     }
 
-    return client.transaction(wrappedUpdateFunction, options.maxAttempts,
-        readOnly: options.readOnly);
+    return client.transaction(
+      wrappedUpdateFunction,
+      options.maxAttempts,
+      readOnly: options.readOnly,
+    );
   }
 
   /// Creates a write batch, used for performing multiple writes as a single
@@ -336,9 +360,10 @@ class Firestore {
 
     controller = StreamController<void>(
       // A terminated instance fails the listen: report it on the stream.
-      onListen: () => client
-          .addSnapshotsInSyncListener(listener)
-          .catchError((Object error, StackTrace stackTrace) {
+      onListen: () => client.addSnapshotsInSyncListener(listener).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
         if (!controller.isClosed) {
           controller
             ..addError(error, stackTrace)
@@ -434,9 +459,10 @@ class Firestore {
   /// this instance does not use the persistent (SQLite) cache. On a terminated instance it fails with the same
   /// [FirestoreError] as every other operation, whatever the cache.
   @Deprecated(
-      'Instead of creating cache indexes manually, consider using '
-      'persistentCacheIndexManager.enableIndexAutoCreation() to let the SDK '
-      'decide whether to create cache indexes for queries running locally.')
+    'Instead of creating cache indexes manually, consider using '
+    'persistentCacheIndexManager.enableIndexAutoCreation() to let the SDK '
+    'decide whether to create cache indexes for queries running locally.',
+  )
   Future<void> setIndexConfiguration(String json) async {
     client.verifyNotTerminated();
     if (!client.supportsFieldIndexes) {
@@ -483,7 +509,8 @@ class Firestore {
   /// completion or error events.
   LoadBundleTask loadBundle(List<int> bundleData) {
     return loadBundleStream(
-        Stream<List<int>>.fromIterable(<List<int>>[bundleData]));
+      Stream<List<int>>.fromIterable(<List<int>>[bundleData]),
+    );
   }
 
   /// Loads a Firestore bundle into the local cache.
@@ -525,7 +552,11 @@ class Firestore {
     FirestoreDataConverter<T>? converter,
   }) {
     return snapshot_json.documentSnapshotsFromJson<T>(
-        this, json, options, converter);
+      this,
+      json,
+      options,
+      converter,
+    );
   }
 
   /// Listens to the query of a [QuerySnapshot.toJson] result, resuming from that snapshot.
@@ -543,7 +574,11 @@ class Firestore {
     FirestoreDataConverter<T>? converter,
   }) {
     return snapshot_json.querySnapshotsFromJson<T>(
-        this, json, options, converter);
+      this,
+      json,
+      options,
+      converter,
+    );
   }
 
   /// Globally enables / disables Firestore logging for the SDK.
@@ -571,7 +606,8 @@ class Firestore {
     checkNotNull(docRef, 'Provided DocumentReference must not be null.');
     if (docRef.firestore != this) {
       throw ArgumentError(
-          'Provided document reference is from a different Cloud Firestore instance.');
+        'Provided document reference is from a different Cloud Firestore instance.',
+      );
     }
   }
 }

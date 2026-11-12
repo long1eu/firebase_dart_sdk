@@ -72,8 +72,14 @@ class LoadBundleTaskProgress {
   }
 
   /// The progress a [LoadBundleTask] reports before the bundle metadata is known.
-  static const LoadBundleTaskProgress initial =
-      LoadBundleTaskProgress(0, 0, 0, 0, null, LoadBundleTaskState.success);
+  static const LoadBundleTaskProgress initial = LoadBundleTaskProgress(
+    0,
+    0,
+    0,
+    0,
+    null,
+    LoadBundleTaskState.success,
+  );
 
   /// How many documents have been loaded.
   final int documentsLoaded;

@@ -85,24 +85,27 @@ BooleanExpression filterToCondition(Filter filter) {
       return field.exists().and(_ifArray(field, field.arrayContains(value)));
     } else if (op == FilterOperator.IN) {
       final List<Constant> values = _elements(filter.value);
-      return field.exists().and(values.length == 1
-          ? field.equal(values.first)
-          : field.equalAny(values));
+      return field.exists().and(
+        values.length == 1 ? field.equal(values.first) : field.equalAny(values),
+      );
     } else if (op == FilterOperator.arrayContainsAny) {
       return field.exists().and(
-          _ifArray(field, field.arrayContainsAny(_elements(filter.value))));
+        _ifArray(field, field.arrayContainsAny(_elements(filter.value))),
+      );
     } else if (op == FilterOperator.NOT_IN) {
       final List<Constant> values = _elements(filter.value);
       return _andNotNull(
-          field,
-          values.length == 1
-              ? field.notEqual(values.first)
-              : field.notEqualAny(values));
+        field,
+        values.length == 1
+            ? field.notEqual(values.first)
+            : field.notEqualAny(values),
+      );
     }
     throw fail('Unexpected filter operator: $op');
   } else if (filter is CompositeFilter) {
-    final List<BooleanExpression> conditions =
-        filter.filters.map(filterToCondition).toList(growable: false);
+    final List<BooleanExpression> conditions = filter.filters
+        .map(filterToCondition)
+        .toList(growable: false);
     hardAssert(conditions.isNotEmpty, 'A composite filter must have filters.');
     switch (filter.operator) {
       case CompositeFilterOperator.and:
@@ -126,8 +129,12 @@ BooleanExpression filterToCondition(Filter filter) {
 /// classic cursor is a position in the order of all types. On a field that
 /// holds values of several types the pipeline therefore returns only the
 /// documents of the cursor's type.
-BooleanExpression _cursorCondition(Bound bound, List<Ordering> orderings,
-    {required bool after, required bool inclusive}) {
+BooleanExpression _cursorCondition(
+  Bound bound,
+  List<Ordering> orderings, {
+  required bool after,
+  required bool inclusive,
+}) {
   BooleanExpression compare(int i) {
     final Expression field = orderings[i].expression;
     final Constant value = Constant.fromModel(bound.position[i]);
@@ -142,8 +149,10 @@ BooleanExpression _cursorCondition(Bound bound, List<Ordering> orderings,
       orderings[i].expression.equal(Constant.fromModel(bound.position[i]));
 
   final int size = bound.position.length;
-  hardAssert(size > 0 && size <= orderings.length,
-      'Bound positions must not exceed order fields.');
+  hardAssert(
+    size > 0 && size <= orderings.length,
+    'Bound positions must not exceed order fields.',
+  );
   BooleanExpression condition = compare(size - 1);
   if (inclusive) {
     condition = condition.or(same(size - 1));
@@ -174,26 +183,44 @@ Pipeline queryToPipeline(Firestore firestore, core.Query query) {
   // Like a classic query, only return documents that have every field that
   // is ordered by (this includes the document key, which always exists).
   final List<OrderBy> orders = query.orderByConstraints;
-  pipeline = pipeline.where(_and(orders
-      .map((OrderBy order) => Field(order.field).exists())
-      .toList(growable: false)));
+  pipeline = pipeline.where(
+    _and(
+      orders
+          .map((OrderBy order) => Field(order.field).exists())
+          .toList(growable: false),
+    ),
+  );
 
   final List<Ordering> orderings = orders
-      .map((OrderBy order) => order.direction == OrderByDirection.ascending
-          ? Field(order.field).ascending()
-          : Field(order.field).descending())
+      .map(
+        (OrderBy order) => order.direction == OrderByDirection.ascending
+            ? Field(order.field).ascending()
+            : Field(order.field).descending(),
+      )
       .toList(growable: false);
 
   Pipeline applyCursors(Pipeline pipeline) {
     final Bound? startAt = query.getStartAt();
     if (startAt != null) {
-      pipeline = pipeline.where(_cursorCondition(startAt, orderings,
-          after: true, inclusive: startAt.inclusive));
+      pipeline = pipeline.where(
+        _cursorCondition(
+          startAt,
+          orderings,
+          after: true,
+          inclusive: startAt.inclusive,
+        ),
+      );
     }
     final Bound? endAt = query.getEndAt();
     if (endAt != null) {
-      pipeline = pipeline.where(_cursorCondition(endAt, orderings,
-          after: false, inclusive: endAt.inclusive));
+      pipeline = pipeline.where(
+        _cursorCondition(
+          endAt,
+          orderings,
+          after: false,
+          inclusive: endAt.inclusive,
+        ),
+      );
     }
     return pipeline;
   }
@@ -201,16 +228,19 @@ Pipeline queryToPipeline(Firestore firestore, core.Query query) {
   if (query.hasLimitToLast) {
     if (query.explicitSortOrder.isEmpty) {
       throw StateError(
-          'limitToLast() queries require specifying at least one orderBy() clause');
+        'limitToLast() queries require specifying at least one orderBy() clause',
+      );
     }
     final List<Ordering> reversed = orderings
-        .map((Ordering o) => o.direction == OrderingDirection.ascending
-            ? o.expression.descending()
-            : o.expression.ascending())
+        .map(
+          (Ordering o) => o.direction == OrderingDirection.ascending
+              ? o.expression.descending()
+              : o.expression.ascending(),
+        )
         .toList(growable: false);
-    pipeline = applyCursors(pipeline.sort(reversed))
-        .limit(query.getLimit())
-        .sort(orderings);
+    pipeline = applyCursors(
+      pipeline.sort(reversed),
+    ).limit(query.getLimit()).sort(orderings);
   } else {
     pipeline = applyCursors(pipeline.sort(orderings));
     if (query.hasLimit) {

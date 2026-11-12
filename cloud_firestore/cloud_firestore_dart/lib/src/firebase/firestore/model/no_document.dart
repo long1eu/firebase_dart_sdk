@@ -9,9 +9,11 @@ import 'package:firebase_app_dart/internal.dart';
 
 /// Represents that no documents exists for the key at the given version.
 class NoDocument extends MaybeDocument {
-  const NoDocument(DocumentKey key, SnapshotVersion version,
-      {required this.hasCommittedMutations})
-      : super(key, version);
+  const NoDocument(
+    DocumentKey key,
+    SnapshotVersion version, {
+    required this.hasCommittedMutations,
+  }) : super(key, version);
 
   final bool hasCommittedMutations;
 

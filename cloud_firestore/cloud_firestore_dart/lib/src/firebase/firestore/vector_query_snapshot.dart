@@ -24,7 +24,7 @@ class VectorQuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   VectorQuerySnapshot(this.query, List<QueryDocumentSnapshot> docs)
-      : docs = List<QueryDocumentSnapshot>.unmodifiable(docs);
+    : docs = List<QueryDocumentSnapshot>.unmodifiable(docs);
 
   /// The query that produced this snapshot.
   final VectorQuery query;

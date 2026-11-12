@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -37,8 +36,8 @@ class SQLiteBundleCache implements BundleCache {
   @override
   Future<BundleMetadata?> getBundleMetadata(String bundleId) async {
     final List<Map<String, dynamic>> rows = await _db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT schema_version,
                  create_time_seconds,
                  create_time_nanos,
@@ -47,8 +46,9 @@ class SQLiteBundleCache implements BundleCache {
           FROM bundles
           WHERE bundle_id = ?;
         ''',
-        // @formatter:on
-        <Object?>[bundleId]);
+      // @formatter:on
+      <Object?>[bundleId],
+    );
     if (rows.isEmpty) {
       return null;
     }
@@ -58,7 +58,8 @@ class SQLiteBundleCache implements BundleCache {
       bundleId,
       row['schema_version'],
       SnapshotVersion(
-          Timestamp(row['create_time_seconds'], row['create_time_nanos'])),
+        Timestamp(row['create_time_seconds'], row['create_time_nanos']),
+      ),
       row['total_documents'],
       row['total_bytes'],
     );
@@ -67,8 +68,8 @@ class SQLiteBundleCache implements BundleCache {
   @override
   Future<void> saveBundleMetadata(BundleMetadata metadata) {
     return _db.execute(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           INSERT OR REPLACE INTO bundles (bundle_id,
                                           schema_version,
                                           create_time_seconds,
@@ -77,30 +78,32 @@ class SQLiteBundleCache implements BundleCache {
                                           total_bytes)
           VALUES (?, ?, ?, ?, ?, ?);
         ''',
-        // @formatter:on
-        <Object?>[
-          metadata.bundleId,
-          metadata.schemaVersion,
-          metadata.createTime.timestamp.seconds,
-          metadata.createTime.timestamp.nanoseconds,
-          metadata.totalDocuments,
-          metadata.totalBytes,
-        ]);
+      // @formatter:on
+      <Object?>[
+        metadata.bundleId,
+        metadata.schemaVersion,
+        metadata.createTime.timestamp.seconds,
+        metadata.createTime.timestamp.nanoseconds,
+        metadata.totalDocuments,
+        metadata.totalBytes,
+      ],
+    );
   }
 
   @override
   Future<NamedQuery?> getNamedQuery(String queryName) async {
     final List<Map<String, dynamic>> rows = await _db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT read_time_seconds,
                  read_time_nanos,
                  bundled_query_proto
           FROM named_queries
           WHERE name = ?;
         ''',
-        // @formatter:on
-        <Object?>[queryName]);
+      // @formatter:on
+      <Object?>[queryName],
+    );
     if (rows.isEmpty) {
       return null;
     }
@@ -109,37 +112,42 @@ class SQLiteBundleCache implements BundleCache {
     final BundledQuery bundledQuery;
     try {
       bundledQuery = _serializer.decodeBundledQuery(
-          proto.BundledQuery.fromBuffer(row['bundled_query_proto'] as Uint8List));
+        proto.BundledQuery.fromBuffer(row['bundled_query_proto'] as Uint8List),
+      );
     } on Exception catch (e) {
       throw fail('NamedQuery failed to parse: $e');
     }
     return NamedQuery(
       queryName,
       bundledQuery,
-      SnapshotVersion(Timestamp(row['read_time_seconds'], row['read_time_nanos'])),
+      SnapshotVersion(
+        Timestamp(row['read_time_seconds'], row['read_time_nanos']),
+      ),
     );
   }
 
   @override
   Future<void> saveNamedQuery(NamedQuery query) {
-    final proto.BundledQuery bundledQuery =
-        _serializer.encodeBundledQuery(query.bundledQuery);
+    final proto.BundledQuery bundledQuery = _serializer.encodeBundledQuery(
+      query.bundledQuery,
+    );
 
     return _db.execute(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           INSERT OR REPLACE INTO named_queries (name,
                                                 read_time_seconds,
                                                 read_time_nanos,
                                                 bundled_query_proto)
           VALUES (?, ?, ?, ?);
         ''',
-        // @formatter:on
-        <Object?>[
-          query.name,
-          query.readTime.timestamp.seconds,
-          query.readTime.timestamp.nanoseconds,
-          bundledQuery.writeToBuffer(),
-        ]);
+      // @formatter:on
+      <Object?>[
+        query.name,
+        query.readTime.timestamp.seconds,
+        query.readTime.timestamp.nanoseconds,
+        bundledQuery.writeToBuffer(),
+      ],
+    );
   }
 }

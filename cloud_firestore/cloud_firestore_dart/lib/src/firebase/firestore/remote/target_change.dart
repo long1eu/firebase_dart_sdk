@@ -67,8 +67,10 @@ class TargetChange {
       identical(this, other) ||
       other is TargetChange &&
           runtimeType == other.runtimeType &&
-          const DeepCollectionEquality()
-              .equals(resumeToken, other.resumeToken) &&
+          const DeepCollectionEquality().equals(
+            resumeToken,
+            other.resumeToken,
+          ) &&
           current == other.current &&
           addedDocuments == other.addedDocuments &&
           modifiedDocuments == other.modifiedDocuments &&

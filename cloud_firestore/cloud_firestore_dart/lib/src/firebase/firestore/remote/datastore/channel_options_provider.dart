@@ -17,9 +17,9 @@ class ChannelOptionsProvider {
     required DatabaseId databaseId,
     required CredentialsProvider credentialsProvider,
     AppCheckTokenProvider? appCheckProvider,
-  })  : _databaseId = databaseId,
-        _credentialsProvider = credentialsProvider,
-        _appCheckProvider = appCheckProvider;
+  }) : _databaseId = databaseId,
+       _credentialsProvider = credentialsProvider,
+       _appCheckProvider = appCheckProvider;
 
   final DatabaseId _databaseId;
   final CredentialsProvider _credentialsProvider;
@@ -37,7 +37,7 @@ class ChannelOptionsProvider {
           // #3498).
           map['google-cloud-resource-prefix'] = _resourcePrefix;
           map['x-goog-request-params'] = _resourcePrefix;
-        }
+        },
       ],
     );
   }
@@ -48,8 +48,9 @@ class ChannelOptionsProvider {
   }
 
   FirestoreCallCredentials get _callCredentials => FirestoreCallCredentials(
-      _credentialsProvider,
-      appCheckProvider: _appCheckProvider);
+    _credentialsProvider,
+    appCheckProvider: _appCheckProvider,
+  );
 
   // This header is used to improve routing and project isolation by the backend.
   String get _resourcePrefix =>

@@ -85,11 +85,14 @@ class DefaultQueryEngine implements QueryEngine {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      Query query,
-      SnapshotVersion lastLimboFreeSnapshotVersion,
-      ImmutableSortedSet<DocumentKey> remoteKeys) async {
+    Query query,
+    SnapshotVersion lastLimboFreeSnapshotVersion,
+    ImmutableSortedSet<DocumentKey> remoteKeys,
+  ) async {
     hardAssert(
-        _localDocumentsView != null, 'setLocalDocumentsView() not called');
+      _localDocumentsView != null,
+      'setLocalDocumentsView() not called',
+    );
 
     ImmutableSortedMap<DocumentKey, Document>? result =
         await _performQueryUsingIndex(query);
@@ -98,7 +101,10 @@ class DefaultQueryEngine implements QueryEngine {
     }
 
     result = await _performQueryUsingRemoteKeys(
-        query, remoteKeys, lastLimboFreeSnapshotVersion);
+      query,
+      remoteKeys,
+      lastLimboFreeSnapshotVersion,
+    );
     if (result != null) {
       return result;
     }
@@ -114,35 +120,43 @@ class DefaultQueryEngine implements QueryEngine {
   /// Decides whether SDK should create a full matched field index for this query based on query context and query
   /// result size.
   Future<void> _createCacheIndexes(
-      Query query, QueryContext context, int resultSize) async {
+    Query query,
+    QueryContext context,
+    int resultSize,
+  ) async {
     if (context.documentReadCount < indexAutoCreationMinCollectionSize) {
       Log.d(
-          _tag,
-          'SDK will not create cache indexes for query: $query, since it only creates cache indexes for collection '
-          'contains more than or equal to $indexAutoCreationMinCollectionSize documents.');
+        _tag,
+        'SDK will not create cache indexes for query: $query, since it only creates cache indexes for collection '
+        'contains more than or equal to $indexAutoCreationMinCollectionSize documents.',
+      );
       return;
     }
 
     Log.d(
-        _tag,
-        'Query: $query, scans ${context.documentReadCount} local documents and returns $resultSize documents as '
-        'results.');
+      _tag,
+      'Query: $query, scans ${context.documentReadCount} local documents and returns $resultSize documents as '
+      'results.',
+    );
 
     if (context.documentReadCount >
         relativeIndexReadCostPerDocument * resultSize) {
-      await _localDocumentsView!.indexManager
-          .createTargetIndexes(query.toTarget());
+      await _localDocumentsView!.indexManager.createTargetIndexes(
+        query.toTarget(),
+      );
       Log.d(
-          _tag,
-          'The SDK decides to create cache indexes for query: $query, as using cache indexes may help improve '
-          'performance.');
+        _tag,
+        'The SDK decides to create cache indexes for query: $query, as using cache indexes may help improve '
+        'performance.',
+      );
     }
   }
 
   /// Performs an indexed query that evaluates the query based on a collection's persisted index values. Returns null
   /// if an index is not available.
   Future<ImmutableSortedMap<DocumentKey, Document>?> _performQueryUsingIndex(
-      Query query) async {
+    Query query,
+  ) async {
     if (query.matchesAllDocuments) {
       // Don't use indexes for queries that can be executed by scanning the collection.
       return null;
@@ -168,17 +182,21 @@ class DefaultQueryEngine implements QueryEngine {
       return _performQueryUsingIndex(query.limitToFirst(Target.noLimit));
     }
 
-    final List<DocumentKey>? keys =
-        await indexManager.getDocumentsMatchingTarget(target);
-    hardAssert(keys != null,
-        'index manager must return results for partial and full indexes.');
+    final List<DocumentKey>? keys = await indexManager
+        .getDocumentsMatchingTarget(target);
+    hardAssert(
+      keys != null,
+      'index manager must return results for partial and full indexes.',
+    );
 
     final ImmutableSortedMap<DocumentKey, MaybeDocument> indexedDocuments =
         await localDocumentsView.getDocuments(keys!);
     final IndexOffset offset = indexManager.getMinOffsetForTarget(target);
 
-    final ImmutableSortedSet<Document> previousResults =
-        _applyQuery(query, indexedDocuments);
+    final ImmutableSortedSet<Document> previousResults = _applyQuery(
+      query,
+      indexedDocuments,
+    );
     if (_needsRefill(query, keys.length, previousResults, offset.readTime)) {
       // A limit query whose boundaries change due to local edits can be re-run against the cache by excluding the
       // limit. This ensures that all documents that match the query's filters are included in the result set. The SDK
@@ -192,10 +210,11 @@ class DefaultQueryEngine implements QueryEngine {
   /// Performs a query based on the target's persisted query mapping. Returns null if the mapping is not available or
   /// cannot be used.
   Future<ImmutableSortedMap<DocumentKey, Document>?>
-      _performQueryUsingRemoteKeys(
-          Query query,
-          ImmutableSortedSet<DocumentKey> remoteKeys,
-          SnapshotVersion lastLimboFreeSnapshotVersion) async {
+  _performQueryUsingRemoteKeys(
+    Query query,
+    ImmutableSortedSet<DocumentKey> remoteKeys,
+    SnapshotVersion lastLimboFreeSnapshotVersion,
+  ) async {
     if (query.matchesAllDocuments) {
       // Queries that match all documents don't benefit from using key-based lookups. It is more efficient to scan all
       // documents in a collection, rather than to perform individual lookups.
@@ -209,33 +228,48 @@ class DefaultQueryEngine implements QueryEngine {
 
     final ImmutableSortedMap<DocumentKey, MaybeDocument> documents =
         await _localDocumentsView!.getDocuments(remoteKeys);
-    final ImmutableSortedSet<Document> previousResults =
-        _applyQuery(query, documents);
+    final ImmutableSortedSet<Document> previousResults = _applyQuery(
+      query,
+      documents,
+    );
 
-    if (_needsRefill(query, remoteKeys.length, previousResults,
-        lastLimboFreeSnapshotVersion)) {
+    if (_needsRefill(
+      query,
+      remoteKeys.length,
+      previousResults,
+      lastLimboFreeSnapshotVersion,
+    )) {
       return null;
     }
 
     if (Log.isDebugEnabled) {
-      Log.d(_tag,
-          'Re-using previous result from $lastLimboFreeSnapshotVersion to execute query: $query');
+      Log.d(
+        _tag,
+        'Re-using previous result from $lastLimboFreeSnapshotVersion to execute query: $query',
+      );
     }
 
     return _appendRemainingResults(
-        previousResults,
-        query,
-        IndexOffset.createSuccessor(
-            lastLimboFreeSnapshotVersion, FieldIndex.initialLargestBatchId));
+      previousResults,
+      query,
+      IndexOffset.createSuccessor(
+        lastLimboFreeSnapshotVersion,
+        FieldIndex.initialLargestBatchId,
+      ),
+    );
   }
 
   /// Applies the query filter and sorting to the provided documents.
   ImmutableSortedSet<Document> _applyQuery(
-      Query query, ImmutableSortedMap<DocumentKey, MaybeDocument> documents) {
+    Query query,
+    ImmutableSortedMap<DocumentKey, MaybeDocument> documents,
+  ) {
     // Sort the documents and re-apply the query filter since previously matching documents do not necessarily still
     // match the query.
-    ImmutableSortedSet<Document> queryResults =
-        ImmutableSortedSet<Document>(<Document>[], query.comparator);
+    ImmutableSortedSet<Document> queryResults = ImmutableSortedSet<Document>(
+      <Document>[],
+      query.comparator,
+    );
     for (MapEntry<DocumentKey, MaybeDocument> entry in documents) {
       final MaybeDocument maybeDoc = entry.value;
       if (maybeDoc is Document && query.matches(maybeDoc)) {
@@ -252,10 +286,11 @@ class DefaultQueryEngine implements QueryEngine {
   /// comparator (its size may be different from [expectedDocumentCount] if documents cease to match the query) and
   /// [limboFreeSnapshotVersion] the version of the snapshot when the query was last synchronized.
   bool _needsRefill(
-      Query query,
-      int expectedDocumentCount,
-      ImmutableSortedSet<Document> sortedPreviousResults,
-      SnapshotVersion limboFreeSnapshotVersion) {
+    Query query,
+    int expectedDocumentCount,
+    ImmutableSortedSet<Document> sortedPreviousResults,
+    SnapshotVersion limboFreeSnapshotVersion,
+  ) {
     if (!query.hasLimit) {
       // Queries without limits do not need to be refilled.
       return false;
@@ -273,8 +308,8 @@ class DefaultQueryEngine implements QueryEngine {
     // "rejected" by this boundary. Therefore, we can ignore any modifications that don't affect the last document.
     final Document? documentAtLimitEdge =
         query.limitType == LimitType.limitToFirst
-            ? sortedPreviousResults.maxEntry
-            : sortedPreviousResults.minEntry;
+        ? sortedPreviousResults.maxEntry
+        : sortedPreviousResults.minEntry;
     if (documentAtLimitEdge == null) {
       // We don't need to refill the query if there were already no documents.
       return false;
@@ -285,24 +320,32 @@ class DefaultQueryEngine implements QueryEngine {
 
   @override
   void handleDocumentChange(
-      MaybeDocument oldDocument, MaybeDocument newDocument) {
+    MaybeDocument oldDocument,
+    MaybeDocument newDocument,
+  ) {
     // No indexes to update.
   }
 
   Future<ImmutableSortedMap<DocumentKey, Document>> _executeFullCollectionScan(
-      Query query, QueryContext context) {
+    Query query,
+    QueryContext context,
+  ) {
     if (Log.isDebugEnabled) {
       Log.d(_tag, 'Using full collection scan to execute query: $query');
     }
-    return _localDocumentsView!
-        .getDocumentsMatchingQuery(query, IndexOffset.none, context);
+    return _localDocumentsView!.getDocumentsMatchingQuery(
+      query,
+      IndexOffset.none,
+      context,
+    );
   }
 
   /// Combines the results from an indexed execution with the remaining documents that have not yet been indexed.
   Future<ImmutableSortedMap<DocumentKey, Document>> _appendRemainingResults(
-      Iterable<Document> indexedResults,
-      Query query,
-      IndexOffset offset) async {
+    Iterable<Document> indexedResults,
+    Query query,
+    IndexOffset offset,
+  ) async {
     // Retrieve all results for documents that were updated since the offset.
     ImmutableSortedMap<DocumentKey, Document> remainingResults =
         await _localDocumentsView!.getDocumentsMatchingQuery(query, offset);

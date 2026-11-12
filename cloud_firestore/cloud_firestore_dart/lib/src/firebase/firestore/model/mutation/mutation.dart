@@ -53,8 +53,11 @@ import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 /// [fieldTransforms] and sent to the backend in the `updateTransforms` field of the write, rather
 /// than in a separate transform write.
 abstract class Mutation {
-  const Mutation(this.key, this.precondition,
-      [this.fieldTransforms = const <FieldTransform>[]]);
+  const Mutation(
+    this.key,
+    this.precondition, [
+    this.fieldTransforms = const <FieldTransform>[],
+  ]);
 
   final DocumentKey key;
 
@@ -77,7 +80,9 @@ abstract class Mutation {
   /// Returns the mutated document. The returned document may be an [UnknownDocument], if the
   /// mutation could not be applied to the locally cached base document.
   MaybeDocument applyToRemoteDocument(
-      MaybeDocument? maybeDoc, MutationResult mutationResult);
+    MaybeDocument? maybeDoc,
+    MutationResult mutationResult,
+  );
 
   /// Applies this mutation to [maybeDoc] for the purposes of computing the new local view of a
   /// document. Both the input and returned documents can be null.
@@ -93,8 +98,11 @@ abstract class Mutation {
   ///
   /// Returns the mutated document. The returned document may be null, but only if [maybeDoc] was
   /// null and the mutation would not create a new document.
-  MaybeDocument? applyToLocalView(MaybeDocument? maybeDoc,
-      MaybeDocument? baseDoc, Timestamp localWriteTime);
+  MaybeDocument? applyToLocalView(
+    MaybeDocument? maybeDoc,
+    MaybeDocument? baseDoc,
+    Timestamp localWriteTime,
+  );
 
   /// Applies this mutation to [maybeDoc] like [applyToLocalView] and also returns the fields of the document that are
   /// mutated locally after this mutation (the port's version of the upstream `applyToLocalView` that returns a
@@ -104,15 +112,22 @@ abstract class Mutation {
   /// none, or null if a set or a delete was applied (the whole document is mutated). The returned mask follows the
   /// same rules: a set or delete returns null, a patch adds its mask and the paths of its field transforms, and a
   /// mutation whose precondition does not hold leaves the document and the mask unchanged.
-  (MaybeDocument?, FieldMask?) applyToLocalViewWithMask(MaybeDocument? maybeDoc,
-      MaybeDocument? baseDoc, FieldMask? previousMask, Timestamp localWriteTime) {
+  (MaybeDocument?, FieldMask?) applyToLocalViewWithMask(
+    MaybeDocument? maybeDoc,
+    MaybeDocument? baseDoc,
+    FieldMask? previousMask,
+    Timestamp localWriteTime,
+  ) {
     verifyKeyMatches(maybeDoc);
     if (!precondition.isValidFor(maybeDoc)) {
       return (maybeDoc, previousMask);
     }
 
-    final MaybeDocument? result =
-        applyToLocalView(maybeDoc, baseDoc, localWriteTime);
+    final MaybeDocument? result = applyToLocalView(
+      maybeDoc,
+      baseDoc,
+      localWriteTime,
+    );
     final Mutation mutation = this;
     if (mutation is PatchMutation) {
       // As upstream, a patch keeps its mask also when it creates the document (a merge on a document that the cache
@@ -128,7 +143,7 @@ abstract class Mutation {
           ...previousMask.mask,
           ...mutation.mask.mask,
           for (FieldTransform transform in fieldTransforms) transform.fieldPath,
-        })
+        }),
       );
     } else if (mutation is SetMutation || mutation is DeleteMutation) {
       return (result, null);
@@ -150,14 +165,18 @@ abstract class Mutation {
   /// empty mask only means "no overlay" when the document has no local mutations; otherwise the overlay is a patch
   /// with an empty mask.
   static Mutation? calculateOverlayMutation(
-      MaybeDocument? maybeDoc, FieldMask? mask) {
+    MaybeDocument? maybeDoc,
+    FieldMask? mask,
+  ) {
     if (mask != null &&
         mask.mask.isEmpty &&
         !(maybeDoc is Document && maybeDoc.hasLocalMutations)) {
       return null;
     }
-    hardAssert(maybeDoc != null,
-        'A document with local mutations must have a local view');
+    hardAssert(
+      maybeDoc != null,
+      'A document with local mutations must have a local view',
+    );
     final MaybeDocument doc = maybeDoc!;
 
     // mask == null when there are Set or Delete being applied to get to the current document.
@@ -165,14 +184,15 @@ abstract class Mutation {
       if (doc is Document) {
         return SetMutation(doc.key, doc.data, Precondition.none);
       } else {
-        hardAssert(doc is NoDocument,
-            'A local delete must result in a NoDocument, got $doc');
+        hardAssert(
+          doc is NoDocument,
+          'A local delete must result in a NoDocument, got $doc',
+        );
         return DeleteMutation(doc.key, Precondition.none);
       }
     }
 
-    final ObjectValue docValue =
-        doc is Document ? doc.data : ObjectValue.empty;
+    final ObjectValue docValue = doc is Document ? doc.data : ObjectValue.empty;
     ObjectValue patchValue = ObjectValue.empty;
     final Set<FieldPath> maskSet = <FieldPath>{};
     for (FieldPath path in mask.mask) {
@@ -197,7 +217,11 @@ abstract class Mutation {
       maskSet.add(fieldPath);
     }
     return PatchMutation(
-        doc.key, patchValue, FieldMask(maskSet), Precondition.none);
+      doc.key,
+      patchValue,
+      FieldMask(maskSet),
+      Precondition.none,
+    );
   }
 
   /// Helper for derived classes to implement .equals.
@@ -212,8 +236,10 @@ abstract class Mutation {
 
   void verifyKeyMatches(MaybeDocument? maybeDoc) {
     if (maybeDoc != null) {
-      hardAssert(maybeDoc.key == key,
-          'Can only apply a mutation to a document with the same key');
+      hardAssert(
+        maybeDoc.key == key,
+        'Can only apply a mutation to a document with the same key',
+      );
     }
   }
 
@@ -224,13 +250,16 @@ abstract class Mutation {
   /// [baseDoc] is the document the transforms are applied on top of. [serverTransformResults] are
   /// the transform results received by the server.
   List<FieldValue> serverTransformResults(
-      MaybeDocument? baseDoc, List<FieldValue> serverTransformResults) {
+    MaybeDocument? baseDoc,
+    List<FieldValue> serverTransformResults,
+  ) {
     final List<FieldValue> transformResults = <FieldValue>[];
     hardAssertLazy(
-        fieldTransforms.length == serverTransformResults.length,
-        () =>
-            'server transform count (${serverTransformResults.length}) should match field transform '
-            'count (${fieldTransforms.length})');
+      fieldTransforms.length == serverTransformResults.length,
+      () =>
+          'server transform count (${serverTransformResults.length}) should match field transform '
+          'count (${fieldTransforms.length})',
+    );
 
     for (int i = 0; i < serverTransformResults.length; i++) {
       final FieldTransform fieldTransform = fieldTransforms[i];
@@ -241,8 +270,12 @@ abstract class Mutation {
         previousValue = baseDoc.getField(fieldTransform.fieldPath);
       }
 
-      transformResults.add(transform.applyToRemoteDocument(
-          previousValue, serverTransformResults[i]));
+      transformResults.add(
+        transform.applyToRemoteDocument(
+          previousValue,
+          serverTransformResults[i],
+        ),
+      );
     }
     return transformResults;
   }
@@ -274,17 +307,22 @@ abstract class Mutation {
         previousValue = baseDoc.getField(fieldTransform.fieldPath);
       }
 
-      transformResults
-          .add(transform.applyToLocalView(previousValue, localWriteTime));
+      transformResults.add(
+        transform.applyToLocalView(previousValue, localWriteTime),
+      );
     }
     return transformResults;
   }
 
   /// Sets the [transformResults] on [objectValue], one per entry in [fieldTransforms].
   ObjectValue transformObject(
-      ObjectValue objectValue, List<FieldValue> transformResults) {
-    hardAssert(transformResults.length == fieldTransforms.length,
-        'Transform results length mismatch.');
+    ObjectValue objectValue,
+    List<FieldValue> transformResults,
+  ) {
+    hardAssert(
+      transformResults.length == fieldTransforms.length,
+      'Transform results length mismatch.',
+    );
 
     for (int i = 0; i < fieldTransforms.length; i++) {
       final FieldPath fieldPath = fieldTransforms[i].fieldPath;
@@ -314,11 +352,14 @@ abstract class Mutation {
         existingValue = maybeDoc.getField(transform.fieldPath);
       }
 
-      final FieldValue? coercedValue =
-          transform.operation.computeBaseValue(existingValue);
+      final FieldValue? coercedValue = transform.operation.computeBaseValue(
+        existingValue,
+      );
       if (coercedValue != null) {
-        baseObject = (baseObject ?? ObjectValue.empty)
-            .set(transform.fieldPath, coercedValue);
+        baseObject = (baseObject ?? ObjectValue.empty).set(
+          transform.fieldPath,
+          coercedValue,
+        );
       }
     }
 

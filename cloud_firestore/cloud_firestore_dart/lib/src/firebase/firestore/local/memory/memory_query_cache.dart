@@ -40,7 +40,8 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<void> setLastRemoteSnapshotVersion(
-      SnapshotVersion snapshotVersion) async {
+    SnapshotVersion snapshotVersion,
+  ) async {
     lastRemoteSnapshotVersion = snapshotVersion;
   }
 
@@ -96,7 +97,9 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<void> addMatchingKeys(
-      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+    ImmutableSortedSet<DocumentKey> keys,
+    int targetId,
+  ) async {
     references.addReferences(keys, targetId);
     final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
 
@@ -107,7 +110,9 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<void> removeMatchingKeys(
-      ImmutableSortedSet<DocumentKey> keys, int targetId) async {
+    ImmutableSortedSet<DocumentKey> keys,
+    int targetId,
+  ) async {
     references.removeReferences(keys, targetId);
     final ReferenceDelegate referenceDelegate = persistence.referenceDelegate;
 
@@ -127,7 +132,8 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
-      int targetId) async {
+    int targetId,
+  ) async {
     return references.referencesForId(targetId);
   }
 

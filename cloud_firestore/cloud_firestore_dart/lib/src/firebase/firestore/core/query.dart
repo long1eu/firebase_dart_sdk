@@ -15,10 +15,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 
 /// Whether a query limit keeps the first or the last matching results.
-enum LimitType {
-  limitToFirst,
-  limitToLast,
-}
+enum LimitType { limitToFirst, limitToLast }
 
 /// Represents the internal structure of a Firestore Query. It can be run
 /// against the LocalStore, as well as be converted to a [Target] (see
@@ -34,17 +31,21 @@ class Query {
     this.limitType = LimitType.limitToFirst,
     Bound? startAt,
     Bound? endAt,
-  })  : _limit = limit,
-        _startAt = startAt,
-        _endAt = endAt;
+  }) : _limit = limit,
+       _startAt = startAt,
+       _endAt = endAt;
 
   static const int noLimit = Target.noLimit;
 
-  static final OrderBy keyOrderingAsc =
-      OrderBy.getInstance(OrderByDirection.ascending, FieldPath.keyPath);
+  static final OrderBy keyOrderingAsc = OrderBy.getInstance(
+    OrderByDirection.ascending,
+    FieldPath.keyPath,
+  );
 
-  static final OrderBy keyOrderingDesc =
-      OrderBy.getInstance(OrderByDirection.descending, FieldPath.keyPath);
+  static final OrderBy keyOrderingDesc = OrderBy.getInstance(
+    OrderByDirection.descending,
+    FieldPath.keyPath,
+  );
 
   /// Returns the list of ordering constraints that were explicitly requested on the query by the user.
   ///
@@ -164,7 +165,11 @@ class Query {
   Query filter(Filter filter) {
     hardAssert(!isDocumentQuery, 'No filter is allowed for document query');
     return copyWith(
-        filters: <Filter>[...filters, ...CompositeFilter.conjunctionTerms(filter)]);
+      filters: <Filter>[
+        ...filters,
+        ...CompositeFilter.conjunctionTerms(filter),
+      ],
+    );
   }
 
   /// Creates a new Query with an additional ordering constraint.
@@ -175,7 +180,7 @@ class Query {
 
     final List<OrderBy> updatedSortOrder = <OrderBy>[
       ...explicitSortOrder,
-      order
+      order,
     ];
     return copyWith(explicitSortOrder: updatedSortOrder);
   }
@@ -245,9 +250,11 @@ class Query {
 
     // Add the document key field to the last if it is not explicitly ordered.
     if (!fieldsNormalized.contains(FieldPath.keyPath.canonicalString)) {
-      res.add(lastDirection == OrderByDirection.ascending
-          ? keyOrderingAsc
-          : keyOrderingDesc);
+      res.add(
+        lastDirection == OrderByDirection.ascending
+            ? keyOrderingAsc
+            : keyOrderingDesc,
+      );
     }
 
     return _memoizedOrderBy = List<OrderBy>.unmodifiable(res);
@@ -353,8 +360,8 @@ class Query {
       for (OrderBy orderBy in orderByConstraints) {
         final OrderByDirection dir =
             orderBy.direction == OrderByDirection.descending
-                ? OrderByDirection.ascending
-                : OrderByDirection.descending;
+            ? OrderByDirection.ascending
+            : OrderByDirection.descending;
         newOrderBy.add(OrderBy.getInstance(dir, orderBy.field));
       }
 

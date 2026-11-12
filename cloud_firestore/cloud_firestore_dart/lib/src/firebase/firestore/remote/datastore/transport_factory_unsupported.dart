@@ -4,7 +4,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/fir
 
 /// There is no transport for this platform.
 FirestoreTransport createTransport(
-    DatabaseInfo databaseInfo, ChannelOptionsProvider optionsProvider) {
+  DatabaseInfo databaseInfo,
+  ChannelOptionsProvider optionsProvider,
+) {
   throw UnsupportedError(
-      'Cloud Firestore has no network transport for this platform.');
+    'Cloud Firestore has no network transport for this platform.',
+  );
 }

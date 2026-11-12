@@ -23,14 +23,14 @@ class WatchStream
     TaskScheduler scheduler,
     RemoteSerializer serializer,
     StreamController<StreamEvent> eventsController,
-  )   : _client = client,
-        _serializer = serializer,
-        super(
-          eventsController,
-          scheduler,
-          TaskId.listenStreamIdle,
-          TaskId.listenStreamConnectionBackoff,
-        );
+  ) : _client = client,
+      _serializer = serializer,
+      super(
+        eventsController,
+        scheduler,
+        TaskId.listenStreamIdle,
+        TaskId.listenStreamConnectionBackoff,
+      );
 
   final FirestoreClient _client;
   final RemoteSerializer _serializer;
@@ -40,7 +40,8 @@ class WatchStream
 
   @override
   Future<ResponseStream<proto.ListenResponse>> _buildCall(
-      Stream<proto.ListenRequest> requests) async {
+    Stream<proto.ListenRequest> requests,
+  ) async {
     return _client.listen(requests);
   }
 
@@ -78,8 +79,8 @@ class WatchStream
     _backoff.reset();
 
     final WatchChange watchChange = _serializer.decodeWatchChange(response);
-    final SnapshotVersion snapshotVersion =
-        _serializer.decodeVersionFromListenResponse(response);
+    final SnapshotVersion snapshotVersion = _serializer
+        .decodeVersionFromListenResponse(response);
 
     addEvent(OnWatchChange(snapshotVersion, watchChange));
   }

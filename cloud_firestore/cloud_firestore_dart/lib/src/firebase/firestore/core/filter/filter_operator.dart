@@ -15,10 +15,12 @@ class FilterOperator {
   static const FilterOperator notEqual = FilterOperator._('!=');
   static const FilterOperator graterThan = FilterOperator._('>');
   static const FilterOperator graterThanOrEqual = FilterOperator._('>=');
-  static const FilterOperator arrayContains =
-      FilterOperator._('array_contains');
-  static const FilterOperator arrayContainsAny =
-      FilterOperator._('array_contains_any');
+  static const FilterOperator arrayContains = FilterOperator._(
+    'array_contains',
+  );
+  static const FilterOperator arrayContainsAny = FilterOperator._(
+    'array_contains_any',
+  );
 
   // ignore: constant_identifier_names
   static const FilterOperator IN = FilterOperator._('in');
@@ -28,12 +30,12 @@ class FilterOperator {
 
   static const List<FilterOperator> arrayOperators = <FilterOperator>[
     arrayContains,
-    arrayContainsAny
+    arrayContainsAny,
   ];
 
   static const List<FilterOperator> disjunctiveOperators = <FilterOperator>[
     arrayContainsAny,
-    IN
+    IN,
   ];
 
   static const List<FilterOperator> inequalityOperators = <FilterOperator>[
@@ -42,7 +44,7 @@ class FilterOperator {
     graterThan,
     graterThanOrEqual,
     notEqual,
-    NOT_IN
+    NOT_IN,
   ];
 
   @override

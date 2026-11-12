@@ -26,9 +26,9 @@ typedef OnlineStateCallback = Future<void> Function(OnlineState onlineState);
 /// cached data, etc.).
 class OnlineStateTracker {
   OnlineStateTracker(this._scheduler, this._onlineStateCallback)
-      : _state = OnlineState.unknown,
-        _watchStreamFailures = 0,
-        _shouldWarnClientIsOffline = false;
+    : _state = OnlineState.unknown,
+      _watchStreamFailures = 0,
+      _shouldWarnClientIsOffline = false;
 
   /// The current OnlineState.
   OnlineState _state;
@@ -59,18 +59,23 @@ class OnlineStateTracker {
     if (_watchStreamFailures == 0) {
       await _setAndBroadcastState(OnlineState.unknown);
 
-      hardAssert(_onlineStateTimer == null,
-          'onlineStateTimer shouldn\'t be started yet');
+      hardAssert(
+        _onlineStateTimer == null,
+        'onlineStateTimer shouldn\'t be started yet',
+      );
 
       _onlineStateTimer = _scheduler.add(
         TaskId.onlineStateTimeout,
         const Duration(milliseconds: _onlineStateTimeoutMs),
         () async {
           _onlineStateTimer = null;
-          hardAssert(_state == OnlineState.unknown,
-              'Timer should be canceled if we transitioned to a different state.');
+          hardAssert(
+            _state == OnlineState.unknown,
+            'Timer should be canceled if we transitioned to a different state.',
+          );
           _logClientOfflineWarningIfNecessary(
-              'Backend didn\'t respond within ${_onlineStateTimeoutMs / 1000} seconds\n');
+            'Backend didn\'t respond within ${_onlineStateTimeoutMs / 1000} seconds\n',
+          );
           await _setAndBroadcastState(OnlineState.offline);
 
           // NOTE: [handleWatchStreamFailure] will continue to increment [watchStreamFailures] even
@@ -98,7 +103,8 @@ class OnlineStateTracker {
       if (_watchStreamFailures >= _maxWatchStreamFailures) {
         _clearOnlineStateTimer();
         _logClientOfflineWarningIfNecessary(
-            'Connection failed $_maxWatchStreamFailures times. Most recent error: $status');
+          'Connection failed $_maxWatchStreamFailures times. Most recent error: $status',
+        );
         await _setAndBroadcastState(OnlineState.offline);
       }
     }

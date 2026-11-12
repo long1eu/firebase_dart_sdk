@@ -24,8 +24,8 @@ class MutationBatch {
     required this.baseMutations,
     required this.mutations,
   })
-  // ignore: prefer_is_empty
-  : assert(mutations.length != 0, 'Cannot create an empty mutation batch');
+    // ignore: prefer_is_empty
+    : assert(mutations.length != 0, 'Cannot create an empty mutation batch');
 
   /// A batch ID that was searched for and not found or a batch ID value known to be before all
   /// known batches.
@@ -56,21 +56,26 @@ class MutationBatch {
   /// [documentKey] is the key of the document to apply mutations to, [maybeDoc] is the document to
   /// apply mutations to and [batchResult] is the result of applying the [MutationBatch] to the
   /// backend.
-  MaybeDocument? applyToRemoteDocument(DocumentKey documentKey,
-      MaybeDocument? maybeDoc, MutationBatchResult batchResult) {
+  MaybeDocument? applyToRemoteDocument(
+    DocumentKey documentKey,
+    MaybeDocument? maybeDoc,
+    MutationBatchResult batchResult,
+  ) {
     if (maybeDoc != null) {
       hardAssertLazy(
-          maybeDoc.key == documentKey,
-          () =>
-              'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}');
+        maybeDoc.key == documentKey,
+        () =>
+            'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}',
+      );
     }
 
     final int size = mutations.length;
     final List<MutationResult> mutationResults = batchResult.mutationResults;
     hardAssertLazy(
-        mutationResults.length == size,
-        () =>
-            'Mismatch between mutations length ($size) and results length (${mutationResults.length})');
+      mutationResults.length == size,
+      () =>
+          'Mismatch between mutations length ($size) and results length (${mutationResults.length})',
+    );
 
     for (int i = 0; i < size; i++) {
       final Mutation mutation = mutations[i];
@@ -84,20 +89,26 @@ class MutationBatch {
 
   /// Computes the local view of a document given all the mutations in this batch.
   MaybeDocument? applyToLocalView(
-      DocumentKey documentKey, MaybeDocument? maybeDoc) {
+    DocumentKey documentKey,
+    MaybeDocument? maybeDoc,
+  ) {
     if (maybeDoc != null) {
       hardAssertLazy(
-          maybeDoc.key == documentKey,
-          () =>
-              'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}');
+        maybeDoc.key == documentKey,
+        () =>
+            'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}',
+      );
     }
     // First, apply the base state. This allows us to apply non-idempotent transform against a
     // consistent set of values.
     for (int i = 0; i < baseMutations.length; i++) {
       final Mutation mutation = baseMutations[i];
       if (mutation.key == documentKey) {
-        maybeDoc =
-            mutation.applyToLocalView(maybeDoc, maybeDoc, localWriteTime);
+        maybeDoc = mutation.applyToLocalView(
+          maybeDoc,
+          maybeDoc,
+          localWriteTime,
+        );
       }
     }
 
@@ -115,13 +126,17 @@ class MutationBatch {
 
   /// Like [applyToLocalView], but also returns the fields mutated locally once this batch is applied, starting from
   /// [mutatedFields] (see [Mutation.applyToLocalViewWithMask]).
-  (MaybeDocument?, FieldMask?) applyToLocalViewWithMask(DocumentKey documentKey,
-      MaybeDocument? maybeDoc, FieldMask? mutatedFields) {
+  (MaybeDocument?, FieldMask?) applyToLocalViewWithMask(
+    DocumentKey documentKey,
+    MaybeDocument? maybeDoc,
+    FieldMask? mutatedFields,
+  ) {
     if (maybeDoc != null) {
       hardAssertLazy(
-          maybeDoc.key == documentKey,
-          () =>
-              'applyToLocalView: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}');
+        maybeDoc.key == documentKey,
+        () =>
+            'applyToLocalView: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}',
+      );
     }
     // First, apply the base state. This allows us to apply non-idempotent transform against a consistent set of
     // values.
@@ -129,7 +144,11 @@ class MutationBatch {
       final Mutation mutation = baseMutations[i];
       if (mutation.key == documentKey) {
         (maybeDoc, mutatedFields) = mutation.applyToLocalViewWithMask(
-            maybeDoc, maybeDoc, mutatedFields, localWriteTime);
+          maybeDoc,
+          maybeDoc,
+          mutatedFields,
+          localWriteTime,
+        );
       }
     }
 
@@ -140,7 +159,11 @@ class MutationBatch {
       final Mutation mutation = mutations[i];
       if (mutation.key == documentKey) {
         (maybeDoc, mutatedFields) = mutation.applyToLocalViewWithMask(
-            maybeDoc, baseDoc, mutatedFields, localWriteTime);
+          maybeDoc,
+          baseDoc,
+          mutatedFields,
+          localWriteTime,
+        );
       }
     }
     return (maybeDoc, mutatedFields);
@@ -149,7 +172,8 @@ class MutationBatch {
   /// Computes the local view for all provided documents given the mutations in
   /// this batch.
   ImmutableSortedMap<DocumentKey, MaybeDocument> applyToLocalDocumentSet(
-      ImmutableSortedMap<DocumentKey, MaybeDocument> maybeDocumentMap) {
+    ImmutableSortedMap<DocumentKey, MaybeDocument> maybeDocumentMap,
+  ) {
     // TODO(mrschmidt): This implementation is O(n^2). If we iterate through the
     //  mutations first (as done in [applyToLocalView]), we can reduce the
     //  complexity to O(n).
@@ -157,11 +181,15 @@ class MutationBatch {
     ImmutableSortedMap<DocumentKey, MaybeDocument> mutatedDocuments =
         maybeDocumentMap;
     for (DocumentKey key in keys) {
-      final MaybeDocument? mutatedDocument =
-          applyToLocalView(key, mutatedDocuments[key]);
+      final MaybeDocument? mutatedDocument = applyToLocalView(
+        key,
+        mutatedDocuments[key],
+      );
       if (mutatedDocument != null) {
-        mutatedDocuments =
-            mutatedDocuments.insert(mutatedDocument.key, mutatedDocument);
+        mutatedDocuments = mutatedDocuments.insert(
+          mutatedDocument.key,
+          mutatedDocument,
+        );
       }
     }
     return mutatedDocuments;
@@ -183,8 +211,10 @@ class MutationBatch {
           runtimeType == other.runtimeType &&
           batchId == other.batchId &&
           localWriteTime == other.localWriteTime &&
-          const DeepCollectionEquality()
-              .equals(baseMutations, other.baseMutations) &&
+          const DeepCollectionEquality().equals(
+            baseMutations,
+            other.baseMutations,
+          ) &&
           const DeepCollectionEquality().equals(mutations, other.mutations);
 
   @override

@@ -31,7 +31,7 @@ import 'package:protobuf/protobuf.dart';
 /// SQLite-backed [DocumentOverlayCache] of one user (table `document_overlays`, schema migration 11).
 class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
   SQLiteDocumentOverlayCache(this._db, this._serializer, User user)
-      : _uid = user.isAuthenticated ? user.uid! : '';
+    : _uid = user.isAuthenticated ? user.uid! : '';
 
   final SQLitePersistence _db;
   final LocalSerializer _serializer;
@@ -42,14 +42,15 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     final String collectionPath = EncodedPath.encode(key.path.popLast());
     final String documentId = key.path.getLastSegment();
     final List<Map<String, dynamic>> rows = await _db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT overlay_mutation, largest_batch_id
           FROM document_overlays
           WHERE uid = ? AND collection_path = ? AND document_id = ?
         ''',
-        // @formatter:on
-        <Object>[_uid, collectionPath, documentId]);
+      // @formatter:on
+      <Object>[_uid, collectionPath, documentId],
+    );
     if (rows.isEmpty) {
       return null;
     }
@@ -58,7 +59,8 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<Map<DocumentKey, Overlay>> getOverlays(
-      Iterable<DocumentKey> keys) async {
+    Iterable<DocumentKey> keys,
+  ) async {
     // Group the keys by collection, so that each collection is read with one (long) query.
     final Map<ResourcePath, List<Object?>> documentIdsByCollection =
         <ResourcePath, List<Object?>>{};
@@ -72,12 +74,13 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     for (MapEntry<ResourcePath, List<Object?>> entry
         in documentIdsByCollection.entries) {
       final LongQuery longQuery = LongQuery(
-          _db,
-          'SELECT overlay_mutation, largest_batch_id FROM document_overlays '
-              'WHERE uid = ? AND collection_path = ? AND document_id IN (',
-          <Object?>[_uid, EncodedPath.encode(entry.key)],
-          entry.value,
-          ')');
+        _db,
+        'SELECT overlay_mutation, largest_batch_id FROM document_overlays '
+            'WHERE uid = ? AND collection_path = ? AND document_id IN (',
+        <Object?>[_uid, EncodedPath.encode(entry.key)],
+        entry.value,
+        ')',
+      );
       while (longQuery.hasMoreSubqueries) {
         for (Map<String, dynamic> row
             in await longQuery.performNextSubquery()) {
@@ -90,32 +93,38 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
   }
 
   Future<void> _saveOverlay(
-      int largestBatchId, DocumentKey key, Mutation mutation) async {
+    int largestBatchId,
+    DocumentKey key,
+    Mutation mutation,
+  ) async {
     final ResourcePath path = key.path;
     final String group = path.segments[path.length - 2];
     final String collectionPath = EncodedPath.encode(path.popLast());
     final String documentId = path.getLastSegment();
     await _db.execute(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           INSERT OR REPLACE INTO document_overlays
           (uid, collection_group, collection_path, document_id, largest_batch_id, overlay_mutation)
           VALUES (?, ?, ?, ?, ?, ?)
         ''',
-        // @formatter:on
-        <Object>[
-          _uid,
-          group,
-          collectionPath,
-          documentId,
-          largestBatchId,
-          _serializer.encodeOverlayMutation(mutation).writeToBuffer(),
-        ]);
+      // @formatter:on
+      <Object>[
+        _uid,
+        group,
+        collectionPath,
+        documentId,
+        largestBatchId,
+        _serializer.encodeOverlayMutation(mutation).writeToBuffer(),
+      ],
+    );
   }
 
   @override
   Future<void> saveOverlays(
-      int largestBatchId, Map<DocumentKey, Mutation> overlays) async {
+    int largestBatchId,
+    Map<DocumentKey, Mutation> overlays,
+  ) async {
     for (MapEntry<DocumentKey, Mutation> entry in overlays.entries) {
       await _saveOverlay(largestBatchId, entry.key, entry.value);
     }
@@ -124,35 +133,40 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
   @override
   Future<void> removeOverlaysForBatchId(int batchId) async {
     await _db.execute(
-        'DELETE FROM document_overlays WHERE uid = ? AND largest_batch_id = ?',
-        <Object>[_uid, batchId]);
+      'DELETE FROM document_overlays WHERE uid = ? AND largest_batch_id = ?',
+      <Object>[_uid, batchId],
+    );
   }
 
   @override
   Future<void> removeOverlays(Iterable<DocumentKey> keys) async {
     for (DocumentKey key in keys) {
       await _db.execute(
-          'DELETE FROM document_overlays WHERE uid = ? AND collection_path = ? AND document_id = ?',
-          <Object>[
-            _uid,
-            EncodedPath.encode(key.path.popLast()),
-            key.path.getLastSegment()
-          ]);
+        'DELETE FROM document_overlays WHERE uid = ? AND collection_path = ? AND document_id = ?',
+        <Object>[
+          _uid,
+          EncodedPath.encode(key.path.popLast()),
+          key.path.getLastSegment(),
+        ],
+      );
     }
   }
 
   @override
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollection(
-      ResourcePath collection, int sinceBatchId) async {
+    ResourcePath collection,
+    int sinceBatchId,
+  ) async {
     final List<Map<String, dynamic>> rows = await _db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT overlay_mutation, largest_batch_id
           FROM document_overlays
           WHERE uid = ? AND collection_path = ? AND largest_batch_id > ?
         ''',
-        // @formatter:on
-        <Object>[_uid, EncodedPath.encode(collection), sinceBatchId]);
+      // @formatter:on
+      <Object>[_uid, EncodedPath.encode(collection), sinceBatchId],
+    );
     return <DocumentKey, Overlay>{
       for (Overlay overlay in rows.map(_decodeOverlay)) overlay.key: overlay,
     };
@@ -160,19 +174,23 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollectionGroup(
-      String collectionGroup, int sinceBatchId, int count) async {
+    String collectionGroup,
+    int sinceBatchId,
+    int count,
+  ) async {
     final Map<DocumentKey, Overlay> result = <DocumentKey, Overlay>{};
     final List<Map<String, dynamic>> rows = await _db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT overlay_mutation, largest_batch_id, collection_path, document_id
           FROM document_overlays
           WHERE uid = ? AND collection_group = ? AND largest_batch_id > ?
           ORDER BY largest_batch_id, collection_path, document_id
           LIMIT ?
         ''',
-        // @formatter:on
-        <Object>[_uid, collectionGroup, sinceBatchId, count]);
+      // @formatter:on
+      <Object>[_uid, collectionGroup, sinceBatchId, count],
+    );
     if (rows.isEmpty) {
       return result;
     }
@@ -186,23 +204,24 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     // query appends any remaining overlays for the last batch.
     final Map<String, dynamic> last = rows.last;
     final List<Map<String, dynamic>> remaining = await _db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT overlay_mutation, largest_batch_id
           FROM document_overlays
           WHERE uid = ? AND collection_group = ?
             AND (collection_path > ? OR (collection_path = ? AND document_id > ?))
             AND largest_batch_id = ?
         ''',
-        // @formatter:on
-        <Object>[
-          _uid,
-          collectionGroup,
-          last['collection_path'],
-          last['collection_path'],
-          last['document_id'],
-          last['largest_batch_id'],
-        ]);
+      // @formatter:on
+      <Object>[
+        _uid,
+        collectionGroup,
+        last['collection_path'],
+        last['collection_path'],
+        last['document_id'],
+        last['largest_batch_id'],
+      ],
+    );
     for (Map<String, dynamic> row in remaining) {
       final Overlay overlay = _decodeOverlay(row);
       result[overlay.key] = overlay;
@@ -214,8 +233,9 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
     final Uint8List rawMutation = row['overlay_mutation'];
     final int largestBatchId = row['largest_batch_id'];
     try {
-      final Mutation mutation = _serializer
-          .decodeOverlayMutation(proto.Write.fromBuffer(rawMutation));
+      final Mutation mutation = _serializer.decodeOverlayMutation(
+        proto.Write.fromBuffer(rawMutation),
+      );
       return Overlay(largestBatchId, mutation);
     } on InvalidProtocolBufferException catch (e) {
       throw fail('Overlay failed to parse: $e');

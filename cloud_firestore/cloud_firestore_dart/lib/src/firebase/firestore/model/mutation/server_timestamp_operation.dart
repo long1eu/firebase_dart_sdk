@@ -17,13 +17,17 @@ class ServerTimestampOperation implements TransformOperation {
 
   @override
   FieldValue applyToLocalView(
-      FieldValue? previousValue, Timestamp localWriteTime) {
+    FieldValue? previousValue,
+    Timestamp localWriteTime,
+  ) {
     return ServerTimestampValue(localWriteTime, previousValue);
   }
 
   @override
   FieldValue applyToRemoteDocument(
-      FieldValue? previousValue, FieldValue transformResult) {
+    FieldValue? previousValue,
+    FieldValue transformResult,
+  ) {
     return transformResult;
   }
 
@@ -33,6 +37,6 @@ class ServerTimestampOperation implements TransformOperation {
     return null;
   }
 
-// NOTE: Since we've guaranteed a singleton instance, we can rely on Object's
-// default implementation of equals() / hashCode().
+  // NOTE: Since we've guaranteed a singleton instance, we can rely on Object's
+  // default implementation of equals() / hashCode().
 }

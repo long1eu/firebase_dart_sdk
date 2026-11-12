@@ -18,16 +18,21 @@ import 'package:firebase_app_dart/internal.dart';
 /// A mutation that creates or replaces the document at the given key with the object value
 /// contents.
 class SetMutation extends Mutation {
-  SetMutation(DocumentKey key, this.value, Precondition precondition,
-      [List<FieldTransform> fieldTransforms = const <FieldTransform>[]])
-      : super(key, precondition, fieldTransforms);
+  SetMutation(
+    DocumentKey key,
+    this.value,
+    Precondition precondition, [
+    List<FieldTransform> fieldTransforms = const <FieldTransform>[],
+  ]) : super(key, precondition, fieldTransforms);
 
   /// The object value to use when setting the document.
   final ObjectValue value;
 
   @override
   MaybeDocument applyToRemoteDocument(
-      MaybeDocument? maybeDoc, MutationResult mutationResult) {
+    MaybeDocument? maybeDoc,
+    MutationResult mutationResult,
+  ) {
     verifyKeyMatches(maybeDoc);
 
     // Unlike applyToLocalView, if we're applying a mutation to a remote document the server has
@@ -36,18 +41,27 @@ class SetMutation extends Mutation {
     ObjectValue newData = value;
     if (fieldTransforms.isNotEmpty) {
       // The transforms are applied by the backend on top of the written data.
-      final Document written =
-          Document(key, version, DocumentState.committedMutations, value);
-      final List<FieldValue> transformResults =
-          serverTransformResults(written, mutationResult.transformResults);
+      final Document written = Document(
+        key,
+        version,
+        DocumentState.committedMutations,
+        value,
+      );
+      final List<FieldValue> transformResults = serverTransformResults(
+        written,
+        mutationResult.transformResults,
+      );
       newData = transformObject(newData, transformResults);
     }
     return Document(key, version, DocumentState.committedMutations, newData);
   }
 
   @override
-  MaybeDocument? applyToLocalView(MaybeDocument? maybeDoc,
-      MaybeDocument? baseDoc, Timestamp localWriteTime) {
+  MaybeDocument? applyToLocalView(
+    MaybeDocument? maybeDoc,
+    MaybeDocument? baseDoc,
+    Timestamp localWriteTime,
+  ) {
     verifyKeyMatches(maybeDoc);
 
     if (!precondition.isValidFor(maybeDoc)) {
@@ -59,10 +73,17 @@ class SetMutation extends Mutation {
     const SnapshotVersion version = SnapshotVersion.none;
     ObjectValue newData = value;
     if (fieldTransforms.isNotEmpty) {
-      final Document written =
-          Document(key, version, DocumentState.localMutations, value);
-      final List<FieldValue> transformResults =
-          localTransformResults(localWriteTime, written, baseDoc);
+      final Document written = Document(
+        key,
+        version,
+        DocumentState.localMutations,
+        value,
+      );
+      final List<FieldValue> transformResults = localTransformResults(
+        localWriteTime,
+        written,
+        baseDoc,
+      );
       newData = transformObject(newData, transformResults);
     }
     return Document(key, version, DocumentState.localMutations, newData);
@@ -75,8 +96,10 @@ class SetMutation extends Mutation {
           runtimeType == other.runtimeType &&
           hasSameKeyAndPrecondition(other) &&
           value == other.value &&
-          const ListEquality<FieldTransform>()
-              .equals(fieldTransforms, other.fieldTransforms);
+          const ListEquality<FieldTransform>().equals(
+            fieldTransforms,
+            other.fieldTransforms,
+          );
 
   @override
   int get hashCode =>

@@ -9,7 +9,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/bound.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/event_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart'
-    as core_filter show Filter, CompositeFilter;
+    as core_filter
+    show Filter, CompositeFilter;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart'
     hide Filter, CompositeFilter;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/listen_to_query.dart';
@@ -22,7 +23,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart'
-    as api show CompositeFilter, UnaryFilter;
+    as api
+    show CompositeFilter, UnaryFilter;
 import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_converter.dart';
@@ -72,7 +74,8 @@ class Query<T extends dynamic> {
   /// Filters, ordering and limits are kept. Use [withoutConverter] to go
   /// back to raw maps.
   Query<U> withConverter<U extends Object?>(
-      FirestoreDataConverter<U> converter) {
+    FirestoreDataConverter<U> converter,
+  ) {
     return Query<U>(query, firestore, converter);
   }
 
@@ -86,6 +89,7 @@ class Query<T extends dynamic> {
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final core.Query query;
+
   /// The [Firestore] instance this query belongs to.
   final Firestore firestore;
 
@@ -98,7 +102,10 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereEqualTo(String field, Object? value) {
     return _whereHelper(
-        FieldPath.fromDotSeparatedPath(field), FilterOperator.equal, value);
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.equal,
+      value,
+    );
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -124,7 +131,10 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereNotEqualTo(String field, Object? value) {
     return _whereHelper(
-        FieldPath.fromDotSeparatedPath(field), FilterOperator.notEqual, value);
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.notEqual,
+      value,
+    );
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -150,7 +160,10 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereLessThan(String field, Object? value) {
     return _whereHelper(
-        FieldPath.fromDotSeparatedPath(field), FilterOperator.lessThan, value);
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.lessThan,
+      value,
+    );
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -172,8 +185,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created [Query].
   Query<T> whereLessThanOrEqualTo(String field, Object? value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
-        FilterOperator.lessThanOrEqual, value);
+    return _whereHelper(
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.lessThanOrEqual,
+      value,
+    );
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -195,8 +211,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created [Query].
   Query<T> whereGreaterThan(String field, Object? value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
-        FilterOperator.graterThan, value);
+    return _whereHelper(
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.graterThan,
+      value,
+    );
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -218,8 +237,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created [Query].
   Query<T> whereGreaterThanOrEqualTo(String field, Object? value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
-        FilterOperator.graterThanOrEqual, value);
+    return _whereHelper(
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.graterThanOrEqual,
+      value,
+    );
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field and
@@ -243,8 +265,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created [Query].
   Query<T> whereArrayContains(String field, Object? value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
-        FilterOperator.arrayContains, value);
+    return _whereHelper(
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.arrayContains,
+      value,
+    );
   }
 
   /// Creates and returns a new [Query] with the additional filter that documents must contain the specified field, the
@@ -266,8 +291,11 @@ class Query<T extends dynamic> {
   ///
   /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
   Query<T> whereArrayContainsAny(String field, List<Object?> value) {
-    return _whereHelper(FieldPath.fromDotSeparatedPath(field),
-        FilterOperator.arrayContainsAny, value);
+    return _whereHelper(
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.arrayContainsAny,
+      value,
+    );
   }
 
   /// Creates and returns a new Query with the additional filter that documents
@@ -275,7 +303,10 @@ class Query<T extends dynamic> {
   /// array must contain at least one value from the provided array.
   ///
   /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
-  Query<T> whereArrayContainsAnyField(FieldPath fieldPath, List<Object?> value) {
+  Query<T> whereArrayContainsAnyField(
+    FieldPath fieldPath,
+    List<Object?> value,
+  ) {
     return _whereHelper(fieldPath, FilterOperator.arrayContainsAny, value);
   }
 
@@ -286,7 +317,10 @@ class Query<T extends dynamic> {
   /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
   Query<T> whereIn(String field, List<Object?> value) {
     return _whereHelper(
-        FieldPath.fromDotSeparatedPath(field), FilterOperator.IN, value);
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.IN,
+      value,
+    );
   }
 
   /// Creates and returns a new Query with the additional filter that documents
@@ -306,7 +340,10 @@ class Query<T extends dynamic> {
   /// with [whereArrayContainsAny], [whereIn] or [whereNotEqualTo].
   Query<T> whereNotIn(String field, List<Object?> value) {
     return _whereHelper(
-        FieldPath.fromDotSeparatedPath(field), FilterOperator.NOT_IN, value);
+      FieldPath.fromDotSeparatedPath(field),
+      FilterOperator.NOT_IN,
+      value,
+    );
   }
 
   /// Creates and returns a new Query with the additional filter that documents
@@ -362,7 +399,8 @@ class Query<T extends dynamic> {
   }) {
     final List<Filter> filters;
     if (fieldOrFilter is Filter) {
-      final bool hasConstraint = isEqualTo != null ||
+      final bool hasConstraint =
+          isEqualTo != null ||
           isNotEqualTo != null ||
           isLessThan != null ||
           isLessThanOrEqualTo != null ||
@@ -375,8 +413,9 @@ class Query<T extends dynamic> {
           isNull != null;
       if (hasConstraint) {
         throw ArgumentError(
-            'Invalid query. Named arguments cannot be combined with a Filter '
-            'in where().');
+          'Invalid query. Named arguments cannot be combined with a Filter '
+          'in where().',
+        );
       }
       filters = <Filter>[fieldOrFilter];
     } else {
@@ -386,8 +425,11 @@ class Query<T extends dynamic> {
       } else if (fieldOrFilter is String) {
         fieldPath = FieldPath.fromDotSeparatedPath(fieldOrFilter);
       } else {
-        throw ArgumentError.value(fieldOrFilter, 'fieldOrFilter',
-            'where() expects a Filter, a String field or a FieldPath');
+        throw ArgumentError.value(
+          fieldOrFilter,
+          'fieldOrFilter',
+          'where() expects a Filter, a String field or a FieldPath',
+        );
       }
       api.UnaryFilter filter(FilterOperator op, Object? value) =>
           api.UnaryFilter(fieldPath, op, value);
@@ -413,8 +455,9 @@ class Query<T extends dynamic> {
       ];
       if (filters.isEmpty) {
         throw ArgumentError(
-            "Invalid query. where('$fieldPath') needs at least one non-null "
-            'named argument. Use isNull to compare with null.');
+          "Invalid query. where('$fieldPath') needs at least one non-null "
+          'named argument. Use isNull to compare with null.',
+        );
       }
     }
 
@@ -457,7 +500,8 @@ class Query<T extends dynamic> {
       if (op == FilterOperator.arrayContains ||
           op == FilterOperator.arrayContainsAny) {
         throw ArgumentError(
-            'Invalid query. You can\'t perform "$op" queries on FieldPath.documentId().');
+          'Invalid query. You can\'t perform "$op" queries on FieldPath.documentId().',
+        );
       } else if (op == FilterOperator.IN || op == FilterOperator.NOT_IN) {
         _validateDisjunctiveFilterElements(value, op);
         final List<FieldValue> referenceList = <FieldValue>[];
@@ -474,8 +518,10 @@ class Query<T extends dynamic> {
           op == FilterOperator.arrayContainsAny) {
         _validateDisjunctiveFilterElements(value, op);
       }
-      fieldValue = firestore.dataConverter.parseQueryValue(value,
-          allowArrays: op == FilterOperator.IN || op == FilterOperator.NOT_IN);
+      fieldValue = firestore.dataConverter.parseQueryValue(
+        value,
+        allowArrays: op == FilterOperator.IN || op == FilterOperator.NOT_IN,
+      );
     }
     return FieldFilter(internalPath, op, fieldValue);
   }
@@ -483,7 +529,8 @@ class Query<T extends dynamic> {
   /// Takes an [api.CompositeFilter], parses each of its subfilters, and
   /// returns a new filter that is constructed using the parsed values.
   core_filter.Filter _parseCompositeFilter(
-      api.CompositeFilter compositeFilterData) {
+    api.CompositeFilter compositeFilterData,
+  ) {
     final List<core_filter.Filter> parsedFilters = <core_filter.Filter>[];
     for (Filter filter in compositeFilterData.filters) {
       final core_filter.Filter parsedFilter = _parseFilter(filter);
@@ -498,7 +545,9 @@ class Query<T extends dynamic> {
       return parsedFilters[0];
     }
     return core_filter.CompositeFilter(
-        parsedFilters, compositeFilterData.operator);
+      parsedFilters,
+      compositeFilterData.operator,
+    );
   }
 
   /// Takes a filter whose value has not been parsed, parses the value object
@@ -510,7 +559,8 @@ class Query<T extends dynamic> {
       return _parseCompositeFilter(filter);
     }
     throw fail(
-        'Parsing is only supported for Filter.UnaryFilter and Filter.CompositeFilter.');
+      'Parsing is only supported for Filter.UnaryFilter and Filter.CompositeFilter.',
+    );
   }
 
   /// Parses the given documentIdValue into a ReferenceValue, throwing
@@ -520,28 +570,35 @@ class Query<T extends dynamic> {
     if (value is String) {
       if (value.isEmpty) {
         throw ArgumentError(
-            'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.');
+          'Invalid query. When querying with FieldPath.documentId() you must provide a valid document ID, but it was an empty string.',
+        );
       }
 
       if (!query.isCollectionGroupQuery && value.contains('/')) {
         throw ArgumentError(
-            'Invalid query. When querying a collection by FieldPath.documentId() you must provide a plain document ID, but "$value" contains a "/" character.');
+          'Invalid query. When querying a collection by FieldPath.documentId() you must provide a plain document ID, but "$value" contains a "/" character.',
+        );
       }
 
-      final ResourcePath path =
-          query.path.appendField(ResourcePath.fromString(value));
+      final ResourcePath path = query.path.appendField(
+        ResourcePath.fromString(value),
+      );
       if (!DocumentKey.isDocumentKey(path)) {
         throw ArgumentError(
-            'Invalid query. When querying a collection group by FieldPath.documentId(), the value provided must result in a valid document path, but "$path" is not because it has an odd number of segments (${path.length}).');
+          'Invalid query. When querying a collection group by FieldPath.documentId(), the value provided must result in a valid document path, but "$path" is not because it has an odd number of segments (${path.length}).',
+        );
       }
       return ReferenceValue.valueOf(
-          firestore.databaseId, DocumentKey.fromPath(path));
+        firestore.databaseId,
+        DocumentKey.fromPath(path),
+      );
     } else if (value is DocumentReference) {
       return ReferenceValue.valueOf(firestore.databaseId, value.key);
     } else {
       throw ArgumentError(
-          'Invalid query. When querying with FieldPath.documentId() you must provide a valid String or '
-          'DocumentReference, but it was of type: ${typeName(value)}');
+        'Invalid query. When querying with FieldPath.documentId() you must provide a valid String or '
+        'DocumentReference, but it was of type: ${typeName(value)}',
+      );
     }
   }
 
@@ -554,7 +611,8 @@ class Query<T extends dynamic> {
   void _validateDisjunctiveFilterElements(Object? value, FilterOperator op) {
     if (value is! List || value.isEmpty) {
       throw ArgumentError(
-          'Invalid Query. A non-empty array is required for "$op" filters.');
+        'Invalid Query. A non-empty array is required for "$op" filters.',
+      );
     }
   }
 
@@ -586,7 +644,7 @@ class Query<T extends dynamic> {
           FilterOperator.arrayContainsAny,
           FilterOperator.IN,
           FilterOperator.NOT_IN,
-          FilterOperator.notEqual
+          FilterOperator.notEqual,
         ];
       default:
         return <FilterOperator>[];
@@ -598,17 +656,21 @@ class Query<T extends dynamic> {
   void _validateNewFieldFilter(core.Query query, FieldFilter fieldFilter) {
     final FilterOperator filterOp = fieldFilter.operator;
 
-    final FilterOperator? conflictingOperator =
-        _findOpInsideFilters(query.filters, _conflictingOps(filterOp));
+    final FilterOperator? conflictingOperator = _findOpInsideFilters(
+      query.filters,
+      _conflictingOps(filterOp),
+    );
     if (conflictingOperator != null) {
       // We special case when it's a duplicate op to give a slightly clearer
       // error message.
       if (conflictingOperator == filterOp) {
         throw ArgumentError(
-            'Invalid Query. You cannot use more than one "$filterOp" filter.');
+          'Invalid Query. You cannot use more than one "$filterOp" filter.',
+        );
       } else {
         throw ArgumentError(
-            'Invalid Query. You cannot use "$filterOp" filters with "$conflictingOperator" filters.');
+          'Invalid Query. You cannot use "$filterOp" filters with "$conflictingOperator" filters.',
+        );
       }
     }
   }
@@ -626,7 +688,9 @@ class Query<T extends dynamic> {
   /// list of filters (including the ones nested in composite filters) and
   /// returns the first one that is, or null if none are.
   FilterOperator? _findOpInsideFilters(
-      List<core_filter.Filter> filters, List<FilterOperator> operators) {
+    List<core_filter.Filter> filters,
+    List<FilterOperator> operators,
+  ) {
     for (core_filter.Filter filter in filters) {
       for (FieldFilter fieldFilter in filter.flattenedFilters) {
         if (operators.contains(fieldFilter.operator)) {
@@ -655,8 +719,10 @@ class Query<T extends dynamic> {
   /// [direction] the direction to sort.
   ///
   /// Returns the created Query.
-  Query<T> orderByField(FieldPath fieldPath,
-      [Direction direction = Direction.ascending]) {
+  Query<T> orderByField(
+    FieldPath fieldPath, [
+    Direction direction = Direction.ascending,
+  ]) {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
     return _orderBy(fieldPath.internalPath, direction);
   }
@@ -665,16 +731,22 @@ class Query<T extends dynamic> {
     checkNotNull(direction, 'Provided direction must not be null.');
     if (query.getStartAt() != null) {
       throw ArgumentError(
-          'Invalid query. You must not call Query.startAt() or Query.startAfter() before calling Query.orderBy().');
+        'Invalid query. You must not call Query.startAt() or Query.startAfter() before calling Query.orderBy().',
+      );
     }
     if (query.getEndAt() != null) {
       throw ArgumentError(
-          'Invalid query. You must not call Query.endAt() or Query.endBefore() before calling Query.orderBy().');
+        'Invalid query. You must not call Query.endAt() or Query.endBefore() before calling Query.orderBy().',
+      );
     }
     final OrderByDirection dir = direction == Direction.ascending
         ? OrderByDirection.ascending
         : OrderByDirection.descending;
-    return Query<T>(query.orderBy(OrderBy.getInstance(dir, fieldPath)), firestore, converter);
+    return Query<T>(
+      query.orderBy(OrderBy.getInstance(dir, fieldPath)),
+      firestore,
+      converter,
+    );
   }
 
   /// Creates and returns a new [Query] that's additionally limited to only return up to the specified number of
@@ -686,7 +758,8 @@ class Query<T extends dynamic> {
   Query<T> limit(int limit) {
     if (limit <= 0) {
       throw ArgumentError(
-          'Invalid Query. Query limit ($limit) is invalid. Limit must be positive.');
+        'Invalid Query. Query limit ($limit) is invalid. Limit must be positive.',
+      );
     }
     return Query<T>(query.limitToFirst(limit), firestore, converter);
   }
@@ -703,7 +776,8 @@ class Query<T extends dynamic> {
   Query<T> limitToLast(int limit) {
     if (limit <= 0) {
       throw ArgumentError(
-          'Invalid Query. Query limitToLast ($limit) is invalid. Limit must be positive.');
+        'Invalid Query. Query limitToLast ($limit) is invalid. Limit must be positive.',
+      );
     }
     return Query<T>(query.limitToLast(limit), firestore, converter);
   }
@@ -716,8 +790,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> startAtDocument(DocumentSnapshot<Object?> snapshot) {
-    final Bound bound =
-        _boundFromDocumentSnapshot('startAt', snapshot, /*inclusive:*/ true);
+    final Bound bound = _boundFromDocumentSnapshot(
+      'startAt',
+      snapshot,
+      /*inclusive:*/ true,
+    );
     return Query<T>(query.startAt(bound), firestore, converter);
   }
 
@@ -728,8 +805,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> startAt(List<Object?> fieldValues) {
-    final Bound bound =
-        _boundFromFields('startAt', fieldValues, /*inclusive:*/ true);
+    final Bound bound = _boundFromFields(
+      'startAt',
+      fieldValues,
+      /*inclusive:*/ true,
+    );
     return Query<T>(query.startAt(bound), firestore, converter);
   }
 
@@ -742,7 +822,10 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   Query<T> startAfterDocument(DocumentSnapshot<Object?> snapshot) {
     final Bound bound = _boundFromDocumentSnapshot(
-        'startAfter', snapshot, /*inclusive:*/ false);
+      'startAfter',
+      snapshot,
+      /*inclusive:*/ false,
+    );
     return Query<T>(query.startAt(bound), firestore, converter);
   }
 
@@ -753,8 +836,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> startAfter(List<Object?> fieldValues) {
-    final Bound bound =
-        _boundFromFields('startAfter', fieldValues, /*inclusive:*/ false);
+    final Bound bound = _boundFromFields(
+      'startAfter',
+      fieldValues,
+      /*inclusive:*/ false,
+    );
     return Query<T>(query.startAt(bound), firestore, converter);
   }
 
@@ -765,8 +851,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> endBeforeDocument(DocumentSnapshot<Object?> snapshot) {
-    final Bound bound =
-        _boundFromDocumentSnapshot('endBefore', snapshot, /*inclusive:*/ false);
+    final Bound bound = _boundFromDocumentSnapshot(
+      'endBefore',
+      snapshot,
+      /*inclusive:*/ false,
+    );
     return Query<T>(query.endAt(bound), firestore, converter);
   }
 
@@ -777,8 +866,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> endBefore(List<Object?> fieldValues) {
-    final Bound bound =
-        _boundFromFields('endBefore', fieldValues, /*inclusive:*/ false);
+    final Bound bound = _boundFromFields(
+      'endBefore',
+      fieldValues,
+      /*inclusive:*/ false,
+    );
     return Query<T>(query.endAt(bound), firestore, converter);
   }
 
@@ -789,8 +881,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> endAtDocument(DocumentSnapshot<Object?> snapshot) {
-    final Bound bound =
-        _boundFromDocumentSnapshot('endAt', snapshot, /*inclusive:*/ true);
+    final Bound bound = _boundFromDocumentSnapshot(
+      'endAt',
+      snapshot,
+      /*inclusive:*/ true,
+    );
     return Query<T>(query.endAt(bound), firestore, converter);
   }
 
@@ -801,8 +896,11 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> endAt(List<Object?> fieldValues) {
-    final Bound bound =
-        _boundFromFields('endAt', fieldValues, /*inclusive:*/ true);
+    final Bound bound = _boundFromFields(
+      'endAt',
+      fieldValues,
+      /*inclusive:*/ true,
+    );
     return Query<T>(query.endAt(bound), firestore, converter);
   }
 
@@ -814,12 +912,18 @@ class Query<T extends dynamic> {
   /// Will throw if the document does not contain all fields of the order by of the query or if any of the fields in the
   /// order by are an uncommitted server timestamp.
   Bound _boundFromDocumentSnapshot(
-      String methodName, DocumentSnapshot<Object?> snapshot, bool inclusive) {
+    String methodName,
+    DocumentSnapshot<Object?> snapshot,
+    bool inclusive,
+  ) {
     checkNotNull<DocumentSnapshot<Object?>>(
-        snapshot, 'Provided snapshot must not be null.');
+      snapshot,
+      'Provided snapshot must not be null.',
+    );
     if (!snapshot.exists) {
       throw ArgumentError(
-          'Can\'t use a DocumentSnapshot for a document that doesn\'t exist for $methodName().');
+        'Can\'t use a DocumentSnapshot for a document that doesn\'t exist for $methodName().',
+      );
     }
     final Document document = snapshot.document!;
     final List<FieldValue> components = <FieldValue>[];
@@ -830,21 +934,24 @@ class Query<T extends dynamic> {
     // using the explicit sort orders), multiple documents could match the position, yielding duplicate results.
     for (OrderBy orderBy in query.orderByConstraints) {
       if (orderBy.field == core.FieldPath.keyPath) {
-        components
-            .add(ReferenceValue.valueOf(firestore.databaseId, document.key));
+        components.add(
+          ReferenceValue.valueOf(firestore.databaseId, document.key),
+        );
       } else {
         final FieldValue? value = document.getField(orderBy.field);
         if (value is ServerTimestampValue) {
           throw ArgumentError(
-              'Invalid query. You are trying to start or end a query using a document for which the field '
-              '\'${orderBy.field}\' is an uncommitted server timestamp. (Since the value of this field is unknown, you '
-              'cannot start/end a query with it.)');
+            'Invalid query. You are trying to start or end a query using a document for which the field '
+            '\'${orderBy.field}\' is an uncommitted server timestamp. (Since the value of this field is unknown, you '
+            'cannot start/end a query with it.)',
+          );
         } else if (value != null) {
           components.add(value);
         } else {
           throw ArgumentError(
-              'Invalid query. You are trying to start or end a query using a document for which the field '
-              '\'${orderBy.field}\' (used as the orderBy) does not exist.');
+            'Invalid query. You are trying to start or end a query using a document for which the field '
+            '\'${orderBy.field}\' (used as the orderBy) does not exist.',
+          );
         }
       }
     }
@@ -853,13 +960,17 @@ class Query<T extends dynamic> {
 
   /// Converts a list of field values to Bound.
   Bound _boundFromFields(
-      String methodName, List<Object?> values, bool inclusive) {
+    String methodName,
+    List<Object?> values,
+    bool inclusive,
+  ) {
     // Use explicit order by's because it has to match the query the user made
     final List<OrderBy> explicitOrderBy = query.explicitSortOrder;
     if (values.length > explicitOrderBy.length) {
       throw ArgumentError(
-          'Too many arguments provided to $methodName(). The number of arguments must be less than or equal to the '
-          'number of orderBy() clauses.');
+        'Too many arguments provided to $methodName(). The number of arguments must be less than or equal to the '
+        'number of orderBy() clauses.',
+      );
     }
 
     final List<FieldValue> components = <FieldValue>[];
@@ -869,25 +980,30 @@ class Query<T extends dynamic> {
       if (orderBy.field == core.FieldPath.keyPath) {
         if (rawValue is! String) {
           throw ArgumentError(
-              'Invalid query. Expected a string for document ID in $methodName(), but got $rawValue.');
+            'Invalid query. Expected a string for document ID in $methodName(), but got $rawValue.',
+          );
         }
         final String documentId = rawValue;
 
         if (!query.isCollectionGroupQuery && documentId.contains('/')) {
           throw ArgumentError(
-              'Invalid query. When querying a collection and ordering by FieldPath.documentId(), the value passed to $methodName() must be a plain document ID, but "$documentId" contains a slash.');
+            'Invalid query. When querying a collection and ordering by FieldPath.documentId(), the value passed to $methodName() must be a plain document ID, but "$documentId" contains a slash.',
+          );
         }
-        final ResourcePath path =
-            query.path.appendField(ResourcePath.fromString(documentId));
+        final ResourcePath path = query.path.appendField(
+          ResourcePath.fromString(documentId),
+        );
         if (!DocumentKey.isDocumentKey(path)) {
           throw ArgumentError(
-              'Invalid query. When querying a collection group and ordering by FieldPath.documentId(), the value passed to $methodName() must result in a valid document path, but "$path" is not because it contains an odd number of segments.');
+            'Invalid query. When querying a collection group and ordering by FieldPath.documentId(), the value passed to $methodName() must result in a valid document path, but "$path" is not because it contains an odd number of segments.',
+          );
         }
         final DocumentKey key = DocumentKey.fromPath(path);
         components.add(ReferenceValue.valueOf(firestore.databaseId, key));
       } else {
-        final FieldValue wrapped =
-            firestore.dataConverter.parseQueryValue(rawValue);
+        final FieldValue wrapped = firestore.dataConverter.parseQueryValue(
+          rawValue,
+        );
         components.add(wrapped);
       }
     }
@@ -907,11 +1023,14 @@ class Query<T extends dynamic> {
   Future<QuerySnapshot<T>> get([Source source = Source.defaultSource]) async {
     _validateHasExplicitOrderByForLimitToLast();
     if (source == Source.cache) {
-      final ViewSnapshot viewSnap =
-          await firestore.client.getDocumentsFromLocalCache(query);
+      final ViewSnapshot viewSnap = await firestore.client
+          .getDocumentsFromLocalCache(query);
 
       return QuerySnapshot<T>(
-          Query<T>(query, firestore, converter), viewSnap, firestore);
+        Query<T>(query, firestore, converter),
+        viewSnap,
+        firestore,
+      );
     } else {
       return _getViaSnapshotListener(source);
     }
@@ -921,16 +1040,18 @@ class Query<T extends dynamic> {
     const ListenOptions options = ListenOptions.all();
 
     return _firstAndCancel(
-        _getSnapshotsInternal(options).map((QuerySnapshot<T> snapshot) {
-      if (snapshot.metadata.isFromCache && source == Source.server) {
-        throw FirestoreError(
+      _getSnapshotsInternal(options).map((QuerySnapshot<T> snapshot) {
+        if (snapshot.metadata.isFromCache && source == Source.server) {
+          throw FirestoreError(
             'Failed to get documents from server. (However, these documents may exist in the local cache. Run again '
             'without setting source to Source.server to retrieve the cached documents.)',
-            FirestoreErrorCode.unavailable);
-      } else {
-        return snapshot;
-      }
-    }));
+            FirestoreErrorCode.unavailable,
+          );
+        } else {
+          return snapshot;
+        }
+      }),
+    );
   }
 
   /// Returns a [VectorQuery] that finds the [limit] documents whose
@@ -952,12 +1073,13 @@ class Query<T extends dynamic> {
     double? distanceThreshold,
   }) {
     return findNearestField(
-        FieldPath.fromDotSeparatedPath(vectorField),
-        queryVector,
-        limit,
-        distanceMeasure,
-        distanceResultField: distanceResultField,
-        distanceThreshold: distanceThreshold);
+      FieldPath.fromDotSeparatedPath(vectorField),
+      queryVector,
+      limit,
+      distanceMeasure,
+      distanceResultField: distanceResultField,
+      distanceThreshold: distanceThreshold,
+    );
   }
 
   /// Same as [findNearest] but takes the vector field as a [FieldPath].
@@ -976,12 +1098,18 @@ class Query<T extends dynamic> {
       vector = VectorValue(queryVector);
     } else {
       throw ArgumentError(
-          'Invalid vector query: the query vector must be a VectorValue or a List<double>, but was ${queryVector.runtimeType}.');
+        'Invalid vector query: the query vector must be a VectorValue or a List<double>, but was ${queryVector.runtimeType}.',
+      );
     }
-    return VectorQuery(this, vectorField.internalPath, vector, limit,
-        distanceMeasure,
-        distanceResultField: distanceResultField,
-        distanceThreshold: distanceThreshold);
+    return VectorQuery(
+      this,
+      vectorField.internalPath,
+      vector,
+      limit,
+      distanceMeasure,
+      distanceResultField: distanceResultField,
+      distanceThreshold: distanceThreshold,
+    );
   }
 
   /// Returns an [AggregateQuery] that counts the documents in the result set of
@@ -1031,8 +1159,9 @@ class Query<T extends dynamic> {
   /// Return cached results first and then queries the server with resume token
   /// to ensure unnecessary reads are not made.
   Stream<QuerySnapshot<T>> getSnapshots([MetadataChanges? changes]) {
-    final ListenOptions options =
-        _internalOptions(changes ?? MetadataChanges.exclude);
+    final ListenOptions options = _internalOptions(
+      changes ?? MetadataChanges.exclude,
+    );
     return _getSnapshotsInternal(options);
   }
 
@@ -1040,27 +1169,34 @@ class Query<T extends dynamic> {
   /// [ListenSource]: with [ListenSource.cache] the events are raised from the
   /// local cache only (local writes, cache updates) and the backend is not
   /// contacted for this listener.
-  Stream<QuerySnapshot<T>> getSnapshotsWithOptions(SnapshotListenOptions options) {
+  Stream<QuerySnapshot<T>> getSnapshotsWithOptions(
+    SnapshotListenOptions options,
+  ) {
     return _getSnapshotsInternal(
-        _internalOptions(options.metadataChanges, options.source));
+      _internalOptions(options.metadataChanges, options.source),
+    );
   }
 
   void _validateHasExplicitOrderByForLimitToLast() {
     if (query.hasLimitToLast && query.explicitSortOrder.isEmpty) {
       throw StateError(
-          'limitToLast() queries require specifying at least one orderBy() clause');
+        'limitToLast() queries require specifying at least one orderBy() clause',
+      );
     }
   }
 
   Stream<QuerySnapshot<T>> _getSnapshotsInternal(ListenOptions options) {
     _validateHasExplicitOrderByForLimitToLast();
     return listenToQuery(firestore.client, query, options).map(
-        (ViewSnapshot snapshot) => QuerySnapshot<T>(this, snapshot, firestore));
+      (ViewSnapshot snapshot) => QuerySnapshot<T>(this, snapshot, firestore),
+    );
   }
 
   /// Converts the  API options object to the internal options object.
-  static ListenOptions _internalOptions(MetadataChanges metadataChanges,
-      [ListenSource source = ListenSource.defaultSource]) {
+  static ListenOptions _internalOptions(
+    MetadataChanges metadataChanges, [
+    ListenSource source = ListenSource.defaultSource,
+  ]) {
     return ListenOptions(
       source: source,
       includeDocumentMetadataChanges:
@@ -1079,8 +1215,7 @@ class Query<T extends dynamic> {
           converter == other.converter;
 
   @override
-  int get hashCode =>
-      query.hashCode ^ firestore.hashCode ^ converter.hashCode;
+  int get hashCode => query.hashCode ^ firestore.hashCode ^ converter.hashCode;
 
   @override
   String toString() {

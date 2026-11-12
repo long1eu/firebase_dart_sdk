@@ -63,7 +63,7 @@ enum PipelineIndexMode {
 class Pipeline {
   @internal
   Pipeline(this.firestore, List<Stage> stages)
-      : stages = List<Stage>.unmodifiable(stages);
+    : stages = List<Stage>.unmodifiable(stages);
 
   /// The database this pipeline runs against.
   final Firestore firestore;
@@ -75,13 +75,17 @@ class Pipeline {
       Pipeline(firestore, <Stage>[...stages, stage]);
 
   /// Keeps only the inputs for which [condition] holds.
-  Pipeline where(BooleanExpression condition,
-      {Map<String, Object?>? rawOptions}) {
-    return _append(Stage(
-      'where',
-      args: <pb.Value Function(PipelineEncoder)>[condition.toProto],
-      rawOptions: rawOptions,
-    ));
+  Pipeline where(
+    BooleanExpression condition, {
+    Map<String, Object?>? rawOptions,
+  }) {
+    return _append(
+      Stage(
+        'where',
+        args: <pb.Value Function(PipelineEncoder)>[condition.toProto],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Outputs only the given [selections]: field names (`String`), [Field]s or
@@ -92,26 +96,32 @@ class Pipeline {
 
   /// Adds the given aliased expressions as [fields] to every input, keeping
   /// the existing fields.
-  Pipeline addFields(List<Selectable> fields,
-      {Map<String, Object?>? rawOptions}) {
+  Pipeline addFields(
+    List<Selectable> fields, {
+    Map<String, Object?>? rawOptions,
+  }) {
     return _expressionMapStage('add_fields', 'addFields', fields, rawOptions);
   }
 
   /// Removes the given [fields] (`String` names or [Field]s) from every
   /// input.
-  Pipeline removeFields(List<Object> fields,
-      {Map<String, Object?>? rawOptions}) {
+  Pipeline removeFields(
+    List<Object> fields, {
+    Map<String, Object?>? rawOptions,
+  }) {
     _requireNotEmpty(fields, 'removeFields');
     final List<Field> converted = fields
         .map((Object f) => f is Field ? f : Field.of(f))
         .toList(growable: false);
-    return _append(Stage(
-      'remove_fields',
-      args: <pb.Value Function(PipelineEncoder)>[
-        for (final Field field in converted) field.toProto,
-      ],
-      rawOptions: rawOptions,
-    ));
+    return _append(
+      Stage(
+        'remove_fields',
+        args: <pb.Value Function(PipelineEncoder)>[
+          for (final Field field in converted) field.toProto,
+        ],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Sorts the inputs by [orderings], the first one being the most
@@ -119,13 +129,15 @@ class Pipeline {
   Pipeline sort(List<Ordering> orderings, {Map<String, Object?>? rawOptions}) {
     _requireNotEmpty(orderings, 'sort');
     final List<Ordering> copy = List<Ordering>.of(orderings);
-    return _append(Stage(
-      'sort',
-      args: <pb.Value Function(PipelineEncoder)>[
-        for (final Ordering ordering in copy) ordering.toProto,
-      ],
-      rawOptions: rawOptions,
-    ));
+    return _append(
+      Stage(
+        'sort',
+        args: <pb.Value Function(PipelineEncoder)>[
+          for (final Ordering ordering in copy) ordering.toProto,
+        ],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Keeps at most the first [limit] inputs.
@@ -133,11 +145,13 @@ class Pipeline {
     if (limit < 0) {
       throw ArgumentError.value(limit, 'limit', 'must not be negative');
     }
-    return _append(Stage(
-      'limit',
-      args: <pb.Value Function(PipelineEncoder)>[(_) => integerValue(limit)],
-      rawOptions: rawOptions,
-    ));
+    return _append(
+      Stage(
+        'limit',
+        args: <pb.Value Function(PipelineEncoder)>[(_) => integerValue(limit)],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Skips the first [offset] inputs.
@@ -145,11 +159,13 @@ class Pipeline {
     if (offset < 0) {
       throw ArgumentError.value(offset, 'offset', 'must not be negative');
     }
-    return _append(Stage(
-      'offset',
-      args: <pb.Value Function(PipelineEncoder)>[(_) => integerValue(offset)],
-      rawOptions: rawOptions,
-    ));
+    return _append(
+      Stage(
+        'offset',
+        args: <pb.Value Function(PipelineEncoder)>[(_) => integerValue(offset)],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Combines the inputs into one result per group, computing
@@ -164,35 +180,42 @@ class Pipeline {
   ///   groups: ['genre'],
   /// );
   /// ```
-  Pipeline aggregate(List<AliasedAggregate> accumulators,
-      {List<Object> groups = const <Object>[],
-      Map<String, Object?>? rawOptions}) {
+  Pipeline aggregate(
+    List<AliasedAggregate> accumulators, {
+    List<Object> groups = const <Object>[],
+    Map<String, Object?>? rawOptions,
+  }) {
     _requireNotEmpty(accumulators, 'aggregate');
     final Map<String, AggregateFunction> accumulatorMap =
         <String, AggregateFunction>{};
     for (final AliasedAggregate aliased in accumulators) {
       if (accumulatorMap.containsKey(aliased.alias)) {
         throw ArgumentError(
-            "Duplicate alias or field '${aliased.alias}' in aggregate().");
+          "Duplicate alias or field '${aliased.alias}' in aggregate().",
+        );
       }
       accumulatorMap[aliased.alias] = aliased.aggregate;
     }
-    final Map<String, Expression> groupMap =
-        selectablesToMap(groups, method: 'aggregate');
-    return _append(Stage(
-      'aggregate',
-      args: <pb.Value Function(PipelineEncoder)>[
-        (PipelineEncoder encoder) {
-          final pb.MapValue map = pb.MapValue();
-          accumulatorMap.forEach((String alias, AggregateFunction function) {
-            map.fields[alias] = function.toProto(encoder);
-          });
-          return pb.Value()..mapValue = map;
-        },
-        (PipelineEncoder encoder) => encodeExpressionMap(encoder, groupMap),
-      ],
-      rawOptions: rawOptions,
-    ));
+    final Map<String, Expression> groupMap = selectablesToMap(
+      groups,
+      method: 'aggregate',
+    );
+    return _append(
+      Stage(
+        'aggregate',
+        args: <pb.Value Function(PipelineEncoder)>[
+          (PipelineEncoder encoder) {
+            final pb.MapValue map = pb.MapValue();
+            accumulatorMap.forEach((String alias, AggregateFunction function) {
+              map.fields[alias] = function.toProto(encoder);
+            });
+            return pb.Value()..mapValue = map;
+          },
+          (PipelineEncoder encoder) => encodeExpressionMap(encoder, groupMap),
+        ],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Outputs one result for every distinct combination of [groups]: field
@@ -225,8 +248,9 @@ class Pipeline {
       vectorExpression = Constant(VectorValue(vector));
     } else {
       throw ArgumentError(
-          'findNearest() expects a VectorValue, a List<double> or an '
-          'Expression as the vector, but got: $vector');
+        'findNearest() expects a VectorValue, a List<double> or an '
+        'Expression as the vector, but got: $vector',
+      );
     }
     if (limit != null && limit <= 0) {
       throw ArgumentError.value(limit, 'limit', 'must be positive');
@@ -243,53 +267,63 @@ class Pipeline {
         measure = 'dot_product';
         break;
     }
-    return _append(Stage(
-      'find_nearest',
-      args: <pb.Value Function(PipelineEncoder)>[
-        vectorField.toProto,
-        vectorExpression.toProto,
-        (_) => stringValue(measure),
-      ],
-      options: <String, pb.Value Function(PipelineEncoder)>{
-        if (limit != null) 'limit': (_) => integerValue(limit),
-        if (distanceField != null)
-          'distance_field': Field.of(distanceField).toProto,
-      },
-      rawOptions: rawOptions,
-    ));
+    return _append(
+      Stage(
+        'find_nearest',
+        args: <pb.Value Function(PipelineEncoder)>[
+          vectorField.toProto,
+          vectorExpression.toProto,
+          (_) => stringValue(measure),
+        ],
+        options: <String, pb.Value Function(PipelineEncoder)>{
+          if (limit != null) 'limit': (_) => integerValue(limit),
+          if (distanceField != null)
+            'distance_field': Field.of(distanceField).toProto,
+        },
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Keeps a random sample of the inputs: either a number of [documents], or
   /// a [percentage] of them between 0 and 1. Exactly one must be given.
-  Pipeline sample(
-      {int? documents, double? percentage, Map<String, Object?>? rawOptions}) {
+  Pipeline sample({
+    int? documents,
+    double? percentage,
+    Map<String, Object?>? rawOptions,
+  }) {
     if ((documents == null) == (percentage == null)) {
       throw ArgumentError(
-          'sample() needs exactly one of documents and percentage.');
+        'sample() needs exactly one of documents and percentage.',
+      );
     }
-    return _append(Stage(
-      'sample',
-      args: <pb.Value Function(PipelineEncoder)>[
-        (_) => documents != null
-            ? integerValue(documents)
-            : doubleValue(percentage!),
-        (_) => stringValue(documents != null ? 'documents' : 'percent'),
-      ],
-      rawOptions: rawOptions,
-    ));
+    return _append(
+      Stage(
+        'sample',
+        args: <pb.Value Function(PipelineEncoder)>[
+          (_) => documents != null
+              ? integerValue(documents)
+              : doubleValue(percentage!),
+          (_) => stringValue(documents != null ? 'documents' : 'percent'),
+        ],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Appends the results of [other] to the results of this pipeline. The
   /// order of the combined results is not defined.
   Pipeline union(Pipeline other, {Map<String, Object?>? rawOptions}) {
-    return _append(Stage(
-      'union',
-      args: <pb.Value Function(PipelineEncoder)>[
-        (PipelineEncoder encoder) =>
-            pb.Value()..pipelineValue = other.toProto(encoder),
-      ],
-      rawOptions: rawOptions,
-    ));
+    return _append(
+      Stage(
+        'union',
+        args: <pb.Value Function(PipelineEncoder)>[
+          (PipelineEncoder encoder) =>
+              pb.Value()..pipelineValue = other.toProto(encoder),
+        ],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Outputs one result per element of an array: [selectable] is the array
@@ -298,41 +332,51 @@ class Pipeline {
   ///
   /// With [indexField] the position of the element in the array is stored
   /// under that name.
-  Pipeline unnest(Selectable selectable,
-      {String? indexField, Map<String, Object?>? rawOptions}) {
+  Pipeline unnest(
+    Selectable selectable, {
+    String? indexField,
+    Map<String, Object?>? rawOptions,
+  }) {
     final Field alias = Field.of(selectable.alias);
-    return _append(Stage(
-      'unnest',
-      args: <pb.Value Function(PipelineEncoder)>[
-        selectable.expression.toProto,
-        alias.toProto,
-      ],
-      options: <String, pb.Value Function(PipelineEncoder)>{
-        if (indexField != null) 'index_field': Field.of(indexField).toProto,
-      },
-      rawOptions: rawOptions,
-    ));
+    return _append(
+      Stage(
+        'unnest',
+        args: <pb.Value Function(PipelineEncoder)>[
+          selectable.expression.toProto,
+          alias.toProto,
+        ],
+        options: <String, pb.Value Function(PipelineEncoder)>{
+          if (indexField != null) 'index_field': Field.of(indexField).toProto,
+        },
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Replaces every input with the map that [fieldOrExpression] evaluates to:
   /// a field name (`String`) or an [Expression].
-  Pipeline replaceWith(Object fieldOrExpression,
-      {Map<String, Object?>? rawOptions}) {
+  Pipeline replaceWith(
+    Object fieldOrExpression, {
+    Map<String, Object?>? rawOptions,
+  }) {
     final Expression expression = fieldOrExpression is String
         ? Field.of(fieldOrExpression)
         : fieldOrExpression is Expression
-            ? fieldOrExpression
-            : throw ArgumentError(
-                'replaceWith() takes a field name or an Expression, but got: '
-                '$fieldOrExpression');
-    return _append(Stage(
-      'replace_with',
-      args: <pb.Value Function(PipelineEncoder)>[
-        expression.toProto,
-        (_) => stringValue('full_replace'),
-      ],
-      rawOptions: rawOptions,
-    ));
+        ? fieldOrExpression
+        : throw ArgumentError(
+            'replaceWith() takes a field name or an Expression, but got: '
+            '$fieldOrExpression',
+          );
+    return _append(
+      Stage(
+        'replace_with',
+        args: <pb.Value Function(PipelineEncoder)>[
+          expression.toProto,
+          (_) => stringValue('full_replace'),
+        ],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Defines variables for the following stages and for subqueries used in
@@ -349,8 +393,10 @@ class Pipeline {
   ///           .toScalarExpression().as('bookCount'),
   ///     ]);
   /// ```
-  Pipeline define(List<AliasedExpression> variables,
-      {Map<String, Object?>? rawOptions}) {
+  Pipeline define(
+    List<AliasedExpression> variables, {
+    Map<String, Object?>? rawOptions,
+  }) {
     return _expressionMapStage('let', 'define', variables, rawOptions);
   }
 
@@ -359,15 +405,17 @@ class Pipeline {
   ///
   /// A pipeline that outputs a single field yields an array of the values of
   /// that field; otherwise every element is a map of the fields of a result.
-  Expression toArrayExpression() => FunctionExpression(
-      'array', <Object?>[RawValueExpression(_toPipelineValue, toString())]);
+  Expression toArrayExpression() => FunctionExpression('array', <Object?>[
+    RawValueExpression(_toPipelineValue, toString()),
+  ]);
 
   /// This pipeline as an expression that evaluates to its single result, for
   /// use in a stage of another pipeline (a subquery). The pipeline must
   /// produce at most one result; with a single output field the expression
   /// is the value of that field.
-  Expression toScalarExpression() => FunctionExpression(
-      'scalar', <Object?>[RawValueExpression(_toPipelineValue, toString())]);
+  Expression toScalarExpression() => FunctionExpression('scalar', <Object?>[
+    RawValueExpression(_toPipelineValue, toString()),
+  ]);
 
   pb.Value _toPipelineValue(PipelineEncoder encoder) =>
       pb.Value()..pipelineValue = toProto(encoder);
@@ -394,18 +442,23 @@ class Pipeline {
   /// of the given aliased expressions. Without them the documents are
   /// written as the preceding stages left them (for example after
   /// `addFields`). See [delete] for how write stages behave.
-  Pipeline update(
-      {List<Selectable> transformedFields = const <Selectable>[],
-      Map<String, Object?>? rawOptions}) {
-    final Map<String, Expression> fields =
-        selectablesToMap(transformedFields, method: 'update');
-    return _append(Stage(
-      'update',
-      args: <pb.Value Function(PipelineEncoder)>[
-        (PipelineEncoder encoder) => encodeExpressionMap(encoder, fields),
-      ],
-      rawOptions: rawOptions,
-    ));
+  Pipeline update({
+    List<Selectable> transformedFields = const <Selectable>[],
+    Map<String, Object?>? rawOptions,
+  }) {
+    final Map<String, Expression> fields = selectablesToMap(
+      transformedFields,
+      method: 'update',
+    );
+    return _append(
+      Stage(
+        'update',
+        args: <pb.Value Function(PipelineEncoder)>[
+          (PipelineEncoder encoder) => encodeExpressionMap(encoder, fields),
+        ],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Creates a document from every input; fails with `already-exists` if one
@@ -416,15 +469,18 @@ class Pipeline {
   /// from. [documentId] (a field name or an [Expression]) gives the id of
   /// each new document; without it the server assigns ids. See [delete] for
   /// how write stages behave.
-  Pipeline insert(
-      {Object? collection,
-      Object? documentId,
-      Map<String, Object?>? rawOptions}) {
-    return _append(Stage(
-      'insert',
-      options: _writeTarget('insert', collection, documentId),
-      rawOptions: rawOptions,
-    ));
+  Pipeline insert({
+    Object? collection,
+    Object? documentId,
+    Map<String, Object?>? rawOptions,
+  }) {
+    return _append(
+      Stage(
+        'insert',
+        options: _writeTarget('insert', collection, documentId),
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Creates or replaces a document from every input.
@@ -432,30 +488,39 @@ class Pipeline {
   /// [additionalFields] are aliased expressions that are written on top of
   /// the input. [collection] and [documentId] are as for [insert]. See
   /// [delete] for how write stages behave.
-  Pipeline upsert(
-      {List<Selectable> additionalFields = const <Selectable>[],
-      Object? collection,
-      Object? documentId,
-      Map<String, Object?>? rawOptions}) {
-    final Map<String, Expression> fields =
-        selectablesToMap(additionalFields, method: 'upsert');
-    return _append(Stage(
-      'upsert',
-      args: <pb.Value Function(PipelineEncoder)>[
-        (PipelineEncoder encoder) => encodeExpressionMap(encoder, fields),
-      ],
-      options: _writeTarget('upsert', collection, documentId),
-      rawOptions: rawOptions,
-    ));
+  Pipeline upsert({
+    List<Selectable> additionalFields = const <Selectable>[],
+    Object? collection,
+    Object? documentId,
+    Map<String, Object?>? rawOptions,
+  }) {
+    final Map<String, Expression> fields = selectablesToMap(
+      additionalFields,
+      method: 'upsert',
+    );
+    return _append(
+      Stage(
+        'upsert',
+        args: <pb.Value Function(PipelineEncoder)>[
+          (PipelineEncoder encoder) => encodeExpressionMap(encoder, fields),
+        ],
+        options: _writeTarget('upsert', collection, documentId),
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   Map<String, pb.Value Function(PipelineEncoder)> _writeTarget(
-      String method, Object? collection, Object? documentId) {
+    String method,
+    Object? collection,
+    Object? documentId,
+  ) {
     final String? path = collection == null
         ? null
         : PipelineSource.collectionPath(firestore, collection, method);
-    final Expression? id =
-        documentId == null ? null : fieldOrExpression(documentId);
+    final Expression? id = documentId == null
+        ? null
+        : fieldOrExpression(documentId);
     return <String, pb.Value Function(PipelineEncoder)>{
       if (path != null) 'collection': (_) => relativeReferenceValue(path),
       if (id != null) 'document_id': id.toProto,
@@ -465,25 +530,29 @@ class Pipeline {
   /// Adds a stage this SDK has no method for: [name] is the server name of
   /// the stage (snake case), [args] its positional arguments (values or
   /// [Expression]s) and [options] its named options.
-  Pipeline rawStage(String name, List<Object?> args,
-      {Map<String, Object?>? options}) {
+  Pipeline rawStage(
+    String name,
+    List<Object?> args, {
+    Map<String, Object?>? options,
+  }) {
     final List<Object?> copy = List<Object?>.of(args);
-    return _append(Stage(
-      name,
-      args: <pb.Value Function(PipelineEncoder)>[
-        for (final Object? arg in copy)
-          (PipelineEncoder encoder) => arg is Expression
-              ? arg.toProto(encoder)
-              : arg is Map
-                  ? encodeExpressionMap(encoder, <String, Expression>{
-                      for (final MapEntry<Object?, Object?> entry
-                          in arg.entries)
-                        entry.key! as String: toExpression(entry.value),
-                    })
-                  : toExpression(arg).toProto(encoder),
-      ],
-      rawOptions: options,
-    ));
+    return _append(
+      Stage(
+        name,
+        args: <pb.Value Function(PipelineEncoder)>[
+          for (final Object? arg in copy)
+            (PipelineEncoder encoder) => arg is Expression
+                ? arg.toProto(encoder)
+                : arg is Map
+                ? encodeExpressionMap(encoder, <String, Expression>{
+                    for (final MapEntry<Object?, Object?> entry in arg.entries)
+                      entry.key! as String: toExpression(entry.value),
+                  })
+                : toExpression(arg).toProto(encoder),
+        ],
+        rawOptions: options,
+      ),
+    );
   }
 
   /// Executes this pipeline on the server.
@@ -504,17 +573,26 @@ class Pipeline {
   }) async {
     if (stages.isNotEmpty && stages.first.name == 'subcollection') {
       throw StateError(
-          'This pipeline starts at a subcollection of the document of an '
-          'enclosing pipeline and cannot be executed directly. It can only '
-          'be used as part of another pipeline.');
+        'This pipeline starts at a subcollection of the document of an '
+        'enclosing pipeline and cannot be executed directly. It can only '
+        'be used as part of another pipeline.',
+      );
     }
     final PipelineEncoder encoder = PipelineEncoder(firestore.databaseId);
-    final proto.ExecutePipelineRequest request = toExecuteRequest(encoder,
-        atomic: atomic, indexMode: indexMode, rawOptions: rawOptions);
-    final List<proto.ExecutePipelineResponse> responses =
-        await firestore.client.executePipeline(request);
+    final proto.ExecutePipelineRequest request = toExecuteRequest(
+      encoder,
+      atomic: atomic,
+      indexMode: indexMode,
+      rawOptions: rawOptions,
+    );
+    final List<proto.ExecutePipelineResponse> responses = await firestore.client
+        .executePipeline(request);
     return decodePipelineResponses(
-        this, firestore, encoder.serializer, responses);
+      this,
+      firestore,
+      encoder.serializer,
+      responses,
+    );
   }
 
   /// Builds the request that [execute] sends.
@@ -552,18 +630,26 @@ class Pipeline {
       ..stages.addAll(stages.map((Stage stage) => stage.toProto(encoder)));
   }
 
-  Pipeline _expressionMapStage(String name, String method,
-      List<Object> selectables, Map<String, Object?>? rawOptions) {
+  Pipeline _expressionMapStage(
+    String name,
+    String method,
+    List<Object> selectables,
+    Map<String, Object?>? rawOptions,
+  ) {
     _requireNotEmpty(selectables, method);
-    final Map<String, Expression> map =
-        selectablesToMap(selectables, method: method);
-    return _append(Stage(
-      name,
-      args: <pb.Value Function(PipelineEncoder)>[
-        (PipelineEncoder encoder) => encodeExpressionMap(encoder, map),
-      ],
-      rawOptions: rawOptions,
-    ));
+    final Map<String, Expression> map = selectablesToMap(
+      selectables,
+      method: method,
+    );
+    return _append(
+      Stage(
+        name,
+        args: <pb.Value Function(PipelineEncoder)>[
+          (PipelineEncoder encoder) => encodeExpressionMap(encoder, map),
+        ],
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   static void _requireNotEmpty(List<Object?> values, String method) {

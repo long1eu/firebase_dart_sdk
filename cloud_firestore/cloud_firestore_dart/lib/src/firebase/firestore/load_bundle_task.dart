@@ -79,8 +79,10 @@ class LoadBundleTask {
   /// Completes the task successfully with the given final [result].
   @internal
   void setResult(LoadBundleTaskProgress result) {
-    hardAssert(result.taskState == LoadBundleTaskState.success,
-        'Expected success, but was ${result.taskState}');
+    hardAssert(
+      result.taskState == LoadBundleTaskState.success,
+      'Expected success, but was ${result.taskState}',
+    );
     _snapshot = result;
     _completion.complete(result);
     _progress

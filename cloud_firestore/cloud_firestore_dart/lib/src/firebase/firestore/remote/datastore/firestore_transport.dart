@@ -11,8 +11,11 @@ import 'package:protobuf/protobuf.dart';
 
 /// Describes one RPC of the `google.firestore.v1.Firestore` service.
 class FirestoreRpc<Req extends GeneratedMessage, Res extends GeneratedMessage> {
-  const FirestoreRpc._(this.name, this.newResponse,
-      {this.clientStreaming = false});
+  const FirestoreRpc._(
+    this.name,
+    this.newResponse, {
+    this.clientStreaming = false,
+  });
 
   /// The method name, for example `Commit`.
   final String name;
@@ -26,39 +29,61 @@ class FirestoreRpc<Req extends GeneratedMessage, Res extends GeneratedMessage> {
   /// The gRPC path of the method.
   String get path => '/google.firestore.v1.Firestore/$name';
 
-  static const FirestoreRpc<proto.BatchGetDocumentsRequest,
-      proto.BatchGetDocumentsResponse> batchGetDocuments = FirestoreRpc<
-          proto.BatchGetDocumentsRequest, proto.BatchGetDocumentsResponse>._(
-      'BatchGetDocuments', proto.BatchGetDocumentsResponse.create);
+  static const FirestoreRpc<
+    proto.BatchGetDocumentsRequest,
+    proto.BatchGetDocumentsResponse
+  >
+  batchGetDocuments =
+      FirestoreRpc<
+        proto.BatchGetDocumentsRequest,
+        proto.BatchGetDocumentsResponse
+      >._('BatchGetDocuments', proto.BatchGetDocumentsResponse.create);
 
   static const FirestoreRpc<proto.RunQueryRequest, proto.RunQueryResponse>
-      runQuery = FirestoreRpc<proto.RunQueryRequest, proto.RunQueryResponse>._(
-          'RunQuery', proto.RunQueryResponse.create);
+  runQuery = FirestoreRpc<proto.RunQueryRequest, proto.RunQueryResponse>._(
+    'RunQuery',
+    proto.RunQueryResponse.create,
+  );
 
-  static const FirestoreRpc<proto.RunAggregationQueryRequest,
-      proto.RunAggregationQueryResponse> runAggregationQuery = FirestoreRpc<
-          proto.RunAggregationQueryRequest,
-          proto.RunAggregationQueryResponse>._(
-      'RunAggregationQuery', proto.RunAggregationQueryResponse.create);
+  static const FirestoreRpc<
+    proto.RunAggregationQueryRequest,
+    proto.RunAggregationQueryResponse
+  >
+  runAggregationQuery =
+      FirestoreRpc<
+        proto.RunAggregationQueryRequest,
+        proto.RunAggregationQueryResponse
+      >._('RunAggregationQuery', proto.RunAggregationQueryResponse.create);
 
-  static const FirestoreRpc<proto.ExecutePipelineRequest,
-      proto.ExecutePipelineResponse> executePipeline = FirestoreRpc<
-          proto.ExecutePipelineRequest, proto.ExecutePipelineResponse>._(
-      'ExecutePipeline', proto.ExecutePipelineResponse.create);
+  static const FirestoreRpc<
+    proto.ExecutePipelineRequest,
+    proto.ExecutePipelineResponse
+  >
+  executePipeline =
+      FirestoreRpc<
+        proto.ExecutePipelineRequest,
+        proto.ExecutePipelineResponse
+      >._('ExecutePipeline', proto.ExecutePipelineResponse.create);
 
   static const FirestoreRpc<proto.CommitRequest, proto.CommitResponse> commit =
       FirestoreRpc<proto.CommitRequest, proto.CommitResponse>._(
-          'Commit', proto.CommitResponse.create);
+        'Commit',
+        proto.CommitResponse.create,
+      );
 
   static const FirestoreRpc<proto.ListenRequest, proto.ListenResponse> listen =
       FirestoreRpc<proto.ListenRequest, proto.ListenResponse>._(
-          'Listen', proto.ListenResponse.create,
-          clientStreaming: true);
+        'Listen',
+        proto.ListenResponse.create,
+        clientStreaming: true,
+      );
 
   static const FirestoreRpc<proto.WriteRequest, proto.WriteResponse> write =
       FirestoreRpc<proto.WriteRequest, proto.WriteResponse>._(
-          'Write', proto.WriteResponse.create,
-          clientStreaming: true);
+        'Write',
+        proto.WriteResponse.create,
+        clientStreaming: true,
+      );
 }
 
 /// Sends the RPCs of the Firestore service to the backend.
@@ -72,10 +97,10 @@ abstract class FirestoreTransport {
   ///
   /// [options] are merged over the default options of the transport (which
   /// carry the credentials).
-  ResponseStream<Res>
-      startCall<Req extends GeneratedMessage, Res extends GeneratedMessage>(
-          FirestoreRpc<Req, Res> rpc, Stream<Req> requests,
-          {CallOptions? options});
+  ResponseStream<Res> startCall<
+    Req extends GeneratedMessage,
+    Res extends GeneratedMessage
+  >(FirestoreRpc<Req, Res> rpc, Stream<Req> requests, {CallOptions? options});
 
   /// Terminates the transport. All open calls are terminated immediately, and
   /// no further calls may be made.

@@ -48,27 +48,35 @@ Field field(Object nameOrPath) => Field.of(nameOrPath);
 Constant constant(Object? value) => Constant(value);
 
 /// Whether all of the conditions hold.
-BooleanExpression and(BooleanExpression first, BooleanExpression second,
-        [List<BooleanExpression> more = const <BooleanExpression>[]]) =>
-    first.and(second, more);
+BooleanExpression and(
+  BooleanExpression first,
+  BooleanExpression second, [
+  List<BooleanExpression> more = const <BooleanExpression>[],
+]) => first.and(second, more);
 
 /// Whether at least one of the conditions holds.
-BooleanExpression or(BooleanExpression first, BooleanExpression second,
-        [List<BooleanExpression> more = const <BooleanExpression>[]]) =>
-    first.or(second, more);
+BooleanExpression or(
+  BooleanExpression first,
+  BooleanExpression second, [
+  List<BooleanExpression> more = const <BooleanExpression>[],
+]) => first.or(second, more);
 
 /// Whether an odd number of the conditions hold.
-BooleanExpression xor(BooleanExpression first, BooleanExpression second,
-        [List<BooleanExpression> more = const <BooleanExpression>[]]) =>
-    first.xor(second, more);
+BooleanExpression xor(
+  BooleanExpression first,
+  BooleanExpression second, [
+  List<BooleanExpression> more = const <BooleanExpression>[],
+]) => first.xor(second, more);
 
 /// The negation of [condition].
 BooleanExpression not(BooleanExpression condition) => condition.not();
 
 /// [thenValue] if [condition] holds, [elseValue] otherwise.
 FunctionExpression conditional(
-        BooleanExpression condition, Object? thenValue, Object? elseValue) =>
-    condition.conditional(thenValue, elseValue);
+  BooleanExpression condition,
+  Object? thenValue,
+  Object? elseValue,
+) => condition.conditional(thenValue, elseValue);
 
 /// Counts all inputs of an aggregation.
 AggregateFunction countAll() => AggregateFunction('count');
@@ -92,9 +100,11 @@ FunctionExpression currentTimestamp() =>
 FunctionExpression rand() => FunctionExpression('rand');
 
 /// Whether none of the conditions holds.
-BooleanExpression nor(BooleanExpression first, BooleanExpression second,
-        [List<BooleanExpression> more = const <BooleanExpression>[]]) =>
-    first.nor(second, more);
+BooleanExpression nor(
+  BooleanExpression first,
+  BooleanExpression second, [
+  List<BooleanExpression> more = const <BooleanExpression>[],
+]) => first.nor(second, more);
 
 /// The result that follows the first condition that holds.
 ///
@@ -104,9 +114,11 @@ BooleanExpression nor(BooleanExpression first, BooleanExpression second,
 /// ```dart
 /// switchOn(field('n').equal(1), 'one', [field('n').equal(2), 'two', 'many']);
 /// ```
-FunctionExpression switchOn(BooleanExpression condition, Object? result,
-        [List<Object?> others = const <Object?>[]]) =>
-    FunctionExpression('switch_on', <Object?>[condition, result, ...others]);
+FunctionExpression switchOn(
+  BooleanExpression condition,
+  Object? result, [
+  List<Object?> others = const <Object?>[],
+]) => FunctionExpression('switch_on', <Object?>[condition, result, ...others]);
 
 /// A reference to the variable [name], defined with `Pipeline.define` in this
 /// pipeline or in a pipeline that contains this one as a subquery.

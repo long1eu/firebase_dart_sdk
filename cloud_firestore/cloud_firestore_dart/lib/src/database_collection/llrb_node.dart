@@ -22,8 +22,13 @@ enum LLRBNodeColor { red, black }
 abstract class LLRBNode<K, V> {
   const LLRBNode();
 
-  LLRBNode<K, V> copy(K? key, V? value, LLRBNodeColor color,
-      LLRBNode<K, V>? left, LLRBNode<K, V>? right);
+  LLRBNode<K, V> copy(
+    K? key,
+    V? value,
+    LLRBNodeColor color,
+    LLRBNode<K, V>? left,
+    LLRBNode<K, V>? right,
+  );
 
   LLRBNode<K, V> insert(K key, V value, Comparator<K> comparator);
 
@@ -50,8 +55,10 @@ abstract class LLRBNode<K, V> {
   void inOrderTraversal(NodeVisitor<K, V> visitor);
 
   bool shortCircuitingInOrderTraversal(
-      ShortCircuitingNodeVisitor<K, V> visitor);
+    ShortCircuitingNodeVisitor<K, V> visitor,
+  );
 
   bool shortCircuitingReverseOrderTraversal(
-      ShortCircuitingNodeVisitor<K, V> visitor);
+    ShortCircuitingNodeVisitor<K, V> visitor,
+  );
 }

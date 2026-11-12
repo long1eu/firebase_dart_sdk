@@ -26,7 +26,7 @@ class AggregateQuerySnapshot {
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   AggregateQuerySnapshot(this.query, Map<String, FieldValue> data)
-      : _data = Map<String, FieldValue>.unmodifiable(data);
+    : _data = Map<String, FieldValue>.unmodifiable(data);
 
   /// The query that produced this snapshot.
   final AggregateQuery query;
@@ -62,7 +62,8 @@ class AggregateQuerySnapshot {
     final int? value = getInt(AggregateField.count());
     if (value == null) {
       throw ArgumentError(
-          'RunAggregationQueryResponse alias ${AggregateField.count().alias} is null');
+        'RunAggregationQueryResponse alias ${AggregateField.count().alias} is null',
+      );
     }
     return value;
   }
@@ -79,7 +80,8 @@ class AggregateQuerySnapshot {
     final FieldValue? value = _data[aggregateField.alias];
     if (value == null) {
       throw ArgumentError(
-          "'${aggregateField.operator}(${aggregateField.fieldPath})' was not requested in the aggregation query.");
+        "'${aggregateField.operator}(${aggregateField.fieldPath})' was not requested in the aggregation query.",
+      );
     }
     return value.value;
   }

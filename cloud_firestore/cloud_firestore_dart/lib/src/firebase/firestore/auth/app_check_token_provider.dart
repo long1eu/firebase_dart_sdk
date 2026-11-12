@@ -43,8 +43,10 @@ class AppCheckTokenProvider {
 
   void _onTokenChanged(AppCheckTokenResult result) {
     if (result.error != null) {
-      Log.w(_tag,
-          'Error getting App Check token; using placeholder token instead. Error: ${result.error}');
+      Log.w(
+        _tag,
+        'Error getting App Check token; using placeholder token instead. Error: ${result.error}',
+      );
     }
     _onChange.add(result.token);
   }
@@ -58,11 +60,14 @@ class AppCheckTokenProvider {
     }
     final bool forceRefresh = _forceRefresh;
     _forceRefresh = false;
-    final AppCheckTokenResult result =
-        await interop.getToken(forceRefresh: forceRefresh);
+    final AppCheckTokenResult result = await interop.getToken(
+      forceRefresh: forceRefresh,
+    );
     if (result.error != null) {
-      Log.w(_tag,
-          'Error getting App Check token; using placeholder token instead. Error: ${result.error}');
+      Log.w(
+        _tag,
+        'Error getting App Check token; using placeholder token instead. Error: ${result.error}',
+      );
     }
     return result.token;
   }

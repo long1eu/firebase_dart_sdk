@@ -19,11 +19,15 @@
 class TargetIdGenerator {
   /// Instantiates a new TargetIdGenerator, using the seed as the first target ID to return.
   TargetIdGenerator(int generatorId, int seed)
-      : assert((generatorId & _reservedBits) == generatorId,
-            'Generator ID $generatorId contains more than $_reservedBits reserved bits.'),
-        assert((seed & _reservedBits) == generatorId,
-            'Cannot supply target ID from different generator ID'),
-        _nextId = seed;
+    : assert(
+        (generatorId & _reservedBits) == generatorId,
+        'Generator ID $generatorId contains more than $_reservedBits reserved bits.',
+      ),
+      assert(
+        (seed & _reservedBits) == generatorId,
+        'Cannot supply target ID from different generator ID',
+      ),
+      _nextId = seed;
 
   /// Creates and returns the [TargetIdGenerator] for the local store.
   factory TargetIdGenerator.forQueryCache(int after) {

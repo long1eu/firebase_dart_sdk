@@ -104,16 +104,19 @@ class RestClient {
           throw parsed;
         }
       }
-      throw GrpcError.custom(codeFromHttpStatus(response.statusCode),
-          'Request failed with HTTP status ${response.statusCode}');
+      throw GrpcError.custom(
+        codeFromHttpStatus(response.statusCode),
+        'Request failed with HTTP status ${response.statusCode}',
+      );
     }
 
     if (json is List) {
       // A streaming call that failed part way reports the error as an element.
       for (final Object? element in json) {
         if (element is Map && element['error'] is Map) {
-          throw grpcErrorFromJson((element['error'] as Map<Object?, Object?>)
-              .cast<String, Object?>());
+          throw grpcErrorFromJson(
+            (element['error'] as Map<Object?, Object?>).cast<String, Object?>(),
+          );
         }
       }
       return json;

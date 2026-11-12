@@ -28,8 +28,8 @@ class TargetIndexMatcher {
   /// [target] must only have field filters (a target with composite filters
   /// is matched through its sub targets in disjunctive normal form).
   TargetIndexMatcher(Target target)
-      : _collectionId = target.collectionGroup ?? target.path.getLastSegment(),
-        _orderBys = target.orderBy {
+    : _collectionId = target.collectionGroup ?? target.path.getLastSegment(),
+      _orderBys = target.orderBy {
     for (final Filter filter in target.filters) {
       final FieldFilter fieldFilter = filter as FieldFilter;
       if (_isInequality(fieldFilter)) {
@@ -86,7 +86,9 @@ class TargetIndexMatcher {
   /// Throws an [AssertionError] if the index is for a different collection.
   bool servedByIndex(FieldIndex index) {
     hardAssert(
-        index.collectionGroup == _collectionId, 'Collection IDs do not match');
+      index.collectionGroup == _collectionId,
+      'Collection IDs do not match',
+    );
 
     if (hasMultipleInequality) {
       // Only single inequality is supported for now.
@@ -207,15 +209,22 @@ class TargetIndexMatcher {
       }
       uniqueFields.add(orderBy.field);
 
-      segments.add(IndexSegment(
+      segments.add(
+        IndexSegment(
           orderBy.field,
           orderBy.direction == OrderByDirection.ascending
               ? SegmentKind.ascending
-              : SegmentKind.descending));
+              : SegmentKind.descending,
+        ),
+      );
     }
 
     return FieldIndex(
-        FieldIndex.unknownId, _collectionId, segments, FieldIndex.initialState);
+      FieldIndex.unknownId,
+      _collectionId,
+      segments,
+      FieldIndex.initialState,
+    );
   }
 
   bool _hasMatchingEqualityFilter(IndexSegment segment) {

@@ -25,7 +25,9 @@ abstract class NumericTransformOperation implements TransformOperation {
 
   @override
   FieldValue applyToRemoteDocument(
-      FieldValue? previousValue, FieldValue transformResult) {
+    FieldValue? previousValue,
+    FieldValue transformResult,
+  ) {
     return transformResult;
   }
 
@@ -46,7 +48,8 @@ abstract class NumericTransformOperation implements TransformOperation {
       return operand.doubleValue;
     } else {
       throw fail(
-          "Expected 'operand' to be of Number type, but was ${operand.runtimeType}");
+        "Expected 'operand' to be of Number type, but was ${operand.runtimeType}",
+      );
     }
   }
 
@@ -62,7 +65,8 @@ abstract class NumericTransformOperation implements TransformOperation {
       return operand.doubleValue.toInt();
     } else {
       throw fail(
-          "Expected 'operand' to be of Number type, but was ${operand.runtimeType}");
+        "Expected 'operand' to be of Number type, but was ${operand.runtimeType}",
+      );
     }
   }
 

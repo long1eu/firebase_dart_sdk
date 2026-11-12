@@ -19,34 +19,41 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<void> add(
-      MaybeDocument maybeDocument, SnapshotVersion readTime) async {
-    hardAssert(readTime != SnapshotVersion.none,
-        'Cannot add document to the RemoteDocumentCache with a read time of zero');
+    MaybeDocument maybeDocument,
+    SnapshotVersion readTime,
+  ) async {
+    hardAssert(
+      readTime != SnapshotVersion.none,
+      'Cannot add document to the RemoteDocumentCache with a read time of zero',
+    );
 
     final String path = _pathForKey(maybeDocument.key);
     final Timestamp timestamp = readTime.timestamp;
-    final GeneratedMessage message =
-        serializer.encodeMaybeDocument(maybeDocument);
+    final GeneratedMessage message = serializer.encodeMaybeDocument(
+      maybeDocument,
+    );
 
     _statsCollector.recordRowsWritten(RemoteDocumentCache.statsTag, 1);
     await db.execute(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           INSERT
           OR REPLACE INTO remote_documents (path, path_length, read_time_seconds, read_time_nanos, contents)
           VALUES (?, ?, ?, ?, ?);
         ''',
-        // @formatter:on
-        <dynamic>[
-          path,
-          maybeDocument.key.path.length,
-          timestamp.seconds,
-          timestamp.nanoseconds,
-          message.writeToBuffer()
-        ]);
+      // @formatter:on
+      <dynamic>[
+        path,
+        maybeDocument.key.path.length,
+        timestamp.seconds,
+        timestamp.nanoseconds,
+        message.writeToBuffer(),
+      ],
+    );
 
-    await (_indexManager ?? db.indexManager)
-        .addToCollectionParentIndex(maybeDocument.key.path.popLast());
+    await (_indexManager ?? db.indexManager).addToCollectionParentIndex(
+      maybeDocument.key.path.popLast(),
+    );
   }
 
   @override
@@ -55,18 +62,20 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     _statsCollector.recordRowsDeleted(RemoteDocumentCache.statsTag, 1);
 
     await db.execute(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           DELETE
           FROM remote_documents
           WHERE path = ?;
         ''',
-        // @formatter:on
-        <String>[path]);
+      // @formatter:on
+      <String>[path],
+    );
 
     // A removed document has no index entries (upstream does this in `removeAll`).
-    await _indexManager?.updateIndexEntries(
-        <DocumentKey, MaybeDocument?>{documentKey: null});
+    await _indexManager?.updateIndexEntries(<DocumentKey, MaybeDocument?>{
+      documentKey: null,
+    });
   }
 
   @override
@@ -75,14 +84,15 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, 1);
     final List<Map<String, dynamic>> result = await db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT contents
           FROM remote_documents
           WHERE path = ?;
         ''',
-        // @formatter:on
-        <String>[path]);
+      // @formatter:on
+      <String>[path],
+    );
 
     if (result.isEmpty) {
       return null;
@@ -94,7 +104,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<Map<DocumentKey, MaybeDocument?>> getAll(
-      Iterable<DocumentKey> documentKeys) async {
+    Iterable<DocumentKey> documentKeys,
+  ) async {
     final List<Object?> args = <Object?>[];
     for (DocumentKey key in documentKeys) {
       args.add(EncodedPath.encode(key.path));
@@ -108,16 +119,17 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     }
 
     final LongQuery longQuery = LongQuery(
-        db,
-        'SELECT contents FROM remote_documents WHERE path IN (',
-        null,
-        args,
-        ') ORDER BY path');
+      db,
+      'SELECT contents FROM remote_documents WHERE path IN (',
+      null,
+      args,
+      ') ORDER BY path',
+    );
 
     int rowsProcessed = 0;
     while (longQuery.hasMoreSubqueries) {
-      final List<Map<String, dynamic>> rows =
-          await longQuery.performNextSubquery();
+      final List<Map<String, dynamic>> rows = await longQuery
+          .performNextSubquery();
       for (Map<String, dynamic> row in rows) {
         final MaybeDocument decoded = decodeMaybeDocument(row['contents']);
         results[decoded.key] = decoded;
@@ -138,9 +150,12 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<Map<DocumentKey, ReadDocument>> getAllForCollectionGroup(
-      String collectionGroup, IndexOffset offset, int limit) async {
-    final List<ResourcePath> collectionParents =
-        await db.indexManager.getCollectionParents(collectionGroup);
+    String collectionGroup,
+    IndexOffset offset,
+    int limit,
+  ) async {
+    final List<ResourcePath> collectionParents = await db.indexManager
+        .getCollectionParents(collectionGroup);
     final List<ResourcePath> collections = <ResourcePath>[
       for (final ResourcePath collectionParent in collectionParents)
         collectionParent.appendSegment(collectionGroup),
@@ -156,30 +171,38 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           <DocumentKey, ReadDocument>{};
       const int pageSize = _maxArgs ~/ bindsPerStatement;
       for (int i = 0; i < collections.length; i += pageSize) {
-        results.addAll(await _getAllForCollections(
+        results.addAll(
+          await _getAllForCollections(
             collections.sublist(i, min(collections.length, i + pageSize)),
             offset,
-            limit));
+            limit,
+          ),
+        );
       }
       // The first [limit] entries, by read time and key.
-      final List<MapEntry<DocumentKey, ReadDocument>> entries = results.entries
-          .toList()
-        ..sort((MapEntry<DocumentKey, ReadDocument> l,
-            MapEntry<DocumentKey, ReadDocument> r) {
-          final int cmp = l.value.readTime.compareTo(r.value.readTime);
-          return cmp != 0 ? cmp : l.key.compareTo(r.key);
-        });
+      final List<MapEntry<DocumentKey, ReadDocument>> entries =
+          results.entries.toList()..sort((
+            MapEntry<DocumentKey, ReadDocument> l,
+            MapEntry<DocumentKey, ReadDocument> r,
+          ) {
+            final int cmp = l.value.readTime.compareTo(r.value.readTime);
+            return cmp != 0 ? cmp : l.key.compareTo(r.key);
+          });
       return Map<DocumentKey, ReadDocument>.fromEntries(entries.take(limit));
     }
   }
 
   /// Returns the next [count] documents from the provided collections, ordered by read time.
   Future<Map<DocumentKey, ReadDocument>> _getAllForCollections(
-      List<ResourcePath> collections, IndexOffset offset, int count) async {
+    List<ResourcePath> collections,
+    IndexOffset offset,
+    int count,
+  ) async {
     final Timestamp readTime = offset.readTime.timestamp;
     final DocumentKey documentKey = offset.documentKey;
 
-    final String sql = '${List<String>.filled(collections.length, '''
+    final String sql =
+        '${List<String>.filled(collections.length, '''
           SELECT contents, read_time_seconds, read_time_nanos, path
           FROM remote_documents
           WHERE path >= ? AND path < ? AND path_length = ?
@@ -214,7 +237,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       results[document.key] = (
         document: document,
         readTime: SnapshotVersion(
-            Timestamp(row['read_time_seconds'], row['read_time_nanos'])),
+          Timestamp(row['read_time_seconds'], row['read_time_nanos']),
+        ),
       );
     }
 
@@ -224,10 +248,15 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query, IndexOffset offset,
-          [QueryContext? context]) async {
-    hardAssert(!query.isCollectionGroupQuery,
-        'CollectionGroup queries should be handled in LocalDocumentsView');
+  getAllDocumentsMatchingQuery(
+    Query query,
+    IndexOffset offset, [
+    QueryContext? context,
+  ]) async {
+    hardAssert(
+      !query.isCollectionGroupQuery,
+      'CollectionGroup queries should be handled in LocalDocumentsView',
+    );
 
     // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
@@ -241,23 +270,24 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final List<Map<String, dynamic>> result;
     if (offset == IndexOffset.none) {
       result = await db.query(
-          // @formatter:off
-          '''
+        // @formatter:off
+        '''
             SELECT path, contents
             FROM remote_documents
             WHERE path >= ?
               AND path < ?;
           ''',
-          // @formatter:on
-          <String>[prefixPath, prefixSuccessorPath]);
+        // @formatter:on
+        <String>[prefixPath, prefixSuccessorPath],
+      );
     } else {
       // Execute an index-free query and filter by read time (and by key, for the documents read at the read time of
       // the offset). This is safe since all document changes to queries that have a lastLimboFreeSnapshotVersion have
       // a read time set.
       final Timestamp readTime = offset.readTime.timestamp;
       result = await db.query(
-          // @formatter:off
-          '''
+        // @formatter:off
+        '''
             SELECT path, contents
             FROM remote_documents
             WHERE path >= ?
@@ -266,17 +296,18 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
                 OR (read_time_seconds = ? AND read_time_nanos > ?)
                 OR (read_time_seconds = ? AND read_time_nanos = ? AND path > ?));
           ''',
-          // @formatter:on
-          <Object>[
-            prefixPath,
-            prefixSuccessorPath,
-            readTime.seconds,
-            readTime.seconds,
-            readTime.nanoseconds,
-            readTime.seconds,
-            readTime.nanoseconds,
-            EncodedPath.encode(offset.documentKey.path),
-          ]);
+        // @formatter:on
+        <Object>[
+          prefixPath,
+          prefixSuccessorPath,
+          readTime.seconds,
+          readTime.seconds,
+          readTime.nanoseconds,
+          readTime.seconds,
+          readTime.nanoseconds,
+          EncodedPath.encode(offset.documentKey.path),
+        ],
+      );
     }
 
     for (Map<String, dynamic> row in result) {
@@ -309,7 +340,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, result.length);
     context?.incrementDocumentReadCount(result.length);
     return ImmutableSortedMap<DocumentKey, Document>.fromMap(
-        results, DocumentKey.comparator);
+      results,
+      DocumentKey.comparator,
+    );
   }
 
   String _pathForKey(DocumentKey key) {
@@ -318,8 +351,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   MaybeDocument decodeMaybeDocument(Uint8List bytes) {
     try {
-      return serializer
-          .decodeMaybeDocument(proto.MaybeDocument.fromBuffer(bytes));
+      return serializer.decodeMaybeDocument(
+        proto.MaybeDocument.fromBuffer(bytes),
+      );
     } on InvalidProtocolBufferException catch (e) {
       throw fail('MaybeDocument failed to parse: $e');
     }

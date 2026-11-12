@@ -29,12 +29,16 @@ class FieldPath {
   ///
   /// Return a FieldPath that points to a field location in a document.
   factory FieldPath.of(List<String> fieldNames) {
-    checkArgument(fieldNames.isNotEmpty,
-        'Invalid field path. Provided path must not be null or empty.');
+    checkArgument(
+      fieldNames.isNotEmpty,
+      'Invalid field path. Provided path must not be null or empty.',
+    );
 
     for (int i = 0; i < fieldNames.length; ++i) {
-      checkArgument(fieldNames[i].isNotEmpty,
-          'Invalid field name at argument ${i + 1}. Field names must not be null or empty.');
+      checkArgument(
+        fieldNames[i].isNotEmpty,
+        'Invalid field name at argument ${i + 1}. Field names must not be null or empty.',
+      );
     }
 
     return FieldPath.fromSegments(fieldNames);
@@ -43,14 +47,17 @@ class FieldPath {
   /// Parses a field path string into a [FieldPath], treating dots as separators.
   factory FieldPath.fromDotSeparatedPath(String path) {
     checkNotNull(path, 'Provided field path must not be null.');
-    checkArgument(!reserved.hasMatch(path),
-        "Use FieldPath.of() for field names containing '~*/[]'.");
+    checkArgument(
+      !reserved.hasMatch(path),
+      "Use FieldPath.of() for field names containing '~*/[]'.",
+    );
     try {
       return FieldPath.of(path.split('.'));
     } on ArgumentError catch (_) {
       throw ArgumentError(
-          'Invalid field path ($path). Paths must not be empty, begin with \'.\', end with \'.\', '
-          'or contain \'..\'');
+        'Invalid field path ($path). Paths must not be empty, begin with \'.\', end with \'.\', '
+        'or contain \'..\'',
+      );
     }
   }
 
@@ -64,8 +71,9 @@ class FieldPath {
 
   /// Implementation detail of the SDK; not part of the supported API. Use [documentIdField].
   @internal
-  static final FieldPath documentIdInstance =
-      FieldPath(model.FieldPath.keyPath);
+  static final FieldPath documentIdInstance = FieldPath(
+    model.FieldPath.keyPath,
+  );
 
   /// Returns a special sentinel [FieldPath] to refer to the id of a document. It can be used in
   /// queries to sort or filter by the document id.

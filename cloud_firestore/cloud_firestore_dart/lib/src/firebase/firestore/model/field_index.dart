@@ -65,7 +65,9 @@ class IndexOffset implements Comparable<IndexOffset> {
   /// Creates an offset that matches all documents with a read time higher than
   /// [readTime].
   factory IndexOffset.createSuccessor(
-      SnapshotVersion readTime, int largestBatchId) {
+    SnapshotVersion readTime,
+    int largestBatchId,
+  ) {
     // We want to create an offset that matches all documents with a read time
     // greater than the provided read time. To do so, we technically need to
     // create an offset for `(readTime, MAX_DOCUMENT_KEY)`. While we could use
@@ -75,15 +77,19 @@ class IndexOffset implements Comparable<IndexOffset> {
     final int successorSeconds = readTime.timestamp.seconds;
     final int successorNanos = readTime.timestamp.nanoseconds + 1;
     final SnapshotVersion successor = SnapshotVersion(
-        successorNanos == 1000000000
-            ? Timestamp(successorSeconds + 1, 0)
-            : Timestamp(successorSeconds, successorNanos));
+      successorNanos == 1000000000
+          ? Timestamp(successorSeconds + 1, 0)
+          : Timestamp(successorSeconds, successorNanos),
+    );
     return IndexOffset(successor, DocumentKey.empty(), largestBatchId);
   }
 
   /// The offset of an index that has not processed any document.
-  static final IndexOffset none = IndexOffset(SnapshotVersion.none,
-      DocumentKey.empty(), FieldIndex.initialLargestBatchId);
+  static final IndexOffset none = IndexOffset(
+    SnapshotVersion.none,
+    DocumentKey.empty(),
+    FieldIndex.initialLargestBatchId,
+  );
 
   /// The latest read time version that has been indexed by Firestore for this
   /// field index.
@@ -121,7 +127,8 @@ class IndexOffset implements Comparable<IndexOffset> {
   int get hashCode => Object.hash(readTime, documentKey, largestBatchId);
 
   @override
-  String toString() => 'IndexOffset{readTime=$readTime, '
+  String toString() =>
+      'IndexOffset{readTime=$readTime, '
       'documentKey=$documentKey, largestBatchId=$largestBatchId}';
 }
 
@@ -164,9 +171,12 @@ class IndexState {
 /// collection group-scoped indices. Every index can be used for both single
 /// collection and collection group queries.
 class FieldIndex {
-  FieldIndex(this.indexId, this.collectionGroup, List<IndexSegment> segments,
-      this.indexState)
-      : segments = List<IndexSegment>.unmodifiable(segments);
+  FieldIndex(
+    this.indexId,
+    this.collectionGroup,
+    List<IndexSegment> segments,
+    this.indexState,
+  ) : segments = List<IndexSegment>.unmodifiable(segments);
 
   /// An ID for an index that has not yet been added to persistence.
   static const int unknownId = -1;
@@ -180,8 +190,10 @@ class FieldIndex {
   static const int initialSequenceNumber = 0;
 
   /// The state of an index that has not yet been backfilled.
-  static final IndexState initialState =
-      IndexState(initialSequenceNumber, IndexOffset.none);
+  static final IndexState initialState = IndexState(
+    initialSequenceNumber,
+    IndexOffset.none,
+  );
 
   /// Compares indexes by collection group and segments. Ignores update time
   /// and index ID.
@@ -229,7 +241,8 @@ class FieldIndex {
   /// Firestore queries can only have a single ArrayContains/ArrayContainsAny
   /// statement.
   IndexSegment? get arraySegment => segments.firstWhereOrNull(
-      (IndexSegment segment) => segment.kind == SegmentKind.contains);
+    (IndexSegment segment) => segment.kind == SegmentKind.contains,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -241,11 +254,16 @@ class FieldIndex {
           indexState == other.indexState;
 
   @override
-  int get hashCode => Object.hash(indexId, collectionGroup,
-      const ListEquality<IndexSegment>().hash(segments), indexState);
+  int get hashCode => Object.hash(
+    indexId,
+    collectionGroup,
+    const ListEquality<IndexSegment>().hash(segments),
+    indexState,
+  );
 
   @override
-  String toString() => 'FieldIndex{indexId=$indexId, '
+  String toString() =>
+      'FieldIndex{indexId=$indexId, '
       'collectionGroup=$collectionGroup, segments=$segments, '
       'indexState=$indexState}';
 }

@@ -25,8 +25,10 @@ class SQLiteSchema {
   final Database db;
 
   /// Runs the migration methods defined in this class, starting at the given version.
-  Future<void> runMigrations(
-      [int fromVersion = 0, int toVersion = version]) async {
+  Future<void> runMigrations([
+    int fromVersion = 0,
+    int toVersion = version,
+  ]) async {
     // New migrations should be added at the end of the series of `if` statements and should follow the pattern. Make
     // sure to increment `VERSION` and to read the comment below about requirements for new migrations.
 
@@ -137,7 +139,9 @@ class SQLiteSchema {
   ///
   /// If some but not all of the tables exist, an exception will be thrown.
   Future<void> _ifTablesDontExist(
-      List<String> tables, Future<void> Function() fn) async {
+    List<String> tables,
+    Future<void> Function() fn,
+  ) async {
     bool tablesFound = false;
     final String allTables = '[${tables.join(', ')}]';
     for (int i = 0; i < tables.length; i++) {
@@ -147,7 +151,8 @@ class SQLiteSchema {
         tablesFound = tableFound;
       } else if (tableFound != tablesFound) {
         final StringBuffer msg = StringBuffer(
-            'Expected all of $allTables to either exist or not, but ');
+          'Expected all of $allTables to either exist or not, but ',
+        );
         if (tablesFound) {
           msg.write('${tables[0]} exists and $table does not');
         } else {
@@ -159,17 +164,19 @@ class SQLiteSchema {
     if (!tablesFound) {
       return fn();
     } else {
-      Log.d('SQLiteSchema',
-          'Skipping migration because all of $allTables already exist');
+      Log.d(
+        'SQLiteSchema',
+        'Skipping migration because all of $allTables already exist',
+      );
     }
   }
 
   Future<void> _createV1MutationQueue() async {
     return _ifTablesDontExist(
-        <String>['mutation_queues', 'mutations', 'document_mutations'],
-        () async {
-      // A table naming all the mutation queues in the system.
-      await db.query(
+      <String>['mutation_queues', 'mutations', 'document_mutations'],
+      () async {
+        // A table naming all the mutation queues in the system.
+        await db.query(
           // @formatter:off
           '''
           CREATE TABLE mutation_queues (
@@ -177,12 +184,12 @@ class SQLiteSchema {
             last_acknowledged_batch_id INTEGER,
             last_stream_token          BLOB
           );
-        '''
+        ''',
           // @formatter:on
-          );
+        );
 
-      // All the mutation batches in the system, partitioned by user.
-      await db.query(
+        // All the mutation batches in the system, partitioned by user.
+        await db.query(
           // @formatter:off
           '''
           CREATE TABLE mutations (
@@ -191,13 +198,13 @@ class SQLiteSchema {
             mutations BLOB,
             PRIMARY KEY (uid, batch_id)
           );
-        '''
+        ''',
           // @formatter:on
-          );
+        );
 
-      // A manually maintained index of all the mutation batches that affect a given document key. The rows in this
-      // table are references based on the contents of mutations.mutations.
-      await db.query(
+        // A manually maintained index of all the mutation batches that affect a given document key. The rows in this
+        // table are references based on the contents of mutations.mutations.
+        await db.query(
           // @formatter:off
           '''
           CREATE TABLE document_mutations (
@@ -206,16 +213,18 @@ class SQLiteSchema {
             batch_id INTEGER,
             PRIMARY KEY (uid, path, batch_id)
           );
-        '''
+        ''',
           // @formatter:on
-          );
-    });
+        );
+      },
+    );
   }
 
   /// Note: as of this migration, [last_acknowledged_batch_id] is no longer used by the code.
   Future<void> _removeAcknowledgedMutations() async {
-    final List<Map<String, dynamic>> data = await db
-        .query('SELECT uid, last_acknowledged_batch_id FROM mutation_queues');
+    final List<Map<String, dynamic>> data = await db.query(
+      'SELECT uid, last_acknowledged_batch_id FROM mutation_queues',
+    );
 
     for (Map<String, dynamic> row in data) {
       final String uid = row['uid'];
@@ -223,8 +232,9 @@ class SQLiteSchema {
           (row['last_acknowledged_batch_id'] as int?) ?? 0;
 
       final List<Map<String, dynamic>> rows = await db.query(
-          'SELECT batch_id FROM mutations WHERE uid = ? AND batch_id <= ?',
-          <dynamic>[uid, lastAcknowledgedBatchId]);
+        'SELECT batch_id FROM mutations WHERE uid = ? AND batch_id <= ?',
+        <dynamic>[uid, lastAcknowledgedBatchId],
+      );
 
       for (Map<String, dynamic> row in rows) {
         await _removeMutationBatch(uid, row['batch_id']);
@@ -234,22 +244,27 @@ class SQLiteSchema {
 
   Future<void> _removeMutationBatch(String uid, int batchId) async {
     final int deleted = await db.delete(
-        'DELETE FROM mutations WHERE uid = ? AND batch_id = ?',
-        <dynamic>[uid, batchId]);
+      'DELETE FROM mutations WHERE uid = ? AND batch_id = ?',
+      <dynamic>[uid, batchId],
+    );
     hardAssertLazy(
-        deleted != 0, () => 'Mutation batch ($uid, $batchId) did not exist');
+      deleted != 0,
+      () => 'Mutation batch ($uid, $batchId) did not exist',
+    );
 
     // Delete all index entries for this batch
     await db.delete(
-        'DELETE FROM document_mutations WHERE uid = ? AND batch_id = ?',
-        <dynamic>[uid, batchId]);
+      'DELETE FROM document_mutations WHERE uid = ? AND batch_id = ?',
+      <dynamic>[uid, batchId],
+    );
   }
 
   Future<void> _createV1QueryCache() async {
     return _ifTablesDontExist(
-        <String>['targets', 'target_globals', 'target_documents'], () async {
-      // A cache of targets and associated metadata
-      await db.query(
+      <String>['targets', 'target_globals', 'target_documents'],
+      () async {
+        // A cache of targets and associated metadata
+        await db.query(
           // @formatter:off
           '''
           CREATE TABLE targets (
@@ -261,21 +276,21 @@ class SQLiteSchema {
             last_listen_sequence_number INTEGER,
             target_proto                BLOB
           );
-        '''
+        ''',
           // @formatter:on
-          );
+        );
 
-      await db.query(
+        await db.query(
           // @formatter:off
           '''
           CREATE INDEX query_targets
             ON targets (canonical_id, target_id);
-        '''
+        ''',
           // @formatter:on
-          );
+        );
 
-      // Global state tracked across all queries, tracked separately
-      await db.query(
+        // Global state tracked across all queries, tracked separately
+        await db.query(
           // @formatter:off
           '''
           CREATE TABLE target_globals (
@@ -284,12 +299,12 @@ class SQLiteSchema {
             last_remote_snapshot_version_seconds INTEGER,
             last_remote_snapshot_version_nanos   INTEGER
           );
-        '''
+        ''',
           // @formatter:on
-          );
+        );
 
-      // A Mapping table between targets, document paths
-      await db.query(
+        // A Mapping table between targets, document paths
+        await db.query(
           // @formatter:off
           '''
           CREATE TABLE target_documents (
@@ -297,20 +312,21 @@ class SQLiteSchema {
             path            TEXT,
             PRIMARY KEY (target_id, path)
           );
-        '''
+        ''',
           // @formatter:on
-          );
+        );
 
-      // The document_targets reverse mapping table is just an index on target_documents.
-      await db.query(
+        // The document_targets reverse mapping table is just an index on target_documents.
+        await db.query(
           // @formatter:off
           '''
           CREATE INDEX document_targets
             ON target_documents (path, target_id);
-        '''
+        ''',
           // @formatter:on
-          );
-    });
+        );
+      },
+    );
   }
 
   Future<void> _dropV1QueryCache() async {
@@ -331,15 +347,15 @@ class SQLiteSchema {
     return _ifTablesDontExist(<String>['remote_documents'], () async {
       // A cache of documents obtained from the server.
       await db.query(
-          // @formatter:off
-          '''
+        // @formatter:off
+        '''
           CREATE TABLE remote_documents (
             path     TEXT PRIMARY KEY,
             contents BLOB
           );
-        '''
-          // @formatter:on
-          );
+        ''',
+        // @formatter:on
+      );
     });
   }
 
@@ -348,39 +364,43 @@ class SQLiteSchema {
 
     if (!targetGlobalExists) {
       await db.execute(
-          // @formatter:off
-          '''
+        // @formatter:off
+        '''
           INSERT INTO target_globals
           (highest_target_id, highest_listen_sequence_number, last_remote_snapshot_version_seconds,
            last_remote_snapshot_version_nanos)
           VALUES (?, ?, ?, ?)
           ''',
-          // @formatter:on
-          <int>[0, 0, 0, 0]);
+        // @formatter:on
+        <int>[0, 0, 0, 0],
+      );
     }
   }
 
   Future<void> _addTargetCount() async {
     if (!(await _tableContainsColumn('target_globals', 'target_count'))) {
       await db.execute(
-          'ALTER TABLE target_globals ADD COLUMN target_count INTEGER');
+        'ALTER TABLE target_globals ADD COLUMN target_count INTEGER',
+      );
     }
     // Even if the column already existed, rerun the data migration to make sure it's correct.
     final int count = await _rowNumber('targets');
     return db.execute(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           UPDATE target_globals
           SET target_count=?
         ''',
-        // @formatter:on
-        <int>[count]);
+      // @formatter:on
+      <int>[count],
+    );
   }
 
   Future<void> _addSequenceNumber() async {
     if (!(await _tableContainsColumn('target_documents', 'sequence_number'))) {
       return db.execute(
-          'ALTER TABLE target_documents ADD COLUMN sequence_number INTEGER');
+        'ALTER TABLE target_documents ADD COLUMN sequence_number INTEGER',
+      );
     }
   }
 
@@ -390,20 +410,20 @@ class SQLiteSchema {
   Future<void> _ensureSequenceNumbers() async {
     // Get the current highest sequence number
     final List<Map<String, dynamic>> sequenceNumberQuery = await db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT highest_listen_sequence_number
           FROM target_globals
           LIMIT 1;
-        '''
-        // @formatter:on
-        );
+        ''',
+      // @formatter:on
+    );
     final int sequenceNumber =
         sequenceNumberQuery.first['highest_listen_sequence_number'];
 
     final List<Map<String, dynamic>> untaggedDocumentsQuery = await db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT RD.path
           FROM remote_documents AS RD
           WHERE NOT EXISTS(
@@ -411,9 +431,9 @@ class SQLiteSchema {
                   FROM target_documents AS TD
                   WHERE RD.path = TD.path
                     AND TD.target_id = 0);
-        '''
-        // @formatter:on
-        );
+        ''',
+      // @formatter:on
+    );
 
     for (Map<String, dynamic> row in untaggedDocumentsQuery) {
       await db.execute(
@@ -431,28 +451,25 @@ class SQLiteSchema {
   }
 
   Future<void> _createV8CollectionParentsIndex() async {
-    await _ifTablesDontExist(
-      <String>['collection_parents'],
-      () async {
-        // A table storing associations between a Collection ID (e.g.
-        // 'messages') to a parent path (e.g. '/chats/123') that contains it as
-        // a (sub)collection. This is used to efficiently find all collections
-        // to query when performing a Collection Group query. Note that the
-        // parent path will be an empty path in the case of root-level
-        // collections.
-        await db.execute(
-            // @formatter:off
-            '''
+    await _ifTablesDontExist(<String>['collection_parents'], () async {
+      // A table storing associations between a Collection ID (e.g.
+      // 'messages') to a parent path (e.g. '/chats/123') that contains it as
+      // a (sub)collection. This is used to efficiently find all collections
+      // to query when performing a Collection Group query. Note that the
+      // parent path will be an empty path in the case of root-level
+      // collections.
+      await db.execute(
+        // @formatter:off
+        '''
               CREATE TABLE collection_parents(
                   collection_id TEXT,
                   parent        TEXT,
                   PRIMARY KEY (collection_id, parent)
               );
-            '''
-            // @formatter:on
-            );
-      },
-    );
+            ''',
+        // @formatter:on
+      );
+    });
 
     // Helper to add an index entry if we haven't already written it.
     final MemoryCollectionParentIndex cache = MemoryCollectionParentIndex();
@@ -477,13 +494,13 @@ class SQLiteSchema {
 
     // Index existing remote documents.
     final List<Map<String, dynamic>> remoteDocumentsQuery = await db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT path
           FROM remote_documents;
-        '''
-        // @formatter:on
-        );
+        ''',
+      // @formatter:on
+    );
 
     for (Map<String, dynamic> row in remoteDocumentsQuery) {
       final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
@@ -492,13 +509,13 @@ class SQLiteSchema {
 
     // Index existing mutations.
     final List<Map<String, dynamic>> documentMutationsQuery = await db.query(
-        // @formatter:off
-        '''
+      // @formatter:off
+      '''
           SELECT path
           FROM document_mutations;
-        '''
-        // @formatter:on
-        );
+        ''',
+      // @formatter:on
+    );
 
     for (Map<String, dynamic> row in documentMutationsQuery) {
       final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
@@ -510,8 +527,8 @@ class SQLiteSchema {
   Future<void> _createV9BundleCache() async {
     await _ifTablesDontExist(<String>['bundles', 'named_queries'], () async {
       await db.execute(
-          // @formatter:off
-          '''
+        // @formatter:off
+        '''
             CREATE TABLE bundles (
               bundle_id           TEXT PRIMARY KEY,
               create_time_seconds INTEGER,
@@ -520,22 +537,22 @@ class SQLiteSchema {
               total_documents     INTEGER,
               total_bytes         INTEGER
             );
-          '''
-          // @formatter:on
-          );
+          ''',
+        // @formatter:on
+      );
 
       await db.execute(
-          // @formatter:off
-          '''
+        // @formatter:off
+        '''
             CREATE TABLE named_queries (
               name                TEXT PRIMARY KEY,
               read_time_seconds   INTEGER,
               read_time_nanos     INTEGER,
               bundled_query_proto BLOB
             );
-          '''
-          // @formatter:on
-          );
+          ''',
+        // @formatter:on
+      );
     });
   }
 
@@ -546,16 +563,18 @@ class SQLiteSchema {
   ///     it indexes (the primary key has the index values before the key, which made a backfill quadratic).
   Future<void> _createV14LookupIndexes() async {
     await db.execute(
-        'CREATE INDEX IF NOT EXISTS document_mutations_path ON document_mutations (path)');
+      'CREATE INDEX IF NOT EXISTS document_mutations_path ON document_mutations (path)',
+    );
     await db.execute(
-        'CREATE INDEX IF NOT EXISTS index_entries_document_key ON index_entries (index_id, uid, document_key)');
+      'CREATE INDEX IF NOT EXISTS index_entries_document_key ON index_entries (index_id, uid, document_key)',
+    );
   }
 
   Future<void> _createOverlays() async {
     await _ifTablesDontExist(<String>['document_overlays'], () async {
       await db.execute(
-          // @formatter:off
-          '''
+        // @formatter:off
+        '''
             CREATE TABLE document_overlays (
               uid               TEXT,
               collection_path   TEXT,
@@ -565,35 +584,40 @@ class SQLiteSchema {
               overlay_mutation  BLOB,
               PRIMARY KEY (uid, collection_path, document_id)
             );
-          '''
-          // @formatter:on
-          );
+          ''',
+        // @formatter:on
+      );
     });
     // Outside of the guard, so that an interrupted migration (table created, indexes not yet) is completed.
     await db.execute(
-        'CREATE INDEX IF NOT EXISTS batch_id_overlay ON document_overlays (uid, largest_batch_id)');
+      'CREATE INDEX IF NOT EXISTS batch_id_overlay ON document_overlays (uid, largest_batch_id)',
+    );
     await db.execute(
-        'CREATE INDEX IF NOT EXISTS collection_group_overlay ON document_overlays (uid, collection_group)');
+      'CREATE INDEX IF NOT EXISTS collection_group_overlay ON document_overlays (uid, collection_group)',
+    );
   }
 
   Future<void> _createDataMigrationTable() async {
     await _ifTablesDontExist(<String>['data_migrations'], () async {
       await db.execute(
-          'CREATE TABLE data_migrations (migration_name TEXT, PRIMARY KEY (migration_name))');
+        'CREATE TABLE data_migrations (migration_name TEXT, PRIMARY KEY (migration_name))',
+      );
     });
   }
 
   Future<void> _addPendingDataMigration(String migration) async {
     await db.execute(
-        'INSERT OR IGNORE INTO data_migrations (migration_name) VALUES (?)',
-        <Object>[migration]);
+      'INSERT OR IGNORE INTO data_migrations (migration_name) VALUES (?)',
+      <Object>[migration],
+    );
   }
 
   Future<void> _addPathLength() async {
     if (!(await _tableContainsColumn('remote_documents', 'path_length'))) {
       // The "path_length" column store the number of segments in the path.
       await db.execute(
-          'ALTER TABLE remote_documents ADD COLUMN path_length INTEGER');
+        'ALTER TABLE remote_documents ADD COLUMN path_length INTEGER',
+      );
     }
   }
 
@@ -601,19 +625,22 @@ class SQLiteSchema {
   Future<void> _ensurePathLength() async {
     while (true) {
       final List<Map<String, dynamic>> rows = await db.query(
-          'SELECT path FROM remote_documents WHERE path_length IS NULL LIMIT ?',
-          <Object>[migrationBatchSize]);
+        'SELECT path FROM remote_documents WHERE path_length IS NULL LIMIT ?',
+        <Object>[migrationBatchSize],
+      );
       if (rows.isEmpty) {
         break;
       }
 
       for (final Map<String, dynamic> row in rows) {
         final String encodedPath = row['path'];
-        final ResourcePath decodedPath =
-            EncodedPath.decodeResourcePath(encodedPath);
+        final ResourcePath decodedPath = EncodedPath.decodeResourcePath(
+          encodedPath,
+        );
         await db.execute(
-            'UPDATE remote_documents SET path_length = ? WHERE path = ?',
-            <Object>[decodedPath.length, encodedPath]);
+          'UPDATE remote_documents SET path_length = ? WHERE path = ?',
+          <Object>[decodedPath.length, encodedPath],
+        );
       }
     }
   }
@@ -621,7 +648,8 @@ class SQLiteSchema {
   /// Initialize the remote_document's read_time column with 0 values if they are not set.
   Future<void> _ensureReadTime() async {
     await db.execute(
-        'UPDATE remote_documents SET read_time_seconds = 0, read_time_nanos = 0 WHERE read_time_seconds IS NULL');
+      'UPDATE remote_documents SET read_time_seconds = 0, read_time_nanos = 0 WHERE read_time_seconds IS NULL',
+    );
   }
 
   /// Creates the tables of the field indexes.
@@ -635,10 +663,10 @@ class SQLiteSchema {
   /// combination that matches a configured index.
   Future<void> _createFieldIndex() async {
     await _ifTablesDontExist(
-        <String>['index_configuration', 'index_state', 'index_entries'],
-        () async {
-      // Global configuration for all existing field indexes
-      await db.execute(
+      <String>['index_configuration', 'index_state', 'index_entries'],
+      () async {
+        // Global configuration for all existing field indexes
+        await db.execute(
           // @formatter:off
           '''
             CREATE TABLE index_configuration (
@@ -647,12 +675,12 @@ class SQLiteSchema {
               index_proto      BLOB, -- V1 Admin index proto
               PRIMARY KEY (index_id)
             );
-          '''
+          ''',
           // @formatter:on
-          );
+        );
 
-      // Per index per user state to track the backfill state for each index
-      await db.execute(
+        // Per index per user state to track the backfill state for each index
+        await db.execute(
           // @formatter:off
           '''
             CREATE TABLE index_state (
@@ -665,13 +693,13 @@ class SQLiteSchema {
               largest_batch_id  INTEGER, -- Largest mutation batch id that was processed
               PRIMARY KEY (index_id, uid)
             );
-          '''
+          ''',
           // @formatter:on
-          );
+        );
 
-      // The index entry table stores the encoded entries for all fields.
-      // The table only has a single primary index. `array_value` should be set for all queries.
-      await db.execute(
+        // The index entry table stores the encoded entries for all fields.
+        // The table only has a single primary index. `array_value` should be set for all queries.
+        await db.execute(
           // @formatter:off
           '''
             CREATE TABLE index_entries (
@@ -682,20 +710,26 @@ class SQLiteSchema {
               document_key      TEXT,
               PRIMARY KEY (index_id, uid, array_value, directional_value, document_key)
             );
-          '''
+          ''',
           // @formatter:on
-          );
+        );
 
-      await db.execute(
-          'CREATE INDEX read_time ON remote_documents(read_time_seconds, read_time_nanos)');
-    });
+        await db.execute(
+          'CREATE INDEX read_time ON remote_documents(read_time_seconds, read_time_nanos)',
+        );
+      },
+    );
   }
 
   Future<bool> _hasReadTime() async {
-    final bool hasReadTimeSeconds =
-        await _tableContainsColumn('remote_documents', 'read_time_seconds');
-    final bool hasReadTimeNanos =
-        await _tableContainsColumn('remote_documents', 'read_time_nanos');
+    final bool hasReadTimeSeconds = await _tableContainsColumn(
+      'remote_documents',
+      'read_time_seconds',
+    );
+    final bool hasReadTimeNanos = await _tableContainsColumn(
+      'remote_documents',
+      'read_time_nanos',
+    );
 
     // Only one of the columns exists when the migration that adds them was interrupted: it is not complete then.
     return hasReadTimeSeconds && hasReadTimeNanos;
@@ -704,18 +738,20 @@ class SQLiteSchema {
   Future<void> _addReadTime() async {
     for (final String column in <String>[
       'read_time_seconds',
-      'read_time_nanos'
+      'read_time_nanos',
     ]) {
       if (!(await _tableContainsColumn('remote_documents', column))) {
         await db.execute(
-            'ALTER TABLE remote_documents ADD COLUMN $column INTEGER');
+          'ALTER TABLE remote_documents ADD COLUMN $column INTEGER',
+        );
       }
     }
   }
 
   Future<void> _dropLastLimboFreeSnapshotVersion() async {
-    final List<Map<String, dynamic>> rows =
-        await db.query('SELECT target_id, target_proto FROM targets');
+    final List<Map<String, dynamic>> rows = await db.query(
+      'SELECT target_id, target_proto FROM targets',
+    );
     for (Map<String, dynamic> row in rows) {
       final int targetId = row['target_id'];
       final Uint8List targetProtoBytes = row['target_proto'];
@@ -726,8 +762,10 @@ class SQLiteSchema {
         throw fail('Failed to decode Query data for target $targetId');
       }
       targetProto.clearLastLimboFreeSnapshotVersion();
-      await db.execute('UPDATE targets SET target_proto = ? WHERE target_id = ?',
-          <Object>[targetProto.writeToBuffer(), targetId]);
+      await db.execute(
+        'UPDATE targets SET target_proto = ? WHERE target_id = ?',
+        <Object>[targetProto.writeToBuffer(), targetId],
+      );
     }
   }
 
@@ -738,19 +776,23 @@ class SQLiteSchema {
 
   @visibleForTesting
   Future<List<String>> getTableColumns(String table) async {
-    final List<Map<String, dynamic>> data =
-        await db.query('PRAGMA table_info($table);');
+    final List<Map<String, dynamic>> data = await db.query(
+      'PRAGMA table_info($table);',
+    );
     return data.map<String>((Map<String, dynamic> row) => row['name']).toList();
   }
 
   Future<bool> _tableExists(String table) async {
     final List<Map<String, dynamic>> data = await db.query(
-        'SELECT 1=1 FROM sqlite_master WHERE tbl_name = ?', <String>[table]);
+      'SELECT 1=1 FROM sqlite_master WHERE tbl_name = ?',
+      <String>[table],
+    );
     return data.isNotEmpty;
   }
 
   Future<int> _rowNumber(String tableName) async {
-    return (await db.query('SELECT Count(*) as count FROM $tableName;'))
-        .first['count'];
+    return (await db.query(
+      'SELECT Count(*) as count FROM $tableName;',
+    )).first['count'];
   }
 }

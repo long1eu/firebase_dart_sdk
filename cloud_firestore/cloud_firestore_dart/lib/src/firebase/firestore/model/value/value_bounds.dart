@@ -59,22 +59,29 @@ class ValueBounds {
 
   /// PORTING NOTE: upstream uses `Long.MIN_VALUE` seconds; this is the
   /// earliest timestamp the port's [Timestamp] can hold.
-  static final FieldValue _minTimestamp =
-      TimestampValue.valueOf(const Timestamp(-62135596800, 0));
-  static final FieldValue _minBsonTimestamp =
-      BsonTimestampValue(BsonTimestamp(0, 0));
+  static final FieldValue _minTimestamp = TimestampValue.valueOf(
+    const Timestamp(-62135596800, 0),
+  );
+  static final FieldValue _minBsonTimestamp = BsonTimestampValue(
+    BsonTimestamp(0, 0),
+  );
   static final FieldValue _minString = StringValue.valueOf('');
   static final FieldValue _minBytes = BlobValue.valueOf(Blob(Uint8List(0)));
   static final FieldValue _minReference = ReferenceValue.valueOf(
-      DatabaseId.forDatabase('', ''), DocumentKey.empty());
-  static const FieldValue _minBsonObjectId =
-      BsonObjectIdValue(BsonObjectId(''));
-  static final FieldValue _minGeoPoint =
-      GeoPointValue.valueOf(const GeoPoint(-90, -180));
+    DatabaseId.forDatabase('', ''),
+    DocumentKey.empty(),
+  );
+  static const FieldValue _minBsonObjectId = BsonObjectIdValue(
+    BsonObjectId(''),
+  );
+  static final FieldValue _minGeoPoint = GeoPointValue.valueOf(
+    const GeoPoint(-90, -180),
+  );
   static const FieldValue _minRegex = RegexFieldValue(RegexValue('', ''));
   static final FieldValue _minArray = ArrayValue.fromList(const <FieldValue>[]);
-  static final FieldValue _minVector =
-      VectorFieldValue.fromList(const <double>[]);
+  static final FieldValue _minVector = VectorFieldValue.fromList(
+    const <double>[],
+  );
   static final FieldValue _minMap = ObjectValue.empty;
 
   /// Returns the lowest value for the type of [value] (inclusive).
@@ -159,8 +166,12 @@ class ValueBounds {
 
   /// Compares two lower bounds: for equal values the inclusive bound is the
   /// lower one.
-  static int lowerBoundCompare(FieldValue left, bool leftInclusive,
-      FieldValue right, bool rightInclusive) {
+  static int lowerBoundCompare(
+    FieldValue left,
+    bool leftInclusive,
+    FieldValue right,
+    bool rightInclusive,
+  ) {
     final int cmp = left.compareTo(right);
     if (cmp != 0) {
       return cmp;
@@ -177,8 +188,12 @@ class ValueBounds {
 
   /// Compares two upper bounds: for equal values the inclusive bound is the
   /// higher one.
-  static int upperBoundCompare(FieldValue left, bool leftInclusive,
-      FieldValue right, bool rightInclusive) {
+  static int upperBoundCompare(
+    FieldValue left,
+    bool leftInclusive,
+    FieldValue right,
+    bool rightInclusive,
+  ) {
     final int cmp = left.compareTo(right);
     if (cmp != 0) {
       return cmp;

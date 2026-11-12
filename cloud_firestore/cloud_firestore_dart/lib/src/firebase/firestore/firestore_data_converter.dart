@@ -49,11 +49,13 @@ abstract class FirestoreDataConverter<T> {
   /// equal when both functions are equal (top level functions, static methods
   /// and constructor tear-offs are canonical, so this works for them).
   const factory FirestoreDataConverter.from({
-    required T Function(DocumentSnapshot<Map<String, Object?>> snapshot,
-            SnapshotOptions? options)
-        fromFirestore,
+    required T Function(
+      DocumentSnapshot<Map<String, Object?>> snapshot,
+      SnapshotOptions? options,
+    )
+    fromFirestore,
     required Map<String, Object?> Function(T value, SetOptions? options)
-        toFirestore,
+    toFirestore,
   }) = _FunctionDataConverter<T>;
 
   /// Called by the SDK to convert a snapshot of an existing document into
@@ -61,8 +63,10 @@ abstract class FirestoreDataConverter<T> {
   /// `QueryDocumentSnapshot`, so `snapshot.data` is never null). Use
   /// `snapshot.getData(options?.serverTimestamps ?? ServerTimestampBehavior.none)`
   /// to honour the requested server timestamp behavior.
-  T fromFirestore(DocumentSnapshot<Map<String, Object?>> snapshot,
-      SnapshotOptions? options);
+  T fromFirestore(
+    DocumentSnapshot<Map<String, Object?>> snapshot,
+    SnapshotOptions? options,
+  );
 
   /// Called by the SDK to convert [value] into the map that is written.
   /// [options] are the [SetOptions] of the write, or null (for example for
@@ -73,20 +77,23 @@ abstract class FirestoreDataConverter<T> {
 class _FunctionDataConverter<T> extends FirestoreDataConverter<T> {
   const _FunctionDataConverter({
     required T Function(
-            DocumentSnapshot<Map<String, Object?>>, SnapshotOptions?)
-        fromFirestore,
+      DocumentSnapshot<Map<String, Object?>>,
+      SnapshotOptions?,
+    )
+    fromFirestore,
     required Map<String, Object?> Function(T, SetOptions?) toFirestore,
-  })  : _from = fromFirestore,
-        _to = toFirestore;
+  }) : _from = fromFirestore,
+       _to = toFirestore;
 
   final T Function(DocumentSnapshot<Map<String, Object?>>, SnapshotOptions?)
-      _from;
+  _from;
   final Map<String, Object?> Function(T, SetOptions?) _to;
 
   @override
-  T fromFirestore(DocumentSnapshot<Map<String, Object?>> snapshot,
-          SnapshotOptions? options) =>
-      _from(snapshot, options);
+  T fromFirestore(
+    DocumentSnapshot<Map<String, Object?>> snapshot,
+    SnapshotOptions? options,
+  ) => _from(snapshot, options);
 
   @override
   Map<String, Object?> toFirestore(T value, SetOptions? options) =>

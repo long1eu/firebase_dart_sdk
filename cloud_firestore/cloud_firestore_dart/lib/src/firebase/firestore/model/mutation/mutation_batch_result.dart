@@ -27,23 +27,27 @@ class MutationBatchResult {
   /// There must be one result for each mutation in the batch. This factory caches a
   /// document=>version mapping (as [docVersions]).
   factory MutationBatchResult.create(
-      MutationBatch batch,
-      SnapshotVersion commitVersion,
-      List<MutationResult> mutationResults,
-      Uint8List streamToken) {
+    MutationBatch batch,
+    SnapshotVersion commitVersion,
+    List<MutationResult> mutationResults,
+    Uint8List streamToken,
+  ) {
     hardAssertLazy(
-        batch.mutations.length == mutationResults.length,
-        () =>
-            'Mutations sent ${batch.mutations.length} must equal results received '
-            '${mutationResults.length}');
+      batch.mutations.length == mutationResults.length,
+      () =>
+          'Mutations sent ${batch.mutations.length} must equal results received '
+          '${mutationResults.length}',
+    );
 
     ImmutableSortedMap<DocumentKey, SnapshotVersion> docVersions =
         DocumentCollections.emptyVersionMap();
 
     final List<Mutation> mutations = batch.mutations;
     for (int i = 0; i < mutations.length; i++) {
-      docVersions =
-          docVersions.insert(mutations[i].key, mutationResults[i].version);
+      docVersions = docVersions.insert(
+        mutations[i].key,
+        mutationResults[i].version,
+      );
     }
     return MutationBatchResult(
       batch,

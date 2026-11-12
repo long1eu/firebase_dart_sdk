@@ -17,14 +17,13 @@ import 'package:protobuf/protobuf.dart';
 /// A [FirestoreTransport] that only needs HTTP requests with streamed
 /// responses. Messages are exchanged as proto3 JSON.
 class WebChannelTransport implements FirestoreTransport {
-  WebChannelTransport(
-    this._http,
-    DatabaseInfo databaseInfo,
-    this._options,
-  )   : _baseUrl = '${databaseInfo.sslEnabled ? 'https' : 'http'}://'
-            '${databaseInfo.host}:${databaseInfo.port}',
-        _database = 'projects/${databaseInfo.databaseId.projectId}'
-            '/databases/${databaseInfo.databaseId.databaseId}' {
+  WebChannelTransport(this._http, DatabaseInfo databaseInfo, this._options)
+    : _baseUrl =
+          '${databaseInfo.sslEnabled ? 'https' : 'http'}://'
+          '${databaseInfo.host}:${databaseInfo.port}',
+      _database =
+          'projects/${databaseInfo.databaseId.projectId}'
+          '/databases/${databaseInfo.databaseId.databaseId}' {
     _rest = RestClient(_http, _baseUrl);
   }
 
@@ -38,10 +37,10 @@ class WebChannelTransport implements FirestoreTransport {
   bool _shutdown = false;
 
   @override
-  ResponseStream<Res>
-      startCall<Req extends GeneratedMessage, Res extends GeneratedMessage>(
-          FirestoreRpc<Req, Res> rpc, Stream<Req> requests,
-          {CallOptions? options}) {
+  ResponseStream<Res> startCall<
+    Req extends GeneratedMessage,
+    Res extends GeneratedMessage
+  >(FirestoreRpc<Req, Res> rpc, Stream<Req> requests, {CallOptions? options}) {
     final StreamController<Res> responses = StreamController<Res>();
     final _WebCall call = _WebCall();
     _calls.add(call);
@@ -73,12 +72,13 @@ class WebChannelTransport implements FirestoreTransport {
   }
 
   Future<void>
-      _runUnary<Req extends GeneratedMessage, Res extends GeneratedMessage>(
-          FirestoreRpc<Req, Res> rpc,
-          Stream<Req> requests,
-          CallOptions? options,
-          _WebCall call,
-          StreamController<Res> responses) async {
+  _runUnary<Req extends GeneratedMessage, Res extends GeneratedMessage>(
+    FirestoreRpc<Req, Res> rpc,
+    Stream<Req> requests,
+    CallOptions? options,
+    _WebCall call,
+    StreamController<Res> responses,
+  ) async {
     try {
       final Req request = await requests.first;
       final Map<String, String> headers = await _headers(options);
@@ -111,12 +111,13 @@ class WebChannelTransport implements FirestoreTransport {
   }
 
   Future<void>
-      _runStream<Req extends GeneratedMessage, Res extends GeneratedMessage>(
-          FirestoreRpc<Req, Res> rpc,
-          Stream<Req> requests,
-          CallOptions? options,
-          _WebCall call,
-          StreamController<Res> responses) async {
+  _runStream<Req extends GeneratedMessage, Res extends GeneratedMessage>(
+    FirestoreRpc<Req, Res> rpc,
+    Stream<Req> requests,
+    CallOptions? options,
+    _WebCall call,
+    StreamController<Res> responses,
+  ) async {
     final Map<String, String> headers;
     try {
       headers = await _headers(options);
@@ -152,7 +153,9 @@ class WebChannelTransport implements FirestoreTransport {
           response = _decode(rpc, message);
         } catch (e, s) {
           responses.addError(
-              GrpcError.internal('Malformed ${rpc.name} response: $e'), s);
+            GrpcError.internal('Malformed ${rpc.name} response: $e'),
+            s,
+          );
           call.cancel();
           return;
         }
@@ -180,9 +183,10 @@ class WebChannelTransport implements FirestoreTransport {
     );
   }
 
-  static Res
-      _decode<Req extends GeneratedMessage, Res extends GeneratedMessage>(
-          FirestoreRpc<Req, Res> rpc, Object? json) {
+  static Res _decode<
+    Req extends GeneratedMessage,
+    Res extends GeneratedMessage
+  >(FirestoreRpc<Req, Res> rpc, Object? json) {
     if (json is Map) {
       // `google.rpc.Status.details` holds `Any` messages, which proto3 JSON can
       // only decode with a registry of every possible type. The client never

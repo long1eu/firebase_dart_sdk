@@ -98,7 +98,9 @@ abstract class IndexManager {
   /// to [getNextCollectionGroupToUpdate] will return a different collection
   /// group (unless only one collection group is configured).
   Future<void> updateCollectionGroup(
-      String collectionGroup, IndexOffset offset);
+    String collectionGroup,
+    IndexOffset offset,
+  );
 
   /// Updates the index entries for the provided documents. A key that maps to
   /// null or to a document that does not exist loses its entries.
@@ -115,8 +117,9 @@ class MemoryCollectionParentIndex {
 
   /// Whether [collectionPath] was already added.
   bool contains(ResourcePath collectionPath) {
-    return _index[collectionPath.getLastSegment()]
-            ?.contains(collectionPath.popLast()) ??
+    return _index[collectionPath.getLastSegment()]?.contains(
+          collectionPath.popLast(),
+        ) ??
         false;
   }
 

@@ -7,38 +7,54 @@ part of 'filter.dart';
 /// Represents a filter to be applied to query.
 class FieldFilter extends Filter {
   factory FieldFilter(
-      FieldPath path, FilterOperator operator, FieldValue value) {
+    FieldPath path,
+    FilterOperator operator,
+    FieldValue value,
+  ) {
     if (path.isKeyField) {
       if (operator == FilterOperator.IN) {
-        hardAssert(value is ArrayValue,
-            'Comparing on key with IN, but an array value was not a RefValue');
+        hardAssert(
+          value is ArrayValue,
+          'Comparing on key with IN, but an array value was not a RefValue',
+        );
         return KeyFieldInFilter(path, value);
       } else if (operator == FilterOperator.NOT_IN) {
-        hardAssert(value is ArrayValue,
-            'Comparing on key with NOT_IN, but an array value was not a RefValue');
+        hardAssert(
+          value is ArrayValue,
+          'Comparing on key with NOT_IN, but an array value was not a RefValue',
+        );
         return KeyFieldNotInFilter(path, value);
       } else {
-        hardAssert(value is ReferenceValue,
-            'Comparing on key, but filter value not a ReferenceValue');
+        hardAssert(
+          value is ReferenceValue,
+          'Comparing on key, but filter value not a ReferenceValue',
+        );
         hardAssertLazy(
-            operator != FilterOperator.arrayContains &&
-                operator != FilterOperator.arrayContainsAny,
-            () => '$operator queries don\'t make sense on document keys');
+          operator != FilterOperator.arrayContains &&
+              operator != FilterOperator.arrayContainsAny,
+          () => '$operator queries don\'t make sense on document keys',
+        );
         return KeyFieldFilter(path, operator, value);
       }
     } else if (operator == FilterOperator.arrayContains) {
       return ArrayContainsFilter(path, value);
     } else if (operator == FilterOperator.IN) {
       hardAssertLazy(
-          value is ArrayValue, () => 'IN filter has invalid value: $value');
+        value is ArrayValue,
+        () => 'IN filter has invalid value: $value',
+      );
       return InFilter(path, value);
     } else if (operator == FilterOperator.arrayContainsAny) {
-      hardAssertLazy(value is ArrayValue,
-          () => 'ARRAY_CONTAINS_ANY filter has invalid value: $value');
+      hardAssertLazy(
+        value is ArrayValue,
+        () => 'ARRAY_CONTAINS_ANY filter has invalid value: $value',
+      );
       return ArrayContainsAnyFilter(path, value);
     } else if (operator == FilterOperator.NOT_IN) {
       hardAssertLazy(
-          value is ArrayValue, () => 'NOT_IN filter has invalid value: $value');
+        value is ArrayValue,
+        () => 'NOT_IN filter has invalid value: $value',
+      );
       return NotInFilter(path, value);
     } else {
       return FieldFilter._(path, operator, value);
@@ -76,7 +92,8 @@ class FieldFilter extends Filter {
     //
     // PORTING NOTE: the JS and Android SDKs evaluate these with the order of
     // values, and then match documents that the backend does not return.
-    final bool special = _isNaN(other) ||
+    final bool special =
+        _isNaN(other) ||
         _isNaN(value) ||
         other is NullValue ||
         value is NullValue;
@@ -84,7 +101,8 @@ class FieldFilter extends Filter {
       // `<=` and `>=` hold for a null with null and for a NaN with NaN, as in
       // the other SDKs and in an Enterprise edition database (a Standard
       // edition database matches nothing here either).
-      final bool same = other is NullValue && value is NullValue ||
+      final bool same =
+          other is NullValue && value is NullValue ||
           _isNaN(other) && _isNaN(value);
       return same &&
           (operator == FilterOperator.lessThanOrEqual ||

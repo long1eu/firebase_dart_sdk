@@ -29,16 +29,17 @@ class AggregateQuery {
   /// [Query.aggregate].
   @internal
   AggregateQuery(this.query, List<AggregateField> aggregateFields)
-      : aggregateFields = List<AggregateField>.unmodifiable(aggregateFields),
-        aliases = null;
+    : aggregateFields = List<AggregateField>.unmodifiable(aggregateFields),
+      aliases = null;
 
   /// Creates an aggregate query whose results are keyed by the user-chosen
   /// aliases of [aliases] (see `Query.aggregateWithAliases`).
   @internal
   AggregateQuery.withAliases(this.query, Map<String, AggregateField> aliases)
-      : aggregateFields = List<AggregateField>.unmodifiable(
-            LinkedHashSet<AggregateField>.of(aliases.values)),
-        aliases = Map<String, AggregateField>.unmodifiable(aliases);
+    : aggregateFields = List<AggregateField>.unmodifiable(
+        LinkedHashSet<AggregateField>.of(aliases.values),
+      ),
+      aliases = Map<String, AggregateField>.unmodifiable(aliases);
 
   /// The query whose result set is aggregated.
   final Query<Object?> query;
@@ -56,8 +57,9 @@ class AggregateQuery {
   /// Aggregations are never computed from the local cache: when the client is
   /// offline the returned Future fails with a `FirestoreError` whose code is
   /// `unavailable`.
-  Future<AggregateQuerySnapshot> get(
-      [AggregateSource source = AggregateSource.server]) async {
+  Future<AggregateQuerySnapshot> get([
+    AggregateSource source = AggregateSource.server,
+  ]) async {
     final Map<String, FieldValue> data = await query.firestore.client
         .runAggregateQuery(query.query, aggregateFields);
     return AggregateQuerySnapshot(this, data);
@@ -68,14 +70,19 @@ class AggregateQuery {
       identical(this, other) ||
       other is AggregateQuery &&
           query == other.query &&
-          const ListEquality<AggregateField>()
-              .equals(aggregateFields, other.aggregateFields) &&
-          const MapEquality<String, AggregateField>()
-              .equals(aliases, other.aliases);
+          const ListEquality<AggregateField>().equals(
+            aggregateFields,
+            other.aggregateFields,
+          ) &&
+          const MapEquality<String, AggregateField>().equals(
+            aliases,
+            other.aliases,
+          );
 
   @override
   int get hashCode => Object.hash(
-      query,
-      const ListEquality<AggregateField>().hash(aggregateFields),
-      const MapEquality<String, AggregateField>().hash(aliases));
+    query,
+    const ListEquality<AggregateField>().hash(aggregateFields),
+    const MapEquality<String, AggregateField>().hash(aliases),
+  );
 }

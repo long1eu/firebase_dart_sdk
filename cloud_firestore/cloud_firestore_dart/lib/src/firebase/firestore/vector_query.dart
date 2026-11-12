@@ -48,25 +48,30 @@ class VectorQuery {
   }) {
     if (limit <= 0 || limit > maxVectorQueryLimit) {
       throw ArgumentError(
-          'Invalid vector query: limit must be a positive integer of no more than $maxVectorQueryLimit, but was $limit.');
+        'Invalid vector query: limit must be a positive integer of no more than $maxVectorQueryLimit, but was $limit.',
+      );
     }
     if (queryVector.length == 0) {
       throw ArgumentError(
-          'Invalid vector query: the query vector must not be empty.');
+        'Invalid vector query: the query vector must not be empty.',
+      );
     }
     if (queryVector.length > maxVectorQueryDimensions) {
       throw ArgumentError(
-          'Invalid vector query: the query vector must have no more than $maxVectorQueryDimensions dimensions, but had ${queryVector.length}.');
+        'Invalid vector query: the query vector must have no more than $maxVectorQueryDimensions dimensions, but had ${queryVector.length}.',
+      );
     }
     final String? resultField = distanceResultField;
     if (resultField != null && resultField.isEmpty) {
       throw ArgumentError(
-          'Invalid vector query: distanceResultField must not be empty.');
+        'Invalid vector query: distanceResultField must not be empty.',
+      );
     }
     final double? threshold = distanceThreshold;
     if (threshold != null && threshold.isNaN) {
       throw ArgumentError(
-          'Invalid vector query: distanceThreshold must not be NaN.');
+        'Invalid vector query: distanceThreshold must not be NaN.',
+      );
     }
   }
 
@@ -94,15 +99,23 @@ class VectorQuery {
 
   /// Executes the query on the server and returns the nearest documents.
   Future<VectorQuerySnapshot> get() async {
-    final List<Document> docs =
-        await query.firestore.client.runVectorQuery(query.query, this);
+    final List<Document> docs = await query.firestore.client.runVectorQuery(
+      query.query,
+      this,
+    );
     return VectorQuerySnapshot(
-        this,
-        docs
-            .map((Document doc) => QueryDocumentSnapshot.fromDocument(
-                query.firestore, doc,
-                fromCache: false, hasPendingWrites: false))
-            .toList(growable: false));
+      this,
+      docs
+          .map(
+            (Document doc) => QueryDocumentSnapshot.fromDocument(
+              query.firestore,
+              doc,
+              fromCache: false,
+              hasPendingWrites: false,
+            ),
+          )
+          .toList(growable: false),
+    );
   }
 
   @override
@@ -118,6 +131,13 @@ class VectorQuery {
           distanceThreshold == other.distanceThreshold;
 
   @override
-  int get hashCode => Object.hash(query, vectorField, queryVector, limit,
-      distanceMeasure, distanceResultField, distanceThreshold);
+  int get hashCode => Object.hash(
+    query,
+    vectorField,
+    queryVector,
+    limit,
+    distanceMeasure,
+    distanceResultField,
+    distanceThreshold,
+  );
 }

@@ -109,8 +109,10 @@ abstract class FieldValue implements Comparable<FieldValue> {
 
   int defaultCompareTo(FieldValue other) {
     final int cmp = typeOrder.compareTo(other.typeOrder);
-    hardAssert(cmp != 0,
-        'Default compareTo should not be used for values of same type.');
+    hardAssert(
+      cmp != 0,
+      'Default compareTo should not be used for values of same type.',
+    );
     return cmp;
   }
 }

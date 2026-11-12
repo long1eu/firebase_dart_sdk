@@ -30,8 +30,12 @@ extension VectorQuerySerializer on RemoteSerializer {
   /// with a `find_nearest` stage. As for aggregations, only the explicit sort
   /// orders are sent (the ordering of `find_nearest` supersedes them).
   proto.Target_QueryTarget encodeVectorQueryTarget(
-      Query query, VectorQuery vectorQuery) {
-    final proto.Target_QueryTarget target = encodeQueryTarget(query.toTarget()).clone();
+    Query query,
+    VectorQuery vectorQuery,
+  ) {
+    final proto.Target_QueryTarget target = encodeQueryTarget(
+      query.toTarget(),
+    ).clone();
     final List<proto.StructuredQuery_Order> orders =
         target.structuredQuery.orderBy;
     final int explicitCount = query.explicitSortOrder.length;
@@ -44,9 +48,11 @@ extension VectorQuerySerializer on RemoteSerializer {
           ..vectorField = (proto.StructuredQuery_FieldReference()
             ..fieldPath = vectorQuery.vectorField.canonicalString)
           ..queryVector = encodeValue(
-              VectorFieldValue.fromList(vectorQuery.queryVector.toArray()))
-          ..distanceMeasure =
-              _encodeDistanceMeasure(vectorQuery.distanceMeasure)
+            VectorFieldValue.fromList(vectorQuery.queryVector.toArray()),
+          )
+          ..distanceMeasure = _encodeDistanceMeasure(
+            vectorQuery.distanceMeasure,
+          )
           ..limit = (proto.Int32Value()..value = vectorQuery.limit);
     final String? resultField = vectorQuery.distanceResultField;
     if (resultField != null) {
@@ -61,7 +67,8 @@ extension VectorQuerySerializer on RemoteSerializer {
   }
 
   proto.StructuredQuery_FindNearest_DistanceMeasure _encodeDistanceMeasure(
-      DistanceMeasure measure) {
+    DistanceMeasure measure,
+  ) {
     switch (measure) {
       case DistanceMeasure.euclidean:
         return proto.StructuredQuery_FindNearest_DistanceMeasure.EUCLIDEAN;
@@ -77,6 +84,11 @@ extension VectorQuerySerializer on RemoteSerializer {
     final DocumentKey key = decodeKey(document.name);
     final SnapshotVersion version = decodeVersion(document.updateTime);
     return Document.fromProto(
-        key, version, DocumentState.synced, document, decodeValue);
+      key,
+      version,
+      DocumentState.synced,
+      document,
+      decodeValue,
+    );
   }
 }

@@ -28,12 +28,14 @@ final class PersistentCacheSettings extends LocalCacheSettings {
   /// beyond it, Firestore starts removing data that has not been recently used.
   /// Use [FirestoreSettings.cacheSizeUnlimited] to disable the collection. The
   /// minimum is 1 MB, an [ArgumentError] is thrown otherwise.
-  PersistentCacheSettings(
-      {this.sizeBytes = FirestoreSettings.defaultCacheSizeBytes}) {
+  PersistentCacheSettings({
+    this.sizeBytes = FirestoreSettings.defaultCacheSizeBytes,
+  }) {
     if (sizeBytes != FirestoreSettings.cacheSizeUnlimited &&
         sizeBytes < FirestoreSettings.minimumCacheBytes) {
       throw ArgumentError(
-          'Cache size must be set to at least ${FirestoreSettings.minimumCacheBytes} bytes');
+        'Cache size must be set to at least ${FirestoreSettings.minimumCacheBytes} bytes',
+      );
     }
   }
 
@@ -100,12 +102,14 @@ final class MemoryEagerGcSettings extends MemoryGarbageCollectorSettings {
 final class MemoryLruGcSettings extends MemoryGarbageCollectorSettings {
   /// [sizeBytes] is an approximate threshold, see
   /// [PersistentCacheSettings.sizeBytes] for the accepted values.
-  MemoryLruGcSettings(
-      {this.sizeBytes = FirestoreSettings.defaultCacheSizeBytes}) {
+  MemoryLruGcSettings({
+    this.sizeBytes = FirestoreSettings.defaultCacheSizeBytes,
+  }) {
     if (sizeBytes != FirestoreSettings.cacheSizeUnlimited &&
         sizeBytes < FirestoreSettings.minimumCacheBytes) {
       throw ArgumentError(
-          'Cache size must be set to at least ${FirestoreSettings.minimumCacheBytes} bytes');
+        'Cache size must be set to at least ${FirestoreSettings.minimumCacheBytes} bytes',
+      );
     }
   }
 

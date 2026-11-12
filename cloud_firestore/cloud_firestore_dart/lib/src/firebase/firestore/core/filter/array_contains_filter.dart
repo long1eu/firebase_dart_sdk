@@ -7,7 +7,7 @@ part of 'filter.dart';
 /// A Filter that implements the array-contains operator.
 class ArrayContainsFilter extends FieldFilter {
   ArrayContainsFilter(FieldPath field, FieldValue value)
-      : super._(field, FilterOperator.arrayContains, value);
+    : super._(field, FilterOperator.arrayContains, value);
 
   @override
   bool matches(Document doc) {

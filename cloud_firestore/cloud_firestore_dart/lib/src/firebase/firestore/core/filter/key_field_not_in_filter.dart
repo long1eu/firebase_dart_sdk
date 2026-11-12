@@ -17,13 +17,17 @@ part of 'filter.dart';
 /// A Filter that implements the not-in operator on the document key.
 class KeyFieldNotInFilter extends FieldFilter {
   KeyFieldNotInFilter(FieldPath field, FieldValue value)
-      : super._(field, FilterOperator.NOT_IN, value) {
-    hardAssert(value is ArrayValue,
-        'KeyFieldNotInFilter expects an ArrayValue');
+    : super._(field, FilterOperator.NOT_IN, value) {
+    hardAssert(
+      value is ArrayValue,
+      'KeyFieldNotInFilter expects an ArrayValue',
+    );
     final ArrayValue arrayValue = value as ArrayValue;
     for (FieldValue refValue in arrayValue.internalValue) {
-      hardAssert(refValue is ReferenceValue,
-          'Comparing on key with not_in, but an array value was not a ReferenceValue');
+      hardAssert(
+        refValue is ReferenceValue,
+        'Comparing on key with not_in, but an array value was not a ReferenceValue',
+      );
     }
   }
 

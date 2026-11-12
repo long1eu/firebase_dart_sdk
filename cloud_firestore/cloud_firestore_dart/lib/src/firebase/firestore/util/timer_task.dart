@@ -47,8 +47,10 @@ class TaskScheduler {
   /// [TaskId.all] and no such task is scheduled.
   void runUntil(TaskId id) {
     _log('Run until $id');
-    hardAssert(id == TaskId.all || _tasks.containsKey(id),
-        'Attempted to run tasks until missing id: $id');
+    hardAssert(
+      id == TaskId.all || _tasks.containsKey(id),
+      'Attempted to run tasks until missing id: $id',
+    );
 
     final List<TimerTask> pending = _tasks.values.toList()..sort();
     for (final TimerTask task in pending) {
@@ -81,12 +83,12 @@ class TimerTask implements Comparable<TimerTask> {
     required Timer timer,
     required TaskFunction function,
     required TaskScheduler scheduler,
-  })  : _index = index,
-        _id = id,
-        _targetTime = targetTime,
-        _timer = timer,
-        _function = function,
-        _scheduler = scheduler;
+  }) : _index = index,
+       _id = id,
+       _targetTime = targetTime,
+       _timer = timer,
+       _function = function,
+       _scheduler = scheduler;
 
   final int _index;
   final TaskId _id;

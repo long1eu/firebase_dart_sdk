@@ -12,8 +12,12 @@ import 'package:firebase_app_dart/internal.dart' show Log;
 
 /// Multi-resource container for Firestore.
 class FirestoreMultiDbComponent {
-  FirestoreMultiDbComponent(this.app, this.authProvider, this.settings,
-      {this.appCheckProvider});
+  FirestoreMultiDbComponent(
+    this.app,
+    this.authProvider,
+    this.settings, {
+    this.appCheckProvider,
+  });
 
   /// A static map from instance key (see [keyFor]) to [Firestore] instances.
   static final Map<String, Firestore> instances = <String, Firestore>{};
@@ -28,8 +32,7 @@ class FirestoreMultiDbComponent {
       <String, StreamSubscription<String>>{};
 
   /// The key of the instance for the given app and database.
-  static String keyFor(String appName, String database) =>
-      '$appName/$database';
+  static String keyFor(String appName, String database) => '$appName/$database';
 
   /// Makes [firestore] the instance returned for [app] and [database], and
   /// releases it again when [app] is deleted.
@@ -41,8 +44,10 @@ class FirestoreMultiDbComponent {
       if (identical(instances[key], firestore)) {
         // Nobody awaits this: report a failure instead of raising an unhandled error.
         firestore.shutdown().catchError((Object e) {
-          Log.w('FirebaseFirestore',
-              'Shutting down the instance of the deleted app failed: $e');
+          Log.w(
+            'FirebaseFirestore',
+            'Shutting down the instance of the deleted app failed: $e',
+          );
         });
       }
     });
@@ -86,24 +91,25 @@ class FirestoreMultiDbComponent {
     }
 
     Future<Firestore> create() => Firestore.newInstance(
-          app,
-          databaseName,
-          authProvider: authProvider,
-          appCheckProvider: appCheckProvider,
-          openDatabase: openDatabase,
-          settings: settings,
-        );
+      app,
+      databaseName,
+      authProvider: authProvider,
+      appCheckProvider: appCheckProvider,
+      openDatabase: openDatabase,
+      settings: settings,
+    );
 
-    return _pending[key] ??= (existing == null
-            ? create()
-            // The instance of another FirebaseApp object with the same name: app names are unique among live apps,
-            // so that app was deleted and its delete event (which is delivered asynchronously) has not terminated
-            // the instance yet. Terminate it before the new instance opens the same persistence.
-            : existing.terminate().then((_) => create()))
-        .whenComplete(() {
-      // Not an arrow: remove() returns this very future, which whenComplete
-      // would then wait for.
-      _pending.remove(key);
-    });
+    return _pending[key] ??=
+        (existing == null
+                ? create()
+                // The instance of another FirebaseApp object with the same name: app names are unique among live apps,
+                // so that app was deleted and its delete event (which is delivered asynchronously) has not terminated
+                // the instance yet. Terminate it before the new instance opens the same persistence.
+                : existing.terminate().then((_) => create()))
+            .whenComplete(() {
+              // Not an arrow: remove() returns this very future, which whenComplete
+              // would then wait for.
+              _pending.remove(key);
+            });
   }
 }

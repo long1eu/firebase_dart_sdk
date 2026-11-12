@@ -20,9 +20,11 @@ extension DatastoreAggregation on Datastore {
   ///
   /// The result is keyed by the client-side alias of each field.
   Future<Map<String, FieldValue>> runAggregateQuery(
-      Query query, List<AggregateField> aggregateFields) async {
-    final proto.Target_QueryTarget target =
-        _serializer.encodeAggregateQueryTarget(query);
+    Query query,
+    List<AggregateField> aggregateFields,
+  ) async {
+    final proto.Target_QueryTarget target = _serializer
+        .encodeAggregateQueryTarget(query);
     final Map<String, String> aliasMap = <String, String>{};
     final proto.StructuredAggregationQuery aggregationQuery = _serializer
         .encodeStructuredAggregationQuery(target, aggregateFields, aliasMap);
@@ -32,8 +34,8 @@ extension DatastoreAggregation on Datastore {
           ..parent = target.parent
           ..structuredAggregationQuery = aggregationQuery;
 
-    final ResponseStream<proto.RunAggregationQueryResponse> call =
-        _client.runAggregationQuery(request);
+    final ResponseStream<proto.RunAggregationQueryResponse> call = _client
+        .runAggregationQuery(request);
     final proto.RunAggregationQueryResponse response;
     try {
       // The first response carries the whole result. The call is not cancelled (which `call.first` would do), see
@@ -41,10 +43,14 @@ extension DatastoreAggregation on Datastore {
       response = await _client.callReleaser.first(call, call.cancel);
     } on StateError {
       throw FirestoreError(
-          'No responses received', FirestoreErrorCode.unimplemented);
+        'No responses received',
+        FirestoreErrorCode.unimplemented,
+      );
     }
 
     return _serializer.decodeAggregationResult(
-        response.result.aggregateFields, aliasMap);
+      response.result.aggregateFields,
+      aliasMap,
+    );
   }
 }

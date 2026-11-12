@@ -7,7 +7,7 @@ part of 'filter.dart';
 /// A Filter that implements the IN operator.
 class InFilter extends FieldFilter {
   InFilter(FieldPath field, FieldValue value)
-      : super._(field, FilterOperator.IN, value);
+    : super._(field, FilterOperator.IN, value);
 
   @override
   bool matches(Document doc) {

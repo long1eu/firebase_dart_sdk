@@ -71,7 +71,7 @@ class Datastore {
     CredentialsProvider credentialsProvider, {
     AppCheckTokenProvider? appCheckProvider,
     FirestoreTransport Function(ChannelOptionsProvider options)?
-        transportFactory,
+    transportFactory,
   }) {
     final ChannelOptionsProvider optionsProvider = ChannelOptionsProvider(
       databaseId: databaseInfo.databaseId,
@@ -82,8 +82,9 @@ class Datastore {
         ? transportFactory(optionsProvider)
         : (transportOverride ?? createTransport)(databaseInfo, optionsProvider);
     final FirestoreClient client = FirestoreClient(transport, optionsProvider);
-    final RemoteSerializer serializer =
-        RemoteSerializer(databaseInfo.databaseId);
+    final RemoteSerializer serializer = RemoteSerializer(
+      databaseInfo.databaseId,
+    );
     return Datastore.test(scheduler, databaseInfo, serializer, client);
   }
 
@@ -91,8 +92,10 @@ class Datastore {
   /// afterwards, so that tests can run a whole client over another transport.
   @visibleForTesting
   static FirestoreTransport Function(
-          DatabaseInfo databaseInfo, ChannelOptionsProvider options)?
-      transportOverride;
+    DatabaseInfo databaseInfo,
+    ChannelOptionsProvider options,
+  )?
+  transportOverride;
 
   @visibleForTesting
   Datastore.test(
@@ -108,7 +111,7 @@ class Datastore {
     'x-google-backends',
     'x-google-netmon-label',
     'x-google-service',
-    'x-google-gfe-request-trace'
+    'x-google-gfe-request-trace',
   };
 
   final TaskScheduler _scheduler;

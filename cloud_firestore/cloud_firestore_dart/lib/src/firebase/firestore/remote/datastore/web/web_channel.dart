@@ -58,8 +58,9 @@ class WebChannelChunkParser {
         break;
       }
       final String prefix = _buffer.substring(0, newline).trim();
-      final int? length =
-          _decimal.hasMatch(prefix) ? int.tryParse(prefix) : null;
+      final int? length = _decimal.hasMatch(prefix)
+          ? int.tryParse(prefix)
+          : null;
       if (length == null || length > maxChunkLength) {
         throw FormatException('Invalid chunk length', prefix);
       }
@@ -172,8 +173,10 @@ class WebChannelStream {
       't': '1',
     };
     final String query = all.entries
-        .map((MapEntry<String, String> e) =>
-            '${e.key}=${Uri.encodeComponent(e.value)}')
+        .map(
+          (MapEntry<String, String> e) =>
+              '${e.key}=${Uri.encodeComponent(e.value)}',
+        )
         .join('&');
     return Uri.parse('$_channelUrl?$query');
   }
@@ -270,7 +273,8 @@ class WebChannelStream {
       // Not JSON, fall through.
     }
     return GrpcError.unavailable(
-        'The stream request failed with HTTP status $status');
+      'The stream request failed with HTTP status $status',
+    );
   }
 
   /// Reads the session out of the handshake response. Returns false if the
@@ -296,8 +300,9 @@ class WebChannelStream {
           final List<Object?> open = array[1] as List<Object?>;
           _sessionId = open[1] as String?;
           if (open.length > 5 && open[5] is int && (open[5] as int) > 0) {
-            _backChannelTimeout =
-                Duration(milliseconds: ((open[5] as int) * 1.5).round());
+            _backChannelTimeout = Duration(
+              milliseconds: ((open[5] as int) * 1.5).round(),
+            );
           }
         } else {
           _onArray(array);
@@ -308,8 +313,9 @@ class WebChannelStream {
       }
     }
     if (_sessionId == null) {
-      _fail(const GrpcError.unavailable(
-          'The handshake response has no session id'));
+      _fail(
+        const GrpcError.unavailable('The handshake response has no session id'),
+      );
       return false;
     }
     final String? httpSessionId = response.headers['x-http-session-id'];
@@ -471,9 +477,11 @@ class WebChannelStream {
             'TYPE': 'terminate',
           }),
         );
-        unawaited(terminate.response
-            .then((WebHttpResponse response) => response.body.drain<void>())
-            .catchError((Object _) {}));
+        unawaited(
+          terminate.response
+              .then((WebHttpResponse response) => response.body.drain<void>())
+              .catchError((Object _) {}),
+        );
       } catch (_) {
         // The client may already be closed.
       }

@@ -65,16 +65,16 @@ class SyncEngine implements RemoteStoreCallback {
     this._remoteStore,
     this._currentUser, {
     int maxConcurrentLimboResolutions = _defaultMaxConcurrentLimboResolutions,
-  })  : _maxConcurrentLimboResolutions = maxConcurrentLimboResolutions,
-        _queryViewsByQuery = <Query, QueryView>{},
-        _queriesByTarget = <int, List<Query>>{},
-        _enqueuedLimboResolutions = <DocumentKey>{},
-        _activeLimboTargetsByKey = <DocumentKey, int>{},
-        _activeLimboResolutionsByTarget = <int, _LimboResolution>{},
-        _limboDocumentRefs = ReferenceSet(),
-        _mutationUserCallbacks = <User, Map<int, Completer<void>>>{},
-        _pendingWritesCallbacks = <int, List<Completer<void>>>{},
-        _targetIdGenerator = TargetIdGenerator.forSyncEngine();
+  }) : _maxConcurrentLimboResolutions = maxConcurrentLimboResolutions,
+       _queryViewsByQuery = <Query, QueryView>{},
+       _queriesByTarget = <int, List<Query>>{},
+       _enqueuedLimboResolutions = <DocumentKey>{},
+       _activeLimboTargetsByKey = <DocumentKey, int>{},
+       _activeLimboResolutionsByTarget = <int, _LimboResolution>{},
+       _limboDocumentRefs = ReferenceSet(),
+       _mutationUserCallbacks = <User, Map<int, Completer<void>>>{},
+       _pendingWritesCallbacks = <int, List<Completer<void>>>{},
+       _targetIdGenerator = TargetIdGenerator.forSyncEngine();
 
   static const String _tag = 'SyncEngine';
 
@@ -133,8 +133,10 @@ class SyncEngine implements RemoteStoreCallback {
   }
 
   void _assertCallback(String method) {
-    hardAssertLazy(_syncEngineListener != null,
-        () => 'Trying to call $method before setting callback');
+    hardAssertLazy(
+      _syncEngineListener != null,
+      () => 'Trying to call $method before setting callback',
+    );
   }
 
   /// Initiates a new listen.
@@ -151,15 +153,21 @@ class SyncEngine implements RemoteStoreCallback {
   /// Returns the target ID assigned to the query.
   Future<int> listen(Query query, {bool shouldListenToRemote = true}) async {
     _assertCallback('listen');
-    hardAssertLazy(!_queryViewsByQuery.containsKey(query),
-        () => 'We already listen to query: $query');
+    hardAssertLazy(
+      !_queryViewsByQuery.containsKey(query),
+      () => 'We already listen to query: $query',
+    );
 
-    final QueryData queryData = await _localStore.allocateTarget(query.toTarget());
+    final QueryData queryData = await _localStore.allocateTarget(
+      query.toTarget(),
+    );
 
     // The view has to exist before the remote store sends the listen request: the request carries the number of
     // documents the client already has for the target (expected count), which is read from the view.
-    final ViewSnapshot viewSnapshot =
-        await initializeViewAndComputeSnapshot(query, queryData);
+    final ViewSnapshot viewSnapshot = await initializeViewAndComputeSnapshot(
+      query,
+      queryData,
+    );
     await _listener.onViewSnapshots(<ViewSnapshot>[viewSnapshot]);
 
     if (shouldListenToRemote) {
@@ -169,13 +177,18 @@ class SyncEngine implements RemoteStoreCallback {
   }
 
   Future<ViewSnapshot> initializeViewAndComputeSnapshot(
-      Query query, QueryData queryData) async {
+    Query query,
+    QueryData queryData,
+  ) async {
     final QueryResult queryResult = await _localStore.executeQuery(
-        query, /* usePreviousResults= */ true);
+      query,
+      /* usePreviousResults= */ true,
+    );
 
     final View view = View(query, queryResult.remoteKeys);
-    final ViewDocumentChanges viewDocChanges =
-        view.computeDocChanges(queryResult.documents);
+    final ViewDocumentChanges viewDocChanges = view.computeDocChanges(
+      queryResult.documents,
+    );
 
     // The initial snapshot carries the resume token of the target so that an empty result of a target that has been
     // synced before can be raised from the cache. If there are already queries mapped to the target, the sync state of
@@ -185,7 +198,8 @@ class SyncEngine implements RemoteStoreCallback {
     final List<Query>? mirrorQueries = _queriesByTarget[queryData.targetId];
     if (mirrorQueries != null && mirrorQueries.isNotEmpty) {
       final QueryView? mirrorView = _queryViewsByQuery[mirrorQueries.first];
-      targetIsCurrent = mirrorView != null &&
+      targetIsCurrent =
+          mirrorView != null &&
           mirrorView.view.syncState == ViewSnapshotSyncState.synced;
       if (targetIsCurrent) {
         mirrorReadTime = mirrorView.view.readTime;
@@ -193,14 +207,26 @@ class SyncEngine implements RemoteStoreCallback {
     }
     final TargetChange synthesizedCurrentChange =
         TargetChange.createSynthesizedTargetChangeForCurrentChange(
-            targetIsCurrent, queryData.resumeToken);
+          targetIsCurrent,
+          queryData.resumeToken,
+        );
     final ViewChange viewChange = view.applyChanges(
-        viewDocChanges, synthesizedCurrentChange, false, mirrorReadTime);
-    hardAssert(view.limboDocuments.isEmpty,
-        'View returned limbo docs before target ack from the server');
+      viewDocChanges,
+      synthesizedCurrentChange,
+      false,
+      mirrorReadTime,
+    );
+    hardAssert(
+      view.limboDocuments.isEmpty,
+      'View returned limbo docs before target ack from the server',
+    );
 
-    final QueryView queryView =
-        QueryView(query, queryData.targetId, view, queryData);
+    final QueryView queryView = QueryView(
+      query,
+      queryData.targetId,
+      view,
+      queryData,
+    );
     _queryViewsByQuery[query] = queryView;
     // Most likely there will only be one query mapping to a target.
     _queriesByTarget
@@ -225,22 +251,30 @@ class SyncEngine implements RemoteStoreCallback {
   /// with a local cache. The remote store registers the target synchronously; a failure to start the stream is
   /// reported by the stream itself.
   void _listenToRemote(QueryData queryData) {
-    unawaited(_remoteStore.listen(queryData).catchError(
-        (Object error, StackTrace stackTrace) {
-      Zone.current.handleUncaughtError(error, stackTrace);
-    }));
+    unawaited(
+      _remoteStore.listen(queryData).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        Zone.current.handleUncaughtError(error, stackTrace);
+      }),
+    );
   }
 
   /// Stops listening to a query previously listened to via listen. The target
   /// is only removed from the [RemoteStore] if [shouldUnlistenToRemote] is
   /// true.
-  Future<void> stopListening(Query query,
-      {bool shouldUnlistenToRemote = true}) async {
+  Future<void> stopListening(
+    Query query, {
+    bool shouldUnlistenToRemote = true,
+  }) async {
     _assertCallback('stopListening');
 
     final QueryView? queryView = _queryViewsByQuery[query];
     hardAssert(
-        queryView != null, 'Trying to stop listening to a query not found');
+      queryView != null,
+      'Trying to stop listening to a query not found',
+    );
 
     _queryViewsByQuery.remove(query);
 
@@ -264,7 +298,9 @@ class SyncEngine implements RemoteStoreCallback {
     _assertCallback('stopListeningToRemoteStore');
     final QueryView? queryView = _queryViewsByQuery[query];
     hardAssert(
-        queryView != null, 'Trying to stop listening to a query not found');
+      queryView != null,
+      'Trying to stop listening to a query not found',
+    );
 
     await _remoteStore.stopListening(queryView!.targetId);
   }
@@ -275,14 +311,18 @@ class SyncEngine implements RemoteStoreCallback {
   /// The provided Future will be resolved once the write has been acked/rejected by the backend (or failed locally for
   /// any other reason).
   Future<void> writeMutations(
-      List<Mutation> mutations, Completer<void> userTask) async {
+    List<Mutation> mutations,
+    Completer<void> userTask,
+  ) async {
     _assertCallback('writeMutations');
 
     final LocalWriteResult result = await _localStore.writeLocally(mutations);
     _addUserCallback(result.batchId, userTask);
 
     await _emitNewSnapsAndNotifyLocalStore(
-        result.changes, /*remoteEvent:*/ null);
+      result.changes,
+      /*remoteEvent:*/ null,
+    );
     await _remoteStore.fillWritePipeline();
   }
 
@@ -297,7 +337,9 @@ class SyncEngine implements RemoteStoreCallback {
 
   /// Runs an aggregation over [query] on the server.
   Future<Map<String, FieldValue>> runAggregateQuery(
-      Query query, List<AggregateField> aggregateFields) {
+    Query query,
+    List<AggregateField> aggregateFields,
+  ) {
     return _remoteStore.runAggregateQuery(query, aggregateFields);
   }
 
@@ -321,19 +363,24 @@ class SyncEngine implements RemoteStoreCallback {
         // Since this is a limbo resolution lookup, it's for a single document and it could be added, modified, or
         // removed, but not a combination.
         hardAssert(
-            targetChange.addedDocuments.length +
-                    targetChange.modifiedDocuments.length +
-                    targetChange.removedDocuments.length <=
-                1,
-            'Limbo resolution for single document contains multiple changes.');
+          targetChange.addedDocuments.length +
+                  targetChange.modifiedDocuments.length +
+                  targetChange.removedDocuments.length <=
+              1,
+          'Limbo resolution for single document contains multiple changes.',
+        );
         if (targetChange.addedDocuments.isNotEmpty) {
           limboResolution.receivedDocument = true;
         } else if (targetChange.modifiedDocuments.isNotEmpty) {
-          hardAssert(limboResolution.receivedDocument,
-              'Received change for limbo target document without add.');
+          hardAssert(
+            limboResolution.receivedDocument,
+            'Received change for limbo target document without add.',
+          );
         } else if (targetChange.removedDocuments.isNotEmpty) {
-          hardAssert(limboResolution.receivedDocument,
-              'Received remove for limbo target document without add.');
+          hardAssert(
+            limboResolution.receivedDocument,
+            'Received remove for limbo target document without add.',
+          );
           limboResolution.receivedDocument = false;
         } else {
           // This was probably just a CURRENT targetChange or similar.
@@ -354,8 +401,10 @@ class SyncEngine implements RemoteStoreCallback {
     for (MapEntry<Query, QueryView> entry in _queryViewsByQuery.entries) {
       final View view = entry.value.view;
       final ViewChange viewChange = view.applyOnlineStateChange(onlineState);
-      hardAssert(viewChange.limboChanges.isEmpty,
-          'OnlineState should not affect limbo documents.');
+      hardAssert(
+        viewChange.limboChanges.isEmpty,
+        'OnlineState should not affect limbo documents.',
+      );
       final ViewSnapshot? snapshot = viewChange.snapshot;
       if (snapshot != null) {
         newViewSnapshots.add(snapshot);
@@ -368,7 +417,7 @@ class SyncEngine implements RemoteStoreCallback {
   // TODO(long1eu): implement getRemoteKeysForTarget
   @override
   ImmutableSortedSet<DocumentKey> Function(int targetId)
-      get getRemoteKeysForTarget {
+  get getRemoteKeysForTarget {
     return (int targetId) {
       final _LimboResolution? limboResolution =
           _activeLimboResolutionsByTarget[targetId];
@@ -399,8 +448,9 @@ class SyncEngine implements RemoteStoreCallback {
 
     final _LimboResolution? limboResolution =
         _activeLimboResolutionsByTarget[targetId];
-    final DocumentKey? limboKey =
-        limboResolution != null ? limboResolution.key : null;
+    final DocumentKey? limboKey = limboResolution != null
+        ? limboResolution.key
+        : null;
     if (limboKey != null) {
       // Since this query failed, we won't want to manually unlisten to it. So go ahead and remove it from bookkeeping.
       _activeLimboTargetsByKey.remove(limboKey);
@@ -414,12 +464,12 @@ class SyncEngine implements RemoteStoreCallback {
       // store's invariants with another method.
       final Map<DocumentKey, MaybeDocument> documentUpdates =
           <DocumentKey, MaybeDocument>{
-        limboKey: NoDocument(
-          limboKey,
-          SnapshotVersion.none,
-          hasCommittedMutations: false,
-        )
-      };
+            limboKey: NoDocument(
+              limboKey,
+              SnapshotVersion.none,
+              hasCommittedMutations: false,
+            ),
+          };
       final Set<DocumentKey> limboDocuments = <DocumentKey>{limboKey};
       final RemoteEvent event = RemoteEvent(
         documentUpdates: documentUpdates,
@@ -427,8 +477,10 @@ class SyncEngine implements RemoteStoreCallback {
       );
       await handleRemoteEvent(event);
     } else {
-      hardAssertLazy(_queriesByTarget.containsKey(targetId),
-          () => 'Unknown target: $targetId');
+      hardAssertLazy(
+        _queriesByTarget.containsKey(targetId),
+        () => 'Unknown target: $targetId',
+      );
       await _localStore.releaseTarget(targetId);
       await _removeAndCleanupTarget(targetId, error);
     }
@@ -436,7 +488,8 @@ class SyncEngine implements RemoteStoreCallback {
 
   @override
   Future<void> handleSuccessfulWrite(
-      MutationBatchResult mutationBatchResult) async {
+    MutationBatchResult mutationBatchResult,
+  ) async {
     _assertCallback('handleSuccessfulWrite');
 
     // The local store may or may not be able to apply the write result and raise events immediately (depending on
@@ -478,13 +531,14 @@ class SyncEngine implements RemoteStoreCallback {
   Future<void> registerPendingWritesTask(Completer<void> userTask) async {
     if (!_remoteStore.canUseNetwork) {
       Log.d(
-          _tag,
-          'The network is disabled. The task returned by \'waitForPendingWrites()\' will not complete until the '
-          'network is enabled.');
+        _tag,
+        'The network is disabled. The task returned by \'waitForPendingWrites()\' will not complete until the '
+        'network is enabled.',
+      );
     }
 
-    final int largestPendingBatchId =
-        await _localStore.getHighestUnacknowledgedBatchId();
+    final int largestPendingBatchId = await _localStore
+        .getHighestUnacknowledgedBatchId();
 
     if (largestPendingBatchId == MutationBatch.unknown) {
       // Complete the task right away if there is no pending writes at the moment.
@@ -498,8 +552,9 @@ class SyncEngine implements RemoteStoreCallback {
 
   /// Resolves tasks waiting for this batch id to get acknowledged by the server, if there are any.
   void _resolvePendingWriteTasks(int batchId) {
-    final List<Completer<void>>? tasks =
-        _pendingWritesCallbacks.remove(batchId);
+    final List<Completer<void>>? tasks = _pendingWritesCallbacks.remove(
+      batchId,
+    );
     if (tasks != null) {
       for (Completer<void> task in tasks) {
         task.complete();
@@ -509,13 +564,17 @@ class SyncEngine implements RemoteStoreCallback {
 
   void _failOutstandingPendingWritesAwaitingTasks() {
     final List<Completer<void>> tasks = <Completer<void>>[
-      for (List<Completer<void>> list in _pendingWritesCallbacks.values) ...list
+      for (List<Completer<void>> list in _pendingWritesCallbacks.values)
+        ...list,
     ];
     _pendingWritesCallbacks.clear();
     for (Completer<void> task in tasks) {
-      task.completeError(FirestoreError(
+      task.completeError(
+        FirestoreError(
           '\'waitForPendingWrites\' task is cancelled due to User change.',
-          FirestoreErrorCode.cancelled));
+          FirestoreErrorCode.cancelled,
+        ),
+      );
     }
   }
 
@@ -552,8 +611,8 @@ class SyncEngine implements RemoteStoreCallback {
     }
     _queriesByTarget.remove(targetId);
 
-    final ImmutableSortedSet<DocumentKey> limboKeys =
-        _limboDocumentRefs.referencesForId(targetId);
+    final ImmutableSortedSet<DocumentKey> limboKeys = _limboDocumentRefs
+        .referencesForId(targetId);
     _limboDocumentRefs.removeReferencesForId(targetId);
     for (DocumentKey key in limboKeys) {
       if (!_limboDocumentRefs.containsKey(key)) {
@@ -580,7 +639,8 @@ class SyncEngine implements RemoteStoreCallback {
   /// Computes a new snapshot from the changes and calls the registered callback with the new snapshot.
   Future<void> _emitNewSnapsAndNotifyLocalStore(
     ImmutableSortedMap<DocumentKey, MaybeDocument> changes,
-    RemoteEvent? remoteEvent) async {
+    RemoteEvent? remoteEvent,
+  ) async {
     final List<ViewSnapshot> newSnapshots = <ViewSnapshot>[];
     final List<LocalViewChanges> documentChangesInAllViews =
         <LocalViewChanges>[];
@@ -598,8 +658,9 @@ class SyncEngine implements RemoteStoreCallback {
         // store to make sure we didn't lose any good docs that had been past the limit.
         final ImmutableSortedMap<DocumentKey, Document> docs =
             (await _localStore.executeQuery(
-                    queryView.query, /* usePreviousResults= */ false))
-                .documents;
+              queryView.query,
+              /* usePreviousResults= */ false,
+            )).documents;
         viewDocChanges = view.computeDocChanges(docs, viewDocChanges);
         if (!identical(_queryViewsByQuery[queryView.query], queryView)) {
           continue;
@@ -608,12 +669,19 @@ class SyncEngine implements RemoteStoreCallback {
       final TargetChange? targetChange = remoteEvent == null
           ? null
           : remoteEvent.targetChanges[queryView.targetId];
-      final bool targetIsPendingReset = remoteEvent != null &&
+      final bool targetIsPendingReset =
+          remoteEvent != null &&
           remoteEvent.targetMismatches.containsKey(queryView.targetId);
-      final ViewChange viewChange = queryView.view.applyChanges(viewDocChanges,
-          targetChange, targetIsPendingReset, remoteEvent?.snapshotVersion);
+      final ViewChange viewChange = queryView.view.applyChanges(
+        viewDocChanges,
+        targetChange,
+        targetIsPendingReset,
+        remoteEvent?.snapshotVersion,
+      );
       await _updateTrackedLimboDocuments(
-          viewChange.limboChanges, queryView.targetId);
+        viewChange.limboChanges,
+        queryView.targetId,
+      );
 
       final ViewSnapshot? snapshot = viewChange.snapshot;
       if (snapshot != null) {
@@ -632,7 +700,9 @@ class SyncEngine implements RemoteStoreCallback {
 
   /// Updates the limbo document state for the given targetId.
   Future<void> _updateTrackedLimboDocuments(
-      List<LimboDocumentChange> limboChanges, int targetId) async {
+    List<LimboDocumentChange> limboChanges,
+    int targetId,
+  ) async {
     for (LimboDocumentChange limboChange in limboChanges) {
       switch (limboChange.type) {
         case LimboDocumentChangeType.added:
@@ -675,12 +745,14 @@ class SyncEngine implements RemoteStoreCallback {
       final int limboTargetId = _targetIdGenerator.nextId;
       _activeLimboResolutionsByTarget[limboTargetId] = _LimboResolution(key);
       _activeLimboTargetsByKey[key] = limboTargetId;
-      await _remoteStore.listen(QueryData(
-        Query(key.path).toTarget(),
-        limboTargetId,
-        ListenSequence.invalid,
-        QueryPurpose.limboResolution,
-      ));
+      await _remoteStore.listen(
+        QueryData(
+          Query(key.path).toTarget(),
+          limboTargetId,
+          ListenSequence.invalid,
+          QueryPurpose.limboResolution,
+        ),
+      );
     }
   }
 
@@ -718,23 +790,29 @@ class SyncEngine implements RemoteStoreCallback {
 
   /// Loads the bundle read by [bundleReader] into the local store and reports the progress to [resultTask].
   Future<void> loadBundle(
-      BundleReader bundleReader, LoadBundleTask resultTask) async {
+    BundleReader bundleReader,
+    LoadBundleTask resultTask,
+  ) async {
     try {
-      final BundleMetadata bundleMetadata =
-          await bundleReader.getBundleMetadata();
-      final bool hasNewerBundle =
-          await _localStore.hasNewerBundle(bundleMetadata);
+      final BundleMetadata bundleMetadata = await bundleReader
+          .getBundleMetadata();
+      final bool hasNewerBundle = await _localStore.hasNewerBundle(
+        bundleMetadata,
+      );
       if (hasNewerBundle) {
         resultTask.setResult(LoadBundleTaskProgress.forSuccess(bundleMetadata));
         return;
       }
 
-      LoadBundleTaskProgress? progress =
-          LoadBundleTaskProgress.forInitial(bundleMetadata);
+      LoadBundleTaskProgress? progress = LoadBundleTaskProgress.forInitial(
+        bundleMetadata,
+      );
       resultTask.updateProgress(progress);
 
-      final BundleLoader bundleLoader =
-          BundleLoader(_localStore, bundleMetadata);
+      final BundleLoader bundleLoader = BundleLoader(
+        _localStore,
+        bundleMetadata,
+      );
 
       int currentBytesRead = 0;
       BundleElement? bundleElement;
@@ -742,7 +820,9 @@ class SyncEngine implements RemoteStoreCallback {
         final int oldBytesRead = currentBytesRead;
         currentBytesRead = bundleReader.bytesRead;
         progress = bundleLoader.addElement(
-            bundleElement!, currentBytesRead - oldBytesRead);
+          bundleElement!,
+          currentBytesRead - oldBytesRead,
+        );
         if (progress != null) {
           resultTask.updateProgress(progress);
         }
@@ -759,12 +839,14 @@ class SyncEngine implements RemoteStoreCallback {
       resultTask.setResult(LoadBundleTaskProgress.forSuccess(bundleMetadata));
     } catch (e, stackTrace) {
       Log.w('Firestore', 'Loading bundle failed : $e');
-      resultTask.setException(FirestoreError(
-        'Bundle failed to load',
-        FirestoreErrorCode.invalidArgument,
-        e,
-        stackTrace,
-      ));
+      resultTask.setException(
+        FirestoreError(
+          'Bundle failed to load',
+          FirestoreErrorCode.invalidArgument,
+          e,
+          stackTrace,
+        ),
+      );
     } finally {
       try {
         await bundleReader.close();

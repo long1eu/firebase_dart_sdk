@@ -17,7 +17,7 @@ part of 'filter.dart';
 /// A Filter that implements the not-in operator.
 class NotInFilter extends FieldFilter {
   NotInFilter(FieldPath field, FieldValue value)
-      : super._(field, FilterOperator.NOT_IN, value) {
+    : super._(field, FilterOperator.NOT_IN, value) {
     hardAssert(value is ArrayValue, 'NotInFilter expects an ArrayValue');
   }
 

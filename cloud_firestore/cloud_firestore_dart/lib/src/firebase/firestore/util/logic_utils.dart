@@ -30,8 +30,10 @@ class LogicUtils {
 
   /// Asserts that the given filter is a [FieldFilter] or [CompositeFilter].
   static void _assertFieldFilterOrCompositeFilter(Filter filter) {
-    hardAssert(filter is FieldFilter || filter is CompositeFilter,
-        'Only field filters and composite filters are accepted.');
+    hardAssert(
+      filter is FieldFilter || filter is CompositeFilter,
+      'Only field filters and composite filters are accepted.',
+    );
   }
 
   /// Returns true if the given filter is a single field filter. For example,
@@ -49,7 +51,8 @@ class LogicUtils {
   static bool _isDisjunctionOfFieldFiltersAndFlatConjunctions(Filter filter) {
     if (filter is CompositeFilter && filter.isDisjunction) {
       for (Filter subfilter in filter.filters) {
-        if (!_isSingleFieldFilter(subfilter) && !_isFlatConjunction(subfilter)) {
+        if (!_isSingleFieldFilter(subfilter) &&
+            !_isFlatConjunction(subfilter)) {
           return false;
         }
       }
@@ -107,8 +110,9 @@ class LogicUtils {
     // First apply associativity to all subfilters. This will in turn
     // recursively apply associativity to all nested composite filters and
     // field filters.
-    final List<Filter> updatedFilters =
-        filters.map(applyAssociation).toList(growable: false);
+    final List<Filter> updatedFilters = filters
+        .map(applyAssociation)
+        .toList(growable: false);
 
     // For composite subfilters that perform the same kind of logical operation
     // as `compositeFilter` take out their filters and add them to
@@ -163,7 +167,9 @@ class LogicUtils {
       result = _distributeFieldCompositeFilter(rhs, lhs);
     } else {
       result = _distributeCompositeComposite(
-          lhs as CompositeFilter, rhs as CompositeFilter);
+        lhs as CompositeFilter,
+        rhs as CompositeFilter,
+      );
     }
 
     // Since `applyDistribution` is recursive, we must apply association at the
@@ -179,7 +185,9 @@ class LogicUtils {
   }
 
   static Filter _distributeFieldCompositeFilter(
-      FieldFilter fieldFilter, CompositeFilter compositeFilter) {
+    FieldFilter fieldFilter,
+    CompositeFilter compositeFilter,
+  ) {
     // There are two cases:
     // A & (B & C) --> (A & B & C)
     // A & (B | C) --> (A & B) | (A & C)
@@ -197,9 +205,13 @@ class LogicUtils {
   }
 
   static Filter _distributeCompositeComposite(
-      CompositeFilter lhs, CompositeFilter rhs) {
-    hardAssert(lhs.filters.isNotEmpty && rhs.filters.isNotEmpty,
-        'Found an empty composite filter');
+    CompositeFilter lhs,
+    CompositeFilter rhs,
+  ) {
+    hardAssert(
+      lhs.filters.isNotEmpty && rhs.filters.isNotEmpty,
+      'Found an empty composite filter',
+    );
 
     // There are four cases:
     // (A & B) & (C & D) --> (A & B & C & D)
@@ -252,18 +264,26 @@ class LogicUtils {
       return newFilter;
     }
 
-    hardAssert(newFilter is CompositeFilter,
-        'field filters are already in DNF form.');
+    hardAssert(
+      newFilter is CompositeFilter,
+      'field filters are already in DNF form.',
+    );
     final CompositeFilter newCompositeFilter = newFilter as CompositeFilter;
-    hardAssert(newCompositeFilter.isConjunction,
-        'Disjunction of filters all of which are already in DNF form is itself in DNF form.');
-    hardAssert(newCompositeFilter.filters.length > 1,
-        'Single-filter composite filters are already in DNF form.');
+    hardAssert(
+      newCompositeFilter.isConjunction,
+      'Disjunction of filters all of which are already in DNF form is itself in DNF form.',
+    );
+    hardAssert(
+      newCompositeFilter.filters.length > 1,
+      'Single-filter composite filters are already in DNF form.',
+    );
 
     Filter runningResult = newCompositeFilter.filters[0];
     for (int i = 1; i < newCompositeFilter.filters.length; ++i) {
-      runningResult =
-          applyDistribution(runningResult, newCompositeFilter.filters[i]);
+      runningResult = applyDistribution(
+        runningResult,
+        newCompositeFilter.filters[i],
+      );
     }
     return runningResult;
   }
@@ -279,14 +299,12 @@ class LogicUtils {
     if (filter is FieldFilter) {
       if (filter is InFilter) {
         // We have reached a field filter with `in` operator.
-        final List<FieldValue> values = (filter.value as ArrayValue).internalValue;
-        return CompositeFilter(
-          <Filter>[
-            for (FieldValue value in values)
-              FieldFilter(filter.field, FilterOperator.equal, value),
-          ],
-          CompositeFilterOperator.or,
-        );
+        final List<FieldValue> values =
+            (filter.value as ArrayValue).internalValue;
+        return CompositeFilter(<Filter>[
+          for (FieldValue value in values)
+            FieldFilter(filter.field, FilterOperator.equal, value),
+        ], CompositeFilterOperator.or);
       } else {
         // We have reached other kinds of field filters.
         return filter;
@@ -316,11 +334,14 @@ class LogicUtils {
     // The `in` operator is a syntactic sugar over a disjunction of equalities.
     // We should first replace such filters with equality filters before
     // running the DNF transform.
-    final Filter result =
-        computeDistributedNormalForm(computeInExpansion(filter));
+    final Filter result = computeDistributedNormalForm(
+      computeInExpansion(filter),
+    );
 
-    hardAssert(isDisjunctiveNormalForm(result),
-        'computeDistributedNormalForm did not result in disjunctive normal form');
+    hardAssert(
+      isDisjunctiveNormalForm(result),
+      'computeDistributedNormalForm did not result in disjunctive normal form',
+    );
 
     if (_isSingleFieldFilter(result) || _isFlatConjunction(result)) {
       return <Filter>[result];

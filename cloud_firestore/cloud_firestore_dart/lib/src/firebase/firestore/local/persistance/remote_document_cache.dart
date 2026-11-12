@@ -60,7 +60,8 @@ abstract class RemoteDocumentCache {
   /// an entry is not cached, the corresponding key will be mapped to a null
   /// value.
   Future<Map<DocumentKey, MaybeDocument?>> getAll(
-      Iterable<DocumentKey> documentKeys);
+    Iterable<DocumentKey> documentKeys,
+  );
 
   /// Looks up the next [limit] documents for a collection group based on the provided [offset]. The ordering is based
   /// on the document's read time and key.
@@ -68,7 +69,10 @@ abstract class RemoteDocumentCache {
   /// The result includes the cached [NoDocument] entries. Only supported by the SQLite implementation (it is used to
   /// backfill field indexes, which memory persistence does not have).
   Future<Map<DocumentKey, ReadDocument>> getAllForCollectionGroup(
-      String collectionGroup, IndexOffset offset, int limit);
+    String collectionGroup,
+    IndexOffset offset,
+    int limit,
+  );
 
   /// Executes a query against the cached [Document] entries
   ///
@@ -84,6 +88,9 @@ abstract class RemoteDocumentCache {
   /// [context] is an optional tracker that records the number of documents the scan went through (SQLite only, as
   /// upstream).
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query, IndexOffset offset,
-          [QueryContext? context]);
+  getAllDocumentsMatchingQuery(
+    Query query,
+    IndexOffset offset, [
+    QueryContext? context,
+  ]);
 }

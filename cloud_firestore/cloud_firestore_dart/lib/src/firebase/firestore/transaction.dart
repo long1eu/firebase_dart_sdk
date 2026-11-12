@@ -48,14 +48,20 @@ class Transaction {
   /// [options] An object to configure the set behavior.
   ///
   /// Returns this Transaction instance. Used for chaining method calls.
-  Transaction set<T extends Object?>(DocumentReference<T> documentRef, T data,
-      [SetOptions? options]) {
+  Transaction set<T extends Object?>(
+    DocumentReference<T> documentRef,
+    T data, [
+    SetOptions? options,
+  ]) {
     final SetOptions? userOptions = options;
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
     checkNotNull<Object>(data, 'Provided data must not be null.');
-    final Map<String, Object?> rawData =
-        toRawData<T>(data, documentRef.converter, userOptions);
+    final Map<String, Object?> rawData = toRawData<T>(
+      data,
+      documentRef.converter,
+      userOptions,
+    );
     final UserDataParsedSetData parsed = options.merge
         ? _firestore.dataConverter.parseMergeData(rawData, options.fieldMask)
         : _firestore.dataConverter.parseSetData(rawData);
@@ -71,7 +77,10 @@ class Transaction {
   /// fields within the document.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  Transaction updateFromList(DocumentReference<Object?> documentRef, List<Object?> data) {
+  Transaction updateFromList(
+    DocumentReference<Object?> documentRef,
+    List<Object?> data,
+  ) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
     return _update(documentRef, parsedData);
@@ -85,14 +94,19 @@ class Transaction {
   /// fields within the document.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  Transaction update(DocumentReference<Object?> documentRef, Map<String, Object?> data) {
-    final UserDataParsedUpdateData parsedData =
-        _firestore.dataConverter.parseUpdateData(data);
+  Transaction update(
+    DocumentReference<Object?> documentRef,
+    Map<String, Object?> data,
+  ) {
+    final UserDataParsedUpdateData parsedData = _firestore.dataConverter
+        .parseUpdateData(data);
     return _update(documentRef, parsedData);
   }
 
   Transaction _update(
-      DocumentReference<Object?> documentRef, UserDataParsedUpdateData updateData) {
+    DocumentReference<Object?> documentRef,
+    UserDataParsedUpdateData updateData,
+  ) {
     _firestore.validateReference(documentRef);
     _transaction.update(documentRef.key, updateData);
     return this;
@@ -116,10 +130,12 @@ class Transaction {
   /// Returns a Future that will be resolved with the contents of the [Document] at this
   /// [DocumentReference].
   Future<DocumentSnapshot<T>> get<T extends Object?>(
-      DocumentReference<T> documentRef) async {
+    DocumentReference<T> documentRef,
+  ) async {
     _firestore.validateReference(documentRef);
-    final List<MaybeDocument> result =
-        await _transaction.lookup(<DocumentKey>[documentRef.key]);
+    final List<MaybeDocument> result = await _transaction.lookup(<DocumentKey>[
+      documentRef.key,
+    ]);
 
     if (result.length != 1) {
       throw fail('Mismatch in docs returned from document lookup.');
@@ -143,8 +159,10 @@ class Transaction {
         converter: documentRef.converter,
       );
     } else {
-      throw fail('BatchGetDocumentsRequest returned unexpected document type: '
-          '${doc.runtimeType}');
+      throw fail(
+        'BatchGetDocumentsRequest returned unexpected document type: '
+        '${doc.runtimeType}',
+      );
     }
   }
 }

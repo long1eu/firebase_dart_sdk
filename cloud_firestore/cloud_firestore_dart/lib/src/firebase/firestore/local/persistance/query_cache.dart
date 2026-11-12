@@ -77,18 +77,23 @@ abstract class QueryCache {
   /// Adds the given document [keys] to cached query results of the given
   /// [targetId].
   Future<void> addMatchingKeys(
-      ImmutableSortedSet<DocumentKey> keys, int targetId);
+    ImmutableSortedSet<DocumentKey> keys,
+    int targetId,
+  );
 
   /// Removes the given document [keys] from the cached query results of the
   /// given [targetId].
   Future<void> removeMatchingKeys(
-      ImmutableSortedSet<DocumentKey> keys, int targetId);
+    ImmutableSortedSet<DocumentKey> keys,
+    int targetId,
+  );
 
   /// Removes all the keys in the query results of the given [targetId].
   Future<void> removeMatchingKeysForTargetId(int targetId);
 
   Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
-      int targetId);
+    int targetId,
+  );
 
   /// Returns true if the document is part of any target
   Future<bool> containsKey(DocumentKey key);

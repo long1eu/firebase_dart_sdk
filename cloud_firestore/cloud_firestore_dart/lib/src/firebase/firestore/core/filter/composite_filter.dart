@@ -31,16 +31,16 @@ enum CompositeFilterOperator {
 /// filters.
 class CompositeFilter extends Filter {
   CompositeFilter(List<Filter> filters, this.operator)
-      : filters = List<Filter>.unmodifiable(filters),
-        super._();
+    : filters = List<Filter>.unmodifiable(filters),
+      super._();
 
   /// A conjunction of [filters].
   CompositeFilter.and(List<Filter> filters)
-      : this(filters, CompositeFilterOperator.and);
+    : this(filters, CompositeFilterOperator.and);
 
   /// A disjunction of [filters].
   CompositeFilter.or(List<Filter> filters)
-      : this(filters, CompositeFilterOperator.or);
+    : this(filters, CompositeFilterOperator.or);
 
   @override
   final List<Filter> filters;

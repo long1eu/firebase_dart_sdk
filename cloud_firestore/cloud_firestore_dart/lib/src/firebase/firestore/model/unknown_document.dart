@@ -11,7 +11,7 @@ import 'package:firebase_app_dart/internal.dart';
 /// updated without a known base document).
 class UnknownDocument extends MaybeDocument {
   UnknownDocument(DocumentKey key, SnapshotVersion version)
-      : super(key, version);
+    : super(key, version);
 
   @override
   bool get hasPendingWrites => true;

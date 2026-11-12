@@ -21,13 +21,17 @@ class IndexBackfiller {
   /// Creates a backfiller that works on the index manager and the local
   /// documents view of the current user of [localStore].
   IndexBackfiller(Persistence persistence, LocalStore localStore)
-      : this.forTesting(
-            persistence,
-            () => localStore.indexManagerForCurrentUser,
-            () => localStore.localDocumentsForCurrentUser);
+    : this.forTesting(
+        persistence,
+        () => localStore.indexManagerForCurrentUser,
+        () => localStore.localDocumentsForCurrentUser,
+      );
 
-  IndexBackfiller.forTesting(this._persistence, this._indexManagerOfCurrentUser,
-      this._localDocumentsViewOfCurrentUser);
+  IndexBackfiller.forTesting(
+    this._persistence,
+    this._indexManagerOfCurrentUser,
+    this._localDocumentsViewOfCurrentUser,
+  );
 
   static const String _tag = 'IndexBackfiller';
 
@@ -47,7 +51,9 @@ class IndexBackfiller {
   /// processed.
   Future<int> backfill() {
     return _persistence.runTransactionAndReturn<int>(
-        'Backfill Indexes', _writeIndexEntries);
+      'Backfill Indexes',
+      _writeIndexEntries,
+    );
   }
 
   /// Writes index entries until the cap is reached. Returns the number of
@@ -57,15 +63,17 @@ class IndexBackfiller {
     final Set<String> processedCollectionGroups = <String>{};
     int documentsRemaining = maxDocumentsToProcess;
     while (documentsRemaining > 0) {
-      final String? collectionGroup =
-          indexManager.getNextCollectionGroupToUpdate();
+      final String? collectionGroup = indexManager
+          .getNextCollectionGroupToUpdate();
       if (collectionGroup == null ||
           processedCollectionGroups.contains(collectionGroup)) {
         break;
       }
       Log.d(_tag, 'Processing collection: $collectionGroup');
       documentsRemaining -= await _writeEntriesForCollectionGroup(
-          collectionGroup, documentsRemaining);
+        collectionGroup,
+        documentsRemaining,
+      );
       processedCollectionGroups.add(collectionGroup);
     }
     return maxDocumentsToProcess - documentsRemaining;
@@ -74,18 +82,24 @@ class IndexBackfiller {
   /// Writes entries for the provided collection group. Returns the number of
   /// documents processed.
   Future<int> _writeEntriesForCollectionGroup(
-      String collectionGroup, int documentsRemainingUnderCap) async {
+    String collectionGroup,
+    int documentsRemainingUnderCap,
+  ) async {
     final IndexManager indexManager = _indexManagerOfCurrentUser();
     final LocalDocumentsView localDocumentsView =
         _localDocumentsViewOfCurrentUser();
 
     // Use the earliest offset of all field indexes to query the local cache.
-    final IndexOffset existingOffset =
-        indexManager.getMinOffset(collectionGroup);
+    final IndexOffset existingOffset = indexManager.getMinOffset(
+      collectionGroup,
+    );
 
-    final LocalDocumentsResult nextBatch =
-        await localDocumentsView.getNextDocuments(
-            collectionGroup, existingOffset, documentsRemainingUnderCap);
+    final LocalDocumentsResult nextBatch = await localDocumentsView
+        .getNextDocuments(
+          collectionGroup,
+          existingOffset,
+          documentsRemainingUnderCap,
+        );
     await indexManager.updateIndexEntries(nextBatch.documents);
 
     final IndexOffset newOffset = _getNewOffset(existingOffset, nextBatch);
@@ -97,19 +111,25 @@ class IndexBackfiller {
 
   /// Returns the next offset based on the provided documents.
   IndexOffset _getNewOffset(
-      IndexOffset existingOffset, LocalDocumentsResult lookupResult) {
+    IndexOffset existingOffset,
+    LocalDocumentsResult lookupResult,
+  ) {
     IndexOffset maxOffset = existingOffset;
     for (final DocumentKey key in lookupResult.documents.keys) {
       final IndexOffset newOffset = IndexOffset(
-          lookupResult.readTimes[key] ?? SnapshotVersion.none,
-          key,
-          FieldIndex.initialLargestBatchId);
+        lookupResult.readTimes[key] ?? SnapshotVersion.none,
+        key,
+        FieldIndex.initialLargestBatchId,
+      );
       if (newOffset.compareTo(maxOffset) > 0) {
         maxOffset = newOffset;
       }
     }
-    return IndexOffset(maxOffset.readTime, maxOffset.documentKey,
-        max(lookupResult.batchId, existingOffset.largestBatchId));
+    return IndexOffset(
+      maxOffset.readTime,
+      maxOffset.documentKey,
+      max(lookupResult.batchId, existingOffset.largestBatchId),
+    );
   }
 }
 
@@ -119,9 +139,11 @@ class IndexBackfillerScheduler {
   /// [run] executes a backfill; the client passes a function that puts it on
   /// its serial queue, so that a backfill never interleaves with the other
   /// operations of the local store.
-  IndexBackfillerScheduler(this._backfiller, this._scheduler,
-      {Future<int> Function(Future<int> Function() backfill)? run})
-      : _run = run ?? ((Future<int> Function() backfill) => backfill());
+  IndexBackfillerScheduler(
+    this._backfiller,
+    this._scheduler, {
+    Future<int> Function(Future<int> Function() backfill)? run,
+  }) : _run = run ?? ((Future<int> Function() backfill) => backfill());
 
   static const String _tag = 'IndexBackfiller';
 
@@ -149,22 +171,18 @@ class IndexBackfillerScheduler {
   }
 
   void _scheduleBackfill(Duration delay) {
-    _backfillTask = _scheduler.add(
-      TaskId.indexBackfill,
-      delay,
-      () async {
-        try {
-          final int documentsProcessed = await _run(_backfiller.backfill);
-          Log.d(_tag, 'Documents written: $documentsProcessed');
-        } catch (e) {
-          // A failed run (for example a closed database) must not end the
-          // scheduling for the whole process.
-          Log.w(_tag, 'Index backfill failed: $e');
-        }
-        if (!_stopped) {
-          _scheduleBackfill(regularBackfillDelay);
-        }
-      },
-    );
+    _backfillTask = _scheduler.add(TaskId.indexBackfill, delay, () async {
+      try {
+        final int documentsProcessed = await _run(_backfiller.backfill);
+        Log.d(_tag, 'Documents written: $documentsProcessed');
+      } catch (e) {
+        // A failed run (for example a closed database) must not end the
+        // scheduling for the whole process.
+        Log.w(_tag, 'Index backfill failed: $e');
+      }
+      if (!_stopped) {
+        _scheduleBackfill(regularBackfillDelay);
+      }
+    });
   }
 }

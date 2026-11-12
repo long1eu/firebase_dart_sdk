@@ -20,16 +20,24 @@ class Timestamp implements Comparable<Timestamp> {
   ///
   /// The value must lie between 0001-01-01T00:00:00Z and 9999-12-31T23:59:59.999999999Z.
   const Timestamp(this.seconds, this.nanoseconds)
-      : assert(nanoseconds >= 0,
-            'Timestamp nanoseconds out of range: $nanoseconds'),
-        assert(nanoseconds < 1e9,
-            'Timestamp nanoseconds out of range: $nanoseconds'),
-        // Midnight at the beginning of 1/1/1 is the earliest supported timestamp.
-        assert(seconds >= -62135596800,
-            'Timestamp seconds out of range: $seconds'),
-        // This will break in the year 10,000.
-        assert(
-            seconds < 253402300800, 'Timestamp seconds out of range: $seconds');
+    : assert(
+        nanoseconds >= 0,
+        'Timestamp nanoseconds out of range: $nanoseconds',
+      ),
+      assert(
+        nanoseconds < 1e9,
+        'Timestamp nanoseconds out of range: $nanoseconds',
+      ),
+      // Midnight at the beginning of 1/1/1 is the earliest supported timestamp.
+      assert(
+        seconds >= -62135596800,
+        'Timestamp seconds out of range: $seconds',
+      ),
+      // This will break in the year 10,000.
+      assert(
+        seconds < 253402300800,
+        'Timestamp seconds out of range: $seconds',
+      );
 
   /// Creates a new timestamp from [date], with microsecond precision (the
   /// precision of [DateTime] on the Dart VM, and of the Firestore backend).
@@ -77,7 +85,10 @@ class Timestamp implements Comparable<Timestamp> {
     final Object? nanoseconds = json['nanoseconds'];
     if (json['type'] != jsonType || seconds is! int || nanoseconds is! int) {
       throw ArgumentError.value(
-          json, 'json', 'Not a JSON representation of a Timestamp');
+        json,
+        'json',
+        'Not a JSON representation of a Timestamp',
+      );
     }
     validateRange(seconds, nanoseconds);
     return Timestamp(seconds, nanoseconds);
@@ -103,7 +114,8 @@ class Timestamp implements Comparable<Timestamp> {
   /// earlier time.
   DateTime toDate() {
     return DateTime.fromMicrosecondsSinceEpoch(
-        seconds * 1000000 + nanoseconds ~/ 1000);
+      seconds * 1000000 + nanoseconds ~/ 1000,
+    );
   }
 
   /// The number of milliseconds since the Unix epoch 1970-01-01T00:00:00Z.
@@ -136,15 +148,23 @@ class Timestamp implements Comparable<Timestamp> {
   @internal
   static void validateRange(int seconds, int nanoseconds) {
     Preconditions.checkArgument(
-        nanoseconds >= 0, 'Timestamp nanoseconds out of range: $nanoseconds');
+      nanoseconds >= 0,
+      'Timestamp nanoseconds out of range: $nanoseconds',
+    );
     Preconditions.checkArgument(
-        nanoseconds < 1e9, 'Timestamp nanoseconds out of range: $nanoseconds');
+      nanoseconds < 1e9,
+      'Timestamp nanoseconds out of range: $nanoseconds',
+    );
     // Midnight at the beginning of 1/1/1 is the earliest supported timestamp.
     Preconditions.checkArgument(
-        seconds >= -62135596800, 'Timestamp seconds out of range: $seconds');
+      seconds >= -62135596800,
+      'Timestamp seconds out of range: $seconds',
+    );
     // This will break in the year 10,000.
     Preconditions.checkArgument(
-        seconds < 253402300800, 'Timestamp seconds out of range: $seconds');
+      seconds < 253402300800,
+      'Timestamp seconds out of range: $seconds',
+    );
   }
 
   @override

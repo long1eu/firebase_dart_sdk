@@ -15,13 +15,17 @@ abstract class ArrayTransformOperation implements TransformOperation {
 
   @override
   FieldValue applyToLocalView(
-      FieldValue? previousValue, Timestamp localWriteTime) {
+    FieldValue? previousValue,
+    Timestamp localWriteTime,
+  ) {
     return apply(previousValue);
   }
 
   @override
   FieldValue applyToRemoteDocument(
-      FieldValue? previousValue, FieldValue transformResult) {
+    FieldValue? previousValue,
+    FieldValue transformResult,
+  ) {
     // The server just sends null as the transform result for array operations,
     // so we have to calculate a result the same as we do for local
     // applications.
@@ -99,8 +103,11 @@ class ArrayTransformOperationRemove extends ArrayTransformOperation {
   ArrayValue apply(FieldValue? previousValue) {
     final List<FieldValue> result =
         ArrayTransformOperation.coercedFieldValuesArray(previousValue)
-          ..removeWhere((FieldValue value) => elements
-              .any((FieldValue element) => _sameElement(value, element)));
+          ..removeWhere(
+            (FieldValue value) => elements.any(
+              (FieldValue element) => _sameElement(value, element),
+            ),
+          );
     return ArrayValue.fromList(result);
   }
 }

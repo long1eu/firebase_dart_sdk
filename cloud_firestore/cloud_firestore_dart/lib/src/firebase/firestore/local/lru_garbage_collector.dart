@@ -23,7 +23,9 @@ class LruGarbageCollector {
 
   /// A helper method to create a new scheduler.
   LruGarbageCollectorScheduler newScheduler(
-      TaskScheduler scheduler, LocalStore localStore) {
+    TaskScheduler scheduler,
+    LocalStore localStore,
+  ) {
     return LruGarbageCollectorScheduler(this, localStore, scheduler);
   }
 
@@ -38,10 +40,12 @@ class LruGarbageCollector {
     if (count == 0) {
       return ListenSequence.invalid;
     }
-    final _RollingSequenceNumberBuffer buffer =
-        _RollingSequenceNumberBuffer(count);
+    final _RollingSequenceNumberBuffer buffer = _RollingSequenceNumberBuffer(
+      count,
+    );
     await delegate.forEachTarget(
-        (QueryData queryData) => buffer.addElement(queryData.sequenceNumber));
+      (QueryData queryData) => buffer.addElement(queryData.sequenceNumber),
+    );
     await delegate.forEachOrphanedDocumentSequenceNumber(buffer.addElement);
     return buffer.maxValue;
   }
@@ -66,8 +70,10 @@ class LruGarbageCollector {
 
     final int cacheSize = await byteSize;
     if (cacheSize < _params.minBytesThreshold) {
-      Log.d('LruGarbageCollector',
-          'Garbage collection skipped; Cache size $cacheSize is lower than threshold ${_params.minBytesThreshold}');
+      Log.d(
+        'LruGarbageCollector',
+        'Garbage collection skipped; Cache size $cacheSize is lower than threshold ${_params.minBytesThreshold}',
+      );
       return LruGarbageCollectorResults.didNotRun;
     } else {
       return _runGarbageCollection(activeTargetIds);
@@ -75,16 +81,19 @@ class LruGarbageCollector {
   }
 
   Future<LruGarbageCollectorResults> _runGarbageCollection(
-      Set<int> liveTargetIds) async {
+    Set<int> liveTargetIds,
+  ) async {
     final DateTime startTs = DateTime.now();
-    int sequenceNumbers =
-        await calculateQueryCount(_params.percentileToCollect);
+    int sequenceNumbers = await calculateQueryCount(
+      _params.percentileToCollect,
+    );
     // Cap at the configured max
     if (sequenceNumbers > _params.maximumSequenceNumbersToCollect) {
       Log.d(
-          'LruGarbageCollector',
-          'Capping sequence numbers to collect down to the maximum of ${_params.maximumSequenceNumbersToCollect} from '
-              '$sequenceNumbers');
+        'LruGarbageCollector',
+        'Capping sequence numbers to collect down to the maximum of ${_params.maximumSequenceNumbersToCollect} from '
+            '$sequenceNumbers',
+      );
       sequenceNumbers = _params.maximumSequenceNumbersToCollect;
     }
     final DateTime countedTargetsTs = DateTime.now();
@@ -92,8 +101,10 @@ class LruGarbageCollector {
     final int upperBound = await getNthSequenceNumber(sequenceNumbers);
     final DateTime foundUpperBoundTs = DateTime.now();
 
-    final int numTargetsRemoved =
-        await removeTargets(upperBound, liveTargetIds);
+    final int numTargetsRemoved = await removeTargets(
+      upperBound,
+      liveTargetIds,
+    );
     final DateTime removedTargetsTs = DateTime.now();
 
     final int numDocumentsRemoved = await removeOrphanedDocuments(upperBound);
@@ -102,14 +113,18 @@ class LruGarbageCollector {
     if (Log.isDebugEnabled) {
       final StringBuffer desc = StringBuffer('LRU Garbage Collection:\n')
         ..writeln(
-            '\tCounted targets in ${countedTargetsTs.difference(startTs)}')
+          '\tCounted targets in ${countedTargetsTs.difference(startTs)}',
+        )
         ..writeln(
-            '\tDetermined least recently used $sequenceNumbers sequence numbers in '
-            '${foundUpperBoundTs.difference(countedTargetsTs)}')
+          '\tDetermined least recently used $sequenceNumbers sequence numbers in '
+          '${foundUpperBoundTs.difference(countedTargetsTs)}',
+        )
         ..writeln(
-            '\tRemoved $numTargetsRemoved targets in ${removedTargetsTs.difference(foundUpperBoundTs)}')
+          '\tRemoved $numTargetsRemoved targets in ${removedTargetsTs.difference(foundUpperBoundTs)}',
+        )
         ..writeln(
-            '\tRemoved $numDocumentsRemoved documents in ${removedDocumentsTs.difference(removedTargetsTs)}')
+          '\tRemoved $numDocumentsRemoved documents in ${removedDocumentsTs.difference(removedTargetsTs)}',
+        )
         ..writeln('Total Duration: ${removedDocumentsTs.difference(startTs)}');
 
       Log.d('LruGarbageCollector', desc);
@@ -129,7 +144,7 @@ class LruGarbageCollector {
 /// finally reports the largest of them in [maxValue].
 class _RollingSequenceNumberBuffer {
   _RollingSequenceNumberBuffer(this.maxElements)
-      : queue = PriorityQueue<int>(comparator);
+    : queue = PriorityQueue<int>(comparator);
 
   final PriorityQueue<int> queue;
   final int maxElements;
@@ -161,13 +176,14 @@ class LruGarbageCollectorParams {
   });
 
   LruGarbageCollectorParams.disabled()
-      : this(
-            minBytesThreshold: _collectionDisabled,
-            percentileToCollect: 0,
-            maximumSequenceNumbersToCollect: 0);
+    : this(
+        minBytesThreshold: _collectionDisabled,
+        percentileToCollect: 0,
+        maximumSequenceNumbersToCollect: 0,
+      );
 
   LruGarbageCollectorParams.withCacheSizeBytes(int cacheSizeBytes)
-      : this(minBytesThreshold: cacheSizeBytes);
+    : this(minBytesThreshold: cacheSizeBytes);
 
   final int minBytesThreshold;
   final int percentileToCollect;
@@ -195,10 +211,11 @@ class LruGarbageCollectorResults {
 
   static const LruGarbageCollectorResults didNotRun =
       LruGarbageCollectorResults(
-          hasRun: false,
-          sequenceNumbersCollected: 0,
-          targetsRemoved: 0,
-          documentsRemoved: 0);
+        hasRun: false,
+        sequenceNumbersCollected: 0,
+        targetsRemoved: 0,
+        documentsRemoved: 0,
+      );
 
   final bool hasRun;
   final int sequenceNumbersCollected;
@@ -255,21 +272,17 @@ class LruGarbageCollectorScheduler {
   void _scheduleGC() {
     final Duration delay = _hasRun ? _regularGcDelay : _initialGcDelay;
 
-    _gcTask = _scheduler.add(
-      TaskId.garbageCollection,
-      delay,
-      () async {
-        try {
-          await _localStore.collectGarbage(_garbageCollector);
-        } catch (e) {
-          // A failed run (e.g. a locked or closed database) must not end the scheduling for the whole process.
-          Log.w('LruGarbageCollectorScheduler', 'Garbage collection failed: $e');
-        }
-        _hasRun = true;
-        if (!_stopped) {
-          _scheduleGC();
-        }
-      },
-    );
+    _gcTask = _scheduler.add(TaskId.garbageCollection, delay, () async {
+      try {
+        await _localStore.collectGarbage(_garbageCollector);
+      } catch (e) {
+        // A failed run (e.g. a locked or closed database) must not end the scheduling for the whole process.
+        Log.w('LruGarbageCollectorScheduler', 'Garbage collection failed: $e');
+      }
+      _hasRun = true;
+      if (!_stopped) {
+        _scheduleGC();
+      }
+    });
   }
 }

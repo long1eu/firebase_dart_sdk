@@ -11,19 +11,24 @@ class GeoPoint implements Comparable<GeoPoint> {
   // NaN is detected with `x != x`, because `identical(x, double.nan)` never
   // matches a computed NaN (and `isNaN` is not usable in constant expressions).
   const GeoPoint(this.latitude, this.longitude)
-      : assert(latitude == latitude, 'Latitude should not be a NaN.'),
-        assert(
-            latitude != double.infinity && latitude != double.negativeInfinity,
-            'Latitude should not be an infinity.'),
-        assert(longitude == longitude, 'Longitude should not be a NaN.'),
-        assert(
-            longitude != double.infinity &&
-                longitude != double.negativeInfinity,
-            'Longitude should not be an infinity.'),
-        assert(latitude >= -90.0 && latitude <= 90.0,
-            'Latitude must be in the range of [-90, 90] but was $latitude'),
-        assert(longitude >= -180.0 && longitude <= 180.0,
-            'Longitude must be in the range of [-180, 180] but was $longitude');
+    : assert(latitude == latitude, 'Latitude should not be a NaN.'),
+      assert(
+        latitude != double.infinity && latitude != double.negativeInfinity,
+        'Latitude should not be an infinity.',
+      ),
+      assert(longitude == longitude, 'Longitude should not be a NaN.'),
+      assert(
+        longitude != double.infinity && longitude != double.negativeInfinity,
+        'Longitude should not be an infinity.',
+      ),
+      assert(
+        latitude >= -90.0 && latitude <= 90.0,
+        'Latitude must be in the range of [-90, 90] but was $latitude',
+      ),
+      assert(
+        longitude >= -180.0 && longitude <= 180.0,
+        'Longitude must be in the range of [-180, 180] but was $longitude',
+      );
 
   /// Builds a GeoPoint from a JSON map created by [toJson].
   ///
@@ -34,7 +39,10 @@ class GeoPoint implements Comparable<GeoPoint> {
     final Object? longitude = json['longitude'];
     if (json['type'] != jsonType || latitude is! num || longitude is! num) {
       throw ArgumentError.value(
-          json, 'json', 'Not a JSON representation of a GeoPoint');
+        json,
+        'json',
+        'Not a JSON representation of a GeoPoint',
+      );
     }
     if (!(latitude >= -90 && latitude <= 90)) {
       throw RangeError.range(latitude, -90, 90, 'latitude');

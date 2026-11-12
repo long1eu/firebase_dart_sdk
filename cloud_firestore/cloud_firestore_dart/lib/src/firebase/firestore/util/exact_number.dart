@@ -30,7 +30,12 @@ enum _Kind { nan, negativeInfinity, finite, positiveInfinity }
 /// 34-digit decimal128 the same way and needs no rounding.
 class ExactNumber implements Comparable<ExactNumber> {
   ExactNumber._(
-      this._kind, this._negative, this._mantissa, this._exp2, this._exp10);
+    this._kind,
+    this._negative,
+    this._mantissa,
+    this._exp2,
+    this._exp10,
+  );
 
   /// Creates the exact value of the integer [value].
   factory ExactNumber.fromInt(int value) {
@@ -147,12 +152,27 @@ class ExactNumber implements Comparable<ExactNumber> {
     return ExactNumber._(_Kind.finite, negative, mantissa, 0, exponent);
   }
 
-  static final ExactNumber nan =
-      ExactNumber._(_Kind.nan, false, BigInt.zero, 0, 0);
-  static final ExactNumber positiveInfinity =
-      ExactNumber._(_Kind.positiveInfinity, false, BigInt.zero, 0, 0);
-  static final ExactNumber negativeInfinity =
-      ExactNumber._(_Kind.negativeInfinity, true, BigInt.zero, 0, 0);
+  static final ExactNumber nan = ExactNumber._(
+    _Kind.nan,
+    false,
+    BigInt.zero,
+    0,
+    0,
+  );
+  static final ExactNumber positiveInfinity = ExactNumber._(
+    _Kind.positiveInfinity,
+    false,
+    BigInt.zero,
+    0,
+    0,
+  );
+  static final ExactNumber negativeInfinity = ExactNumber._(
+    _Kind.negativeInfinity,
+    true,
+    BigInt.zero,
+    0,
+    0,
+  );
 
   final _Kind _kind;
   final bool _negative;

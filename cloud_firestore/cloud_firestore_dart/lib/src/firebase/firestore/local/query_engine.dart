@@ -24,9 +24,10 @@ abstract class QueryEngine {
   /// ([SnapshotVersion.none] if it never was or the previous results must not be used) and [remoteKeys] are the keys
   /// of the documents that matched the target at that version.
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      Query query,
-      SnapshotVersion lastLimboFreeSnapshotVersion,
-      ImmutableSortedSet<DocumentKey> remoteKeys);
+    Query query,
+    SnapshotVersion lastLimboFreeSnapshotVersion,
+    ImmutableSortedSet<DocumentKey> remoteKeys,
+  );
 
   /// Whether the engine creates a field index for a query when it finds that the index would have made the query
   /// cheaper (see `PersistentCacheIndexManager`). Off by default.
@@ -37,5 +38,7 @@ abstract class QueryEngine {
   // TODO(long1eu): We can change this to just accept the changed fields
   //  (w/ old and new values) if it's convenient for the caller to compute.
   void handleDocumentChange(
-      MaybeDocument oldDocument, MaybeDocument newDocument);
+    MaybeDocument oldDocument,
+    MaybeDocument newDocument,
+  );
 }

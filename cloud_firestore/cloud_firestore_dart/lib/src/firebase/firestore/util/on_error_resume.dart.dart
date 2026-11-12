@@ -20,8 +20,9 @@ import 'dart:async';
 ///       .listen(print); // prints 0
 class OnErrorResumeStreamTransformer<T> extends StreamTransformerBase<T, T> {
   OnErrorResumeStreamTransformer(Stream<T> Function(dynamic error) recoveryFn)
-      : transformer = _buildTransformer<T>(
-            (dynamic error, [StackTrace? stackTrace]) => recoveryFn(error));
+    : transformer = _buildTransformer<T>(
+        (dynamic error, [StackTrace? stackTrace]) => recoveryFn(error),
+      );
 
   final StreamTransformer<T, T> transformer;
 
@@ -29,7 +30,8 @@ class OnErrorResumeStreamTransformer<T> extends StreamTransformerBase<T, T> {
   Stream<T> bind(Stream<T> stream) => transformer.bind(stream);
 
   static StreamTransformer<T, T> _buildTransformer<T>(
-      Stream<T> Function(dynamic error, [StackTrace? stackTrace]) recoveryFn) {
+    Stream<T> Function(dynamic error, [StackTrace? stackTrace]) recoveryFn,
+  ) {
     return StreamTransformer<T, T>((Stream<T> input, bool cancelOnError) {
       StreamSubscription<T>? inputSubscription;
       StreamSubscription<T>? recoverySubscription;
@@ -43,42 +45,43 @@ class OnErrorResumeStreamTransformer<T> extends StreamTransformerBase<T, T> {
       }
 
       controller = StreamController<T>(
-          sync: true,
-          onListen: () {
-            inputSubscription = input.listen(
-              controller.add,
-              onError: (dynamic e, StackTrace s) {
-                shouldCloseController = false;
+        sync: true,
+        onListen: () {
+          inputSubscription = input.listen(
+            controller.add,
+            onError: (dynamic e, StackTrace s) {
+              shouldCloseController = false;
 
-                recoverySubscription = recoveryFn(e, s).listen(
-                  controller.add,
-                  onError: controller.addError,
-                  onDone: controller.close,
-                  cancelOnError: cancelOnError,
-                );
+              recoverySubscription = recoveryFn(e, s).listen(
+                controller.add,
+                onError: controller.addError,
+                onDone: controller.close,
+                cancelOnError: cancelOnError,
+              );
 
-                inputSubscription?.cancel();
-              },
-              onDone: safeClose,
-              cancelOnError: cancelOnError,
-            );
-          },
-          onPause: () {
-            inputSubscription?.pause();
-            recoverySubscription?.pause();
-          },
-          onResume: () {
-            inputSubscription?.resume();
-            recoverySubscription?.resume();
-          },
-          // The returned future is awaited by `cancel()`.
-          // ignore: void_checks
-          onCancel: () {
-            return Future.wait<void>(<Future<void>>[
-              if (inputSubscription != null) inputSubscription!.cancel(),
-              if (recoverySubscription != null) recoverySubscription!.cancel(),
-            ]);
-          });
+              inputSubscription?.cancel();
+            },
+            onDone: safeClose,
+            cancelOnError: cancelOnError,
+          );
+        },
+        onPause: () {
+          inputSubscription?.pause();
+          recoverySubscription?.pause();
+        },
+        onResume: () {
+          inputSubscription?.resume();
+          recoverySubscription?.resume();
+        },
+        // The returned future is awaited by `cancel()`.
+        // ignore: void_checks
+        onCancel: () {
+          return Future.wait<void>(<Future<void>>[
+            if (inputSubscription != null) inputSubscription!.cancel(),
+            if (recoverySubscription != null) recoverySubscription!.cancel(),
+          ]);
+        },
+      );
 
       return controller.stream.listen(null);
     });

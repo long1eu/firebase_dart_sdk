@@ -139,7 +139,7 @@ class Int32FieldValue extends NumberValue {
 /// the other numbers, by its exact numeric value.
 class Decimal128FieldValue extends NumberValue {
   Decimal128FieldValue(this._value)
-      : number = ExactNumber.parse(_value.stringValue);
+    : number = ExactNumber.parse(_value.stringValue);
 
   factory Decimal128FieldValue.valueOf(Decimal128Value value) =>
       Decimal128FieldValue(value);
@@ -261,7 +261,8 @@ class BsonTimestampValue extends FieldValue {
   int get hashCode => Object.hash(BsonTimestampValue, _value);
 
   @override
-  String toString() => '{${BsonKeys.timestamp}:{'
+  String toString() =>
+      '{${BsonKeys.timestamp}:{'
       '${BsonKeys.timestampIncrement}:${_value.increment},'
       '${BsonKeys.timestampSeconds}:${_value.seconds}}}';
 }
@@ -304,7 +305,8 @@ class RegexFieldValue extends FieldValue {
   int get hashCode => Object.hash(RegexFieldValue, _value);
 
   @override
-  String toString() => '{${BsonKeys.regex}:{'
+  String toString() =>
+      '{${BsonKeys.regex}:{'
       '${BsonKeys.regexOptions}:${_value.options},'
       '${BsonKeys.regexPattern}:${_value.pattern}}}';
 }
@@ -375,8 +377,12 @@ FieldValue? _bsonValueOfShape(ObjectValue object) {
         final Blob blob = field.value;
         // A subtype of 0 is a regular blob, which is never encoded as a map.
         if (blob.subtype == 0 && blob.bytes.isNotEmpty && blob.bytes[0] != 0) {
-          return BlobValue.valueOf(Blob.bsonBinary(
-              blob.bytes[0], Uint8List.sublistView(blob.bytes, 1)));
+          return BlobValue.valueOf(
+            Blob.bsonBinary(
+              blob.bytes[0],
+              Uint8List.sublistView(blob.bytes, 1),
+            ),
+          );
         }
       }
       return null;
@@ -393,7 +399,8 @@ FieldValue? _bsonValueOfShape(ObjectValue object) {
             increment.value >= 0 &&
             increment.value <= BsonTimestamp.maxValue) {
           return BsonTimestampValue.valueOf(
-              BsonTimestamp(seconds.value, increment.value));
+            BsonTimestamp(seconds.value, increment.value),
+          );
         }
       }
       return null;
@@ -403,7 +410,8 @@ FieldValue? _bsonValueOfShape(ObjectValue object) {
         final FieldValue? options = field.internalValue[BsonKeys.regexOptions];
         if (pattern is StringValue && options is StringValue) {
           return RegexFieldValue.valueOf(
-              RegexValue(pattern.value, options.value));
+            RegexValue(pattern.value, options.value),
+          );
         }
       }
       return null;

@@ -11,13 +11,13 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 /// special case of an explicit 'empty' precondition (meaning no precondition).
 class Precondition {
   Precondition({this.updateTime, this.exists}) {
-    hardAssert(updateTime == null || exists == null,
-        'Precondition can specify \'exists\' or \'updateTime\' but not both');
+    hardAssert(
+      updateTime == null || exists == null,
+      'Precondition can specify \'exists\' or \'updateTime\' but not both',
+    );
   }
 
-  const Precondition._()
-      : updateTime = null,
-        exists = null;
+  const Precondition._() : updateTime = null, exists = null;
 
   static const Precondition none = Precondition._();
 

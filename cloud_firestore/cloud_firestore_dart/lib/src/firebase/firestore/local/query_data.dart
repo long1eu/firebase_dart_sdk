@@ -31,10 +31,10 @@ class QueryData {
     Uint8List? resumeToken,
     this.expectedCount,
     SnapshotVersion? lastLimboFreeSnapshotVersion,
-  ])  : snapshotVersion = snapshotVersion ?? SnapshotVersion.none,
-        resumeToken = resumeToken ?? Uint8List(0),
-        lastLimboFreeSnapshotVersion =
-            lastLimboFreeSnapshotVersion ?? SnapshotVersion.none;
+  ]) : snapshotVersion = snapshotVersion ?? SnapshotVersion.none,
+       resumeToken = resumeToken ?? Uint8List(0),
+       lastLimboFreeSnapshotVersion =
+           lastLimboFreeSnapshotVersion ?? SnapshotVersion.none;
 
   final Target target;
   final int targetId;
@@ -75,7 +75,8 @@ class QueryData {
 
   /// Creates a new query data instance with an updated last limbo free snapshot version.
   QueryData withLastLimboFreeSnapshotVersion(
-      SnapshotVersion lastLimboFreeSnapshotVersion) {
+    SnapshotVersion lastLimboFreeSnapshotVersion,
+  ) {
     return QueryData(
       target,
       targetId,
@@ -112,7 +113,10 @@ class QueryData {
           sequenceNumber == other.sequenceNumber &&
           purpose == other.purpose &&
           snapshotVersion == other.snapshotVersion &&
-          const DeepCollectionEquality().equals(resumeToken, other.resumeToken) &&
+          const DeepCollectionEquality().equals(
+            resumeToken,
+            other.resumeToken,
+          ) &&
           expectedCount == other.expectedCount &&
           lastLimboFreeSnapshotVersion == other.lastLimboFreeSnapshotVersion;
 

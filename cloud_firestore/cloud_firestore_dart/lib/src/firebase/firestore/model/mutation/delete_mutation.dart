@@ -16,39 +16,38 @@ import 'package:firebase_app_dart/internal.dart';
 /// Represents a Delete operation
 class DeleteMutation extends Mutation {
   const DeleteMutation(DocumentKey key, Precondition precondition)
-      : super(key, precondition);
+    : super(key, precondition);
 
   @override
   MaybeDocument applyToRemoteDocument(
-      MaybeDocument? maybeDoc, MutationResult mutationResult) {
+    MaybeDocument? maybeDoc,
+    MutationResult mutationResult,
+  ) {
     verifyKeyMatches(maybeDoc);
 
-    hardAssert(mutationResult.transformResults.isEmpty,
-        'Transform results received by DeleteMutation.');
+    hardAssert(
+      mutationResult.transformResults.isEmpty,
+      'Transform results received by DeleteMutation.',
+    );
 
     // Unlike applyToLocalView, if we're applying a mutation to a remote document the server has
     // accepted the mutation so the precondition must have held.
-    return NoDocument(
-      key,
-      mutationResult.version,
-      hasCommittedMutations: true,
-    );
+    return NoDocument(key, mutationResult.version, hasCommittedMutations: true);
   }
 
   @override
-  MaybeDocument? applyToLocalView(MaybeDocument? maybeDoc,
-      MaybeDocument? baseDoc, Timestamp localWriteTime) {
+  MaybeDocument? applyToLocalView(
+    MaybeDocument? maybeDoc,
+    MaybeDocument? baseDoc,
+    Timestamp localWriteTime,
+  ) {
     verifyKeyMatches(maybeDoc);
 
     if (!precondition.isValidFor(maybeDoc)) {
       return maybeDoc;
     }
 
-    return NoDocument(
-      key,
-      SnapshotVersion.none,
-      hasCommittedMutations: false,
-    );
+    return NoDocument(key, SnapshotVersion.none, hasCommittedMutations: false);
   }
 
   @override

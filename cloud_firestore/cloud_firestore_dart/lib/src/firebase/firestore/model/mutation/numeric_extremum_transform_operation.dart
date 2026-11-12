@@ -37,7 +37,9 @@ abstract class _NumericExtremumTransformOperation
 
   @override
   FieldValue applyToLocalView(
-      FieldValue? previousValue, Timestamp localWriteTime) {
+    FieldValue? previousValue,
+    Timestamp localWriteTime,
+  ) {
     final NumberValue operand = this.operand;
     if (previousValue is! NumberValue) {
       return operand;
@@ -59,7 +61,9 @@ abstract class _NumericExtremumTransformOperation
     }
 
     if (previousValue is IntegerValue && operand is IntegerValue) {
-      return IntegerValue.valueOf(_pickInt(previousValue.value, operandAsInt()));
+      return IntegerValue.valueOf(
+        _pickInt(previousValue.value, operandAsInt()),
+      );
     }
 
     final double prevDouble = (previousValue.value as num).toDouble();

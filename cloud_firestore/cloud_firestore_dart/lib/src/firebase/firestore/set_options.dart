@@ -14,16 +14,14 @@ import 'package:meta/meta.dart';
 /// instead of overwriting the target documents in their entirety.
 class SetOptions {
   const SetOptions._(this.merge, this.fieldMask)
-      : assert(fieldMask != null && merge,
-            'Cannot specify a fieldMask for non-merge sets()');
+    : assert(
+        fieldMask != null && merge,
+        'Cannot specify a fieldMask for non-merge sets()',
+      );
 
-  const SetOptions._overwrite()
-      : merge = false,
-        fieldMask = null;
+  const SetOptions._overwrite() : merge = false, fieldMask = null;
 
-  const SetOptions._mergeAll()
-      : merge = true,
-        fieldMask = null;
+  const SetOptions._mergeAll() : merge = true, fieldMask = null;
 
   /// Changes the behavior of set() calls to only replace the fields under [fields]. Any field
   /// that is not specified in [fields] is ignored and remains untouched.
@@ -35,8 +33,9 @@ class SetOptions {
   /// within the document.
   factory SetOptions.mergeFields(List<String> fields) {
     final Set<model.FieldPath> fieldPaths = fields
-        .map((String field) =>
-            FieldPath.fromDotSeparatedPath(field).internalPath)
+        .map(
+          (String field) => FieldPath.fromDotSeparatedPath(field).internalPath,
+        )
         .toSet();
     return SetOptions._(true, FieldMask(fieldPaths));
   }
@@ -47,8 +46,9 @@ class SetOptions {
   /// It is an error to pass a SetOptions object to a set() call that is missing a value for any of
   /// the fields specified here in its to data argument.
   factory SetOptions.mergeFieldPaths(List<FieldPath> fields) {
-    final Set<model.FieldPath> fieldPaths =
-        fields.map((FieldPath field) => field.internalPath).toSet();
+    final Set<model.FieldPath> fieldPaths = fields
+        .map((FieldPath field) => field.internalPath)
+        .toSet();
     return SetOptions._(true, FieldMask(fieldPaths));
   }
 

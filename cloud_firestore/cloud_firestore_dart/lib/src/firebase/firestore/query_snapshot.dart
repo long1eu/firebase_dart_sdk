@@ -28,8 +28,10 @@ class QuerySnapshot<T extends dynamic>
   /// Implementation detail of the SDK; not part of the supported API.
   @internal
   QuerySnapshot(this.query, this.snapshot, this._firestore)
-      : metadata =
-            SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
+    : metadata = SnapshotMetadata(
+        snapshot.hasPendingWrites,
+        snapshot.isFromCache,
+      );
 
   /// Builds a [QuerySnapshot] from the JSON object written by [toJson], for the [firestore] instance.
   ///
@@ -84,16 +86,20 @@ class QuerySnapshot<T extends dynamic>
     if (metadataChanges == MetadataChanges.include &&
         snapshot.excludesMetadataChanges) {
       throw ArgumentError(
-          'To include metadata changes with your document changes, you must also pass '
-          'MetadataChanges.include to getSnapshots().');
+        'To include metadata changes with your document changes, you must also pass '
+        'MetadataChanges.include to getSnapshots().',
+      );
     }
 
     List<DocumentChange<T>>? cachedChanges = _cachedChanges;
     if (cachedChanges == null ||
         _cachedChangesMetadataState != metadataChanges) {
       cachedChanges = DocumentChange.changesFromSnapshot<T>(
-              _firestore, metadataChanges, snapshot, query.converter)
-          .toList(growable: false);
+        _firestore,
+        metadataChanges,
+        snapshot,
+        query.converter,
+      ).toList(growable: false);
       _cachedChanges = cachedChanges;
       _cachedChangesMetadataState = metadataChanges;
     }
@@ -106,7 +112,7 @@ class QuerySnapshot<T extends dynamic>
   @Deprecated('Use docs instead.')
   List<DocumentSnapshot<T>> get documents {
     return <DocumentSnapshot<T>>[
-      for (core.Document doc in snapshot.documents) _convertDocument(doc)
+      for (core.Document doc in snapshot.documents) _convertDocument(doc),
     ];
   }
 
@@ -130,8 +136,7 @@ class QuerySnapshot<T extends dynamic>
       while (it.moveNext()) {
         yield _convertDocument(it.current);
       }
-    }()
-        .iterator;
+    }().iterator;
   }
 
   /// The value of the `type` field written by [toJson].

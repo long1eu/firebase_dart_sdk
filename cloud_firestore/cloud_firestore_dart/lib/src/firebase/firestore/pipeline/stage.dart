@@ -26,14 +26,14 @@ import 'package:meta/meta.dart';
 class Stage {
   Stage(
     this.name, {
-    List<pb.Value Function(PipelineEncoder encoder)> args = const <pb.Value
-        Function(PipelineEncoder)>[],
+    List<pb.Value Function(PipelineEncoder encoder)> args =
+        const <pb.Value Function(PipelineEncoder)>[],
     Map<String, pb.Value Function(PipelineEncoder encoder)> options =
         const <String, pb.Value Function(PipelineEncoder)>{},
     Map<String, Object?>? rawOptions,
-  })  : _args = args,
-        _options = options,
-        _rawOptions = rawOptions;
+  }) : _args = args,
+       _options = options,
+       _rawOptions = rawOptions;
 
   final String name;
   final List<pb.Value Function(PipelineEncoder encoder)> _args;
@@ -60,7 +60,9 @@ class Stage {
 /// Encodes user supplied option values; expressions are allowed as values.
 @internal
 Map<String, pb.Value> encodeOptions(
-    PipelineEncoder encoder, Map<String, Object?>? options) {
+  PipelineEncoder encoder,
+  Map<String, Object?>? options,
+) {
   final Map<String, pb.Value> result = <String, pb.Value>{};
   options?.forEach((String key, Object? value) {
     result[key] = value is Expression
@@ -74,7 +76,9 @@ Map<String, pb.Value> encodeOptions(
 /// `add_fields`, `aggregate`, ...).
 @internal
 pb.Value encodeExpressionMap(
-    PipelineEncoder encoder, Map<String, Expression> expressions) {
+  PipelineEncoder encoder,
+  Map<String, Expression> expressions,
+) {
   final pb.MapValue map = pb.MapValue();
   expressions.forEach((String alias, Expression expression) {
     map.fields[alias] = expression.toProto(encoder);
@@ -102,8 +106,10 @@ pb.Value relativeReferenceValue(String path) {
 /// output name to expression. Fails on duplicate names, because the second
 /// entry would silently replace the first on the wire.
 @internal
-Map<String, Expression> selectablesToMap(List<Object> selectables,
-    {required String method}) {
+Map<String, Expression> selectablesToMap(
+  List<Object> selectables, {
+  required String method,
+}) {
   final Map<String, Expression> result = <String, Expression>{};
   for (final Object selectable in selectables) {
     final String alias;
@@ -117,8 +123,9 @@ Map<String, Expression> selectablesToMap(List<Object> selectables,
       expression = selectable.expression;
     } else {
       throw ArgumentError(
-          '$method() takes field names (String) and Selectables (a Field or '
-          'an expression with an alias), but got: $selectable');
+        '$method() takes field names (String) and Selectables (a Field or '
+        'an expression with an alias), but got: $selectable',
+      );
     }
     if (result.containsKey(alias)) {
       throw ArgumentError("Duplicate alias or field '$alias' in $method().");

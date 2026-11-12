@@ -36,7 +36,8 @@ class MemoryDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<Map<DocumentKey, Overlay>> getOverlays(
-      Iterable<DocumentKey> keys) async {
+    Iterable<DocumentKey> keys,
+  ) async {
     final Map<DocumentKey, Overlay> result = <DocumentKey, Overlay>{};
     for (DocumentKey key in keys) {
       final Overlay? overlay = _overlays[key];
@@ -54,8 +55,10 @@ class MemoryDocumentOverlayCache implements DocumentOverlayCache {
       _overlayByBatchId[existing.largestBatchId]!.remove(mutation.key);
     }
 
-    _overlays =
-        _overlays.insert(mutation.key, Overlay(largestBatchId, mutation));
+    _overlays = _overlays.insert(
+      mutation.key,
+      Overlay(largestBatchId, mutation),
+    );
 
     // Create the associate of this overlay to the given largestBatchId.
     _overlayByBatchId
@@ -65,7 +68,9 @@ class MemoryDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<void> saveOverlays(
-      int largestBatchId, Map<DocumentKey, Mutation> overlays) async {
+    int largestBatchId,
+    Map<DocumentKey, Mutation> overlays,
+  ) async {
     for (MapEntry<DocumentKey, Mutation> entry in overlays.entries) {
       _saveOverlay(largestBatchId, entry.value);
     }
@@ -94,14 +99,17 @@ class MemoryDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollection(
-      ResourcePath collection, int sinceBatchId) async {
+    ResourcePath collection,
+    int sinceBatchId,
+  ) async {
     final Map<DocumentKey, Overlay> result = <DocumentKey, Overlay>{};
 
     final int immediateChildrenPathLength = collection.length + 1;
-    final DocumentKey prefix =
-        DocumentKey.fromPath(collection.appendSegment(''));
-    final Iterator<MapEntry<DocumentKey, Overlay>> iterator =
-        _overlays.iteratorFrom(prefix);
+    final DocumentKey prefix = DocumentKey.fromPath(
+      collection.appendSegment(''),
+    );
+    final Iterator<MapEntry<DocumentKey, Overlay>> iterator = _overlays
+        .iteratorFrom(prefix);
 
     while (iterator.moveNext()) {
       final Overlay overlay = iterator.current.value;
@@ -124,7 +132,10 @@ class MemoryDocumentOverlayCache implements DocumentOverlayCache {
 
   @override
   Future<Map<DocumentKey, Overlay>> getOverlaysForCollectionGroup(
-      String collectionGroup, int sinceBatchId, int count) async {
+    String collectionGroup,
+    int sinceBatchId,
+    int count,
+  ) async {
     // NOTE: As upstream, this is only needed by the index backfiller, which does not run for memory persistence; it
     // is implemented so that the overlay cache test cases run against both caches.
     final SplayTreeMap<int, Map<DocumentKey, Overlay>> batchIdToOverlays =
@@ -137,8 +148,10 @@ class MemoryDocumentOverlayCache implements DocumentOverlayCache {
         continue;
       }
       if (overlay.largestBatchId > sinceBatchId) {
-        batchIdToOverlays.putIfAbsent(overlay.largestBatchId,
-            () => <DocumentKey, Overlay>{})[overlay.key] = overlay;
+        batchIdToOverlays.putIfAbsent(
+          overlay.largestBatchId,
+          () => <DocumentKey, Overlay>{},
+        )[overlay.key] = overlay;
       }
     }
 

@@ -122,7 +122,9 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
       rethrow;
     } else {
       return Future<void>.error(
-          FirestoreError('$e', FirestoreErrorCode.unknown), s);
+        FirestoreError('$e', FirestoreErrorCode.unknown),
+        s,
+      );
     }
   }
 }
@@ -133,20 +135,24 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
 /// [fieldPathOffset] is the offset of the first field path in the original update API (used as the
 /// index in error messages)
 List<Object?> collectUpdateArguments(
-    int fieldPathOffset, List<Object?> fieldsAndValues) {
+  int fieldPathOffset,
+  List<Object?> fieldsAndValues,
+) {
   if (fieldsAndValues.length % 2 == 1) {
     throw ArgumentError(
-        'Missing value in call to update().  There must be an even number of '
-        'arguments that alternate between field names and values');
+      'Missing value in call to update().  There must be an even number of '
+      'arguments that alternate between field names and values',
+    );
   }
   final List<Object?> argumentList = fieldsAndValues.toList(growable: false);
   for (int i = 0; i < argumentList.length; i += 2) {
     final Object? fieldPath = argumentList[i];
     if (fieldPath is! String && fieldPath is! FieldPath) {
       throw ArgumentError(
-          'Excepted field name at argument position ${i + fieldPathOffset + 1} but '
-          'got $fieldPath in call to update. The arguments to update should alternate between '
-          'field names and values');
+        'Excepted field name at argument position ${i + fieldPathOffset + 1} but '
+        'got $fieldPath in call to update. The arguments to update should alternate between '
+        'field names and values',
+      );
     }
   }
 

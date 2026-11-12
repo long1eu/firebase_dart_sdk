@@ -17,8 +17,12 @@ class FetchHttpClient implements WebHttpClient {
   final Set<_FetchRequest> _requests = <_FetchRequest>{};
 
   @override
-  WebHttpRequest send(String method, Uri url,
-      {Map<String, String> headers = const <String, String>{}, String? body}) {
+  WebHttpRequest send(
+    String method,
+    Uri url, {
+    Map<String, String> headers = const <String, String>{},
+    String? body,
+  }) {
     final _FetchRequest request = _FetchRequest(method, url, headers, body);
     _requests.add(request);
     request._done.future.whenComplete(() => _requests.remove(request));
@@ -35,7 +39,11 @@ class FetchHttpClient implements WebHttpClient {
 
 class _FetchRequest implements WebHttpRequest {
   _FetchRequest(
-      String method, Uri url, Map<String, String> headers, String? body) {
+    String method,
+    Uri url,
+    Map<String, String> headers,
+    String? body,
+  ) {
     response = _send(method, url, headers, body);
     // The caller may have stopped listening after an abort.
     response.ignore();
@@ -48,7 +56,11 @@ class _FetchRequest implements WebHttpRequest {
   late final Future<WebHttpResponse> response;
 
   Future<WebHttpResponse> _send(
-      String method, Uri url, Map<String, String> headers, String? body) async {
+    String method,
+    Uri url,
+    Map<String, String> headers,
+    String? body,
+  ) async {
     final web.Headers requestHeaders = web.Headers();
     headers.forEach((String name, String value) {
       requestHeaders.append(name, value);
@@ -88,7 +100,10 @@ class _FetchRequest implements WebHttpRequest {
       }
     }
     return WebHttpResponse(
-        response.status, responseHeaders, _readBody(response));
+      response.status,
+      responseHeaders,
+      _readBody(response),
+    );
   }
 
   Stream<String> _readBody(web.Response response) {
@@ -102,8 +117,9 @@ class _FetchRequest implements WebHttpRequest {
       final web.ReadableStreamDefaultReader reader =
           body.getReader() as web.ReadableStreamDefaultReader;
       // Chunked, so that a character split over two reads is put together.
-      final Sink<List<int>> decoder = const Utf8Decoder(allowMalformed: true)
-          .startChunkedConversion(_StringSink(controller));
+      final Sink<List<int>> decoder = const Utf8Decoder(
+        allowMalformed: true,
+      ).startChunkedConversion(_StringSink(controller));
       while (true) {
         final web.ReadableStreamReadResult result = await reader.read().toDart;
         if (result.done) {
@@ -118,17 +134,19 @@ class _FetchRequest implements WebHttpRequest {
     }
 
     controller.onListen = () {
-      pump().catchError((Object error, StackTrace stackTrace) {
-        // An abort ends the body quietly, anything else is an error.
-        if (!_abort.signal.aborted && !controller.isClosed) {
-          controller.addError(error, stackTrace);
-        }
-      }).whenComplete(() {
-        _finish();
-        if (!controller.isClosed) {
-          controller.close();
-        }
-      });
+      pump()
+          .catchError((Object error, StackTrace stackTrace) {
+            // An abort ends the body quietly, anything else is an error.
+            if (!_abort.signal.aborted && !controller.isClosed) {
+              controller.addError(error, stackTrace);
+            }
+          })
+          .whenComplete(() {
+            _finish();
+            if (!controller.isClosed) {
+              controller.close();
+            }
+          });
     };
     controller.onCancel = abort;
     return controller.stream;

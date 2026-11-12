@@ -100,6 +100,6 @@ int compareDoubleWithInt(double doubleValue, int intValue) {
   return doubleValue < integral
       ? -1
       : doubleValue > integral
-          ? 1
-          : 0;
+      ? 1
+      : 0;
 }

@@ -4,18 +4,21 @@
 
 part of 'datastore.dart';
 
-abstract class BaseStream<Req extends GeneratedMessage,
-    Res extends GeneratedMessage> extends DelegatingStream<StreamEvent> {
+abstract class BaseStream<
+  Req extends GeneratedMessage,
+  Res extends GeneratedMessage
+>
+    extends DelegatingStream<StreamEvent> {
   BaseStream(
     StreamController<StreamEvent> eventsController,
     TaskScheduler scheduler,
     TaskId idleTaskId,
     TaskId connectionTaskId,
-  )   : _backoff = ExponentialBackoff(scheduler, connectionTaskId),
-        _eventsController = eventsController,
-        _scheduler = scheduler,
-        _idleTimerId = idleTaskId,
-        super(eventsController.stream);
+  ) : _backoff = ExponentialBackoff(scheduler, connectionTaskId),
+      _eventsController = eventsController,
+      _scheduler = scheduler,
+      _idleTimerId = idleTaskId,
+      super(eventsController.stream);
 
   final ExponentialBackoff _backoff;
   final StreamController<StreamEvent> _eventsController;
@@ -67,8 +70,9 @@ abstract class BaseStream<Req extends GeneratedMessage,
     // once the connection is up, anything written before must be buffered.
     final StreamController<Req> requestsController = StreamController<Req>();
     _requestsController = requestsController;
-    final ResponseStream<Res> writeResponse =
-        await _buildCall(requestsController.stream);
+    final ResponseStream<Res> writeResponse = await _buildCall(
+      requestsController.stream,
+    );
 
     // The stream might have been stopped while the call was being built (for
     // example when the network was toggled). In that case the call is stale and
@@ -81,8 +85,12 @@ abstract class BaseStream<Req extends GeneratedMessage,
     }
     _writeResponse = writeResponse;
 
-    _responseSub = writeResponse.listen(_onData,
-        onError: _onError, onDone: _onDone, cancelOnError: false);
+    _responseSub = writeResponse.listen(
+      _onData,
+      onError: _onError,
+      onDone: _onDone,
+      cancelOnError: false,
+    );
     // A call that fails before the headers arrive completes this future with
     // the error. It is reported through the response stream instead.
     unawaited(writeResponse.headers.then(_onHeaders, onError: (Object _) {}));
@@ -105,16 +113,20 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
   void writeRequest(Req request) {
     if (Log.isDebugEnabled) {
-      Log.d('$runtimeType',
-          '($hashCode) Stream sending: ${describeForLog(request)}');
+      Log.d(
+        '$runtimeType',
+        '($hashCode) Stream sending: ${describeForLog(request)}',
+      );
     }
     _cancelIdleCheck();
     final StreamController<Req>? requestsController = _requestsController;
     if (requestsController == null) {
       // The stream was torn down in the meantime. The request will be sent
       // again when the stream restarts.
-      Log.d('$runtimeType',
-          '($hashCode) Dropping request, the stream is not active.');
+      Log.d(
+        '$runtimeType',
+        '($hashCode) Dropping request, the stream is not active.',
+      );
       return;
     }
     requestsController.add(request);
@@ -133,8 +145,11 @@ abstract class BaseStream<Req extends GeneratedMessage,
     // already running a timer (in which case the previous idle timeout still
     // applies).
     if (isOpen && _idleTimer == null) {
-      _idleTimer =
-          _scheduler.add(_idleTimerId, idleTimeout, _handleIdleCloseTimer);
+      _idleTimer = _scheduler.add(
+        _idleTimerId,
+        idleTimeout,
+        _handleIdleCloseTimer,
+      );
     }
   }
 
@@ -163,8 +178,10 @@ abstract class BaseStream<Req extends GeneratedMessage,
   void _onData(Res response) {
     if (_state != State.closing) {
       if (Log.isDebugEnabled) {
-        Log.d('$runtimeType',
-            '($hashCode) Stream received: ${describeForLog(response)}');
+        Log.d(
+          '$runtimeType',
+          '($hashCode) Stream received: ${describeForLog(response)}',
+        );
       }
     }
   }
@@ -172,11 +189,13 @@ abstract class BaseStream<Req extends GeneratedMessage,
   void _onHeaders(Map<String, String> headers) {
     if (Log.isDebugEnabled) {
       final Iterable<MapEntry<String, String>> entries = headers.entries.where(
-          (MapEntry<String, String> entry) =>
-              whiteListedHeaders.contains(entry.key.toLowerCase()));
+        (MapEntry<String, String> entry) =>
+            whiteListedHeaders.contains(entry.key.toLowerCase()),
+      );
 
-      final Map<String, String> values =
-          Map<String, String>.fromEntries(entries);
+      final Map<String, String> values = Map<String, String>.fromEntries(
+        entries,
+      );
       if (values.isNotEmpty) {
         Log.d('$runtimeType', '($hashCode) Stream received headers: $values');
       }
@@ -199,8 +218,10 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
         handleServerClose(err);
       } else {
-        Log.d('$runtimeType',
-            '($hashCode) Stream closed with status: ${StatusCode.unknown} $error.');
+        Log.d(
+          '$runtimeType',
+          '($hashCode) Stream closed with status: ${StatusCode.unknown} $error.',
+        );
         handleServerClose(GrpcError.unknown(error.toString()));
       }
     }
@@ -221,19 +242,24 @@ abstract class BaseStream<Req extends GeneratedMessage,
     }
     Log.d('$runtimeType', '($hashCode) Stream closed by the server.');
     handleServerClose(
-        const GrpcError.unavailable('Stream closed by the server'));
+      const GrpcError.unavailable('Stream closed by the server'),
+    );
   }
 
   void _performBackoff() {
     assert(
-        _state == State.error, 'Should only perform backoff in an error state');
+      _state == State.error,
+      'Should only perform backoff in an error state',
+    );
     _changeState(State.backoff);
     _backoff.backoffAndRun(_restart);
   }
 
   Future<void> _restart() async {
-    assert(_state == State.backoff,
-        'State should still be backoff but was $_state');
+    assert(
+      _state == State.backoff,
+      'State should still be backoff but was $_state',
+    );
     // Momentarily set state to Initial as start() expects it.
     _changeState(State.initial);
     await start();
@@ -242,8 +268,10 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
   Future<void> _close(State state, GrpcError grpcError) async {
     assert(isStarted, 'Only started streams should be closed.');
-    assert(state == State.error || grpcError.code == StatusCode.ok,
-        'Can\'t provide an error when not in an error state.');
+    assert(
+      state == State.error || grpcError.code == StatusCode.ok,
+      'Can\'t provide an error when not in an error state.',
+    );
 
     if (state != State.error) {
       Log.d('$runtimeType', '($hashCode) Performing stream teardown');
@@ -262,14 +290,18 @@ abstract class BaseStream<Req extends GeneratedMessage,
       // connection attempt.
       _backoff.reset();
     } else if (code == StatusCode.resourceExhausted) {
-      Log.d('$runtimeType',
-          '($hashCode) Using maximum backoff delay to prevent overloading the backend.');
+      Log.d(
+        '$runtimeType',
+        '($hashCode) Using maximum backoff delay to prevent overloading the backend.',
+      );
       _backoff.resetToMax();
     } else if (code == StatusCode.unauthenticated) {
       // 'unauthenticated' error means the token was rejected. Force refreshing
       // was done by the FirestoreClient
-      Log.d('$runtimeType',
-          '($hashCode) Unauthenticated trying to refresh the token.');
+      Log.d(
+        '$runtimeType',
+        '($hashCode) Unauthenticated trying to refresh the token.',
+      );
     }
 
     if (grpcError.code == StatusCode.ok) {
@@ -293,7 +325,9 @@ abstract class BaseStream<Req extends GeneratedMessage,
       // Not awaited: the future of a buffering controller only completes once
       // gRPC consumed the requests, which never happens if it never connected.
       unawaited(requestsController?.close());
-      if (state != State.error && responseSub != null && writeResponse != null) {
+      if (state != State.error &&
+          responseSub != null &&
+          writeResponse != null) {
         // A close by the client: closing the requests (above) is the half-close that tells the backend to finish
         // the call, as upstream does. The call is not reset, see [CallReleaser]; what it still delivers is ignored.
         _callReleaser.release(responseSub, writeResponse.cancel);
@@ -350,7 +384,7 @@ abstract class BaseStream<Req extends GeneratedMessage,
     'x-google-backends',
     'x-google-netmon-label',
     'x-google-service',
-    'x-google-gfe-request-trace'
+    'x-google-gfe-request-trace',
   };
 }
 

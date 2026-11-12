@@ -35,7 +35,9 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
     _tokenSubscription = authProvider.onTokenChanged.listen(
       tokenObserver,
       onError: (Object error) => Log.w(
-          'FirebaseAuthCredentialsProvider', 'Token stream error: $error'),
+        'FirebaseAuthCredentialsProvider',
+        'Token stream error: $error',
+      ),
     );
     if (_wasUnsubscribed) {
       // Changes may have been missed while not listening: invalidate any
@@ -86,15 +88,18 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
     // can retry if there is a token change while the request is outstanding.
     final int savedCounter = _tokenCounter;
 
-    final GetTokenResult result =
-        await authProvider.getAccessToken(forceRefresh: doForceRefresh);
+    final GetTokenResult result = await authProvider.getAccessToken(
+      forceRefresh: doForceRefresh,
+    );
 
     // Discard the response since the token changed while the request was
     // outstanding, so it is potentially for a previous user (which user, we
     // can't be sure), and fetch the token again.
     if (savedCounter != _tokenCounter) {
-      Log.d('FirebaseAuthCredentialsProvider',
-          'getToken aborted due to token change');
+      Log.d(
+        'FirebaseAuthCredentialsProvider',
+        'getToken aborted due to token change',
+      );
       return token;
     }
 

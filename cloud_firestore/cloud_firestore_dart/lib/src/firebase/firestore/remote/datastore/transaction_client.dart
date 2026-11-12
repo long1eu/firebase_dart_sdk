@@ -14,16 +14,20 @@ class TransactionClient {
   String get _databaseName => _serializer.databaseName;
 
   Future<List<MutationResult>> commit(List<Mutation> mutations) async {
-    final proto.CommitRequest builder = proto.CommitRequest() //
-      ..database = _databaseName
-      ..writes.addAll(mutations.map(_serializer.encodeMutation));
+    final proto.CommitRequest builder =
+        proto.CommitRequest() //
+          ..database = _databaseName
+          ..writes.addAll(mutations.map(_serializer.encodeMutation));
 
     final proto.CommitResponse response = await _client.commit(builder);
-    final SnapshotVersion commitVersion =
-        _serializer.decodeVersion(response.commitTime);
+    final SnapshotVersion commitVersion = _serializer.decodeVersion(
+      response.commitTime,
+    );
     return response.writeResults
-        .map((proto.WriteResult result) =>
-            _serializer.decodeMutationResult(result, commitVersion))
+        .map(
+          (proto.WriteResult result) =>
+              _serializer.decodeMutationResult(result, commitVersion),
+        )
         .toList();
   }
 
@@ -42,8 +46,8 @@ class TransactionClient {
         <DocumentKey, MaybeDocument>{};
     // The backend answers once per distinct document, even if a key is repeated.
     final int expectedCount = keys.toSet().length;
-    final ResponseStream<proto.BatchGetDocumentsResponse> call =
-        _client.batchGetDocuments(builder);
+    final ResponseStream<proto.BatchGetDocumentsResponse> call = _client
+        .batchGetDocuments(builder);
     late final StreamSubscription<proto.BatchGetDocumentsResponse> subscription;
 
     // The call is not cancelled once the last document arrived, see [CallReleaser].
@@ -59,7 +63,7 @@ class TransactionClient {
         if (documents.length == expectedCount) {
           completer.complete(<MaybeDocument>[
             for (DocumentKey key in keys)
-              if (documents.containsKey(key)) documents[key]!
+              if (documents.containsKey(key)) documents[key]!,
           ]);
           finish();
         }
@@ -75,7 +79,7 @@ class TransactionClient {
           // key order) instead of an empty result.
           completer.complete(<MaybeDocument>[
             for (DocumentKey key in keys)
-              if (documents.containsKey(key)) documents[key]!
+              if (documents.containsKey(key)) documents[key]!,
           ]);
         }
       },

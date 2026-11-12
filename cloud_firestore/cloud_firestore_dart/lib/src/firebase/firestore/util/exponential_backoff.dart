@@ -25,13 +25,13 @@ class ExponentialBackoff {
     Duration initialDelay = const Duration(seconds: 1),
     double backoffFactor = 1.5,
     Duration maxDelay = const Duration(minutes: 1),
-  })  : _scheduler = scheduler,
-        _taskId = taskId,
-        _initialDelay = initialDelay,
-        _backoffFactor = backoffFactor,
-        _maxDelay = maxDelay,
-        _lastAttemptTime = DateTime.now(),
-        _currentBase = Duration.zero;
+  }) : _scheduler = scheduler,
+       _taskId = taskId,
+       _initialDelay = initialDelay,
+       _backoffFactor = backoffFactor,
+       _maxDelay = maxDelay,
+       _lastAttemptTime = DateTime.now(),
+       _currentBase = Duration.zero;
 
   final TaskScheduler _scheduler;
   final TaskId _taskId;
@@ -64,29 +64,28 @@ class ExponentialBackoff {
 
     // Guard against lastAttemptTime being in the future due to a clock change.
     final Duration difference = DateTime.now().difference(_lastAttemptTime);
-    final Duration delaySoFar =
-        difference < Duration.zero ? Duration.zero : difference;
+    final Duration delaySoFar = difference < Duration.zero
+        ? Duration.zero
+        : difference;
 
     // Guard against the backoff delay already being past.
     final Duration remaining = desiredDelayWithJitter - delaySoFar;
-    final Duration remainingDelay =
-        remaining < Duration.zero ? Duration.zero : remaining;
+    final Duration remainingDelay = remaining < Duration.zero
+        ? Duration.zero
+        : remaining;
 
     if (_currentBase > Duration.zero) {
       Log.d(
-          runtimeType.toString(),
-          'Backing off for $remainingDelay (base delay: $_currentBase, delay with jitter: $desiredDelayWithJitter, '
-          'last attempt: $delaySoFar ago)');
+        runtimeType.toString(),
+        'Backing off for $remainingDelay (base delay: $_currentBase, delay with jitter: $desiredDelayWithJitter, '
+        'last attempt: $delaySoFar ago)',
+      );
     }
 
-    _timerTask = _scheduler.add(
-      _taskId,
-      remainingDelay,
-      () {
-        _lastAttemptTime = DateTime.now();
-        task();
-      },
-    );
+    _timerTask = _scheduler.add(_taskId, remainingDelay, () {
+      _lastAttemptTime = DateTime.now();
+      task();
+    });
 
     // Apply backoff factor to determine next delay and ensure it is within bounds.
     _currentBase = _currentBase * _backoffFactor;
@@ -109,6 +108,7 @@ class ExponentialBackoff {
   Duration _jitterDelay() {
     final double value = Random().nextDouble() - 0.5;
     return Duration(
-        milliseconds: (value * _currentBase.inMilliseconds).toInt());
+      milliseconds: (value * _currentBase.inMilliseconds).toInt(),
+    );
   }
 }

@@ -6,11 +6,13 @@ part of 'memory_persistence.dart';
 
 class MemoryMutationQueue implements MutationQueue {
   MemoryMutationQueue(this.persistence, this._statsCollector)
-      : _queue = <MutationBatch>[],
-        _batchesByDocumentKey = ImmutableSortedSet<DocumentReference>(
-            <DocumentReference>[], DocumentReference.byKey),
-        _nextBatchId = 1,
-        lastStreamToken = Uint8List(0);
+    : _queue = <MutationBatch>[],
+      _batchesByDocumentKey = ImmutableSortedSet<DocumentReference>(
+        <DocumentReference>[],
+        DocumentReference.byKey,
+      ),
+      _nextBatchId = 1,
+      lastStreamToken = Uint8List(0);
 
   /// A FIFO queue of all mutations to apply to the backend. Mutations are added to the end of the queue as they're
   /// written, and removed from the front of the queue as the mutations become visible or are rejected.
@@ -68,18 +70,23 @@ class MemoryMutationQueue implements MutationQueue {
 
   @override
   Future<void> acknowledgeBatch(
-      MutationBatch batch, Uint8List streamToken) async {
+    MutationBatch batch,
+    Uint8List streamToken,
+  ) async {
     final int batchId = batch.batchId;
     final int batchIndex = _indexOfExistingBatchId(batchId, 'acknowledged');
-    hardAssert(batchIndex == 0,
-        'Can only acknowledge the first batch in the mutation queue');
+    hardAssert(
+      batchIndex == 0,
+      'Can only acknowledge the first batch in the mutation queue',
+    );
 
     // Verify that the batch in the queue is the one to be acknowledged.
     final MutationBatch check = _queue[batchIndex];
     hardAssertLazy(
-        batchId == check.batchId,
-        () =>
-            'Queue ordering failure: expected batch $batchId, got batch ${check.batchId}');
+      batchId == check.batchId,
+      () =>
+          'Queue ordering failure: expected batch $batchId, got batch ${check.batchId}',
+    );
 
     lastStreamToken = checkNotNull(streamToken);
   }
@@ -103,8 +110,10 @@ class MemoryMutationQueue implements MutationQueue {
     final int size = _queue.length;
     if (size > 0) {
       final MutationBatch prior = _queue[size - 1];
-      hardAssert(prior.batchId < batchId,
-          'Mutation batchIds must be monotonically increasing order');
+      hardAssert(
+        prior.batchId < batchId,
+        'Mutation batchIds must be monotonically increasing order',
+      );
     }
 
     final MutationBatch batch = MutationBatch(
@@ -117,11 +126,13 @@ class MemoryMutationQueue implements MutationQueue {
 
     // Track references by document key and index collection parents.
     for (Mutation mutation in mutations) {
-      _batchesByDocumentKey = _batchesByDocumentKey
-          .insert(DocumentReference(mutation.key, batchId));
+      _batchesByDocumentKey = _batchesByDocumentKey.insert(
+        DocumentReference(mutation.key, batchId),
+      );
 
-      await persistence.indexManager
-          .addToCollectionParentIndex(mutation.key.path.popLast());
+      await persistence.indexManager.addToCollectionParentIndex(
+        mutation.key.path.popLast(),
+      );
     }
 
     _statsCollector.recordRowsWritten(MutationQueue.statsTag, 1);
@@ -158,12 +169,13 @@ class MemoryMutationQueue implements MutationQueue {
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKey(
-      DocumentKey documentKey) async {
+    DocumentKey documentKey,
+  ) async {
     final DocumentReference start = DocumentReference(documentKey, 0);
 
     final List<MutationBatch> result = <MutationBatch>[];
-    final Iterator<DocumentReference> iterator =
-        _batchesByDocumentKey.iteratorFrom(start);
+    final Iterator<DocumentReference> iterator = _batchesByDocumentKey
+        .iteratorFrom(start);
     while (iterator.moveNext()) {
       final DocumentReference reference = iterator.current;
       if (documentKey != reference.key) {
@@ -172,7 +184,9 @@ class MemoryMutationQueue implements MutationQueue {
 
       final MutationBatch? batch = await lookupMutationBatch(reference.id);
       hardAssert(
-          batch != null, 'Batches in the index must exist in the main table');
+        batch != null,
+        'Batches in the index must exist in the main table',
+      );
       result.add(batch!);
     }
 
@@ -182,14 +196,17 @@ class MemoryMutationQueue implements MutationQueue {
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingDocumentKeys(
-      Iterable<DocumentKey> documentKeys) async {
-    ImmutableSortedSet<int> uniqueBatchIDs =
-        ImmutableSortedSet<int>(<int>[], standardComparator<num>());
+    Iterable<DocumentKey> documentKeys,
+  ) async {
+    ImmutableSortedSet<int> uniqueBatchIDs = ImmutableSortedSet<int>(
+      <int>[],
+      standardComparator<num>(),
+    );
 
     for (DocumentKey key in documentKeys) {
       final DocumentReference start = DocumentReference(key, 0);
-      final Iterator<DocumentReference> batchesIterator =
-          _batchesByDocumentKey.iteratorFrom(start);
+      final Iterator<DocumentReference> batchesIterator = _batchesByDocumentKey
+          .iteratorFrom(start);
       while (batchesIterator.moveNext()) {
         final DocumentReference reference = batchesIterator.current;
         if (key != reference.key) {
@@ -204,9 +221,12 @@ class MemoryMutationQueue implements MutationQueue {
 
   @override
   Future<List<MutationBatch>> getAllMutationBatchesAffectingQuery(
-      Query query) async {
-    hardAssert(!query.isCollectionGroupQuery,
-        'CollectionGroup queries should be handled in LocalDocumentsView');
+    Query query,
+  ) async {
+    hardAssert(
+      !query.isCollectionGroupQuery,
+      'CollectionGroup queries should be handled in LocalDocumentsView',
+    );
 
     // Use the query path as a prefix for testing if a document matches the query.
     final ResourcePath prefix = query.path;
@@ -219,15 +239,19 @@ class MemoryMutationQueue implements MutationQueue {
     if (!DocumentKey.isDocumentKey(startPath)) {
       startPath = startPath.appendSegment('');
     }
-    final DocumentReference start =
-        DocumentReference(DocumentKey.fromPath(startPath), 0);
+    final DocumentReference start = DocumentReference(
+      DocumentKey.fromPath(startPath),
+      0,
+    );
 
     // Find unique [batchId]s referenced by all documents potentially matching the query.
-    ImmutableSortedSet<int> uniqueBatchIDs =
-        ImmutableSortedSet<int>(<int>[], standardComparator<num>());
+    ImmutableSortedSet<int> uniqueBatchIDs = ImmutableSortedSet<int>(
+      <int>[],
+      standardComparator<num>(),
+    );
 
-    final Iterator<DocumentReference> iterator =
-        _batchesByDocumentKey.iteratorFrom(start);
+    final Iterator<DocumentReference> iterator = _batchesByDocumentKey
+        .iteratorFrom(start);
     while (iterator.moveNext()) {
       final DocumentReference reference = iterator.current;
       final ResourcePath rowKeyPath = reference.key.path;
@@ -247,7 +271,8 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   Future<List<MutationBatch>> _lookupMutationBatches(
-      ImmutableSortedSet<int> batchIds) async {
+    ImmutableSortedSet<int> batchIds,
+  ) async {
     // Construct an array of matching batches, sorted by batchId to ensure that multiple mutations affecting the same
     // document key are applied in order.
     final List<MutationBatch> result = <MutationBatch>[];
@@ -265,8 +290,10 @@ class MemoryMutationQueue implements MutationQueue {
   Future<void> removeMutationBatch(MutationBatch batch) async {
     // Find the position of the first batch for removal. This need not be the first entry in the queue.
     final int batchIndex = _indexOfExistingBatchId(batch.batchId, 'removed');
-    hardAssert(batchIndex == 0,
-        'Can only remove the first entry of the mutation queue');
+    hardAssert(
+      batchIndex == 0,
+      'Can only remove the first entry of the mutation queue',
+    );
 
     _queue.removeAt(0);
 
@@ -286,8 +313,10 @@ class MemoryMutationQueue implements MutationQueue {
   @override
   Future<void> performConsistencyCheck() async {
     if (_queue.isEmpty) {
-      hardAssert(_batchesByDocumentKey.isEmpty,
-          'Document leak -- detected dangling mutation references when queue is empty.');
+      hardAssert(
+        _batchesByDocumentKey.isEmpty,
+        'Document leak -- detected dangling mutation references when queue is empty.',
+      );
     }
   }
 
@@ -295,8 +324,8 @@ class MemoryMutationQueue implements MutationQueue {
     // Create a reference with a zero ID as the start position to find any document reference with this key.
     final DocumentReference reference = DocumentReference(key, 0);
 
-    final Iterator<DocumentReference> iterator =
-        _batchesByDocumentKey.iteratorFrom(reference);
+    final Iterator<DocumentReference> iterator = _batchesByDocumentKey
+        .iteratorFrom(reference);
     if (!iterator.moveNext()) {
       return false;
     }
@@ -336,8 +365,10 @@ class MemoryMutationQueue implements MutationQueue {
   /// batches).
   int _indexOfExistingBatchId(int batchId, String action) {
     final int index = _indexOfBatchId(batchId);
-    hardAssertLazy(index >= 0 && index < _queue.length,
-        () => 'Batches must exist to be $action');
+    hardAssertLazy(
+      index >= 0 && index < _queue.length,
+      () => 'Batches must exist to be $action',
+    );
     return index;
   }
 

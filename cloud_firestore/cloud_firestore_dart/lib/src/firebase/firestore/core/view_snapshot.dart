@@ -13,11 +13,7 @@ import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/internal.dart';
 
 /// The possibly states a document can be in w.r.t syncing from local storage to the backend.
-enum ViewSnapshotSyncState {
-  none,
-  local,
-  synced,
-}
+enum ViewSnapshotSyncState { none, local, synced }
 
 class ViewSnapshot {
   const ViewSnapshot(

@@ -34,13 +34,17 @@ import 'package:firebase_app_dart/internal.dart';
 /// of a JSON string, or of a multi-byte UTF-8 character.
 class BundleReader {
   BundleReader(this.serializer, Stream<List<int>> bundleStream)
-      : _chunks = StreamIterator<List<int>>(bundleStream);
+    : _chunks = StreamIterator<List<int>>(bundleStream);
 
   /// Creates a reader over a bundle that is entirely available in memory.
   factory BundleReader.fromBytes(
-      BundleSerializer serializer, List<int> bundleData) {
+    BundleSerializer serializer,
+    List<int> bundleData,
+  ) {
     return BundleReader(
-        serializer, Stream<List<int>>.fromIterable(<List<int>>[bundleData]));
+      serializer,
+      Stream<List<int>>.fromIterable(<List<int>>[bundleData]),
+    );
   }
 
   static const String _tag = 'BundleElement';
@@ -79,7 +83,8 @@ class BundleReader {
     final BundleElement? element = await _readNextElement();
     if (element is! BundleMetadata) {
       throw await _abort(
-          'Expected first element in bundle to be a metadata object');
+        'Expected first element in bundle to be a metadata object',
+      );
     }
     _metadata = element;
     // We don't consider the metadata as part of the bundle size, as it is used to encode the size of all remaining
@@ -117,14 +122,16 @@ class BundleReader {
       return null;
     }
 
-    final int? jsonStringByteCount =
-        _decimal.hasMatch(lengthPrefix) ? int.tryParse(lengthPrefix) : null;
+    final int? jsonStringByteCount = _decimal.hasMatch(lengthPrefix)
+        ? int.tryParse(lengthPrefix)
+        : null;
     if (jsonStringByteCount == null) {
       throw await _abort('Invalid length prefix: "$lengthPrefix"');
     }
     if (jsonStringByteCount > maxElementBytes) {
       throw await _abort(
-          'Element of $jsonStringByteCount bytes is larger than the limit of $maxElementBytes bytes');
+        'Element of $jsonStringByteCount bytes is larger than the limit of $maxElementBytes bytes',
+      );
     }
     final String json = await _readJsonString(jsonStringByteCount);
     _bytesRead += utf8.encode(lengthPrefix).length + jsonStringByteCount;
@@ -141,7 +148,8 @@ class BundleReader {
       if (_remaining > _maxLengthPrefixBytes) {
         // Not a length prefix: stop here rather than buffer the stream looking for a '{'.
         throw await _abort(
-            'Expected a length prefix of at most $_maxLengthPrefixBytes digits.');
+          'Expected a length prefix of at most $_maxLengthPrefixBytes digits.',
+        );
       }
       if (!await _pullMoreData()) {
         break;
@@ -149,7 +157,8 @@ class BundleReader {
     }
     if (nextOpenBracket > _maxLengthPrefixBytes) {
       throw await _abort(
-          'Expected a length prefix of at most $_maxLengthPrefixBytes digits.');
+        'Expected a length prefix of at most $_maxLengthPrefixBytes digits.',
+      );
     }
 
     // We broke out of the loop because the underlying stream is closed, and there happens to be no more data to
@@ -161,12 +170,14 @@ class BundleReader {
     // We broke out of the loop because the underlying stream is closed, but still cannot find an open bracket.
     if (nextOpenBracket == -1) {
       throw await _abort(
-          'Reached the end of bundle when a length string is expected.');
+        'Reached the end of bundle when a length string is expected.',
+      );
     }
 
     final String prefix = utf8.decode(
-        Uint8List.sublistView(_buffer, _position, _position + nextOpenBracket),
-        allowMalformed: true);
+      Uint8List.sublistView(_buffer, _position, _position + nextOpenBracket),
+      allowMalformed: true,
+    );
     _position += nextOpenBracket;
     return prefix;
   }
@@ -192,8 +203,11 @@ class BundleReader {
   Future<String> _readJsonString(int bytesToRead) async {
     final Uint8List jsonBytes;
     if (_remaining >= bytesToRead) {
-      jsonBytes =
-          Uint8List.sublistView(_buffer, _position, _position + bytesToRead);
+      jsonBytes = Uint8List.sublistView(
+        _buffer,
+        _position,
+        _position + bytesToRead,
+      );
       _position += bytesToRead;
     } else {
       // The element continues in later chunks: collect it into one buffer of its final size, so that every byte is
@@ -206,7 +220,8 @@ class BundleReader {
       while (filled < bytesToRead) {
         if (_closed || !await _chunks.moveNext()) {
           throw await _abort(
-              'Reached the end of bundle when more data was expected.');
+            'Reached the end of bundle when more data was expected.',
+          );
         }
         final List<int> chunk = _chunks.current;
         final int take = chunk.length < bytesToRead - filled
@@ -261,29 +276,34 @@ class BundleReader {
     }
     if (decoded is! Map<String, dynamic>) {
       throw await _abort(
-          'Cannot decode unknown Bundle element: ${_excerpt(json)}');
+        'Cannot decode unknown Bundle element: ${_excerpt(json)}',
+      );
     }
 
     try {
       if (decoded.containsKey('metadata')) {
-        final BundleMetadata metadata =
-            serializer.decodeBundleMetadata(_object(decoded, 'metadata'));
+        final BundleMetadata metadata = serializer.decodeBundleMetadata(
+          _object(decoded, 'metadata'),
+        );
         Log.d(_tag, 'BundleMetadata element loaded');
         return metadata;
       } else if (decoded.containsKey('namedQuery')) {
-        final NamedQuery namedQuery =
-            serializer.decodeNamedQuery(_object(decoded, 'namedQuery'));
+        final NamedQuery namedQuery = serializer.decodeNamedQuery(
+          _object(decoded, 'namedQuery'),
+        );
         Log.d(_tag, 'Query loaded: ${namedQuery.name}');
         return namedQuery;
       } else if (decoded.containsKey('documentMetadata')) {
-        final BundledDocumentMetadata documentMetadata =
-            serializer.decodeBundledDocumentMetadata(
-                _object(decoded, 'documentMetadata'));
+        final BundledDocumentMetadata documentMetadata = serializer
+            .decodeBundledDocumentMetadata(
+              _object(decoded, 'documentMetadata'),
+            );
         Log.d(_tag, 'Document metadata loaded: ${documentMetadata.key}');
         return documentMetadata;
       } else if (decoded.containsKey('document')) {
-        final BundleDocument document =
-            serializer.decodeDocument(_object(decoded, 'document'));
+        final BundleDocument document = serializer.decodeDocument(
+          _object(decoded, 'document'),
+        );
         Log.d(_tag, 'Document loaded: ${document.key}');
         return document;
       }
@@ -295,11 +315,14 @@ class BundleReader {
       throw await _abort('Malformed element: $e');
     }
     throw await _abort(
-        'Cannot decode unknown Bundle element: ${_excerpt(json)}');
+      'Cannot decode unknown Bundle element: ${_excerpt(json)}',
+    );
   }
 
   static Map<String, dynamic> _object(
-      Map<String, dynamic> element, String key) {
+    Map<String, dynamic> element,
+    String key,
+  ) {
     final dynamic value = element[key];
     if (value is! Map<String, dynamic>) {
       throw ArgumentError('Invalid bundle: "$key" must be a JSON object');

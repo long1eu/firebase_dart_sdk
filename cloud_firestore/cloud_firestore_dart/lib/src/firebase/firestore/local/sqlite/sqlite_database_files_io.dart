@@ -7,7 +7,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart
 const List<String> sqliteSideFileSuffixes = <String>[
   '-journal',
   '-wal',
-  '-shm'
+  '-shm',
 ];
 
 /// Deletes the SQLite database file at [path] and its side files. Files that
@@ -25,6 +25,9 @@ void deleteSqliteDatabaseFiles(String path) {
     }
   } on FileSystemException catch (e) {
     throw FirestoreError(
-        'Failed to clear persistence.$e', FirestoreErrorCode.unknown, e);
+      'Failed to clear persistence.$e',
+      FirestoreErrorCode.unknown,
+      e,
+    );
   }
 }

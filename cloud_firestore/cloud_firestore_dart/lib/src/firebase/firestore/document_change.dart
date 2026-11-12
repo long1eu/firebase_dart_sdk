@@ -24,7 +24,7 @@ enum DocumentChangeType {
 
   /// Indicates a document within the query was removed (either deleted or no  longer matches the
   /// query.
-  removed
+  removed,
 }
 
 /// A [DocumentChange] represents a change to the documents matching a query. It contains the
@@ -66,8 +66,11 @@ class DocumentChange<T extends dynamic> {
   /// Creates the list of DocumentChanges from a ViewSnapshot.
   @internal
   static List<DocumentChange<T>> changesFromSnapshot<T extends Object?>(
-      Firestore firestore, MetadataChanges metadataChanges, ViewSnapshot snapshot,
-      [FirestoreDataConverter<T>? converter]) {
+    Firestore firestore,
+    MetadataChanges metadataChanges,
+    ViewSnapshot snapshot, [
+    FirestoreDataConverter<T>? converter,
+  ]) {
     final List<DocumentChange<T>> documentChanges = <DocumentChange<T>>[];
     if (snapshot.oldDocuments.isEmpty) {
       // Special case the first snapshot because index calculation is easy and fast. Also all
@@ -79,20 +82,29 @@ class DocumentChange<T extends dynamic> {
         final Document document = change.document;
         final QueryDocumentSnapshot<T> documentSnapshot =
             QueryDocumentSnapshot<T>.fromDocument(
-          firestore,
-          document,
-          fromCache: snapshot.isFromCache,
-          hasPendingWrites: snapshot.mutatedKeys.contains(document.key),
-          converter: converter,
-        );
+              firestore,
+              document,
+              fromCache: snapshot.isFromCache,
+              hasPendingWrites: snapshot.mutatedKeys.contains(document.key),
+              converter: converter,
+            );
 
-        hardAssert(change.type == DocumentViewChangeType.added,
-            'Invalid added event for first snapshot');
         hardAssert(
-            lastDoc == null || snapshot.query.comparator(lastDoc, document) < 0,
-            'Got added events in wrong order');
-        documentChanges.add(DocumentChange<T>(
-            documentSnapshot, DocumentChangeType.added, -1, index++));
+          change.type == DocumentViewChangeType.added,
+          'Invalid added event for first snapshot',
+        );
+        hardAssert(
+          lastDoc == null || snapshot.query.comparator(lastDoc, document) < 0,
+          'Got added events in wrong order',
+        );
+        documentChanges.add(
+          DocumentChange<T>(
+            documentSnapshot,
+            DocumentChangeType.added,
+            -1,
+            index++,
+          ),
+        );
         lastDoc = document;
       }
     } else {
@@ -107,12 +119,12 @@ class DocumentChange<T extends dynamic> {
         final Document document = change.document;
         final QueryDocumentSnapshot<T> documentSnapshot =
             QueryDocumentSnapshot<T>.fromDocument(
-          firestore,
-          document,
-          fromCache: snapshot.isFromCache,
-          hasPendingWrites: snapshot.mutatedKeys.contains(document.key),
-          converter: converter,
-        );
+              firestore,
+              document,
+              fromCache: snapshot.isFromCache,
+              hasPendingWrites: snapshot.mutatedKeys.contains(document.key),
+              converter: converter,
+            );
         int oldIndex, newIndex;
         final DocumentChangeType type = _getType(change);
         if (type != DocumentChangeType.added) {
@@ -129,8 +141,9 @@ class DocumentChange<T extends dynamic> {
         } else {
           newIndex = -1;
         }
-        documentChanges
-            .add(DocumentChange<T>(documentSnapshot, type, oldIndex, newIndex));
+        documentChanges.add(
+          DocumentChange<T>(documentSnapshot, type, oldIndex, newIndex),
+        );
       }
     }
     return documentChanges;

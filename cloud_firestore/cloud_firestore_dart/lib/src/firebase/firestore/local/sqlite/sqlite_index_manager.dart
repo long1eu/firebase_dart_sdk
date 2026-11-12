@@ -7,9 +7,9 @@ part of 'sqlite_persistence.dart';
 /// A persisted implementation of IndexManager. Port of `SQLiteIndexManager` of the Android SDK.
 class SqliteIndexManager extends IndexManager {
   SqliteIndexManager(this.db, [LocalSerializer? serializer, User? user])
-      : _serializer = serializer ?? db.serializer,
-        _uid = user?.uid ?? '',
-        _collectionParentsIndex = MemoryCollectionParentIndex();
+    : _serializer = serializer ?? db.serializer,
+      _uid = user?.uid ?? '',
+      _collectionParentsIndex = MemoryCollectionParentIndex();
 
   static const String _tag = 'SQLiteIndexManager';
 
@@ -36,13 +36,14 @@ class SqliteIndexManager extends IndexManager {
   /// The indexes ordered by when they were last updated (and by collection group, to make the order deterministic).
   final PriorityQueue<FieldIndex> _nextIndexToUpdate =
       PriorityQueue<FieldIndex>((FieldIndex l, FieldIndex r) {
-    final int sequenceCmp =
-        l.indexState.sequenceNumber.compareTo(r.indexState.sequenceNumber);
-    if (sequenceCmp == 0) {
-      return l.collectionGroup.compareTo(r.collectionGroup);
-    }
-    return sequenceCmp;
-  });
+        final int sequenceCmp = l.indexState.sequenceNumber.compareTo(
+          r.indexState.sequenceNumber,
+        );
+        if (sequenceCmp == 0) {
+          return l.collectionGroup.compareTo(r.collectionGroup);
+        }
+        return sequenceCmp;
+      });
 
   bool _started = false;
   int _memoizedMaxIndexId = -1;
@@ -55,38 +56,49 @@ class SqliteIndexManager extends IndexManager {
     // Fetch all index states if persisted for the user. These states contain per user information on how up to date
     // the index is.
     final List<Map<String, dynamic>> stateRows = await db.query(
-        'SELECT index_id, sequence_number, read_time_seconds, read_time_nanos, document_key, largest_batch_id '
-        'FROM index_state WHERE uid = ?',
-        <Object>[_uid]);
+      'SELECT index_id, sequence_number, read_time_seconds, read_time_nanos, document_key, largest_batch_id '
+      'FROM index_state WHERE uid = ?',
+      <Object>[_uid],
+    );
     for (final Map<String, dynamic> row in stateRows) {
       final int indexId = row['index_id'];
       final int sequenceNumber = row['sequence_number'];
       final SnapshotVersion readTime = SnapshotVersion(
-          Timestamp(row['read_time_seconds'], row['read_time_nanos']));
+        Timestamp(row['read_time_seconds'], row['read_time_nanos']),
+      );
       final DocumentKey documentKey = DocumentKey.fromPath(
-          EncodedPath.decodeResourcePath(row['document_key']));
+        EncodedPath.decodeResourcePath(row['document_key']),
+      );
       final int largestBatchId = row['largest_batch_id'];
       indexStates[indexId] = IndexState(
-          sequenceNumber, IndexOffset(readTime, documentKey, largestBatchId));
+        sequenceNumber,
+        IndexOffset(readTime, documentKey, largestBatchId),
+      );
     }
 
     // Fetch all indices and combine with user's index state if available.
     final List<Map<String, dynamic>> configRows = await db.query(
-        'SELECT index_id, collection_group, index_proto FROM index_configuration');
+      'SELECT index_id, collection_group, index_proto FROM index_configuration',
+    );
     for (final Map<String, dynamic> row in configRows) {
       try {
         final int indexId = row['index_id'];
         final String collectionGroup = row['collection_group'];
-        final List<IndexSegment> segments =
-            _serializer.decodeFieldIndexSegments(
-                admin.Index.fromBuffer(row['index_proto']));
+        final List<IndexSegment> segments = _serializer
+            .decodeFieldIndexSegments(
+              admin.Index.fromBuffer(row['index_proto']),
+            );
 
         // If we fetched an index state for the user above, combine it with this index. We use the default state if we
         // don't have an index state (for example, if the index was created while a different user as logged in).
         final IndexState indexState =
             indexStates[indexId] ?? FieldIndex.initialState;
-        final FieldIndex fieldIndex =
-            FieldIndex(indexId, collectionGroup, segments, indexState);
+        final FieldIndex fieldIndex = FieldIndex(
+          indexId,
+          collectionGroup,
+          segments,
+          indexState,
+        );
 
         // Store the index and update `_memoizedMaxIndexId` and `_memoizedMaxSequenceNumber`.
         _memoizeIndex(fieldIndex);
@@ -126,8 +138,10 @@ class SqliteIndexManager extends IndexManager {
     );
 
     return data
-        .map((Map<String, dynamic> row) =>
-            EncodedPath.decodeResourcePath(row['parent']))
+        .map(
+          (Map<String, dynamic> row) =>
+              EncodedPath.decodeResourcePath(row['parent']),
+        )
         .toList();
   }
 
@@ -137,15 +151,20 @@ class SqliteIndexManager extends IndexManager {
 
     final int nextIndexId = _memoizedMaxIndexId + 1;
     final FieldIndex newIndex = FieldIndex(
-        nextIndexId, index.collectionGroup, index.segments, index.indexState);
+      nextIndexId,
+      index.collectionGroup,
+      index.segments,
+      index.indexState,
+    );
 
     await db.execute(
-        'INSERT INTO index_configuration (index_id, collection_group, index_proto) VALUES(?, ?, ?)',
-        <Object>[
-          nextIndexId,
-          newIndex.collectionGroup,
-          _encodeSegments(newIndex)
-        ]);
+      'INSERT INTO index_configuration (index_id, collection_group, index_proto) VALUES(?, ?, ?)',
+      <Object>[
+        nextIndexId,
+        newIndex.collectionGroup,
+        _encodeSegments(newIndex),
+      ],
+    );
 
     // TODO(indexing): Use a 0-counter rather than the timestamp.
     _memoizeIndex(newIndex);
@@ -153,12 +172,16 @@ class SqliteIndexManager extends IndexManager {
 
   @override
   Future<void> deleteFieldIndex(FieldIndex index) async {
-    await db.execute('DELETE FROM index_configuration WHERE index_id = ?',
-        <Object>[index.indexId]);
-    await db.execute('DELETE FROM index_entries WHERE index_id = ?',
-        <Object>[index.indexId]);
     await db.execute(
-        'DELETE FROM index_state WHERE index_id = ?', <Object>[index.indexId]);
+      'DELETE FROM index_configuration WHERE index_id = ?',
+      <Object>[index.indexId],
+    );
+    await db.execute('DELETE FROM index_entries WHERE index_id = ?', <Object>[
+      index.indexId,
+    ]);
+    await db.execute('DELETE FROM index_state WHERE index_id = ?', <Object>[
+      index.indexId,
+    ]);
 
     _nextIndexToUpdate.remove(index);
     _memoizedIndexes[index.collectionGroup]?.remove(index.indexId);
@@ -181,8 +204,9 @@ class SqliteIndexManager extends IndexManager {
     for (final Target subTarget in _getSubTargets(target)) {
       final IndexType type = getIndexType(subTarget);
       if (type == IndexType.none || type == IndexType.partial) {
-        final TargetIndexMatcher targetIndexMatcher =
-            TargetIndexMatcher(subTarget);
+        final TargetIndexMatcher targetIndexMatcher = TargetIndexMatcher(
+          subTarget,
+        );
         final FieldIndex? fieldIndex = targetIndexMatcher.buildTargetIndex();
         if (fieldIndex != null) {
           await addFieldIndex(fieldIndex);
@@ -201,20 +225,27 @@ class SqliteIndexManager extends IndexManager {
 
   @override
   Future<void> updateIndexEntries(
-      Map<DocumentKey, MaybeDocument?> documents) async {
+    Map<DocumentKey, MaybeDocument?> documents,
+  ) async {
     hardAssert(_started, 'IndexManager not started');
 
     for (final MapEntry<DocumentKey, MaybeDocument?> entry
         in documents.entries) {
-      final List<FieldIndex> fieldIndexes =
-          getFieldIndexes(entry.key.collectionGroup);
+      final List<FieldIndex> fieldIndexes = getFieldIndexes(
+        entry.key.collectionGroup,
+      );
       for (final FieldIndex fieldIndex in fieldIndexes) {
         final SplayTreeSet<IndexEntry> existingEntries =
             await _getExistingIndexEntries(entry.key, fieldIndex);
-        final SplayTreeSet<IndexEntry> newEntries =
-            _computeIndexEntries(entry.key, entry.value, fieldIndex);
-        if (!const IterableEquality<IndexEntry>()
-            .equals(existingEntries, newEntries)) {
+        final SplayTreeSet<IndexEntry> newEntries = _computeIndexEntries(
+          entry.key,
+          entry.value,
+          fieldIndex,
+        );
+        if (!const IterableEquality<IndexEntry>().equals(
+          existingEntries,
+          newEntries,
+        )) {
           await _updateEntries(entry.key, existingEntries, newEntries);
         }
       }
@@ -224,9 +255,10 @@ class SqliteIndexManager extends IndexManager {
   /// Updates the index entries for the provided document by deleting entries that are no longer referenced in
   /// [newEntries] and adding all newly added entries.
   Future<void> _updateEntries(
-      DocumentKey key,
-      SplayTreeSet<IndexEntry> existingEntries,
-      SplayTreeSet<IndexEntry> newEntries) async {
+    DocumentKey key,
+    SplayTreeSet<IndexEntry> existingEntries,
+    SplayTreeSet<IndexEntry> newEntries,
+  ) async {
     Log.d(_tag, 'Updating index entries for document \'$key\'');
     for (final IndexEntry entry in newEntries.difference(existingEntries)) {
       await _addIndexEntry(key, entry);
@@ -251,8 +283,10 @@ class SqliteIndexManager extends IndexManager {
   }
 
   IndexOffset _getMinOffset(List<FieldIndex> fieldIndexes) {
-    hardAssert(fieldIndexes.isNotEmpty,
-        'Found empty index group when looking for least recent index offset.');
+    hardAssert(
+      fieldIndexes.isNotEmpty,
+      'Found empty index group when looking for least recent index offset.',
+    );
 
     IndexOffset minOffset = fieldIndexes.first.indexState.offset;
     int maxBatchId = minOffset.largestBatchId;
@@ -270,8 +304,10 @@ class SqliteIndexManager extends IndexManager {
   @override
   IndexOffset getMinOffset(String collectionGroup) {
     final List<FieldIndex> fieldIndexes = getFieldIndexes(collectionGroup);
-    hardAssert(fieldIndexes.isNotEmpty,
-        'minOffset was called for collection without indexes');
+    hardAssert(
+      fieldIndexes.isNotEmpty,
+      'minOffset was called for collection without indexes',
+    );
     return _getMinOffset(fieldIndexes);
   }
 
@@ -327,17 +363,20 @@ class SqliteIndexManager extends IndexManager {
     } else {
       // There is an implicit AND operation between all the filters stored in the target.
       final List<Filter> dnf = LogicUtils.getDnfTerms(
-          CompositeFilter(target.filters, CompositeFilterOperator.and));
+        CompositeFilter(target.filters, CompositeFilterOperator.and),
+      );
       for (final Filter term in dnf) {
-        subTargets.add(Target(
-          target.path,
-          collectionGroup: target.collectionGroup,
-          filters: term.filters,
-          orderBy: target.orderBy,
-          limit: target.limit,
-          startAt: target.startAt,
-          endAt: target.endAt,
-        ));
+        subTargets.add(
+          Target(
+            target.path,
+            collectionGroup: target.collectionGroup,
+            filters: term.filters,
+            orderBy: target.orderBy,
+            limit: target.limit,
+            startAt: target.startAt,
+            endAt: target.endAt,
+          ),
+        );
       }
     }
     _targetToDnfSubTargets[target] = subTargets;
@@ -348,7 +387,9 @@ class SqliteIndexManager extends IndexManager {
   /// [_memoizedMaxSequenceNumber].
   void _memoizeIndex(FieldIndex fieldIndex) {
     final Map<int, FieldIndex> existingIndexes = _memoizedIndexes.putIfAbsent(
-        fieldIndex.collectionGroup, () => <int, FieldIndex>{});
+      fieldIndex.collectionGroup,
+      () => <int, FieldIndex>{},
+    );
 
     final FieldIndex? existingIndex = existingIndexes[fieldIndex.indexId];
     if (existingIndex != null) {
@@ -358,21 +399,28 @@ class SqliteIndexManager extends IndexManager {
     existingIndexes[fieldIndex.indexId] = fieldIndex;
     _nextIndexToUpdate.add(fieldIndex);
     _memoizedMaxIndexId = max(_memoizedMaxIndexId, fieldIndex.indexId);
-    _memoizedMaxSequenceNumber =
-        max(_memoizedMaxSequenceNumber, fieldIndex.indexState.sequenceNumber);
+    _memoizedMaxSequenceNumber = max(
+      _memoizedMaxSequenceNumber,
+      fieldIndex.indexState.sequenceNumber,
+    );
   }
 
   /// Creates the index entries for the given document. A missing document has none.
   SplayTreeSet<IndexEntry> _computeIndexEntries(
-      DocumentKey key, MaybeDocument? maybeDocument, FieldIndex fieldIndex) {
+    DocumentKey key,
+    MaybeDocument? maybeDocument,
+    FieldIndex fieldIndex,
+  ) {
     final SplayTreeSet<IndexEntry> result = SplayTreeSet<IndexEntry>();
     if (maybeDocument is! Document) {
       return result;
     }
     final Document document = maybeDocument;
 
-    final Uint8List? directionalValue =
-        _encodeDirectionalElements(fieldIndex, document);
+    final Uint8List? directionalValue = _encodeDirectionalElements(
+      fieldIndex,
+      document,
+    );
     if (directionalValue == null) {
       return result;
     }
@@ -382,13 +430,20 @@ class SqliteIndexManager extends IndexManager {
       final FieldValue? value = document.getField(arraySegment.fieldPath);
       if (value is ArrayValue) {
         for (final FieldValue arrayValue in value.internalValue) {
-          result.add(IndexEntry(fieldIndex.indexId, key,
-              _encodeSingleElement(arrayValue), directionalValue));
+          result.add(
+            IndexEntry(
+              fieldIndex.indexId,
+              key,
+              _encodeSingleElement(arrayValue),
+              directionalValue,
+            ),
+          );
         }
       }
     } else {
       result.add(
-          IndexEntry(fieldIndex.indexId, key, Uint8List(0), directionalValue));
+        IndexEntry(fieldIndex.indexId, key, Uint8List(0), directionalValue),
+      );
     }
 
     return result;
@@ -396,46 +451,54 @@ class SqliteIndexManager extends IndexManager {
 
   Future<void> _addIndexEntry(DocumentKey key, IndexEntry indexEntry) {
     return db.execute(
-        'INSERT INTO index_entries (index_id, uid, array_value, directional_value, document_key) '
-        'VALUES(?, ?, ?, ?, ?)',
-        <Object>[
-          indexEntry.indexId,
-          _uid,
-          indexEntry.arrayValue,
-          indexEntry.directionalValue,
-          key.path.canonicalString,
-        ]);
+      'INSERT INTO index_entries (index_id, uid, array_value, directional_value, document_key) '
+      'VALUES(?, ?, ?, ?, ?)',
+      <Object>[
+        indexEntry.indexId,
+        _uid,
+        indexEntry.arrayValue,
+        indexEntry.directionalValue,
+        key.path.canonicalString,
+      ],
+    );
   }
 
   Future<void> _deleteIndexEntry(DocumentKey key, IndexEntry indexEntry) {
     return db.execute(
-        'DELETE FROM index_entries WHERE index_id = ? AND uid = ? AND array_value = ? '
-        'AND directional_value = ? AND document_key = ?',
-        <Object>[
-          indexEntry.indexId,
-          _uid,
-          indexEntry.arrayValue,
-          indexEntry.directionalValue,
-          key.path.canonicalString,
-        ]);
+      'DELETE FROM index_entries WHERE index_id = ? AND uid = ? AND array_value = ? '
+      'AND directional_value = ? AND document_key = ?',
+      <Object>[
+        indexEntry.indexId,
+        _uid,
+        indexEntry.arrayValue,
+        indexEntry.directionalValue,
+        key.path.canonicalString,
+      ],
+    );
   }
 
   Future<SplayTreeSet<IndexEntry>> _getExistingIndexEntries(
-      DocumentKey documentKey, FieldIndex fieldIndex) async {
+    DocumentKey documentKey,
+    FieldIndex fieldIndex,
+  ) async {
     final SplayTreeSet<IndexEntry> results = SplayTreeSet<IndexEntry>();
     final List<Map<String, dynamic>> rows = await db.query(
-        // The index of schema migration 14 is named, because SQLite prefers the (covering) primary key otherwise and
-        // then walks all the entries of the index for every document.
-        'SELECT array_value, directional_value FROM index_entries '
-        'INDEXED BY index_entries_document_key '
-        'WHERE index_id = ? AND document_key = ? AND uid = ?',
-        <Object>[fieldIndex.indexId, documentKey.path.canonicalString, _uid]);
+      // The index of schema migration 14 is named, because SQLite prefers the (covering) primary key otherwise and
+      // then walks all the entries of the index for every document.
+      'SELECT array_value, directional_value FROM index_entries '
+      'INDEXED BY index_entries_document_key '
+      'WHERE index_id = ? AND document_key = ? AND uid = ?',
+      <Object>[fieldIndex.indexId, documentKey.path.canonicalString, _uid],
+    );
     for (final Map<String, dynamic> row in rows) {
-      results.add(IndexEntry(
+      results.add(
+        IndexEntry(
           fieldIndex.indexId,
           documentKey,
           Uint8List.fromList(row['array_value']),
-          Uint8List.fromList(row['directional_value'])));
+          Uint8List.fromList(row['directional_value']),
+        ),
+      );
     }
     return results;
   }
@@ -458,39 +521,54 @@ class SqliteIndexManager extends IndexManager {
     }
 
     for (final (Target subTarget, FieldIndex fieldIndex) in indexes) {
-      final List<FieldValue>? arrayValues =
-          subTarget.getArrayValues(fieldIndex);
-      final List<FieldValue>? notInValues =
-          subTarget.getNotInValues(fieldIndex);
+      final List<FieldValue>? arrayValues = subTarget.getArrayValues(
+        fieldIndex,
+      );
+      final List<FieldValue>? notInValues = subTarget.getNotInValues(
+        fieldIndex,
+      );
       final Bound lowerBound = subTarget.getLowerBound(fieldIndex);
       final Bound upperBound = subTarget.getUpperBound(fieldIndex);
 
       if (Log.isDebugEnabled) {
         Log.d(
-            _tag,
-            'Using index \'$fieldIndex\' to execute \'$subTarget\' (Arrays: $arrayValues, Lower bound: $lowerBound, '
-            'Upper bound: $upperBound)');
+          _tag,
+          'Using index \'$fieldIndex\' to execute \'$subTarget\' (Arrays: $arrayValues, Lower bound: $lowerBound, '
+          'Upper bound: $upperBound)',
+        );
       }
 
-      final List<Uint8List> lowerBoundEncoded =
-          _encodeValues(fieldIndex, subTarget, lowerBound.position)!;
+      final List<Uint8List> lowerBoundEncoded = _encodeValues(
+        fieldIndex,
+        subTarget,
+        lowerBound.position,
+      )!;
       final String lowerBoundOp = lowerBound.inclusive ? '>=' : '>';
-      final List<Uint8List> upperBoundEncoded =
-          _encodeValues(fieldIndex, subTarget, upperBound.position)!;
+      final List<Uint8List> upperBoundEncoded = _encodeValues(
+        fieldIndex,
+        subTarget,
+        upperBound.position,
+      )!;
       final String upperBoundOp = upperBound.inclusive ? '<=' : '<';
-      final List<Uint8List>? notInEncoded =
-          _encodeValues(fieldIndex, subTarget, notInValues);
+      final List<Uint8List>? notInEncoded = _encodeValues(
+        fieldIndex,
+        subTarget,
+        notInValues,
+      );
 
-      final (String subQuery, List<Object> subQueryBindings) =
-          _generateQueryAndBindings(
-              subTarget,
-              fieldIndex.indexId,
-              arrayValues,
-              lowerBoundEncoded,
-              lowerBoundOp,
-              upperBoundEncoded,
-              upperBoundOp,
-              notInEncoded);
+      final (
+        String subQuery,
+        List<Object> subQueryBindings,
+      ) = _generateQueryAndBindings(
+        subTarget,
+        fieldIndex.indexId,
+        arrayValues,
+        lowerBoundEncoded,
+        lowerBoundOp,
+        upperBoundEncoded,
+        upperBoundOp,
+        notInEncoded,
+      );
       subQueries.add(subQuery);
       bindings.addAll(subQueryBindings);
     }
@@ -505,7 +583,8 @@ class SqliteIndexManager extends IndexManager {
     // Note: SQLite does not allow performing ORDER BY on each union clause. The ORDER BY must come after the last
     // union clause. Also note that LIMIT must be applied *after* the DISTINCT operator has been performed. When
     // dealing with multiple sub-targets, it's possible that the same document_key appears multiple times.
-    final String unionSubTargets = '${subQueries.join(' UNION ')}'
+    final String unionSubTargets =
+        '${subQueries.join(' UNION ')}'
         'ORDER BY directional_value, document_key '
         '${target.keyOrder == OrderByDirection.ascending ? 'asc ' : 'desc '}';
 
@@ -514,11 +593,15 @@ class SqliteIndexManager extends IndexManager {
       queryString = '$queryString LIMIT ${target.limit}';
     }
 
-    hardAssert(bindings.length < 1000,
-        'Cannot perform query with more than 999 bind elements');
+    hardAssert(
+      bindings.length < 1000,
+      'Cannot perform query with more than 999 bind elements',
+    );
 
-    final List<Map<String, dynamic>> rows =
-        await db.query(queryString, bindings);
+    final List<Map<String, dynamic>> rows = await db.query(
+      queryString,
+      bindings,
+    );
 
     final List<DocumentKey> result = <DocumentKey>[
       for (final Map<String, dynamic> row in rows)
@@ -532,18 +615,20 @@ class SqliteIndexManager extends IndexManager {
   /// Constructs a SQL query on 'index_entries' that unions all bounds. Returns the SQL query string and its binding
   /// arguments.
   (String, List<Object>) _generateQueryAndBindings(
-      Target target,
-      int indexId,
-      List<FieldValue>? arrayValues,
-      List<Uint8List> lowerBounds,
-      String lowerBoundOp,
-      List<Uint8List> upperBounds,
-      String upperBoundOp,
-      List<Uint8List>? notIn) {
+    Target target,
+    int indexId,
+    List<FieldValue>? arrayValues,
+    List<Uint8List> lowerBounds,
+    String lowerBoundOp,
+    List<Uint8List> upperBounds,
+    String upperBoundOp,
+    List<Uint8List>? notIn,
+  ) {
     // The number of total statements we union together. This is similar to a distributed normal form, but adapted for
     // array values. We create a single statement per value in an ARRAY_CONTAINS or ARRAY_CONTAINS_ANY filter combined
     // with the values from the query bounds.
-    final int statementCount = (arrayValues != null ? arrayValues.length : 1) *
+    final int statementCount =
+        (arrayValues != null ? arrayValues.length : 1) *
         max(lowerBounds.length, upperBounds.length);
 
     // Build the statement. We always include the lower bound, and optionally include an array value and an upper
@@ -560,25 +645,33 @@ class SqliteIndexManager extends IndexManager {
 
     if (notIn != null) {
       // Wrap the statement in a NOT-IN call.
-      sql = 'SELECT document_key, directional_value FROM ($sql) '
+      sql =
+          'SELECT document_key, directional_value FROM ($sql) '
           'WHERE directional_value NOT IN (${List<String>.filled(notIn.length, '?').join(', ')})';
     }
 
     // Fill in the bind ("question marks") variables.
     final List<Object> bindArgs = _fillBounds(
-        statementCount, indexId, arrayValues, lowerBounds, upperBounds, notIn);
+      statementCount,
+      indexId,
+      arrayValues,
+      lowerBounds,
+      upperBounds,
+      notIn,
+    );
 
     return (sql, bindArgs);
   }
 
   /// Returns the bind arguments for all [statementCount] statements.
   List<Object> _fillBounds(
-      int statementCount,
-      int indexId,
-      List<FieldValue>? arrayValues,
-      List<Uint8List> lowerBounds,
-      List<Uint8List> upperBounds,
-      List<Uint8List>? notInValues) {
+    int statementCount,
+    int indexId,
+    List<FieldValue>? arrayValues,
+    List<Uint8List> lowerBounds,
+    List<Uint8List> upperBounds,
+    List<Uint8List>? notInValues,
+  ) {
     // Every SQL statement we union together have 5 binds, see [_generateQueryAndBindings].
     final int statementsPerArrayValue =
         statementCount ~/ (arrayValues != null ? arrayValues.length : 1);
@@ -588,9 +681,11 @@ class SqliteIndexManager extends IndexManager {
       bindArgs
         ..add(indexId)
         ..add(_uid)
-        ..add(arrayValues != null
-            ? _encodeSingleElement(arrayValues[i ~/ statementsPerArrayValue])
-            : Uint8List(0))
+        ..add(
+          arrayValues != null
+              ? _encodeSingleElement(arrayValues[i ~/ statementsPerArrayValue])
+              : Uint8List(0),
+        )
         ..add(lowerBounds[i % statementsPerArrayValue])
         ..add(upperBounds[i % statementsPerArrayValue]);
     }
@@ -631,15 +726,19 @@ class SqliteIndexManager extends IndexManager {
   /// Returns the byte encoded form of the directional values in the field index. Returns null if the document does
   /// not have all fields specified in the index.
   Uint8List? _encodeDirectionalElements(
-      FieldIndex fieldIndex, Document document) {
+    FieldIndex fieldIndex,
+    Document document,
+  ) {
     final IndexByteEncoder encoder = IndexByteEncoder();
     for (final IndexSegment segment in fieldIndex.directionalSegments) {
       final FieldValue? field = document.getField(segment.fieldPath);
       if (field == null) {
         return null;
       }
-      FirestoreIndexValueWriter.instance
-          .writeIndexValue(field, encoder.forKind(segment.kind));
+      FirestoreIndexValueWriter.instance.writeIndexValue(
+        field,
+        encoder.forKind(segment.kind),
+      );
     }
     return encoder.encodedBytes;
   }
@@ -647,15 +746,20 @@ class SqliteIndexManager extends IndexManager {
   /// Encodes a single value to the ascending index format.
   Uint8List _encodeSingleElement(FieldValue value) {
     final IndexByteEncoder encoder = IndexByteEncoder();
-    FirestoreIndexValueWriter.instance
-        .writeIndexValue(value, encoder.forKind(SegmentKind.ascending));
+    FirestoreIndexValueWriter.instance.writeIndexValue(
+      value,
+      encoder.forKind(SegmentKind.ascending),
+    );
     return encoder.encodedBytes;
   }
 
   /// Encodes the given field values (the position of a bound, or the values of a != / not-in filter) according to the
   /// specification in [target]. For IN queries, a list of possible values is returned.
   List<Uint8List>? _encodeValues(
-      FieldIndex fieldIndex, Target target, List<FieldValue>? values) {
+    FieldIndex fieldIndex,
+    Target target,
+    List<FieldValue>? values,
+  ) {
     if (values == null) {
       return null;
     }
@@ -667,13 +771,16 @@ class SqliteIndexManager extends IndexManager {
       position.moveNext();
       final FieldValue value = position.current;
       // The list is replaced while its previous value is iterated, as upstream does.
-      for (final IndexByteEncoder encoder
-          in List<IndexByteEncoder>.of(encoders)) {
+      for (final IndexByteEncoder encoder in List<IndexByteEncoder>.of(
+        encoders,
+      )) {
         if (_isInFilter(target, segment.fieldPath) && value is ArrayValue) {
           encoders = _expandIndexValues(encoders, segment, value);
         } else {
-          FirestoreIndexValueWriter.instance
-              .writeIndexValue(value, encoder.forKind(segment.kind));
+          FirestoreIndexValueWriter.instance.writeIndexValue(
+            value,
+            encoder.forKind(segment.kind),
+          );
         }
       }
     }
@@ -687,15 +794,20 @@ class SqliteIndexManager extends IndexManager {
   /// The method appends each value to all existing encoders (for example, filter("a", "==", "a1").filter("b", "in",
   /// ["b1", "b2"]) becomes ["a1,b1", "a1,b2"]). A list of new encoders is returned.
   List<IndexByteEncoder> _expandIndexValues(
-      List<IndexByteEncoder> encoders, IndexSegment segment, ArrayValue value) {
+    List<IndexByteEncoder> encoders,
+    IndexSegment segment,
+    ArrayValue value,
+  ) {
     final List<IndexByteEncoder> prefixes = List<IndexByteEncoder>.of(encoders);
     final List<IndexByteEncoder> results = <IndexByteEncoder>[];
     for (final FieldValue arrayElement in value.internalValue) {
       for (final IndexByteEncoder prefix in prefixes) {
         final IndexByteEncoder clonedEncoder = IndexByteEncoder()
           ..seed(prefix.encodedBytes);
-        FirestoreIndexValueWriter.instance
-            .writeIndexValue(arrayElement, clonedEncoder.forKind(segment.kind));
+        FirestoreIndexValueWriter.instance.writeIndexValue(
+          arrayElement,
+          clonedEncoder.forKind(segment.kind),
+        );
         results.add(clonedEncoder);
       }
     }
@@ -723,29 +835,33 @@ class SqliteIndexManager extends IndexManager {
 
   @override
   Future<void> updateCollectionGroup(
-      String collectionGroup, IndexOffset offset) async {
+    String collectionGroup,
+    IndexOffset offset,
+  ) async {
     hardAssert(_started, 'IndexManager not started');
 
     ++_memoizedMaxSequenceNumber;
     for (final FieldIndex fieldIndex in getFieldIndexes(collectionGroup)) {
       final FieldIndex updatedIndex = FieldIndex(
-          fieldIndex.indexId,
-          fieldIndex.collectionGroup,
-          fieldIndex.segments,
-          IndexState(_memoizedMaxSequenceNumber, offset));
+        fieldIndex.indexId,
+        fieldIndex.collectionGroup,
+        fieldIndex.segments,
+        IndexState(_memoizedMaxSequenceNumber, offset),
+      );
       await db.execute(
-          'REPLACE INTO index_state (index_id, uid,  sequence_number, '
-          'read_time_seconds, read_time_nanos, document_key, largest_batch_id) '
-          'VALUES(?, ?, ?, ?, ?, ?, ?)',
-          <Object>[
-            fieldIndex.indexId,
-            _uid,
-            _memoizedMaxSequenceNumber,
-            offset.readTime.timestamp.seconds,
-            offset.readTime.timestamp.nanoseconds,
-            EncodedPath.encode(offset.documentKey.path),
-            offset.largestBatchId,
-          ]);
+        'REPLACE INTO index_state (index_id, uid,  sequence_number, '
+        'read_time_seconds, read_time_nanos, document_key, largest_batch_id) '
+        'VALUES(?, ?, ?, ?, ?, ?, ?)',
+        <Object>[
+          fieldIndex.indexId,
+          _uid,
+          _memoizedMaxSequenceNumber,
+          offset.readTime.timestamp.seconds,
+          offset.readTime.timestamp.nanoseconds,
+          EncodedPath.encode(offset.documentKey.path),
+          offset.largestBatchId,
+        ],
+      );
       _memoizeIndex(updatedIndex);
     }
   }

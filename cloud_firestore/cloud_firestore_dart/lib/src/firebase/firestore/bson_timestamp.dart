@@ -22,12 +22,18 @@ class BsonTimestamp {
   /// of an unsigned 32-bit integer.
   BsonTimestamp(this.seconds, this.increment) {
     if (seconds < 0 || seconds > maxValue) {
-      throw ArgumentError.value(seconds, 'seconds',
-          "The field 'seconds' does not represent an unsigned 32-bit integer");
+      throw ArgumentError.value(
+        seconds,
+        'seconds',
+        "The field 'seconds' does not represent an unsigned 32-bit integer",
+      );
     }
     if (increment < 0 || increment > maxValue) {
-      throw ArgumentError.value(increment, 'increment',
-          "The field 'increment' does not represent an unsigned 32-bit integer");
+      throw ArgumentError.value(
+        increment,
+        'increment',
+        "The field 'increment' does not represent an unsigned 32-bit integer",
+      );
     }
   }
 

@@ -103,8 +103,9 @@ class Target {
       return null;
     }
 
-    for (final FieldFilter fieldFilter
-        in _getFieldFiltersForPath(segment.fieldPath)) {
+    for (final FieldFilter fieldFilter in _getFieldFiltersForPath(
+      segment.fieldPath,
+    )) {
       if (fieldFilter.operator == FilterOperator.arrayContainsAny) {
         return (fieldFilter.value as ArrayValue).internalValue;
       } else if (fieldFilter.operator == FilterOperator.arrayContains) {
@@ -122,8 +123,9 @@ class Target {
     final Map<FieldPath, FieldValue> values = <FieldPath, FieldValue>{};
 
     for (final IndexSegment segment in fieldIndex.directionalSegments) {
-      for (final FieldFilter fieldFilter
-          in _getFieldFiltersForPath(segment.fieldPath)) {
+      for (final FieldFilter fieldFilter in _getFieldFiltersForPath(
+        segment.fieldPath,
+      )) {
         final FilterOperator operator = fieldFilter.operator;
         if (operator == FilterOperator.equal || operator == FilterOperator.IN) {
           // Encode equality prefix, which is encoded in the index value before
@@ -152,10 +154,12 @@ class Target {
     // For each segment, retrieve a lower bound if there is a suitable filter or
     // startAt.
     for (final IndexSegment segment in fieldIndex.directionalSegments) {
-      final (FieldValue value, bool segmentInclusive) =
-          segment.kind == SegmentKind.ascending
-              ? _getAscendingBound(segment, startAt)
-              : _getDescendingBound(segment, startAt);
+      final (
+        FieldValue value,
+        bool segmentInclusive,
+      ) = segment.kind == SegmentKind.ascending
+          ? _getAscendingBound(segment, startAt)
+          : _getDescendingBound(segment, startAt);
 
       values.add(value);
       inclusive &= segmentInclusive;
@@ -174,10 +178,12 @@ class Target {
     // For each segment, retrieve an upper bound if there is a suitable filter
     // or endAt.
     for (final IndexSegment segment in fieldIndex.directionalSegments) {
-      final (FieldValue value, bool segmentInclusive) =
-          segment.kind == SegmentKind.ascending
-              ? _getDescendingBound(segment, endAt)
-              : _getAscendingBound(segment, endAt);
+      final (
+        FieldValue value,
+        bool segmentInclusive,
+      ) = segment.kind == SegmentKind.ascending
+          ? _getDescendingBound(segment, endAt)
+          : _getAscendingBound(segment, endAt);
 
       values.add(value);
       inclusive &= segmentInclusive;
@@ -193,8 +199,9 @@ class Target {
     bool segmentInclusive = true;
 
     // Process all filters to find a value for the current field segment
-    for (final FieldFilter fieldFilter
-        in _getFieldFiltersForPath(segment.fieldPath)) {
+    for (final FieldFilter fieldFilter in _getFieldFiltersForPath(
+      segment.fieldPath,
+    )) {
       FieldValue filterValue = ValueBounds.internalMinValue;
       bool filterInclusive = true;
 
@@ -216,7 +223,11 @@ class Target {
       // Remaining filters cannot be used as bound.
 
       if (ValueBounds.lowerBoundCompare(
-              segmentValue, segmentInclusive, filterValue, filterInclusive) <
+            segmentValue,
+            segmentInclusive,
+            filterValue,
+            filterInclusive,
+          ) <
           0) {
         segmentValue = filterValue;
         segmentInclusive = filterInclusive;
@@ -229,8 +240,12 @@ class Target {
       for (int i = 0; i < orderBy.length; ++i) {
         if (orderBy[i].field == segment.fieldPath) {
           final FieldValue cursorValue = bound.position[i];
-          if (ValueBounds.lowerBoundCompare(segmentValue, segmentInclusive,
-                  cursorValue, bound.inclusive) <
+          if (ValueBounds.lowerBoundCompare(
+                segmentValue,
+                segmentInclusive,
+                cursorValue,
+                bound.inclusive,
+              ) <
               0) {
             segmentValue = cursorValue;
             segmentInclusive = bound.inclusive;
@@ -250,8 +265,9 @@ class Target {
     bool segmentInclusive = true;
 
     // Process all filters to find a value for the current field segment
-    for (final FieldFilter fieldFilter
-        in _getFieldFiltersForPath(segment.fieldPath)) {
+    for (final FieldFilter fieldFilter in _getFieldFiltersForPath(
+      segment.fieldPath,
+    )) {
       FieldValue filterValue = ValueBounds.internalMaxValue;
       bool filterInclusive = true;
 
@@ -274,7 +290,11 @@ class Target {
       // Remaining filters cannot be used as bound.
 
       if (ValueBounds.upperBoundCompare(
-              segmentValue, segmentInclusive, filterValue, filterInclusive) >
+            segmentValue,
+            segmentInclusive,
+            filterValue,
+            filterInclusive,
+          ) >
           0) {
         segmentValue = filterValue;
         segmentInclusive = filterInclusive;
@@ -287,8 +307,12 @@ class Target {
       for (int i = 0; i < orderBy.length; ++i) {
         if (orderBy[i].field == segment.fieldPath) {
           final FieldValue cursorValue = bound.position[i];
-          if (ValueBounds.upperBoundCompare(segmentValue, segmentInclusive,
-                  cursorValue, bound.inclusive) >
+          if (ValueBounds.upperBoundCompare(
+                segmentValue,
+                segmentInclusive,
+                cursorValue,
+                bound.inclusive,
+              ) >
               0) {
             segmentValue = cursorValue;
             segmentInclusive = bound.inclusive;
@@ -365,7 +389,8 @@ class Target {
       builder
         ..write(orderBy.field.canonicalString)
         ..write(
-            orderBy.direction == OrderByDirection.ascending ? 'asc' : 'desc');
+          orderBy.direction == OrderByDirection.ascending ? 'asc' : 'desc',
+        );
     }
 
     // Add limit.
@@ -420,9 +445,10 @@ class Target {
 
   @override
   String toString() {
-    final StringBuffer builder = StringBuffer() //
-      ..write('Query(')
-      ..write(path.canonicalString);
+    final StringBuffer builder =
+        StringBuffer() //
+          ..write('Query(')
+          ..write(path.canonicalString);
     if (collectionGroup != null) {
       builder //
         ..write(' collectionGroup=')

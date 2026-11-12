@@ -27,8 +27,7 @@ class DocumentSet extends Iterable<Document> {
       Expando<Comparator<Document>>('adjustedComparator');
 
   static Comparator<Document> _adjusted(Comparator<Document> comparator) {
-    return _adjustedComparators[comparator] ??=
-        (Document left, Document right) {
+    return _adjustedComparators[comparator] ??= (Document left, Document right) {
       // We have to add the document key comparator to the passed in comparator, as it's the only
       // guaranteed unique property of a document.
       final int comparison = comparator(left, right);
@@ -108,10 +107,12 @@ class DocumentSet extends Iterable<Document> {
     // accumulating values that aren't in the index.
     final DocumentSet removed = remove(document.key);
 
-    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
-        removed._keyIndex.insert(document.key, document);
-    final ImmutableSortedSet<Document> newSortedSet =
-        removed.sortedSet.insert(document);
+    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex = removed
+        ._keyIndex
+        .insert(document.key, document);
+    final ImmutableSortedSet<Document> newSortedSet = removed.sortedSet.insert(
+      document,
+    );
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
@@ -125,10 +126,11 @@ class DocumentSet extends Iterable<Document> {
     _keyIndex.remove(key);
     sortedSet.remove(document);
 
-    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex =
-        _keyIndex.remove(key);
-    final ImmutableSortedSet<Document> newSortedSet =
-        sortedSet.remove(document);
+    final ImmutableSortedMap<DocumentKey, Document> newKeyIndex = _keyIndex
+        .remove(key);
+    final ImmutableSortedSet<Document> newSortedSet = sortedSet.remove(
+      document,
+    );
     return DocumentSet._(newKeyIndex, newSortedSet);
   }
 
@@ -153,8 +155,9 @@ class DocumentSet extends Iterable<Document> {
 
     if (other is DocumentSet) {
       final Iterator<Document> thisList = toList(growable: false).iterator;
-      final Iterator<Document> otherList =
-          other.toList(growable: false).iterator;
+      final Iterator<Document> otherList = other
+          .toList(growable: false)
+          .iterator;
 
       while (thisList.moveNext()) {
         if (!otherList.moveNext()) {
