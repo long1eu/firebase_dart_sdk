@@ -25,8 +25,41 @@ class GeoPoint implements Comparable<GeoPoint> {
         assert(longitude >= -180.0 && longitude <= 180.0,
             'Longitude must be in the range of [-180, 180] but was $longitude');
 
+  /// Builds a GeoPoint from a JSON map created by [toJson].
+  ///
+  /// Throws an [ArgumentError] if [json] does not have that shape or the
+  /// coordinates are out of range.
+  factory GeoPoint.fromJson(Map<String, Object?> json) {
+    final Object? latitude = json['latitude'];
+    final Object? longitude = json['longitude'];
+    if (json['type'] != jsonType || latitude is! num || longitude is! num) {
+      throw ArgumentError.value(
+          json, 'json', 'Not a JSON representation of a GeoPoint');
+    }
+    if (!(latitude >= -90 && latitude <= 90)) {
+      throw RangeError.range(latitude, -90, 90, 'latitude');
+    }
+    if (!(longitude >= -180 && longitude <= 180)) {
+      throw RangeError.range(longitude, -180, 180, 'longitude');
+    }
+    return GeoPoint(latitude.toDouble(), longitude.toDouble());
+  }
+
+  /// The value of the `type` field written by [toJson].
+  static const String jsonType = 'firestore/geoPoint/1.0';
+
   final double latitude;
   final double longitude;
+
+  /// A JSON-serializable representation of this GeoPoint, in the same shape as
+  /// the JS SDK's `GeoPoint.toJSON()`. Read it back with [GeoPoint.fromJson].
+  Map<String, Object> toJson() {
+    return <String, Object>{
+      'latitude': latitude,
+      'longitude': longitude,
+      'type': jsonType,
+    };
+  }
 
   @override
   int compareTo(GeoPoint other) {

@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 28/09/2018
 
+import 'dart:convert';
+
 import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
 import 'package:test/test.dart';
 
@@ -77,5 +79,44 @@ void main() {
     expect(() => GeoPoint(0.0, double.infinity), throwsAssertionError);
     expect(() => GeoPoint(0.0, -180.1), throwsAssertionError);
     expect(() => GeoPoint(0.0, 180.1), throwsAssertionError);
+  });
+
+  test('toJson matches the JS shape and round trips through fromJson', () {
+    final GeoPoint point = gp(12.5, -45.25);
+    expect(point.toJson(), <String, Object>{
+      'latitude': 12.5,
+      'longitude': -45.25,
+      'type': 'firestore/geoPoint/1.0',
+    });
+    expect(
+        GeoPoint.fromJson(
+            jsonDecode(jsonEncode(point)) as Map<String, Object?>),
+        point);
+    // JSON integers are accepted as coordinates.
+    expect(
+        GeoPoint.fromJson(<String, Object?>{
+          'type': 'firestore/geoPoint/1.0',
+          'latitude': 1,
+          'longitude': 2
+        }),
+        gp(1.0, 2.0));
+  });
+
+  test('fromJson rejects malformed input and out-of-range coordinates', () {
+    final Matcher throwsArgumentError = throwsA(isA<ArgumentError>());
+    Map<String, Object?> json(Object? latitude, Object? longitude) =>
+        <String, Object?>{
+          'type': 'firestore/geoPoint/1.0',
+          'latitude': latitude,
+          'longitude': longitude
+        };
+    expect(
+        () =>
+            GeoPoint.fromJson(<String, Object?>{'latitude': 1, 'longitude': 2}),
+        throwsArgumentError);
+    expect(() => GeoPoint.fromJson(json('1', 2)), throwsArgumentError);
+    expect(() => GeoPoint.fromJson(json(90.1, 0)), throwsArgumentError);
+    expect(() => GeoPoint.fromJson(json(0, -180.1)), throwsArgumentError);
+    expect(() => GeoPoint.fromJson(json(double.nan, 0)), throwsArgumentError);
   });
 }

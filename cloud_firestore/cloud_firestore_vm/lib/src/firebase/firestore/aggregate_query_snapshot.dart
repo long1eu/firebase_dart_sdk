@@ -28,6 +28,20 @@ class AggregateQuerySnapshot {
   /// Results keyed by [AggregateField.alias].
   final Map<String, FieldValue> _data;
 
+  /// All results of this snapshot, keyed by [AggregateField.alias]: each value
+  /// is an `int`, a `double` or null, as returned by [get].
+  ///
+  /// This is the counterpart of the JS SDK's `AggregateQuerySnapshot.data()`.
+  /// The keys are the aliases this SDK derives for each field (for example
+  /// `count`, or `sum_price` for `AggregateField.sum('price')`), not
+  /// user-chosen names.
+  Map<String, Object?> data() {
+    return Map<String, Object?>.unmodifiable(<String, Object?>{
+      for (final MapEntry<String, FieldValue> entry in _data.entries)
+        entry.key: entry.value.value,
+    });
+  }
+
   /// The result of the count aggregation. Throws an [ArgumentError] when the
   /// query did not request [AggregateField.count] or the result is null.
   int getCount() {

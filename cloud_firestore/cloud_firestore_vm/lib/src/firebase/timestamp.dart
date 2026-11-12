@@ -26,16 +26,40 @@ class Timestamp implements Comparable<Timestamp> {
         assert(
             seconds < 253402300800, 'Timestamp seconds out of range: $seconds');
 
+  /// Creates a new timestamp from [date], with millisecond precision.
   factory Timestamp.fromDate(DateTime date) {
-    final int millis = date.millisecondsSinceEpoch;
-    int seconds = millis ~/ 1000;
-    int nanoseconds = millis.remainder(1000) * 1000000;
+    return Timestamp.fromMillis(date.millisecondsSinceEpoch);
+  }
+
+  /// Creates a new timestamp from the given number of [milliseconds] since the
+  /// Unix epoch 1970-01-01T00:00:00Z.
+  ///
+  /// Throws an [ArgumentError] if the result is outside the supported range.
+  factory Timestamp.fromMillis(int milliseconds) {
+    // Floor division, so that negative values keep non-negative nanoseconds.
+    int seconds = milliseconds ~/ 1000;
+    int nanoseconds = milliseconds.remainder(1000) * 1000000;
 
     if (nanoseconds < 0) {
       seconds -= 1;
       nanoseconds += 1000000000;
     }
 
+    validateRange(seconds, nanoseconds);
+    return Timestamp(seconds, nanoseconds);
+  }
+
+  /// Builds a timestamp from a JSON map created by [toJson].
+  ///
+  /// Throws an [ArgumentError] if [json] does not have that shape or the value
+  /// is outside the supported range.
+  factory Timestamp.fromJson(Map<String, Object?> json) {
+    final Object? seconds = json['seconds'];
+    final Object? nanoseconds = json['nanoseconds'];
+    if (json['type'] != jsonType || seconds is! int || nanoseconds is! int) {
+      throw ArgumentError.value(
+          json, 'json', 'Not a JSON representation of a Timestamp');
+    }
     validateRange(seconds, nanoseconds);
     return Timestamp(seconds, nanoseconds);
   }
@@ -48,9 +72,29 @@ class Timestamp implements Comparable<Timestamp> {
   final int seconds;
   final int nanoseconds;
 
+  /// The value of the `type` field written by [toJson].
+  static const String jsonType = 'firestore/timestamp/1.0';
+
+  /// Converts this timestamp to a [DateTime], with millisecond precision.
   DateTime toDate() {
-    return DateTime.fromMillisecondsSinceEpoch(
-        (seconds * 1000 + (nanoseconds ~/ 1000000)).toInt());
+    return DateTime.fromMillisecondsSinceEpoch(toMillis());
+  }
+
+  /// The number of milliseconds since the Unix epoch 1970-01-01T00:00:00Z.
+  /// Sub-millisecond precision is truncated toward the earlier time.
+  int toMillis() {
+    return seconds * 1000 + nanoseconds ~/ 1000000;
+  }
+
+  /// A JSON-serializable representation of this timestamp, in the same shape
+  /// as the JS SDK's `Timestamp.toJSON()`. Read it back with
+  /// [Timestamp.fromJson].
+  Map<String, Object> toJson() {
+    return <String, Object>{
+      'type': jsonType,
+      'seconds': seconds,
+      'nanoseconds': nanoseconds,
+    };
   }
 
   @override

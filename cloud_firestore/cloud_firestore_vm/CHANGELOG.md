@@ -56,6 +56,10 @@ Firestore emulator only. **Nothing was run against production Firestore.**
 - Bloom-filter existence-filter handling, gRPC keepalive and connect timeout, backoff reset on
   connectivity change, instance cache per app and database, serial queue for remote store work.
 - `ServerTimestampBehavior` is exported; `@internal` on constructors that leaked internals.
+- Value helpers from the JS SDK: `Timestamp.fromMillis` / `toMillis`, `Blob.fromBase64String` /
+  `toBase64`, `AggregateQuerySnapshot.data()` (results keyed by alias), and `toJson` /
+  `fromJson` on `Timestamp`, `GeoPoint` and `Blob` in the JS `toJSON()` shape (so `jsonEncode`
+  works on them). `Timestamp.fromDate` now goes through `fromMillis` (same results).
 - Fixes from the upstream sync (UTF-8 string ordering, limbo handling, limbo-resolution
   document removal, transaction precondition, listener lifecycle and others); see
   `docs/upstream_sync/UPSTREAM_PLAN.md`.

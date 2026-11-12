@@ -20,6 +20,7 @@ class AggregateQuery
   new AggregateQuery(Query<Object> query, List<AggregateField> aggregateFields)
 class AggregateQuerySnapshot
   ==(Object other): bool
+  data(): Map<String, Object>
   final query: AggregateQuery
   get hashCode: int
   get(AggregateField aggregateField): Object
@@ -39,6 +40,11 @@ class Blob
   final bytes: Uint8List
   get hashCode: int
   new Blob(Uint8List bytes)
+  new Blob.fromBase64String(String base64String)
+  new Blob.fromJson(Map<String, Object> json)
+  static final jsonType: String
+  toBase64(): String
+  toJson(): Map<String, Object>
   toString(): String
 class CollectionReference extends Query<X0>
   add(X0 data): Future<DocumentReference<X0>>
@@ -296,6 +302,9 @@ class GeoPoint
   final longitude: double
   get hashCode: int
   new GeoPoint(double latitude, double longitude)
+  new GeoPoint.fromJson(Map<String, Object> json)
+  static final jsonType: String
+  toJson(): Map<String, Object>
   toString(): String
 enum ListenSource
   new ListenSource(int #index, String #name)
@@ -488,9 +497,14 @@ class Timestamp
   get hashCode: int
   new Timestamp(int seconds, int nanoseconds)
   new Timestamp.fromDate(DateTime date)
+  new Timestamp.fromJson(Map<String, Object> json)
+  new Timestamp.fromMillis(int milliseconds)
   new Timestamp.now()
+  static final jsonType: String
   static validateRange(int seconds, int nanoseconds): void
   toDate(): DateTime
+  toJson(): Map<String, Object>
+  toMillis(): int
   toString(): String
 class Transaction
   delete(DocumentReference<Object> documentRef): Transaction

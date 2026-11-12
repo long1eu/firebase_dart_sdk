@@ -37,4 +37,38 @@ void main() {
       skip: 'AggregateQuery.get takes a non-nullable AggregateSource in Dart; '
           'a null source is rejected by the compiler',
       () {});
+
+  test('data returns every result keyed by alias', () {
+    final AggregateQuery query =
+        collectionReference('coll').aggregate(<AggregateField>[
+      AggregateField.count(),
+      AggregateField.sum('pages'),
+      AggregateField.average('rating'),
+    ]);
+    final AggregateQuerySnapshot snapshot =
+        AggregateQuerySnapshot(query, <String, FieldValue>{
+      AggregateField.count().alias: IntegerValue.valueOf(3),
+      AggregateField.sum('pages').alias: IntegerValue.valueOf(150),
+      AggregateField.average('rating').alias: NullValue.nullValue(),
+    });
+    final Map<String, Object?> data = snapshot.data();
+    expect(data, <String, Object?>{
+      'count': 3,
+      'sum_pages': 150,
+      'average_rating': null,
+    });
+    expect(data[AggregateField.sum('pages').alias],
+        snapshot.get(AggregateField.sum('pages')));
+    expect(() => data['count'] = 4, throwsUnsupportedError);
+  });
+
+  test('data converts double results', () {
+    final AggregateQuery query = collectionReference('coll')
+        .aggregate(<AggregateField>[AggregateField.average('rating')]);
+    final AggregateQuerySnapshot snapshot =
+        AggregateQuerySnapshot(query, <String, FieldValue>{
+      AggregateField.average('rating').alias: DoubleValue.valueOf(4.5),
+    });
+    expect(snapshot.data(), <String, Object?>{'average_rating': 4.5});
+  });
 }
