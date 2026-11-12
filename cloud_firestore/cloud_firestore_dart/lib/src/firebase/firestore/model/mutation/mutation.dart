@@ -115,10 +115,10 @@ abstract class Mutation {
         applyToLocalView(maybeDoc, baseDoc, localWriteTime);
     final Mutation mutation = this;
     if (mutation is PatchMutation) {
-      // PORTING NOTE: a patch that creates the document (there was no document before) mutates the whole document,
-      // as a set would. Upstream keeps the patch mask here, which loses the document when the mask is empty (a merge
-      // of no fields on a deleted document).
-      if (previousMask == null || maybeDoc is! Document) {
+      // As upstream, a patch keeps its mask also when it creates the document (a merge on a document that the cache
+      // knows as deleted). The overlay then stays a patch: it is recalculated when the backend creates the document,
+      // and only writes the merged fields. A set overlay would hide the other fields of the backend's document.
+      if (previousMask == null) {
         return (result, null);
       }
       final FieldMask mask = FieldMask(<FieldPath>{
@@ -127,7 +127,8 @@ abstract class Mutation {
         for (FieldTransform transform in fieldTransforms) transform.fieldPath,
       });
       // PORTING NOTE: an empty mask means "not mutated locally", but a patch of no fields (a merge of `{}`) still
-      // marks the document as having pending writes; keep that by treating it as a set of the current document.
+      // marks the document as having pending writes, and creates the document when there is none (upstream loses
+      // it); keep that by treating it as a set of the current document.
       return (result, mask.mask.isEmpty ? null : mask);
     } else if (mutation is SetMutation || mutation is DeleteMutation) {
       return (result, null);

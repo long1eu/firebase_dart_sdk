@@ -319,6 +319,43 @@ void main() {
       await requests.close();
     });
 
+    test(
+        'closing the requests sends what is queued, then ends the session '
+        'and the call', () async {
+      // The client closes a stream by closing its requests (a half-close for
+      // gRPC). WebChannel has no half-close: the session is terminated once
+      // the last request was delivered.
+      final StreamController<proto.WriteRequest> requests =
+          StreamController<proto.WriteRequest>();
+      bool done = false;
+      final List<Object> errors = <Object>[];
+      transport
+          .startCall(FirestoreRpc.write, requests.stream)
+          .listen((_) {}, onError: errors.add, onDone: () => done = true);
+
+      requests.add(proto.WriteRequest()..database = database);
+      (await http.next()).respond(200,
+          body: '52\n[[0,["c","YpagAp1anIKb52xNgWf4xg==","",8,12,30000]]]');
+      final FakeRequest back = await http.next();
+      back.stream(200);
+      await pump();
+
+      // The final (empty) write of a write stream, then the close.
+      requests.add(proto.WriteRequest()..streamToken = <int>[0x30]);
+      unawaited(requests.close());
+      final FakeRequest lastWrite = await http.next();
+      expect(jsonDecode(lastWrite.form['req0___data__']!),
+          <String, Object?>{'streamToken': 'MA=='});
+      expect(done, isFalse);
+      lastWrite.respond(200, body: '7\n[1,2,7]');
+
+      expect((await http.next()).query['TYPE'], 'terminate');
+      await pump();
+      expect(back.aborted, isTrue);
+      expect(done, isTrue);
+      expect(errors, isEmpty);
+    });
+
     test('Listen: a rejected target keeps its cause, without the details',
         () async {
       final StreamController<proto.ListenRequest> requests =

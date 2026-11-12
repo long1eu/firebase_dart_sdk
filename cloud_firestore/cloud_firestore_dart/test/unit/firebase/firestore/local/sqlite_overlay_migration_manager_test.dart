@@ -185,15 +185,16 @@ void main() {
         bar,
         patchMutation(
             'foo/bar', map(<dynamic>['it', 2]), <FieldPath>[field('it')]));
-    // The new document has no remote version: its overlay is a set.
+    // As upstream (SQLiteOverlayMigrationManagerTest): the merge on the new document stays a merge.
     expect(
         await overlay('foo/newBar'),
-        setMutation(
+        patchMutation(
             'foo/newBar',
             map(<dynamic>[
               'it',
               <int>[1]
-            ])));
+            ]),
+            <FieldPath>[field('it')]));
 
     expect(
         await localStore.readDocument(key('foo/bar')),

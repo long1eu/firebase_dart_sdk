@@ -174,6 +174,9 @@ class WebChannelTransport implements FirestoreTransport {
 
     requestSub = requests.listen(
       (Req request) => channel.send(jsonEncode(request.toProto3Json())),
+      // The client is done with the stream (it half-closes a gRPC call the same way): end the session, otherwise it
+      // stays open, with its long poll, until the call is cancelled.
+      onDone: channel.closeWhenFlushed,
     );
   }
 

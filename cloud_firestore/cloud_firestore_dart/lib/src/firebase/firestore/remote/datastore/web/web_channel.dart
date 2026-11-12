@@ -105,6 +105,7 @@ class WebChannelStream {
   bool _sending = false;
   bool _opened = false;
   bool _closed = false;
+  bool _closeWhenFlushed = false;
 
   late int _requestId;
   String? _sessionId;
@@ -136,6 +137,15 @@ class WebChannelStream {
 
   /// Ends the session.
   Future<void> close() => _shutdown();
+
+  /// Closes the stream once everything that was passed to [send] has been delivered. WebChannel has no half-close:
+  /// this is what the end of the client's requests means for it.
+  void closeWhenFlushed() {
+    _closeWhenFlushed = true;
+    if (!_sending && _outgoing.isEmpty) {
+      unawaited(_shutdown());
+    }
+  }
 
   Uri _url(Map<String, String> params) {
     final Map<String, String> all = <String, String>{
@@ -220,6 +230,10 @@ class WebChannelStream {
       return;
     } finally {
       _sending = false;
+    }
+    if (_closeWhenFlushed && _outgoing.isEmpty) {
+      unawaited(_shutdown());
+      return;
     }
     unawaited(_flush());
   }
