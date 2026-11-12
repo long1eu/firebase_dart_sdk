@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 13/03/2020
 
+import 'dart:typed_data';
+
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
@@ -13,9 +15,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:grpc/grpc.dart';
 import 'package:rxdart/subjects.dart';
@@ -69,7 +73,84 @@ void main() {
     expect(datastore.watchStreamRequestCount, greaterThan(watchRequests));
     expect(datastore.writeStreamRequestCount, greaterThan(writeRequests));
     expect(datastore.writesSent, 1);
-    expect(datastore.activeTargets.keys, <int>[2]);
+    // The backend sees the remote target id that the listen of target 2 was mapped to.
+    expect(remoteStore.getRemoteTargetId(2), isNotNull);
+    expect(datastore.activeTargets.keys, <int?>[
+      remoteStore.getRemoteTargetId(2),
+    ]);
+
+    await remoteStore.shutdown();
+    await onNetworkConnected.close();
+  });
+
+  test('an error for an earlier listen of a target does not reject the new listen',
+      () async {
+    final TaskScheduler scheduler = TaskScheduler('');
+    final MockDatastore datastore = MockDatastore(scheduler)
+      ..allowUnlistedTargetRemoval = true;
+    final BehaviorSubject<bool> onNetworkConnected =
+        BehaviorSubject<bool>.seeded(true);
+    final Persistence persistence =
+        MemoryPersistence.createEagerGcMemoryPersistence();
+    await persistence.start();
+    final LocalStore localStore = LocalStore(persistence, User.unauthenticated);
+    await localStore.start();
+    final _RecordingCallback callback = _RecordingCallback();
+    final RemoteStore remoteStore = RemoteStore(
+        callback, localStore, datastore, onNetworkConnected, scheduler);
+    await remoteStore.start();
+    Future<void> settle() =>
+        Future<void>.delayed(const Duration(milliseconds: 50));
+    QueryData target() =>
+        QueryData(query('foo').toTarget(), 2, 1, QueryPurpose.listen);
+
+    await remoteStore.listen(target());
+    await settle();
+    final int first = remoteStore.getRemoteTargetId(2)!;
+    await datastore.writeWatchChange(
+      WatchChangeWatchTargetChange(WatchTargetChangeType.added, <int>[first]),
+      SnapshotVersion.none,
+    );
+    await settle();
+
+    // Every listen gets a fresh remote target id of the same parity as the SDK target id.
+    await remoteStore.stopListening(2);
+    expect(remoteStore.getRemoteTargetId(2), isNull);
+    await remoteStore.listen(target());
+    await settle();
+    final int second = remoteStore.getRemoteTargetId(2)!;
+    expect(second, isNot(first));
+    expect(first.isEven, isTrue);
+    expect(second.isEven, isTrue);
+    expect(datastore.activeTargets.keys, <int>[second]);
+
+    // The backend fails the first listen after the client listened again: the current listen is not affected.
+    await datastore.writeWatchChange(
+      WatchChangeWatchTargetChange(
+        WatchTargetChangeType.removed,
+        <int>[first],
+        Uint8List(0),
+        GrpcError.resourceExhausted(),
+      ),
+      SnapshotVersion.none,
+    );
+    await settle();
+    expect(callback.rejectedListens, isEmpty);
+    expect(remoteStore.getRemoteTargetId(2), second);
+
+    // An error for the current listen rejects it, with the SDK target id.
+    await datastore.writeWatchChange(
+      WatchChangeWatchTargetChange(
+        WatchTargetChangeType.removed,
+        <int>[second],
+        Uint8List(0),
+        GrpcError.resourceExhausted(),
+      ),
+      SnapshotVersion.none,
+    );
+    await settle();
+    expect(callback.rejectedListens, <int>[2]);
+    expect(remoteStore.getRemoteTargetId(2), isNull);
 
     await remoteStore.shutdown();
     await onNetworkConnected.close();
@@ -130,4 +211,13 @@ class MockRemoteStoreCallback implements RemoteStoreCallback {
   @override
   ImmutableSortedSet<DocumentKey> Function(int targetId)
       get getRemoteKeysForTarget => (int targetId) => DocumentKey.emptyKeySet;
+}
+
+class _RecordingCallback extends MockRemoteStoreCallback {
+  final List<int> rejectedListens = <int>[];
+
+  @override
+  Future<void> handleRejectedListen(int targetId, GrpcError error) async {
+    rejectedListens.add(targetId);
+  }
 }

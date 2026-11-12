@@ -131,6 +131,13 @@ class SpecTestCase implements RemoteStoreCallback {
   /// The spec config `allowUnlistedTargetRemoval`: a watch removal with a cause may name a target that is not active.
   bool _allowUnlistedTargetRemoval = false;
 
+  /// The remote target ids that the [RemoteStore] assigned to the listens of each SDK target id, in order.
+  final Map<int, List<int>> _sdkToRemoteTargetIds = <int, List<int>>{};
+
+  /// The index (into the lists of [_sdkToRemoteTargetIds]) of the listen that watch steps address, as set by the
+  /// `watchUsesTargetIndex` step; null means the latest listen.
+  int? _currentRemoteTargetIndex;
+
   /// Set of expected active targets, keyed by target ID.
   late Map<int, QueryData> _expectedActiveTargets;
   Map<int, QueryPurpose> _expectedPurposes = <int, QueryPurpose>{};
@@ -385,6 +392,31 @@ class SpecTestCase implements RemoteStoreCallback {
     return values;
   }
 
+  /// Parses the SDK target ids of a watch step and maps each to the remote target id that watch should address (see
+  /// [_remoteTargetId]).
+  List<int> _parseWatchTargets(List<dynamic>? arr) {
+    return _parseIntList(arr)
+        .map((int id) => _remoteTargetId(id, isWatchStep: true))
+        .toList();
+  }
+
+  /// Resolves an SDK target id to the remote target id of one of its listens: the one chosen by the last
+  /// `watchUsesTargetIndex` step, otherwise the latest.
+  int _remoteTargetId(int sdkTargetId, {bool isWatchStep = false}) {
+    final List<int> list =
+        _sdkToRemoteTargetIds.putIfAbsent(sdkTargetId, () => <int>[]);
+    // Listens that did not go through a userListen step (limbo resolutions) are picked up here.
+    final int? current = _remoteStore.getRemoteTargetId(sdkTargetId);
+    if (current != null && !list.contains(current)) {
+      list.add(current);
+    }
+    if (list.isEmpty) {
+      return sdkTargetId;
+    }
+    final int? index = _currentRemoteTargetIndex;
+    return isWatchStep && index != null ? list[index] : list.last;
+  }
+
   List<int> _parseIntList(List<dynamic>? arr) {
     final List<int> result = <int>[];
     if (arr == null) {
@@ -433,6 +465,14 @@ class SpecTestCase implements RemoteStoreCallback {
 
     final int actualId = await _eventManager.addQueryListener(listener);
     expect(actualId, expectedId);
+
+    // The remote store maps the listen to a new remote target id; remember it for `watchUsesTargetIndex`.
+    final int? remoteTargetId = _remoteStore.getRemoteTargetId(expectedId);
+    if (remoteTargetId != null) {
+      _sdkToRemoteTargetIds
+          .putIfAbsent(expectedId, () => <int>[])
+          .add(remoteTargetId);
+    }
 
     await Future<void>.delayed(_delayDuration);
   }
@@ -486,13 +526,13 @@ class SpecTestCase implements RemoteStoreCallback {
   Future<void> _doWatchAck(List<dynamic> ackedTargets) async {
     final WatchChangeWatchTargetChange change = WatchChangeWatchTargetChange(
       WatchTargetChangeType.added,
-      _parseIntList(ackedTargets),
+      _parseWatchTargets(ackedTargets),
     );
     await _writeWatchChange(change, SnapshotVersion.none);
   }
 
   Future<void> _doWatchCurrent(List<dynamic> currentSpec) async {
-    final List<int> currentTargets = _parseIntList(currentSpec[0]);
+    final List<int> currentTargets = _parseWatchTargets(currentSpec[0]);
     final Uint8List resumeToken = Uint8List.fromList(
       utf8.encode(currentSpec[1]),
     );
@@ -514,7 +554,7 @@ class SpecTestCase implements RemoteStoreCallback {
       }
     }
 
-    final List<int> targetIds = _parseIntList(
+    final List<int> targetIds = _parseWatchTargets(
       watchRemoveSpec['targetIds'].cast<int>(),
     );
     final WatchChangeWatchTargetChange change = WatchChangeWatchTargetChange(
@@ -560,10 +600,10 @@ class SpecTestCase implements RemoteStoreCallback {
       final MaybeDocument document =
           value != null ? doc(key, version, value) : deletedDoc(key, version);
 
-      final List<int> updated = _parseIntList(
+      final List<int> updated = _parseWatchTargets(
         watchEntity['targets'] ?? <int>[].cast<int>(),
       );
-      final List<int> removed = _parseIntList(
+      final List<int> removed = _parseWatchTargets(
         (watchEntity['removedTargets'] ?? <int>[]).cast<int>(),
       );
       final WatchChange change = WatchChangeDocumentChange(
@@ -576,7 +616,7 @@ class SpecTestCase implements RemoteStoreCallback {
       await _writeWatchChange(change, SnapshotVersion.none);
     } else if (watchEntity.containsKey('key')) {
       final String _key = watchEntity['key'];
-      final List<int> removed = _parseIntList(
+      final List<int> removed = _parseWatchTargets(
         watchEntity['removedTargets'].cast<int>(),
       );
       final WatchChange change = WatchChangeDocumentChange(
@@ -592,7 +632,7 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   Future<void> _doWatchFilter(Map<String, dynamic> watchFilter) async {
-    final List<int> targets = _parseIntList(watchFilter['targetIds']);
+    final List<int> targets = _parseWatchTargets(watchFilter['targetIds']);
     asserts.hardAssert(
       targets.length == 1,
       'ExistenceFilters currently support exactly one target only.',
@@ -648,7 +688,7 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   Future<void> _doWatchReset(List<dynamic> targetIds) async {
-    final List<int> targets = _parseIntList(targetIds);
+    final List<int> targets = _parseWatchTargets(targetIds);
     final WatchChange change = WatchChangeWatchTargetChange(
       WatchTargetChangeType.reset,
       targets,
@@ -658,7 +698,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
   Future<void> _doWatchSnapshot(Map<String, dynamic> watchSnapshot) async {
     // The client will only respond to watchSnapshots if they are on a target change with an empty set of target IDs.
-    final List<int> targets = _parseIntList(
+    final List<int> targets = _parseWatchTargets(
       watchSnapshot['targetIds']?.cast<int>(),
     );
     final String resumeToken = watchSnapshot['resumeToken'] ?? '';
@@ -797,6 +837,8 @@ class SpecTestCase implements RemoteStoreCallback {
       // ignore: cascade_invocations
       databaseMock.renamePath = false;
     }
+    _sdkToRemoteTargetIds.clear();
+    _currentRemoteTargetIndex = null;
 
     await Future.wait(<Future<void>>[
       _remoteStore.shutdown(),
@@ -938,9 +980,10 @@ class SpecTestCase implements RemoteStoreCallback {
     } else if (step.containsKey('restart')) {
       await _doRestart();
     } else if (step.containsKey('watchUsesTargetIndex')) {
-      // The JS SDK gives every listen of a target a fresh remote target id, and this step picks which of them the
-      // following watch steps address. The port (like Android) sends the SDK target id to watch and tracks
-      // re-listens with pending-response counts, so every index names the same id and the step is a no-op.
+      // Every listen of a target gets a fresh remote target id; this step picks which of them the following watch
+      // steps address.
+      final dynamic index = step['watchUsesTargetIndex'];
+      _currentRemoteTargetIndex = index == 'latest' ? null : index as int;
     } else {
       for (String unsupported in unsupportedSteps) {
         if (step.containsKey(unsupported)) {
@@ -1215,17 +1258,20 @@ class SpecTestCase implements RemoteStoreCallback {
 
     final Map<int, QueryData> actualTargets = _datastore.activeTargets;
     for (MapEntry<int, QueryData> expected in _expectedActiveTargets.entries) {
-      expect(actualTargets.containsKey(expected.key), isTrue);
+      // The spec names SDK target ids; the datastore sees the remote target ids the remote store mapped them to.
+      final int remoteTargetId = _remoteTargetId(expected.key);
+      expect(actualTargets.containsKey(remoteTargetId), isTrue,
+          reason: 'Expected active target not found: ${expected.key}');
 
       final QueryData expectedTarget = expected.value;
-      final QueryData? actualTarget = actualTargets[expected.key];
+      final QueryData? actualTarget = actualTargets[remoteTargetId];
 
       // TODO(long1eu): validate the purpose of the target once it's possible to encode that in the spec tests. For now,
       //  only validate properties that can be validated.
       // expect(actualTarget, expectedTarget);
 
       expect(actualTarget!.target, expectedTarget.target);
-      expect(actualTarget.targetId, expectedTarget.targetId);
+      expect(actualTarget.targetId, remoteTargetId);
       expect(actualTarget.snapshotVersion, expectedTarget.snapshotVersion);
       expect(
         utf8.decode(actualTarget.resumeToken),
@@ -1245,7 +1291,7 @@ class SpecTestCase implements RemoteStoreCallback {
           reason: 'expectedCount of target ${expected.key}',
         );
       }
-      actualTargets.remove(expected.key);
+      actualTargets.remove(remoteTargetId);
     }
 
     expect(actualTargets, isEmpty);

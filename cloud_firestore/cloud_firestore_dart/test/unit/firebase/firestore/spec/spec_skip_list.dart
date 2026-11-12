@@ -69,13 +69,7 @@ const Map<String, String> sqliteExcludedTags = <String, String>{
 /// Single specs that need a library design the port (like upstream Android) does not have, keyed by
 /// `'<describeName> <itName>'`. Unlike [skippedSpecFeatures] these are not detectable from the spec JSON: the spec
 /// uses only supported steps but expects behaviour that only the JS SDK implements.
-const Map<String, String> knownSpecDivergences = <String, String>{
-  'Remote store: Handles removal of old target (with cause) after re-listen':
-      'JS-only remote target ids: the JS RemoteStore gives every listen a fresh remote target id '
-          '(targetIdMapSdkToRemote), so a removal with a cause for the previous listen of the query is ignored. '
-          'The port, like Android main, sends the SDK target id to watch, so the removal rejects the re-listened '
-          'query with RESOURCE_EXHAUSTED. Needs the JS remote-target-id redesign of RemoteStore/WatchChangeAggregator.',
-};
+const Map<String, String> knownSpecDivergences = <String, String>{};
 
 /// Returns the names (keys of [skippedSpecFeatures]) of all features that [testJson] needs.
 Set<String> detectSpecFeatures(Map<String, dynamic> testJson) {

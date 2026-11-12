@@ -81,7 +81,41 @@ class RemoteStore implements TargetMetadataProvider {
   /// server. On re-establishing the listen stream, these targets should be sent
   /// to the server. The targets removed with unlistens are removed eagerly
   /// without waiting for confirmation from the listen stream.
+  ///
+  /// The keys, and the target ids of the values, are remote target ids (see [_sdkToRemoteTargetId]).
   final Map<int, QueryData> _listenTargets;
+
+  /// The remote target id that the current listen of an SDK target id (the id the [LocalStore] and the [SyncEngine]
+  /// use) was sent to the backend with.
+  ///
+  /// Every listen gets a fresh remote target id, so that messages the backend sends for an earlier listen of the same
+  /// target (a late removal, an error, documents) can't be mistaken for messages of the current listen.
+  final Map<int, int> _sdkToRemoteTargetId = <int, int>{};
+  final Map<int, int> _remoteToSdkTargetId = <int, int>{};
+
+  /// The last remote target id handed out for an even (query cache) and for an odd (sync engine) SDK target id.
+  int _lastQueryCacheRemoteTargetId = 1000;
+  int _lastSyncEngineRemoteTargetId = 1001;
+
+  /// Returns the remote target id that the SDK target id [sdkTargetId] is currently listened to with, or null.
+  @visibleForTesting
+  int? getRemoteTargetId(int sdkTargetId) => _sdkToRemoteTargetId[sdkTargetId];
+
+  /// Maps [sdkTargetId] to a new remote target id and forgets the one it was mapped to before.
+  int _allocateRemoteTargetId(int sdkTargetId) {
+    final int? current = _sdkToRemoteTargetId[sdkTargetId];
+    if (current != null) {
+      _remoteToSdkTargetId.remove(current);
+    }
+
+    // Remote ids keep the parity of the SDK id: odd for the sync engine (limbo resolution), even for the query cache.
+    final int remoteTargetId = sdkTargetId.isOdd
+        ? _lastSyncEngineRemoteTargetId += 2
+        : _lastQueryCacheRemoteTargetId += 2;
+    _sdkToRemoteTargetId[sdkTargetId] = remoteTargetId;
+    _remoteToSdkTargetId[remoteTargetId] = sdkTargetId;
+    return remoteTargetId;
+  }
   final OnlineStateTracker _onlineStateTracker;
   final BehaviorSubject<bool> _onNetworkConnected;
   final WatchStream _watchStream;
@@ -296,17 +330,27 @@ class RemoteStore implements TargetMetadataProvider {
   ///
   /// It is a no-op if the target of the given query data is already being listened to.
   Future<void> listen(QueryData queryData) async {
-    final int targetId = queryData.targetId;
-    if (_listenTargets.containsKey(targetId)) {
+    final int? currentRemoteTargetId = _sdkToRemoteTargetId[queryData.targetId];
+    if (currentRemoteTargetId != null &&
+        _listenTargets.containsKey(currentRemoteTargetId)) {
       return;
     }
 
-    _listenTargets[targetId] = queryData;
+    final int remoteTargetId = _allocateRemoteTargetId(queryData.targetId);
+    final QueryData remoteQueryData = QueryData(
+      queryData.target,
+      remoteTargetId,
+      queryData.sequenceNumber,
+      queryData.purpose,
+      queryData.snapshotVersion,
+      queryData.resumeToken,
+    );
+    _listenTargets[remoteTargetId] = remoteQueryData;
 
     if (_shouldStartWatchStream) {
       await _startWatchStream();
     } else if (_watchStream.isOpen) {
-      _sendWatchRequest(queryData);
+      _sendWatchRequest(remoteQueryData);
     }
   }
 
@@ -317,8 +361,13 @@ class RemoteStore implements TargetMetadataProvider {
     // answer a mismatch with a bloom filter instead of making the client re-run the query.
     if (queryData.resumeToken.isNotEmpty ||
         queryData.snapshotVersion.compareTo(SnapshotVersion.none) > 0) {
+      final int? sdkTargetId = _remoteToSdkTargetId[queryData.targetId];
+      if (sdkTargetId == null) {
+        // The target was listened to again under a new remote target id, so this request is obsolete.
+        return;
+      }
       final int expectedCount =
-          getRemoteKeysForTarget(queryData.targetId).length;
+          _remoteStoreCallback.getRemoteKeysForTarget(sdkTargetId).length;
       queryData = queryData.withExpectedCount(expectedCount);
     }
 
@@ -330,13 +379,16 @@ class RemoteStore implements TargetMetadataProvider {
   /// If this is called with the last active targetId, the watch stream enters idle mode and will be  torn down after
   /// one minute of inactivity.
   Future<void> stopListening(int targetId) async {
-    final QueryData? queryData = _listenTargets.remove(targetId);
+    final int? remoteTargetId = _sdkToRemoteTargetId.remove(targetId);
+    final QueryData? queryData =
+        remoteTargetId == null ? null : _listenTargets.remove(remoteTargetId);
     hardAssertLazy(queryData != null,
         () => 'stopListening called on target no currently watched: $targetId');
+    _remoteToSdkTargetId.remove(remoteTargetId);
 
     // The watch stream might not be started if we're in a disconnected state
     if (_watchStream.isOpen) {
-      _sendUnwatchRequest(targetId);
+      _sendUnwatchRequest(remoteTargetId!);
     }
 
     if (_listenTargets.isEmpty) {
@@ -525,7 +577,37 @@ class RemoteStore implements TargetMetadataProvider {
     }
 
     // Finally raise remote event
-    await _remoteStoreCallback.handleRemoteEvent(remoteEvent);
+    await _remoteStoreCallback.handleRemoteEvent(_toSdkRemoteEvent(remoteEvent));
+  }
+
+  /// Converts a [RemoteEvent] keyed by remote target ids to one keyed by SDK target ids, dropping the changes of
+  /// targets that are no longer tracked.
+  RemoteEvent _toSdkRemoteEvent(RemoteEvent remoteEvent) {
+    final Map<int, TargetChange> targetChanges = <int, TargetChange>{};
+    for (MapEntry<int, TargetChange> entry
+        in remoteEvent.targetChanges.entries) {
+      final int? sdkTargetId = _remoteToSdkTargetId[entry.key];
+      if (sdkTargetId != null) {
+        targetChanges[sdkTargetId] = entry.value;
+      }
+    }
+
+    final Map<int, QueryPurpose> targetMismatches = <int, QueryPurpose>{};
+    for (MapEntry<int, QueryPurpose> entry
+        in remoteEvent.targetMismatches.entries) {
+      final int? sdkTargetId = _remoteToSdkTargetId[entry.key];
+      if (sdkTargetId != null) {
+        targetMismatches[sdkTargetId] = entry.value;
+      }
+    }
+
+    return RemoteEvent(
+      snapshotVersion: remoteEvent.snapshotVersion,
+      targetChanges: targetChanges,
+      targetMismatches: targetMismatches,
+      documentUpdates: remoteEvent.documentUpdates,
+      resolvedLimboDocuments: remoteEvent.resolvedLimboDocuments,
+    );
   }
 
   Future<void> _processTargetError(
@@ -533,11 +615,18 @@ class RemoteStore implements TargetMetadataProvider {
     final GrpcError? cause = targetChange.cause;
     hardAssert(cause != null, 'Processing target error without a cause');
     for (int targetId in targetChange.targetIds) {
-      // Ignore targets that have been removed already.
+      // Ignore targets that have been removed already (an error for an earlier listen of a target names a remote
+      // target id that is no longer tracked).
       if (_listenTargets.containsKey(targetId)) {
         _listenTargets.remove(targetId);
+        final int? sdkTargetId = _remoteToSdkTargetId.remove(targetId);
         _watchChangeAggregator!.removeTarget(targetId);
-        await _remoteStoreCallback.handleRejectedListen(targetId, cause!);
+        if (sdkTargetId != null) {
+          _sdkToRemoteTargetId.remove(sdkTargetId);
+          await _remoteStoreCallback.handleRejectedListen(sdkTargetId, cause!);
+        }
+      } else {
+        _watchChangeAggregator!.removeTarget(targetId);
       }
     }
   }
@@ -754,8 +843,12 @@ class RemoteStore implements TargetMetadataProvider {
   @override
   ImmutableSortedSet<DocumentKey> Function(int targetId)
       get getRemoteKeysForTarget {
+    // The [WatchChangeAggregator] asks with remote target ids; the callback knows SDK target ids.
     return (int targetId) {
-      return _remoteStoreCallback.getRemoteKeysForTarget(targetId);
+      final int? sdkTargetId = _remoteToSdkTargetId[targetId];
+      return sdkTargetId == null
+          ? DocumentKey.emptyKeySet
+          : _remoteStoreCallback.getRemoteKeysForTarget(sdkTargetId);
     };
   }
 }

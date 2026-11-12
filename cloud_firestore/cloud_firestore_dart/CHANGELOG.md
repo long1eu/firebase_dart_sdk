@@ -105,6 +105,8 @@ only. **Nothing was run against production Firestore.**
 - App Check token plumbing (`x-firebase-appcheck` header); the enforcement side was not tested.
 - Bloom-filter existence-filter handling, gRPC keepalive and connect timeout, backoff reset on
   connectivity change, instance cache per app and database, serial queue for remote store work.
+- Every listen is sent to the backend with a fresh remote target id (as the JS SDK), so a late
+  removal or error for an earlier listen of a query no longer rejects a newer listen of it.
 - `ServerTimestampBehavior` is exported; `@internal` on constructors that leaked internals.
 - Fixes from the upstream sync (UTF-8 string ordering, limbo handling, limbo-resolution
   document removal, transaction precondition, listener lifecycle and others); see
