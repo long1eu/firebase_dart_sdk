@@ -18,13 +18,13 @@ rewritten; the table here is the current state.
 | Wave 4: bundles and named queries, OR queries / multiple inequality filters / Query-Target split, bloom filters, vector values | done |
 | Wave 4: index-free queries (read time on remote documents, upstream 21.3.0) | done (SQLite schema 10; `2f53c69`) |
 | Wave 4: document overlays (upstream 24.0.0) | done (SQLite schema 11, with a migration that builds the overlays from existing mutation queues; `2f53c69`) |
-| Wave 4: client-side index engine, auto-indexing | in progress. Stage 0 (index value encoding, `FieldIndex` model, index configuration parsing; `ab398b4`) and stage 1 (`Bound.inclusive`, target index bounds, `TargetIndexMatcher`; `6a7c99c`) are merged and unused by the library. Stage 2 (schema, index manager), stage 3 (backfiller, query engine) and stage 4 (public API, auto-indexing) are in progress and not merged |
+| Wave 4: client-side index engine, auto-indexing | in progress. Stage 0 (index value encoding, `FieldIndex` model, index configuration parsing; `ab398b4`) and stage 1 (`Bound.inclusive`, target index bounds, `TargetIndexMatcher`; `6a7c99c`) and stage 2 (SQLite schema 12 and 13, index manager; `b8fc0ab`) are merged; nothing reads the indexes yet. Stage 3 (backfiller, query engine) and stage 4 (public API, auto-indexing) are in progress and not merged |
 | BSON value types | done (`9709a29`, `c9ade8d`); Enterprise edition emulator only |
 | Read-only transactions | done (`TransactionOptions.readOnly`, client-side `VerifyMutation`; emulator-verified) |
 | Verify documents read in a transaction (upstream ef38ef7) | done (`58674f9`) |
 | Persistence clearing | done (`Firestore.clearPersistence()` on a terminated instance; `ee0ee5b`) |
 | Pipelines | preview, in a separate library (`99f3706`, `02444ca`, `5d732eb`): server-executed only, Enterprise edition emulator only. Search, window functions, local evaluation and real-time pipelines are not done |
-| Web | not part of the Android plan. The library compiles with dart2js and dart2wasm, the RPCs are behind a transport interface (`76f975a`, `41e9b46`), and an experimental web transport (REST and WebChannel over `fetch`, `6d95cf5`) passes a smoke test in Chrome against the emulator. Memory cache only; no other browser and no production backend was tried |
+| Web | not part of the Android plan. The library compiles with dart2js and dart2wasm, the RPCs are behind a transport interface (`76f975a`, `41e9b46`), and an experimental web transport (REST and WebChannel over `fetch`, `6d95cf5`) passes 16 browser tests in Chrome and the standard integration suite on the VM, against the emulator (`6d95cf5`, `5226466`). Memory cache only; no other browser and no production backend was tried |
 | Kotlin/ktx, Android-only | skipped by design |
 
 Not from upstream, found while testing: the client no longer resets a call that the backend may be finishing

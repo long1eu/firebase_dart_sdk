@@ -64,8 +64,10 @@ follow the JS SDK.
   `_firebase_database_collection_vm`, now folded in). See
   [docs/migrating_from_vm_packages.md](docs/migrating_from_vm_packages.md).
 - Web support is experimental. In a browser the client uses REST and WebChannel over `fetch`
-  instead of gRPC, with a memory cache only. A small smoke test passes in Chrome against the
-  emulator (dart2wasm and dart2js); no other browser and no production backend was tried.
+  instead of gRPC, with a memory cache only. 16 browser tests pass in Chrome against the
+  emulator (dart2wasm; with dart2js 15 pass and 1 is skipped), and the whole standard integration
+  suite passes on the VM over the web transport. No other browser and no production backend was
+  tried.
 - Not implemented: the client-side index engine (`setIndexConfiguration`, auto-indexing; only
   its internal building blocks exist), sharing one cache between running clients, and Pipelines
   beyond the preview (no search, no local evaluation, no listeners). The package README lists the
@@ -140,6 +142,12 @@ If the installed `protoc` is unusable, set up the Python wrapper (instructions a
 upstream Android SDK commits since the sync point, triaged per commit (`analysis_0.md` to
 `analysis_4.md`), and the order in which they are being ported. Rows the analysis did not read in
 depth are marked unverified there. The top of that file has the current status. Behaviour is ported in Dart, not copied verbatim.
+
+## Architecture
+
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) maps the layers of the client to the upstream code,
+describes the test suites and lists the deliberate deviations from upstream with the tests that
+pin them.
 
 ## Contributing
 

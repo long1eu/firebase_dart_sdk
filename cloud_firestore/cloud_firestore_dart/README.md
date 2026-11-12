@@ -34,7 +34,7 @@ yet**, so the `dart pub add` command above only works once it is.
   connectivity changes) is untested.
 - Features of the Enterprise edition (BSON value types, Pipelines) were verified against the
   emulator in Enterprise edition only, never against a production Enterprise database.
-- Web support is experimental: a smoke test passes in Chrome against the emulator, with a
+- Web support is experimental: tested in Chrome only, against the emulator only, with a
   memory cache only. See [Platforms](#platforms).
 
 ## Platforms
@@ -49,9 +49,11 @@ Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChann
 listen and write streams, over `fetch`. What to know:
 
 - The cache is in memory only on the web (no SQLite persistence there yet).
-- It was verified against the emulator only, in Chrome, with a small smoke test
-  (`dart test -p chrome -c dart2wasm test/browser`). Other browsers and the production
-  backend are untested.
+- It was verified against the emulator only: 16 tests in Chrome
+  (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 15 pass and 1 is skipped),
+  and the whole standard integration suite on the VM over the web transport
+  (`tool/test_integration.sh standard --transport=webchannel`). Other browsers and the
+  production backend are untested.
 - Prefer dart2wasm. Compiled to JavaScript, integers above 2^53 lose precision.
 
 ## Features
@@ -431,7 +433,8 @@ Run everything from this directory. The scripts are in `tool/` at the repository
 | Unit | `dart test test/unit` | none |
 | Integration | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration` | standard emulator (`tool/start_emulator.sh`) |
 | Enterprise | `FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise` | Enterprise edition emulator (`tool/start_enterprise_emulator.sh`) |
-| Browser smoke test | `dart test -p chrome -c dart2wasm test/browser` | standard emulator on 127.0.0.1:8080, Chrome |
+| Browser | `dart test -p chrome -c dart2wasm test/browser` | standard emulator on 127.0.0.1:8080, Chrome |
+| Integration over the web transport | `tool/test_integration.sh standard --transport=webchannel` (repository root) | standard emulator; runs on the VM |
 | Standard suite on Enterprise | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8181 FIRESTORE_EMULATOR_EDITION=enterprise dart test test/integration` | Enterprise edition emulator |
 
 The environment variables are read by `test/util/test_backend.dart`:
@@ -517,8 +520,8 @@ Not done:
 - **Web beyond the experiment**: persistence on the web (the cache is in memory only there) and
   any browser other than Chrome.
 - **The client-side index engine**: `setIndexConfiguration` and persistent-cache
-  auto-indexing. The index value encoding, the `FieldIndex` model and the matching of a query
-  to an index exist internally, but nothing uses them yet and there is no public API. Queries
+  auto-indexing. The index value encoding, the `FieldIndex` model, the matching of a query to
+  an index and the index manager exist internally, but no query reads the indexes yet. Queries
   against the cache use index-free execution (the results of an earlier listen plus the
   documents changed since) or scan the collection.
 - **Pipelines** beyond the [preview](#pipelines-preview) described above: full-text search,

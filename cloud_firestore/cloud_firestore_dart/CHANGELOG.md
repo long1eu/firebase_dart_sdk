@@ -10,8 +10,9 @@ How this was verified:
   the local Firestore emulator. **Nothing was run against production Firestore.**
 - Features of the Enterprise edition (BSON value types, Pipelines) were run against the
   emulator in Enterprise edition only.
-- Web support is experimental: it was run in Chrome against the emulator with a small smoke
-  test, with a memory cache only.
+- Web support is experimental: it was run in Chrome only, against the emulator only, with a
+  memory cache only (16 browser tests, and the standard integration suite on the VM over the web
+  transport).
 
 ### Renamed packages
 
@@ -87,8 +88,9 @@ Behaviour changes without a compile error:
   (`update_transforms`). Stored legacy transform writes are squashed on load by the local
   serializer.
 - Locally mutated documents carry `SnapshotVersion.none`, as upstream.
-- The SQLite schema goes from version 8 to 11 (bundle tables, read times on remote documents,
-  document overlays; see index-free queries and document overlays under Added). The migration
+- The SQLite schema goes from version 8 to 13 (bundle tables, read times on remote documents,
+  document overlays, and the tables of the client-side index engine, which nothing reads yet;
+  see index-free queries and document overlays under Added). The migration
   runs through the opener's `onUpgrade` callback on the first open; pending writes are
   converted to overlays the first time the client starts. A cache written by
   `cloud_firestore_vm` 0.0.7 (schema 8) is migrated with its documents, targets (reused: the
@@ -187,7 +189,8 @@ Listeners, cache and lifecycle:
   holds the snapshot as a bundle string; resuming a query listen sends the snapshot's read time
   to the backend. Also `DocumentReference.toJson()` / `DocumentReference.fromJson()`. The JSON
   and bundle formats are checked against the JS SDK (13.3.0) and firebase-admin by
-  `test/integration/.../js_interop_test.dart` (needs `tool/interop`).
+  `test/integration/.../js_interop_test.dart` (needs `tool/interop`). A serialized snapshot
+  keeps empty blobs and `-0.0`.
 
 Emulator and logging:
 
@@ -216,7 +219,12 @@ Pipelines (preview):
   `toArrayExpression`, `toScalarExpression`), lambda functions (`arrayFilter`,
   `arrayTransform`), `switchOn`, `nor`, and `PipelineSnapshot.explainStats`.
   `createFrom(query)`, `createFromAggregateQuery` and `createFromVectorQuery` convert the
-  classic queries; `example/pipelines.dart` shows the API.
+  classic queries; `example/pipelines.dart` shows the API. A converted query returns what the
+  classic query returns in two cases where the pipeline functions behave differently (the JS and
+  Android SDKs do not add these checks): `!=` and `not-in` do not match a null value, and
+  `array-contains` / `array-contains-any` skip a field that is not an array instead of failing
+  the pipeline. Known difference: a cursor on a field that holds values of several types only
+  returns the documents whose value has the type of the cursor value.
   Pipeline results return BSON values as their value classes.
 
 Networking:
@@ -232,10 +240,11 @@ Networking:
   JS SDK does; neither the backend nor the emulator accept gRPC-Web. The VM keeps using gRPC.
   Limits:
   - The cache is in memory only on the web; there is no SQLite persistence there yet.
-  - Verified against the emulator only: on the VM (the integration tests can run over the web
-    transport with `FIRESTORE_TEST_TRANSPORT=webchannel`) and in Chrome with a small smoke test
-    (`dart test -p chrome -c dart2wasm test/browser`, also passing with `-c dart2js`). No other
-    browser and no production backend was tried.
+  - Verified against the emulator only: on the VM, where the whole standard integration suite
+    runs over the web transport (`tool/test_integration.sh standard --transport=webchannel`, or
+    `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 16 browser tests
+    (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 15 pass and 1 is
+    skipped). No other browser and no production backend was tried.
   - Compile with dart2wasm to keep 64 bit integers exact. Compiled with dart2js, integers
     above 2^53 lose precision.
 
@@ -277,8 +286,9 @@ Documentation and tests:
 ### Not done
 
 - The client-side index engine (`setIndexConfiguration`, persistent-cache auto-indexing): the
-  index value encoding, the `FieldIndex` model and target-to-index matching exist internally but
-  nothing uses them yet, and there is no public API.
+  index value encoding, the `FieldIndex` model, target-to-index matching and the index manager
+  with its tables exist internally, but no query reads the indexes yet, and there is no public
+  API.
 - Persistence on the web (the cache is in memory only there), and any browser other than
   Chrome.
 - Pipelines beyond the preview: full-text search, window functions, pipelines in a

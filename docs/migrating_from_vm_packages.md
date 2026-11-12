@@ -202,7 +202,7 @@ A complete implementation on top of `package:sqlite3` that you can copy is
 
 The database name passed to the opener is built the same way as in 0.0.7
 (`firestore.<app name>.<project id>.<database>`), so an opener that maps names to files the same
-way finds the existing cache. 0.0.7 wrote schema version 8 and this version is at 11 (bundle
+way finds the existing cache. 0.0.7 wrote schema version 8 and this version is at 13 (bundle
 tables, read times on cached documents, document overlays); the first open with the new package
 runs the newer migrations through your opener's `onUpgrade` callback (it must call it when the
 stored `user_version` is lower than the requested one, see the contract on `OpenDatabase`), and
