@@ -152,4 +152,28 @@ void main() {
       () => testCase.testClearsResumeTokenOnExistenceFilterMismatch());
   test('testGetHighestUnacknowledgedBatchId',
       () => testCase.testGetHighestUnacknowledgedBatchId());
+
+  // The index cases of SQLiteLocalStoreTest of the Android SDK.
+  test('testAddsIndexes', () => testCase.testAddsIndexes());
+  test('testRemovesIndexes', () => testCase.testRemovesIndexes());
+  test('testDoesNotResetIndexWhenSameIndexIsAdded', () => testCase.testDoesNotResetIndexWhenSameIndexIsAdded());
+  test('testDeletedDocumentRemovesIndex', () => testCase.testDeletedDocumentRemovesIndex());
+  test('testUsesIndexes', () => testCase.testUsesIndexes());
+  test('testUsesPartiallyIndexedRemoteDocumentsWhenAvailable', () => testCase.testUsesPartiallyIndexedRemoteDocumentsWhenAvailable());
+  test('testUsesPartiallyIndexedOverlaysWhenAvailable', () => testCase.testUsesPartiallyIndexedOverlaysWhenAvailable());
+  test('testDoesNotUseLimitWhenIndexIsOutdated', () => testCase.testDoesNotUseLimitWhenIndexIsOutdated());
+  test('testUsesIndexForLimitQueryWhenIndexIsUpdated', () => testCase.testUsesIndexForLimitQueryWhenIndexIsUpdated());
+  test('testIndexesVectorValues', () => testCase.testIndexesVectorValues());
+  test('testIndexesBsonObjectId', () => testCase.testIndexesBsonObjectId());
+  test('testIndexesBsonTimestamp', () => testCase.testIndexesBsonTimestamp());
+  test('testIndexesBsonBinary', () => testCase.testIndexesBsonBinary());
+  test('testIndexesRegex', () => testCase.testIndexesRegex());
+  test('testIndexesInt32', () => testCase.testIndexesInt32());
+  test('testIndexesDecimal128Value', () => testCase.testIndexesDecimal128Value());
+  test('testIndexesDecimal128ValueWithPrecisionLoss', () => testCase.testIndexesDecimal128ValueWithPrecisionLoss());
+  test('testIndexesMinKey', () => testCase.testIndexesMinKey());
+  test('testIndexesMaxKey', () => testCase.testIndexesMaxKey());
+  test('testIndexesAllBsonTypesTogether', () => testCase.testIndexesAllBsonTypesTogether());
+  test('testIndexesAllTypesTogether', () => testCase.testIndexesAllTypesTogether());
+  test('testIndexesServerTimestamps', () => testCase.testIndexesServerTimestamps());
 }

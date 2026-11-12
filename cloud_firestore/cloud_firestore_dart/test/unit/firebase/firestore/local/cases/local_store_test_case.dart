@@ -4,12 +4,25 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore_dart/cloud_firestore_dart.dart'
+    show
+        Blob,
+        BsonObjectId,
+        BsonTimestamp,
+        Decimal128Value,
+        GeoPoint,
+        Int32Value,
+        MaxKey,
+        MinKey,
+        RegexValue,
+        VectorValue;
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/default_query_engine.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_backfiller.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_write_result.dart';
@@ -22,6 +35,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
@@ -41,9 +55,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/target_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change_aggregator.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
 
+import '../../../../../util/index_helpers.dart';
 import '../../../../../util/test_util.dart';
 import '../../util/test_target_metadata_provider.dart' as t;
 import '../accumulating_stats_collector.dart';
@@ -2029,5 +2045,1374 @@ class LocalStoreTestCase {
   void _resetPersistenceStats() {
     _statsCollector.reset();
     _queryEngine.resetCounts();
+  }
+
+  // Field indexes: the index cases of SQLiteLocalStoreTest of the Android SDK. They only run with SQLite persistence.
+
+  Future<void> _configureFieldIndexes(List<FieldIndex> fieldIndexes) {
+    return _localStore.configureFieldIndexes(fieldIndexes);
+  }
+
+  Future<void> _backfillIndexes() async {
+    await IndexBackfiller(_persistence, _localStore).backfill();
+  }
+
+  /// Asserts the type of every overlay that the query engine read since the last call to [_resetPersistenceStats].
+  void _expectOverlayTypes(Map<String, OverlayType> expected) {
+    expect(_queryEngine.overlayTypes, <DocumentKey, OverlayType>{
+      for (final MapEntry<String, OverlayType> entry in expected.entries)
+        key(entry.key): entry.value,
+    });
+  }
+
+  @testMethod
+  Future<void> testAddsIndexes() async {
+    final FieldIndex indexA = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['a', SegmentKind.ascending]);
+    final FieldIndex indexB = fieldIndex('coll',
+        indexId: 1,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['b', SegmentKind.descending]);
+    final FieldIndex indexC = fieldIndex('coll',
+        indexId: 2,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>[
+          'c1',
+          SegmentKind.ascending,
+          'c2',
+          SegmentKind.contains
+        ]);
+
+    await _configureFieldIndexes(<FieldIndex>[indexA, indexB]);
+    List<FieldIndex> fieldIndexes = _localStore.getFieldIndexes();
+    expect(fieldIndexes, unorderedEquals(<FieldIndex>[indexA, indexB]));
+
+    await _configureFieldIndexes(<FieldIndex>[indexA, indexC]);
+    fieldIndexes = _localStore.getFieldIndexes();
+    expect(fieldIndexes, unorderedEquals(<FieldIndex>[indexA, indexC]));
+  }
+
+  @testMethod
+  Future<void> testRemovesIndexes() async {
+    final FieldIndex indexA = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['a', SegmentKind.ascending]);
+    final FieldIndex indexB = fieldIndex('coll',
+        indexId: 1,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['b', SegmentKind.descending]);
+
+    await _configureFieldIndexes(<FieldIndex>[indexA, indexB]);
+    List<FieldIndex> fieldIndexes = _localStore.getFieldIndexes();
+    expect(fieldIndexes, unorderedEquals(<FieldIndex>[indexA, indexB]));
+
+    await _configureFieldIndexes(<FieldIndex>[indexA]);
+    fieldIndexes = _localStore.getFieldIndexes();
+    expect(fieldIndexes, unorderedEquals(<FieldIndex>[indexA]));
+  }
+
+  @testMethod
+  Future<void> testDoesNotResetIndexWhenSameIndexIsAdded() async {
+    final FieldIndex indexA = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['a', SegmentKind.ascending]);
+
+    await _configureFieldIndexes(<FieldIndex>[indexA]);
+    List<FieldIndex> fieldIndexes = _localStore.getFieldIndexes();
+    expect(fieldIndexes, unorderedEquals(<FieldIndex>[indexA]));
+
+    Query qry = query('coll').filter(filter('a', '==', 1));
+    final int targetId = await _allocateQuery(qry);
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['a', 1])), <int>[targetId], <int>[]));
+
+    await _backfillIndexes();
+    final FieldIndex updatedIndexA = fieldIndex('coll',
+        indexId: 0,
+        indexState: IndexState(1, IndexOffset(version(10), key('coll/a'), -1)),
+        fieldsAndKinds: <Object>['a', SegmentKind.ascending]);
+
+    fieldIndexes = _localStore.getFieldIndexes();
+    expect(fieldIndexes, unorderedEquals(<FieldIndex>[updatedIndexA]));
+
+    // Re-add the same index. We do not reset the index to its initial state.
+    await _configureFieldIndexes(<FieldIndex>[indexA]);
+    fieldIndexes = _localStore.getFieldIndexes();
+    expect(fieldIndexes, unorderedEquals(<FieldIndex>[updatedIndexA]));
+  }
+
+  @testMethod
+  Future<void> testDeletedDocumentRemovesIndex() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['matches', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    Query qry = query('coll').filter(filter('matches', '==', true));
+    final int targetId = await _allocateQuery(qry);
+
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['matches', true])),
+        <int>[targetId],
+        <int>[]));
+
+    // Add the document to the index
+    await _backfillIndexes();
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 1, byQuery: 0);
+    _expectQueryReturned(<String>['coll/a']);
+
+    await _applyRemoteEvent(
+        updateRemoteEvent(deletedDoc('coll/a', 0), <int>[targetId], <int>[]));
+
+    // No backfill needed for deleted document.
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 0);
+    _expectQueryReturned(<String>[]);
+  }
+
+  @testMethod
+  Future<void> testUsesIndexes() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['matches', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    Query qry = query('coll').filter(filter('matches', '==', true));
+    final int targetId = await _allocateQuery(qry);
+
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['matches', true])),
+        <int>[targetId],
+        <int>[]));
+
+    await _backfillIndexes();
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 1, byQuery: 0);
+    _expectQueryReturned(<String>['coll/a']);
+  }
+
+  @testMethod
+  Future<void> testUsesPartiallyIndexedRemoteDocumentsWhenAvailable() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['matches', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    Query qry = query('coll').filter(filter('matches', '==', true));
+    final int targetId = await _allocateQuery(qry);
+
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['matches', true])),
+        <int>[targetId],
+        <int>[]));
+    await _backfillIndexes();
+
+    await _applyRemoteEvent(addedRemoteEvent(
+        doc('coll/b', 20, map(<dynamic>['matches', true])),
+        <int>[targetId],
+        <int>[]));
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 1, byQuery: 1);
+    _expectQueryReturned(<String>['coll/a', 'coll/b']);
+  }
+
+  @testMethod
+  Future<void> testUsesPartiallyIndexedOverlaysWhenAvailable() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['matches', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(
+        setMutation('coll/a', map(<dynamic>['matches', true])));
+    await _backfillIndexes();
+
+    await _writeMutation(
+        setMutation('coll/b', map(<dynamic>['matches', true])));
+
+    Query qry = query('coll').filter(filter('matches', '==', true));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 1);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/a', 'coll/b']);
+  }
+
+  @testMethod
+  Future<void> testDoesNotUseLimitWhenIndexIsOutdated() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['count', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    Query qry = query('coll').orderBy(orderBy('count')).limitToFirst(2);
+    final int targetId = await _allocateQuery(qry);
+
+    await _applyRemoteEvent(addedRemoteEvents(<MaybeDocument>[
+      doc('coll/a', 10, map(<dynamic>['count', 1])),
+      doc('coll/b', 10, map(<dynamic>['count', 2])),
+      doc('coll/c', 10, map(<dynamic>['count', 3]))
+    ], <int>[
+      targetId
+    ], <int>[]));
+    await _backfillIndexes();
+
+    await _writeMutation(deleteMutation('coll/b'));
+
+    await _executeQuery(qry);
+
+    // The qry engine first reads the documents by key and then re-runs the qry without limit.
+    _expectRemoteDocumentsReadByEngine(byKey: 5, byQuery: 0);
+    // PORTING NOTE: byKey is 5 upstream, whose CountingQueryEngine counts the keys that are looked up (2 + 3). The one
+    // of the port counts the overlays that are found: the delete of coll/b, once per run.
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 1);
+    _expectOverlayTypes(<String, OverlayType>{'coll/b': OverlayType.delete});
+    _expectQueryReturned(<String>['coll/a', 'coll/c']);
+  }
+
+  @testMethod
+  Future<void> testUsesIndexForLimitQueryWhenIndexIsUpdated() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['count', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    Query qry = query('coll').orderBy(orderBy('count')).limitToFirst(2);
+    final int targetId = await _allocateQuery(qry);
+
+    await _applyRemoteEvent(addedRemoteEvents(<MaybeDocument>[
+      doc('coll/a', 10, map(<dynamic>['count', 1])),
+      doc('coll/b', 10, map(<dynamic>['count', 2])),
+      doc('coll/c', 10, map(<dynamic>['count', 3]))
+    ], <int>[
+      targetId
+    ], <int>[]));
+    await _writeMutation(deleteMutation('coll/b'));
+    await _backfillIndexes();
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 2, byQuery: 0);
+    // PORTING NOTE: byKey is 2 upstream (keys looked up); the port counts the overlays found, and coll/a and coll/c have
+    // none.
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturned(<String>['coll/a', 'coll/c']);
+  }
+
+  @testMethod
+  Future<void> testIndexesVectorValues() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['embedding', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(setMutation(
+        'coll/arr1',
+        map(<dynamic>[
+          'embedding',
+          <Object?>[0.1, 0.2, 0.3]
+        ])));
+    await _writeMutation(
+        setMutation('coll/map2', map(<dynamic>['embedding', map()])));
+    await _writeMutation(setMutation(
+        'coll/doc3',
+        map(<dynamic>[
+          'embedding',
+          VectorValue(<double>[4, 5, 6])
+        ])));
+    await _writeMutation(setMutation(
+        'coll/doc4',
+        map(<dynamic>[
+          'embedding',
+          VectorValue(<double>[5])
+        ])));
+
+    Query qry = query('coll').orderBy(orderBy('embedding', 'asc'));
+    await _executeQuery(qry);
+    _expectQueryReturned(
+        <String>['coll/arr1', 'coll/doc4', 'coll/doc3', 'coll/map2']);
+
+    qry = query('coll')
+        .filter(filter('embedding', '==', VectorValue(<double>[4, 5, 6])));
+    await _executeQuery(qry);
+    _expectQueryReturned(<String>['coll/doc3']);
+
+    qry = query('coll')
+        .filter(filter('embedding', '>', VectorValue(<double>[4, 5, 6])));
+    await _executeQuery(qry);
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll')
+        .filter(filter('embedding', '>=', VectorValue(<double>[4])));
+    await _executeQuery(qry);
+    _expectQueryReturned(<String>['coll/doc4', 'coll/doc3']);
+
+    await _backfillIndexes();
+
+    qry = query('coll').orderBy(orderBy('embedding', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 4, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/arr1': OverlayType.set,
+      'coll/map2': OverlayType.set,
+      'coll/doc3': OverlayType.set,
+      'coll/doc4': OverlayType.set
+    });
+    _expectQueryReturned(
+        <String>['coll/arr1', 'coll/doc4', 'coll/doc3', 'coll/map2']);
+
+    qry = query('coll')
+        .filter(filter('embedding', '==', VectorValue(<double>[4, 5, 6])));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc3': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc3']);
+
+    qry = query('coll')
+        .filter(filter('embedding', '>', VectorValue(<double>[4, 5, 6])));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll')
+        .filter(filter('embedding', '>=', VectorValue(<double>[4])));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc4': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc4', 'coll/doc3']);
+  }
+
+  @testMethod
+  Future<void> testIndexesBsonObjectId() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(setMutation('coll/doc1',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')])));
+    await _writeMutation(setMutation('coll/doc2',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860eb')])));
+    await _writeMutation(setMutation('coll/doc3',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ec')])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
+
+    qry = query('coll')
+        .filter(filter('key', '==', BsonObjectId('507f191e810c19729de860ea')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc1']);
+
+    qry = query('coll')
+        .filter(filter('key', '!=', BsonObjectId('507f191e810c19729de860ea')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    qry = query('coll')
+        .filter(filter('key', '>=', BsonObjectId('507f191e810c19729de860eb')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    qry = query('coll')
+        .filter(filter('key', '<=', BsonObjectId('507f191e810c19729de860eb')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
+
+    qry = query('coll')
+        .filter(filter('key', '>', BsonObjectId('507f191e810c19729de860ec')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll')
+        .filter(filter('key', '<', BsonObjectId('507f191e810c19729de860ea')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', 'in', <Object?>[
+      BsonObjectId('507f191e810c19729de860ea'),
+      BsonObjectId('507f191e810c19729de860eb')
+    ]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
+  }
+
+  @testMethod
+  Future<void> testIndexesBsonTimestamp() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(setMutation(
+        'coll/doc1', map(<dynamic>['key', BsonTimestamp(1000, 1000)])));
+    await _writeMutation(setMutation(
+        'coll/doc2', map(<dynamic>['key', BsonTimestamp(1001, 1000)])));
+    await _writeMutation(setMutation(
+        'coll/doc3', map(<dynamic>['key', BsonTimestamp(1000, 1001)])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc3', 'coll/doc2']);
+
+    qry = query('coll').filter(filter('key', '==', BsonTimestamp(1000, 1000)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc1']);
+
+    qry = query('coll').filter(filter('key', '!=', BsonTimestamp(1000, 1000)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc3', 'coll/doc2']);
+
+    qry = query('coll').filter(filter('key', '>=', BsonTimestamp(1000, 1001)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc3', 'coll/doc2']);
+
+    qry = query('coll').filter(filter('key', '<=', BsonTimestamp(1000, 1001)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '>', BsonTimestamp(1001, 1000)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', '<', BsonTimestamp(1000, 1000)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', 'in',
+        <Object?>[BsonTimestamp(1000, 1000), BsonTimestamp(1000, 1001)]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
+  }
+
+  @testMethod
+  Future<void> testIndexesBsonBinary() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(setMutation(
+        'coll/doc1',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))
+        ])));
+    await _writeMutation(setMutation(
+        'coll/doc2',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2]))
+        ])));
+    await _writeMutation(setMutation(
+        'coll/doc3',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 4]))
+        ])));
+    await _writeMutation(setMutation(
+        'coll/doc4',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(2, Uint8List.fromList(<int>[1, 2]))
+        ])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 4, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set,
+      'coll/doc4': OverlayType.set
+    });
+    _expectQueryReturned(
+        <String>['coll/doc2', 'coll/doc1', 'coll/doc3', 'coll/doc4']);
+
+    qry = query('coll').filter(filter(
+        'key', '==', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc1']);
+
+    qry = query('coll').filter(filter(
+        'key', '!=', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set,
+      'coll/doc4': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3', 'coll/doc4']);
+
+    qry = query('coll').filter(filter(
+        'key', '>=', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc3': OverlayType.set,
+      'coll/doc4': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc3', 'coll/doc4']);
+
+    qry = query('coll').filter(filter(
+        'key', '<=', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc1']);
+
+    qry = query('coll').filter(filter(
+        'key', '>', Blob.bsonBinary(2, Uint8List.fromList(<int>[1, 2]))));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter(
+        'key', '<', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2]))));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', 'in', <Object?>[
+      Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+      Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2]))
+    ]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
+  }
+
+  @testMethod
+  Future<void> testIndexesRegex() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(setMutation(
+        'coll/doc1', map(<dynamic>['key', RegexValue('^bar', 'i')])));
+    await _writeMutation(setMutation(
+        'coll/doc2', map(<dynamic>['key', RegexValue('^bar', 'm')])));
+    await _writeMutation(setMutation(
+        'coll/doc3', map(<dynamic>['key', RegexValue('^foo', 'i')])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '==', RegexValue('^bar', 'i')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc1']);
+
+    qry = query('coll').filter(filter('key', '!=', RegexValue('^bar', 'i')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '>', RegexValue('^foo', 'i')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', '<', RegexValue('^bar', 'i')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', 'in',
+        <Object?>[RegexValue('^bar', 'i'), RegexValue('^foo', 'i')]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
+  }
+
+  @testMethod
+  Future<void> testIndexesInt32() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+        setMutation('coll/doc1', map(<dynamic>['key', Int32Value(-1)])));
+    await _writeMutation(
+        setMutation('coll/doc2', map(<dynamic>['key', Int32Value(0)])));
+    await _writeMutation(
+        setMutation('coll/doc3', map(<dynamic>['key', Int32Value(1)])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '==', Int32Value(-1)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc1']);
+
+    qry = query('coll').filter(filter('key', '!=', Int32Value(-1)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '>=', Int32Value(0)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '<=', Int32Value(0)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
+
+    qry = query('coll').filter(filter('key', '>', Int32Value(1)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', '<', Int32Value(-1)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll')
+        .filter(filter('key', 'in', <Object?>[Int32Value(-1), Int32Value(0)]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
+  }
+
+  @testMethod
+  Future<void> testIndexesDecimal128Value() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(setMutation(
+        'coll/doc1', map(<dynamic>['key', Decimal128Value('-1.2e3')])));
+    await _writeMutation(
+        setMutation('coll/doc2', map(<dynamic>['key', Decimal128Value('0')])));
+    await _writeMutation(setMutation(
+        'coll/doc3', map(<dynamic>['key', Decimal128Value('1.2e3')])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '==', Decimal128Value('-1200')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc1']);
+
+    qry = query('coll').filter(filter('key', '!=', Decimal128Value('0.0')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '>=', Decimal128Value('-0')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    // This will fail if the negative 0s are not converted to positive 0 in `writeIndexValue`
+    // function
+    qry = query('coll').filter(filter('key', '<=', Decimal128Value('-0.0')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
+
+    qry = query('coll').filter(filter('key', '>', Decimal128Value('1.2e3')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', '<', Decimal128Value('-1.2e3')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', 'in',
+        <Object?>[Decimal128Value('-1.2e3'), Decimal128Value('0')]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2']);
+  }
+
+  @testMethod
+  Future<void> testIndexesDecimal128ValueWithPrecisionLoss() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(setMutation(
+        'coll/doc1',
+        map(<dynamic>[
+          'key',
+          Decimal128Value('-0.1234567890123456789')
+        ]))); // will be rounded to -0.12345678901234568
+    await _writeMutation(
+        setMutation('coll/doc2', map(<dynamic>['key', Decimal128Value('0')])));
+    await _writeMutation(setMutation(
+        'coll/doc3',
+        map(<dynamic>[
+          'key',
+          Decimal128Value('0.1234567890123456789')
+        ]))); // will be rounded to 0.12345678901234568
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc2', 'coll/doc3']);
+
+    qry = query('coll')
+        .filter(filter('key', '==', Decimal128Value('0.1234567890123456789')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc3': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc3']);
+
+    // Mismatch behaviour caused by rounding error. Firestore fetches the doc3 from SQLite DB as
+    // doc3 rounds to the same number, but, it is not presented on the final qry result.
+    qry = query('coll')
+        .filter(filter('key', '==', Decimal128Value('0.12345678901234568')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc3': OverlayType.set});
+    _expectQueryReturned(<String>[]);
+
+    // Operations that doesn't go up to 17 decimal digits of precision wouldn't be affected by
+    // this rounding errors.
+    qry = query('coll').filter(filter('key', '!=', Decimal128Value('0.0')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc1', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '>=', Decimal128Value('1.23e-1')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc3': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc3']);
+
+    qry =
+        query('coll').filter(filter('key', '<=', Decimal128Value('-1.23e-1')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/doc1': OverlayType.set});
+    _expectQueryReturned(<String>['coll/doc1']);
+
+    qry = query('coll').filter(filter('key', '>', Decimal128Value('1.2e3')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', '<', Decimal128Value('-1.2e3')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+  }
+
+  @testMethod
+  Future<void> testIndexesMinKey() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(setMutation('coll/doc1', map(<dynamic>['key', null])));
+    await _writeMutation(
+        setMutation('coll/doc2', map(<dynamic>['key', MinKey.instance])));
+    await _writeMutation(
+        setMutation('coll/doc3', map(<dynamic>['key', MinKey.instance])));
+    await _writeMutation(setMutation('coll/doc4', map(<dynamic>['key', 1])));
+    await _writeMutation(
+        setMutation('coll/doc5', map(<dynamic>['key', MaxKey.instance])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 5, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set,
+      'coll/doc4': OverlayType.set,
+      'coll/doc5': OverlayType.set
+    });
+    _expectQueryReturned(<String>[
+      'coll/doc1',
+      'coll/doc2',
+      'coll/doc3',
+      'coll/doc4',
+      'coll/doc5'
+    ]);
+
+    qry = query('coll').filter(filter('key', '==', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '!=', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc4': OverlayType.set,
+      'coll/doc5': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc4', 'coll/doc5']);
+
+    qry = query('coll').filter(filter('key', '>=', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '<=', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '>', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', '<', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(
+        filter('key', 'in', <Object?>[MinKey.instance, MaxKey.instance]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set,
+      'coll/doc5': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3', 'coll/doc5']);
+  }
+
+  @testMethod
+  Future<void> testIndexesMaxKey() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(setMutation('coll/doc1', map(<dynamic>['key', null])));
+    await _writeMutation(
+        setMutation('coll/doc2', map(<dynamic>['key', MinKey.instance])));
+    await _writeMutation(setMutation('coll/doc3', map(<dynamic>['key', 1])));
+    await _writeMutation(
+        setMutation('coll/doc4', map(<dynamic>['key', MaxKey.instance])));
+    await _writeMutation(
+        setMutation('coll/doc5', map(<dynamic>['key', MaxKey.instance])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 5, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set,
+      'coll/doc4': OverlayType.set,
+      'coll/doc5': OverlayType.set
+    });
+    _expectQueryReturned(<String>[
+      'coll/doc1',
+      'coll/doc2',
+      'coll/doc3',
+      'coll/doc4',
+      'coll/doc5'
+    ]);
+
+    qry = query('coll').filter(filter('key', '==', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc4': OverlayType.set,
+      'coll/doc5': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc4', 'coll/doc5']);
+
+    qry = query('coll').filter(filter('key', '!=', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc2', 'coll/doc3']);
+
+    qry = query('coll').filter(filter('key', '>=', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc4': OverlayType.set,
+      'coll/doc5': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc4', 'coll/doc5']);
+
+    qry = query('coll').filter(filter('key', '<=', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc4': OverlayType.set,
+      'coll/doc5': OverlayType.set
+    });
+    _expectQueryReturned(<String>['coll/doc4', 'coll/doc5']);
+
+    qry = query('coll').filter(filter('key', '>', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+
+    qry = query('coll').filter(filter('key', '<', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturned(<String>[]);
+  }
+
+  @testMethod
+  Future<void> testIndexesAllBsonTypesTogether() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.descending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(
+        setMutation('coll/doc1', map(<dynamic>['key', MinKey.instance])));
+    await _writeMutation(
+        setMutation('coll/doc2', map(<dynamic>['key', Int32Value(2)])));
+    await _writeMutation(
+        setMutation('coll/doc3', map(<dynamic>['key', Int32Value(-1)])));
+    await _writeMutation(setMutation(
+        'coll/doc4', map(<dynamic>['key', Decimal128Value('1.2e3')])));
+    await _writeMutation(setMutation(
+        'coll/doc5', map(<dynamic>['key', Decimal128Value('-0.0')])));
+    await _writeMutation(setMutation(
+        'coll/doc6', map(<dynamic>['key', BsonTimestamp(1000, 1001)])));
+    await _writeMutation(setMutation(
+        'coll/doc7', map(<dynamic>['key', BsonTimestamp(1000, 1000)])));
+    await _writeMutation(setMutation(
+        'coll/doc8',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 4]))
+        ])));
+    await _writeMutation(setMutation(
+        'coll/doc9',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))
+        ])));
+    await _writeMutation(setMutation('coll/doc10',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860eb')])));
+    await _writeMutation(setMutation('coll/doc11',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')])));
+    await _writeMutation(setMutation(
+        'coll/doc12', map(<dynamic>['key', RegexValue('^bar', 'm')])));
+    await _writeMutation(setMutation(
+        'coll/doc13', map(<dynamic>['key', RegexValue('^bar', 'i')])));
+    await _writeMutation(
+        setMutation('coll/doc14', map(<dynamic>['key', MaxKey.instance])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'desc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 14, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set,
+      'coll/doc4': OverlayType.set,
+      'coll/doc5': OverlayType.set,
+      'coll/doc6': OverlayType.set,
+      'coll/doc7': OverlayType.set,
+      'coll/doc8': OverlayType.set,
+      'coll/doc9': OverlayType.set,
+      'coll/doc10': OverlayType.set,
+      'coll/doc11': OverlayType.set,
+      'coll/doc12': OverlayType.set,
+      'coll/doc13': OverlayType.set,
+      'coll/doc14': OverlayType.set
+    });
+    _expectQueryReturned(<String>[
+      'coll/doc14', // maxKey
+      'coll/doc12', // regex m
+      'coll/doc13', // regex i
+      'coll/doc10', // objectId eb
+      'coll/doc11', // objectId ea
+      'coll/doc8', // binary [1,2,4]
+      'coll/doc9', // binary [1,2,3]
+      'coll/doc6', // timestamp 1, 2
+      'coll/doc7', // timestamp 1, 1
+      'coll/doc4', // decimal128 1200
+      'coll/doc2', // int32 2
+      'coll/doc5', // decimal128 -0.0
+      'coll/doc3', // int32 -1
+      'coll/doc1' // minKey
+    ]);
+  }
+
+  @testMethod
+  Future<void> testIndexesAllTypesTogether() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['key', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    await _writeMutation(setMutation('coll/doc1', map(<dynamic>['key', null])));
+    await _writeMutation(
+        setMutation('coll/doc2', map(<dynamic>['key', MinKey.instance])));
+    await _writeMutation(setMutation('coll/doc3', map(<dynamic>['key', true])));
+    await _writeMutation(
+        setMutation('coll/doc4', map(<dynamic>['key', double.nan])));
+    await _writeMutation(
+        setMutation('coll/doc5', map(<dynamic>['key', Int32Value(1)])));
+    await _writeMutation(setMutation('coll/doc6', map(<dynamic>['key', 2.0])));
+    await _writeMutation(setMutation('coll/doc7', map(<dynamic>['key', 3])));
+    await _writeMutation(setMutation(
+        'coll/doc8', map(<dynamic>['key', Decimal128Value('1.2e3')])));
+    await _writeMutation(setMutation(
+        'coll/doc9', map(<dynamic>['key', Timestamp(100, 123456000)])));
+    await _writeMutation(
+        setMutation('coll/doc10', map(<dynamic>['key', BsonTimestamp(1, 2)])));
+    await _writeMutation(
+        setMutation('coll/doc11', map(<dynamic>['key', 'string'])));
+    await _writeMutation(setMutation(
+        'coll/doc12',
+        map(<dynamic>[
+          'key',
+          blob(<int>[1, 2, 3])
+        ])));
+    await _writeMutation(setMutation(
+        'coll/doc13',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3]))
+        ])));
+    await _writeMutation(
+        setMutation('coll/doc14', map(<dynamic>['key', ref('foo/bar')])));
+    await _writeMutation(setMutation('coll/doc15',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')])));
+    await _writeMutation(
+        setMutation('coll/doc16', map(<dynamic>['key', GeoPoint(1, 2)])));
+    await _writeMutation(setMutation(
+        'coll/doc17', map(<dynamic>['key', RegexValue('^bar', 'm')])));
+    await _writeMutation(setMutation(
+        'coll/doc18',
+        map(<dynamic>[
+          'key',
+          <Object?>[2, 'foo']
+        ])));
+    await _writeMutation(setMutation(
+        'coll/doc19',
+        map(<dynamic>[
+          'key',
+          VectorValue(<double>[1, 2, 3])
+        ])));
+    await _writeMutation(setMutation(
+        'coll/doc20',
+        map(<dynamic>[
+          'key',
+          map(<dynamic>['bar', 1, 'foo', 2])
+        ])));
+    await _writeMutation(
+        setMutation('coll/doc21', map(<dynamic>['key', MaxKey.instance])));
+
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 21, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/doc1': OverlayType.set,
+      'coll/doc2': OverlayType.set,
+      'coll/doc3': OverlayType.set,
+      'coll/doc4': OverlayType.set,
+      'coll/doc5': OverlayType.set,
+      'coll/doc6': OverlayType.set,
+      'coll/doc7': OverlayType.set,
+      'coll/doc8': OverlayType.set,
+      'coll/doc9': OverlayType.set,
+      'coll/doc10': OverlayType.set,
+      'coll/doc11': OverlayType.set,
+      'coll/doc12': OverlayType.set,
+      'coll/doc13': OverlayType.set,
+      'coll/doc14': OverlayType.set,
+      'coll/doc15': OverlayType.set,
+      'coll/doc16': OverlayType.set,
+      'coll/doc17': OverlayType.set,
+      'coll/doc18': OverlayType.set,
+      'coll/doc19': OverlayType.set,
+      'coll/doc20': OverlayType.set,
+      'coll/doc21': OverlayType.set
+    });
+    _expectQueryReturned(<String>[
+      'coll/doc1',
+      'coll/doc2',
+      'coll/doc3',
+      'coll/doc4',
+      'coll/doc5',
+      'coll/doc6',
+      'coll/doc7',
+      'coll/doc8',
+      'coll/doc9',
+      'coll/doc10',
+      'coll/doc11',
+      'coll/doc12',
+      'coll/doc13',
+      'coll/doc14',
+      'coll/doc15',
+      'coll/doc16',
+      'coll/doc17',
+      'coll/doc18',
+      'coll/doc19',
+      'coll/doc20',
+      'coll/doc21'
+    ]);
+  }
+
+  @testMethod
+  Future<void> testIndexesServerTimestamps() async {
+    final FieldIndex index = fieldIndex('coll',
+        indexId: 0,
+        indexState: FieldIndex.initialState,
+        fieldsAndKinds: <Object>['time', SegmentKind.ascending]);
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    // PORTING NOTE: the `setMutation` helper of the port does not take sentinels, so the mutation is built the way the
+    // public API builds it.
+    await _writeMutation(UserDataConverter(DatabaseId.forProject('project'))
+        .parseSetData(<String, Object?>{'time': FieldValue.serverTimestamp()})
+        .toMutation(key('coll/a'), Precondition.none));
+    await _backfillIndexes();
+
+    Query qry = query('coll').orderBy(orderBy('time', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/a': OverlayType.set});
+    _expectQueryReturned(<String>['coll/a']);
   }
 }

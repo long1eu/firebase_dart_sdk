@@ -20,13 +20,18 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   final MemoryPersistence _persistence;
   final StatsCollector _statsCollector;
 
+  IndexManager? _indexManager;
+
+  @override
+  set indexManager(IndexManager indexManager) => _indexManager = indexManager;
+
   @override
   Future<void> add(MaybeDocument document, SnapshotVersion readTime) async {
     hardAssert(readTime != SnapshotVersion.none,
         'Cannot add document to the RemoteDocumentCache with a read time of zero');
     documents = documents.insert(document.key, document);
     _readTimes[document.key] = readTime;
-    await _persistence.indexManager
+    await (_indexManager ?? _persistence.indexManager)
         .addToCollectionParentIndex(document.key.path.popLast());
   }
 
@@ -65,8 +70,7 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(
-          Query query, SnapshotVersion sinceReadTime) async {
+      getAllDocumentsMatchingQuery(Query query, IndexOffset offset) async {
     hardAssert(!query.isCollectionGroupQuery,
         'CollectionGroup queries should be handled in LocalDocumentsView');
     ImmutableSortedMap<DocumentKey, Document> result =
@@ -93,8 +97,11 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
         continue;
       }
 
-      if (sinceReadTime != SnapshotVersion.none &&
-          _readTimes[entry.key]!.compareTo(sinceReadTime) <= 0) {
+      if (offset != IndexOffset.none &&
+          IndexOffset(_readTimes[entry.key]!, entry.key,
+                      FieldIndex.initialLargestBatchId)
+                  .compareTo(offset) <=
+              0) {
         continue;
       }
 

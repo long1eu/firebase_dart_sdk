@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
@@ -27,6 +28,11 @@ typedef ReadDocument = ({MaybeDocument document, SnapshotVersion readTime});
 
 abstract class RemoteDocumentCache {
   static const String statsTag = 'remote_documents';
+
+  /// Sets the index manager of the current user. It is used to keep the collection parent index up to date and to
+  /// drop the field index entries of the documents that are removed from the cache. Until it is set, the shared
+  /// `Persistence.indexManager` maintains the collection parent index and field index entries are left alone.
+  set indexManager(IndexManager indexManager);
 
   /// Adds or replaces an entry in the cache.
   ///
@@ -70,8 +76,9 @@ abstract class RemoteDocumentCache {
   ///
   /// Cached [NoDocument] entries have no bearing on query results.
   ///
-  /// If [sinceReadTime] is not [SnapshotVersion.none], only documents that have been read after this snapshot version
-  /// (exclusive) are returned.
+  /// [offset] is the read time and document key to start scanning at (exclusive): only documents that were read after
+  /// its read time, or at its read time with a key after its key, are returned. [IndexOffset.none] returns all
+  /// documents; `IndexOffset.createSuccessor(version, ...)` the documents read after `version`.
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query, SnapshotVersion sinceReadTime);
+      getAllDocumentsMatchingQuery(Query query, IndexOffset offset);
 }

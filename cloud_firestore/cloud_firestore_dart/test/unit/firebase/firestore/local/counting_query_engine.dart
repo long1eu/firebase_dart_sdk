@@ -18,6 +18,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_documents_view.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
@@ -29,9 +30,14 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+
+/// The kind of mutation of an overlay that was read.
+enum OverlayType { patch, set, delete }
 
 /// A test-only [QueryEngine] that forwards all API calls and exposes the number of documents and mutations read.
 class CountingQueryEngine implements QueryEngine {
@@ -47,9 +53,25 @@ class CountingQueryEngine implements QueryEngine {
   int overlaysReadByCollection = 0;
   int overlaysReadByKey = 0;
 
+  /// The type of every overlay that was read since the last [resetCounts].
+  final Map<DocumentKey, OverlayType> overlayTypes =
+      <DocumentKey, OverlayType>{};
+
+  void _recordOverlays(Iterable<Overlay> overlays) {
+    for (final Overlay overlay in overlays) {
+      final Mutation mutation = overlay.mutation;
+      overlayTypes[overlay.key] = mutation is PatchMutation
+          ? OverlayType.patch
+          : mutation is SetMutation
+              ? OverlayType.set
+              : OverlayType.delete;
+    }
+  }
+
   void resetCounts() {
     overlaysReadByCollection = 0;
     overlaysReadByKey = 0;
+    overlayTypes.clear();
     mutationsReadByQuery = 0;
     mutationsReadByKey = 0;
     documentsReadByQuery = 0;
@@ -91,6 +113,10 @@ class _CountingRemoteDocumentCache implements RemoteDocumentCache {
   final CountingQueryEngine _counter;
 
   @override
+  set indexManager(IndexManager indexManager) =>
+      _subject.indexManager = indexManager;
+
+  @override
   Future<void> add(MaybeDocument maybeDocument, SnapshotVersion readTime) =>
       _subject.add(maybeDocument, readTime);
 
@@ -124,10 +150,9 @@ class _CountingRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(
-          Query query, SnapshotVersion sinceReadTime) async {
+      getAllDocumentsMatchingQuery(Query query, IndexOffset offset) async {
     final ImmutableSortedMap<DocumentKey, Document> result =
-        await _subject.getAllDocumentsMatchingQuery(query, sinceReadTime);
+        await _subject.getAllDocumentsMatchingQuery(query, offset);
     _counter.documentsReadByQuery += result.length;
     return result;
   }
@@ -143,6 +168,9 @@ class _CountingDocumentOverlayCache implements DocumentOverlayCache {
   Future<Overlay?> getOverlay(DocumentKey key) async {
     final Overlay? result = await _subject.getOverlay(key);
     _counter.overlaysReadByKey += result != null ? 1 : 0;
+    if (result != null) {
+      _counter._recordOverlays(<Overlay>[result]);
+    }
     return result;
   }
 
@@ -151,6 +179,7 @@ class _CountingDocumentOverlayCache implements DocumentOverlayCache {
       Iterable<DocumentKey> keys) async {
     final Map<DocumentKey, Overlay> result = await _subject.getOverlays(keys);
     _counter.overlaysReadByKey += result.length;
+    _counter._recordOverlays(result.values);
     return result;
   }
 
@@ -173,6 +202,7 @@ class _CountingDocumentOverlayCache implements DocumentOverlayCache {
     final Map<DocumentKey, Overlay> result =
         await _subject.getOverlaysForCollection(collection, sinceBatchId);
     _counter.overlaysReadByCollection += result.length;
+    _counter._recordOverlays(result.values);
     return result;
   }
 
@@ -182,6 +212,7 @@ class _CountingDocumentOverlayCache implements DocumentOverlayCache {
     final Map<DocumentKey, Overlay> result = await _subject
         .getOverlaysForCollectionGroup(collectionGroup, sinceBatchId, count);
     _counter.overlaysReadByCollection += result.length;
+    _counter._recordOverlays(result.values);
     return result;
   }
 }

@@ -298,17 +298,17 @@ class LocalDocumentsView {
 
   /// Performs a query against the local view of all documents.
   ///
-  /// If [sinceReadTime] is not [SnapshotVersion.none], only remote documents read after this version are considered
-  /// (documents with local mutations are always included).
+  /// [offset] is the read time and document key to start scanning the remote documents at (exclusive);
+  /// [IndexOffset.none] considers all of them. Documents with local mutations are always included.
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      Query query, SnapshotVersion sinceReadTime) async {
+      Query query, IndexOffset offset) async {
     final ResourcePath path = query.path;
     if (query.isDocumentQuery) {
       return _getDocumentsMatchingDocumentQuery(path);
     } else if (query.isCollectionGroupQuery) {
-      return _getDocumentsMatchingCollectionGroupQuery(query, sinceReadTime);
+      return _getDocumentsMatchingCollectionGroupQuery(query, offset);
     } else {
-      return _getDocumentsMatchingCollectionQuery(query, sinceReadTime);
+      return _getDocumentsMatchingCollectionQuery(query, offset);
     }
   }
 
@@ -327,7 +327,7 @@ class LocalDocumentsView {
 
   Future<ImmutableSortedMap<DocumentKey, Document>>
       _getDocumentsMatchingCollectionGroupQuery(
-          Query query, SnapshotVersion sinceReadTime) async {
+          Query query, IndexOffset offset) async {
     hardAssert(query.path.isEmpty,
         'Currently we only support collection group queries at the root.');
     final String collectionId = query.collectionGroup!;
@@ -343,7 +343,7 @@ class LocalDocumentsView {
           query.asCollectionQueryAtPath(parent.appendSegment(collectionId));
       final ImmutableSortedMap<DocumentKey, Document> collectionResults =
           await _getDocumentsMatchingCollectionQuery(
-              collectionQuery, sinceReadTime);
+              collectionQuery, offset);
       for (MapEntry<DocumentKey, Document> docEntry in collectionResults) {
         results = results.insert(docEntry.key, docEntry.value);
       }
@@ -354,12 +354,31 @@ class LocalDocumentsView {
   /// Queries the remote documents and applies the overlays of the collection.
   Future<ImmutableSortedMap<DocumentKey, Document>>
       _getDocumentsMatchingCollectionQuery(
-          Query query, SnapshotVersion sinceReadTime) async {
-    final Map<DocumentKey, Overlay> overlays =
-        await documentOverlayCache.getOverlaysForCollection(query.path, -1);
+          Query query, IndexOffset offset) async {
+    // With an offset that comes from a field index only the overlays of the batches after the offset are read: the
+    // documents of the earlier batches are in the index with their overlay applied.
+    final bool overlaysSinceBatch =
+        offset.largestBatchId != FieldIndex.initialLargestBatchId;
+    final Map<DocumentKey, Overlay> overlays = await documentOverlayCache
+        .getOverlaysForCollection(query.path, offset.largestBatchId);
+
+    // PORTING NOTE: upstream filters the remote documents by the query here as well. With only the newer overlays at
+    // hand that misses a document that was read after the offset and matches the query (or stops matching it) through
+    // an overlay of an earlier batch, until the next backfill. The port reads all the documents after the offset in
+    // that case and looks their overlays up by key.
     final ImmutableSortedMap<DocumentKey, Document> remoteDocuments =
         await remoteDocumentCache.getAllDocumentsMatchingQuery(
-            query, sinceReadTime);
+            overlaysSinceBatch ? Query(query.path) : query, offset);
+    if (overlaysSinceBatch) {
+      final List<DocumentKey> withoutOverlay = <DocumentKey>[
+        for (final MapEntry<DocumentKey, Document> entry in remoteDocuments)
+          if (!overlays.containsKey(entry.key)) entry.key,
+      ];
+      if (withoutOverlay.isNotEmpty) {
+        overlays
+            .addAll(await documentOverlayCache.getOverlays(withoutOverlay));
+      }
+    }
 
     final Map<DocumentKey, MaybeDocument?> baseDocuments =
         <DocumentKey, MaybeDocument?>{

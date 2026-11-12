@@ -26,6 +26,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_backfiller.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
@@ -77,6 +78,9 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<void>? _shutdownFuture;
 
   LruGarbageCollectorScheduler? _lruScheduler;
+
+  /// Fills the field indexes in the background. Only with SQLite persistence: memory persistence has no field indexes.
+  IndexBackfillerScheduler? _indexBackfillScheduler;
 
   static Future<FirestoreClient> initialize(
     DatabaseInfo databaseInfo,
@@ -195,6 +199,7 @@ class FirestoreClient implements RemoteStoreCallback {
     // closed database.
     _isShutdown = true;
     _lruScheduler?.stop();
+    _indexBackfillScheduler?.stop();
 
     await onCredentialChangeSubscription.cancel();
     await appCheckProvider?.close();
@@ -410,6 +415,17 @@ class FirestoreClient implements RemoteStoreCallback {
     if (gc != null) {
       _lruScheduler = gc.newScheduler(scheduler, localStore) //
         ..start();
+    }
+    if (persistence is SQLitePersistence) {
+      final IndexBackfiller indexBackfiller =
+          IndexBackfiller(persistence, localStore);
+      _indexBackfillScheduler = IndexBackfillerScheduler(
+        indexBackfiller,
+        scheduler,
+        // On the queue of the client, like every other operation of the local store.
+        run: (Future<int> Function() backfill) =>
+            _enqueue<int>(() async => _isShutdown ? 0 : await backfill()),
+      )..start();
     }
 
     final Datastore datastore = Datastore(

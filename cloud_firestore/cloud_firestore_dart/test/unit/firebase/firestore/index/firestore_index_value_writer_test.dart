@@ -18,7 +18,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
-import 'package:fixnum/fixnum.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart';
@@ -143,7 +142,9 @@ void main() {
     expectEncoding(BsonTimestamp(1, 2), (DirectionalIndexByteEncoder encoder) {
       encoder
         ..writeLong(FirestoreIndexValueWriter.indexTypeBsonTimestamp)
-        ..writeInt64((Int64(1) << 32) | Int64(2))
+        // Not upstream, which writes one long: 1L << 32 | 2.
+        ..writeLong(1)
+        ..writeLong(2)
         ..writeInfinity();
     });
   });
@@ -153,8 +154,9 @@ void main() {
         (DirectionalIndexByteEncoder encoder) {
       encoder
         ..writeLong(FirestoreIndexValueWriter.indexTypeBsonTimestamp)
-        // 4294967295L << 32 | 4294967295L: all 64 bits set.
-        ..writeInt64(Int64(-1))
+        // Not upstream, which writes 4294967295L << 32 | 4294967295L: -1.
+        ..writeLong(4294967295)
+        ..writeLong(4294967295)
         ..writeInfinity();
     });
   });
@@ -163,7 +165,8 @@ void main() {
     expectEncoding(BsonTimestamp(0, 0), (DirectionalIndexByteEncoder encoder) {
       encoder
         ..writeLong(FirestoreIndexValueWriter.indexTypeBsonTimestamp)
-        ..writeInt64(Int64.ZERO)
+        ..writeLong(0)
+        ..writeLong(0)
         ..writeInfinity();
     });
   });
@@ -447,6 +450,9 @@ void main() {
       <Object?>[BsonTimestamp(0, 1)],
       <Object?>[BsonTimestamp(1, 0)],
       <Object?>[BsonTimestamp(2147483647, 0)],
+      <Object?>[BsonTimestamp(2147483648, 0)],
+      <Object?>[BsonTimestamp(2147483648, 4294967295)],
+      <Object?>[BsonTimestamp(4294967295, 4294967295)],
       <Object?>[''],
       <Object?>['\u0000'],
       <Object?>['a'],
@@ -573,14 +579,18 @@ void main() {
           1);
     });
 
-    test('a BSON timestamp past 2^31 seconds sorts before the smaller ones',
-        () {
-      // Same as upstream: seconds and increment are packed into a signed
+    test('a BSON timestamp past 2^31 seconds sorts after the smaller ones', () {
+      // Not so upstream, where seconds and increment are packed into a signed
       // 64-bit long, which is negative when the top bit of the seconds is set.
       final FieldValue small = wrap(BsonTimestamp(2147483647, 0));
       final FieldValue large = wrap(BsonTimestamp(2147483648, 0));
       expect(small.compareTo(large).sign, -1);
-      expect(compareByteArrays(encode(small), encode(large)).sign, 1);
+      expect(compareByteArrays(encode(small), encode(large)).sign, -1);
+      expect(
+          compareByteArrays(encode(small, SegmentKind.descending),
+                  encode(large, SegmentKind.descending))
+              .sign,
+          1);
     });
 
     test('the max value sorts after every value', () {

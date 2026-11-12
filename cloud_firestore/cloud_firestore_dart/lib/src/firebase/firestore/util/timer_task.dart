@@ -171,6 +171,9 @@ class TaskId implements Comparable<TaskId> {
   /// A timer used to retry transactions with a backoff.
   static const TaskId retryTransaction = TaskId._(7);
 
+  /// A timer used to periodically attempt index backfill.
+  static const TaskId indexBackfill = TaskId._(8);
+
   @override
   int compareTo(TaskId other) => _i.compareTo(other._i);
 
@@ -199,6 +202,7 @@ class TaskId implements Comparable<TaskId> {
     'onlineStateTimeout',
     'garbageCollection',
     'retryTransaction',
+    'indexBackfill',
   ];
 
   @override

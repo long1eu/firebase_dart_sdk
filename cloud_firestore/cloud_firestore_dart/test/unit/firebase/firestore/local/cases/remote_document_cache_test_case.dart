@@ -10,6 +10,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/pe
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
@@ -146,7 +147,7 @@ class RemoteDocumentCacheTestCase {
     final Query query = Query(path('b'));
     final ImmutableSortedMap<DocumentKey, Document> results =
         await _remoteDocumentCache.getAllDocumentsMatchingQuery(
-            query, SnapshotVersion.none);
+            query, IndexOffset.none);
     final List<Document> expected = <Document>[
       doc('b/1', 42, docData),
       doc('b/2', 42, docData)
@@ -165,7 +166,7 @@ class RemoteDocumentCacheTestCase {
     final Query query = Query(path('b'));
     final ImmutableSortedMap<DocumentKey, Document> results =
         await _remoteDocumentCache.getAllDocumentsMatchingQuery(
-            query, version(12));
+            query, IndexOffset.createSuccessor(version(12), -1));
     expect(values(results), <Document>[doc('b/new', 3, docData)]);
   }
 
@@ -178,7 +179,7 @@ class RemoteDocumentCacheTestCase {
     final Query query = Query(path('b'));
     final ImmutableSortedMap<DocumentKey, Document> results =
         await _remoteDocumentCache.getAllDocumentsMatchingQuery(
-            query, version(1));
+            query, IndexOffset.createSuccessor(version(1), -1));
     expect(values(results), <Document>[doc('b/old', 1, docData)]);
   }
 

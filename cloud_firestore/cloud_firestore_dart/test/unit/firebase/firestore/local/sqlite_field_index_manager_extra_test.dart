@@ -1,3 +1,5 @@
+import 'package:cloud_firestore_dart/cloud_firestore_dart.dart'
+    show BsonTimestamp, Timestamp;
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/geo_point.dart';
@@ -125,6 +127,70 @@ void main() {
               ordered.endAt(bound(inclusive, <Object?>[ref('x/b')]));
           expect(await idsFromIndex(indexManager, endAt), idsFromScan(endAt),
               reason: 'endAt inclusive=$inclusive');
+        }
+      });
+    }
+  });
+
+  group('BSON timestamps', () {
+    // Seconds on both sides of 2^31, where the upstream encoding wraps.
+    final List<BsonTimestamp> values = <BsonTimestamp>[
+      BsonTimestamp(0, 0),
+      BsonTimestamp(1, 4294967295),
+      BsonTimestamp(2147483647, 5),
+      BsonTimestamp(2147483648, 0),
+      BsonTimestamp(2147483648, 1),
+      BsonTimestamp(4294967295, 4294967295),
+    ];
+    final List<Document> docs = <Document>[
+      for (int i = 0; i < values.length; i++)
+        doc('coll/t$i', 1, map(<dynamic>['t', values[i]])),
+      doc('coll/timestamp', 1, map(<dynamic>['t', Timestamp(1, 0)])),
+      doc('coll/string', 1, map(<dynamic>['t', 'a'])),
+    ];
+
+    List<String> idsFromScan(Query query) {
+      final List<Document> matching = docs.where(query.matches).toList()
+        ..sort(query.comparator);
+      return matching.map((Document d) => d.key.path.getLastSegment()).toList();
+    }
+
+    for (final SegmentKind kind in <SegmentKind>[
+      SegmentKind.ascending,
+      SegmentKind.descending
+    ]) {
+      final String dir = kind == SegmentKind.ascending ? 'asc' : 'desc';
+
+      test('filters, cursors and limits match a scan (${kind.name})', () async {
+        await indexManager.addFieldIndex(
+            fieldIndex('coll', fieldsAndKinds: <Object>['t', kind]));
+        await addDocs(indexManager, docs);
+
+        final Query ordered = Query(path('coll')).orderBy(orderBy('t', dir));
+        expect(await idsFromIndex(indexManager, ordered), idsFromScan(ordered));
+
+        for (final String op in <String>['<', '<=', '==', '>=', '>', '!=']) {
+          for (final BsonTimestamp value in values) {
+            final Query query = Query(path('coll'))
+                .filter(filter('t', op, value))
+                .orderBy(orderBy('t', dir));
+            expect(await idsFromIndex(indexManager, query), idsFromScan(query),
+                reason: 't $op (${value.seconds}, ${value.increment})');
+          }
+        }
+
+        for (int limit = 1; limit <= docs.length; limit++) {
+          expect(await idsFromIndex(indexManager, ordered.limitToFirst(limit)),
+              idsFromScan(ordered).take(limit).toList(),
+              reason: 'limit $limit');
+        }
+
+        for (final bool inclusive in <bool>[true, false]) {
+          final Query startAt = ordered.startAt(
+              bound(inclusive, <Object?>[BsonTimestamp(2147483648, 0)]));
+          expect(
+              await idsFromIndex(indexManager, startAt), idsFromScan(startAt),
+              reason: 'startAt inclusive=$inclusive');
         }
       });
     }

@@ -11,6 +11,12 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   final LocalSerializer serializer;
   final StatsCollector _statsCollector;
 
+  /// The index manager of the current user, once the local store set it.
+  IndexManager? _indexManager;
+
+  @override
+  set indexManager(IndexManager indexManager) => _indexManager = indexManager;
+
   @override
   Future<void> add(
       MaybeDocument maybeDocument, SnapshotVersion readTime) async {
@@ -39,7 +45,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           message.writeToBuffer()
         ]);
 
-    await db.indexManager
+    await (_indexManager ?? db.indexManager)
         .addToCollectionParentIndex(maybeDocument.key.path.popLast());
   }
 
@@ -57,6 +63,10 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         ''',
         // @formatter:on
         <String>[path]);
+
+    // A removed document has no index entries (upstream does this in `removeAll`).
+    await _indexManager?.updateIndexEntries(
+        <DocumentKey, MaybeDocument?>{documentKey: null});
   }
 
   @override
@@ -214,8 +224,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(
-          Query query, SnapshotVersion sinceReadTime) async {
+      getAllDocumentsMatchingQuery(Query query, IndexOffset offset) async {
     hardAssert(!query.isCollectionGroupQuery,
         'CollectionGroup queries should be handled in LocalDocumentsView');
 
@@ -229,7 +238,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final Map<DocumentKey, Document> results = <DocumentKey, Document>{};
 
     final List<Map<String, dynamic>> result;
-    if (sinceReadTime == SnapshotVersion.none) {
+    if (offset == IndexOffset.none) {
       result = await db.query(
           // @formatter:off
           '''
@@ -241,9 +250,10 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           // @formatter:on
           <String>[prefixPath, prefixSuccessorPath]);
     } else {
-      // Execute an index-free query and filter by read time. This is safe since all document changes to queries that
-      // have a lastLimboFreeSnapshotVersion (`sinceReadTime`) have a read time set.
-      final Timestamp readTime = sinceReadTime.timestamp;
+      // Execute an index-free query and filter by read time (and by key, for the documents read at the read time of
+      // the offset). This is safe since all document changes to queries that have a lastLimboFreeSnapshotVersion have
+      // a read time set.
+      final Timestamp readTime = offset.readTime.timestamp;
       result = await db.query(
           // @formatter:off
           '''
@@ -251,7 +261,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
             FROM remote_documents
             WHERE path >= ?
               AND path < ?
-              AND (read_time_seconds > ? OR (read_time_seconds = ? AND read_time_nanos > ?));
+              AND (read_time_seconds > ?
+                OR (read_time_seconds = ? AND read_time_nanos > ?)
+                OR (read_time_seconds = ? AND read_time_nanos = ? AND path > ?));
           ''',
           // @formatter:on
           <Object>[
@@ -260,6 +272,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
             readTime.seconds,
             readTime.seconds,
             readTime.nanoseconds,
+            readTime.seconds,
+            readTime.nanoseconds,
+            EncodedPath.encode(offset.documentKey.path),
           ]);
     }
 

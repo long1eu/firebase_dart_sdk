@@ -360,6 +360,27 @@ RemoteEvent addedRemoteEvent(MaybeDocument doc, List<int> updatedInTargets,
   return aggregator.createRemoteEvent(doc.version);
 }
 
+/// Like [addedRemoteEvent], for several documents in one event (the event has the highest of their versions).
+RemoteEvent addedRemoteEvents(List<MaybeDocument> docs,
+    List<int> updatedInTargets, List<int> removedFromTargets) {
+  assert(docs.isNotEmpty, 'Cannot pass empty docs array');
+  final WatchChangeAggregator aggregator =
+      WatchChangeAggregator(TargetMetadataProvider(
+    getRemoteKeysForTarget: (int targetId) => DocumentKey.emptyKeySet,
+    getDatabaseId: () => DatabaseId.forDatabase('p', 'd'),
+    getQueryDataForTarget: (int targetId) => queryData(targetId,
+        QueryPurpose.listen, docs.first.key.path.popLast().toString()),
+  ));
+
+  SnapshotVersion version = SnapshotVersion.none;
+  for (final MaybeDocument doc in docs) {
+    aggregator.handleDocumentChange(WatchChangeDocumentChange(
+        updatedInTargets, removedFromTargets, doc.key, doc));
+    version = doc.version.compareTo(version) > 0 ? doc.version : version;
+  }
+  return aggregator.createRemoteEvent(version);
+}
+
 RemoteEvent updateRemoteEvent(
     MaybeDocument doc, List<int> updatedInTargets, List<int> removedFromTargets,
     [List<int> limboTargets = const <int>[]]) {

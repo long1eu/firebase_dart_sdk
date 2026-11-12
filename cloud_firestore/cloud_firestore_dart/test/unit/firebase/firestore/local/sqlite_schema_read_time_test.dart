@@ -31,6 +31,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
@@ -171,7 +172,7 @@ void main() {
       // Queries with SnapshotVersion.none return all results, regardless of whether the read time has been set.
       ImmutableSortedMap<DocumentKey, Document> results = await persistence
           .remoteDocumentCache
-          .getAllDocumentsMatchingQuery(query('coll'), SnapshotVersion.none);
+          .getAllDocumentsMatchingQuery(query('coll'), IndexOffset.none);
       expect(
           results
               .map((MapEntry<DocumentKey, Document> e) => e.key.path.toString())
@@ -180,7 +181,8 @@ void main() {
 
       // Queries that filter by read time only return documents that were written after the migration.
       results = await persistence.remoteDocumentCache
-          .getAllDocumentsMatchingQuery(query('coll'), version(2));
+          .getAllDocumentsMatchingQuery(
+              query('coll'), IndexOffset.createSuccessor(version(2), -1));
       expect(
           results
               .map((MapEntry<DocumentKey, Document> e) => e.key.path.toString())

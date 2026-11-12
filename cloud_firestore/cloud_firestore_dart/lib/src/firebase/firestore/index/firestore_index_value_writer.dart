@@ -6,7 +6,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/value_bounds.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
-import 'package:fixnum/fixnum.dart';
 
 /// Firestore index value writer. Port of `FirestoreIndexValueWriter` of the
 /// Android SDK.
@@ -16,6 +15,8 @@ import 'package:fixnum/fixnum.dart';
 ///   * A [ReferenceValue] holds a document key, so its segments are written
 ///     directly (upstream skips the five `projects/p/databases/d/documents`
 ///     segments of the resource name).
+///   * A BSON timestamp is written as two numbers (seconds, increment)
+///     instead of one packed signed long, see [_writeIndexValueAux].
 ///   * A reference ends with a truncation marker, which upstream does not
 ///     write: see [_writeIndexEntityRef]. The index entries are only read by
 ///     this SDK, so the different bytes are not a compatibility concern.
@@ -120,10 +121,15 @@ class FirestoreIndexValueWriter {
       _writeValueTypeLabel(encoder, indexTypeMaxKey);
     } else if (indexValue is BsonTimestampValue) {
       _writeValueTypeLabel(encoder, indexTypeBsonTimestamp);
-      // BSON Timestamps are encoded as a 64-bit long with the lower 32 bits
-      // being the increment and the upper 32 bits being the seconds
-      encoder.writeInt64((Int64(indexValue.value.seconds) << 32) |
-          (Int64(indexValue.value.increment) & 0xffffffff));
+      // PORTING NOTE: not upstream, which packs the seconds into the upper and
+      // the increment into the lower 32 bits of one signed 64-bit long. That
+      // long is negative for seconds >= 2^31 (the year 2038), so such
+      // timestamps sort before all the others in the index and range scans
+      // return other documents than a collection scan. Both parts are
+      // unsigned 32-bit numbers: written as two longs they sort correctly.
+      encoder
+        ..writeLong(indexValue.value.seconds)
+        ..writeLong(indexValue.value.increment);
     } else if (indexValue is BsonObjectIdValue) {
       _writeValueTypeLabel(encoder, indexTypeBsonObjectId);
       encoder.writeBytes(utf8.encode(indexValue.value.value));

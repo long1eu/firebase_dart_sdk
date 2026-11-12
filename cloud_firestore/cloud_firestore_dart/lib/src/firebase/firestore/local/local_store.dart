@@ -3,6 +3,7 @@
 // on 23/09/2018
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
@@ -17,6 +18,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/default_query_
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_documents_view.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_write_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
@@ -31,6 +33,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_collections.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
@@ -100,12 +103,14 @@ class LocalStore implements BundleCallback {
     final RemoteDocumentCache remoteDocuments = persistence.remoteDocumentCache;
     final DocumentOverlayCache documentOverlayCache =
         persistence.getDocumentOverlayCache(initialUser);
+    final IndexManager indexManager = persistence.getIndexManager(initialUser);
     final LocalDocumentsView localDocuments = LocalDocumentsView(
       remoteDocumentCache: remoteDocuments,
       mutationQueue: mutationQueue,
       documentOverlayCache: documentOverlayCache,
-      indexManager: persistence.indexManager,
+      indexManager: indexManager,
     );
+    remoteDocuments.indexManager = indexManager;
     final QueryEngine engine = (queryEngine ?? DefaultQueryEngine())
       ..setLocalDocumentsView(localDocuments);
 
@@ -119,6 +124,7 @@ class LocalStore implements BundleCallback {
       mutationQueue,
       remoteDocuments,
       documentOverlayCache,
+      indexManager,
       localDocuments,
       engine,
       localViewReferences,
@@ -135,6 +141,7 @@ class LocalStore implements BundleCallback {
     this._mutationQueue,
     this._remoteDocuments,
     this._documentOverlayCache,
+    this._indexManager,
     this._localDocuments,
     this._queryEngine,
     this._localViewReferences,
@@ -163,6 +170,9 @@ class LocalStore implements BundleCallback {
   /// The overlays that can be used to short circuit applying all mutations from the mutation queue.
   DocumentOverlayCache _documentOverlayCache;
 
+  /// Manages the list of active field and collection indices of the current user.
+  IndexManager _indexManager;
+
   /// The current state of all referenced documents, reflecting local changes.
   LocalDocumentsView _localDocuments;
 
@@ -190,7 +200,51 @@ class LocalStore implements BundleCallback {
 
   Future<void> start() async {
     await _persistence.overlayMigrationManager.run();
+    await startIndexManager();
     await startMutationQueue();
+  }
+
+  Future<void> startIndexManager() {
+    return _persistence.runTransaction(
+        'Start IndexManager', _indexManager.start);
+  }
+
+  /// The index manager of the current user. It is replaced when the user changes.
+  IndexManager get indexManagerForCurrentUser => _indexManager;
+
+  /// The local documents view of the current user. It is replaced when the user changes.
+  LocalDocumentsView get localDocumentsForCurrentUser => _localDocuments;
+
+  /// Returns all configured field indexes.
+  List<FieldIndex> getFieldIndexes() => _indexManager.getFieldIndexes();
+
+  /// Makes [newFieldIndexes] the configured field indexes: the indexes that are not in the list are deleted with
+  /// their entries, the ones that are new are added (and filled by the index backfiller), the others are kept.
+  Future<void> configureFieldIndexes(List<FieldIndex> newFieldIndexes) {
+    return _persistence.runTransaction('Configure indexes', () async {
+      final SplayTreeSet<FieldIndex> existing =
+          SplayTreeSet<FieldIndex>(FieldIndex.semanticCompare)
+            ..addAll(_indexManager.getFieldIndexes());
+      final SplayTreeSet<FieldIndex> wanted =
+          SplayTreeSet<FieldIndex>(FieldIndex.semanticCompare)
+            ..addAll(newFieldIndexes);
+      for (final FieldIndex index in existing) {
+        if (!wanted.contains(index)) {
+          await _indexManager.deleteFieldIndex(index);
+        }
+      }
+      for (final FieldIndex index in wanted) {
+        if (!existing.contains(index)) {
+          await _indexManager.addFieldIndex(index);
+        }
+      }
+    });
+  }
+
+  /// Removes all field indexes and their entries.
+  Future<void> deleteAllFieldIndexes() {
+    return _persistence.runTransaction(
+        'Delete All Indexes', _indexManager.deleteAllFieldIndexes);
   }
 
   Future<void> startMutationQueue() {
@@ -207,6 +261,9 @@ class LocalStore implements BundleCallback {
 
     _mutationQueue = _persistence.getMutationQueue(user);
     _documentOverlayCache = _persistence.getDocumentOverlayCache(user);
+    _indexManager = _persistence.getIndexManager(user);
+    await startIndexManager();
+    _remoteDocuments.indexManager = _indexManager;
     await startMutationQueue();
 
     final List<MutationBatch> newBatches =
@@ -217,7 +274,7 @@ class LocalStore implements BundleCallback {
       remoteDocumentCache: _remoteDocuments,
       mutationQueue: _mutationQueue,
       documentOverlayCache: _documentOverlayCache,
-      indexManager: _persistence.indexManager,
+      indexManager: _indexManager,
     );
     _queryEngine.setLocalDocumentsView(_localDocuments);
 
