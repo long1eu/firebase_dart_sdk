@@ -250,9 +250,9 @@ await firestore
 - The helper functions have short names (`field`, `and`, `or`, `not`, ...); import the library
   with a prefix if they clash with yours.
 
-To run `test/integration/firebase/firestore/pipeline_test.dart`, start a second emulator in
-Enterprise edition and set `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (host:port); without it the tests
-are skipped.
+To run `test/integration_enterprise/pipeline_test.dart`, start the Enterprise edition emulator
+(`tool/start_enterprise_emulator.sh`) and set `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (host:port);
+without it the tests are skipped.
 
 ## Persistence and connectivity
 
@@ -334,11 +334,14 @@ not set (the emulator always wins, so an emulator run can never reach a real pro
 ## Not supported or not done
 
 - BSON value types (`MinKey`, `MaxKey`, `Int32Value`, `Decimal128Value`, `BsonObjectId`,
-  `BsonTimestamp`, `RegexValue`, `Blob.bsonBinary`) are supported, with two known gaps. `in`,
+  `BsonTimestamp`, `RegexValue`, `Blob.bsonBinary`) are supported, with one known gap. `in`,
   `not-in`, `array-contains` and `array-contains-any` match a number against the local cache
   only if it has the same type (`Int32Value(5)` does not match `5`), while the backend compares
-  numbers by value; the JS SDK has the same gap. A plain `Map` written with one of the reserved
-  keys (for example `{'__int__': 5}`) is treated as a map locally until the server sends it back.
+  numbers by value; the JS SDK has the same gap. A plain `Map` with one of the reserved keys (for
+  example `{'__int__': 5}`) is rejected in document data, like every field name that begins and
+  ends with `__`; as a query value or an `arrayUnion` / `arrayRemove` element it is read as the
+  BSON value, like the backend does. The sum and the average of an aggregation that includes a
+  `Decimal128Value` are a `Decimal128Value` (`getDouble` and `getInt` convert it).
 - Index-free queries, document overlays, the client-side index engine and persistent-cache
   auto-indexing: not implemented. Queries run against the local cache as in the 2019 design
   (SQLite schema version 8 lineage, plus the changes listed in the CHANGELOG).

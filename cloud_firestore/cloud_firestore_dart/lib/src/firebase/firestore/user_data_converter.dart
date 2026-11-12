@@ -157,7 +157,10 @@ class UserDataConverter {
     hardAssert(parsed != null, 'Parsed data should not be null.');
     hardAssert(accumulator.fieldTransforms.isEmpty,
         'Field transforms should have been disallowed.');
-    return parsed!;
+    // Unlike document data, a query value may hold a plain map with a reserved
+    // key such as `{'__int__': 5}`. The backend reads it as the BSON value, so
+    // the local evaluation of the query has to as well.
+    return resolveBsonShapes(parsed!);
   }
 
   /// Internal helper for parsing user data.
@@ -366,7 +369,10 @@ class UserDataConverter {
       // writes since they cannot contain any FieldValue sentinels, etc.
       final UserDataParseContext context = accumulator.rootContext;
       // Sentinels are not allowed inside array transforms, so the parsed value is never null.
-      result.add(_parseData(element, context.childContextForArrayIndex(i))!);
+      // Like a query value, an element may be a plain map with a reserved key such as `{'__int__': 5}`, which the
+      // backend reads as the BSON value.
+      result.add(resolveBsonShapes(
+          _parseData(element, context.childContextForArrayIndex(i))!));
     }
     return result;
   }

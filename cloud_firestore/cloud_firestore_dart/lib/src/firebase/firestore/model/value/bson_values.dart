@@ -308,3 +308,106 @@ class RegexFieldValue extends FieldValue {
       '${BsonKeys.regexOptions}:${_value.options},'
       '${BsonKeys.regexPattern}:${_value.pattern}}}';
 }
+
+/// Replaces every map in [value] that has the encoded shape of a BSON value
+/// (for example `{__int__: 5}`) with that BSON value, in [value] itself and
+/// inside of its arrays and maps.
+///
+/// The backend does not tell such a map from the BSON value, both have the
+/// same encoding. This is for values that do not come out of the serializer,
+/// which already reads these maps as BSON values.
+FieldValue resolveBsonShapes(FieldValue value) {
+  if (value is ArrayValue) {
+    bool changed = false;
+    final List<FieldValue> elements = <FieldValue>[];
+    for (final FieldValue element in value.internalValue) {
+      final FieldValue resolved = resolveBsonShapes(element);
+      changed = changed || !identical(resolved, element);
+      elements.add(resolved);
+    }
+    return changed ? ArrayValue.fromList(elements) : value;
+  } else if (value is ObjectValue) {
+    ObjectValue result = value;
+    for (final MapEntry<String, FieldValue> entry in value.internalValue) {
+      final FieldValue resolved = resolveBsonShapes(entry.value);
+      if (!identical(resolved, entry.value)) {
+        result = result.set(FieldPath.fromSingleSegment(entry.key), resolved);
+      }
+    }
+    return _bsonValueOfShape(result) ?? result;
+  }
+  return value;
+}
+
+FieldValue? _bsonValueOfShape(ObjectValue object) {
+  if (object.internalValue.length != 1) {
+    return null;
+  }
+  final MapEntry<String, FieldValue> entry = object.internalValue.first;
+  final FieldValue field = entry.value;
+  switch (entry.key) {
+    case BsonKeys.minKey:
+      return field is NullValue ? MinKeyValue.instance() : null;
+    case BsonKeys.maxKey:
+      return field is NullValue ? MaxKeyValue.instance() : null;
+    case BsonKeys.int32:
+      if (field is IntegerValue &&
+          field.value >= Int32Value.minValue &&
+          field.value <= Int32Value.maxValue) {
+        return Int32FieldValue.valueOf(Int32Value(field.value));
+      }
+      return null;
+    case BsonKeys.decimal128:
+      if (field is! StringValue) {
+        return null;
+      }
+      try {
+        return Decimal128FieldValue.valueOf(Decimal128Value(field.value));
+      } on FormatException {
+        return null;
+      }
+    case BsonKeys.objectId:
+      return field is StringValue
+          ? BsonObjectIdValue.valueOf(BsonObjectId(field.value))
+          : null;
+    case BsonKeys.binary:
+      if (field is BlobValue) {
+        final Blob blob = field.value;
+        // A subtype of 0 is a regular blob, which is never encoded as a map.
+        if (blob.subtype == 0 && blob.bytes.isNotEmpty && blob.bytes[0] != 0) {
+          return BlobValue.valueOf(Blob.bsonBinary(
+              blob.bytes[0], Uint8List.sublistView(blob.bytes, 1)));
+        }
+      }
+      return null;
+    case BsonKeys.timestamp:
+      if (field is ObjectValue && field.internalValue.length == 2) {
+        final FieldValue? seconds =
+            field.internalValue[BsonKeys.timestampSeconds];
+        final FieldValue? increment =
+            field.internalValue[BsonKeys.timestampIncrement];
+        if (seconds is IntegerValue &&
+            increment is IntegerValue &&
+            seconds.value >= 0 &&
+            seconds.value <= BsonTimestamp.maxValue &&
+            increment.value >= 0 &&
+            increment.value <= BsonTimestamp.maxValue) {
+          return BsonTimestampValue.valueOf(
+              BsonTimestamp(seconds.value, increment.value));
+        }
+      }
+      return null;
+    case BsonKeys.regex:
+      if (field is ObjectValue && field.internalValue.length == 2) {
+        final FieldValue? pattern = field.internalValue[BsonKeys.regexPattern];
+        final FieldValue? options = field.internalValue[BsonKeys.regexOptions];
+        if (pattern is StringValue && options is StringValue) {
+          return RegexFieldValue.valueOf(
+              RegexValue(pattern.value, options.value));
+        }
+      }
+      return null;
+    default:
+      return null;
+  }
+}

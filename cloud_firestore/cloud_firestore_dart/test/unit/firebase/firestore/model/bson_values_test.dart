@@ -50,10 +50,18 @@ void main() {
       wrap(const RegexValue('^foo', 'i'))
     ]).addEqualityGroup(<Object>[wrap(const RegexValue('^foo', 'm'))]).addEqualityGroup(<Object>[wrap(const RegexValue('^bar', 'i'))]).addEqualityGroup(
             <Object>[wrap(MinKey.instance), wrap(MinKey.instance)]).addEqualityGroup(<Object>[wrap(MaxKey.instance), wrap(MaxKey.instance)])
+        // A map in the model is not the BSON value it has the shape of. (A
+        // query value, which wrap() parses, is resolved to the BSON value, see
+        // bson_shaped_maps_test.dart.)
+        .addEqualityGroup(<Object>[
+      ObjectValue.fromMap(<String, FieldValue>{'__int__': wrap(1)}),
+      ObjectValue.fromMap(<String, FieldValue>{'__int__': wrap(1)})
+    ])
         // A map that only looks like a BSON type is a map.
         .addEqualityGroup(<Object>[
-      wrap(<String, Object?>{'__int__': 1})
+      wrap(<String, Object?>{'__int__': 'a'})
     ]).testEquals();
+    expect(wrap(<String, Object?>{'__int__': 1}), _int32(1));
   });
 
   test('testValueOrdering', () {

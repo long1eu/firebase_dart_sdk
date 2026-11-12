@@ -14,7 +14,10 @@
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/exact_number.dart';
 import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 
@@ -67,6 +70,10 @@ class AggregateQuerySnapshot {
   /// The result of [aggregateField]: an `int`, a `double` or null (for
   /// example the average over no numeric values).
   ///
+  /// On an Enterprise edition database the sum and the average over values
+  /// that include a [Decimal128Value] are a [Decimal128Value]. [getDouble] and
+  /// [getInt] convert it to the closest `double`.
+  ///
   /// Throws an [ArgumentError] if [aggregateField] was not requested.
   Object? get(AggregateField aggregateField) {
     final FieldValue? value = _data[aggregateField.alias];
@@ -111,6 +118,10 @@ class AggregateQuerySnapshot {
     final Object? value = get(aggregateField);
     if (value == null) {
       return null;
+    } else if (value is Decimal128Value) {
+      return ExactNumber.parse(value.stringValue).toDouble();
+    } else if (value is Int32Value) {
+      return value.value;
     } else if (value is! num) {
       throw StateError("AggregateField '${aggregateField.alias}' is not a num");
     }

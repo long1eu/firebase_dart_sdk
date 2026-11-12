@@ -5,6 +5,7 @@
 library field_value;
 
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/blob.dart';

@@ -85,6 +85,10 @@ only. **Nothing was run against production Firestore.**
   typed `DocumentSnapshot` getters such as `getInt32Value`), filtered and ordered, and the local
   cache sorts them like the backend. `Blob.fromJson` now accepts a `subtype`. Until now a
   document with such a field was read as a map like `{'__int__': 5}`.
+  `AggregateQuerySnapshot.getDouble` / `getInt` convert a `Decimal128Value` sum or average
+  instead of throwing, and a plain map with a reserved key used as a query value or as an
+  `arrayUnion` / `arrayRemove` element (for example `{'__int__': 5}`) is read as the BSON value,
+  so that the local cache evaluates the query like the backend.
 - Value helpers from the JS SDK: `Timestamp.fromMillis` / `toMillis`, `Blob.fromBase64String` /
   `toBase64`, `AggregateQuerySnapshot.data()` (results keyed by alias), and `toJson` /
   `fromJson` on `Timestamp`, `GeoPoint` and `Blob` in the JS `toJSON()` shape (so `jsonEncode`

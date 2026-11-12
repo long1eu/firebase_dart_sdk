@@ -12,19 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Pipelines need an Enterprise edition database, so these tests do not use the
-// shared (Standard edition) emulator of `FIRESTORE_EMULATOR_HOST`. Start a
-// second emulator in Enterprise edition, for example
-//
-//     java -jar cloud-firestore-emulator-vX.jar --port 8181 \
-//         --database-edition enterprise --project_id demo-test
-//
-// and point `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (host:port) at it. Without
-// that variable every test in this file is skipped.
+// shared (Standard edition) emulator of `FIRESTORE_EMULATOR_HOST`. Start the
+// Enterprise edition emulator with `tool/start_enterprise_emulator.sh` and
+// point `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (host:port) at it. Without that
+// variable every test in this file is skipped.
 //
 // The cases are a subset of the JS SDK's test/integration/api/pipeline.test.ts
 // and query_to_pipeline.test.ts.
 
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
@@ -32,24 +27,7 @@ import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:test/test.dart';
 
-import '../../../util/integration_test_util.dart';
-
-const String enterpriseHostVariable = 'FIRESTORE_ENTERPRISE_EMULATOR_HOST';
-
-String? get enterpriseHost {
-  final String? value = Platform.environment[enterpriseHostVariable];
-  return value == null || value.isEmpty ? null : value;
-}
-
-Future<Firestore> enterpriseFirestore() {
-  final String host = enterpriseHost!;
-  final int separator = host.lastIndexOf(':');
-  return IntegrationTestUtil.testFirestore(FirestoreSettings(
-    host: separator < 0 ? host : host.substring(0, separator),
-    port: separator < 0 ? 8080 : int.parse(host.substring(separator + 1)),
-    sslEnabled: false,
-  ));
-}
+import '../util/integration_test_util.dart';
 
 const Map<String, Map<String, Object?>> books = <String, Map<String, Object?>>{
   'book1': <String, Object?>{
@@ -109,12 +87,9 @@ const Map<String, Map<String, Object?>> books = <String, Map<String, Object?>>{
 };
 
 void main() {
-  IntegrationTestUtil.currentDatabasePath = 'integration/pipeline';
+  IntegrationTestUtil.currentDatabasePath = 'integration_enterprise/pipeline';
 
-  final String? skip = enterpriseHost == null
-      ? 'Pipelines need an Enterprise edition emulator: set '
-          '$enterpriseHostVariable (host:port) to run these tests.'
-      : null;
+  final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
   late Firestore firestore;
   late CollectionReference<Map<String, Object?>> collection;
@@ -127,7 +102,7 @@ void main() {
 
   group('pipelines', () {
     setUp(() async {
-      firestore = await enterpriseFirestore();
+      firestore = await IntegrationTestUtil.testEnterpriseFirestore();
       collection = firestore.collection('books_${autoId()}');
       for (final MapEntry<String, Map<String, Object?>> book in books.entries) {
         await collection.document(book.key).set(book.value);

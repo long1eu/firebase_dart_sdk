@@ -2,17 +2,17 @@
 // cases of its TypeTest.
 //
 // The BSON types are only stored by databases of the Enterprise edition. Start
-// an emulator with `--database-edition=enterprise` and point
-// FIRESTORE_ENTERPRISE_EMULATOR_HOST at it (`host:port`) to run these tests.
+// the Enterprise edition emulator with `tool/start_enterprise_emulator.sh` and
+// point FIRESTORE_ENTERPRISE_EMULATOR_HOST at it (`host:port`) to run these
+// tests.
 
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:test/test.dart';
 
-import '../../../util/integration_test_util.dart';
+import '../util/integration_test_util.dart';
 
 Blob _binary(int subtype, [List<int> bytes = const <int>[]]) =>
     Blob.bsonBinary(subtype, Uint8List.fromList(bytes));
@@ -20,15 +20,9 @@ Blob _binary(int subtype, [List<int> bytes = const <int>[]]) =>
 typedef _Docs = Map<String, Map<String, Object?>>;
 
 void main() {
-  IntegrationTestUtil.currentDatabasePath = 'integration/bson_types_test';
+  IntegrationTestUtil.currentDatabasePath = 'integration_enterprise/bson_types';
 
-  final String? emulator =
-      Platform.environment['FIRESTORE_ENTERPRISE_EMULATOR_HOST'];
-  final String? skip = emulator == null || emulator.isEmpty
-      ? 'BSON types need an Enterprise edition database: set '
-          'FIRESTORE_ENTERPRISE_EMULATOR_HOST to the host:port of an emulator '
-          'started with --database-edition=enterprise'
-      : null;
+  final String? skip = IntegrationTestUtil.enterpriseEmulatorSkipReason;
 
   late Firestore firestore;
   int collectionIndex = 0;
@@ -37,12 +31,7 @@ void main() {
     if (skip != null) {
       return;
     }
-    final int separator = emulator!.lastIndexOf(':');
-    firestore = await IntegrationTestUtil.testFirestore(FirestoreSettings(
-      host: emulator.substring(0, separator),
-      port: int.parse(emulator.substring(separator + 1)),
-      sslEnabled: false,
-    ));
+    firestore = await IntegrationTestUtil.testEnterpriseFirestore();
   });
 
   tearDown(() async {
