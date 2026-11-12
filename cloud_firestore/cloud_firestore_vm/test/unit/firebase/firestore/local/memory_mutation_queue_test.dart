@@ -11,7 +11,7 @@ import 'cases/mutation_queue_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  MutationQueueTestCase testCase;
+  late MutationQueueTestCase testCase;
 
   setUp(() async {
     print('setUp');

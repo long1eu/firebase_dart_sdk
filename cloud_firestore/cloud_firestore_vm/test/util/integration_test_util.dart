@@ -7,7 +7,7 @@ import 'dart:io';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/credentials_provider.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/auth/empty_credentials_provider.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/database_info.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/firestore_client.dart';
@@ -40,11 +40,27 @@ class IntegrationTestUtil {
   /// Online status of all active Firestore clients.
   static final Map<Firestore, bool> firestoreStatus = <Firestore, bool>{};
 
+  /// The credentials provider of each test instance, to be able to switch the user.
+  static final Map<Firestore, MockCredentialsProvider> credentialsProviders =
+      <Firestore, MockCredentialsProvider>{};
+
+  /// Switches the user of the given test [firestore] instance.
+  static void testChangeUserTo(Firestore firestore, User user) {
+    credentialsProviders[firestore]!.changeUserTo(user);
+  }
+
   static final FirestoreProvider provider = FirestoreProvider();
 
   static bool sentFirstWrite = false;
 
-  static String currentDatabasePath;
+  static String currentDatabasePath = 'test';
+
+  /// The `host:port` of the Firestore emulator, taken from the
+  /// `FIRESTORE_EMULATOR_HOST` environment variable, or null if it is not set.
+  static String? get emulatorHost {
+    final String? value = Platform.environment['FIRESTORE_EMULATOR_HOST'];
+    return value == null || value.isEmpty ? null : value;
+  }
 
   static DatabaseInfo testEnvDatabaseInfo() {
     return DatabaseInfo(
@@ -57,18 +73,45 @@ class IntegrationTestUtil {
   }
 
   static FirestoreSettings newTestSettings() {
-    return FirestoreSettings();
+    final String? emulator = emulatorHost;
+    if (emulator == null) {
+      return FirestoreSettings();
+    }
+
+    final int separator = emulator.lastIndexOf(':');
+    final String host =
+        separator < 0 ? emulator : emulator.substring(0, separator);
+    final int port =
+        separator < 0 ? 8080 : int.parse(emulator.substring(separator + 1));
+    return FirestoreSettings(host: host, port: port, sslEnabled: false);
+  }
+
+  /// Deletes all the documents from the emulator for the test project.
+  static Future<void> clearEmulatorData() async {
+    final String? emulator = emulatorHost;
+    if (emulator == null) {
+      return;
+    }
+
+    final HttpClient client = HttpClient();
+    try {
+      final HttpClientRequest request = await client.deleteUrl(Uri.parse(
+          'http://$emulator/emulator/v1/projects/${provider.projectId}/databases/(default)/documents'));
+      final HttpClientResponse response = await request.close();
+      await response.drain<void>();
+    } finally {
+      client.close();
+    }
   }
 
   /// Initializes a new Firestore instance that uses the default project, customized with the provided settings if
   /// provided.
   static Future<Firestore> testFirestore(
-      [FirestoreSettings settings, String dbPath]) async {
-    settings ??= newTestSettings();
+      [FirestoreSettings? settings, String? dbPath]) async {
     return testFirestoreInstance(
       provider.projectId,
-      LogLevel.d,
-      settings,
+      LogLevel.w,
+      settings ?? newTestSettings(),
       dbPath ?? currentDatabasePath,
     );
   }
@@ -77,25 +120,10 @@ class IntegrationTestUtil {
   static Future<Firestore> testAlternateFirestore() async {
     return testFirestoreInstance(
       badProjectId,
-      LogLevel.d,
+      LogLevel.w,
       newTestSettings(),
       'bad/projectId/path.db',
     );
-  }
-
-  static void _clearPersistence(String path) {
-    final String sqlLitePath = path;
-    final String journalPath = '$sqlLitePath-journal';
-
-    final File db = File(sqlLitePath);
-    if (db.existsSync()) {
-      db.deleteSync();
-    }
-
-    final File journal = File(journalPath);
-    if (journal.existsSync()) {
-      journal.deleteSync();
-    }
   }
 
   static Future<Firestore> forTests(
@@ -107,7 +135,7 @@ class IntegrationTestUtil {
       FirestoreSettings settings) async {
     final DatabaseInfo databaseInfo = DatabaseInfo(
         databaseId, persistenceKey, settings.host,
-        sslEnabled: settings.sslEnabled);
+        port: settings.port, sslEnabled: settings.sslEnabled);
 
     final BehaviorSubject<bool> onNetworkConnected =
         BehaviorSubject<bool>.seeded(true);
@@ -138,25 +166,27 @@ class IntegrationTestUtil {
     final String persistenceKey = 'db${firestoreStatus.length}';
 
     print('index: $dbIndex');
-    final String dbFullPath =
-        '${Directory.current.path}/build/test/$dbPath\_${dbIndex++}.db';
+    // A name relative to build/test: DatabaseMock resolves it to a path itself.
+    final String dbName = '$dbPath\_${dbIndex++}.db';
 
-    _clearPersistence(dbFullPath);
+    DatabaseMock.deleteDatabaseFiles(dbName);
 
     final TaskScheduler scheduler = TaskScheduler('');
+    final MockCredentialsProvider credentialsProvider =
+        MockCredentialsProvider();
     final Firestore firestore = await forTests(
       databaseId,
       persistenceKey,
-      EmptyCredentialsProvider(),
+      credentialsProvider,
       scheduler,
       (String path,
-          {int version,
-          OnConfigure onConfigure,
-          OnCreate onCreate,
-          OnVersionChange onUpgrade,
-          OnVersionChange onDowngrade,
-          OnOpen onOpen}) async {
-        final DatabaseMock db = await DatabaseMock.create(dbFullPath,
+          {int? version,
+          OnConfigure? onConfigure,
+          OnCreate? onCreate,
+          OnVersionChange? onUpgrade,
+          OnVersionChange? onDowngrade,
+          OnOpen? onOpen}) async {
+        final DatabaseMock db = await DatabaseMock.create(dbName,
             version: version,
             onConfigure: onConfigure,
             onCreate: onCreate,
@@ -170,6 +200,7 @@ class IntegrationTestUtil {
     );
 
     firestoreStatus[firestore] = true;
+    credentialsProviders[firestore] = credentialsProvider;
     return firestore;
   }
 
@@ -178,6 +209,7 @@ class IntegrationTestUtil {
       await firestore.shutdown();
     }
     firestoreStatus.clear();
+    credentialsProviders.clear();
   }
 
   static Future<DocumentReference> testDocument() async {
@@ -185,19 +217,19 @@ class IntegrationTestUtil {
   }
 
   static Future<DocumentReference> testDocumentWithData(
-      Map<String, Object> data) async {
+      Map<String, Object?> data) async {
     final DocumentReference docRef = await testDocument();
     await docRef.set(data);
     return docRef;
   }
 
-  static Future<CollectionReference> testCollection([String name]) async {
+  static Future<CollectionReference> testCollection([String? name]) async {
     return (await testFirestore())
         .collection(name == null ? autoId() : '$name${autoId()}');
   }
 
   static Future<CollectionReference> testCollectionWithDocs(
-      Map<String, Map<String, Object>> docs) async {
+      Map<String, Map<String, Object?>> docs) async {
     final CollectionReference collection = await testCollection();
     final CollectionReference writer =
         (await testFirestore()).collection(collection.id);
@@ -207,8 +239,8 @@ class IntegrationTestUtil {
   }
 
   static Future<void> writeAllDocs(CollectionReference collection,
-      Map<String, Map<String, Object>> docs) async {
-    for (MapEntry<String, Map<String, Object>> doc in docs.entries) {
+      Map<String, Map<String, Object?>> docs) async {
+    for (MapEntry<String, Map<String, Object?>> doc in docs.entries) {
       await collection.document(doc.key).set(doc.value);
     }
   }
@@ -220,11 +252,11 @@ class IntegrationTestUtil {
         .first;
   }
 
-  static List<Map<String, Object>> querySnapshotToValues(
+  static List<Map<String, Object?>> querySnapshotToValues(
       QuerySnapshot querySnapshot) {
-    final List<Map<String, Object>> res = <Map<String, Object>>[];
+    final List<Map<String, Object?>> res = <Map<String, Object?>>[];
     for (DocumentSnapshot doc in querySnapshot) {
-      res.add(doc.data);
+      res.add(doc.data!);
     }
     return res;
   }
@@ -238,14 +270,14 @@ class IntegrationTestUtil {
   }
 
   static Future<void> disableNetwork(Firestore firestore) async {
-    if (firestoreStatus[firestore]) {
+    if (firestoreStatus[firestore] ?? false) {
       await firestore.disableNetwork();
       firestoreStatus[firestore] = false;
     }
   }
 
   static Future<void> enableNetwork(Firestore firestore) async {
-    if (!firestoreStatus[firestore]) {
+    if (!(firestoreStatus[firestore] ?? false)) {
       await firestore.enableNetwork();
       // Wait for the client to connect.
       await firestore.collection('unknown').document().delete();
@@ -254,11 +286,11 @@ class IntegrationTestUtil {
   }
 
   static bool isNetworkEnabled(Firestore firestore) {
-    return firestoreStatus[firestore];
+    return firestoreStatus[firestore] ?? false;
   }
 
-  static Map<String, Object> toDataMap(QuerySnapshot qrySnap) {
-    final Map<String, Object> result = <String, Object>{};
+  static Map<String, Object?> toDataMap(QuerySnapshot qrySnap) {
+    final Map<String, Object?> result = <String, Object>{};
     for (DocumentSnapshot docSnap in qrySnap.documents) {
       result[docSnap.id] = docSnap.data;
     }
@@ -299,7 +331,7 @@ class _MoreOrLessEquals extends Matcher {
   final double epsilon;
 
   @override
-  bool matches(Object object, Map<dynamic, dynamic> matchState) {
+  bool matches(dynamic object, Map<dynamic, dynamic> matchState) {
     if (object is! double) {
       return false;
     }
@@ -315,10 +347,28 @@ class _MoreOrLessEquals extends Matcher {
       description.add('$value (±$epsilon)');
 
   @override
-  Description describeMismatch(Object item, Description mismatchDescription,
+  Description describeMismatch(dynamic item, Description mismatchDescription,
       Map<dynamic, dynamic> matchState, bool verbose) {
     return super
         .describeMismatch(item, mismatchDescription, matchState, verbose)
-          ..add('$item is not in the range of $value (±$epsilon).');
+      ..add('$item is not in the range of $value (±$epsilon).');
   }
+}
+
+/// A credentials provider that lets a test change the current user.
+class MockCredentialsProvider extends CredentialsProvider {
+  // ignore: close_sinks
+  final BehaviorSubject<User> _onChange =
+      BehaviorSubject<User>.seeded(User.unauthenticated);
+
+  @override
+  Future<String?> get token => Future<String?>.value(null);
+
+  @override
+  void invalidateToken() {}
+
+  @override
+  Stream<User> get onChange => _onChange;
+
+  void changeUserTo(User user) => _onChange.add(user);
 }

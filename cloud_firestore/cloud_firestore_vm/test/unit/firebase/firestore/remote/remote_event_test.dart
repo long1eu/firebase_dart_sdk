@@ -7,6 +7,7 @@ import 'dart:typed_data';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
@@ -17,13 +18,15 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_aggregator.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart'
     as asserts;
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart'
+    as proto;
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart' as util;
 import '../util/test_target_metadata_provider.dart';
 
 void main() {
-  TestTargetMetadataProvider targetMetadataProvider;
+  late TestTargetMetadataProvider targetMetadataProvider;
   final Map<int, int> noOutstandingResponses = <int, int>{};
   final ImmutableSortedSet<DocumentKey> noExistingKeys =
       DocumentKey.emptyKeySet;
@@ -504,6 +507,124 @@ void main() {
     expect(event.documentUpdates.length, 0);
   });
 
+  /// Creates an aggregator that has seen docs/1 and docs/2 in target 1 (current).
+  WatchChangeAggregator bloomAggregator(Document doc1, Document doc2) {
+    final Map<int, QueryData> targetMap = util.activeQueries(<int>[1, 2]);
+    final WatchChangeAggregator aggregator = createAggregator(
+        targetMap,
+        noOutstandingResponses,
+        util.keySet(<DocumentKey>[doc1.key, doc2.key]), <WatchChange>[
+      WatchChangeDocumentChange(<int>[1], <int>[], doc1.key, doc1),
+      WatchChangeDocumentChange(<int>[1], <int>[], doc2.key, doc2),
+      WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[1]),
+    ]);
+    final RemoteEvent event = aggregator.createRemoteEvent(util.version(3));
+    expect(event.targetChanges.length, 2);
+    expect(event.documentUpdates.length, 2);
+    return aggregator;
+  }
+
+  test('testExistenceFilterMismatchWithSuccessfulBloomFilterApplication', () {
+    final Document doc1 =
+        util.doc('docs/1', 1, util.map(<dynamic>['value', 1]));
+    final Document doc2 =
+        util.doc('docs/2', 2, util.map(<dynamic>['value', 2]));
+
+    // The bloom filter below is built from document paths of the form
+    // "projects/test-project/databases/test-database/documents/" + key.
+    targetMetadataProvider.setDatabaseId('test-project', 'test-database');
+    final WatchChangeAggregator aggregator = bloomAggregator(doc1, doc2);
+
+    // This bloom filter returns false on mightContain(doc1) and true on mightContain(doc2).
+    final proto.BloomFilter bloomFilter = proto.BloomFilter(
+      bits: proto.BitSequence(bitmap: <int>[0x0E, 0x0F], padding: 1),
+      hashCount: 7,
+    );
+    aggregator.handleExistenceFilter(WatchChangeExistenceFilterWatchChange(
+        1, ExistenceFilter(1, bloomFilter)));
+
+    final RemoteEvent event = aggregator.createRemoteEvent(util.version(3));
+
+    // doc1 is removed from the target, no re-query is needed.
+    expect(event.targetChanges.length, 1);
+    expect(event.targetChanges[1]!.removedDocuments.contains(doc1.key), isTrue);
+    expect(event.targetChanges[1]!.removedDocuments.length, 1);
+    expect(event.targetMismatches, isEmpty);
+    expect(event.documentUpdates.length, 0);
+  });
+
+  test('testExistenceFilterMismatchWithBloomFilterFalsePositiveResult', () {
+    final Document doc1 =
+        util.doc('docs/1', 1, util.map(<dynamic>['value', 1]));
+    final Document doc2 =
+        util.doc('docs/2', 2, util.map(<dynamic>['value', 2]));
+    final WatchChangeAggregator aggregator = bloomAggregator(doc1, doc2);
+
+    // With this bloom filter mightContain() returns true for all documents.
+    final proto.BloomFilter bloomFilter = proto.BloomFilter(
+      bits: proto.BitSequence(bitmap: <int>[0xFF, 0xFF], padding: 7),
+      hashCount: 33,
+    );
+    aggregator.handleExistenceFilter(WatchChangeExistenceFilterWatchChange(
+        1, ExistenceFilter(1, bloomFilter)));
+
+    final RemoteEvent event = aggregator.createRemoteEvent(util.version(3));
+
+    final TargetChange mapping = util.targetChange(
+        Uint8List.fromList(<int>[]), null, null, <Document>[doc1, doc2],
+        current: false);
+    expect(event.targetChanges.length, 1);
+    expect(event.targetChanges[1], mapping);
+    expect(event.targetMismatches,
+        <int, QueryPurpose>{1: QueryPurpose.existenceFilterMismatchBloom});
+    expect(event.documentUpdates.length, 0);
+  });
+
+  test('testExistenceFilterMismatchWithoutBloomFilterIsPlainMismatch', () {
+    final Document doc1 =
+        util.doc('docs/1', 1, util.map(<dynamic>['value', 1]));
+    final Document doc2 =
+        util.doc('docs/2', 2, util.map(<dynamic>['value', 2]));
+    final WatchChangeAggregator aggregator = bloomAggregator(doc1, doc2);
+
+    aggregator.handleExistenceFilter(
+        const WatchChangeExistenceFilterWatchChange(1, ExistenceFilter(1)));
+
+    final RemoteEvent event = aggregator.createRemoteEvent(util.version(3));
+    expect(event.targetMismatches,
+        <int, QueryPurpose>{1: QueryPurpose.existenceFilterMismatch});
+  });
+
+  test('testExistenceFilterMismatchIgnoresInvalidBloomFilters', () {
+    final Document doc1 =
+        util.doc('docs/1', 1, util.map(<dynamic>['value', 1]));
+    final Document doc2 =
+        util.doc('docs/2', 2, util.map(<dynamic>['value', 2]));
+
+    final List<proto.BloomFilter?> invalid = <proto.BloomFilter?>[
+      // Padding out of range.
+      proto.BloomFilter(
+          bits: proto.BitSequence(bitmap: <int>[0x0E, 0x0F], padding: 8),
+          hashCount: 7),
+      // Non-empty bitmap with no hash count.
+      proto.BloomFilter(
+          bits: proto.BitSequence(bitmap: <int>[0x0E, 0x0F], padding: 1)),
+      // Empty bitmap.
+      proto.BloomFilter(bits: proto.BitSequence(), hashCount: 0),
+      // No bits at all.
+      proto.BloomFilter(hashCount: 7),
+    ];
+    for (final proto.BloomFilter? bloomFilter in invalid) {
+      final WatchChangeAggregator aggregator = bloomAggregator(doc1, doc2);
+      aggregator.handleExistenceFilter(WatchChangeExistenceFilterWatchChange(
+          1, ExistenceFilter(1, bloomFilter)));
+      final RemoteEvent event = aggregator.createRemoteEvent(util.version(3));
+      expect(event.targetMismatches,
+          <int, QueryPurpose>{1: QueryPurpose.existenceFilterMismatch},
+          reason: '$bloomFilter');
+    }
+  });
+
   test('testExistenceFilterMismatchRemovesCurrentChanges', () {
     final Map<int, QueryData> targetMap = util.activeQueries(<int>[1]);
 
@@ -564,7 +685,7 @@ void main() {
     expect(event.documentUpdates[doc2.key], doc2);
 
     targetMetadataProvider.setSyncedKeys(
-        targetMap[1], util.keySet(<DocumentKey>[doc1.key, doc2.key]));
+        targetMap[1]!, util.keySet(<DocumentKey>[doc1.key, doc2.key]));
 
     final NoDocument deletedDoc1 = util.deletedDoc('docs/1', 3);
     final WatchChangeDocumentChange change3 = WatchChangeDocumentChange(

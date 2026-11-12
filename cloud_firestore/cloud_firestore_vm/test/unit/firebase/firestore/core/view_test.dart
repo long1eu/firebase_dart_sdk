@@ -47,16 +47,16 @@ void main() {
     final ViewDocumentChanges docViewChanges = view.computeDocChanges(updates);
     final TargetChange targetChange = ackTarget(<Document>[doc1, doc2, doc3]);
     final ViewSnapshot snapshot =
-        view.applyChanges(docViewChanges, targetChange).snapshot;
-    expect(snapshot.query, query);
-    expect(snapshot.documents.toList(), <Document>[doc1, doc2]);
-    expect(snapshot.changes, <DocumentViewChange>[
+        view.applyChanges(docViewChanges, targetChange).snapshot!;
+    expect(snapshot!.query, query);
+    expect(snapshot!.documents.toList(), <Document>[doc1, doc2]);
+    expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.added, doc1),
       DocumentViewChange(DocumentViewChangeType.added, doc2)
     ]);
-    expect(snapshot.isFromCache, isFalse);
-    expect(snapshot.didSyncStateChange, isTrue);
-    expect(snapshot.hasPendingWrites, isFalse);
+    expect(snapshot!.isFromCache, isFalse);
+    expect(snapshot!.didSyncStateChange, isTrue);
+    expect(snapshot!.hasPendingWrites, isFalse);
   });
 
   test('testRemovesDocument', () {
@@ -79,16 +79,16 @@ void main() {
             view.computeDocChanges(docUpdates(
                 <MaybeDocument>[deletedDoc('rooms/eros/messages/2', 0), doc3])),
             ackTarget(<Document>[doc1, doc3]))
-        .snapshot;
+        .snapshot!;
 
-    expect(snapshot.query, query);
-    expect(snapshot.documents.toList(), <Document>[doc1, doc3]);
-    expect(snapshot.changes, <DocumentViewChange>[
+    expect(snapshot!.query, query);
+    expect(snapshot!.documents.toList(), <Document>[doc1, doc3]);
+    expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc2),
       DocumentViewChange(DocumentViewChangeType.added, doc3)
     ]);
-    expect(snapshot.isFromCache, isFalse);
-    expect(snapshot.didSyncStateChange, isTrue);
+    expect(snapshot!.isFromCache, isFalse);
+    expect(snapshot!.didSyncStateChange, isTrue);
   });
 
   test('testReturnsNilIfNoChange', () {
@@ -103,7 +103,7 @@ void main() {
     // initial state
     applyChanges(view, <Document>[doc1, doc2]);
 
-    final ViewSnapshot snapshot =
+    final ViewSnapshot? snapshot =
         applyChanges(view, <Document>[doc1, doc2]).snapshot;
     expect(snapshot, isNull);
   });
@@ -132,17 +132,17 @@ void main() {
         doc('rooms/eros/messages/5', 0, map(<dynamic>['sort', 1]));
 
     final ViewSnapshot snapshot =
-        applyChanges(view, <Document>[doc1, doc2, doc3, doc4, doc5]).snapshot;
+        applyChanges(view, <Document>[doc1, doc2, doc3, doc4, doc5]).snapshot!;
 
-    expect(snapshot.query, query);
-    expect(snapshot.documents.toList(), <Document>[doc1, doc5, doc2]);
-    expect(snapshot.changes, <DocumentViewChange>[
+    expect(snapshot!.query, query);
+    expect(snapshot!.documents.toList(), <Document>[doc1, doc5, doc2]);
+    expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.added, doc1),
       DocumentViewChange(DocumentViewChangeType.added, doc5),
       DocumentViewChange(DocumentViewChangeType.added, doc2)
     ]);
-    expect(snapshot.isFromCache, isTrue);
-    expect(snapshot.didSyncStateChange, isTrue);
+    expect(snapshot!.isFromCache, isTrue);
+    expect(snapshot!.didSyncStateChange, isTrue);
   });
 
   test('testUpdatesDocumentsBasedOnQueryWithFilters', () {
@@ -158,10 +158,10 @@ void main() {
     final Document doc4 = doc('rooms/eros/messages/4', 0, map());
 
     ViewSnapshot snapshot =
-        applyChanges(view, <Document>[doc1, doc2, doc3, doc4]).snapshot;
+        applyChanges(view, <Document>[doc1, doc2, doc3, doc4]).snapshot!;
 
-    expect(snapshot.query, query);
-    expect(snapshot.documents.toList(), <Document>[doc1, doc3]);
+    expect(snapshot!.query, query);
+    expect(snapshot!.documents.toList(), <Document>[doc1, doc3]);
 
     final Document newDoc2 =
         doc('rooms/eros/messages/2', 1, map(<dynamic>['sort', 2]));
@@ -171,18 +171,18 @@ void main() {
         doc('rooms/eros/messages/4', 1, map(<dynamic>['sort', 0]));
 
     snapshot =
-        applyChanges(view, <Document>[newDoc2, newDoc3, newDoc4]).snapshot;
+        applyChanges(view, <Document>[newDoc2, newDoc3, newDoc4]).snapshot!;
 
-    expect(snapshot.query, query);
-    expect(snapshot.documents.toList(), <Document>[newDoc4, doc1, newDoc2]);
+    expect(snapshot!.query, query);
+    expect(snapshot!.documents.toList(), <Document>[newDoc4, doc1, newDoc2]);
 
-    expect(snapshot.changes, <DocumentViewChange>[
+    expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc3),
       DocumentViewChange(DocumentViewChangeType.added, newDoc4),
       DocumentViewChange(DocumentViewChangeType.added, newDoc2)
     ]);
-    expect(snapshot.isFromCache, isTrue);
-    expect(snapshot.didSyncStateChange, isFalse);
+    expect(snapshot!.isFromCache, isTrue);
+    expect(snapshot!.didSyncStateChange, isFalse);
   });
 
   test('testRemovesDocumentsForQueryWithLimit', () {
@@ -202,16 +202,16 @@ void main() {
     final ViewSnapshot snapshot = view
         .applyChanges(view.computeDocChanges(docUpdates(<Document>[doc2])),
             ackTarget(<Document>[doc1, doc2, doc3]))
-        .snapshot;
-    expect(snapshot.query, query);
-    expect(snapshot.documents.toList(), <Document>[doc1, doc2]);
+        .snapshot!;
+    expect(snapshot!.query, query);
+    expect(snapshot!.documents.toList(), <Document>[doc1, doc2]);
 
-    expect(snapshot.changes, <DocumentViewChange>[
+    expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc3),
       DocumentViewChange(DocumentViewChangeType.added, doc2)
     ]);
-    expect(snapshot.isFromCache, isFalse);
-    expect(snapshot.didSyncStateChange, isTrue);
+    expect(snapshot!.isFromCache, isFalse);
+    expect(snapshot!.didSyncStateChange, isTrue);
   });
 
   test('testDoesNotReportChangesForDocumentBeyondLimit', () {
@@ -242,17 +242,17 @@ void main() {
     final ViewSnapshot snapshot = view
         .applyChanges(
             viewDocChanges, ackTarget(<Document>[doc1, doc2, doc3, doc4]))
-        .snapshot;
+        .snapshot!;
 
-    expect(snapshot.query, query);
-    expect(snapshot.documents.toList(), <Document>[doc1, doc3]);
+    expect(snapshot!.query, query);
+    expect(snapshot!.documents.toList(), <Document>[doc1, doc3]);
 
-    expect(snapshot.changes, <DocumentViewChange>[
+    expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc2),
       DocumentViewChange(DocumentViewChangeType.added, doc3)
     ]);
-    expect(snapshot.isFromCache, isFalse);
-    expect(snapshot.didSyncStateChange, isTrue);
+    expect(snapshot!.isFromCache, isFalse);
+    expect(snapshot!.didSyncStateChange, isTrue);
   });
 
   test('testKeepsTrackOfLimboDocuments', () {
@@ -312,6 +312,29 @@ void main() {
     final ViewDocumentChanges changes = view.computeDocChanges(docUpdates());
     final ViewChange change = view.applyChanges(changes, markCurrent);
     expect(change.limboChanges, isEmpty);
+  });
+
+  test('testPendingResetCreatesNoLimbosAndIsNotSynced', () {
+    final Query query = messageQuery();
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+
+    // doc1 is only in the local cache: once the target is current it would be treated as a limbo document. While the
+    // target is pending a reset (existence filter mismatch) that must not happen and the view must not be synced.
+    final View view = View(query, DocumentKey.emptyKeySet);
+    final ViewChange change = view.applyChanges(
+        view.computeDocChanges(docUpdates(<Document>[doc1])),
+        ackTarget(),
+        true);
+
+    expect(change.limboChanges, isEmpty);
+    expect(change.snapshot!.isFromCache, isTrue);
+
+    // Without the pending reset the same state does resolve doc1 as limbo.
+    final ViewChange next =
+        view.applyChanges(view.computeDocChanges(docUpdates()), ackTarget());
+    expect(next.limboChanges, <LimboDocumentChange>[
+      LimboDocumentChange(LimboDocumentChangeType.added, doc1.key)
+    ]);
   });
 
   test('testReturnsNeedsRefillOnDeleteInLimitQuery', () {
@@ -587,7 +610,7 @@ void main() {
         view.computeDocChanges(docUpdates(<MaybeDocument>[doc1]));
     final ViewChange viewChange = view.applyChanges(changes);
 
-    expect(viewChange.snapshot.hasPendingWrites, isTrue);
+    expect(viewChange.snapshot!.hasPendingWrites, isTrue);
   });
 
   test('testDoesntRaiseHasPendingWritesForCommittedMutationsInInitialSnapshot',
@@ -601,7 +624,7 @@ void main() {
         view.computeDocChanges(docUpdates(<MaybeDocument>[doc1]));
     final ViewChange viewChange = view.applyChanges(changes);
 
-    expect(viewChange.snapshot.hasPendingWrites, isFalse);
+    expect(viewChange.snapshot!.hasPendingWrites, isFalse);
   });
 
   test('testSuppressesWriteAcknowledgementIfWatchHasNotCaughtUp', () {
@@ -630,7 +653,7 @@ void main() {
         view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
     ViewChange snap = view.applyChanges(changes);
 
-    expect(snap.snapshot.changes, <DocumentViewChange>[
+    expect(snap.snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.added, doc1),
       DocumentViewChange(DocumentViewChangeType.added, doc2)
     ]);
@@ -640,7 +663,7 @@ void main() {
     snap = view.applyChanges(changes);
 
     // The 'doc1Committed' update is suppressed
-    expect(snap.snapshot.changes, <DocumentViewChange>[
+    expect(snap.snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.modified, doc2Modified)
     ]);
 
@@ -648,10 +671,209 @@ void main() {
         docUpdates(<Document>[doc1Acknowledged, doc2Acknowledged]));
     snap = view.applyChanges(changes);
 
-    expect(snap.snapshot.changes, <DocumentViewChange>[
+    expect(snap.snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.modified, doc1Acknowledged),
       DocumentViewChange(DocumentViewChangeType.metadata, doc2Acknowledged)
     ]);
+  });
+
+  group('limitToLast', () {
+    Document numDoc(int id, int num, [int version = 0]) => doc(
+        'rooms/eros/messages/$id', version, map(<dynamic>['num', num]));
+
+    Query lastQuery(int limit) =>
+        messageQuery().orderBy(orderBy('num')).limitToLast(limit);
+
+    test('keeps the last documents of the query ordering', () {
+      final Query query = lastQuery(2);
+      final View view = View(query, DocumentKey.emptyKeySet);
+
+      final Document doc1 = numDoc(1, 1);
+      final Document doc2 = numDoc(2, 2);
+      final Document doc3 = numDoc(3, 3);
+
+      final ViewSnapshot snapshot = view
+          .applyChanges(
+              view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])),
+              ackTarget(<Document>[doc1, doc2, doc3]))
+          .snapshot!;
+
+      expect(snapshot.query, query);
+      // The results stay in the order of the query (ascending), the first
+      // document is the one that was dropped.
+      expect(snapshot.documents.toList(), <Document>[doc2, doc3]);
+      expect(snapshot.changes, <DocumentViewChange>[
+        DocumentViewChange(DocumentViewChangeType.added, doc2),
+        DocumentViewChange(DocumentViewChangeType.added, doc3),
+      ]);
+      expect(snapshot.isFromCache, isFalse);
+      expect(snapshot.didSyncStateChange, isTrue);
+      expect(view.syncState, ViewSnapshotSyncState.synced);
+    });
+
+    test('keeps the order of a descending limitToLast query', () {
+      final Query query = messageQuery()
+          .orderBy(orderBy('num', 'desc'))
+          .limitToLast(2);
+      final View view = View(query, DocumentKey.emptyKeySet);
+
+      final Document doc1 = numDoc(1, 1);
+      final Document doc2 = numDoc(2, 2);
+      final Document doc3 = numDoc(3, 3);
+
+      final ViewSnapshot snapshot = view
+          .applyChanges(view
+              .computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])))
+          .snapshot!;
+
+      // Descending order: doc3, doc2, doc1. The last two are doc2 and doc1.
+      expect(snapshot.documents.toList(), <Document>[doc2, doc1]);
+    });
+
+    test('replaces the first document when a document is added before it', () {
+      final View view = View(lastQuery(2), DocumentKey.emptyKeySet);
+
+      final Document doc2 = numDoc(2, 2);
+      final Document doc3 = numDoc(3, 3);
+      final Document doc4 = numDoc(4, 4);
+      applyChanges(view, <Document>[doc2, doc3]);
+
+      final ViewSnapshot snapshot = view
+          .applyChanges(view.computeDocChanges(docUpdates(<Document>[doc4])))
+          .snapshot!;
+
+      expect(snapshot.documents.toList(), <Document>[doc3, doc4]);
+      expect(snapshot.changes, <DocumentViewChange>[
+        DocumentViewChange(DocumentViewChangeType.removed, doc2),
+        DocumentViewChange(DocumentViewChangeType.added, doc4),
+      ]);
+    });
+
+    test('does not report documents that sort before the limit', () {
+      final View view = View(lastQuery(2), DocumentKey.emptyKeySet);
+
+      final Document doc2 = numDoc(2, 2);
+      final Document doc3 = numDoc(3, 3);
+      applyChanges(view, <Document>[doc2, doc3]);
+
+      final ViewDocumentChanges changes = view
+          .computeDocChanges(docUpdates(<Document>[numDoc(1, 1)]));
+      expect(changes.needsRefill, isFalse);
+      expect(changes.changeSet.changes, isEmpty);
+      expect(changes.documentSet.toList(), <Document>[doc2, doc3]);
+    });
+
+    test('returns needsRefill on delete in a limitToLast query', () {
+      final View view = View(lastQuery(2), DocumentKey.emptyKeySet);
+      final Document doc1 = numDoc(0, 1);
+      final Document doc2 = numDoc(1, 2);
+
+      // Start with a full view.
+      ViewDocumentChanges changes =
+          view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+      expect(changes.documentSet.length, 2);
+      expect(changes.needsRefill, isFalse);
+      view.applyChanges(changes);
+
+      // Remove one of the docs.
+      changes = view.computeDocChanges(
+          docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/1', 0)]));
+      expect(changes.documentSet.length, 1);
+      expect(changes.needsRefill, isTrue);
+      expect(changes.changeSet.changes.length, 1);
+
+      // Refill it with just the one doc remaining.
+      changes = view.computeDocChanges(docUpdates(<Document>[doc1]), changes);
+      expect(changes.documentSet.length, 1);
+      expect(changes.needsRefill, isFalse);
+      view.applyChanges(changes);
+    });
+
+    test('returns needsRefill when a document moves before the limit', () {
+      final Document doc1 = numDoc(0, 1);
+      Document doc2 = numDoc(1, 2);
+      final Document doc3 = numDoc(2, 3);
+      final View view = View(lastQuery(2), DocumentKey.emptyKeySet);
+
+      // Start with a full view holding doc2 and doc3.
+      ViewDocumentChanges changes =
+          view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3]));
+      expect(changes.documentSet.toList(), <Document>[doc2, doc3]);
+      expect(changes.needsRefill, isFalse);
+      view.applyChanges(changes);
+
+      // Move the first document of the view in front of the limit.
+      doc2 = numDoc(1, 0, 1);
+      changes = view.computeDocChanges(docUpdates(<Document>[doc2]));
+      expect(changes.needsRefill, isTrue);
+
+      // Refill it with all three current docs.
+      changes = view.computeDocChanges(
+          docUpdates(<Document>[doc1, doc2, doc3]), changes);
+      expect(changes.needsRefill, isFalse);
+      expect(changes.documentSet.toList(), <Document>[doc1, doc3]);
+      view.applyChanges(changes);
+    });
+
+    test('does not need a refill when a document moves within the limit', () {
+      final Document doc1 = numDoc(0, 1);
+      Document doc2 = numDoc(1, 2);
+      final Document doc3 = numDoc(2, 3);
+      final View view = View(lastQuery(3), DocumentKey.emptyKeySet);
+
+      view.applyChanges(
+          view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])));
+
+      doc2 = numDoc(1, 2000, 1);
+      final ViewDocumentChanges changes =
+          view.computeDocChanges(docUpdates(<Document>[doc2]));
+      expect(changes.needsRefill, isFalse);
+      expect(changes.documentSet.toList(), <Document>[doc1, doc3, doc2]);
+    });
+
+    test('does not need a refill when a document moves after the first', () {
+      final Document doc1 = numDoc(0, 1);
+      final Document doc2 = numDoc(1, 2);
+      Document doc3 = numDoc(2, 3);
+      final View view = View(lastQuery(2), DocumentKey.emptyKeySet);
+
+      view.applyChanges(
+          view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])));
+
+      // Still sorts after the first document of the view (doc2).
+      doc3 = numDoc(2, 2500, 1);
+      final ViewDocumentChanges changes =
+          view.computeDocChanges(docUpdates(<Document>[doc3]));
+      expect(changes.needsRefill, isFalse);
+      expect(changes.documentSet.toList(), <Document>[doc2, doc3]);
+    });
+
+    test('does not need a refill when not near the limit', () {
+      final Document doc1 = numDoc(0, 1);
+      final Document doc2 = numDoc(1, 2);
+      final View view = View(lastQuery(20), DocumentKey.emptyKeySet);
+
+      view.applyChanges(
+          view.computeDocChanges(docUpdates(<Document>[doc1, doc2])));
+
+      final ViewDocumentChanges changes = view.computeDocChanges(
+          docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/0', 0)]));
+      expect(changes.needsRefill, isFalse);
+      expect(changes.documentSet.toList(), <Document>[doc2]);
+    });
+
+    test('tracks the sync state of the view', () {
+      final View view = View(lastQuery(2), DocumentKey.emptyKeySet);
+      expect(view.syncState, ViewSnapshotSyncState.none);
+
+      final Document doc1 = numDoc(1, 1);
+      applyChanges(view, <Document>[doc1]);
+      expect(view.syncState, ViewSnapshotSyncState.local);
+
+      view.applyChanges(view.computeDocChanges(docUpdates(<Document>[doc1])),
+          ackTarget(<Document>[doc1]));
+      expect(view.syncState, ViewSnapshotSyncState.synced);
+    });
   });
 }
 

@@ -11,7 +11,7 @@ import 'cases/remote_document_cache_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  RemoteDocumentCacheTestCase testCase;
+  late RemoteDocumentCacheTestCase testCase;
 
   setUp(() async {
     print('setUp');

@@ -2,13 +2,13 @@
 // Lung Razvan <long1eu>
 // on 18/09/2018
 
-import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:meta/meta.dart';
 
 /// A [QueryDocumentSnapshot] contains data read from a document in your Firestore database as part
 /// of a query. The document is guaranteed to exist and its data can be extracted using the [data]
@@ -36,11 +36,12 @@ class QueryDocumentSnapshot extends DocumentSnapshot {
           hasPendingWrites: hasPendingWrites,
         );
 
+  @internal
   factory QueryDocumentSnapshot.fromDocument(
     Firestore firestore,
     Document doc, {
-    bool fromCache,
-    bool hasPendingWrites,
+    required bool fromCache,
+    required bool hasPendingWrites,
   }) {
     return QueryDocumentSnapshot._(
         firestore, doc.key, doc, fromCache, hasPendingWrites);
@@ -51,11 +52,11 @@ class QueryDocumentSnapshot extends DocumentSnapshot {
   ///
   /// Returns the fields of the document as a Map.
   @override
-  Map<String, Object> get data {
-    final Map<String, Object> result = super.data;
+  Map<String, Object?> get data {
+    final Map<String, Object?>? result = super.data;
     hardAssert(
         result != null, 'Data in a QueryDocumentSnapshot should be non-null');
-    return result;
+    return result!;
   }
 
   /// Returns the fields of the document as a Map. Field values will be converted to their native
@@ -66,11 +67,11 @@ class QueryDocumentSnapshot extends DocumentSnapshot {
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
   @override
-  Map<String, Object> getData(ServerTimestampBehavior serverTimestampBehavior) {
-    Preconditions.checkNotNull(serverTimestampBehavior);
-    final Map<String, Object> result = super.getData(serverTimestampBehavior);
+  Map<String, Object?> getData(
+      ServerTimestampBehavior serverTimestampBehavior) {
+    final Map<String, Object?>? result = super.getData(serverTimestampBehavior);
     hardAssert(
         result != null, 'Data in a QueryDocumentSnapshot should be non-null');
-    return result;
+    return result!;
   }
 }

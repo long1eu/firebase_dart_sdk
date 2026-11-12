@@ -21,7 +21,7 @@ class RemoteDocumentCacheTestCase {
 
   final Persistence _persistence;
 
-  RemoteDocumentCache _remoteDocumentCache;
+  late RemoteDocumentCache _remoteDocumentCache;
 
   void setUp() {
     _remoteDocumentCache = _persistence.remoteDocumentCache;
@@ -39,7 +39,7 @@ class RemoteDocumentCacheTestCase {
     final List<String> paths = <String>['a/b', 'a/b/c/d/e/f'];
     for (String path in paths) {
       final Document written = await _addTestDocumentAtPath(path);
-      final MaybeDocument read = await _get(path);
+      final MaybeDocument? read = await _get(path);
       expect(read, written);
     }
   }
@@ -48,22 +48,22 @@ class RemoteDocumentCacheTestCase {
   Future<void> testSetAndReadSeveralDocuments() async {
     final List<String> paths = <String>['a/b', 'a/b/c/d/e/f'];
 
-    final Map<DocumentKey, MaybeDocument> written =
-        <DocumentKey, MaybeDocument>{};
+    final Map<DocumentKey, MaybeDocument?> written =
+        <DocumentKey, MaybeDocument?>{};
     for (String path in paths) {
       written[DocumentKey.fromPathString(path)] =
           await _addTestDocumentAtPath(path);
     }
 
-    final Map<DocumentKey, MaybeDocument> read = await _getAll(paths);
+    final Map<DocumentKey, MaybeDocument?> read = await _getAll(paths);
     expect(read, written);
   }
 
   @testMethod
   Future<void> testReadSeveralDocumentsIncludingMissingDocument() async {
     final List<String> paths = <String>['foo/1', 'foo/2'];
-    final Map<DocumentKey, MaybeDocument> written =
-        <DocumentKey, MaybeDocument>{};
+    final Map<DocumentKey, MaybeDocument?> written =
+        <DocumentKey, MaybeDocument?>{};
     for (String path in paths) {
       written[DocumentKey.fromPathString(path)] =
           await _addTestDocumentAtPath(path);
@@ -72,7 +72,7 @@ class RemoteDocumentCacheTestCase {
 
     final List<String> keys = <String>[...paths, 'foo/nonexistent'];
 
-    final Map<DocumentKey, MaybeDocument> read = await _getAll(keys);
+    final Map<DocumentKey, MaybeDocument?> read = await _getAll(keys);
     expect(read, written);
   }
 
@@ -81,8 +81,8 @@ class RemoteDocumentCacheTestCase {
     // Make sure to force SQLite implementation to split the large query into several smaller ones.
     const int lotsOfDocuments = 2000;
     final List<String> paths = <String>[];
-    final Map<DocumentKey, MaybeDocument> expected =
-        <DocumentKey, MaybeDocument>{};
+    final Map<DocumentKey, MaybeDocument?> expected =
+        <DocumentKey, MaybeDocument?>{};
     for (int i = 0; i < lotsOfDocuments; i++) {
       final String path = 'foo/$i';
       paths.add(path);
@@ -90,7 +90,7 @@ class RemoteDocumentCacheTestCase {
           await _addTestDocumentAtPath(path);
     }
 
-    final Map<DocumentKey, MaybeDocument> read = await _getAll(paths);
+    final Map<DocumentKey, MaybeDocument?> read = await _getAll(paths);
     expect(read, expected);
   }
 
@@ -164,11 +164,11 @@ class RemoteDocumentCacheTestCase {
         'add entry', () => _remoteDocumentCache.add(doc));
   }
 
-  Future<MaybeDocument> _get(String path) {
+  Future<MaybeDocument?> _get(String path) {
     return _remoteDocumentCache.get(key(path));
   }
 
-  Future<Map<DocumentKey, MaybeDocument>> _getAll(Iterable<String> paths) {
+  Future<Map<DocumentKey, MaybeDocument?>> _getAll(Iterable<String> paths) {
     final List<DocumentKey> keys = <DocumentKey>[];
 
     for (String path in paths) {

@@ -29,7 +29,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/set_mutation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
@@ -42,7 +41,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_ag
 import 'package:cloud_firestore_vm/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:collection/collection.dart';
-import 'package:meta/meta.dart';
 import 'package:test/test.dart';
 
 import 'test_access_helper.dart';
@@ -71,22 +69,21 @@ FieldMask fieldMask(List<String> fields) {
 
 final Map<String, Object> emptyMap = <String, Object>{};
 
-FieldValue wrap(Object value) {
+FieldValue wrap(Object? value) {
   final DatabaseId databaseId = DatabaseId.forProject('project');
   final UserDataConverter dataConverter = UserDataConverter(databaseId);
   // HACK: We use parseQueryValue() since it accepts scalars as well as
   // arrays / objects, and our tests currently use wrap() pretty generically
   // so we don't know the intent.
-  return dataConverter.parseQueryValue(value);
+  return dataConverter.parseQueryValue(value, allowArrays: true);
 }
 
-ObjectValue wrapMap(Map<String, Object> value) {
+ObjectValue wrapMap(Map<String, Object?> value) {
   // Cast is safe here because value passed in is a map
-  final ObjectValue object = wrap(value);
-  return object;
+  return wrap(value) as ObjectValue;
 }
 
-ObjectValue wrapList(List<Object> entries) {
+ObjectValue wrapList(List<Object?> entries) {
   return wrapMap(map(entries));
 }
 
@@ -110,7 +107,7 @@ DocumentReference ref(String theKey) {
   return TestAccessHelper.createDocumentReference(key(theKey));
 }
 
-DatabaseId dbId(String project, [String database]) {
+DatabaseId dbId(String project, [String? database]) {
   return database == null
       ? DatabaseId.forProject(project)
       : DatabaseId.forDatabase(project, database);
@@ -148,7 +145,7 @@ Document docForValue(
 }
 
 Document doc(/*String|DocumentKey*/ dynamic theKey, int theVersion,
-    Map<String, Object> data,
+    Map<String, Object?> data,
     [DocumentState documentState = DocumentState.synced]) {
   assert(theKey is String || theKey is DocumentKey);
 
@@ -200,9 +197,17 @@ ImmutableSortedSet<DocumentKey> keySet(
   return keySet;
 }
 
-Filter filter(String key, String operator, Object value) {
+FieldFilter filter(String key, String operator, Object? value) {
   return FieldFilter(field(key), operatorFromString(operator), wrap(value));
 }
+
+/// A conjunction of [filters].
+CompositeFilter andFilters(List<Filter> filters) =>
+    CompositeFilter(filters, CompositeFilterOperator.and);
+
+/// A disjunction of [filters].
+CompositeFilter orFilters(List<Filter> filters) =>
+    CompositeFilter(filters, CompositeFilterOperator.or);
 
 FilterOperator operatorFromString(String s) {
   if (s == '<') {
@@ -211,6 +216,8 @@ FilterOperator operatorFromString(String s) {
     return FilterOperator.lessThanOrEqual;
   } else if (s == '==') {
     return FilterOperator.equal;
+  } else if (s == '!=') {
+    return FilterOperator.notEqual;
   } else if (s == '>') {
     return FilterOperator.graterThan;
   } else if (s == '>=') {
@@ -219,6 +226,8 @@ FilterOperator operatorFromString(String s) {
     return FilterOperator.arrayContains;
   } else if (s == 'in') {
     return FilterOperator.IN;
+  } else if (s == 'not-in') {
+    return FilterOperator.NOT_IN;
   } else if (s == 'array-contains-any') {
     return FilterOperator.arrayContainsAny;
   } else {
@@ -227,13 +236,13 @@ FilterOperator operatorFromString(String s) {
 }
 
 OrderBy orderBy(String key, [String dir = 'asc']) {
-  OrderByDirection direction;
+  final OrderByDirection direction;
   if (dir == 'asc') {
     direction = OrderByDirection.ascending;
   } else if (dir == 'desc') {
     direction = OrderByDirection.descending;
   } else {
-    throw ArgumentError('Unknown direction: $direction');
+    throw ArgumentError('Unknown direction: $dir');
   }
   return OrderBy.getInstance(direction, field(key));
 }
@@ -257,25 +266,25 @@ void testEquality(List<List<int>> equalityGroups) {
 
 QueryData queryData(int targetId, QueryPurpose queryPurpose, String path) {
   return QueryData(
-      query(path), targetId, arbitrarySequenceNumber, queryPurpose);
+      query(path).toTarget(), targetId, arbitrarySequenceNumber, queryPurpose);
 }
 
 ImmutableSortedMap<DocumentKey, T> docUpdates<T extends MaybeDocument>(
     [List<MaybeDocument> docs = const <MaybeDocument>[]]) {
   ImmutableSortedMap<DocumentKey, T> res =
       ImmutableSortedMap<DocumentKey, T>.emptyMap(DocumentKey.comparator);
-  for (T doc in docs) {
-    res = res.insert(doc.key, doc);
+  for (MaybeDocument doc in docs) {
+    res = res.insert(doc.key, doc as T);
   }
   return res;
 }
 
 TargetChange targetChange<T extends MaybeDocument>(
-    Uint8List resumeToken,
-    Iterable<Document> addedDocuments,
-    Iterable<Document> modifiedDocuments,
-    Iterable<T> removedDocuments,
-    {@required bool current}) {
+    Uint8List? resumeToken,
+    Iterable<Document>? addedDocuments,
+    Iterable<Document>? modifiedDocuments,
+    Iterable<T>? removedDocuments,
+    {required bool current}) {
   ImmutableSortedSet<DocumentKey> addedDocumentKeys = DocumentKey.emptyKeySet;
   ImmutableSortedSet<DocumentKey> modifiedDocumentKeys =
       DocumentKey.emptyKeySet;
@@ -300,7 +309,7 @@ TargetChange targetChange<T extends MaybeDocument>(
   }
 
   return TargetChange(
-    resumeToken: resumeToken,
+    resumeToken: resumeToken ?? Uint8List(0),
     addedDocuments: addedDocumentKeys,
     modifiedDocuments: modifiedDocumentKeys,
     removedDocuments: removedDocumentKeys,
@@ -308,7 +317,7 @@ TargetChange targetChange<T extends MaybeDocument>(
   );
 }
 
-TargetChange ackTarget([List<Document> docs]) {
+TargetChange ackTarget([List<Document>? docs]) {
   return targetChange(
       Uint8List.fromList(<int>[]), docs ?? const <Document>[], null, null,
       current: true);
@@ -318,8 +327,8 @@ Map<int, QueryData> activeQueries([List<int> targets = const <int>[]]) {
   final Query theQuery = query('foo');
   final Map<int, QueryData> listenMap = <int, QueryData>{};
   for (int targetId in targets) {
-    final QueryData queryData = QueryData(
-        theQuery, targetId, arbitrarySequenceNumber, QueryPurpose.listen);
+    final QueryData queryData = QueryData(theQuery.toTarget(), targetId,
+        arbitrarySequenceNumber, QueryPurpose.listen);
     listenMap[targetId] = queryData;
   }
   return listenMap;
@@ -329,7 +338,7 @@ Map<int, QueryData> activeLimboQueries(String docKey, Iterable<int> targets) {
   final Query theQuery = query(docKey);
   final Map<int, QueryData> listenMap = <int, QueryData>{};
   for (int targetId in targets) {
-    final QueryData queryData = QueryData(theQuery, targetId,
+    final QueryData queryData = QueryData(theQuery.toTarget(), targetId,
         arbitrarySequenceNumber, QueryPurpose.limboResolution);
     listenMap[targetId] = queryData;
   }
@@ -343,6 +352,7 @@ RemoteEvent addedRemoteEvent(MaybeDocument doc, List<int> updatedInTargets,
   final WatchChangeAggregator aggregator =
       WatchChangeAggregator(TargetMetadataProvider(
     getRemoteKeysForTarget: (int targetId) => DocumentKey.emptyKeySet,
+    getDatabaseId: () => DatabaseId.forDatabase('p', 'd'),
     getQueryDataForTarget: (int targetId) =>
         queryData(targetId, QueryPurpose.listen, doc.key.toString()),
   ))
@@ -360,6 +370,7 @@ RemoteEvent updateRemoteEvent(
     getRemoteKeysForTarget: (int targetId) {
       return DocumentKey.emptyKeySet.insert(doc.key);
     },
+    getDatabaseId: () => DatabaseId.forDatabase('p', 'd'),
     getQueryDataForTarget: (int targetId) {
       final bool isLimbo = !(updatedInTargets.contains(targetId) ||
           removedFromTargets.contains(targetId));
@@ -372,15 +383,15 @@ RemoteEvent updateRemoteEvent(
   return aggregator.createRemoteEvent(doc.version);
 }
 
-SetMutation setMutation(String path, Map<String, Object> values) {
+SetMutation setMutation(String path, Map<String, Object?> values) {
   return SetMutation(key(path), wrapMap(values), Precondition.none);
 }
 
-PatchMutation patchMutation(String path, Map<String, Object> values,
-    [List<FieldPath> updateMask]) {
+PatchMutation patchMutation(String path, Map<String, Object?> values,
+    [List<FieldPath>? updateMask]) {
   ObjectValue objectValue = ObjectValue.empty;
   final List<FieldPath> objectMask = <FieldPath>[];
-  for (MapEntry<String, Object> entry in values.entries) {
+  for (MapEntry<String, Object?> entry in values.entries) {
     final FieldPath fieldPath = field(entry.key);
     objectMask.add(fieldPath);
     if (entry.value != deleteSentinel) {
@@ -404,10 +415,10 @@ DeleteMutation deleteMutation(String path) {
   return DeleteMutation(key(path), Precondition.none);
 }
 
-/// Creates a [TransformMutation] by parsing any [FieldValue] sentinels in the provided data. The data is expected to
-/// use dotted-notation for nested fields (i.e. { 'foo.bar': FieldValue.foo() } and must not contain any non-sentinel
-/// data.
-TransformMutation transformMutation(String path, Map<String, Object> data) {
+/// Creates a [PatchMutation] (with an empty mask and the precondition `exists: true`) that carries the transforms
+/// obtained by parsing any [FieldValue] sentinels in the provided data. The data is expected to use dotted-notation for
+/// nested fields (i.e. { 'foo.bar': FieldValue.foo() } and must not contain any non-sentinel data.
+PatchMutation transformMutation(String path, Map<String, Object> data) {
   final UserDataConverter dataConverter =
       UserDataConverter(DatabaseId.forProject('project'));
   final UserDataParsedUpdateData result = dataConverter.parseUpdateData(data);
@@ -420,11 +431,12 @@ TransformMutation transformMutation(String path, Map<String, Object> data) {
           return ft1.fieldPath.compareTo(ft2.fieldPath);
         });
 
-  return TransformMutation(key(path), fieldTransforms);
+  return PatchMutation(key(path), ObjectValue.empty, const FieldMask(<FieldPath>{}),
+      Precondition(exists: true), fieldTransforms);
 }
 
 MutationResult mutationResult(int theVersion) {
-  return MutationResult(version(theVersion), null);
+  return MutationResult(version(theVersion));
 }
 
 LocalViewChanges viewChanges(
@@ -441,7 +453,7 @@ LocalViewChanges viewChanges(
 }
 
 /// Creates a resume token to match the given snapshot version.
-Uint8List resumeToken(
+Uint8List? resumeToken(
     /*int|SnapshotVersion|String*/
     dynamic snapshotVersion) {
   if (snapshotVersion is int) {
@@ -467,8 +479,7 @@ Uint8List resumeToken(
 }
 
 Map<String, Object> fromJsonString(String json) {
-  final Map<String, Object> data = jsonDecode(json);
-  return data;
+  return (jsonDecode(json) as Map<String, dynamic>).cast<String, Object>();
 }
 
 Map<String, Object> fromSingleQuotedString(String json) {
@@ -488,7 +499,7 @@ List<T> values<T>(ImmutableSortedMap<dynamic, T> map) {
 /// be provided which will be displayed in any resulting failure message.
 Future<void> expectError(
     FutureOr<dynamic> Function() runnable, String exceptionMessage,
-    [String context]) async {
+    [String? context]) async {
   bool exceptionThrown = false;
   try {
     await runnable.call();
@@ -499,7 +510,8 @@ Future<void> expectError(
     if (context != null) {
       contextMessage.write(' ($context)');
     }
-    expect(error.message, exceptionMessage, reason: contextMessage.toString());
+    expect((error as dynamic).message, exceptionMessage,
+        reason: contextMessage.toString());
   }
   if (!exceptionThrown) {
     fail(

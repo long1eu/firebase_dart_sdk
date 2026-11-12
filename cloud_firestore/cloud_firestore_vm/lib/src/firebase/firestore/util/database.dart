@@ -23,15 +23,15 @@ abstract class Database {
   File get file;
 
   /// Runs SQLite statement without return values
-  Future<void> execute(String statement, [List<dynamic> arguments]);
+  Future<void> execute(String statement, [List<Object?>? arguments]);
 
   /// SELECT query
   Future<List<Map<String, dynamic>>> query(String statement,
-      [List<dynamic> arguments]);
+      [List<Object?>? arguments]);
 
   /// DELETE query
   /// Returns the number of changes made
-  Future<int> delete(String statement, [List<dynamic> arguments]);
+  Future<int> delete(String statement, [List<Object?>? arguments]);
 
   void close();
 }

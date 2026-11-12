@@ -6,13 +6,11 @@ import 'package:_firebase_database_collection_vm/src/llrb_node.dart';
 import 'package:_firebase_database_collection_vm/src/llrb_red_value_node.dart';
 
 class LLRBEmptyNode<K, V> implements LLRBNode<K, V> {
-  LLRBEmptyNode()
-      : key = null,
-        value = null;
+  const LLRBEmptyNode();
 
   @override
-  LLRBNode<K, V> copy(K key, V value, LLRBNodeColor color, LLRBNode<K, V> left,
-      LLRBNode<K, V> right) {
+  LLRBNode<K, V> copy(K? key, V? value, LLRBNodeColor color, LLRBNode<K, V>? left,
+      LLRBNode<K, V>? right) {
     return this;
   }
 
@@ -31,10 +29,10 @@ class LLRBEmptyNode<K, V> implements LLRBNode<K, V> {
   bool get isRed => false;
 
   @override
-  final K key;
+  K? get key => null;
 
   @override
-  final V value;
+  V? get value => null;
 
   @override
   LLRBNode<K, V> get left => this;

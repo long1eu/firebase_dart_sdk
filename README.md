@@ -1,13 +1,116 @@
-# Archived
+# Firebase Dart SDK: Cloud Firestore for pure Dart
 
-I've started working on this project ready to learn and ready to provide help to others that might need my work. Since this project was way ahead of its time, and help came when it was not worth maintaining anymore, I strongly feel that anyone, that want to pickup on this huge task, should start fron scratch, since a lot of the decisions made in this project were based on what I knew then about Dart and Firebase. The only 2 beings that knew why I did certein things was me and God. Now it's only God. Please have fun reading the code and enjoy arround 2000 free hours berried in this project. 
+A pure-Dart client for Cloud Firestore: no Flutter plugin, no native SDK, just `dart:io`, gRPC and
+SQLite. Use it from Dart servers, CLIs and Flutter apps.
 
-# Firebase Dart SDK
+It is an unofficial port of the open-source
+[Firebase Android SDK](https://github.com/firebase/firebase-android-sdk), including its offline
+cache, listeners with local-write snapshots, transactions and retry logic. It is not affiliated
+with or endorsed by Google or Firebase.
 
-Unofficial Firebase Dart SDK
+```dart
+import 'package:cloud_firestore_vm/cloud_firestore_vm.dart';
 
-# Available service
+final firestore = await Firestore.instanceFor(app: app);
+await firestore.collection('users').doc('ada').set({'name': 'Ada', 'age': 36});
 
-* Firebase Core
-* Firebase Auth
-* Cloud Firestore
+firestore
+    .collection('users')
+    .where(Filter.or([
+      Filter.equalTo('role', 'admin'),
+      Filter.greaterThan('age', 40),
+    ]))
+    .limit(10)
+    .snapshots
+    .listen((snapshot) => print(snapshot.docs.length));
+```
+
+(`app` is a `FirebaseApp` from `firebase_core_vm`; see the
+[package README](cloud_firestore/cloud_firestore_vm/README.md) for current, verified examples.)
+
+## What it does
+
+- Documents, collections, collection groups, queries with `!=`, `not-in`, OR / AND filters,
+  `limitToLast`, cursors and aggregations (count, sum, average).
+- Real-time listeners, offline persistence in SQLite, write queue with pending-write snapshots,
+  `waitForPendingWrites`, `snapshotsInSync`, `terminate`.
+- Transactions (read-write and read-only) with retry and backoff, write batches, field transforms
+  (server timestamp, increment, min/max, array union/remove).
+- Data bundles and named queries, vector values with `findNearest`, App Check token plumbing.
+
+## Status
+
+Revival of the original port, which stopped at the 2019 Android SDK; it now follows the Android
+SDK's behaviour up to late 2026 on Dart 3 with sound null safety.
+
+- **Tested against the Firestore emulator only. Nothing has been run against production Firestore.**
+  Treat it as untested there, and test against your own project before relying on it.
+- Not published from this branch; package versions in the pubspecs are the old ones.
+- Not implemented: BSON value types, index-free queries and overlays, the client-side index engine,
+  clearing persistence (API undecided), Pipelines. Web is not supported.
+- The JS SDK is the reference for the public API of other Firebase clients. A comparison and a
+  roadmap are in `docs/` notes; typed converters (`withConverter`) are the main API gap.
+
+This repository ports Firestore and the Firebase Core pieces it needs. There is no Auth, Storage or
+Realtime Database client here; for those see
+[appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart). The `firebase_auth`,
+`firebase_storage_dart` and `google_sign_in_dart` directories are older code from the original project and
+are not part of the migrated, tested set.
+
+## Packages
+
+| Package | Path | Purpose |
+|---|---|---|
+| `cloud_firestore_vm` | `cloud_firestore/cloud_firestore_vm` | The Firestore client |
+| `firebase_core_vm` | `firebase_core/firebase_core_vm` | `FirebaseApp` and options |
+| `_firebase_internal_vm` | `firebase_core/_firebase_internal_vm` | Internal utilities (not for direct use) |
+| `_firebase_database_collection_vm` | `firebase_core/_firebase_database_collection_vm` | Immutable sorted collections (not for direct use) |
+
+## Running the tests
+
+Unit tests (pub get, analyze `lib`, and tests for the four packages; only `test/unit` for
+Firestore):
+
+    ./tool/test_all.sh
+
+Integration tests need the Firestore emulator. Java and Node are required. Install the Firebase
+CLI locally once:
+
+    mkdir -p .emulator && cd .emulator && npm init -y && npm install firebase-tools && cd ..
+
+Then:
+
+    ./tool/start_emulator.sh        # emulator on 127.0.0.1:8080, project demo-test
+    cd cloud_firestore/cloud_firestore_vm
+    FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration
+    cd ../..
+    ./tool/stop_emulator.sh
+
+See `tool/README.md` for details.
+
+## Regenerating protos
+
+    dart pub global activate protoc_plugin 21.1.2
+    cloud_firestore/cloud_firestore_vm/tool/gen_protos.sh
+
+If the installed `protoc` is unusable, set up the Python wrapper (instructions at the top of
+`tool/protoc_wrap.sh`) and run:
+
+    PROTOC="$PWD/tool/protoc_wrap.sh" cloud_firestore/cloud_firestore_vm/tool/gen_protos.sh
+
+## Upstream sync
+
+[`docs/upstream_sync/UPSTREAM_PLAN.md`](docs/upstream_sync/UPSTREAM_PLAN.md) lists the
+upstream Android SDK commits since the sync point, triaged per commit (`analysis_0.md` to
+`analysis_4.md`), and the order in which they are being ported. Rows the analysis did not read in
+depth are marked unverified there. The top of that file has the current done/deferred status. Behaviour is ported in Dart, not copied verbatim.
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a pull request, run `./tool/test_all.sh`
+and, for changes that touch networking or the local store, the emulator integration tests. Do not
+weaken or remove assertions to get a test passing; report flaky tests instead.
+
+## License
+
+Apache License 2.0, as upstream. See the `LICENSE` file in each package.

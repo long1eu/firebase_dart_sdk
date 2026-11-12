@@ -21,8 +21,8 @@ import 'test_util.dart';
 
 void main() {
   test('testEquals', () {
-    final ObjectValue firstValue = util.wrapList(<dynamic>['a', 1]);
-    final ObjectValue secondValue = util.wrapList(<dynamic>['b', 1]);
+    final ObjectValue firstValue = util.wrapList(<Object>['a', 1]);
+    final ObjectValue secondValue = util.wrapList(<Object>['b', 1]);
 
     final QuerySnapshot foo = querySnapshot(
         'foo', util.map(), util.map(<dynamic>['a', firstValue]), true, false);
@@ -81,6 +81,7 @@ void main() {
       isFromCache: false,
       didSyncStateChange: true,
       excludesMetadataChanges: false,
+      hasCachedResults: false,
     );
 
     final QuerySnapshot snapshot =

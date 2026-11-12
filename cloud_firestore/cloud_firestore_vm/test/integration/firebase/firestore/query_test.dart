@@ -4,6 +4,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
@@ -11,6 +12,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/source.dart';
 import 'package:test/test.dart';
 
 import '../../../util/await_helper.dart';
@@ -31,7 +33,7 @@ void main() {
 
   test('testLimitQueries', () async {
     final CollectionReference collection =
-        await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+        await testCollectionWithDocs(map<Map<String, Object?>>(<dynamic>[
       'a',
       map<String>(<String>['k', 'a']),
       'b',
@@ -42,7 +44,7 @@ void main() {
 
     final Query query = collection.limit(2);
     final QuerySnapshot set = await query.get();
-    final List<Map<String, Object>> data = querySnapshotToValues(set);
+    final List<Map<String, Object?>> data = querySnapshotToValues(set);
 
     expect(data, <Map<String, String>>[
       map<String>(<String>['k', 'a']),
@@ -52,7 +54,7 @@ void main() {
 
   test('testLimitQueriesUsingDescendingSortOrder', () async {
     final CollectionReference collection =
-        await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+        await testCollectionWithDocs(map<Map<String, Object?>>(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['k', 'a', 'sort', 0]),
       'b',
@@ -66,9 +68,9 @@ void main() {
     final Query query =
         collection.limit(2).orderBy('sort', Direction.descending);
     final QuerySnapshot set = await query.get();
-    final List<Map<String, Object>> data = querySnapshotToValues(set);
+    final List<Map<String, Object?>> data = querySnapshotToValues(set);
 
-    expect(data, <Map<String, dynamic>>[
+    expect(data, <Map<String, Object?>>[
       map<dynamic>(<dynamic>['k', 'd', 'sort', 2]),
       map<dynamic>(<dynamic>['k', 'c', 'sort', 1])
     ]);
@@ -76,7 +78,7 @@ void main() {
 
   test('testKeyOrderIsDescendingForDescendingInequality', () async {
     final CollectionReference collection =
-        await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+        await testCollectionWithDocs(map<Map<String, Object?>>(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['foo', 42]),
       'b',
@@ -124,7 +126,7 @@ void main() {
 
   test('testFilterOnInfinity', () async {
     final CollectionReference collection =
-        await testCollectionWithDocs(map<Map<String, dynamic>>(<dynamic>[
+        await testCollectionWithDocs(map<Map<String, Object?>>(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['inf', double.infinity]),
       'b',
@@ -216,16 +218,16 @@ void main() {
     await testCounterFull.following(2);
 
     expect(snapshots.length, 1);
-    expect(querySnapshotToValues(snapshots[0]), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshots[0]), <Map<String, Object?>>[
       map<String>(<String>['v', 'a']),
       map<String>(<String>['v', 'b'])
     ]);
     expect(snapshotsFull.length, 2);
-    expect(querySnapshotToValues(snapshotsFull[0]), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshotsFull[0]), <Map<String, Object?>>[
       map<String>(<String>['v', 'a']),
       map<String>(<String>['v', 'b'])
     ]);
-    expect(querySnapshotToValues(snapshotsFull[1]), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshotsFull[1]), <Map<String, Object?>>[
       map<String>(<String>['v', 'a']),
       map<String>(<String>['v', 'b'])
     ]);
@@ -241,11 +243,11 @@ void main() {
     await testCounterFull.following(2);
 
     expect(snapshotsFull.length, 4);
-    expect(querySnapshotToValues(snapshotsFull[2]), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshotsFull[2]), <Map<String, Object?>>[
       map<String>(<String>['v', 'a1']),
       map<String>(<String>['v', 'b'])
     ]);
-    expect(querySnapshotToValues(snapshotsFull[3]), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshotsFull[3]), <Map<String, Object?>>[
       map<String>(<String>['v', 'a1']),
       map<String>(<String>['v', 'b'])
     ]);
@@ -254,7 +256,7 @@ void main() {
     expect(snapshotsFull[3].metadata.hasPendingWrites, isFalse);
 
     expect(snapshots.length, 2);
-    expect(querySnapshotToValues(snapshots[1]), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshots[1]), <Map<String, Object?>>[
       map<String>(<String>['v', 'a1']),
       map<String>(<String>['v', 'b'])
     ]);
@@ -263,11 +265,11 @@ void main() {
     await Future<void>.delayed(const Duration(seconds: 1));
 
     expect(snapshotsFull.length, 6);
-    expect(querySnapshotToValues(snapshotsFull[4]), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshotsFull[4]), <Map<String, Object?>>[
       map<String>(<String>['v', 'a1']),
       map<String>(<String>['v', 'b1'])
     ]);
-    expect(querySnapshotToValues(snapshotsFull[5]), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshotsFull[5]), <Map<String, Object?>>[
       map<String>(<String>['v', 'a1']),
       map<String>(<String>['v', 'b1'])
     ]);
@@ -275,7 +277,7 @@ void main() {
     expect(snapshotsFull[5].metadata.hasPendingWrites, isFalse);
 
     expect(snapshots.length, 3);
-    expect(querySnapshotToValues(snapshots[2]), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshots[2]), <Map<String, Object?>>[
       map<String>(<String>['v', 'a1']),
       map<String>(<String>['v', 'b1'])
     ]);
@@ -285,7 +287,7 @@ void main() {
   });
 
   test('testCanListenForQueryMetadataChanges', () async {
-    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> testDocs = map(<dynamic>[
       '1',
       map<dynamic>(<dynamic>['sort', 1.0, 'filter', true, 'key', '1']),
       '2',
@@ -312,7 +314,7 @@ void main() {
     await testCounter.next;
     expect(snapshots.length, 1);
     expect(querySnapshotToValues(snapshots[0]),
-        <Map<String, dynamic>>[testDocs['1'], testDocs['2'], testDocs['3']]);
+        <Map<String, Object?>>[testDocs['1']!, testDocs['2']!, testDocs['3']!]);
 
     final Query query2 = collection.whereEqualTo('filter', true);
     final StreamSubscription<QuerySnapshot> listener2 = query2
@@ -327,9 +329,9 @@ void main() {
     await testCounter.following(2);
     expect(snapshots.length, 3);
     expect(querySnapshotToValues(snapshots[1]),
-        <Map<String, dynamic>>[testDocs['1'], testDocs['2'], testDocs['3']]);
+        <Map<String, Object?>>[testDocs['1']!, testDocs['2']!, testDocs['3']!]);
     expect(querySnapshotToValues(snapshots[2]),
-        <Map<String, dynamic>>[testDocs['1'], testDocs['2'], testDocs['3']]);
+        <Map<String, Object?>>[testDocs['1']!, testDocs['2']!, testDocs['3']!]);
     expect(snapshots[1].metadata.isFromCache, isTrue);
     expect(snapshots[2].metadata.isFromCache, isFalse);
 
@@ -338,7 +340,7 @@ void main() {
   });
 
   test('testCanExplicitlySortByDocumentId', () async {
-    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> testDocs = map(<dynamic>[
       'a',
       map<String>(<String>['key', 'a']),
       'b',
@@ -355,11 +357,11 @@ void main() {
         await collection.orderByField(FieldPath.documentId()).get();
 
     expect(querySnapshotToValues(docs),
-        <Map<String, dynamic>>[testDocs['a'], testDocs['b'], testDocs['c']]);
+        <Map<String, Object?>>[testDocs['a']!, testDocs['b']!, testDocs['c']!]);
   });
 
   test('testCanQueryByDocumentId', () async {
-    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> testDocs = map(<dynamic>[
       'aa',
       map<String>(<String>['key', 'aa']),
       'ab',
@@ -374,18 +376,19 @@ void main() {
         await testCollectionWithDocs(testDocs);
     QuerySnapshot docs =
         await collection.whereEqualToField(FieldPath.documentId(), 'ab').get();
-    expect(querySnapshotToValues(docs), <Map<String, dynamic>>[testDocs['ab']]);
+    expect(
+        querySnapshotToValues(docs), <Map<String, Object?>>[testDocs['ab']!]);
 
     docs = await collection
         .whereGreaterThanField(FieldPath.documentId(), 'aa')
         .whereLessThanOrEqualToField(FieldPath.documentId(), 'ba')
         .get();
     expect(querySnapshotToValues(docs),
-        <Map<String, dynamic>>[testDocs['ab'], testDocs['ba']]);
+        <Map<String, Object?>>[testDocs['ab']!, testDocs['ba']!]);
   });
 
   test('testCanQueryByDocumentIdUsingRefs', () async {
-    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> testDocs = map(<dynamic>[
       'aa',
       map<String>(<String>['key', 'aa']),
       'ab',
@@ -400,7 +403,8 @@ void main() {
     QuerySnapshot docs = await collection
         .whereEqualToField(FieldPath.documentId(), collection.document('ab'))
         .get();
-    expect(querySnapshotToValues(docs), <Map<String, dynamic>>[testDocs['ab']]);
+    expect(
+        querySnapshotToValues(docs), <Map<String, Object?>>[testDocs['ab']!]);
 
     docs = await collection
         .whereGreaterThanField(
@@ -409,7 +413,7 @@ void main() {
             FieldPath.documentId(), collection.document('ba'))
         .get();
     expect(querySnapshotToValues(docs),
-        <Map<String, dynamic>>[testDocs['ab'], testDocs['ba']]);
+        <Map<String, Object?>>[testDocs['ab']!, testDocs['ba']!]);
   });
 
   test('testCanQueryWithAndWithoutDocumentKey', () async {
@@ -448,7 +452,7 @@ void main() {
   });
 
   test('testQueriesFireFromCacheWhenOffline', () async {
-    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> testDocs = map(<dynamic>[
       'a',
       map<dynamic>(<dynamic>['foo', 1])
     ]);
@@ -465,7 +469,7 @@ void main() {
     QuerySnapshot querySnapshot = await accum.wait();
 
     expect(querySnapshotToValues(querySnapshot),
-        <Map<String, dynamic>>[testDocs['a']]);
+        <Map<String, Object?>>[testDocs['a']!]);
     expect(querySnapshot.metadata.isFromCache, isFalse);
 
     // offline event with fromCache=true
@@ -481,16 +485,68 @@ void main() {
     await listener.cancel();
   });
 
+  test('testQueriesCanRaiseInitialSnapshotFromCachedEmptyResults', () async {
+    final CollectionReference collectionReference = await testCollection();
+
+    // Populate the cache with empty query result.
+    final QuerySnapshot querySnapshotA = await collectionReference.get();
+    expect(querySnapshotA.metadata.isFromCache, isFalse);
+    expect(querySnapshotToValues(querySnapshotA), <Map<String, Object?>>[]);
+
+    // Add a snapshot listener whose first event should be raised from cache.
+    final EventAccumulator<QuerySnapshot> accum =
+        EventAccumulator<QuerySnapshot>();
+    final StreamSubscription<QuerySnapshot> listener = collectionReference
+        .getSnapshots(MetadataChanges.include)
+        .listen(accum.onData, onError: accum.onError);
+    final QuerySnapshot querySnapshotB = await accum.wait();
+    expect(querySnapshotB.metadata.isFromCache, isTrue);
+    expect(querySnapshotToValues(querySnapshotB), <Map<String, Object?>>[]);
+
+    await listener.cancel();
+  });
+
+  test('testQueriesCanRaiseInitialSnapshotFromEmptyDueToDeleteCachedResults',
+      () async {
+    final Map<String, Map<String, Object?>> testDocs = map(<dynamic>[
+      'a',
+      map<dynamic>(<dynamic>['foo', 1])
+    ]);
+    final CollectionReference collectionReference =
+        await testCollectionWithDocs(testDocs);
+    // Populate the cache with single document.
+    final QuerySnapshot querySnapshotA = await collectionReference.get();
+    expect(querySnapshotA.metadata.isFromCache, isFalse);
+    expect(querySnapshotToValues(querySnapshotA),
+        <Map<String, Object?>>[testDocs['a']!]);
+
+    // Delete the document, make cached result empty.
+    final DocumentReference docRef = collectionReference.document('a');
+    await docRef.delete();
+
+    // Add a snapshot listener whose first event should be raised from cache.
+    final EventAccumulator<QuerySnapshot> accum =
+        EventAccumulator<QuerySnapshot>();
+    final StreamSubscription<QuerySnapshot> listener = collectionReference
+        .getSnapshots(MetadataChanges.include)
+        .listen(accum.onData, onError: accum.onError);
+    final QuerySnapshot querySnapshotB = await accum.wait();
+    expect(querySnapshotB.metadata.isFromCache, isTrue);
+    expect(querySnapshotToValues(querySnapshotB), <Map<String, Object?>>[]);
+
+    await listener.cancel();
+  });
+
   test('testQueriesCanUseArrayContainsFilters', () async {
-    final Map<String, Object> docA = map(<dynamic>[
+    final Map<String, Object?> docA = map(<dynamic>[
       'array',
       <int>[42]
     ]);
-    final Map<String, Object> docB = map(<dynamic>[
+    final Map<String, Object?> docB = map(<dynamic>[
       'array',
       <dynamic>['a', 42, 'c']
     ]);
-    final Map<String, Object> docC = map(<dynamic>[
+    final Map<String, Object?> docC = map(<dynamic>[
       'array',
       <dynamic>[
         41.999,
@@ -501,47 +557,22 @@ void main() {
         ])
       ]
     ]);
-    final Map<String, Object> docD = map(<dynamic>[
+    final Map<String, Object?> docD = map(<dynamic>[
       'array',
       <int>[42],
       'array2',
       <String>['bingo']
     ]);
-    final CollectionReference collection = await testCollectionWithDocs(
-        map<Map<String, dynamic>>(
-            <dynamic>['a', docA, 'b', docB, 'c', docC, 'd', docD]));
-
-    // Search for 'array' to contain 42
-    final QuerySnapshot snapshot =
-        await collection.whereArrayContains('array', 42).get();
-    expect(querySnapshotToValues(snapshot),
-        <Map<String, dynamic>>[docA, docB, docD]);
-
-    // NOTE: The backend doesn't currently support null, NaN, objects, or
-    // arrays, so there isn't much of anything else interesting to test.
-  });
-
-  test('testQueriesCanUseInFilters', () async {
-    final Map<String, Object> docA = map(<dynamic>['zip', 98101]);
-    final Map<String, Object> docB = map(<dynamic>['zip', 91102]);
-    final Map<String, Object> docC = map(<dynamic>['zip', 98103]);
-    final Map<String, Object> docD = map(<dynamic>[
-      'zip',
-      <int>[98101]
+    final Map<String, Object?> docE = map(<dynamic>[
+      'array',
+      <Object?>[null]
     ]);
-    final Map<String, Object> docE = map(<dynamic>[
-      'zip',
-      <dynamic>[
-        '98101',
-        map<dynamic>(<dynamic>['zip', 98101])
-      ]
-    ]);
-    final Map<String, Object> docF = map(<dynamic>[
-      'zip',
-      map<dynamic>(<dynamic>['code', 500])
+    final Map<String, Object?> docF = map(<dynamic>[
+      'array',
+      <double>[double.nan]
     ]);
     final CollectionReference collection = await testCollectionWithDocs(
-        map(<dynamic>[
+        map<Map<String, Object?>>(<dynamic>[
       'a',
       docA,
       'b',
@@ -556,58 +587,45 @@ void main() {
       docF
     ]));
 
-    // Search for zips matching [98101, 98103].
+    // Search for 'array' to contain 42
     QuerySnapshot snapshot =
-        await collection.whereIn('zip', <int>[98101, 98103]).get();
-    expect(querySnapshotToValues(snapshot), <dynamic>[docA, docC]);
+        await collection.whereArrayContains('array', 42).get();
+    expect(querySnapshotToValues(snapshot),
+        <Map<String, Object?>>[docA, docB, docD]);
 
-    // With objects.
-    snapshot = await collection.whereIn('zip', <dynamic>[
-      map<dynamic>(<dynamic>['code', 500])
-    ]).get();
-    expect(querySnapshotToValues(snapshot), <dynamic>[docF]);
+    // Note: whereArrayContains() requires a non-null value parameter, so no null test is needed.
+    // With NaN.
+    snapshot = await collection.whereArrayContains('array', double.nan).get();
+    expect(querySnapshotToValues(snapshot), <Map<String, Object?>>[]);
   });
 
-  test('testQueriesCanUseArrayContainsAnyFilters', () async {
-    final Map<String, Object> docA = map(<dynamic>[
-      'array',
-      <dynamic>[42]
+  test('testQueriesCanUseInFilters', () async {
+    final Map<String, Object?> docA = map(<dynamic>['zip', 98101]);
+    final Map<String, Object?> docB = map(<dynamic>['zip', 91102]);
+    final Map<String, Object?> docC = map(<dynamic>['zip', 98103]);
+    final Map<String, Object?> docD = map(<dynamic>[
+      'zip',
+      <int>[98101]
     ]);
-    final Map<String, Object> docB = map(<dynamic>[
-      'array',
-      <dynamic>['a', 42, 'c']
-    ]);
-    final Map<String, Object> docC = map(<dynamic>[
-      'array',
+    final Map<String, Object?> docE = map(<dynamic>[
+      'zip',
       <dynamic>[
-        41.999,
-        '42',
-        map<dynamic>(<dynamic>[
-          'a',
-          <int>[42]
-        ])
+        '98101',
+        map<dynamic>(<dynamic>['zip', 98101])
       ]
     ]);
-    final Map<String, Object> docD = map(<dynamic>[
-      'array',
-      <dynamic>[42],
-      'array2',
-      <dynamic>['bingo']
+    final Map<String, Object?> docF = map(<dynamic>[
+      'zip',
+      map<dynamic>(<dynamic>['code', 500])
     ]);
-    final Map<String, Object> docE = map(<dynamic>[
-      'array',
-      <dynamic>[43]
+    final Map<String, Object?> docG = map(<dynamic>['zip', null]);
+    final Map<String, Object?> docH = map(<dynamic>['zip', double.nan]);
+    final Map<String, Object?> docI = map(<dynamic>[
+      'zip',
+      <int>[98101, 98102]
     ]);
-    final Map<String, Object> docF = map(<dynamic>[
-      'array',
-      <dynamic>[
-        map<dynamic>(<dynamic>['a', 42])
-      ]
-    ]);
-    final Map<String, Object> docG = map(<dynamic>['array', 42]);
-
-    final CollectionReference collection = await testCollectionWithDocs(
-        map(<dynamic>[
+    final CollectionReference collection =
+        await testCollectionWithDocs(map(<dynamic>[
       'a',
       docA,
       'b',
@@ -619,7 +637,314 @@ void main() {
       'e',
       docE,
       'f',
-      docF
+      docF,
+      'g',
+      docG,
+      'h',
+      docH,
+      'i',
+      docI
+    ]));
+
+    // Search for zips matching [98101, 98103].
+    QuerySnapshot snapshot =
+        await collection.whereIn('zip', <int>[98101, 98103]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docA, docC]);
+
+    // With arrays as values.
+    snapshot = await collection.whereIn('zip', <dynamic>[
+      98101,
+      98103,
+      <int>[98101, 98102]
+    ]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docA, docC, docI]);
+
+    // With objects.
+    snapshot = await collection.whereIn('zip', <dynamic>[
+      map<dynamic>(<dynamic>['code', 500])
+    ]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docF]);
+
+    // With null.
+    snapshot = await collection.whereIn('zip', <Object?>[null]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[]);
+
+    // With null and a value.
+    snapshot = await collection.whereIn('zip', <Object?>[null, 98101]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docA]);
+
+    // With NaN.
+    snapshot = await collection.whereIn('zip', <Object?>[double.nan]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[]);
+
+    // With NaN and a value.
+    snapshot =
+        await collection.whereIn('zip', <Object?>[double.nan, 98101]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docA]);
+  });
+
+  // The documents used by the not-equal and not-in tests. Since both filters
+  // are inequalities, results come back ordered by the value of "zip".
+  Map<String, Object?> notEqualTestDocs() => <String, Object?>{
+        'a': <String, Object?>{'zip': double.nan},
+        'b': <String, Object?>{'zip': 91102},
+        'c': <String, Object?>{'zip': 98101},
+        'd': <String, Object?>{'zip': 98103},
+        'e': <String, Object?>{
+          'zip': <Object?>[98101]
+        },
+        'f': <String, Object?>{
+          'zip': <Object?>[98101, 98102]
+        },
+        'g': <String, Object?>{
+          'zip': <Object?>[
+            '98101',
+            <String, Object?>{'zip': 98101}
+          ]
+        },
+        'h': <String, Object?>{
+          'zip': <String, Object?>{'code': 500}
+        },
+        'i': <String, Object?>{'code': 500},
+        'j': <String, Object?>{'zip': null},
+      };
+
+  List<Object?> docsExcept(Map<String, Object?> all, List<String> excluded) {
+    return all.entries
+        .where((MapEntry<String, Object?> e) => !excluded.contains(e.key))
+        .map((MapEntry<String, Object?> e) => e.value)
+        .toList();
+  }
+
+  test('testQueriesCanUseNotEqualFilters', () async {
+    final Map<String, Object?> all = notEqualTestDocs();
+    final CollectionReference collection = await testCollectionWithDocs(all.map(
+        (String k, Object? v) => MapEntry<String, Map<String, Object?>>(
+            k, v! as Map<String, Object?>)));
+
+    // Search for zips not matching 98101.
+    QuerySnapshot snapshot =
+        await collection.whereNotEqualTo('zip', 98101).get();
+    expect(querySnapshotToValues(snapshot),
+        docsExcept(all, <String>['c', 'i', 'j']));
+
+    // With objects.
+    snapshot = await collection
+        .whereNotEqualTo('zip', <String, Object?>{'code': 500}).get();
+    expect(querySnapshotToValues(snapshot),
+        docsExcept(all, <String>['h', 'i', 'j']));
+
+    // With null.
+    snapshot = await collection.whereNotEqualTo('zip', null).get();
+    expect(
+        querySnapshotToValues(snapshot), docsExcept(all, <String>['i', 'j']));
+
+    // With NaN.
+    snapshot = await collection.whereNotEqualTo('zip', double.nan).get();
+    expect(querySnapshotToValues(snapshot),
+        docsExcept(all, <String>['a', 'i', 'j']));
+  });
+
+  test('testQueriesCanUseNotEqualFiltersWithDocIds', () async {
+    final Map<String, Object?> docA = map(<dynamic>['key', 'aa']);
+    final Map<String, Object?> docB = map(<dynamic>['key', 'ab']);
+    final Map<String, Object?> docC = map(<dynamic>['key', 'ba']);
+    final Map<String, Object?> docD = map(<dynamic>['key', 'bb']);
+    final CollectionReference collection =
+        await testCollectionWithDocs(map<Map<String, Object?>>(<dynamic>[
+      'aa', docA, //
+      'ab', docB,
+      'ba', docC,
+      'bb', docD
+    ]));
+    final QuerySnapshot docs = await collection
+        .whereNotEqualToField(FieldPath.documentId(), 'aa')
+        .get();
+    expect(querySnapshotToValues(docs), <dynamic>[docB, docC, docD]);
+  });
+
+  test('testQueriesCanUseNotInFilters', () async {
+    final Map<String, Object?> all = notEqualTestDocs();
+    final CollectionReference collection = await testCollectionWithDocs(all.map(
+        (String k, Object? v) => MapEntry<String, Map<String, Object?>>(
+            k, v! as Map<String, Object?>)));
+
+    // Search for zips not matching 98101, 98103, or [98101, 98102].
+    QuerySnapshot snapshot = await collection.whereNotIn('zip', <Object?>[
+      98101,
+      98103,
+      <Object?>[98101, 98102]
+    ]).get();
+    expect(querySnapshotToValues(snapshot),
+        docsExcept(all, <String>['c', 'd', 'f', 'i', 'j']));
+
+    // With objects.
+    snapshot = await collection.whereNotIn('zip', <Object?>[
+      <String, Object?>{'code': 500}
+    ]).get();
+    expect(querySnapshotToValues(snapshot),
+        docsExcept(all, <String>['h', 'i', 'j']));
+
+    // With null.
+    snapshot = await collection.whereNotIn('zip', <Object?>[null]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[]);
+
+    // With NaN.
+    snapshot = await collection.whereNotIn('zip', <Object?>[double.nan]).get();
+    expect(querySnapshotToValues(snapshot),
+        docsExcept(all, <String>['a', 'i', 'j']));
+
+    // With NaN and a number.
+    snapshot =
+        await collection.whereNotIn('zip', <Object?>[double.nan, 98101]).get();
+    expect(querySnapshotToValues(snapshot),
+        docsExcept(all, <String>['a', 'c', 'i', 'j']));
+  });
+
+  test('testQueriesCanUseNotInFiltersWithDocIds', () async {
+    final Map<String, Object?> docA = map(<dynamic>['key', 'aa']);
+    final Map<String, Object?> docB = map(<dynamic>['key', 'ab']);
+    final Map<String, Object?> docC = map(<dynamic>['key', 'ba']);
+    final Map<String, Object?> docD = map(<dynamic>['key', 'bb']);
+    final CollectionReference collection =
+        await testCollectionWithDocs(map<Map<String, Object?>>(<dynamic>[
+      'aa', docA, //
+      'ab', docB,
+      'ba', docC,
+      'bb', docD
+    ]));
+    final QuerySnapshot docs = await collection
+        .whereNotInField(FieldPath.documentId(), <Object?>['aa', 'ab']).get();
+    expect(querySnapshotToValues(docs), <dynamic>[docC, docD]);
+  });
+
+  // Checks that the SDK's local filtering of the (cached) documents agrees with
+  // the backend.
+  Future<void> checkOnlineAndOfflineResultsMatch(
+      Query query, List<String> expectedDocs) async {
+    final QuerySnapshot server = await query.get(Source.server);
+    expect(querySnapshotToIds(server), expectedDocs);
+    final QuerySnapshot cache = await query.get(Source.cache);
+    expect(querySnapshotToIds(cache), expectedDocs);
+  }
+
+  test('testSDKUsesNotEqualFiltersSameAsServer', () async {
+    final Map<String, Object?> all = notEqualTestDocs()
+      ..['d'] = <String, Object?>{'zip': '98101'};
+    final CollectionReference collection = await testCollectionWithDocs(all.map(
+        (String k, Object? v) => MapEntry<String, Map<String, Object?>>(
+            k, v! as Map<String, Object?>)));
+
+    await checkOnlineAndOfflineResultsMatch(
+        collection.whereNotEqualTo('zip', 98101),
+        <String>['a', 'b', 'd', 'e', 'f', 'g', 'h']);
+    await checkOnlineAndOfflineResultsMatch(
+        collection.whereNotEqualTo('zip', double.nan),
+        <String>['b', 'c', 'd', 'e', 'f', 'g', 'h']);
+    await checkOnlineAndOfflineResultsMatch(
+        collection.whereNotEqualTo('zip', null),
+        <String>['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']);
+  });
+
+  test('testSDKUsesNotInFiltersSameAsServer', () async {
+    final Map<String, Object?> all = notEqualTestDocs()
+      ..['d'] = <String, Object?>{'zip': '98101'};
+    final CollectionReference collection = await testCollectionWithDocs(all.map(
+        (String k, Object? v) => MapEntry<String, Map<String, Object?>>(
+            k, v! as Map<String, Object?>)));
+
+    await checkOnlineAndOfflineResultsMatch(
+        collection.whereNotIn('zip', <Object?>[
+          98101,
+          98103,
+          <Object?>[98101, 98102]
+        ]),
+        <String>['a', 'b', 'd', 'e', 'g', 'h']);
+    await checkOnlineAndOfflineResultsMatch(
+        collection.whereNotIn('zip', <Object?>[null]), <String>[]);
+  });
+
+  test('testQueriesCanUseInFiltersWithArrayValues', () async {
+    final Map<String, Object?> docA = map(<dynamic>['zip', 98101]);
+    final Map<String, Object?> docB = map(<dynamic>[
+      'zip',
+      <int>[98101, 98102]
+    ]);
+    final CollectionReference collection = await testCollectionWithDocs(
+        map<Map<String, Object?>>(<dynamic>['a', docA, 'b', docB]));
+
+    final QuerySnapshot snapshot = await collection.whereIn('zip', <dynamic>[
+      <int>[98101, 98102]
+    ]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docB]);
+  });
+
+  test('testQueriesCanUseArrayContainsAnyFilters', () async {
+    final Map<String, Object?> docA = map(<dynamic>[
+      'array',
+      <dynamic>[42]
+    ]);
+    final Map<String, Object?> docB = map(<dynamic>[
+      'array',
+      <dynamic>['a', 42, 'c']
+    ]);
+    final Map<String, Object?> docC = map(<dynamic>[
+      'array',
+      <dynamic>[
+        41.999,
+        '42',
+        map<dynamic>(<dynamic>[
+          'a',
+          <int>[42]
+        ])
+      ]
+    ]);
+    final Map<String, Object?> docD = map(<dynamic>[
+      'array',
+      <dynamic>[42],
+      'array2',
+      <dynamic>['bingo']
+    ]);
+    final Map<String, Object?> docE = map(<dynamic>[
+      'array',
+      <dynamic>[43]
+    ]);
+    final Map<String, Object?> docF = map(<dynamic>[
+      'array',
+      <dynamic>[
+        map<dynamic>(<dynamic>['a', 42])
+      ]
+    ]);
+    final Map<String, Object?> docG = map(<dynamic>['array', 42]);
+    final Map<String, Object?> docH = map(<dynamic>[
+      'array',
+      <Object?>[null]
+    ]);
+    final Map<String, Object?> docI = map(<dynamic>[
+      'array',
+      <double>[double.nan]
+    ]);
+
+    final CollectionReference collection =
+        await testCollectionWithDocs(map(<dynamic>[
+      'a',
+      docA,
+      'b',
+      docB,
+      'c',
+      docC,
+      'd',
+      docD,
+      'e',
+      docE,
+      'f',
+      docF,
+      'g',
+      docG,
+      'h',
+      docH,
+      'i',
+      docI
     ]));
 
     // Search for 'array' to contain [42, 43].
@@ -632,6 +957,26 @@ void main() {
       map<dynamic>(<dynamic>['a', 42])
     ]).get();
     expect(querySnapshotToValues(snapshot), <dynamic>[docF]);
+
+    // With null.
+    snapshot =
+        await collection.whereArrayContainsAny('array', <Object?>[null]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[]);
+
+    // With null and a value.
+    snapshot = await collection
+        .whereArrayContainsAny('array', <Object?>[null, 43]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docE]);
+
+    // With NaN.
+    snapshot = await collection
+        .whereArrayContainsAny('array', <Object?>[double.nan]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[]);
+
+    // With NaN and a value.
+    snapshot = await collection
+        .whereArrayContainsAny('array', <Object?>[double.nan, 43]).get();
+    expect(querySnapshotToValues(snapshot), <dynamic>[docE]);
   });
 }
 

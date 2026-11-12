@@ -15,7 +15,7 @@ class IndexManagerTestCase {
   IndexManagerTestCase(this._persistence);
 
   final Persistence _persistence;
-  IndexManager _indexManager;
+  late IndexManager _indexManager;
 
   void setUp() {
     _indexManager = _persistence.indexManager;

@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/reference_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
@@ -17,7 +17,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/types.dart';
 /// both a mapping between queries and the documents that matched them according
 /// to the server, but also metadata about the queries.
 ///
-/// The cache is keyed by [Query] and entries in the cache are [QueryData]
+/// The cache is keyed by [Target] and entries in the cache are [QueryData]
 /// instances.
 abstract class QueryCache {
   /// Returns the highest target id of any query in the cache. Typically called
@@ -53,13 +53,13 @@ abstract class QueryCache {
 
   /// Adds an entry in the cache. This entry should not already exist.
   ///
-  /// The cache key is extracted from [QueryData.query].
+  /// The cache key is extracted from [QueryData.target].
   Future<void> addQueryData(QueryData queryData);
 
   /// Replaces an entry in the cache. An entry with the same key should already
   /// exist.
   ///
-  /// The cache key is extracted from [QueryData.query].
+  /// The cache key is extracted from [QueryData.target].
   Future<void> updateQueryData(QueryData queryData);
 
   /// Removes the cached entry for the given query data. This entry should
@@ -70,9 +70,9 @@ abstract class QueryCache {
 
   /// Looks up a [QueryData] entry in the cache.
   ///
-  /// The [query] corresponding to the entry to look up. Returns the cached
-  /// [QueryData] entry, or null if the cache has no entry for the query.
-  Future<QueryData> getQueryData(Query query);
+  /// The [target] corresponding to the entry to look up. Returns the cached
+  /// [QueryData] entry, or null if the cache has no entry for the target.
+  Future<QueryData?> getQueryData(Target target);
 
   /// Adds the given document [keys] to cached query results of the given
   /// [targetId].
@@ -83,6 +83,9 @@ abstract class QueryCache {
   /// given [targetId].
   Future<void> removeMatchingKeys(
       ImmutableSortedSet<DocumentKey> keys, int targetId);
+
+  /// Removes all the keys in the query results of the given [targetId].
+  Future<void> removeMatchingKeysForTargetId(int targetId);
 
   Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
       int targetId);

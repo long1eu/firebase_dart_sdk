@@ -22,7 +22,7 @@ import 'order_by.dart';
 /// document comes before or after a bound. This is influenced by whether the
 /// position is just before or just after the provided values.
 class Bound {
-  const Bound({this.position, this.before});
+  const Bound({required this.position, required this.before});
 
   /// Whether this bound is just before or just after the provided position
   final bool before;
@@ -52,17 +52,19 @@ class Bound {
       final OrderBy orderByComponent = orderBy[i];
       final FieldValue component = position[i];
       if (orderByComponent.field == FieldPath.keyPath) {
-        final Object refValue = component.value;
-        hardAssert(refValue is DocumentKey,
-            'Bound has a non-key value where the key path is being used $component');
+        final Object? refValue = component.value;
+        hardAssertLazy(
+            refValue is DocumentKey,
+            () =>
+                'Bound has a non-key value where the key path is being used $component');
 
-        final DocumentKey documentKey = refValue;
+        final DocumentKey documentKey = refValue as DocumentKey;
         comparison = documentKey.compareTo(document.key);
       } else {
-        final FieldValue docValue = document.getField(orderByComponent.field);
+        final FieldValue? docValue = document.getField(orderByComponent.field);
         hardAssert(docValue != null,
             'Field should exist since document matched the orderBy already.');
-        comparison = component.compareTo(docValue);
+        comparison = component.compareTo(docValue!);
       }
 
       if (orderByComponent.direction == OrderByDirection.descending) {

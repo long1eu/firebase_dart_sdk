@@ -1,6 +1,9 @@
 export 'any.pb.dart';
 export 'any.pbenum.dart';
 export 'any.pbjson.dart';
+export 'duration.pb.dart';
+export 'duration.pbenum.dart';
+export 'duration.pbjson.dart';
 export 'empty.pb.dart';
 export 'empty.pbenum.dart';
 export 'empty.pbjson.dart';

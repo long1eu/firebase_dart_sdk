@@ -1,0 +1,11 @@
+name: bench
+publish_to: none
+environment:
+  sdk: ^3.0.0
+dependencies:
+  cloud_firestore_vm:
+    path: ../../cloud_firestore/cloud_firestore_vm
+  _firebase_database_collection_vm:
+    path: ../../firebase_core/_firebase_database_collection_vm
+  _firebase_internal_vm:
+    path: ../../firebase_core/_firebase_internal_vm

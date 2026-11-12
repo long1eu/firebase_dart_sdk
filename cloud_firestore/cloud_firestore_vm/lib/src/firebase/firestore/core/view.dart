@@ -21,16 +21,17 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 /// View is responsible for computing the final merged truth of what docs are in a query. It gets notified of local and
 /// remote changes to docs, and applies the query filters and limits to determine the most correct possible results.
 class View {
-  View(this.query, this._syncedDocuments) {
-    _syncState = ViewSnapshotSyncState.none;
-    documentSet = DocumentSet.emptySet(query.comparator);
-    _limboDocuments = DocumentKey.emptyKeySet;
-    mutatedKeys = DocumentKey.emptyKeySet;
-  }
+  View(this.query, this._syncedDocuments)
+      : _syncState = ViewSnapshotSyncState.none,
+        documentSet = DocumentSet.emptySet(query.comparator),
+        _limboDocuments = DocumentKey.emptyKeySet,
+        mutatedKeys = DocumentKey.emptyKeySet;
 
   final Query query;
 
   ViewSnapshotSyncState _syncState;
+
+  ViewSnapshotSyncState get syncState => _syncState;
 
   /// A flag whether the view is current with the backend. A view is considered current after it has seen the current
   /// flag from the backend and did not lose consistency within the watch stream (e.g. because of an existence filter
@@ -42,8 +43,8 @@ class View {
   /// The set of documents that the server has told us belongs to the target associated with this view.
   ImmutableSortedSet<DocumentKey> _syncedDocuments;
 
-  ImmutableSortedSet<DocumentKey> get syncedDocuments =>
-      ImmutableSortedSet<DocumentKey>(_syncedDocuments.toList());
+  // The set is immutable, so it can be shared without copying.
+  ImmutableSortedSet<DocumentKey> get syncedDocuments => _syncedDocuments;
 
   /// Documents in the view but not in the remote target
   ImmutableSortedSet<DocumentKey> _limboDocuments;
@@ -61,7 +62,7 @@ class View {
   /// current view. Returns a new set of docs, changes, and refill flag.
   ViewDocumentChanges computeDocChanges<D extends MaybeDocument>(
       ImmutableSortedMap<DocumentKey, D> docChanges,
-      [ViewDocumentChanges previousChanges]) {
+      [ViewDocumentChanges? previousChanges]) {
     final DocumentViewChangeSet changeSet = previousChanges != null
         ? previousChanges.changeSet
         : DocumentViewChangeSet();
@@ -74,6 +75,8 @@ class View {
 
     DocumentSet newDocumentSet = oldDocumentSet;
     bool needsRefill = false;
+    // The comparator is created on each access, so only ask for it once.
+    final Comparator<Document> queryComparator = query.comparator;
 
     // Track the last doc in a (full) limit. This is necessary, because some update (a delete, or an update moving a doc
     // past the old limit) might mean there is some other document in the local cache that either should come (1)
@@ -82,15 +85,20 @@ class View {
     //
     // Note that this should never get used in a refill (when previousChanges is set), because there will only be adds
     // -- no deletes or updates.
-    final Document lastDocInLimit =
-        (query.hasLimit && oldDocumentSet.length == query.getLimit())
-            ? oldDocumentSet.last
+    final Document? lastDocInLimit =
+        (query.hasLimitToFirst && oldDocumentSet.length == query.getLimit())
+            ? oldDocumentSet.getLastDocument()
+            : null;
+    // For a limitToLast query the documents that fall off the limit are the first ones.
+    final Document? firstDocInLimit =
+        (query.hasLimitToLast && oldDocumentSet.length == query.getLimit())
+            ? oldDocumentSet.getFirstDocument()
             : null;
 
     for (MapEntry<DocumentKey, MaybeDocument> entry in docChanges) {
       final DocumentKey key = entry.key;
-      final Document oldDoc = oldDocumentSet.getDocument(key);
-      Document newDoc;
+      final Document? oldDoc = oldDocumentSet.getDocument(key);
+      Document? newDoc;
       final MaybeDocument maybeDoc = entry.value;
 
       if (maybeDoc is Document) {
@@ -98,8 +106,9 @@ class View {
       }
 
       if (newDoc != null) {
-        hardAssert(key == newDoc.key,
-            'Mismatching key in doc change $key != ${newDoc.key}');
+        final DocumentKey newDocKey = newDoc.key;
+        hardAssertLazy(key == newDocKey,
+            () => 'Mismatching key in doc change $key != $newDocKey');
         if (!query.matches(newDoc)) {
           newDoc = null;
         }
@@ -125,10 +134,12 @@ class View {
                 DocumentViewChange(DocumentViewChangeType.modified, newDoc));
             changeApplied = true;
 
-            if (lastDocInLimit != null &&
-                query.comparator(newDoc, lastDocInLimit) > 0) {
-              // This doc moved from inside the limit to after the limit. That means there may be some doc in the local
-              // cache that's actually less than this one.
+            if ((lastDocInLimit != null &&
+                    queryComparator(newDoc, lastDocInLimit) > 0) ||
+                (firstDocInLimit != null &&
+                    queryComparator(newDoc, firstDocInLimit) < 0)) {
+              // This doc moved from inside the limit to outside the limit. That means there may be some doc in the
+              // local cache that should be included instead.
               needsRefill = true;
             }
           }
@@ -145,7 +156,7 @@ class View {
         changeSet.addChange(
             DocumentViewChange(DocumentViewChangeType.removed, oldDoc));
         changeApplied = true;
-        if (lastDocInLimit != null) {
+        if (lastDocInLimit != null || firstDocInLimit != null) {
           // A doc was removed from a full limit query. We'll need to requery from the local cache to see if we know
           // about some other doc that should be in the results.
           needsRefill = true;
@@ -167,9 +178,12 @@ class View {
       }
     }
 
+    // Drop documents out to meet limitToFirst/limitToLast requirement.
     if (query.hasLimit) {
       for (int i = newDocumentSet.length - query.getLimit(); i > 0; --i) {
-        final Document oldDoc = newDocumentSet.last;
+        final Document oldDoc = query.hasLimitToFirst
+            ? newDocumentSet.getLastDocument()!
+            : newDocumentSet.getFirstDocument()!;
         newDocumentSet = newDocumentSet.remove(oldDoc.key);
         newMutatedKeys = newMutatedKeys.remove(oldDoc.key);
         changeSet.addChange(
@@ -197,8 +211,11 @@ class View {
 
   /// Updates the view with the given [ViewDocumentChanges] and updates limbo docs and sync state from the given
   /// (optional) target change. Returns a new [ViewChange] with the given docs, changes, and sync state.
+  ///
+  /// [targetIsPendingReset] is true if the target is going to be reset because of an existence filter mismatch. While
+  /// it is pending, no limbo documents are computed and the view is not reported as synced.
   ViewChange applyChanges(ViewDocumentChanges docChanges,
-      [TargetChange targetChange]) {
+      [TargetChange? targetChange, bool targetIsPendingReset = false]) {
     hardAssert(
         !docChanges.needsRefill, 'Cannot apply changes that need a refill');
 
@@ -207,32 +224,39 @@ class View {
     mutatedKeys = docChanges.mutatedKeys;
 
     // Sort changes based on type and query comparator.
+    final Comparator<Document> queryComparator = query.comparator;
     final List<DocumentViewChange> viewChanges =
         docChanges.changeSet.getChanges()
           ..sort((DocumentViewChange a, DocumentViewChange b) {
             final int typeComp =
                 View._changeTypeOrder(a).compareTo(View._changeTypeOrder(b));
-            a.type.compareTo(b.type);
             if (typeComp != 0) {
               return typeComp;
             }
-            return query.comparator(a.document, b.document);
+            return queryComparator(a.document, b.document);
           });
 
     _applyTargetChange(targetChange);
 
-    final List<LimboDocumentChange> limboDocumentChanges =
-        _updateLimboDocuments();
-    final bool synced = _limboDocuments.isEmpty && _current;
+    final List<LimboDocumentChange> limboDocumentChanges = targetIsPendingReset
+        ? <LimboDocumentChange>[]
+        : _updateLimboDocuments();
+
+    // We are synced if no limbo documents are waiting to be resolved, the view is current with the backend and the
+    // query is not pending a reset due to an existence filter mismatch.
+    final bool synced =
+        _limboDocuments.isEmpty && _current && !targetIsPendingReset;
 
     final ViewSnapshotSyncState newSyncState = synced //
         ? ViewSnapshotSyncState.synced
         : ViewSnapshotSyncState.local;
     final bool syncStatedChanged = newSyncState != _syncState;
     _syncState = newSyncState;
-    ViewSnapshot snapshot;
+    ViewSnapshot? snapshot;
     if (viewChanges.isNotEmpty || syncStatedChanged) {
       final bool fromCache = newSyncState == ViewSnapshotSyncState.local;
+      final bool hasCachedResults =
+          targetChange != null && targetChange.resumeToken.isNotEmpty;
 
       snapshot = ViewSnapshot(
         query,
@@ -243,6 +267,7 @@ class View {
         isFromCache: fromCache,
         didSyncStateChange: syncStatedChanged,
         excludesMetadataChanges: false,
+        hasCachedResults: hasCachedResults,
       );
     }
     return ViewChange(snapshot, limboDocumentChanges);
@@ -268,14 +293,14 @@ class View {
     }
   }
 
-  void _applyTargetChange(TargetChange targetChange) {
+  void _applyTargetChange(TargetChange? targetChange) {
     if (targetChange != null) {
       for (DocumentKey documentKey in targetChange.addedDocuments) {
         _syncedDocuments = _syncedDocuments.insert(documentKey);
       }
       for (DocumentKey documentKey in targetChange.modifiedDocuments) {
-        hardAssert(_syncedDocuments.contains(documentKey),
-            'Modified document $documentKey not found in view.');
+        hardAssertLazy(_syncedDocuments.contains(documentKey),
+            () => 'Modified document $documentKey not found in view.');
       }
       for (DocumentKey documentKey in targetChange.removedDocuments) {
         _syncedDocuments = _syncedDocuments.remove(documentKey);
@@ -323,7 +348,7 @@ class View {
     }
 
     // The local store doesn't think it's a result, so it shouldn't be in limbo.
-    final Document doc = documentSet.getDocument(key);
+    final Document? doc = documentSet.getDocument(key);
     if (doc == null) {
       return false;
     }

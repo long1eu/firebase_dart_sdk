@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/vector_value.dart';
+
 /// Sentinel values that can be used when writing document fields with [set] or [update].
 abstract class FieldValue {
   const FieldValue._(this.elements);
@@ -19,7 +21,7 @@ abstract class FieldValue {
   /// modified is not already an array it will be overwritten with an array containing exactly the
   /// specified elements. The [elements] to union into the array. Returns the [FieldValue] sentinel
   /// for use in a call to set() or update().
-  factory FieldValue.arrayUnion(List<Object> elements) {
+  factory FieldValue.arrayUnion(List<Object?> elements) {
     return _ArrayUnionFieldValue._(elements);
   }
 
@@ -30,7 +32,7 @@ abstract class FieldValue {
   ///
   /// The [elements] to remove from the array. Returns the [FieldValue] sentinel for use in a call
   /// to set() or update().
-  factory FieldValue.arrayRemove(List<Object> elements) {
+  factory FieldValue.arrayRemove(List<Object?> elements) {
     return _ArrayRemoveFieldValue._(elements);
   }
 
@@ -45,7 +47,36 @@ abstract class FieldValue {
     return _NumericIncrementFieldValue(l);
   }
 
-  final List<Object> elements;
+  /// Returns a special value that can be used with set() or update() that tells
+  /// the server to set the field to the minimum of its current value and the
+  /// given value.
+  ///
+  /// If the current value is not a number, the field is set to the given value.
+  /// If both are numbers they are compared numerically (NaN wins over any other
+  /// number); the field keeps the type (integer or double) of the smaller
+  /// operand, and keeps its current value and type if they are equivalent.
+  factory FieldValue.minimum(num l) {
+    return _NumericMinimumFieldValue(l);
+  }
+
+  /// Returns a special value that can be used with set() or update() that tells
+  /// the server to set the field to the maximum of its current value and the
+  /// given value.
+  ///
+  /// If the current value is not a number, the field is set to the given value.
+  /// If both are numbers they are compared numerically (NaN wins over any other
+  /// number); the field keeps the type (integer or double) of the larger
+  /// operand, and keeps its current value and type if they are equivalent.
+  factory FieldValue.maximum(num l) {
+    return _NumericMaximumFieldValue(l);
+  }
+
+  /// Creates a new [VectorValue] constructed with a copy of the given list of doubles.
+  ///
+  /// Unlike the other factories this is a plain value, not a sentinel.
+  static VectorValue vector(List<double> values) => VectorValue(values);
+
+  final List<Object?> elements;
 
   /// Returns the method name (e.g. 'FieldValue.delete') that was used to create this FieldValue
   /// instance, for use in error messages, etc.
@@ -61,6 +92,10 @@ abstract class FieldValue {
 
   bool get isIncrement => this is _NumericIncrementFieldValue;
 
+  bool get isMinimum => this is _NumericMinimumFieldValue;
+
+  bool get isMaximum => this is _NumericMaximumFieldValue;
+
   static const _DeleteFieldValue _deleteInstance = _DeleteFieldValue._();
 
   static const _ServerTimestampFieldValue _serverTimestampInstance =
@@ -69,7 +104,7 @@ abstract class FieldValue {
 
 /// FieldValue class for field deletes.
 class _DeleteFieldValue extends FieldValue {
-  const _DeleteFieldValue._() : super._(null);
+  const _DeleteFieldValue._() : super._(const <Object>[]);
 
   @override
   String get methodName => 'FieldValue.delete';
@@ -77,7 +112,7 @@ class _DeleteFieldValue extends FieldValue {
 
 /// FieldValue class for server timestamps.
 class _ServerTimestampFieldValue extends FieldValue {
-  const _ServerTimestampFieldValue._() : super._(null);
+  const _ServerTimestampFieldValue._() : super._(const <Object>[]);
 
   @override
   String get methodName => 'FieldValue.serverTimestamp';
@@ -85,7 +120,7 @@ class _ServerTimestampFieldValue extends FieldValue {
 
 /// FieldValue class for arrayUnion() transforms.
 class _ArrayUnionFieldValue extends FieldValue {
-  const _ArrayUnionFieldValue._(List<Object> elements) : super._(elements);
+  const _ArrayUnionFieldValue._(List<Object?> elements) : super._(elements);
 
   @override
   String get methodName => 'FieldValue.arrayUnion';
@@ -93,7 +128,7 @@ class _ArrayUnionFieldValue extends FieldValue {
 
 /// FieldValue class for arrayRemove() transforms.
 class _ArrayRemoveFieldValue extends FieldValue {
-  const _ArrayRemoveFieldValue._(List<Object> elements) : super._(elements);
+  const _ArrayRemoveFieldValue._(List<Object?> elements) : super._(elements);
 
   @override
   String get methodName => 'FieldValue.arrayRemove';
@@ -108,4 +143,56 @@ class _NumericIncrementFieldValue extends FieldValue {
   String get methodName => 'FieldValue.increment';
 
   num getOperand() => operand;
+
+  /// Integer and double operands are different (as in upstream): `5` != `5.0`.
+  @override
+  bool operator ==(Object other) =>
+      other is _NumericIncrementFieldValue &&
+      other.operand.runtimeType == operand.runtimeType &&
+      (other.operand == operand || (other.operand.isNaN && operand.isNaN));
+
+  @override
+  int get hashCode => Object.hash(runtimeType, operand.runtimeType, operand);
+}
+
+/// FieldValue class for minimum() transforms.
+class _NumericMinimumFieldValue extends FieldValue {
+  _NumericMinimumFieldValue(this.operand) : super._(<Object>[operand]);
+  final num operand;
+
+  @override
+  String get methodName => 'FieldValue.minimum';
+
+  num getOperand() => operand;
+
+  /// Integer and double operands are different (as in upstream): `5` != `5.0`.
+  @override
+  bool operator ==(Object other) =>
+      other is _NumericMinimumFieldValue &&
+      other.operand.runtimeType == operand.runtimeType &&
+      (other.operand == operand || (other.operand.isNaN && operand.isNaN));
+
+  @override
+  int get hashCode => Object.hash(runtimeType, operand.runtimeType, operand);
+}
+
+/// FieldValue class for maximum() transforms.
+class _NumericMaximumFieldValue extends FieldValue {
+  _NumericMaximumFieldValue(this.operand) : super._(<Object>[operand]);
+  final num operand;
+
+  @override
+  String get methodName => 'FieldValue.maximum';
+
+  num getOperand() => operand;
+
+  /// Integer and double operands are different (as in upstream): `5` != `5.0`.
+  @override
+  bool operator ==(Object other) =>
+      other is _NumericMaximumFieldValue &&
+      other.operand.runtimeType == operand.runtimeType &&
+      (other.operand == operand || (other.operand.isNaN && operand.isNaN));
+
+  @override
+  int get hashCode => Object.hash(runtimeType, operand.runtimeType, operand);
 }

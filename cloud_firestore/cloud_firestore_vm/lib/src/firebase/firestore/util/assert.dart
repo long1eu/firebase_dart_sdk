@@ -12,7 +12,16 @@ void hardAssert(bool condition, String message) {
   }
 }
 
-T checkNotNull<T>(T reference, [Object errorMessage]) {
+/// Like [hardAssert], but the message is only built when the condition is
+/// false. Use this when the message interpolates values, so a passing check
+/// costs no string building.
+void hardAssertLazy(bool condition, String Function() message) {
+  if (!condition) {
+    throw AssertionError(message());
+  }
+}
+
+T checkNotNull<T extends Object>(T? reference, [Object? errorMessage]) {
   if (reference == null) {
     throw ArgumentError('$errorMessage');
   }
@@ -32,6 +41,6 @@ void checkArgument(bool expression, Object errorMessage) {
 /// AssertionError so it can be used with a throw statement. However, the
 /// method itself throws an AssertionError so fail will not accidentally be
 /// silent if the throw is forgotten.
-StateError fail(String message, [Error cause]) {
+StateError fail(String message, [Error? cause]) {
   throw StateError('$message ${cause != null ? 'cause: $cause' : ''}');
 }

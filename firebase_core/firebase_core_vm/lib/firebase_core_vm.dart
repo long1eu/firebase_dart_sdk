@@ -1,5 +1,7 @@
 library firebase_core_vm;
 
+export 'package:_firebase_internal_vm/src/app_check.dart'
+    show AppCheckTokenResult, InternalAppCheckTokenProvider;
 export 'package:_firebase_internal_vm/src/auth.dart' show GetTokenResult;
 export 'package:_firebase_internal_vm/src/internal.dart'
     show InternalTokenProvider, InternalTokenResult;

@@ -62,6 +62,11 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
+  Future<int> getHighestUnacknowledgedBatchId() async {
+    return _queue.isEmpty ? MutationBatch.unknown : _nextBatchId - 1;
+  }
+
+  @override
   Future<void> acknowledgeBatch(
       MutationBatch batch, Uint8List streamToken) async {
     final int batchId = batch.batchId;
@@ -71,8 +76,10 @@ class MemoryMutationQueue implements MutationQueue {
 
     // Verify that the batch in the queue is the one to be acknowledged.
     final MutationBatch check = _queue[batchIndex];
-    hardAssert(batchId == check.batchId,
-        'Queue ordering failure: expected batch $batchId, got batch ${check.batchId}');
+    hardAssertLazy(
+        batchId == check.batchId,
+        () =>
+            'Queue ordering failure: expected batch $batchId, got batch ${check.batchId}');
 
     lastStreamToken = checkNotNull(streamToken);
   }
@@ -122,7 +129,7 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<MutationBatch> lookupMutationBatch(int batchId) async {
+  Future<MutationBatch?> lookupMutationBatch(int batchId) async {
     _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
     final int index = _indexOfBatchId(batchId);
     if (index < 0 || index >= _queue.length) {
@@ -135,7 +142,7 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<MutationBatch> getNextMutationBatchAfterBatchId(int batchId) async {
+  Future<MutationBatch?> getNextMutationBatchAfterBatchId(int batchId) async {
     final int nextBatchId = batchId + 1;
 
     // The requested batchId may still be out of range so normalize it to the start of the queue.
@@ -163,10 +170,10 @@ class MemoryMutationQueue implements MutationQueue {
         break;
       }
 
-      final MutationBatch batch = await lookupMutationBatch(reference.id);
+      final MutationBatch? batch = await lookupMutationBatch(reference.id);
       hardAssert(
           batch != null, 'Batches in the index must exist in the main table');
-      result.add(batch);
+      result.add(batch!);
     }
 
     _statsCollector.recordRowsRead(MutationQueue.statsTag, result.length);
@@ -245,7 +252,7 @@ class MemoryMutationQueue implements MutationQueue {
     // document key are applied in order.
     final List<MutationBatch> result = <MutationBatch>[];
     for (int batchId in batchIds) {
-      final MutationBatch batch = await lookupMutationBatch(batchId);
+      final MutationBatch? batch = await lookupMutationBatch(batchId);
       if (batch != null) {
         result.add(batch);
       }
@@ -329,8 +336,8 @@ class MemoryMutationQueue implements MutationQueue {
   /// batches).
   int _indexOfExistingBatchId(int batchId, String action) {
     final int index = _indexOfBatchId(batchId);
-    hardAssert(index >= 0 && index < _queue.length,
-        'Batches must exist to be $action');
+    hardAssertLazy(index >= 0 && index < _queue.length,
+        () => 'Batches must exist to be $action');
     return index;
   }
 

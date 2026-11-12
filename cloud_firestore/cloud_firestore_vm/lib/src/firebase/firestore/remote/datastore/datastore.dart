@@ -9,34 +9,44 @@ import 'dart:typed_data';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:async/async.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/aggregate_field.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/auth/app_check_token_provider.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/database_info.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/aggregation_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_serializer.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/vector_query_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/exponential_backoff.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/on_error_resume.dart.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/vector_query.dart';
 import 'package:cloud_firestore_vm/src/proto/index.dart' as proto;
 import 'package:grpc/grpc.dart';
+import 'package:grpc/grpc.dart' as grpc show ResponseStream;
+import 'package:grpc/grpc_connection_interface.dart' show ClientChannelBase;
 import 'package:meta/meta.dart';
-import 'package:pedantic/pedantic.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:rxdart/rxdart.dart' hide OnErrorResumeStreamTransformer;
 
-import 'channel_options_provider.dart';
-
+part 'aggregation_client.dart';
 part 'base_stream.dart';
 part 'firestore_client.dart';
 part 'transaction_client.dart';
+part 'vector_query_client.dart';
 part 'watch_stream.dart';
 part 'write_stream.dart';
 
@@ -54,30 +64,25 @@ class Datastore {
     TaskScheduler scheduler,
     DatabaseInfo databaseInfo,
     CredentialsProvider credentialsProvider, {
-    ClientChannel clientChannel,
+    AppCheckTokenProvider? appCheckProvider,
+    ClientChannelBase? clientChannel,
   }) {
-    clientChannel ??= ClientChannel(
-      databaseInfo.host,
-      port: databaseInfo.port,
-      options: ChannelOptions(
-        credentials: databaseInfo.sslEnabled //
-            ? const ChannelCredentials.secure()
-            : const ChannelCredentials.insecure(),
-      ),
-    );
+    final ClientChannelBase channel = clientChannel ??
+        ChannelOptionsProvider.createChannel(
+          host: databaseInfo.host,
+          port: databaseInfo.port,
+          sslEnabled: databaseInfo.sslEnabled,
+        );
 
     final ChannelOptionsProvider optionsProvider = ChannelOptionsProvider(
       databaseId: databaseInfo.databaseId,
       credentialsProvider: credentialsProvider,
+      appCheckProvider: appCheckProvider,
     );
-    final FirestoreClient client =
-        FirestoreClient(clientChannel, optionsProvider);
+    final FirestoreClient client = FirestoreClient(channel, optionsProvider);
     final RemoteSerializer serializer =
         RemoteSerializer(databaseInfo.databaseId);
-    clientChannel
-        .getConnection() //
-        .then<void>((dynamic connection) => connection.onStateChanged =
-            (dynamic c) => client.onStateChanged(c.state));
+    channel.onConnectionStateChanged.listen(client.onStateChanged);
     return Datastore.test(scheduler, databaseInfo, serializer, client);
   }
 
@@ -100,6 +105,9 @@ class Datastore {
 
   final TaskScheduler _scheduler;
   final DatabaseInfo _databaseInfo;
+
+  /// The database this datastore talks to.
+  DatabaseInfo get databaseInfo => _databaseInfo;
   final RemoteSerializer _serializer;
   final FirestoreClient _client;
 

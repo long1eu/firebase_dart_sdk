@@ -3,6 +3,7 @@
 // on 26/09/2018
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/event_manager.dart';
@@ -12,6 +13,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/query_stream.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
@@ -27,7 +29,9 @@ import '../../../../util/test_util.dart';
 // ignore_for_file: unawaited_futures
 void main() {
   ViewSnapshot applyChanges(View view, List<MaybeDocument> docs) {
-    return view.applyChanges(view.computeDocChanges(docUpdates(docs))).snapshot;
+    return view
+        .applyChanges(view.computeDocChanges(docUpdates(docs)))
+        .snapshot!;
   }
 
   QueryStream queryListener(
@@ -73,7 +77,9 @@ void main() {
     final DocumentViewChange change4 =
         DocumentViewChange(DocumentViewChangeType.added, doc2prime);
 
-    listener..onViewSnapshot(snap1)..onViewSnapshot(snap2);
+    listener
+      ..onViewSnapshot(snap1)
+      ..onViewSnapshot(snap2);
 
     otherListener.onViewSnapshot(snap2);
     await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -91,6 +97,7 @@ void main() {
       isFromCache: snap2.isFromCache,
       didSyncStateChange: true,
       excludesMetadataChanges: false,
+      hasCachedResults: false,
     );
     expect(otherAccum, <ViewSnapshot>[snap2Prime]);
   });
@@ -110,7 +117,7 @@ void main() {
         },
       );
 
-    final GrpcError status = GrpcError.alreadyExists('test error');
+    const GrpcError status = GrpcError.alreadyExists('test error');
     final FirestoreError error = exceptionFromStatus(status);
     listener.onError(error);
     await Future<void>.delayed(
@@ -129,7 +136,7 @@ void main() {
     final ViewSnapshot snap2 = view
         .applyChanges(
             view.computeDocChanges(docUpdates(<MaybeDocument>[])), _ackTarget)
-        .snapshot;
+        .snapshot!;
 
     listener.onViewSnapshot(snap1);
     expect(accum, isEmpty);
@@ -161,7 +168,7 @@ void main() {
     final ViewSnapshot snap2 = view
         .applyChanges(
             view.computeDocChanges(docUpdates(<MaybeDocument>[])), _ackTarget)
-        .snapshot;
+        .snapshot!;
     final ViewSnapshot snap3 = applyChanges(view, <Document>[doc2]);
 
     filteredListener
@@ -270,6 +277,7 @@ void main() {
       isFromCache: snap4.isFromCache,
       didSyncStateChange: snap4.didSyncStateChange,
       excludesMetadataChanges: true,
+      hasCachedResults: false,
     );
 
     expect(
@@ -300,7 +308,9 @@ void main() {
     final ViewSnapshot snap1 = applyChanges(view, <Document>[doc1, doc2]);
     final ViewSnapshot snap2 = applyChanges(view, <Document>[doc1Prime, doc3]);
 
-    filteredListener..onViewSnapshot(snap1)..onViewSnapshot(snap2);
+    filteredListener
+      ..onViewSnapshot(snap1)
+      ..onViewSnapshot(snap2);
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
     final DocumentViewChange change3 =
@@ -314,6 +324,7 @@ void main() {
       isFromCache: snap2.isFromCache,
       didSyncStateChange: snap2.didSyncStateChange,
       excludesMetadataChanges: true,
+      hasCachedResults: false,
     );
     expect(filteredAccum, <ViewSnapshot>[
       _applyExpectedMetadata(snap1, MetadataChanges.exclude),
@@ -339,7 +350,7 @@ void main() {
         view.computeDocChanges(docUpdates(<MaybeDocument>[]));
 
     final ViewSnapshot snap3 =
-        view.applyChanges(changes, ackTarget(<Document>[doc1, doc2])).snapshot;
+        view.applyChanges(changes, ackTarget(<Document>[doc1, doc2])).snapshot!;
 
     listener
       ..onOnlineStateChanged(OnlineState.online) // no event
@@ -355,16 +366,62 @@ void main() {
     final DocumentViewChange change2 =
         DocumentViewChange(DocumentViewChangeType.added, doc2);
     final ViewSnapshot expectedSnapshot = ViewSnapshot(
-      snap3.query,
-      snap3.documents,
-      DocumentSet.emptySet(snap3.query.comparator),
+      snap3!.query,
+      snap3!.documents,
+      DocumentSet.emptySet(snap3!.query.comparator),
       <DocumentViewChange>[change1, change2],
-      snap3.mutatedKeys /*hasPendingWrites*/,
+      snap3!.mutatedKeys /*hasPendingWrites*/,
       isFromCache: false,
       didSyncStateChange: true,
       excludesMetadataChanges: true,
+      hasCachedResults: false,
     );
     expect(events, <ViewSnapshot>[expectedSnapshot]);
+  });
+
+  // Ported from the upstream QueryListener change of b77c218: a listener that
+  // only listens to the cache always raises its initial event.
+  test('testCacheSourceRaisesInitialEventWithoutWaitingForSync', () async {
+    final List<ViewSnapshot> events = <ViewSnapshot>[];
+    final Query query = Query(path('rooms'));
+    final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']));
+
+    const ListenOptions options =
+        ListenOptions(waitForSyncWhenOnline: true, source: ListenSource.cache);
+    final QueryStream listener = queryListener(query, options, events);
+    expect(listener.listensToRemoteStore, isFalse);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    final ViewSnapshot snap1 = applyChanges(view, <Document>[doc1]);
+
+    listener
+      ..onOnlineStateChanged(OnlineState.online)
+      ..onViewSnapshot(snap1); // raised, even though online and not synced
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(events.length, 1);
+    expect(events.single.isFromCache, isTrue);
+    expect(events.single.documents.length, 1);
+  });
+
+  test('testDefaultSourceStillWaitsForSyncIfOnline', () async {
+    final List<ViewSnapshot> events = <ViewSnapshot>[];
+    final Query query = Query(path('rooms'));
+    final Document doc1 = doc('rooms/eros', 1, map(<String>['name', 'eros']));
+
+    const ListenOptions options = ListenOptions(waitForSyncWhenOnline: true);
+    final QueryStream listener = queryListener(query, options, events);
+    expect(listener.listensToRemoteStore, isTrue);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    final ViewSnapshot snap1 = applyChanges(view, <Document>[doc1]);
+
+    listener
+      ..onOnlineStateChanged(OnlineState.online)
+      ..onViewSnapshot(snap1);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(events, isEmpty);
   });
 
   test('testWillRaiseInitialEventWhenGoingOffline', () async {
@@ -404,6 +461,7 @@ void main() {
       isFromCache: true,
       didSyncStateChange: true,
       excludesMetadataChanges: true,
+      hasCachedResults: false,
     );
 
     final ViewSnapshot expectedSnapshot2 = ViewSnapshot(
@@ -415,8 +473,62 @@ void main() {
       isFromCache: true,
       didSyncStateChange: false,
       excludesMetadataChanges: true,
+      hasCachedResults: false,
     );
     expect(events, <ViewSnapshot>[expectedSnapshot1, expectedSnapshot2]);
+  });
+
+  test('testWillRaiseInitialEventFromEmptyCachedResults', () async {
+    final List<ViewSnapshot> events = <ViewSnapshot>[];
+    final Query query = Query(path('rooms'));
+    const ListenOptions options = ListenOptions();
+
+    final QueryStream listener = queryListener(query, options, events);
+
+    // An empty view for a target that has been synced before (it has a resume token).
+    final View view = View(query, DocumentKey.emptyKeySet);
+    final ViewSnapshot snap = view
+        .applyChanges(
+            view.computeDocChanges(docUpdates(<MaybeDocument>[])),
+            TargetChange.createSynthesizedTargetChangeForCurrentChange(
+                false, Uint8List.fromList(<int>[1, 2, 3])))
+        .snapshot!;
+    expect(snap.hasCachedResults, isTrue);
+
+    listener
+      ..onOnlineStateChanged(OnlineState.online) // no event
+      ..onViewSnapshot(snap); // event, because the (empty) result is cached
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(events.length, 1);
+    expect(events.single.documents.isEmpty, isTrue);
+    expect(events.single.isFromCache, isTrue);
+    expect(events.single.hasCachedResults, isTrue);
+  });
+
+  test('testWillNotRaiseInitialEventFromEmptyResultsThatAreNotCached',
+      () async {
+    final List<ViewSnapshot> events = <ViewSnapshot>[];
+    final Query query = Query(path('rooms'));
+    const ListenOptions options = ListenOptions();
+
+    final QueryStream listener = queryListener(query, options, events);
+
+    final View view = View(query, DocumentKey.emptyKeySet);
+    final ViewSnapshot snap = view
+        .applyChanges(
+            view.computeDocChanges(docUpdates(<MaybeDocument>[])),
+            TargetChange.createSynthesizedTargetChangeForCurrentChange(
+                false, Uint8List(0)))
+        .snapshot!;
+    expect(snap.hasCachedResults, isFalse);
+
+    listener
+      ..onOnlineStateChanged(OnlineState.online)
+      ..onViewSnapshot(snap);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(events, isEmpty);
   });
 
   test('testWillRaiseInitialEventWhenGoingOfflineAndThereAreNoDocs', () async {
@@ -444,6 +556,7 @@ void main() {
       isFromCache: true,
       didSyncStateChange: true,
       excludesMetadataChanges: true,
+      hasCachedResults: false,
     );
     expect(events, <ViewSnapshot>[expectedSnapshot]);
   });
@@ -473,6 +586,7 @@ void main() {
       isFromCache: true,
       didSyncStateChange: true,
       excludesMetadataChanges: true,
+      hasCachedResults: false,
     );
     expect(events, <ViewSnapshot>[expectedSnapshot]);
   });
@@ -489,5 +603,6 @@ ViewSnapshot _applyExpectedMetadata(
     isFromCache: snap.isFromCache,
     didSyncStateChange: snap.didSyncStateChange,
     excludesMetadataChanges: MetadataChanges.exclude == metadata,
+    hasCachedResults: snap.hasCachedResults,
   );
 }

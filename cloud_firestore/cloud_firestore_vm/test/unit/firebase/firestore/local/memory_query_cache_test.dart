@@ -11,7 +11,7 @@ import 'cases/query_cache_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  QueryCacheTestCase testCase;
+  late QueryCacheTestCase testCase;
 
   setUp(() async {
     print('setUp');
@@ -27,6 +27,8 @@ void main() {
   test('testReadQueryNotInCache', () => testCase.testReadQueryNotInCache());
   test('testSetAndReadAQuery', () => testCase.testSetAndReadAQuery());
   test('testCanonicalIdCollision', () => testCase.testCanonicalIdCollision());
+  test('testLimitToLastQueriesAreKeyedByTarget',
+      () => testCase.testLimitToLastQueriesAreKeyedByTarget());
   test('testSetQueryToNewValue', () => testCase.testSetQueryToNewValue());
   test('testRemoveQuery', () => testCase.testRemoveQuery());
   test('testRemoveNonExistentQuery',

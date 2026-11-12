@@ -12,12 +12,12 @@ import 'cases/remote_document_cache_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  RemoteDocumentCacheTestCase testCase;
+  late RemoteDocumentCacheTestCase testCase;
 
   setUp(() async {
     print('setUp');
     final SQLitePersistence persistence = await createSQLitePersistence(
-        'firebase/firestore/local/sqlite_remote_document_cache_test-${Uuid().v4()}.db');
+        'firebase/firestore/local/sqlite_remote_document_cache_test-${const Uuid().v4()}.db');
     testCase = RemoteDocumentCacheTestCase(persistence)..setUp();
     print('setUpDone');
   });

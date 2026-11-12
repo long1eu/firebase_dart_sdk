@@ -10,6 +10,10 @@ enum QueryPurpose {
   /// The query was used to refill a query after an existence filter mismatch.
   existenceFilterMismatch,
 
+  /// The query target was used if the query is the result of a false positive
+  /// in the bloom filter.
+  existenceFilterMismatchBloom,
+
   /// The query was used to resolve a limbo document.
   limboResolution,
 }

@@ -12,17 +12,16 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:collection/collection.dart';
-import 'package:meta/meta.dart';
 
 /// A batch of mutations that will be sent as one unit to the backend. Batches can be marked as a
 /// tombstone if the mutation queue does not remove them immediately. When a batch is a tombstone it
 /// has no mutations.
 class MutationBatch {
   const MutationBatch({
-    @required this.batchId,
-    @required this.localWriteTime,
-    @required this.baseMutations,
-    @required this.mutations,
+    required this.batchId,
+    required this.localWriteTime,
+    required this.baseMutations,
+    required this.mutations,
   })
   // ignore: prefer_is_empty
   : assert(mutations.length != 0, 'Cannot create an empty mutation batch');
@@ -56,17 +55,21 @@ class MutationBatch {
   /// [documentKey] is the key of the document to apply mutations to, [maybeDoc] is the document to
   /// apply mutations to and [batchResult] is the result of applying the [MutationBatch] to the
   /// backend.
-  MaybeDocument applyToRemoteDocument(DocumentKey documentKey,
-      MaybeDocument maybeDoc, MutationBatchResult batchResult) {
+  MaybeDocument? applyToRemoteDocument(DocumentKey documentKey,
+      MaybeDocument? maybeDoc, MutationBatchResult batchResult) {
     if (maybeDoc != null) {
-      hardAssert(maybeDoc.key == documentKey,
-          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
+      hardAssertLazy(
+          maybeDoc.key == documentKey,
+          () =>
+              'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}');
     }
 
     final int size = mutations.length;
     final List<MutationResult> mutationResults = batchResult.mutationResults;
-    hardAssert(mutationResults.length == size,
-        'Mismatch between mutations length ($size) and results length (${mutationResults.length})');
+    hardAssertLazy(
+        mutationResults.length == size,
+        () =>
+            'Mismatch between mutations length ($size) and results length (${mutationResults.length})');
 
     for (int i = 0; i < size; i++) {
       final Mutation mutation = mutations[i];
@@ -79,11 +82,13 @@ class MutationBatch {
   }
 
   /// Computes the local view of a document given all the mutations in this batch.
-  MaybeDocument applyToLocalView(
-      DocumentKey documentKey, MaybeDocument maybeDoc) {
+  MaybeDocument? applyToLocalView(
+      DocumentKey documentKey, MaybeDocument? maybeDoc) {
     if (maybeDoc != null) {
-      hardAssert(maybeDoc.key == documentKey,
-          'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc.key}');
+      hardAssertLazy(
+          maybeDoc.key == documentKey,
+          () =>
+              'applyToRemoteDocument: key $documentKey doesn\'t match maybeDoc key ${maybeDoc?.key}');
     }
     // First, apply the base state. This allows us to apply non-idempotent transform against a
     // consistent set of values.
@@ -95,7 +100,7 @@ class MutationBatch {
       }
     }
 
-    final MaybeDocument baseDoc = maybeDoc;
+    final MaybeDocument? baseDoc = maybeDoc;
 
     // Second, apply all user-provided mutations.
     for (int i = 0; i < mutations.length; i++) {
@@ -118,7 +123,7 @@ class MutationBatch {
     ImmutableSortedMap<DocumentKey, MaybeDocument> mutatedDocuments =
         maybeDocumentMap;
     for (DocumentKey key in keys) {
-      final MaybeDocument mutatedDocument =
+      final MaybeDocument? mutatedDocument =
           applyToLocalView(key, mutatedDocuments[key]);
       if (mutatedDocument != null) {
         mutatedDocuments =

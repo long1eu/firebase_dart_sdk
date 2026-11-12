@@ -89,13 +89,13 @@ void main() {
 
     QuerySnapshot querySnapshot = await query.startAtDocument(snapshot).get();
 
-    expect(querySnapshotToValues(querySnapshot), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(querySnapshot), <Map<String, Object?>>[
       map<dynamic>(<dynamic>['k', 'c', 'sort', 2.0]),
       map<dynamic>(<dynamic>['k', 'd', 'sort', 2.0]),
     ]);
 
     querySnapshot = await query.endBeforeDocument(snapshot).get();
-    expect(querySnapshotToValues(querySnapshot), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(querySnapshot), <Map<String, Object?>>[
       map<dynamic>(<dynamic>['k', 'e', 'sort', 0.0]),
       map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
       map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
@@ -117,21 +117,21 @@ void main() {
     final Query query = testCollection.orderBy('sort');
     QuerySnapshot snapshot = await query.startAt(<double>[2.0]).get();
 
-    expect(querySnapshotToValues(snapshot), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshot), <Map<String, Object?>>[
       map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
       map<dynamic>(<dynamic>['k', 'c', 'sort', 2.0]),
       map<dynamic>(<dynamic>['k', 'd', 'sort', 2.0]),
     ]);
 
     snapshot = await query.endBefore(<double>[2.0]).get();
-    expect(querySnapshotToValues(snapshot), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshot), <Map<String, Object?>>[
       map<dynamic>(<dynamic>['k', 'e', 'sort', 0.0]),
       map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
     ]);
   });
 
   test('canBeCreatedUsingDocumentId', () async {
-    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> testDocs = map(<dynamic>[
       'a',
       map<String>(<String>['k', 'a']),
       'b',
@@ -166,7 +166,7 @@ void main() {
 
   test('canBeUsedWithReferenceValues', () async {
     final Firestore firestore = await testFirestore();
-    final Map<String, Map<String, Object>> testDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> testDocs = map(<dynamic>[
       'a',
       map<dynamic>(
           <dynamic>['k', '1a', 'ref', firestore.collection('1').document('a')]),
@@ -196,7 +196,7 @@ void main() {
 
     final List<String> results = <String>[];
     for (DocumentSnapshot doc in snapshot) {
-      results.add(doc.getString('k'));
+      results.add(doc.getString('k')!);
     }
     expect(results, <String>['1b', '2a', '2b']);
   });
@@ -219,7 +219,7 @@ void main() {
 
     QuerySnapshot snapshot = await query.startAt(<double>[2.0]).get();
 
-    expect(querySnapshotToValues(snapshot), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshot), <Map<String, Object?>>[
       map<dynamic>(<dynamic>['k', 'c', 'sort', 2.0]),
       map<dynamic>(<dynamic>['k', 'b', 'sort', 2.0]),
       map<dynamic>(<dynamic>['k', 'a', 'sort', 1.0]),
@@ -227,7 +227,7 @@ void main() {
     ]);
 
     snapshot = await query.endBefore(<double>[2.0]).get();
-    expect(querySnapshotToValues(snapshot), <Map<String, dynamic>>[
+    expect(querySnapshotToValues(snapshot), <Map<String, Object?>>[
       map<dynamic>(<dynamic>['k', 'd', 'sort', 3.0])
     ]);
   });
@@ -280,9 +280,9 @@ void main() {
   });
 
   test('timestampsAreTruncatedToMicroseconds', () async {
-    final Timestamp nanos = Timestamp(0, 123456789);
-    final Timestamp micros = Timestamp(0, 123456000);
-    final Timestamp millis = Timestamp(0, 123000000);
+    const Timestamp nanos = Timestamp(0, 123456789);
+    const Timestamp micros = Timestamp(0, 123456000);
+    const Timestamp millis = Timestamp(0, 123000000);
     final CollectionReference testCollection =
         await testCollectionWithDocs(map(<dynamic>[
       'a',

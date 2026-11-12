@@ -19,7 +19,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 import 'package:grpc/grpc.dart';
-import 'package:grpc/src/shared/status.dart';
 
 import '../spec/spec_test_case.dart';
 
@@ -27,7 +26,8 @@ import '../spec/spec_test_case.dart';
 /// the parts that would normally be sent from the backend.
 class MockDatastore extends Datastore {
   factory MockDatastore(TaskScheduler scheduler) {
-    final DatabaseId databaseId = DatabaseId.forDatabase('project', 'database');
+    // The bloom filters in the spec tests are built from document paths of this database.
+    final DatabaseId databaseId = DatabaseId.forProject('test-project');
     final RemoteSerializer serializer = RemoteSerializer(databaseId);
     final DatabaseInfo databaseInfo =
         DatabaseInfo(databaseId, 'persistenceKey', 'host', sslEnabled: false);
@@ -61,9 +61,9 @@ class MockDatastore extends Datastore {
   final FirestoreClient _client;
   final TaskScheduler _scheduler;
   final RemoteSerializer _serializer;
-  _MockWatchStream _watchStream;
+  late _MockWatchStream _watchStream;
 
-  _MockWriteStream _writeStream;
+  late _MockWriteStream _writeStream;
 
   int _writeStreamRequestCount = 0;
 
@@ -76,6 +76,10 @@ class MockDatastore extends Datastore {
   @override
   WriteStream get writeStream =>
       _writeStream = _MockWriteStream(this, _serializer, _scheduler);
+
+  /// How often the backoff of the streams was reset with `inhibitBackoff()`.
+  int watchStreamInhibitBackoffCount = 0;
+  int writeStreamInhibitBackoffCount = 0;
 
   int get writeStreamRequestCount => _writeStreamRequestCount;
 
@@ -142,6 +146,12 @@ class _MockWatchStream extends WatchStream {
   final Map<int, QueryData> _activeTargets = <int, QueryData>{};
 
   @override
+  void inhibitBackoff() {
+    _datastore.watchStreamInhibitBackoffCount++;
+    super.inhibitBackoff();
+  }
+
+  @override
   // ignore: must_call_super
   Future<void> start() async {
     hardAssert(!_open, 'Trying to start already started watch stream');
@@ -171,12 +181,14 @@ class _MockWatchStream extends WatchStream {
   void watchQuery(QueryData queryData) {
     final String resumeToken = toDebugString(queryData.resumeToken);
     SpecTestCase.log(
-        '      watchQuery(${queryData.query}, ${queryData.targetId}, $resumeToken)');
+        '      watchQuery(${queryData.target}, ${queryData.targetId}, $resumeToken)');
     // Snapshot version is ignored on the wire
-    final QueryData sentQueryData = queryData.copyWith(
-        snapshotVersion: SnapshotVersion.none,
-        resumeToken: queryData.resumeToken,
-        sequenceNumber: queryData.sequenceNumber);
+    final QueryData sentQueryData = queryData
+        .copyWith(
+            snapshotVersion: SnapshotVersion.none,
+            resumeToken: queryData.resumeToken,
+            sequenceNumber: queryData.sequenceNumber)
+        .withExpectedCount(queryData.expectedCount);
     _datastore._watchStreamRequestCount += 1;
     _activeTargets[queryData.targetId] = sentQueryData;
   }
@@ -198,7 +210,8 @@ class _MockWatchStream extends WatchStream {
       WatchChange change, SnapshotVersion snapshotVersion) async {
     SnapshotVersion _snapshotVersion = snapshotVersion;
     if (change is WatchChangeWatchTargetChange) {
-      if (change.cause != null && change.cause.code != StatusCode.ok) {
+      final GrpcError? cause = change.cause;
+      if (cause != null && cause.code != StatusCode.ok) {
         for (int targetId in change.targetIds) {
           if (!_activeTargets.containsKey(targetId)) {
             // Technically removing an unknown target is valid (e.g. it could
@@ -239,6 +252,12 @@ class _MockWriteStream extends WriteStream {
   bool _open = false;
 
   final List<List<Mutation>> _sentWrites;
+
+  @override
+  void inhibitBackoff() {
+    _datastore.writeStreamInhibitBackoffCount++;
+    super.inhibitBackoff();
+  }
 
   @override
   // ignore: must_call_super

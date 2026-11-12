@@ -3,6 +3,7 @@
 // on 17/09/2018
 
 part of field_value;
+
 /// A wrapper for Array values in Firestore
 class ArrayValue extends FieldValue {
   const ArrayValue(this._value);
@@ -15,7 +16,7 @@ class ArrayValue extends FieldValue {
   int get typeOrder => FieldValue.typeOrderArray;
 
   @override
-  List<Object> get value {
+  List<Object?> get value {
     return _value.map((FieldValue it) => it.value).toList(growable: false);
   }
 

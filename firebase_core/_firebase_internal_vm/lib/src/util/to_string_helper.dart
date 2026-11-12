@@ -10,9 +10,9 @@ class ToStringHelper {
     _indentingBuiltValueToStringHelperIndent += 2;
   }
 
-  StringBuffer _result = StringBuffer();
+  final StringBuffer _result = StringBuffer();
 
-  void add(String field, Object value) {
+  void add(String field, Object? value) {
     if (value != null) {
       _result
         ..write(' ' * _indentingBuiltValueToStringHelperIndent)
@@ -28,7 +28,6 @@ class ToStringHelper {
     _indentingBuiltValueToStringHelperIndent -= 2;
     _result..write(' ' * _indentingBuiltValueToStringHelperIndent)..write('}');
     final String stringResult = _result.toString();
-    _result = null;
     return stringResult;
   }
 }

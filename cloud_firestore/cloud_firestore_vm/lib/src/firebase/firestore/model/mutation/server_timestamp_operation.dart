@@ -17,18 +17,18 @@ class ServerTimestampOperation implements TransformOperation {
 
   @override
   FieldValue applyToLocalView(
-      FieldValue previousValue, Timestamp localWriteTime) {
+      FieldValue? previousValue, Timestamp localWriteTime) {
     return ServerTimestampValue(localWriteTime, previousValue);
   }
 
   @override
   FieldValue applyToRemoteDocument(
-      FieldValue previousValue, FieldValue transformResult) {
+      FieldValue? previousValue, FieldValue transformResult) {
     return transformResult;
   }
 
   @override
-  FieldValue computeBaseValue(FieldValue currentValue) {
+  FieldValue? computeBaseValue(FieldValue? currentValue) {
     // Server timestamps are idempotent and don't require a base value.
     return null;
   }

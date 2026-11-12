@@ -19,7 +19,6 @@ void main() {
 
   test('testComparison', () {
     ComparatorTester<Blob>()
-      ..permitInconsistencyWithEquals()
       ..addEqualityGroup(<Blob>[blob(), blob()])
       ..addEqualityGroup(<Blob>[
         blob(<int>[0]),

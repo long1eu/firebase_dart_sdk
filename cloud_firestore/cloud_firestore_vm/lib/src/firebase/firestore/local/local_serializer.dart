@@ -4,7 +4,9 @@
 
 import 'dart:typed_data';
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/bundle/bundled_query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
@@ -144,22 +146,58 @@ class LocalSerializer {
     return result..freeze();
   }
 
+  /// Decodes the writes of a persisted batch. Batches written before field transforms were folded
+  /// into set/patch writes (`Write.update_transforms`) contain a separate `transform` write after
+  /// the set or patch it belongs to. Those are squashed into the preceding write so that the
+  /// resulting mutations have the same shape as freshly created ones.
+  List<Mutation> _decodeWrites(List<proto.Write> writes) {
+    final List<Mutation> mutations = <Mutation>[];
+    for (int i = 0; i < writes.length; i++) {
+      final proto.Write write = writes[i];
+      if (write.hasTransform()) {
+        // A transform that does not follow a set or patch: it only ever applied to an existing
+        // document, which is what a patch with an empty mask does.
+        mutations.add(rpcSerializer.decodeMutation(_transformToPatch(write)));
+        continue;
+      }
+
+      final bool nextIsTransform = write.hasUpdate() &&
+          i + 1 < writes.length &&
+          writes[i + 1].hasTransform();
+      if (nextIsTransform) {
+        final proto.Write joined = write.clone()
+          ..updateTransforms
+              .addAll(writes[i + 1].transform.fieldTransforms);
+        mutations.add(rpcSerializer.decodeMutation(joined));
+        i++;
+      } else {
+        mutations.add(rpcSerializer.decodeMutation(write));
+      }
+    }
+    return mutations;
+  }
+
+  proto.Write _transformToPatch(proto.Write transformWrite) {
+    final proto.Write patch = proto.Write.create()
+      ..update = (proto.Document.create()
+        ..name = transformWrite.transform.document)
+      ..updateMask = proto.DocumentMask.create()
+      ..updateTransforms.addAll(transformWrite.transform.fieldTransforms);
+    if (transformWrite.hasCurrentDocument()) {
+      patch.currentDocument = transformWrite.currentDocument;
+    }
+    return patch;
+  }
+
   /// Decodes a [WriteBatch] proto into a MutationBatch model. */
   MutationBatch decodeMutationBatch(proto.WriteBatch batch) {
     final int batchId = batch.batchId;
     final Timestamp localWriteTime =
         rpcSerializer.decodeTimestamp(batch.localWriteTime);
 
-    final int baseMutationsCount = batch.baseWrites.length;
-    final List<Mutation> baseMutations = List<Mutation>(baseMutationsCount);
-    for (int i = 0; i < baseMutationsCount; i++) {
-      baseMutations[i] = rpcSerializer.decodeMutation(batch.baseWrites[i]);
-    }
-    final int mutationsCount = batch.writes.length;
-    final List<Mutation> mutations = List<Mutation>(mutationsCount);
-    for (int i = 0; i < mutationsCount; i++) {
-      mutations[i] = rpcSerializer.decodeMutation(batch.writes[i]);
-    }
+    final List<Mutation> baseMutations =
+        _decodeWrites(batch.baseWrites);
+    final List<Mutation> mutations = _decodeWrites(batch.writes);
     return MutationBatch(
       batchId: batchId,
       localWriteTime: localWriteTime,
@@ -169,10 +207,10 @@ class LocalSerializer {
   }
 
   proto.Target encodeQueryData(QueryData queryData) {
-    hardAssert(
+    hardAssertLazy(
         queryData.purpose == QueryPurpose.listen,
-        'Only queries with purpose ${QueryPurpose.listen} '
-        'may be stored, got ${queryData.purpose}');
+        () => 'Only queries with purpose ${QueryPurpose.listen} '
+            'may be stored, got ${queryData.purpose}');
 
     final proto.Target result = proto.Target.create()
       ..targetId = queryData.targetId
@@ -180,11 +218,11 @@ class LocalSerializer {
       ..snapshotVersion = rpcSerializer.encodeVersion(queryData.snapshotVersion)
       ..resumeToken = queryData.resumeToken;
 
-    final Query query = queryData.query;
-    if (query.isDocumentQuery) {
-      result.documents = rpcSerializer.encodeDocumentsTarget(query);
+    final Target target = queryData.target;
+    if (target.isDocumentQuery) {
+      result.documents = rpcSerializer.encodeDocumentsTarget(target);
     } else {
-      result.query = rpcSerializer.encodeQueryTarget(query);
+      result.query = rpcSerializer.encodeQueryTarget(target);
     }
 
     return result..freeze();
@@ -198,23 +236,62 @@ class LocalSerializer {
     final Uint8List resumeToken = Uint8List.fromList(target.resumeToken);
     final int sequenceNumber = target.lastListenSequenceNumber.toInt();
 
-    Query query;
+    Target decodedTarget;
 
     if (target.hasDocuments()) {
-      query = rpcSerializer.decodeDocumentsTarget(target.documents);
+      decodedTarget = rpcSerializer.decodeDocumentsTarget(target.documents);
     } else if (target.hasQuery()) {
-      query = rpcSerializer.decodeQueryTarget(target.query);
+      decodedTarget = rpcSerializer.decodeQueryTarget(target.query);
     } else {
       throw fail('Unknown targetType $target}');
     }
 
     return QueryData(
-      query,
+      decodedTarget,
       targetId,
       sequenceNumber,
       QueryPurpose.listen,
       version,
       resumeToken,
     );
+  }
+
+  /// Encodes a [BundledQuery] to the equivalent protocol buffer for local storage.
+  proto.BundledQuery encodeBundledQuery(BundledQuery bundledQuery) {
+    final proto.Target_QueryTarget queryTarget =
+        rpcSerializer.encodeQueryTarget(bundledQuery.query.toTarget());
+
+    final proto.BundledQuery result = proto.BundledQuery.create()
+      ..limitType = bundledQuery.limitType == BundledQueryLimitType.first
+          ? proto.BundledQuery_LimitType.FIRST
+          : proto.BundledQuery_LimitType.LAST
+      ..parent = queryTarget.parent
+      ..structuredQuery = queryTarget.structuredQuery;
+
+    return result..freeze();
+  }
+
+  /// Decodes a [proto.BundledQuery] proto to the equivalent model.
+  BundledQuery decodeBundledQuery(proto.BundledQuery bundledQuery) {
+    final BundledQueryLimitType limitType =
+        bundledQuery.limitType == proto.BundledQuery_LimitType.FIRST
+            ? BundledQueryLimitType.first
+            : BundledQueryLimitType.last;
+    final Target target = rpcSerializer.decodeQueryTarget(
+        proto.Target_QueryTarget.create()
+          ..parent = bundledQuery.parent
+          ..structuredQuery = bundledQuery.structuredQuery);
+    // The stored target keeps the order constraints as the user wrote them (not flipped for limitToLast).
+    final Query query = Query(
+      target.path,
+      collectionGroup: target.collectionGroup,
+      filters: target.filters,
+      explicitSortOrder: target.orderBy,
+      limit: target.limit,
+      startAt: target.startAt,
+      endAt: target.endAt,
+    );
+
+    return BundledQuery(query, limitType);
   }
 }

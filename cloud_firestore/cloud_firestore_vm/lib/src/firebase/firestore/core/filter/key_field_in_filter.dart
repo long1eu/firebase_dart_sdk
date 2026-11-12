@@ -8,7 +8,7 @@ part of filter;
 class KeyFieldInFilter extends FieldFilter {
   KeyFieldInFilter(FieldPath field, FieldValue value)
       : super._(field, FilterOperator.IN, value) {
-    final ArrayValue arrayValue = value;
+    final ArrayValue arrayValue = value as ArrayValue;
     for (FieldValue refValue in arrayValue.internalValue) {
       hardAssert(refValue is ReferenceValue,
           'Comparing on key with IN, but an array value was not a ReferenceValue');
@@ -17,7 +17,7 @@ class KeyFieldInFilter extends FieldFilter {
 
   @override
   bool matches(Document doc) {
-    final ArrayValue arrayValue = value;
+    final ArrayValue arrayValue = value as ArrayValue;
     for (FieldValue refValue in arrayValue.internalValue) {
       if (doc.key == refValue.value) {
         return true;

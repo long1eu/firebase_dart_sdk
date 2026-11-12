@@ -50,14 +50,14 @@ void main() {
     final ViewDocumentChanges initialChanges =
         view.computeDocChanges(initialDocs);
     final TargetChange initialTargetChange = ackTarget(initialDocsList);
-    final ViewSnapshot initialSnapshot =
+    final ViewSnapshot? initialSnapshot =
         view.applyChanges(initialChanges, initialTargetChange).snapshot;
 
     final ViewDocumentChanges updateChanges = view.computeDocChanges(updates);
     final TargetChange updateTargetChange = targetChange(
         Uint8List.fromList(<int>[]), addedList, modifiedList, removedList,
         current: true);
-    final ViewSnapshot updatedSnapshot =
+    final ViewSnapshot? updatedSnapshot =
         view.applyChanges(updateChanges, updateTargetChange).snapshot;
 
     if (updatedSnapshot == null) {
@@ -66,7 +66,7 @@ void main() {
     }
 
     final List<Document> expected = updatedSnapshot.documents.toList();
-    final List<Document> actual = initialSnapshot.documents.toList();
+    final List<Document> actual = initialSnapshot!.documents.toList();
 
     final Firestore firestore = FirebaseFirestoreMock();
     final List<DocumentChange> changes = DocumentChange.changesFromSnapshot(
@@ -78,7 +78,7 @@ void main() {
       }
 
       if (change.type != DocumentChangeType.removed) {
-        actual.insert(change.newIndex, change.document.document);
+        actual.insert(change.newIndex, change.document.document!);
       }
     }
 

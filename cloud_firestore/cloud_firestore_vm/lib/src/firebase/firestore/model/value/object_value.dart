@@ -9,7 +9,8 @@ class ObjectValue extends FieldValue {
 
   factory ObjectValue.fromMap(Map<String, FieldValue> value) {
     return ObjectValue.fromImmutableMap(
-        ImmutableSortedMap<String, FieldValue>.fromMap(value, comparator()));
+        ImmutableSortedMap<String, FieldValue>.fromMap(
+            value, compareUtf8Strings));
   }
 
   factory ObjectValue.fromImmutableMap(
@@ -22,7 +23,7 @@ class ObjectValue extends FieldValue {
   }
 
   static final ObjectValue empty = ObjectValue(
-      ImmutableSortedMap<String, FieldValue>.emptyMap(comparator()));
+      ImmutableSortedMap<String, FieldValue>.emptyMap(compareUtf8Strings));
 
   final ImmutableSortedMap<String, FieldValue> _value;
 
@@ -56,8 +57,8 @@ class ObjectValue extends FieldValue {
   }
 
   @override
-  Map<String, Object> get value {
-    final Map<String, Object> res = <String, Object>{};
+  Map<String, Object?> get value {
+    final Map<String, Object?> res = <String, Object?>{};
     for (MapEntry<String, FieldValue> entry in _value) {
       res[entry.key] = entry.value.value;
     }
@@ -69,11 +70,16 @@ class ObjectValue extends FieldValue {
   @override
   int compareTo(FieldValue other) {
     if (other is ObjectValue) {
-      for (int i = 0; i < _value.length && i < other._value.length; i++) {
-        final MapEntry<String, FieldValue> entry1 = _value.elementAt(i);
-        final MapEntry<String, FieldValue> entry2 = other._value.elementAt(i);
+      // Walk both maps with iterators: elementAt(i) on a sorted map is linear,
+      // which made comparing large objects quadratic.
+      final Iterator<MapEntry<String, FieldValue>> iterator1 = _value.iterator;
+      final Iterator<MapEntry<String, FieldValue>> iterator2 =
+          other._value.iterator;
+      while (iterator1.moveNext() && iterator2.moveNext()) {
+        final MapEntry<String, FieldValue> entry1 = iterator1.current;
+        final MapEntry<String, FieldValue> entry2 = iterator2.current;
 
-        final int keyCompare = entry1.key.compareTo(entry2.key);
+        final int keyCompare = compareUtf8Strings(entry1.key, entry2.key);
         if (keyCompare != 0) {
           return keyCompare;
         }
@@ -100,8 +106,8 @@ class ObjectValue extends FieldValue {
     if (path.length == 1) {
       return _setChild(childName, value);
     } else {
-      final FieldValue child = internalValue[childName];
-      ObjectValue obj;
+      final FieldValue? child = internalValue[childName];
+      final ObjectValue obj;
       if (child is ObjectValue) {
         obj = child;
       } else {
@@ -123,7 +129,7 @@ class ObjectValue extends FieldValue {
     if (path.length == 1) {
       return ObjectValue.fromImmutableMap(_value.remove(childName));
     } else {
-      final FieldValue child = _value[childName];
+      final FieldValue? child = _value[childName];
       if (child is ObjectValue) {
         final ObjectValue newChild = child.delete(path.popFirst());
         return _setChild(childName, newChild);
@@ -135,8 +141,8 @@ class ObjectValue extends FieldValue {
   }
 
   /// Returns the value at the given path or null
-  FieldValue get(FieldPath fieldPath) {
-    FieldValue current = this;
+  FieldValue? get(FieldPath fieldPath) {
+    FieldValue? current = this;
 
     for (int i = 0; i < fieldPath.length; i++) {
       if (current is ObjectValue) {

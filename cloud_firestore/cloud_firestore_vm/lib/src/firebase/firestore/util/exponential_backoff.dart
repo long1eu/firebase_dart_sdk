@@ -25,12 +25,7 @@ class ExponentialBackoff {
     Duration initialDelay = const Duration(seconds: 1),
     double backoffFactor = 1.5,
     Duration maxDelay = const Duration(minutes: 1),
-  })  : assert(scheduler != null),
-        assert(taskId != null),
-        assert(initialDelay != null),
-        assert(backoffFactor != null),
-        assert(maxDelay != null),
-        _scheduler = scheduler,
+  })  : _scheduler = scheduler,
         _taskId = taskId,
         _initialDelay = initialDelay,
         _backoffFactor = backoffFactor,
@@ -46,7 +41,7 @@ class ExponentialBackoff {
 
   Duration _currentBase;
   DateTime _lastAttemptTime;
-  TimerTask _timerTask;
+  TimerTask? _timerTask;
 
   /// Resets the backoff delay.
   ///
@@ -103,8 +98,9 @@ class ExponentialBackoff {
   }
 
   void cancel() {
-    if (_timerTask != null) {
-      _timerTask.cancel();
+    final TimerTask? timerTask = _timerTask;
+    if (timerTask != null) {
+      timerTask.cancel();
       _timerTask = null;
     }
   }

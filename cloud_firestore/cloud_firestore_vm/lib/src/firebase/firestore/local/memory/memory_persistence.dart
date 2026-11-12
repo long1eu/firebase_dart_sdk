@@ -12,10 +12,13 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/memory/memory_bundle_cache.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
@@ -48,9 +51,9 @@ part 'memory_remote_document_cache.dart';
 class MemoryPersistence extends Persistence {
   /// Use factory constructors to instantiate
   MemoryPersistence._(StatsCollector statsCollector)
-      : _statsCollector = statsCollector ?? StatsCollector.noOp,
+      : _statsCollector = statsCollector,
         mutationQueues = <User, MemoryMutationQueue>{},
-        _semaphore = GlobalSemaphore(),
+        _semaphore = GlobalSemaphore('persistence'),
         indexManager = MemoryIndexManager() {
     queryCache = MemoryQueryCache(this);
     remoteDocumentCache = MemoryRemoteDocumentCache(this, _statsCollector);
@@ -87,13 +90,16 @@ class MemoryPersistence extends Persistence {
   Map<User, MemoryMutationQueue> mutationQueues;
 
   @override
-  MemoryRemoteDocumentCache remoteDocumentCache;
+  late MemoryRemoteDocumentCache remoteDocumentCache;
 
   @override
-  MemoryQueryCache queryCache;
+  late MemoryQueryCache queryCache;
 
   @override
-  ReferenceDelegate referenceDelegate;
+  final BundleCache bundleCache = MemoryBundleCache();
+
+  @override
+  late ReferenceDelegate referenceDelegate;
 
   @override
   bool started = false;
@@ -101,9 +107,12 @@ class MemoryPersistence extends Persistence {
   @override
   Future<void> start() async {
     await _semaphore.acquire();
-    hardAssert(!started, 'MemoryPersistence double-started!');
-    started = true;
-    _semaphore.release();
+    try {
+      hardAssert(!started, 'MemoryPersistence double-started!');
+      started = true;
+    } finally {
+      _semaphore.release();
+    }
   }
 
   @override
@@ -111,14 +120,17 @@ class MemoryPersistence extends Persistence {
     await _semaphore.acquire();
     // TODO(long1eu): This assertion seems problematic, since we may attempt
     //  shutdown in the finally block after failing to initialize.
-    hardAssert(started, 'MemoryPersistence shutdown without start');
-    started = false;
-    _semaphore.release();
+    try {
+      hardAssert(started, 'MemoryPersistence shutdown without start');
+      started = false;
+    } finally {
+      _semaphore.release();
+    }
   }
 
   @override
   MutationQueue getMutationQueue(User user) {
-    MemoryMutationQueue queue = mutationQueues[user];
+    MemoryMutationQueue? queue = mutationQueues[user];
     if (queue == null) {
       queue = MemoryMutationQueue(this, _statsCollector);
       mutationQueues[user] = queue;
@@ -139,13 +151,18 @@ class MemoryPersistence extends Persistence {
       String action, Transaction<T> operation) async {
     await _semaphore.acquire();
 
-    Log.d('$runtimeType', 'Starting transaction: $action');
-    referenceDelegate.onTransactionStarted();
-    final T result = await operation();
-    Log.d('$runtimeType', 'Commit transaction: $action');
-    await referenceDelegate.onTransactionCommitted();
-
-    _semaphore.release();
-    return result;
+    try {
+      Log.d('$runtimeType', 'Starting transaction: $action');
+      referenceDelegate.onTransactionStarted();
+      final T result = await operation();
+      Log.d('$runtimeType', 'Commit transaction: $action');
+      await referenceDelegate.onTransactionCommitted();
+      return result;
+    } catch (_) {
+      referenceDelegate.onTransactionRolledBack();
+      rethrow;
+    } finally {
+      _semaphore.release();
+    }
   }
 }

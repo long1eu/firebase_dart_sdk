@@ -2,8 +2,6 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'dart:collection';
-
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
@@ -11,15 +9,15 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// A set of changes to documents with respect to a view. This set is mutable.
 class DocumentViewChangeSet {
-  DocumentViewChangeSet()
-      : changes = SplayTreeMap<DocumentKey, DocumentViewChange>();
+  DocumentViewChangeSet() : changes = <DocumentKey, DocumentViewChange>{};
 
-  // This map is sorted to make the unit tests simpler.
-  final SplayTreeMap<DocumentKey, DocumentViewChange> changes;
+  // Insertion ordered. The order of the changes is not significant:
+  // [View.applyChanges] sorts them (by type and query order) before use.
+  final Map<DocumentKey, DocumentViewChange> changes;
 
   void addChange(DocumentViewChange change) {
     final DocumentKey key = change.document.key;
-    final DocumentViewChange old = changes[key];
+    final DocumentViewChange? old = changes[key];
     if (old == null) {
       changes[key] = change;
       return;

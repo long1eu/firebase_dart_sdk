@@ -33,10 +33,56 @@ class TransactionClient {
           ..database = _databaseName
           ..documents.addAll(keys.map(_serializer.encodeKey));
 
-    return _client
-        .batchGetDocuments(builder)
-        .map(_serializer.decodeMaybeDocument)
-        .where((MaybeDocument doc) => keys.contains(doc.key))
-        .toList();
+    // The backend may keep the stream open after it has sent a response for
+    // every requested document ("logical termination"), so complete as soon as
+    // all the documents arrived instead of waiting for the stream to close.
+    final Completer<List<MaybeDocument>> completer =
+        Completer<List<MaybeDocument>>();
+    final Map<DocumentKey, MaybeDocument> documents =
+        <DocumentKey, MaybeDocument>{};
+    // The backend answers once per distinct document, even if a key is repeated.
+    final int expectedCount = keys.toSet().length;
+    final ResponseStream<proto.BatchGetDocumentsResponse> call =
+        _client.batchGetDocuments(builder);
+    late final StreamSubscription<proto.BatchGetDocumentsResponse> subscription;
+
+    void finish() {
+      subscription.cancel();
+      call.cancel();
+    }
+
+    subscription = call.listen(
+      (proto.BatchGetDocumentsResponse response) {
+        if (completer.isCompleted) {
+          return;
+        }
+        final MaybeDocument doc = _serializer.decodeMaybeDocument(response);
+        documents[doc.key] = doc;
+        if (documents.length == expectedCount) {
+          completer.complete(<MaybeDocument>[
+            for (DocumentKey key in keys)
+              if (documents.containsKey(key)) documents[key]!
+          ]);
+          finish();
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
+      },
+      onDone: () {
+        if (!completer.isCompleted) {
+          // The server closed the stream early: report what was received (in
+          // key order) instead of an empty result.
+          completer.complete(<MaybeDocument>[
+            for (DocumentKey key in keys)
+              if (documents.containsKey(key)) documents[key]!
+          ]);
+        }
+      },
+      cancelOnError: true,
+    );
+    return completer.future;
   }
 }

@@ -4,8 +4,11 @@
 
 import 'dart:collection';
 
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:test/test.dart';
@@ -25,8 +28,8 @@ void main() {
       'foo',
       map<dynamic>(<dynamic>['a', 1, 'b', true, 'c', 'string'])
     ]);
-    expect(val is ObjectValue, isA<ObjectValue>());
-    final ObjectValue obj = val;
+    expect(val, isA<ObjectValue>());
+    final ObjectValue obj = val as ObjectValue;
     expect(obj.get(field('foo')) is ObjectValue, isTrue);
     expect(obj.get(field('foo.a')), wrap(1));
     expect(obj.get(field('foo.b')), wrap(true));
@@ -57,7 +60,7 @@ void main() {
     ]);
 
     expect(val, isA<ObjectValue>());
-    final ObjectValue obj = val;
+    final ObjectValue obj = val as ObjectValue;
     final FieldMask mask = obj.fieldMask;
     expect(
         mask,
@@ -317,6 +320,126 @@ void main() {
         .addItem(wrapMap(map(<dynamic>['bar', 1])))
         .addItem(wrapMap(map(<dynamic>['foo', 1])))
         .testEquals();
+  });
+
+  test('testServerTimestampHasOwnTypeOrder', () {
+    final ServerTimestampValue pending =
+        ServerTimestampValue(Timestamp(200, 0), null);
+    final FieldValue timestamp = wrap(Timestamp(100, 0));
+    final FieldValue string = wrap('a');
+
+    expect(pending.typeOrder, isNot(timestamp.typeOrder));
+    expect(pending.typeOrder, greaterThan(timestamp.typeOrder));
+    expect(pending.typeOrder, lessThan(string.typeOrder));
+    expect(timestamp.compareTo(pending), lessThan(0));
+    expect(pending.compareTo(timestamp), greaterThan(0));
+    expect(pending.compareTo(string), lessThan(0));
+    expect(string.compareTo(pending), greaterThan(0));
+  });
+
+  test('testIntegerAndNestedMapEquality', () {
+    // Dart compares values structurally (no protobuf equals), as 55e6921 does.
+    expect(wrap(42), wrap(42));
+    expect(wrap(42), isNot(wrap(43)));
+    expect(wrap(1), isNot(wrap(1.0)));
+
+    final FieldValue left = wrap(map<dynamic>(<dynamic>[
+      'a',
+      map<dynamic>(<dynamic>[
+        'b',
+        1,
+        'c',
+        <dynamic>[
+          1,
+          map<dynamic>(<dynamic>['d', 2])
+        ]
+      ])
+    ]));
+    final FieldValue same = wrap(map<dynamic>(<dynamic>[
+      'a',
+      map<dynamic>(<dynamic>[
+        'b',
+        1,
+        'c',
+        <dynamic>[
+          1,
+          map<dynamic>(<dynamic>['d', 2])
+        ]
+      ])
+    ]));
+    final FieldValue different = wrap(map<dynamic>(<dynamic>[
+      'a',
+      map<dynamic>(<dynamic>[
+        'b',
+        1,
+        'c',
+        <dynamic>[
+          1,
+          map<dynamic>(<dynamic>['d', 3])
+        ]
+      ])
+    ]));
+    expect(left, same);
+    expect(left.hashCode, same.hashCode);
+    expect(left, isNot(different));
+  });
+
+  test('testRepeatedServerTimestampsDoNotNestPreviousValues', () {
+    FieldValue value = IntegerValue.valueOf(42);
+    for (int i = 0; i < 200000; i++) {
+      value = ServerTimestampOperation.sharedInstance
+          .applyToLocalView(value, Timestamp(i, 0));
+    }
+
+    final ServerTimestampValue pending = value as ServerTimestampValue;
+    expect(pending.localWriteTime, Timestamp(199999, 0));
+    // The intermediate server timestamps are not retained.
+    expect(pending.previousValue, 42);
+    expect(
+        pending,
+        ServerTimestampValue(Timestamp(199999, 0),
+            ServerTimestampValue(Timestamp(5, 0), IntegerValue.valueOf(42))));
+  });
+
+  test('testPendingServerTimestampDoesNotMatchTimestampFilters', () {
+    final Document document = Document(
+        key('coll/a'),
+        version(1),
+        DocumentState.localMutations,
+        ObjectValue.empty
+            .set(field('t'), ServerTimestampValue(Timestamp(200, 0), null)));
+
+    for (final FilterOperator operator in <FilterOperator>[
+      FilterOperator.lessThan,
+      FilterOperator.lessThanOrEqual,
+      FilterOperator.graterThan,
+      FilterOperator.graterThanOrEqual,
+      FilterOperator.equal,
+    ]) {
+      final Filter filter =
+          FieldFilter(field('t'), operator, wrap(Timestamp(100, 0)));
+      expect(filter.matches(document), isFalse, reason: '$operator');
+    }
+  });
+
+  test('testStringAndMapKeysUseUtf8ByteOrder', () {
+    ComparatorTester<FieldValue>()
+        .permitInconsistencyWithEquals()
+        .addEqualityGroup(<FieldValue>[wrap('\uE000')]).addEqualityGroup(
+            <FieldValue>[wrap('\uFFFF')]).addEqualityGroup(<FieldValue>[
+      wrap('\u{10000}')
+    ]).addEqualityGroup(<FieldValue>[wrap('\u{1F600}')]).testCompare();
+
+    final FieldValue low = wrap(map<dynamic>(<dynamic>['\uFFFF', 1]));
+    final FieldValue high = wrap(map<dynamic>(<dynamic>['\u{10000}', 1]));
+    expect(low.compareTo(high), lessThan(0));
+
+    // Map keys are stored in UTF-8 byte order.
+    final ObjectValue both =
+        wrap(map<dynamic>(<dynamic>['\u{10000}', 1, '\uFFFF', 2, 'a', 3]))
+            as ObjectValue;
+    expect(both.internalValue.map((MapEntry<String, FieldValue> e) => e.key),
+        <String>['a', '\uFFFF', '\u{10000}']);
   });
 
   test('testValueOrdering', () {

@@ -25,7 +25,7 @@ void main() {
   });
 
   Future<void> verifySuccessfulWriteReadCycle(
-      Map<String, Object> data, DocumentReference documentReference) async {
+      Map<String, Object?> data, DocumentReference documentReference) async {
     await documentReference.set(data);
     final DocumentSnapshot doc = await documentReference.get();
     expect(doc.data, data);
@@ -74,7 +74,7 @@ void main() {
   });
 
   test('testCanReadAndWriteTimestamps', () async {
-    final Timestamp timestamp = Timestamp(100, 123000000);
+    const Timestamp timestamp = Timestamp(100, 123000000);
     await verifySuccessfulWriteReadCycle(
         map(<dynamic>['timestamp', timestamp]), await testDoc());
   });
@@ -88,7 +88,7 @@ void main() {
 
   test('testCanUseTypedAccessors', () async {
     final DocumentReference doc = await testDoc();
-    final Map<String, Object> data = map(<dynamic>[
+    final Map<String, Object?> data = map(<dynamic>[
       'null',
       null,
       'boolean',
@@ -107,7 +107,7 @@ void main() {
       'date',
       DateTime.now(),
       'timestamp',
-      Timestamp(100, 123000000),
+      const Timestamp(100, 123000000),
       'reference',
       doc
     ]);
@@ -123,12 +123,12 @@ void main() {
     expect(snapshot.getDouble('int'), 1.0);
     expect(snapshot.getGeoPoint('geoPoint'), data['geoPoint']);
     expect(snapshot.getBlob('blob'), data['blob']);
-    expect(snapshot.getDate('date').millisecondsSinceEpoch,
+    expect(snapshot.getDate('date')!.millisecondsSinceEpoch,
         (data['date'] as DateTime).millisecondsSinceEpoch);
     expect(snapshot.getTimestamp('date'),
         Timestamp.fromDate(data['date'] as DateTime));
     expect(snapshot.getTimestamp('timestamp'), data['timestamp']);
-    final Timestamp timestamp = data['timestamp'];
+    final Timestamp timestamp = data['timestamp']! as Timestamp;
     expect(snapshot.getDate('timestamp'), timestamp.toDate());
     expect(data['reference'], const TypeMatcher<DocumentReference>());
     expect(doc.path, (data['reference'] as DocumentReference).path);
@@ -136,7 +136,7 @@ void main() {
 
   test('testTypeAccessorsCanReturnNull', () async {
     final DocumentReference doc = await testDoc();
-    final Map<String, Object> data = map();
+    final Map<String, Object?> data = map();
 
     await doc.set(data);
     final DocumentSnapshot snapshot = await doc.get();
@@ -154,14 +154,14 @@ void main() {
 
   test('testCanReadAndWriteDocumentReferences', () async {
     final DocumentReference docRef = await testDoc();
-    final Map<String, Object> data = map(<dynamic>['a', 42, 'ref', docRef]);
+    final Map<String, Object?> data = map(<dynamic>['a', 42, 'ref', docRef]);
     await verifySuccessfulWriteReadCycle(data, docRef);
   });
 
   test('testCanReadAndWriteDocumentReferencesInLists', () async {
     final DocumentReference docRef = await testDoc();
     final List<Object> refs = <Object>[docRef];
-    final Map<String, Object> data = map(<dynamic>['a', 42, 'refs', refs]);
+    final Map<String, Object?> data = map(<dynamic>['a', 42, 'refs', refs]);
     await verifySuccessfulWriteReadCycle(data, docRef);
   });
 }

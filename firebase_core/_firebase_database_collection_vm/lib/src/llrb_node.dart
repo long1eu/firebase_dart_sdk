@@ -22,8 +22,8 @@ enum LLRBNodeColor { red, black }
 abstract class LLRBNode<K, V> {
   const LLRBNode();
 
-  LLRBNode<K, V> copy(K key, V value, LLRBNodeColor color, LLRBNode<K, V> left,
-      LLRBNode<K, V> right);
+  LLRBNode<K, V> copy(K? key, V? value, LLRBNodeColor color,
+      LLRBNode<K, V>? left, LLRBNode<K, V>? right);
 
   LLRBNode<K, V> insert(K key, V value, Comparator<K> comparator);
 
@@ -33,9 +33,9 @@ abstract class LLRBNode<K, V> {
 
   bool get isRed;
 
-  K get key;
+  K? get key;
 
-  V get value;
+  V? get value;
 
   LLRBNode<K, V> get left;
 

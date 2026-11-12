@@ -49,4 +49,9 @@ abstract class ReferenceDelegate {
 
   /// Lifecycle hook to notify the delegate that a transaction has committed.
   Future<void> onTransactionCommitted();
+
+  /// Lifecycle hook to notify the delegate that a transaction failed and was
+  /// rolled back (or never really started), so that it can reset any state
+  /// kept for the transaction. Must be safe to call at any time.
+  void onTransactionRolledBack();
 }

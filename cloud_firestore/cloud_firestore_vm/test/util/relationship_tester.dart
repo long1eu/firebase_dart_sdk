@@ -89,7 +89,7 @@ class RelationshipTester<T> {
     }
   }
 
-  static String _itemString(Object item, int groupNumber, int itemNumber) {
+  static String _itemString(Object? item, int groupNumber, int itemNumber) {
     return (StringBuffer()
           ..write(item)
           ..write(' [group ')

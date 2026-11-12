@@ -16,11 +16,11 @@ class NullValue extends FieldValue {
   int get typeOrder => FieldValue.typeOrderNull;
 
   @override
-  Object get value => null;
+  Object? get value => null;
 
   @override
   int compareTo(FieldValue other) {
-    if (other is NullValue || other == null) {
+    if (other is NullValue) {
       return 0;
     } else {
       return defaultCompareTo(other);

@@ -9,7 +9,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dar
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_set.dart';
@@ -17,8 +16,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_snapshot.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_aggregator.dart';
-import 'package:meta/meta.dart';
 import 'package:mockito/mockito.dart';
 
 import '../../../util/test_util.dart' as util;
@@ -34,7 +31,7 @@ DocumentReference documentReference(String path) {
 }
 
 DocumentSnapshot documentSnapshot(
-    String path, Map<String, Object> data, bool isFromCache) {
+    String path, Map<String, Object>? data, bool isFromCache) {
   if (data == null) {
     return DocumentSnapshot.fromNoDocument(
       firestore,
@@ -114,6 +111,7 @@ QuerySnapshot querySnapshot(
     isFromCache: isFromCache,
     didSyncStateChange: true,
     excludesMetadataChanges: false,
+    hasCachedResults: false,
   );
 
   return QuerySnapshot(query(path), viewSnapshot, firestore);

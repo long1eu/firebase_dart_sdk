@@ -19,7 +19,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:meta/meta.dart';
 
 /// A readonly view of the local state of all documents we're tracking (i.e. we
 /// have a cached version in [remoteDocumentCache] or local mutations for the
@@ -29,9 +28,9 @@ import 'package:meta/meta.dart';
 // TODO(long1eu): Turn this into the UnifiedDocumentCache / whatever.
 class LocalDocumentsView {
   const LocalDocumentsView({
-    @required this.remoteDocumentCache,
-    @required this.mutationQueue,
-    @required this.indexManager,
+    required this.remoteDocumentCache,
+    required this.mutationQueue,
+    required this.indexManager,
   });
 
   final RemoteDocumentCache remoteDocumentCache;
@@ -40,16 +39,16 @@ class LocalDocumentsView {
 
   /// Returns the the local view of the document identified by [key]. If we
   /// don't have any cached state it returns null
-  Future<MaybeDocument> getDocument(DocumentKey key) async {
+  Future<MaybeDocument?> getDocument(DocumentKey key) async {
     final List<MutationBatch> batches =
         await mutationQueue.getAllMutationBatchesAffectingDocumentKey(key);
     return _getDocument(key, batches);
   }
 
   // Internal version of [getDocument] that allows reusing batches.
-  Future<MaybeDocument> _getDocument(
+  Future<MaybeDocument?> _getDocument(
       DocumentKey key, List<MutationBatch> inBatches) async {
-    MaybeDocument document = await remoteDocumentCache.get(key);
+    MaybeDocument? document = await remoteDocumentCache.get(key);
 
     for (MutationBatch batch in inBatches) {
       document = batch.applyToLocalView(key, document);
@@ -59,14 +58,14 @@ class LocalDocumentsView {
   }
 
   // Returns the view of the given [docs] as they would appear after applying all mutations in the given [batches].
-  Map<DocumentKey, MaybeDocument> _applyLocalMutationsToDocuments(
-      Map<DocumentKey, MaybeDocument> docs, List<MutationBatch> batches) {
-    return docs.map((DocumentKey key, MaybeDocument value) {
-      return MapEntry<DocumentKey, MaybeDocument>(
+  Map<DocumentKey, MaybeDocument?> _applyLocalMutationsToDocuments(
+      Map<DocumentKey, MaybeDocument?> docs, List<MutationBatch> batches) {
+    return docs.map((DocumentKey key, MaybeDocument? value) {
+      return MapEntry<DocumentKey, MaybeDocument?>(
           key,
-          batches.fold(
+          batches.fold<MaybeDocument?>(
               value,
-              (MaybeDocument localView, MutationBatch batch) =>
+              (MaybeDocument? localView, MutationBatch batch) =>
                   batch.applyToLocalView(key, localView)));
     });
   }
@@ -77,7 +76,7 @@ class LocalDocumentsView {
   /// resulting set.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> getDocuments(
       Iterable<DocumentKey> keys) async {
-    final Map<DocumentKey, MaybeDocument> docs =
+    final Map<DocumentKey, MaybeDocument?> docs =
         await remoteDocumentCache.getAll(keys);
     return getLocalViewOfDocuments(docs);
   }
@@ -85,15 +84,15 @@ class LocalDocumentsView {
   /// Similar to [getDocuments], but creates the local view from the given [baseDocs] without retrieving documents from
   /// the local store.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>>
-      getLocalViewOfDocuments(Map<DocumentKey, MaybeDocument> baseDocs) async {
+      getLocalViewOfDocuments(Map<DocumentKey, MaybeDocument?> baseDocs) async {
     ImmutableSortedMap<DocumentKey, MaybeDocument> results =
         DocumentCollections.emptyMaybeDocumentMap();
 
     final List<MutationBatch> batches = await mutationQueue
         .getAllMutationBatchesAffectingDocumentKeys(baseDocs.keys);
-    final Map<DocumentKey, MaybeDocument> docs =
+    final Map<DocumentKey, MaybeDocument?> docs =
         _applyLocalMutationsToDocuments(baseDocs, batches);
-    for (MapEntry<DocumentKey, MaybeDocument> entry in docs.entries) {
+    for (MapEntry<DocumentKey, MaybeDocument?> entry in docs.entries) {
       // TODO(long1eu): Don't conflate missing / deleted.
       final MaybeDocument maybeDoc = entry.value ??
           NoDocument(
@@ -131,7 +130,7 @@ class LocalDocumentsView {
     ImmutableSortedMap<DocumentKey, Document> result =
         DocumentCollections.emptyDocumentMap();
     // Just do a simple document lookup.
-    final MaybeDocument doc = await getDocument(DocumentKey.fromPath(path));
+    final MaybeDocument? doc = await getDocument(DocumentKey.fromPath(path));
     if (doc is Document) {
       result = result.insert(doc.key, doc);
     }
@@ -142,7 +141,7 @@ class LocalDocumentsView {
       _getDocumentsMatchingCollectionGroupQuery(Query query) async {
     hardAssert(query.path.isEmpty,
         'Currently we only support collection group queries at the root.');
-    final String collectionId = query.collectionGroup;
+    final String collectionId = query.collectionGroup!;
     ImmutableSortedMap<DocumentKey, Document> results =
         DocumentCollections.emptyDocumentMap();
     final List<ResourcePath> parents =
@@ -179,8 +178,8 @@ class LocalDocumentsView {
         }
 
         final DocumentKey key = mutation.key;
-        final MaybeDocument baseDoc = results[key];
-        final MaybeDocument mutatedDoc =
+        final MaybeDocument? baseDoc = results[key];
+        final MaybeDocument? mutatedDoc =
             mutation.applyToLocalView(baseDoc, baseDoc, batch.localWriteTime);
         if (mutatedDoc is Document) {
           results = results.insert(key, mutatedDoc);
@@ -222,11 +221,12 @@ class LocalDocumentsView {
     }
 
     ImmutableSortedMap<DocumentKey, Document> mergedDocs = existingDocs;
-    final Map<DocumentKey, MaybeDocument> missingDocs =
+    final Map<DocumentKey, MaybeDocument?> missingDocs =
         await remoteDocumentCache.getAll(missingDocKeys);
-    for (MapEntry<DocumentKey, MaybeDocument> entry in missingDocs.entries) {
-      if (entry.value != null && (entry.value is Document)) {
-        mergedDocs = mergedDocs.insert(entry.key, entry.value);
+    for (MapEntry<DocumentKey, MaybeDocument?> entry in missingDocs.entries) {
+      final MaybeDocument? value = entry.value;
+      if (value is Document) {
+        mergedDocs = mergedDocs.insert(entry.key, value);
       }
     }
 

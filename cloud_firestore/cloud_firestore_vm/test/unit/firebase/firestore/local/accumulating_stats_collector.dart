@@ -12,19 +12,19 @@ class AccumulatingStatsCollector extends StatsCollector {
 
   @override
   void recordRowsRead(String tag, int count) {
-    final int currentValue = _rowsRead[tag];
+    final int? currentValue = _rowsRead[tag];
     _rowsRead[tag] = currentValue != null ? currentValue + count : count;
   }
 
   @override
   void recordRowsDeleted(String tag, int count) {
-    final int currentValue = _rowsDeleted[tag];
+    final int? currentValue = _rowsDeleted[tag];
     _rowsDeleted[tag] = currentValue != null ? currentValue + count : count;
   }
 
   @override
   void recordRowsWritten(String tag, int count) {
-    final int currentValue = _rowsWritten[tag];
+    final int? currentValue = _rowsWritten[tag];
     _rowsWritten[tag] = currentValue != null ? currentValue + count : count;
   }
 
@@ -38,18 +38,18 @@ class AccumulatingStatsCollector extends StatsCollector {
   /// Returns the number of rows read for the given tag since the last call to
   /// [reset].
   int getRowsRead(String tag) {
-    return _rowsRead.containsKey(tag) ? _rowsRead[tag] : 0;
+    return _rowsRead[tag] ?? 0;
   }
 
   /// Returns the number of rows written for the given tag since the last call
   /// to [reset].
   int getRowsWritten(String tag) {
-    return _rowsWritten.containsKey(tag) ? _rowsWritten[tag] : 0;
+    return _rowsWritten[tag] ?? 0;
   }
 
   /// Returns the number of rows deleted for the given tag since the last call
   /// to [reset].
   int getRowsDeleted(String tag) {
-    return _rowsDeleted.containsKey(tag) ? _rowsDeleted[tag] : 0;
+    return _rowsDeleted[tag] ?? 0;
   }
 }

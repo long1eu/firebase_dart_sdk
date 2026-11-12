@@ -11,8 +11,8 @@ import '../../../../util/test_util.dart';
 
 void main() {
   int testComparator(Document left, Document right) {
-    final FieldValue leftValue = left.getField(field('sort'));
-    final FieldValue rightValue = right.getField(field('sort'));
+    final FieldValue leftValue = left.getField(field('sort'))!;
+    final FieldValue rightValue = right.getField(field('sort'))!;
     return leftValue.compareTo(rightValue);
   }
 
@@ -45,13 +45,13 @@ void main() {
   test('testFirstAndLastDocument', () {
     final DocumentSet emptySet = docSet(testComparator);
 
-    expect(emptySet.first, isNull);
-    expect(emptySet.last, isNull);
+    expect(emptySet.getFirstDocument(), isNull);
+    expect(emptySet.getLastDocument(), isNull);
 
     final DocumentSet set =
         docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
-    expect(set.first, _kDoc3);
-    expect(set.last, _kDoc2);
+    expect(set.getFirstDocument(), _kDoc3);
+    expect(set.getLastDocument(), _kDoc2);
   });
 
   test('testKeepsDocumentsInTheRightOrder', () {
@@ -111,7 +111,6 @@ void main() {
 
     expect(set1, set1);
     expect(set2, set1);
-    expect(set1 == null, isFalse);
 
     final DocumentSet sortedSet1 =
         docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
@@ -119,11 +118,19 @@ void main() {
         docSet(testComparator, <Document>[_kDoc1, _kDoc2, _kDoc3]);
     expect(sortedSet1, sortedSet1);
     expect(sortedSet2, sortedSet1);
-    expect(sortedSet1 == null, isFalse);
 
     final DocumentSet shortSet =
         docSet(Document.keyComparator, <Document>[_kDoc1, _kDoc2]);
     expect(shortSet, isNot(set1));
     expect(sortedSet1, isNot(set1));
+  });
+
+  test('sorted sets of empty document sets with the same comparator are equal',
+      () {
+    final DocumentSet a = DocumentSet.emptySet(Document.keyComparator);
+    final DocumentSet b = DocumentSet.emptySet(Document.keyComparator);
+    expect(a.sortedSet == b.sortedSet, isTrue);
+    expect(a.add(_kDoc1).sortedSet == b.add(_kDoc1).sortedSet, isTrue);
+    expect(a.add(_kDoc1).sortedSet == b.add(_kDoc2).sortedSet, isFalse);
   });
 }

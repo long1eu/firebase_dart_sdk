@@ -3,13 +3,13 @@
 // on 16/09/2018
 
 class Preconditions {
-  static void checkState(bool condition, Object message) {
+  static void checkState(bool condition, Object? message) {
     if (!condition) {
       throw StateError('$message');
     }
   }
 
-  static T checkNotNull<T>(T object, [String message]) {
+  static T checkNotNull<T>(T? object, [String? message]) {
     if (object == null) {
       throw ArgumentError('$message ${T.toString()}');
     } else {
@@ -17,7 +17,7 @@ class Preconditions {
     }
   }
 
-  static String checkNotEmpty(String value, String message) {
+  static String checkNotEmpty(String? value, String message) {
     if (value == null || value.isEmpty) {
       throw ArgumentError(message);
     } else {

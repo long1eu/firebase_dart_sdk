@@ -28,14 +28,14 @@ void main() {
   });
 
   test('testCanWriteADocument', () async {
-    final Map<String, Object> testData = map(
+    final Map<String, Object?> testData = map(
         <String>['name', 'Patryk', 'message', 'We are actually writing data!']);
     final CollectionReference collection = await testCollection();
     await collection.add(testData);
   });
 
   test('testCanReadAWrittenDocument', () async {
-    final Map<String, Object> testData = map(<String>['foo', 'bar']);
+    final Map<String, Object?> testData = map(<String>['foo', 'bar']);
     final CollectionReference collection = await testCollection();
 
     final DocumentReference newRef = await collection.add(testData);
@@ -44,7 +44,7 @@ void main() {
   });
 
   test('testObservesExistingDocument', () async {
-    final Map<String, Object> testData = map(<String>['foo', 'bar']);
+    final Map<String, Object?> testData = map(<String>['foo', 'bar']);
     final CollectionReference collection = await testCollection();
     final DocumentReference writerRef = collection.document();
     final DocumentReference readerRef = collection.document(writerRef.id);
@@ -70,7 +70,7 @@ void main() {
         .listen(accumulator.onData, onError: accumulator.onError);
     DocumentSnapshot doc = await accumulator.wait();
     expect(doc.exists, isFalse);
-    final Map<String, Object> testData = map(<String>['foo', 'bar']);
+    final Map<String, Object?> testData = map(<String>['foo', 'bar']);
     await writerRef.set(testData);
     doc = await accumulator.wait();
     expect(doc.data, testData);
@@ -96,7 +96,7 @@ void main() {
   });
 
   test('testGetCollectionQuery', () async {
-    final Map<String, Map<String, Object>> testData = map(<dynamic>[
+    final Map<String, Map<String, Object?>> testData = map(<dynamic>[
       '1',
       map<dynamic>(<dynamic>['name', 'Patryk', 'message', 'Real data, yo!']),
       '2',
@@ -106,7 +106,7 @@ void main() {
     ]);
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
-    for (MapEntry<String, Map<String, Object>> entry in testData.entries) {
+    for (MapEntry<String, Map<String, Object?>> entry in testData.entries) {
       tasks.add(collection.document(entry.key).set(entry.value));
     }
     await Future.wait(tasks);
@@ -123,7 +123,7 @@ void main() {
   test(
     'testGetCollectionQueryByFieldAndOrdering',
     () async {
-      final Map<String, Map<String, Object>> testData = map(<dynamic>[
+      final Map<String, Map<String, Object?>> testData = map(<dynamic>[
         '1',
         map<dynamic>(<dynamic>['sort', 1.0, 'filter', true, 'key', '1']),
         '2',
@@ -135,7 +135,7 @@ void main() {
       ]);
       final CollectionReference collection = await testCollection();
       final List<Future<void>> tasks = <Future<void>>[];
-      for (MapEntry<String, Map<String, Object>> entry in testData.entries) {
+      for (MapEntry<String, Map<String, Object?>> entry in testData.entries) {
         tasks.add(collection.document(entry.key).set(entry.value));
       }
       await Future.wait(tasks);

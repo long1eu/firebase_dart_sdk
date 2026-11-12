@@ -17,6 +17,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_valu
 import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/snapshot_metadata.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:meta/meta.dart';
 
@@ -29,31 +30,32 @@ import 'package:meta/meta.dart';
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
 class DocumentSnapshot {
+  @internal
   DocumentSnapshot(
     this._firestore,
     this._key,
     this.document, {
-    @required bool isFromCache,
-    @required bool hasPendingWrites,
-  })  : metadata = SnapshotMetadata(hasPendingWrites, isFromCache),
-        assert(_firestore != null),
-        assert(_key != null);
+    required bool isFromCache,
+    required bool hasPendingWrites,
+  }) : metadata = SnapshotMetadata(hasPendingWrites, isFromCache);
 
+  @internal
   factory DocumentSnapshot.fromDocument(
     Firestore firestore,
     Document doc, {
-    @required bool isFromCache,
-    @required bool hasPendingWrites,
+    required bool isFromCache,
+    required bool hasPendingWrites,
   }) {
     return DocumentSnapshot(firestore, doc.key, doc,
         isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
   }
 
+  @internal
   factory DocumentSnapshot.fromNoDocument(
     Firestore firestore,
     DocumentKey key, {
-    @required bool isFromCache,
-    @required bool hasPendingWrites,
+    required bool isFromCache,
+    required bool hasPendingWrites,
   }) {
     return DocumentSnapshot(firestore, key, null,
         isFromCache: isFromCache, hasPendingWrites: hasPendingWrites);
@@ -64,7 +66,7 @@ class DocumentSnapshot {
   final DocumentKey _key;
 
   /// Is null if the document doesn't exist
-  final Document document;
+  final Document? document;
 
   /// The metadata for this document snapshot.
   final SnapshotMetadata metadata;
@@ -79,7 +81,7 @@ class DocumentSnapshot {
   /// to their native Dart representation.
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
-  Map<String, Object> get data => getData(ServerTimestampBehavior.none);
+  Map<String, Object?>? get data => getData(ServerTimestampBehavior.none);
 
   /// Returns the fields of the document as a Map or null if the document doesn't exist. Field values will be converted
   /// to their native Dart representation.
@@ -88,15 +90,15 @@ class DocumentSnapshot {
   /// value.
   ///
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
-  Map<String, Object> getData(ServerTimestampBehavior serverTimestampBehavior) {
-    checkNotNull(serverTimestampBehavior,
-        'Provided serverTimestampBehavior value must not be null.');
-    if (document == null) {
+  Map<String, Object?>? getData(
+      ServerTimestampBehavior serverTimestampBehavior) {
+    final Document? doc = document;
+    if (doc == null) {
       return null;
     } else {
       final _FieldValueOptions fieldValueOptions =
           _FieldValueOptions(serverTimestampBehavior: serverTimestampBehavior);
-      return _convertObject(document.data, fieldValueOptions);
+      return _convertObject(doc.data, fieldValueOptions);
     }
   }
 
@@ -116,11 +118,10 @@ class DocumentSnapshot {
   /// Returns true if the field exists.
   bool containsPath(FieldPath fieldPath) {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
-    return (document != null) &&
-        (document.getField(fieldPath.internalPath) != null);
+    return document?.getField(fieldPath.internalPath) != null;
   }
 
-  Object operator [](String field) => get(field);
+  Object? operator [](String field) => get(field);
 
   /// Returns the value at the field or null if the field doesn't exist.
   ///
@@ -129,7 +130,8 @@ class DocumentSnapshot {
   /// value.
   ///
   /// Returns the value at the given field or null.
-  Object get(String field, [ServerTimestampBehavior serverTimestampBehavior]) {
+  Object? get(String field,
+      [ServerTimestampBehavior? serverTimestampBehavior]) {
     return getField(FieldPath.fromDotSeparatedPath(field),
         serverTimestampBehavior ?? ServerTimestampBehavior.none);
   }
@@ -141,15 +143,13 @@ class DocumentSnapshot {
   /// value.
   ///
   /// Returns the value at the given field or null.
-  Object getField(FieldPath fieldPath,
-      [ServerTimestampBehavior serverTimestampBehavior]) {
-    serverTimestampBehavior ??= ServerTimestampBehavior.none;
+  Object? getField(FieldPath fieldPath,
+      [ServerTimestampBehavior? serverTimestampBehavior]) {
     checkNotNull(fieldPath, 'Provided field path must not be null.');
-    checkNotNull(serverTimestampBehavior,
-        'Provided serverTimestampBehavior value must not be null.');
 
-    final _FieldValueOptions fieldValueOptions =
-        _FieldValueOptions(serverTimestampBehavior: serverTimestampBehavior);
+    final _FieldValueOptions fieldValueOptions = _FieldValueOptions(
+        serverTimestampBehavior:
+            serverTimestampBehavior ?? ServerTimestampBehavior.none);
     return _getInternal(fieldPath.internalPath, fieldValueOptions);
   }
 
@@ -158,7 +158,7 @@ class DocumentSnapshot {
   /// [field] the path to the field.
   ///
   /// Returns the value of the field
-  bool getBool(String field) => _getTypedValue<bool>(field);
+  bool? getBool(String field) => _getTypedValue<bool>(field);
 
   /// Returns the value of the field as a double.
   ///
@@ -166,8 +166,8 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a number.
   /// Returns the value of the field
-  double getDouble(String field) {
-    final num val = _getTypedValue(field);
+  double? getDouble(String field) {
+    final num? val = _getTypedValue(field);
     return val != null ? val.toDouble() : null;
   }
 
@@ -177,8 +177,8 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a number.
   /// Returns the value of the field
-  int getInt(String field) {
-    final num val = _getTypedValue(field);
+  int? getInt(String field) {
+    final num? val = _getTypedValue(field);
     return val != null ? val.toInt() : null;
   }
 
@@ -188,7 +188,7 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a String.
   /// Returns the value of the field
-  String getString(String field) => _getTypedValue(field);
+  String? getString(String field) => _getTypedValue(field);
 
   /// Returns the value of the field as a [DateTime].
   ///
@@ -198,16 +198,14 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a Date.
   /// Returns the value of the field
-  DateTime getDate(String field,
-      [ServerTimestampBehavior serverTimestampBehavior]) {
-    serverTimestampBehavior ??= ServerTimestampBehavior.none;
+  DateTime? getDate(String field,
+      [ServerTimestampBehavior? serverTimestampBehavior]) {
     checkNotNull(field, 'Provided field path must not be null.');
-    checkNotNull(serverTimestampBehavior,
-        'Provided serverTimestampBehavior value must not be null.');
-    final Object maybeDate = _getInternal(
+    final Object? maybeDate = _getInternal(
       FieldPath.fromDotSeparatedPath(field).internalPath,
       _FieldValueOptions(
-        serverTimestampBehavior: serverTimestampBehavior,
+        serverTimestampBehavior:
+            serverTimestampBehavior ?? ServerTimestampBehavior.none,
         timestampsInSnapshotsEnabled: false,
       ),
     );
@@ -222,15 +220,14 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a timestamp field.
   /// Returns the value of the field
-  Timestamp getTimestamp(String field,
-      [ServerTimestampBehavior serverTimestampBehavior]) {
-    serverTimestampBehavior ??= ServerTimestampBehavior.none;
+  Timestamp? getTimestamp(String field,
+      [ServerTimestampBehavior? serverTimestampBehavior]) {
     checkNotNull(field, 'Provided field path must not be null.');
-    checkNotNull(serverTimestampBehavior,
-        'Provided serverTimestampBehavior value must not be null.');
-    final Object maybeTimestamp = _getInternal(
+    final Object? maybeTimestamp = _getInternal(
       FieldPath.fromDotSeparatedPath(field).internalPath,
-      _FieldValueOptions(serverTimestampBehavior: serverTimestampBehavior),
+      _FieldValueOptions(
+          serverTimestampBehavior:
+              serverTimestampBehavior ?? ServerTimestampBehavior.none),
     );
     return _castTypedValue(maybeTimestamp, field);
   }
@@ -241,7 +238,7 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a Blob.
   /// Returns the value of the field
-  Blob getBlob(String field) => _getTypedValue(field);
+  Blob? getBlob(String field) => _getTypedValue(field);
 
   /// Returns the value of the field as a [GeoPoint].
   ///
@@ -249,7 +246,12 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a [GeoPoint].
   /// Returns the value of the field
-  GeoPoint getGeoPoint(String field) => _getTypedValue(field);
+  GeoPoint? getGeoPoint(String field) => _getTypedValue(field);
+
+  /// Returns the value of the field as a [VectorValue], or null if the field does not exist.
+  ///
+  /// Throws [StateError] if the value is not a [VectorValue].
+  VectorValue? getVectorValue(String field) => _getTypedValue(field);
 
   /// Returns the value of the field as a [DocumentReference].
   ///
@@ -257,34 +259,40 @@ class DocumentSnapshot {
   ///
   /// Throws [StateError] if the value is not a [DocumentReference].
   /// Returns the value of the field
-  DocumentReference getDocumentReference(String field) => _getTypedValue(field);
+  DocumentReference? getDocumentReference(String field) =>
+      _getTypedValue(field);
 
   /// Gets the reference to the document.
   ///
   /// Returns the reference to the document.
-  DocumentReference get reference => DocumentReference(_key, _firestore);
+  @Deprecated('Use ref instead.')
+  DocumentReference get reference => ref;
 
-  T _getTypedValue<T>(String field) {
+  /// Gets the reference to the document. Same as [reference]; this is the name
+  /// used by the current official Firestore API.
+  DocumentReference get ref => DocumentReference(_key, _firestore);
+
+  T? _getTypedValue<T>(String field) {
     checkNotNull(field, 'Provided field must not be null.');
-    final Object value = get(field, ServerTimestampBehavior.none);
+    final Object? value = get(field, ServerTimestampBehavior.none);
     return _castTypedValue<T>(value, field);
   }
 
-  T _castTypedValue<T>(Object value, String field) {
+  T? _castTypedValue<T>(Object? value, String field) {
     if (value == null) {
       return null;
     }
 
     try {
-      final T result = value;
+      final T result = value as T;
       return result;
-    } on CastError catch (_) {
+    } on TypeError catch (_) {
       throw StateError(
           'Field \'$field\' is not a $T, but it is ${value.runtimeType}');
     }
   }
 
-  Object _convertValue(FieldValue value, _FieldValueOptions options) {
+  Object? _convertValue(FieldValue value, _FieldValueOptions options) {
     if (value is ObjectValue) {
       return _convertObject(value, options);
     } else if (value is ArrayValue) {
@@ -300,14 +308,15 @@ class DocumentSnapshot {
     }
   }
 
-  Object _convertServerTimestamp(
+  Object? _convertServerTimestamp(
       ServerTimestampValue value, _FieldValueOptions options) {
     switch (options.serverTimestampBehavior) {
       case ServerTimestampBehavior.previous:
-        return value.previousValue;
+        final FieldValue? previous = value.previousFieldValue;
+        return previous == null ? null : _convertValue(previous, options);
       case ServerTimestampBehavior.estimate:
-        return value.localWriteTime;
-      default:
+        return _convertTimestamp(TimestampValue(value.localWriteTime), options);
+      case ServerTimestampBehavior.none:
         return value.value;
     }
   }
@@ -333,29 +342,26 @@ class DocumentSnapshot {
     return DocumentReference(key, _firestore);
   }
 
-  Map<String, Object> _convertObject(
+  Map<String, Object?> _convertObject(
       ObjectValue objectValue, _FieldValueOptions options) {
-    final Map<String, Object> result = <String, Object>{};
+    final Map<String, Object?> result = <String, Object?>{};
     for (MapEntry<String, FieldValue> entry in objectValue.internalValue) {
       result[entry.key] = _convertValue(entry.value, options);
     }
     return result;
   }
 
-  List<Object> _convertArray(
+  List<Object?> _convertArray(
       ArrayValue arrayValue, _FieldValueOptions options) {
-    final List<Object> result = List<Object>(arrayValue.internalValue.length);
-    int i = 0;
-    for (FieldValue v in arrayValue.internalValue) {
-      result[i] = _convertValue(v, options);
-      i++;
-    }
-    return result;
+    return arrayValue.internalValue
+        .map((FieldValue v) => _convertValue(v, options))
+        .toList();
   }
 
-  Object _getInternal(model.FieldPath fieldPath, _FieldValueOptions options) {
-    if (document != null) {
-      final FieldValue val = document.getField(fieldPath);
+  Object? _getInternal(model.FieldPath fieldPath, _FieldValueOptions options) {
+    final Document? doc = document;
+    if (doc != null) {
+      final FieldValue? val = doc.getField(fieldPath);
       if (val != null) {
         return _convertValue(val, options);
       }
@@ -370,16 +376,18 @@ class DocumentSnapshot {
           runtimeType == other.runtimeType &&
           _firestore == other._firestore &&
           _key == other._key &&
-          (document == null
-              ? other.document == null
-              : document == other.document) &&
-          metadata == other.metadata;
+          metadata == other.metadata &&
+          // Only the data is compared, not the internal state of the document
+          // (version, local mutations).
+          document?.data == other.document?.data &&
+          document?.key == other.document?.key;
 
   @override
   int get hashCode {
     return _firestore.hashCode * 31 +
         _key.hashCode * 31 +
-        (document == null ? 0 : document.hashCode) * 31 +
+        (document?.key.hashCode ?? 0) * 31 +
+        (document?.data.hashCode ?? 0) * 31 +
         metadata.hashCode * 31;
   }
 
@@ -396,7 +404,7 @@ class DocumentSnapshot {
 /// Holds settings that define field value deserialization options.
 class _FieldValueOptions {
   _FieldValueOptions({
-    this.serverTimestampBehavior,
+    this.serverTimestampBehavior = ServerTimestampBehavior.none,
     this.timestampsInSnapshotsEnabled = true,
   });
 

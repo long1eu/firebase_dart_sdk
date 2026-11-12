@@ -9,8 +9,7 @@ part of sqlite_persistence;
 ///
 /// NOTE: There is no in-memory implementation at this time.
 class SQLiteCollectionIndex {
-  SQLiteCollectionIndex(this.db, User user)
-      : uid = user.isAuthenticated ? user.uid : '';
+  SQLiteCollectionIndex(this.db, User user) : uid = user.uid ?? '';
 
   final SQLitePersistence db;
   final String uid;

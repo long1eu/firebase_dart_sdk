@@ -1,3 +1,6 @@
+export 'bundle.pb.dart';
+export 'bundle.pbenum.dart';
+export 'bundle.pbjson.dart';
 export 'maybe_document.pb.dart';
 export 'maybe_document.pbenum.dart';
 export 'maybe_document.pbjson.dart';

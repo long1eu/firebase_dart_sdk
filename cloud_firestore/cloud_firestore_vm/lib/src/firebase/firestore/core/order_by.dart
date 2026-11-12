@@ -42,11 +42,11 @@ class OrderBy {
     if (field == FieldPath.keyPath) {
       return direction._comparisonModifier * d1.key.compareTo(d2.key);
     } else {
-      final FieldValue v1 = d1.getField(field);
-      final FieldValue v2 = d2.getField(field);
+      final FieldValue? v1 = d1.getField(field);
+      final FieldValue? v2 = d2.getField(field);
       hardAssert(v1 != null && v2 != null,
           'Trying to compare documents on fields that don\'t exist.');
-      return direction._comparisonModifier * v1.compareTo(v2);
+      return direction._comparisonModifier * v1!.compareTo(v2!);
     }
   }
 

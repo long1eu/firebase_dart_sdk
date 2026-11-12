@@ -23,16 +23,21 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   int _currentSequenceNumber;
 
   @override
-  ReferenceSet inMemoryPins;
+  late ReferenceSet inMemoryPins;
 
   @override
-  LruGarbageCollector garbageCollector;
+  late LruGarbageCollector garbageCollector;
 
   @override
   void onTransactionStarted() {
     hardAssert(_currentSequenceNumber == ListenSequence.invalid,
         'Starting a transaction without committing the previous one');
     _currentSequenceNumber = listenSequence.next;
+  }
+
+  @override
+  void onTransactionRolledBack() {
+    _currentSequenceNumber = ListenSequence.invalid;
   }
 
   @override
@@ -149,7 +154,7 @@ class MemoryLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
       return true;
     }
 
-    final int sequenceNumber = orphanedSequenceNumbers[key];
+    final int? sequenceNumber = orphanedSequenceNumbers[key];
     return sequenceNumber != null && sequenceNumber > upperBound;
   }
 

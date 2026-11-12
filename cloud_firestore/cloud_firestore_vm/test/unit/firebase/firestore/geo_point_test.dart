@@ -14,6 +14,30 @@ void main() {
     return GeoPoint(latitude, longitude);
   }
 
+  test('rejects NaN and infinite coordinates with a precise message', () {
+    expect(
+        () => gp(double.nan, 0.0),
+        throwsA(isA<AssertionError>().having((AssertionError e) => e.message,
+            'message', contains('should not be a NaN'))));
+    expect(
+        () => gp(0.0, double.nan),
+        throwsA(isA<AssertionError>().having((AssertionError e) => e.message,
+            'message', contains('should not be a NaN'))));
+    expect(() => gp(double.infinity, 0.0), throwsA(isA<AssertionError>()));
+    expect(
+        () => gp(double.negativeInfinity, 0.0),
+        throwsA(isA<AssertionError>().having((AssertionError e) => e.message,
+            'message', contains('an infinity'))));
+    expect(
+        () => gp(0.0, double.infinity),
+        throwsA(isA<AssertionError>().having((AssertionError e) => e.message,
+            'message', contains('an infinity'))));
+    expect(
+        () => gp(0.0, double.negativeInfinity), throwsA(isA<AssertionError>()));
+    expect(gp(90.0, 180.0).latitude, 90.0);
+    expect(gp(-90.0, -180.0).longitude, -180.0);
+  });
+
   test('testEquals', () {
     final GeoPoint foo = gp(1.23, 4.56);
     final GeoPoint fooDup = gp(1.23, 4.56);
@@ -30,7 +54,6 @@ void main() {
 
   test('testComparison', () {
     ComparatorTester<GeoPoint>()
-        .permitInconsistencyWithEquals()
         .addEqualityGroup(<GeoPoint>[gp(-90.0, -180.0), gp(-90.0, -180.0)]).addEqualityGroup(<GeoPoint>[gp(-90.0, 0.0), gp(-90.0, 0.0)]).addEqualityGroup(<GeoPoint>[gp(-90.0, 180.0), gp(-90.0, 180.0)]).addEqualityGroup(<GeoPoint>[
       gp(-89.0, -180.0),
       gp(-89.0, -180.0)

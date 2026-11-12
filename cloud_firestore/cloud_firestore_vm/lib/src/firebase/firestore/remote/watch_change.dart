@@ -4,12 +4,12 @@
 
 import 'dart:typed_data';
 
-import 'package:collection/collection.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/existence_filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:collection/collection.dart';
 import 'package:grpc/grpc.dart';
 
 /// The kind of change that happened to the watch target.
@@ -54,7 +54,7 @@ class WatchChangeDocumentChange extends WatchChange {
 
   /// The new document or DeletedDocument if it was deleted. Is null if the document went out of view without the server
   /// sending a new document.
-  final MaybeDocument newDocument;
+  final MaybeDocument? newDocument;
 
   @override
   bool operator ==(Object other) =>
@@ -91,8 +91,8 @@ class WatchChangeWatchTargetChange extends WatchChange {
   WatchChangeWatchTargetChange(
     this.changeType,
     this.targetIds, [
-    Uint8List resumeToken,
-    GrpcError cause,
+    Uint8List? resumeToken,
+    GrpcError? cause,
   ])  : resumeToken = resumeToken ?? Uint8List(0),
         // We can get a cause that is considered ok, but everywhere we assume that any non-null cause is an error.
         cause = cause != null && cause.code != StatusCode.ok ? cause : null,
@@ -114,7 +114,7 @@ class WatchChangeWatchTargetChange extends WatchChange {
   final Uint8List resumeToken;
 
   /// The cause, only valid if changeType == Removal
-  final GrpcError cause;
+  final GrpcError? cause;
 
   @override
   bool operator ==(Object other) =>

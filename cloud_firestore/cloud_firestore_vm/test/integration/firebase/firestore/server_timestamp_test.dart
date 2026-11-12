@@ -23,7 +23,7 @@ void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/server_timestamp';
 
   // Data written in tests via set.
-  final Map<String, Object> setData = map(<dynamic>[
+  final Map<String, Object?> setData = map(<dynamic>[
     'a',
     42,
     'when',
@@ -33,8 +33,8 @@ void main() {
   ]);
 
   // Base and update data used for update tests.
-  final Map<String, Object> initialData = map(<dynamic>['a', 42]);
-  final Map<String, Object> updateData = map<dynamic>(<dynamic>[
+  final Map<String, Object?> initialData = map(<dynamic>['a', 42]);
+  final Map<String, Object?> updateData = map<dynamic>(<dynamic>[
     'when',
     FieldValue.serverTimestamp(),
     'deep',
@@ -42,14 +42,14 @@ void main() {
   ]);
 
   // A document reference to read and write to.
-  DocumentReference docRef;
+  late DocumentReference docRef;
 
   // Accumulator used to capture events during the test.
-  EventAccumulator<DocumentSnapshot> accumulator;
+  late EventAccumulator<DocumentSnapshot> accumulator;
 
   // Listener registration for a listener maintained during the course of the
   // test.
-  StreamSubscription<DocumentSnapshot> listenerRegistration;
+  late StreamSubscription<DocumentSnapshot> listenerRegistration;
 
   setUp(() async {
     docRef = await testDocument();
@@ -70,7 +70,7 @@ void main() {
   });
 
   // Returns the expected data, with an arbitrary timestamp substituted in.
-  Map<String, Object> expectedDataWithTimestamp(Object timestamp) {
+  Map<String, Object?> expectedDataWithTimestamp(Object? timestamp) {
     return map(<dynamic>[
       'a',
       42,
@@ -99,7 +99,7 @@ void main() {
   /// timestamps.
   void verifyTimestampsAreResolved(DocumentSnapshot snapshot) {
     expect(snapshot.exists, isTrue);
-    final Timestamp when = snapshot.getTimestamp('when');
+    final Timestamp when = snapshot.getTimestamp('when')!;
     expect(when, isNotNull);
     // Tolerate up to 48*60*60 seconds of clock skew between client and server.
     // This should be more than enough to compensate for timezone issues (even
@@ -121,7 +121,7 @@ void main() {
   void verifyTimestampsAreEstimates(DocumentSnapshot snapshot) {
     expect(snapshot.exists, isTrue);
     final Timestamp when =
-        snapshot.getTimestamp('when', ServerTimestampBehavior.estimate);
+        snapshot.getTimestamp('when', ServerTimestampBehavior.estimate)!;
     expect(when, isNotNull);
     expect(snapshot.getData(ServerTimestampBehavior.estimate),
         expectedDataWithTimestamp(when));
@@ -130,10 +130,10 @@ void main() {
   /// Verifies a snapshot containing setData but using the previous field value
   /// for the timestamps.
   void verifyTimestampsUsePreviousValue(
-      DocumentSnapshot current, DocumentSnapshot previous) {
+      DocumentSnapshot current, DocumentSnapshot? previous) {
     expect(current.exists, isTrue);
     if (previous != null) {
-      final Timestamp when = previous.getTimestamp('when');
+      final Timestamp when = previous.getTimestamp('when')!;
       expect(when, isNotNull);
       expect(current.getData(ServerTimestampBehavior.previous),
           expectedDataWithTimestamp(when));
@@ -246,7 +246,7 @@ void main() {
   test('testServerTimestampsWorkViaTransactionSet', () async {
     await docRef.firestore.runTransaction<void>((Transaction transaction) {
       transaction.set(docRef, setData);
-      return null;
+      return Future<void>.value();
     });
     verifyTimestampsAreResolved(await accumulator.awaitRemoteEvent());
   });
@@ -256,7 +256,7 @@ void main() {
     await writeInitialData();
     await docRef.firestore.runTransaction<void>((Transaction transaction) {
       transaction.update(docRef, updateData);
-      return null;
+      return Future<void>.value();
     });
     verifyTimestampsAreResolved(await accumulator.awaitRemoteEvent());
   });
@@ -281,7 +281,7 @@ void main() {
     try {
       await docRef.firestore.runTransaction<void>((Transaction transaction) {
         transaction.update(docRef, updateData);
-        return null;
+        return Future<void>.value();
       });
     } on FirestoreError catch (e) {
       hadError = true;

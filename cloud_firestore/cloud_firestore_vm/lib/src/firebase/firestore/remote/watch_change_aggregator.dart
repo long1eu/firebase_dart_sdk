@@ -2,22 +2,28 @@
 // Lung Razvan <long1eu>
 // on 24/09/2018
 
+import 'dart:typed_data';
+
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
+import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/document_view_change.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/remote/bloom_filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/target_state.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:meta/meta.dart';
+import 'package:cloud_firestore_vm/src/proto/google/firestore/v1/index.dart'
+    as proto;
 
 /// A helper class to accumulate watch changes into a [RemoteEvent] and other target information.
 class WatchChangeAggregator {
@@ -36,13 +42,15 @@ class WatchChangeAggregator {
   Map<DocumentKey, Set<int>> _pendingDocumentTargetMapping =
       <DocumentKey, Set<int>>{};
 
-  /// A list of targets with existence filter mismatches. These targets are known to be inconsistent
-  /// and their listens needs to be re-established by [RemoteStore].
-  Set<int> _pendingTargetResets = <int>{};
+  /// A map of targets with existence filter mismatches. These targets are known to be inconsistent
+  /// and their listens needs to be re-established by [RemoteStore], with the given purpose.
+  Map<int, QueryPurpose> _pendingTargetResets = <int, QueryPurpose>{};
+
+  static const String _tag = 'WatchChangeAggregator';
 
   /// Processes and adds the [WatchChangeDocumentChange] to the current set of changes.
   void handleDocumentChange(WatchChangeDocumentChange documentChange) {
-    final MaybeDocument document = documentChange.newDocument;
+    final MaybeDocument? document = documentChange.newDocument;
     final DocumentKey documentKey = documentChange.documentKey;
 
     for (int targetId in documentChange.updatedTargetIds) {
@@ -107,9 +115,6 @@ class WatchChangeAggregator {
             targetState.updateResumeToken(targetChange.resumeToken);
           }
           break;
-        default:
-          throw fail(
-              'Unknown target watch change state: ${targetChange.changeType}');
       }
     }
   }
@@ -132,16 +137,16 @@ class WatchChangeAggregator {
     final int targetId = watchChange.targetId;
     final int expectedCount = watchChange.existenceFilter.count;
 
-    final QueryData queryData = _queryDataForActiveTarget(targetId);
+    final QueryData? queryData = _queryDataForActiveTarget(targetId);
     if (queryData != null) {
-      final Query query = queryData.query;
-      if (query.isDocumentQuery) {
+      final Target target = queryData.target;
+      if (target.isDocumentQuery) {
         if (expectedCount == 0) {
           // The existence filter told us the document does not exist. We deduce that this document
           // does not exist and apply a deleted document to our updates. Without applying this
           // deleted document there might be another query that will raise this document as part of
           // a snapshot until it is resolved, essentially exposing inconsistency between queries.
-          final DocumentKey key = DocumentKey.fromPath(query.path);
+          final DocumentKey key = DocumentKey.fromPath(target.path);
           _removeDocumentFromTarget(
             targetId,
             key,
@@ -152,19 +157,101 @@ class WatchChangeAggregator {
             ),
           );
         } else {
-          hardAssert(expectedCount == 1,
-              'Single document existence filter with count: $expectedCount');
+          hardAssertLazy(
+              expectedCount == 1,
+              () =>
+                  'Single document existence filter with count: $expectedCount');
         }
       } else {
         final int currentSize = _getCurrentDocumentCountForTarget(targetId);
         if (currentSize != expectedCount) {
-          // Existence filter mismatch: We reset the mapping and raise a new snapshot with
-          // [isFromCache:true].
-          _resetTarget(targetId);
-          _pendingTargetResets.add(targetId);
+          // Apply the bloom filter (if the backend sent one) to identify and mark the removed documents.
+          final BloomFilter? bloomFilter = _parseBloomFilter(watchChange);
+          final _BloomFilterApplicationStatus status = bloomFilter != null
+              ? _applyBloomFilter(bloomFilter, watchChange, currentSize)
+              : _BloomFilterApplicationStatus.skipped;
+
+          if (status != _BloomFilterApplicationStatus.success) {
+            // Existence filter mismatch that the bloom filter could not resolve: We reset the mapping and raise a new
+            // snapshot with [isFromCache:true], and the query is re-run in full.
+            _resetTarget(targetId);
+
+            final QueryPurpose purpose =
+                status == _BloomFilterApplicationStatus.falsePositive
+                    ? QueryPurpose.existenceFilterMismatchBloom
+                    : QueryPurpose.existenceFilterMismatch;
+            _pendingTargetResets[targetId] = purpose;
+          }
         }
       }
     }
+  }
+
+  /// Parses the bloom filter from the `unchanged_names` field of an existence filter. Returns `null` if there is none
+  /// or if it is not usable, in which case the caller falls back to a full re-query.
+  BloomFilter? _parseBloomFilter(
+      WatchChangeExistenceFilterWatchChange watchChange) {
+    final proto.BloomFilter? unchangedNames =
+        watchChange.existenceFilter.unchangedNames;
+
+    if (unchangedNames == null || !unchangedNames.hasBits()) {
+      return null;
+    }
+
+    final BloomFilter bloomFilter;
+    try {
+      bloomFilter = BloomFilter.create(
+        Uint8List.fromList(unchangedNames.bits.bitmap),
+        unchangedNames.bits.padding,
+        unchangedNames.hashCount,
+      );
+    } on BloomFilterCreateException catch (e) {
+      Log.w(
+          _tag,
+          'Applying bloom filter failed: (${e.message}); ignoring the bloom filter and falling back to full '
+          're-query.');
+      return null;
+    }
+
+    if (bloomFilter.bitCount == 0) {
+      return null;
+    }
+
+    return bloomFilter;
+  }
+
+  /// Applies the bloom filter to remove the deleted documents, and returns the application status.
+  _BloomFilterApplicationStatus _applyBloomFilter(
+    BloomFilter bloomFilter,
+    WatchChangeExistenceFilterWatchChange watchChange,
+    int currentCount,
+  ) {
+    final int expectedCount = watchChange.existenceFilter.count;
+    final int removedDocumentCount =
+        _filterRemovedDocuments(bloomFilter, watchChange.targetId);
+
+    return expectedCount != currentCount - removedDocumentCount
+        ? _BloomFilterApplicationStatus.falsePositive
+        : _BloomFilterApplicationStatus.success;
+  }
+
+  /// Filters out removed documents based on the bloom filter membership result and returns the number of documents
+  /// removed.
+  int _filterRemovedDocuments(BloomFilter bloomFilter, int targetId) {
+    final ImmutableSortedSet<DocumentKey> existingKeys =
+        _targetMetadataProvider.getRemoteKeysForTarget(targetId);
+    final DatabaseId databaseId = _targetMetadataProvider.getDatabaseId();
+    int removalCount = 0;
+    for (DocumentKey key in existingKeys) {
+      final String documentPath = 'projects/${databaseId.projectId}'
+          '/databases/${databaseId.databaseId}'
+          '/documents/${key.path.canonicalString}';
+      if (!bloomFilter.mightContain(documentPath)) {
+        _removeDocumentFromTarget(targetId, key, null);
+        removalCount++;
+      }
+    }
+    return removalCount;
   }
 
   /// Converts the currently accumulated state into a remote event at the provided snapshot version.
@@ -176,14 +263,14 @@ class WatchChangeAggregator {
       final int targetId = entry.key;
       final TargetState targetState = entry.value;
 
-      final QueryData queryData = _queryDataForActiveTarget(targetId);
+      final QueryData? queryData = _queryDataForActiveTarget(targetId);
       if (queryData != null) {
-        if (targetState.isCurrent && queryData.query.isDocumentQuery) {
+        if (targetState.isCurrent && queryData.target.isDocumentQuery) {
           // Document queries for document that don't exist can produce an empty result set. To
           // update our local cache, we synthesize a document delete if we have not previously
           // received the document. This resolves the limbo state of the document, removing it from
           // [limboDocumentRefs].
-          final DocumentKey key = DocumentKey.fromPath(queryData.query.path);
+          final DocumentKey key = DocumentKey.fromPath(queryData.target.path);
           if (_pendingDocumentUpdates[key] == null &&
               !_targetContainsDocument(targetId, key)) {
             _removeDocumentFromTarget(
@@ -217,7 +304,7 @@ class WatchChangeAggregator {
       bool isOnlyLimboTarget = true;
 
       for (int targetId in targets) {
-        final QueryData queryData = _queryDataForActiveTarget(targetId);
+        final QueryData? queryData = _queryDataForActiveTarget(targetId);
         if (queryData != null &&
             queryData.purpose != QueryPurpose.limboResolution) {
           isOnlyLimboTarget = false;
@@ -233,7 +320,7 @@ class WatchChangeAggregator {
     final RemoteEvent remoteEvent = RemoteEvent(
       snapshotVersion: snapshotVersion,
       targetChanges: Map<int, TargetChange>.from(targetChanges),
-      targetMismatches: Set<int>.from(_pendingTargetResets),
+      targetMismatches: Map<int, QueryPurpose>.from(_pendingTargetResets),
       documentUpdates:
           Map<DocumentKey, MaybeDocument>.from(_pendingDocumentUpdates),
       resolvedLimboDocuments: Set<DocumentKey>.from(resolvedLimboDocuments),
@@ -242,7 +329,7 @@ class WatchChangeAggregator {
     // Re-initialize the current state to ensure that we do not modify the generated [RemoteEvent].
     _pendingDocumentUpdates = <DocumentKey, MaybeDocument>{};
     _pendingDocumentTargetMapping = <DocumentKey, Set<int>>{};
-    _pendingTargetResets = <int>{};
+    _pendingTargetResets = <int, QueryPurpose>{};
 
     return remoteEvent;
   }
@@ -272,7 +359,7 @@ class WatchChangeAggregator {
   /// we received the change that caused the filter mismatch), the new document can be provided to
   /// update the remote document cache.
   void _removeDocumentFromTarget(
-      int targetId, DocumentKey key, MaybeDocument updatedDocument) {
+      int targetId, DocumentKey key, MaybeDocument? updatedDocument) {
     if (!_isActiveTarget(targetId)) {
       return;
     }
@@ -319,14 +406,7 @@ class WatchChangeAggregator {
   }
 
   Set<int> _ensureDocumentTargetMapping(DocumentKey key) {
-    Set<int> targetMapping = _pendingDocumentTargetMapping[key];
-
-    if (targetMapping == null) {
-      targetMapping = <int>{};
-      _pendingDocumentTargetMapping[key] = targetMapping;
-    }
-
-    return targetMapping;
+    return _pendingDocumentTargetMapping[key] ??= <int>{};
   }
 
   /// Verifies that the user is still interested in this target (by calling [getQueryDataForTarget])
@@ -337,8 +417,8 @@ class WatchChangeAggregator {
 
   /// Returns the [QueryData] for an active target (i.e. a target that the user is still interested
   /// in that has no outstanding target change requests).
-  QueryData _queryDataForActiveTarget(int targetId) {
-    final TargetState targetState = _targetStates[targetId];
+  QueryData? _queryDataForActiveTarget(int targetId) {
+    final TargetState? targetState = _targetStates[targetId];
     return targetState != null && targetState.isPending()
         ? null
         : _targetMetadataProvider.getQueryDataForTarget(targetId);
@@ -347,8 +427,8 @@ class WatchChangeAggregator {
   /// Resets the state of a [Watch] target to its initial state (e.g. sets [current] to false,
   /// clears the resume token and removes its target mapping from all documents).
   void _resetTarget(int targetId) {
-    hardAssert(
-        _targetStates[targetId] != null && !_targetStates[targetId].isPending(),
+    final TargetState? currentState = _targetStates[targetId];
+    hardAssert(currentState != null && !currentState.isPending(),
         'Should only reset active targets');
     _targetStates[targetId] = TargetState();
 
@@ -372,8 +452,9 @@ class WatchChangeAggregator {
 /// Interface implemented by [RemoteStore] to expose target metadata to the [WatchChangeAggregator].
 class TargetMetadataProvider {
   const TargetMetadataProvider({
-    @required this.getRemoteKeysForTarget,
-    @required this.getQueryDataForTarget,
+    required this.getRemoteKeysForTarget,
+    required this.getQueryDataForTarget,
+    required this.getDatabaseId,
   });
 
   /// Returns the set of remote document keys for the given target id as of the last raised snapshot
@@ -383,5 +464,11 @@ class TargetMetadataProvider {
 
   /// Returns the [QueryData] for an active target id or 'null' if this query is unknown or has
   /// become inactive.
-  final QueryData Function(int targetId) getQueryDataForTarget;
+  final QueryData? Function(int targetId) getQueryDataForTarget;
+
+  /// Returns the database ID of the Firestore instance.
+  final DatabaseId Function() getDatabaseId;
 }
+
+/// The bloom filter application status while handling an existence filter mismatch.
+enum _BloomFilterApplicationStatus { success, skipped, falsePositive }

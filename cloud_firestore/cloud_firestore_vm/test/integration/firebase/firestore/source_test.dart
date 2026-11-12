@@ -27,7 +27,7 @@ void main() {
   });
 
   test('getDocumentWhileOnlineWithDefaultGetOptions', () async {
-    final Map<String, Object> initialData = map(<String>['key', 'value']);
+    final Map<String, Object?> initialData = map(<String>['key', 'value']);
     final DocumentReference docRef = await testDocumentWithData(initialData);
 
     final DocumentSnapshot doc = await docRef.get();
@@ -39,7 +39,7 @@ void main() {
   });
 
   test('getCollectionWhileOnlineWithDefaultGetOptions', () async {
-    final Map<String, Map<String, Object>> initialDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> initialDocs = map(<dynamic>[
       'doc1',
       map<String>(<String>['key1', 'value1']),
       'doc2',
@@ -58,7 +58,7 @@ void main() {
   });
 
   test('getDocumentWhileOfflineWithDefaultGetOptions', () async {
-    final Map<String, Object> initialData = map(<String>['key', 'value']);
+    final Map<String, Object?> initialData = map(<String>['key', 'value']);
     final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
@@ -73,7 +73,7 @@ void main() {
   });
 
   test('getCollectionWhileOfflineWithDefaultGetOptions', () async {
-    final Map<String, Map<String, Object>> initialDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> initialDocs = map(<dynamic>[
       'doc1',
       map<String>(<String>['key1', 'value1']),
       'doc2',
@@ -113,7 +113,7 @@ void main() {
   });
 
   test('getDocumentWhileOnlineWithSourceEqualToCache', () async {
-    final Map<String, Object> initialData = map(<String>['key', 'value']);
+    final Map<String, Object?> initialData = map(<String>['key', 'value']);
     final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
@@ -127,7 +127,7 @@ void main() {
   });
 
   test('getCollectionWhileOnlineWithSourceEqualToCache', () async {
-    final Map<String, Map<String, Object>> initialDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> initialDocs = map(<dynamic>[
       'doc1',
       map<String>(<String>['key1', 'value1']),
       'doc2',
@@ -148,7 +148,7 @@ void main() {
   });
 
   test('getDocumentWhileOfflineWithSourceEqualToCache', () async {
-    final Map<String, Object> initialData = map(<String>['key', 'value']);
+    final Map<String, Object?> initialData = map(<String>['key', 'value']);
     final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
@@ -162,7 +162,7 @@ void main() {
   });
 
   test('getCollectionWhileOfflineWithSourceEqualToCache', () async {
-    final Map<String, Map<String, Object>> initialDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> initialDocs = map(<dynamic>[
       'doc1',
       map<String>(<String>['key1', 'value1']),
       'doc2',
@@ -202,7 +202,7 @@ void main() {
   });
 
   test('getDocumentWhileOnlineWithSourceEqualToServer', () async {
-    final Map<String, Object> initialData = map(<String>['key', 'value']);
+    final Map<String, Object?> initialData = map(<String>['key', 'value']);
     final DocumentReference docRef = await testDocumentWithData(initialData);
 
     final DocumentSnapshot doc = await docRef.get(Source.server);
@@ -213,7 +213,7 @@ void main() {
   });
 
   test('getCollectionWhileOnlineWithSourceEqualToServer', () async {
-    final Map<String, Map<String, Object>> initialDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> initialDocs = map(<dynamic>[
       'doc1',
       map<String>(<String>['key1', 'value1']),
       'doc2',
@@ -233,7 +233,7 @@ void main() {
   });
 
   test('getDocumentWhileOfflineWithSourceEqualToServer', () async {
-    final Map<String, Object> initialData = map(<String>['key', 'value']);
+    final Map<String, Object?> initialData = map(<String>['key', 'value']);
     final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
@@ -243,7 +243,7 @@ void main() {
   });
 
   test('getCollectionWhileOfflineWithSourceEqualToServer', () async {
-    final Map<String, Map<String, Object>> initialDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> initialDocs = map(<dynamic>[
       'doc1',
       map<String>(<String>['key1', 'value1']),
       'doc2',
@@ -261,7 +261,7 @@ void main() {
   });
 
   test('getDocumentWhileOfflineWithDifferentGetOptions', () async {
-    final Map<String, Object> initialData = map(<String>['key', 'value']);
+    final Map<String, Object?> initialData = map(<String>['key', 'value']);
     final DocumentReference docRef = await testDocumentWithData(initialData);
 
     await docRef.get();
@@ -295,7 +295,7 @@ void main() {
   });
 
   test('getCollectionWhileOfflineWithDifferentGetOptions', () async {
-    final Map<String, Map<String, Object>> initialDocs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> initialDocs = map(<dynamic>[
       'doc1',
       map<String>(<String>['key1', 'value1']),
       'doc2',

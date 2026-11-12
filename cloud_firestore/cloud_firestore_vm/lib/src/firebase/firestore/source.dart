@@ -11,6 +11,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 enum Source {
   /// Causes Firestore to try to retrieve an up-to-date (server-retrieved) snapshot, but fall back
   /// to  returning cached data if the server can't be reached.
+  @Deprecated('Use Source.serverAndCache instead.')
   defaultSource,
 
   /// Causes Firestore to avoid the cache, generating an error if the server cannot be reached. Note
@@ -23,5 +24,12 @@ enum Source {
   /// (implying that the returned value may be stale with respect to the value on the server). If
   /// there is no data in the cache to satisfy the [get] call, [DocumentReference.get] will return
   /// can error and [Query.get] will return an empty [QuerySnapshot] with no documents.
-  cache
+  cache;
+
+  /// The name used by the current official Firestore API for the default
+  /// behaviour. Same value as [defaultSource].
+  ///
+  /// Note: in a `switch` over [Source], use the enum values themselves
+  /// (`defaultSource`, `server`, `cache`) for exhaustiveness checking.
+  static const Source serverAndCache = defaultSource;
 }

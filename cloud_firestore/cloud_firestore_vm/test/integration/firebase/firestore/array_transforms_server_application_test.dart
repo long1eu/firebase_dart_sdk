@@ -23,7 +23,7 @@ void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/array_transforms';
 
   // A document reference to read and write to.
-  DocumentReference docRef;
+  late DocumentReference docRef;
 
   setUp(() async {
     docRef = await testDocument();

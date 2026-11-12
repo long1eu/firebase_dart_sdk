@@ -6,9 +6,9 @@ part of datastore;
 
 class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
   factory WriteStream({
-    @required FirestoreClient client,
-    @required TaskScheduler scheduler,
-    @required RemoteSerializer serializer,
+    required FirestoreClient client,
+    required TaskScheduler scheduler,
+    required RemoteSerializer serializer,
   }) {
     // ignore: close_sinks
     final StreamController<StreamEvent> controller =
@@ -22,9 +22,7 @@ class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
     TaskScheduler scheduler,
     RemoteSerializer serializer,
     StreamController<StreamEvent> eventsController,
-  )   : assert(client != null),
-        assert(serializer != null),
-        _client = client,
+  )   : _client = client,
         _serializer = serializer,
         super(
           eventsController,
@@ -128,7 +126,7 @@ class WriteStream extends BaseStream<proto.WriteRequest, proto.WriteResponse> {
   }
 
   /// The empty stream token.
-  static final Uint8List emptyStreamToken = Uint8List.fromList(<int>[0]);
+  static final Uint8List emptyStreamToken = Uint8List(0);
 }
 
 class HandshakeCompleteEvent extends StreamEvent {

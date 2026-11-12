@@ -24,7 +24,7 @@ class MutationQueueTestCase {
   MutationQueueTestCase(this._persistence);
 
   final Persistence _persistence;
-  MutationQueue _mutationQueue;
+  late MutationQueue _mutationQueue;
 
   Future<void> setUp() async {
     _persistence.referenceDelegate.inMemoryPins = ReferenceSet();
@@ -67,7 +67,7 @@ class MutationQueueTestCase {
   @testMethod
   Future<void> testLookupMutationBatch() async {
     // Searching on an empty queue should not find a non-existent batch
-    MutationBatch notFound = await _mutationQueue.lookupMutationBatch(42);
+    MutationBatch? notFound = await _mutationQueue.lookupMutationBatch(42);
     expect(notFound, isNull);
 
     final List<MutationBatch> batches = await _createBatches(10);
@@ -81,10 +81,10 @@ class MutationQueueTestCase {
 
     // Remaining entries should still be found
     for (MutationBatch batch in batches) {
-      final MutationBatch found =
+      final MutationBatch? found =
           await _mutationQueue.lookupMutationBatch(batch.batchId);
       expect(found, isNotNull);
-      expect(found.batchId, batch.batchId);
+      expect(found!.batchId, batch.batchId);
     }
 
     // Even on a nonempty queue searching should not find a non-existent batch
@@ -100,29 +100,29 @@ class MutationQueueTestCase {
     for (int i = 0; i < batches.length - 1; i++) {
       final MutationBatch current = batches[i];
       final MutationBatch next = batches[i + 1];
-      final MutationBatch found = await _mutationQueue
+      final MutationBatch? found = await _mutationQueue
           .getNextMutationBatchAfterBatchId(current.batchId);
       expect(found, isNotNull);
-      expect(found.batchId, next.batchId);
+      expect(found!.batchId, next.batchId);
     }
 
     for (int i = 0; i < removed.length; i++) {
       final MutationBatch current = removed[i];
       final MutationBatch next = batches[0];
-      final MutationBatch found = await _mutationQueue
+      final MutationBatch? found = await _mutationQueue
           .getNextMutationBatchAfterBatchId(current.batchId);
       expect(found, isNotNull);
-      expect(found.batchId, next.batchId);
+      expect(found!.batchId, next.batchId);
     }
 
     final MutationBatch first = batches[0];
-    final MutationBatch found = await _mutationQueue
+    final MutationBatch? found = await _mutationQueue
         .getNextMutationBatchAfterBatchId(first.batchId - 42);
     expect(found, isNotNull);
-    expect(found.batchId, first.batchId);
+    expect(found!.batchId, first.batchId);
 
     final MutationBatch last = batches[batches.length - 1];
-    final MutationBatch notFound =
+    final MutationBatch? notFound =
         await _mutationQueue.getNextMutationBatchAfterBatchId(last.batchId);
     expect(notFound, isNull);
   }
@@ -341,8 +341,8 @@ class MutationQueueTestCase {
 
   @testMethod
   Future<void> testStreamToken() async {
-    final Uint8List streamToken1 = resumeToken('token1');
-    final Uint8List streamToken2 = resumeToken('token2');
+    final Uint8List streamToken1 = resumeToken('token1')!;
+    final Uint8List streamToken2 = resumeToken('token2')!;
 
     await _persistence.runTransaction('initial stream token',
         () => _mutationQueue.setLastStreamToken(streamToken1));
@@ -410,7 +410,7 @@ class MutationQueueTestCase {
     return removed;
   }
 
-  Future<void> _expectCount({int count, bool isEmpty}) async {
+  Future<void> _expectCount({required int count, required bool isEmpty}) async {
     await _persistence.runTransaction('expectCount', () async {
       final bool empty = await _mutationQueue.isEmpty();
       expect(empty, isEmpty);

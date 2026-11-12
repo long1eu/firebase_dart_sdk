@@ -11,8 +11,8 @@ class ArrayContainsAnyFilter extends FieldFilter {
 
   @override
   bool matches(Document doc) {
-    final ArrayValue arrayValue = value;
-    final FieldValue other = doc.getField(field);
+    final ArrayValue arrayValue = value as ArrayValue;
+    final FieldValue? other = doc.getField(field);
     if (other is ArrayValue) {
       for (FieldValue val in other.internalValue) {
         if (arrayValue.internalValue.contains(val)) {

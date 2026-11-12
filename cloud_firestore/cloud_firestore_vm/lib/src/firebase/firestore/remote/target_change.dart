@@ -9,7 +9,6 @@ import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
 import 'package:collection/collection.dart';
-import 'package:meta/meta.dart';
 
 /// A [TargetChange] specifies the set of changes for a specific target as part
 /// of a [RemoteEvent]. These changes track which documents are added, modified
@@ -17,12 +16,27 @@ import 'package:meta/meta.dart';
 /// marked [current]. The actual changes to documents are not part of the
 /// [TargetChange] since documents may be part of multiple targets.
 class TargetChange {
+  /// Creates a synthesized [TargetChange] that only carries the [current] flag and the [resumeToken] of a target
+  /// that is already being listened to.
+  factory TargetChange.createSynthesizedTargetChangeForCurrentChange(
+    bool isCurrent,
+    Uint8List resumeToken,
+  ) {
+    return TargetChange(
+      resumeToken: resumeToken,
+      current: isCurrent,
+      addedDocuments: DocumentKey.emptyKeySet,
+      modifiedDocuments: DocumentKey.emptyKeySet,
+      removedDocuments: DocumentKey.emptyKeySet,
+    );
+  }
+
   const TargetChange({
-    @required this.resumeToken,
-    @required this.addedDocuments,
-    @required this.modifiedDocuments,
-    @required this.removedDocuments,
-    @required this.current,
+    required this.resumeToken,
+    required this.addedDocuments,
+    required this.modifiedDocuments,
+    required this.removedDocuments,
+    required this.current,
   });
 
   /// Returns the opaque, server-assigned token that allows watching a query to

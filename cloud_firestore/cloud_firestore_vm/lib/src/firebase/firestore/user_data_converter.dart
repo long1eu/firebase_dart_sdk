@@ -14,10 +14,12 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/array_transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/numeric_extremum_transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/numeric_increment_transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
 /// Helper for parsing raw user input (provided via the API) into internal model classes.
@@ -27,19 +29,21 @@ class UserDataConverter {
   final DatabaseId databaseId;
 
   /// Parse document data from a non-merge set() call.
-  UserDataParsedSetData parseSetData(Map<String, Object> input) {
+  UserDataParsedSetData parseSetData(Map<String, Object?> input) {
     final UserDataParseAccumulator accumulator =
         UserDataParseAccumulator(UserDataSource.set);
-    final FieldValue updateData = _parseData(input, accumulator.rootContext);
+    final ObjectValue updateData =
+        _parseData(input, accumulator.rootContext)! as ObjectValue;
     return accumulator.toSetData(updateData);
   }
 
   /// Parse document data from a set() call with SetOptions.merge() set.
   UserDataParsedSetData parseMergeData(
-      Map<String, Object> input, FieldMask fieldMask) {
+      Map<String, Object?> input, FieldMask? fieldMask) {
     final UserDataParseAccumulator accumulator =
         UserDataParseAccumulator(UserDataSource.mergeSet);
-    final ObjectValue updateData = _parseData(input, accumulator.rootContext);
+    final ObjectValue updateData =
+        _parseData(input, accumulator.rootContext)! as ObjectValue;
 
     if (fieldMask != null) {
       // Verify that all elements specified in the field mask are part of the parsed context.
@@ -57,23 +61,23 @@ class UserDataConverter {
   }
 
   /// Parse update data from an update() call.
-  UserDataParsedUpdateData parseUpdateData(Map<String, Object> data) {
+  UserDataParsedUpdateData parseUpdateData(Map<String, Object?> data) {
     checkNotNull(data, 'Provided update data must not be null.');
     final UserDataParseAccumulator accumulator =
         UserDataParseAccumulator(UserDataSource.update);
     final UserDataParseContext context = accumulator.rootContext;
 
     ObjectValue updateData = ObjectValue.empty;
-    for (MapEntry<String, Object> entry in data.entries) {
+    for (MapEntry<String, Object?> entry in data.entries) {
       final FieldPath fieldPath =
           firestore.FieldPath.fromDotSeparatedPath(entry.key).internalPath;
-      final Object fieldValue = entry.value;
+      final Object? fieldValue = entry.value;
 
       if (fieldValue is firestore.FieldValue && fieldValue.isDelete) {
         // Add it to the field mask, but don't add anything to updateData.
         context.addToFieldMask(fieldPath);
       } else {
-        final FieldValue parsedValue =
+        final FieldValue? parsedValue =
             _parseData(fieldValue, context.childContextForField(fieldPath));
         if (parsedValue != null) {
           context.addToFieldMask(fieldPath);
@@ -88,7 +92,7 @@ class UserDataConverter {
   /// Parses the update data from the update(field, value, field, value...) varargs call, accepting both strings and
   /// FieldPaths.
   UserDataParsedUpdateData parseUpdateDataFromList(
-      List<Object> fieldsAndValues) {
+      List<Object?> fieldsAndValues) {
     // fieldsAndValues.length and alternating types should already be validated by collectUpdateArguments().
     final int length = fieldsAndValues.length;
     hardAssert(length.remainder(2) == 0,
@@ -100,19 +104,21 @@ class UserDataConverter {
     ObjectValue updateData = ObjectValue.empty;
 
     for (int i = 0; i < length; i += 2) {
-      final Object fieldPath = fieldsAndValues[i];
-      final Object fieldValue = fieldsAndValues[i + 1];
+      final Object? fieldPath = fieldsAndValues[i];
+      final Object? fieldValue = fieldsAndValues[i + 1];
 
-      hardAssert(fieldPath is String || fieldPath is firestore.FieldPath,
-          'Expected argument to be String or FieldPath, but it was ${fieldPath.runtimeType}.');
+      hardAssertLazy(
+          fieldPath is String || fieldPath is firestore.FieldPath,
+          () =>
+              'Expected argument to be String or FieldPath, but it was ${fieldPath.runtimeType}.');
 
-      FieldPath parsedField;
+      final FieldPath parsedField;
 
       if (fieldPath is String) {
         parsedField =
             firestore.FieldPath.fromDotSeparatedPath(fieldPath).internalPath;
       } else {
-        final firestore.FieldPath path = fieldPath;
+        final firestore.FieldPath path = fieldPath as firestore.FieldPath;
         parsedField = path.internalPath;
       }
 
@@ -120,7 +126,7 @@ class UserDataConverter {
         // Add it to the field mask, but don't add anything to updateData.
         context.addToFieldMask(parsedField);
       } else {
-        final FieldValue parsedValue =
+        final FieldValue? parsedValue =
             _parseData(fieldValue, context.childContextForField(parsedField));
         if (parsedValue != null) {
           context.addToFieldMask(parsedField);
@@ -133,15 +139,18 @@ class UserDataConverter {
   }
 
   /// Parse a 'query value' (e.g. value in a where filter or a value in a cursor bound).
-  FieldValue parseQueryValue(Object input) {
-    final UserDataParseAccumulator accumulator =
-        UserDataParseAccumulator(UserDataSource.argument);
-    final FieldValue parsed = _parseData(input, accumulator.rootContext);
+  ///
+  /// [allowArrays] is whether the query value is an array that may directly contain additional arrays (e.g. the operand
+  /// of a `whereIn` or `whereNotIn` query).
+  FieldValue parseQueryValue(Object? input, {bool allowArrays = false}) {
+    final UserDataParseAccumulator accumulator = UserDataParseAccumulator(
+        allowArrays ? UserDataSource.arrayArgument : UserDataSource.argument);
+    final FieldValue? parsed = _parseData(input, accumulator.rootContext);
 
     hardAssert(parsed != null, 'Parsed data should not be null.');
     hardAssert(accumulator.fieldTransforms.isEmpty,
         'Field transforms should have been disallowed.');
-    return parsed;
+    return parsed!;
   }
 
   /// Internal helper for parsing user data.
@@ -149,9 +158,9 @@ class UserDataConverter {
   /// A [context] object representing the current path being parsed, the source of the data being parsed, etc. Returns
   /// parsed value, or null if the value was a FieldValue sentinel that should not be included in the resulting parsed
   /// data.
-  FieldValue _parseData(Object input, UserDataParseContext context) {
+  FieldValue? _parseData(Object? input, UserDataParseContext context) {
     if (input is Map) {
-      return _parseMap<dynamic>(input.cast<String, dynamic>(), context);
+      return _parseMap<Object?>(input.cast<String, Object?>(), context);
     } else if (input is firestore.FieldValue) {
       // FieldValues usually parse into transforms (except FieldValue.delete()) in which case we do not want to include
       // this field in our parsed data (as doing so will overwrite the field directly prior to the transform trying to
@@ -161,39 +170,41 @@ class UserDataConverter {
     } else {
       // If the context path is null we are inside an array and we don't support field mask paths more granular than the
       // top-level array.
-      if (context.path != null) {
-        context.addToFieldMask(context.path);
+      final FieldPath? path = context.path;
+      if (path != null) {
+        context.addToFieldMask(path);
       }
 
       if (input is List) {
         // TODO(long1eu): Include the path containing the array in the error message.
-        if (context.arrayElement) {
+        // In the case of IN / NOT_IN queries, the parsed data is an array (the set of values to match) that may directly
+        // contain additional arrays (each one an individual field value), so this validation is disabled there.
+        if (context.arrayElement &&
+            context.dataSource != UserDataSource.arrayArgument) {
           throw context.createError('Nested arrays are not supported');
         }
-        return _parseList<dynamic>(input, context);
+        return _parseList<Object?>(input, context);
       } else {
         return _parseScalarValue(input, context);
       }
     }
   }
 
-  ObjectValue _parseMap<V>(Map<String, V> map, UserDataParseContext context) {
+  ObjectValue _parseMap<V extends Object?>(
+      Map<String, V> map, UserDataParseContext context) {
     final Map<String, FieldValue> result = <String, FieldValue>{};
 
     if (map.isEmpty) {
-      if (context.path != null && context.path.isNotEmpty) {
-        context.addToFieldMask(context.path);
+      final FieldPath? path = context.path;
+      if (path != null && path.isNotEmpty) {
+        context.addToFieldMask(path);
       }
 
       return ObjectValue.empty;
     } else {
       for (MapEntry<String, V> entry in map.entries) {
-        if (entry.key is! String) {
-          throw context.createError(
-              'Non-String Map key (${entry.value}) is not allowed');
-        }
         final String key = entry.key;
-        final FieldValue parsedValue =
+        final FieldValue? parsedValue =
             _parseData(entry.value, context.childContextForSegment(key));
         if (parsedValue != null) {
           result[key] = parsedValue;
@@ -203,15 +214,15 @@ class UserDataConverter {
     return ObjectValue.fromMap(result);
   }
 
-  ArrayValue _parseList<T>(List<T> list, UserDataParseContext context) {
-    final List<FieldValue> result = List<FieldValue>(list.length);
+  ArrayValue _parseList<T extends Object?>(
+      List<T> list, UserDataParseContext context) {
+    final List<FieldValue> result = <FieldValue>[];
     int entryIndex = 0;
     for (T entry in list) {
-      FieldValue parsedEntry =
+      final FieldValue? parsedEntry =
           _parseData(entry, context.childContextForArrayIndex(entryIndex));
       // Just include nulls in the array for fields being replaced with a sentinel.
-      parsedEntry ??= NullValue.nullValue();
-      result[entryIndex] = parsedEntry;
+      result.add(parsedEntry ?? NullValue.nullValue());
       entryIndex++;
     }
     return ArrayValue.fromList(result);
@@ -225,7 +236,8 @@ class UserDataConverter {
       throw context.createError(
           '${value.methodName}() can only be used with set() and update()');
     }
-    if (context.path == null) {
+    final FieldPath? path = context.path;
+    if (path == null) {
       throw context.createError(
           '${value.methodName}() is not currently supported inside arrays');
     }
@@ -234,9 +246,9 @@ class UserDataConverter {
       if (context.dataSource == UserDataSource.mergeSet) {
         // No transform to add for a delete, but we need to add it to our
         // fieldMask so it gets deleted.
-        context.addToFieldMask(context.path);
+        context.addToFieldMask(path);
       } else if (context.dataSource == UserDataSource.update) {
-        hardAssert(context.path.isNotEmpty,
+        hardAssert(path.isNotEmpty,
             'FieldValue.delete() at the top level should have already been handled.');
         throw context.createError(
             'FieldValue.delete() can only appear at the top level of your update data');
@@ -246,24 +258,32 @@ class UserDataConverter {
             'FieldValue.delete() can only be used with update() and set() with SetOptions.merge()');
       }
     } else if (value.isServerTimestamp) {
-      context.addToFieldTransforms(context.path, ServerTimestampOperation());
+      context.addToFieldTransforms(path, ServerTimestampOperation());
     } else if (value.isArrayUnion) {
       final List<FieldValue> parsedElements =
           _parseArrayTransformElements(value.elements);
       final ArrayTransformOperation arrayUnion =
           ArrayTransformOperationUnion(parsedElements);
-      context.addToFieldTransforms(context.path, arrayUnion);
+      context.addToFieldTransforms(path, arrayUnion);
     } else if (value.isArrayRemove) {
       final List<FieldValue> parsedElements =
           _parseArrayTransformElements(value.elements);
       final ArrayTransformOperation arrayRemove =
           ArrayTransformOperationRemove(parsedElements);
-      context.addToFieldTransforms(context.path, arrayRemove);
+      context.addToFieldTransforms(path, arrayRemove);
     } else if (value.isIncrement) {
       final FieldValue operand = parseQueryValue(value.elements[0]);
       final NumericIncrementTransformOperation incrementOperation =
-          NumericIncrementTransformOperation(operand);
-      context.addToFieldTransforms(context.path, incrementOperation);
+          NumericIncrementTransformOperation(operand as NumberValue);
+      context.addToFieldTransforms(path, incrementOperation);
+    } else if (value.isMinimum) {
+      final FieldValue operand = parseQueryValue(value.elements[0]);
+      context.addToFieldTransforms(
+          path, NumericMinimumTransformOperation(operand as NumberValue));
+    } else if (value.isMaximum) {
+      final FieldValue operand = parseQueryValue(value.elements[0]);
+      context.addToFieldTransforms(
+          path, NumericMaximumTransformOperation(operand as NumberValue));
     } else {
       throw fail('Unknown FieldValue type: ${value.runtimeType}');
     }
@@ -273,7 +293,7 @@ class UserDataConverter {
   ///
   /// Returns the parsed value, or null if the value was a FieldValue sentinel that should not be included in the
   /// resulting parsed data.
-  FieldValue _parseScalarValue(Object input, UserDataParseContext context) {
+  FieldValue _parseScalarValue(Object? input, UserDataParseContext context) {
     if (input == null) {
       return NullValue.nullValue();
     } else if (input is int) {
@@ -297,16 +317,15 @@ class UserDataConverter {
       return GeoPointValue.valueOf(input);
     } else if (input is Blob) {
       return BlobValue.valueOf(input);
+    } else if (input is VectorValue) {
+      return VectorFieldValue.fromList(input.toArray());
     } else if (input is DocumentReference) {
       final DocumentReference ref = input;
-      // TODO(long1eu): Rework once pre-converter is ported to Android.
-      if (ref.firestore != null) {
-        final DatabaseId otherDb = ref.firestore.databaseId;
-        if (otherDb != databaseId) {
-          throw context.createError(
-              'Document reference is for database ${otherDb.projectId}/${otherDb.databaseId} but '
-              'should be for database ${databaseId.projectId}/${databaseId.databaseId}');
-        }
+      final DatabaseId otherDb = ref.firestore.databaseId;
+      if (otherDb != databaseId) {
+        throw context.createError(
+            'Document reference is for database ${otherDb.projectId}/${otherDb.databaseId} but '
+            'should be for database ${databaseId.projectId}/${databaseId.databaseId}');
       }
       return ReferenceValue.valueOf(databaseId, ref.key);
     } else {
@@ -314,16 +333,17 @@ class UserDataConverter {
     }
   }
 
-  List<FieldValue> _parseArrayTransformElements(List<Object> elements) {
+  List<FieldValue> _parseArrayTransformElements(List<Object?> elements) {
     final UserDataParseAccumulator accumulator =
         UserDataParseAccumulator(UserDataSource.argument);
-    final List<FieldValue> result = List<FieldValue>(elements.length);
+    final List<FieldValue> result = <FieldValue>[];
     for (int i = 0; i < elements.length; i++) {
-      final Object element = elements[i];
+      final Object? element = elements[i];
       // Although array transforms are used with writes, the actual elements being unioned or removed are not considered
       // writes since they cannot contain any FieldValue sentinels, etc.
       final UserDataParseContext context = accumulator.rootContext;
-      result[i] = _parseData(element, context.childContextForArrayIndex(i));
+      // Sentinels are not allowed inside array transforms, so the parsed value is never null.
+      result.add(_parseData(element, context.childContextForArrayIndex(i))!);
     }
     return result;
   }

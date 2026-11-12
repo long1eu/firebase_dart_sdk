@@ -17,11 +17,11 @@ import 'package:uuid/uuid.dart';
 import 'mock/database_mock.dart';
 
 Future<SQLitePersistence> createSQLitePersistence([
-  String name,
+  String? name,
   LruGarbageCollectorParams params = const LruGarbageCollectorParams(),
   StatsCollector statsCollector = StatsCollector.noOp,
 ]) async {
-  name ??= 'test-${Uuid().v4()}';
+  name ??= 'test-${const Uuid().v4()}';
   final DatabaseId databaseId = DatabaseId.forProject('projectId');
   final LocalSerializer serializer =
       LocalSerializer(RemoteSerializer(databaseId));
@@ -31,13 +31,13 @@ Future<SQLitePersistence> createSQLitePersistence([
     databaseId,
     serializer,
     (String path,
-            {int version,
-            OnConfigure onConfigure,
-            OnCreate onCreate,
-            OnVersionChange onUpgrade,
-            OnVersionChange onDowngrade,
-            OnOpen onOpen}) =>
-        DatabaseMock.create(name,
+            {int? version,
+            OnConfigure? onConfigure,
+            OnCreate? onCreate,
+            OnVersionChange? onUpgrade,
+            OnVersionChange? onDowngrade,
+            OnOpen? onOpen}) =>
+        DatabaseMock.create(name!,
             version: version,
             onConfigure: onConfigure,
             onCreate: onCreate,

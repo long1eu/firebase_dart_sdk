@@ -30,6 +30,7 @@ void main() {
     const bool hasPendingWrites = true;
     const bool syncStateChanges = true;
     const bool excludesMetadataChanges = true;
+    const bool hasCachedResults = true;
 
     final ViewSnapshot snapshot = ViewSnapshot(
       query,
@@ -40,6 +41,7 @@ void main() {
       isFromCache: fromCache,
       didSyncStateChange: syncStateChanges,
       excludesMetadataChanges: excludesMetadataChanges,
+      hasCachedResults: hasCachedResults,
     );
 
     expect(snapshot.query, query);
@@ -51,5 +53,6 @@ void main() {
     expect(snapshot.hasPendingWrites, hasPendingWrites);
     expect(snapshot.didSyncStateChange, syncStateChanges);
     expect(snapshot.excludesMetadataChanges, excludesMetadataChanges);
+    expect(snapshot.hasCachedResults, hasCachedResults);
   });
 }

@@ -15,13 +15,13 @@ abstract class ArrayTransformOperation implements TransformOperation {
 
   @override
   FieldValue applyToLocalView(
-      FieldValue previousValue, Timestamp localWriteTime) {
+      FieldValue? previousValue, Timestamp localWriteTime) {
     return apply(previousValue);
   }
 
   @override
   FieldValue applyToRemoteDocument(
-      FieldValue previousValue, FieldValue transformResult) {
+      FieldValue? previousValue, FieldValue transformResult) {
     // The server just sends null as the transform result for array operations,
     // so we have to calculate a result the same as we do for local
     // applications.
@@ -29,17 +29,17 @@ abstract class ArrayTransformOperation implements TransformOperation {
   }
 
   @override
-  FieldValue computeBaseValue(FieldValue currentValue) {
+  FieldValue? computeBaseValue(FieldValue? currentValue) {
     // Array transforms are idempotent and don't require a base value.
     return null;
   }
 
   /// Applies this ArrayTransformOperation against the specified previousValue.
-  ArrayValue apply(FieldValue previousValue);
+  ArrayValue apply(FieldValue? previousValue);
 
   /// Inspects the provided value, returning an [List] copy of the internal array if it's an
   /// ArrayValue and an empty [List] if it's null or any other type of FSTFieldValue.
-  static List<FieldValue> coercedFieldValuesArray(FieldValue value) {
+  static List<FieldValue> coercedFieldValuesArray(FieldValue? value) {
     if (value is ArrayValue) {
       return value.internalValue.toList();
     } else {
@@ -69,7 +69,7 @@ class ArrayTransformOperationUnion extends ArrayTransformOperation {
   ArrayTransformOperationUnion(List<FieldValue> elements) : super(elements);
 
   @override
-  ArrayValue apply(FieldValue previousValue) {
+  ArrayValue apply(FieldValue? previousValue) {
     final List<FieldValue> result =
         ArrayTransformOperation.coercedFieldValuesArray(previousValue);
     for (FieldValue element in elements) {
@@ -86,7 +86,7 @@ class ArrayTransformOperationRemove extends ArrayTransformOperation {
   ArrayTransformOperationRemove(List<FieldValue> elements) : super(elements);
 
   @override
-  ArrayValue apply(FieldValue previousValue) {
+  ArrayValue apply(FieldValue? previousValue) {
     final List<FieldValue> result =
         ArrayTransformOperation.coercedFieldValuesArray(previousValue)
           ..removeWhere(elements.contains);

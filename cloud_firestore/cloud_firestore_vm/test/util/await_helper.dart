@@ -20,24 +20,37 @@ class AwaitHelper<T> {
     }
   }
 
-  void completeNext([FutureOr<T> value]) {
-    _values.removeFirst().complete(value);
+  /// Completes the next pending slot. Like `TaskCompletionSource.trySetResult`
+  /// in the Java tests, this is a no-op when no slot is left.
+  void completeNext([FutureOr<T>? value]) {
+    if (_values.isEmpty) {
+      return;
+    }
+    _lastCompleted = _values.removeFirst()..complete(value as FutureOr<T>);
   }
 
-  void completeFollowing(int count, [List<FutureOr<T>> values]) {
+  void completeFollowing(int count, [List<FutureOr<T>?>? values]) {
     assert(count != 0);
     assert(_values.length >= count);
 
     for (int i = 0; i < count; i++) {
-      _values.removeFirst().complete(values == null ? null : values[i]);
+      _values.removeFirst().complete(
+          values == null ? null as FutureOr<T> : values[i] as FutureOr<T>);
     }
   }
 
-  void completeErrorNext(Object error, [StackTrace stackTrace]) {
+  void completeErrorNext(Object error, [StackTrace? stackTrace]) {
     _values.removeFirst().completeError(error, stackTrace);
   }
 
+  Completer<T>? _lastCompleted;
+
   Future<T> get next {
+    // If every slot was already completed (e.g. the event arrived before the
+    // test started waiting), the most recent result is still observable.
+    if (_values.isEmpty && _lastCompleted != null) {
+      return _lastCompleted!.future;
+    }
     return _values.first.future;
   }
 

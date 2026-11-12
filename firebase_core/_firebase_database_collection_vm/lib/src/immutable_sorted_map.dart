@@ -48,15 +48,15 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
   bool containsKey(K key);
 
-  V operator [](K key);
+  V? operator [](K key);
 
   ImmutableSortedMap<K, V> remove(K key);
 
   ImmutableSortedMap<K, V> insert(K key, V value);
 
-  K get minKey;
+  K? get minKey;
 
-  K get maxKey;
+  K? get maxKey;
 
   @override
   int get length;
@@ -75,9 +75,9 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
 
   Iterator<MapEntry<K, V>> reverseIteratorFrom(K key);
 
-  K getPredecessorKey(K key);
+  K? getPredecessorKey(K key);
 
-  K getSuccessorKey(K key);
+  K? getSuccessorKey(K key);
 
   int indexOf(K key);
 
@@ -93,14 +93,22 @@ abstract class ImmutableSortedMap<K, V> extends Iterable<MapEntry<K, V>> {
       return false;
     }
 
-    final ImmutableSortedMap<K, V> that = other;
+    final ImmutableSortedMap<dynamic, dynamic> that = other;
+
+    // Read through `dynamic` so the comparator's type argument isn't checked
+    // (a Comparator<String> is not a Comparator<dynamic> at runtime).
+    final Object? thatComparator = (other as dynamic).comparator;
+    final Object thisComparator = comparator;
+    if (thisComparator != thatComparator) {
+      return false;
+    }
 
     if (length != that.length) {
       return false;
     }
 
     final Iterator<MapEntry<K, V>> thisIterator = iterator;
-    final Iterator<MapEntry<K, V>> thatIterator = that.iterator;
+    final Iterator<MapEntry<dynamic, dynamic>> thatIterator = that.iterator;
     while (thisIterator.moveNext()) {
       thatIterator.moveNext();
 

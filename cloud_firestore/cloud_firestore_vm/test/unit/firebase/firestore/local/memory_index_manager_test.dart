@@ -11,7 +11,7 @@ import 'cases/index_manager_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  IndexManagerTestCase testCase;
+  late IndexManagerTestCase testCase;
 
   setUp(() async {
     print('setUp');

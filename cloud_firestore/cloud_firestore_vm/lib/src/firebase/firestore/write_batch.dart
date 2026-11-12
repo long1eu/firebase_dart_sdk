@@ -13,6 +13,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precond
 import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:meta/meta.dart';
 
 /// The signature for providing code to be executed within a [WriteBatch]
 /// context.
@@ -31,7 +32,8 @@ typedef BatchCallback = Future<void> Function(WriteBatch);
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class WriteBatch {
-  WriteBatch(this._firestore) : assert(_firestore != null);
+  @internal
+  WriteBatch(this._firestore);
 
   final Firestore _firestore;
   final List<Mutation> _mutations = <Mutation>[];
@@ -46,8 +48,8 @@ class WriteBatch {
   /// [options] is an object to configure the set behavior.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch set(DocumentReference documentRef, Map<String, Object> data,
-      [SetOptions options]) {
+  WriteBatch set(DocumentReference documentRef, Map<String, Object?> data,
+      [SetOptions? options]) {
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
     checkNotNull(data, 'Provided data must not be null.');
@@ -55,8 +57,7 @@ class WriteBatch {
     final UserDataParsedSetData parsed = options.merge
         ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
         : _firestore.dataConverter.parseSetData(data);
-    _mutations
-        .addAll(parsed.toMutationList(documentRef.key, Precondition.none));
+    _mutations.add(parsed.toMutation(documentRef.key, Precondition.none));
     return this;
   }
 
@@ -69,14 +70,14 @@ class WriteBatch {
   /// reference nested fields within the document.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch updateFromList(DocumentReference documentRef, List<Object> data) {
+  WriteBatch updateFromList(DocumentReference documentRef, List<Object?> data) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
-    _mutations.addAll(
-        parsedData.toMutationList(documentRef.key, Precondition(exists: true)));
+    _mutations.add(
+        parsedData.toMutation(documentRef.key, Precondition(exists: true)));
     return this;
   }
 
@@ -88,14 +89,14 @@ class WriteBatch {
   /// fields within the document.
   ///
   /// Returns this [WriteBatch] instance. Used for chaining method calls.
-  WriteBatch update(DocumentReference documentRef, Map<String, Object> data) {
+  WriteBatch update(DocumentReference documentRef, Map<String, Object?> data) {
     final UserDataParsedUpdateData parsedData =
         _firestore.dataConverter.parseUpdateData(data);
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
-    _mutations.addAll(
-        parsedData.toMutationList(documentRef.key, Precondition(exists: true)));
+    _mutations.add(
+        parsedData.toMutation(documentRef.key, Precondition(exists: true)));
     return this;
   }
 

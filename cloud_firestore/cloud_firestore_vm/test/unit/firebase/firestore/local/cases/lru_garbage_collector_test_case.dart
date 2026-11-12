@@ -37,16 +37,16 @@ class LruGarbageCollectorTestCase {
 
   final PersistenceBuilder _getPersistence;
 
-  Persistence _persistence;
-  QueryCache _queryCache;
-  MutationQueue _mutationQueue;
-  RemoteDocumentCache _documentCache;
-  LruGarbageCollector _garbageCollector;
-  LruGarbageCollectorParams _lruParams;
-  int _previousTargetId;
-  int _previousDocNum;
-  int _initialSequenceNumber;
-  ObjectValue _testValue;
+  late Persistence _persistence;
+  late QueryCache _queryCache;
+  late MutationQueue _mutationQueue;
+  late RemoteDocumentCache _documentCache;
+  late LruGarbageCollector _garbageCollector;
+  late LruGarbageCollectorParams _lruParams;
+  late int _previousTargetId;
+  late int _previousDocNum;
+  late int _initialSequenceNumber;
+  late ObjectValue _testValue;
 
   Future<void> setUp() async {
     _previousTargetId = 500;
@@ -276,6 +276,65 @@ class LruGarbageCollectorTestCase {
   }
 
   @testMethod
+  Future<void> testRemoveOrphanedDocumentsWithNoDocuments() async {
+    final int removed = await _garbageCollector.removeOrphanedDocuments(1000);
+    expect(removed, 0);
+  }
+
+  // Upstream uses SQLiteLruReferenceDelegate.REMOVE_ORPHANED_DOCUMENTS_BATCH_SIZE (100) * 2 + 1.
+  static const int _orphanedDocumentCount = 100 * 2 + 1;
+
+  @testMethod
+  Future<void> testRemoveOrphanedDocumentsWithLargeNumberOfDocuments() async {
+    await _persistence.runTransaction('add orphaned docs', () async {
+      for (int i = 0; i < _orphanedDocumentCount; i++) {
+        final Document doc = await _cacheADocumentInTransaction();
+        await _markDocumentEligibleForGcInTransaction(doc.key);
+      }
+    });
+
+    final int removed = await _garbageCollector.removeOrphanedDocuments(1000);
+    expect(removed, _orphanedDocumentCount);
+  }
+
+  // This is a test for https://github.com/firebase/firebase-android-sdk/issues/5417
+  @testMethod
+  Future<void>
+      testRemoveRunToCompleteWhenNoDocumentsIsRemovedWithLargeNumberOfDocs() async {
+    await _persistence.runTransaction('add orphaned docs', () async {
+      for (int i = 0; i < _orphanedDocumentCount; i++) {
+        final Document doc = await _cacheADocumentInTransaction();
+        await _markDocumentEligibleForGcInTransaction(doc.key);
+        final Timestamp writeTime = Timestamp.now();
+        await _mutationQueue.addMutationBatch(
+            writeTime, <Mutation>[], <Mutation>[_mutation(doc.key)]);
+      }
+    });
+
+    final int removed = await _garbageCollector.removeOrphanedDocuments(1000);
+    expect(removed, 0);
+  }
+
+  @testMethod
+  Future<void> testRemoveWhatCanBeRemovedWithLargeNumberOfDocs() async {
+    await _persistence.runTransaction('add orphaned docs', () async {
+      for (int i = 0; i < _orphanedDocumentCount; i++) {
+        final Document doc = await _cacheADocumentInTransaction();
+        await _markDocumentEligibleForGcInTransaction(doc.key);
+
+        if (i % 10 != 0) {
+          final Timestamp writeTime = Timestamp.now();
+          await _mutationQueue.addMutationBatch(
+              writeTime, <Mutation>[], <Mutation>[_mutation(doc.key)]);
+        }
+      }
+    });
+
+    final int removed = await _garbageCollector.removeOrphanedDocuments(1000);
+    expect(removed, 21);
+  }
+
+  @testMethod
   Future<void> testRemoveTargetsThenGC() async {
     // * Create 3 targets, add docs to all of them
     // * Leave oldest target alone, it is still live
@@ -315,7 +374,7 @@ class LruGarbageCollectorTestCase {
     // Add middle target and docs. Some docs will be removed from this target later, which we track here.
     final Set<DocumentKey> middleDocsToRemove = <DocumentKey>{};
     // This will be the document in this target that gets an update later.
-    DocumentKey middleDocToUpdateHolder;
+    late DocumentKey middleDocToUpdateHolder;
     final QueryData middleTarget = await _persistence
         .runTransactionAndReturn('Add middle target and docs', () async {
       final QueryData queryData = await _addNextQueryInTransaction();
@@ -569,12 +628,13 @@ class LruGarbageCollectorTestCase {
     final int sequenceNumber =
         _persistence.referenceDelegate.currentSequenceNumber;
     final Query _query = query('path$targetId');
-    return QueryData(_query, targetId, sequenceNumber, QueryPurpose.listen);
+    return QueryData(
+        _query.toTarget(), targetId, sequenceNumber, QueryPurpose.listen);
   }
 
   Future<void> _updateTargetInTransaction(QueryData queryData) async {
     final SnapshotVersion _version = version(2);
-    final Uint8List _resumeToken = resumeToken(2);
+    final Uint8List _resumeToken = resumeToken(2)!;
     final QueryData updated = queryData.copyWith(
       sequenceNumber: _persistence.referenceDelegate.currentSequenceNumber,
       snapshotVersion: _version,

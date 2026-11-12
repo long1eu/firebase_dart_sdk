@@ -28,6 +28,7 @@ const double _kLowSelectivity = 0.5;
 const List<Type> _kLowCardinalityTypes = <Type>[
   BoolValue,
   ArrayValue,
+  VectorFieldValue,
   ObjectValue
 ];
 
@@ -96,7 +97,7 @@ class IndexedQueryEngine implements QueryEngine {
     hardAssert(!query.isDocumentQuery,
         'matchesCollectionQuery called with document query.');
 
-    final IndexRange indexRange = _extractBestIndexRange(query);
+    final IndexRange? indexRange = _extractBestIndexRange(query);
     ImmutableSortedMap<DocumentKey, Document> filteredResults;
 
     if (indexRange != null) {
@@ -124,9 +125,9 @@ class IndexedQueryEngine implements QueryEngine {
         collectionIndex.getCursor(query.path, indexRange);
     try {
       while (cursor.next) {
-        final Document document =
+        final MaybeDocument? document =
             await localDocuments.getDocument(cursor.documentKey);
-        if (query.matches(document)) {
+        if (document is Document && query.matches(document)) {
           results = results.insert(cursor.documentKey, document);
         }
       }
@@ -145,8 +146,8 @@ class IndexedQueryEngine implements QueryEngine {
   static double _estimateFilterSelectivity(Filter filter) {
     hardAssert(filter is FieldFilter, 'Filter type expected to be FieldFilter');
 
-    final FieldFilter fieldFilter = filter;
-    if (fieldFilter.value == null || fieldFilter.value == DoubleValue.nan) {
+    final FieldFilter fieldFilter = filter as FieldFilter;
+    if (fieldFilter.value == DoubleValue.nan) {
       return _kHighSelectivity;
     } else {
       final double operatorSelectivity =
@@ -167,12 +168,12 @@ class IndexedQueryEngine implements QueryEngine {
   /// The [IndexRange] is computed based on the estimated selectivity of the
   /// query [filters] and [orderBy] constraints. If no [filters] or [orderBy]
   /// constraints are specified, it returns null.
-  static IndexRange _extractBestIndexRange(Query query) {
+  static IndexRange? _extractBestIndexRange(Query query) {
     // TODO(long1eu): consider any startAt/endAt bounds on the query.
     double currentSelectivity = -1.0;
 
     if (query.filters.isNotEmpty) {
-      Filter selectedFilter;
+      Filter? selectedFilter;
       for (Filter currentFilter in query.filters) {
         final double estimatedSelectivity =
             _estimateFilterSelectivity(currentFilter);
@@ -182,7 +183,7 @@ class IndexedQueryEngine implements QueryEngine {
         }
       }
       hardAssert(selectedFilter != null, 'Filter should be defined');
-      return _convertFilterToIndexRange(selectedFilter);
+      return _convertFilterToIndexRange(selectedFilter!);
     } else {
       // If there are no filters, use the first orderBy constraint when
       // performing the index lookup. This index lookup will remove results that
@@ -227,6 +228,6 @@ class IndexedQueryEngine implements QueryEngine {
           throw fail('Unexpected operator in query filter');
       }
     }
-    return IndexRange(fieldPath: filter.field);
+    throw fail('Unexpected filter type $filter');
   }
 }

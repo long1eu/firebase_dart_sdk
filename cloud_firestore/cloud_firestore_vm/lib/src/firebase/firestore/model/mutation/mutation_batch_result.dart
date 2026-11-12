@@ -31,10 +31,11 @@ class MutationBatchResult {
       SnapshotVersion commitVersion,
       List<MutationResult> mutationResults,
       Uint8List streamToken) {
-    hardAssert(
+    hardAssertLazy(
         batch.mutations.length == mutationResults.length,
-        'Mutations sent ${batch.mutations.length} must equal results received '
-        '${mutationResults.length}');
+        () =>
+            'Mutations sent ${batch.mutations.length} must equal results received '
+            '${mutationResults.length}');
 
     ImmutableSortedMap<DocumentKey, SnapshotVersion> docVersions =
         DocumentCollections.emptyVersionMap();

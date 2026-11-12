@@ -33,6 +33,7 @@ enum DocumentChangeType {
 /// does so.
 class DocumentChange {
   @visibleForTesting
+  @internal
   DocumentChange(this.document, this.type, this.oldIndex, this.newIndex);
 
   /// An enumeration of snapshot diff types.
@@ -60,6 +61,7 @@ class DocumentChange {
   final int newIndex;
 
   /// Creates the list of DocumentChanges from a ViewSnapshot.
+  @internal
   static List<DocumentChange> changesFromSnapshot(Firestore firestore,
       MetadataChanges metadataChanges, ViewSnapshot snapshot) {
     final List<DocumentChange> documentChanges = <DocumentChange>[];
@@ -68,7 +70,7 @@ class DocumentChange {
       // changes on the first snapshot are adds so there are also no metadata-only changes to filter
       // out.
       int index = 0;
-      Document lastDoc;
+      Document? lastDoc;
       for (DocumentViewChange change in snapshot.changes) {
         final Document document = change.document;
         final QueryDocumentSnapshot documentSnapshot =

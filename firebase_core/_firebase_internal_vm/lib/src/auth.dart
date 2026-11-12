@@ -49,23 +49,29 @@ class GetTokenResult {
   /// Returns the sign-in provider through which the ID token was obtained (anonymous, custom, phone, password, etc).
   /// Note, this does not map to provider IDs. For example, anonymous and custom authentications are not considered
   /// providers. We chose the name here to map the name used in the ID token.
-  String get signInProvider {
+  String? get signInProvider {
     // Sign in provider might live inside the 'firebase' element of the JSON
-    final Map<String, dynamic> firebaseElem = claims[_firebaseKey];
-    if (firebaseElem != null) {
-      final String provider = firebaseElem[_signInProvider];
-      return provider;
+    final Object? firebaseElem = claims[_firebaseKey];
+    if (firebaseElem is Map) {
+      final Object? provider = firebaseElem[_signInProvider];
+      return provider is String ? provider : null;
     } else {
-      return claims[_signInProvider];
+      final Object? provider = claims[_signInProvider];
+      return provider is String ? provider : null;
     }
   }
 
+  /// The custom claims of the token, or an empty map when there are none.
   Map<String, dynamic> get extraClaims {
-    return claims[_extraClaims];
+    final Object? extra = claims[_extraClaims];
+    return extra is Map
+        ? Map<String, dynamic>.from(extra)
+        : const <String, dynamic>{};
   }
 
   DateTime _getTimeFromClaimsSafely(String key) {
-    final int milliseconds = claims[key] ?? 0;
+    final Object? seconds = claims[key];
+    final int milliseconds = seconds is num ? seconds.toInt() : 0;
     return DateTime.fromMillisecondsSinceEpoch(milliseconds * 1000);
   }
 
@@ -90,14 +96,22 @@ class GetTokenResult {
   }
 }
 
+/// Parses the claims of a JWT. Tokens that are not a JWT (opaque or emulator
+/// tokens) have no claims.
 Map<String, dynamic> _parseJwt(String token) {
   final List<String> parts = token.split('.');
   if (parts.length != 3) {
-    throw Exception('invalid token');
+    return const <String, dynamic>{};
   }
 
-  final String payload = _decodeBase64(parts[1]);
-  return Map<String, dynamic>.from(jsonDecode(payload));
+  try {
+    final Object? claims = jsonDecode(_decodeBase64(parts[1]));
+    return claims is Map
+        ? Map<String, dynamic>.from(claims)
+        : const <String, dynamic>{};
+  } on Object {
+    return const <String, dynamic>{};
+  }
 }
 
 String _decodeBase64(String str) {

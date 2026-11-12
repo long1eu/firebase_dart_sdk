@@ -10,34 +10,34 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
 
   final MemoryPersistence persistence;
 
-  Set<DocumentKey> orphanedDocuments;
+  Set<DocumentKey>? orphanedDocuments;
 
   @override
-  ReferenceSet inMemoryPins;
+  ReferenceSet? inMemoryPins;
 
   @override
   int get currentSequenceNumber => ListenSequence.invalid;
 
   @override
   Future<void> addReference(DocumentKey key) async {
-    orphanedDocuments.remove(key);
+    orphanedDocuments!.remove(key);
   }
 
   @override
   Future<void> removeReference(DocumentKey key) async {
-    orphanedDocuments.add(key);
+    orphanedDocuments!.add(key);
   }
 
   @override
   Future<void> removeMutationReference(DocumentKey key) async {
-    orphanedDocuments.add(key);
+    orphanedDocuments!.add(key);
   }
 
   @override
   Future<void> removeTarget(QueryData queryData) async {
     final MemoryQueryCache queryCache = persistence.queryCache;
     (await queryCache.getMatchingKeysForTargetId(queryData.targetId))
-        .forEach(orphanedDocuments.add);
+        .forEach(orphanedDocuments!.add);
 
     await queryCache.removeQueryData(queryData);
   }
@@ -47,13 +47,18 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
     orphanedDocuments = <DocumentKey>{};
   }
 
+  @override
+  void onTransactionRolledBack() {
+    orphanedDocuments = null;
+  }
+
   /// In eager garbage collection, collection is run on transaction commit.
   @override
   Future<void> onTransactionCommitted() async {
     final MemoryRemoteDocumentCache remoteDocuments =
         persistence.remoteDocumentCache;
 
-    for (DocumentKey key in orphanedDocuments) {
+    for (DocumentKey key in orphanedDocuments!) {
       final bool isReferenced = await _isReferenced(key);
       if (!isReferenced) {
         await remoteDocuments.remove(key);
@@ -66,9 +71,9 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
   Future<void> updateLimboDocument(DocumentKey key) async {
     final bool isReferenced = await _isReferenced(key);
     if (isReferenced) {
-      orphanedDocuments.remove(key);
+      orphanedDocuments!.remove(key);
     } else {
-      orphanedDocuments.add(key);
+      orphanedDocuments!.add(key);
     }
   }
 
@@ -92,6 +97,7 @@ class MemoryEagerReferenceDelegate implements ReferenceDelegate {
       return true;
     }
 
+    final ReferenceSet? inMemoryPins = this.inMemoryPins;
     if (inMemoryPins != null && inMemoryPins.containsKey(key)) {
       return true;
     }

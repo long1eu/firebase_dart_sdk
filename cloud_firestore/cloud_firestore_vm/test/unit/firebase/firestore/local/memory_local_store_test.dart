@@ -12,7 +12,7 @@ import 'cases/local_store_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  LocalStoreTestCase testCase;
+  late LocalStoreTestCase testCase;
 
   setUp(() async {
     print('setUp');
@@ -31,6 +31,10 @@ void main() {
       const Duration(milliseconds: 250), () => testCase?.tearDown()));
 
   test('testMutationBatchKeys', () => testCase.testMutationBatchKeys());
+  test('testAllocatesTheSameTargetForMirrorQueries',
+      () => testCase.testAllocatesTheSameTargetForMirrorQueries());
+  test('testExecutesLimitToLastQueryInTheQueryOrder',
+      () => testCase.testExecutesLimitToLastQueryInTheQueryOrder());
   test('testHandlesSetMutation', () => testCase.testHandlesSetMutation());
   test('testHandlesSetMutationThenDocument',
       () => testCase.testHandlesSetMutationThenDocument());
@@ -113,10 +117,20 @@ void main() {
       'testHandlesSetMutationThenTransformMutationThenRemoteEventThenTransformMutation',
       () => testCase
           .testHandlesSetMutationThenTransformMutationThenRemoteEventThenTransformMutation());
+  test('testHandlesSetMutationWithFoldedTransformThenAck',
+      () => testCase.testHandlesSetMutationWithFoldedTransformThenAck());
   test('testHoldsBackOnlyNonIdempotentTransforms',
       () => testCase.testHoldsBackOnlyNonIdempotentTransforms());
   test('testHandlesMergeMutationWithTransformThenRemoteEvent',
       () => testCase.testHandlesMergeMutationWithTransformThenRemoteEvent());
   test('testHandlesPatchMutationWithTransformThenRemoteEvent',
       () => testCase.testHandlesPatchMutationWithTransformThenRemoteEvent());
+  test('testOnlyPersistsUpdatesForDocumentsWhenVersionChanges',
+      () => testCase.testOnlyPersistsUpdatesForDocumentsWhenVersionChanges());
+  test('testRemovesManufacturedNoDocumentsFromTheCache',
+      () => testCase.testRemovesManufacturedNoDocumentsFromTheCache());
+  test('testClearsResumeTokenOnExistenceFilterMismatch',
+      () => testCase.testClearsResumeTokenOnExistenceFilterMismatch());
+  test('testGetHighestUnacknowledgedBatchId',
+      () => testCase.testGetHighestUnacknowledgedBatchId());
 }

@@ -12,20 +12,18 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart'
     as core;
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart' as core;
 import 'package:cloud_firestore_vm/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/snapshot_metadata.dart';
+import 'package:meta/meta.dart';
 
 /// A [QuerySnapshot] contains the results of a query. It can contain zero or more [DocumentSnapshot] objects.
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
 class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
+  @internal
   QuerySnapshot(this.query, this.snapshot, this._firestore)
-      : assert(query != null),
-        assert(snapshot != null),
-        assert(_firestore != null),
-        metadata =
+      : metadata =
             SnapshotMetadata(snapshot.hasPendingWrites, snapshot.isFromCache);
 
   final Query query;
@@ -36,8 +34,8 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   final ViewSnapshot snapshot;
   final Firestore _firestore;
 
-  List<DocumentChange> _cachedChanges;
-  MetadataChanges _cachedChangesMetadataState;
+  List<DocumentChange>? _cachedChanges;
+  MetadataChanges? _cachedChangesMetadataState;
 
   /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
   /// be in the list as added changes.
@@ -45,7 +43,12 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Documents with changes only to their metadata will not be included.
   ///
   /// Returns the list of document changes since the last snapshot.
-  List<DocumentChange> get documentChanges =>
+  @Deprecated('Use docChanges instead.')
+  List<DocumentChange> get documentChanges => docChanges;
+
+  /// Same as [documentChanges]; this is the name used by the current official
+  /// Firestore API.
+  List<DocumentChange> get docChanges =>
       getDocumentChanges(MetadataChanges.exclude);
 
   /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
@@ -62,29 +65,32 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot> {
           'MetadataChanges.include to getSnapshots().');
     }
 
-    if (_cachedChanges == null ||
+    List<DocumentChange>? cachedChanges = _cachedChanges;
+    if (cachedChanges == null ||
         _cachedChangesMetadataState != metadataChanges) {
-      _cachedChanges = DocumentChange.changesFromSnapshot(
+      cachedChanges = DocumentChange.changesFromSnapshot(
               _firestore, metadataChanges, snapshot)
           .toList(growable: false);
+      _cachedChanges = cachedChanges;
       _cachedChangesMetadataState = metadataChanges;
     }
-    return _cachedChanges;
+    return cachedChanges;
   }
 
   /// Returns the documents in this [QuerySnapshot] as a List in order of the query.
   ///
   /// Returns the list of documents.
+  @Deprecated('Use docs instead.')
   List<DocumentSnapshot> get documents {
-    final List<DocumentSnapshot> res =
-        List<DocumentSnapshot>(snapshot.documents.length);
-    int i = 0;
-    for (core.Document doc in snapshot.documents) {
-      res[i] = _convertDocument(doc);
-      i++;
-    }
-    return res;
+    return <DocumentSnapshot>[
+      for (core.Document doc in snapshot.documents) _convertDocument(doc)
+    ];
   }
+
+  /// Returns the documents in this [QuerySnapshot] as a List in order of the
+  /// query. Same as [documents] but typed as [QueryDocumentSnapshot]; this is
+  /// the name used by the current official Firestore API.
+  List<QueryDocumentSnapshot> get docs => toList(growable: false);
 
   /// Returns true if there are no documents in the QuerySnapshot.
   @override

@@ -12,6 +12,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.d
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/delete_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/verify_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
@@ -20,18 +21,23 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 /// Internal transaction object responsible for accumulating the mutations to
 /// perform and the base versions for any documents read.
 class Transaction {
-  Transaction(this._transactionClient)
+  /// Creates a transaction. A [readOnly] transaction rejects every write and, when committed, only verifies that the
+  /// documents it read did not change.
+  Transaction(this._transactionClient, {this.readOnly = false})
       : readVersions = <DocumentKey, SnapshotVersion>{},
         mutations = <Mutation>[],
         committed = false;
 
   final TransactionClient _transactionClient;
+
+  /// Whether this transaction can only read.
+  final bool readOnly;
   final Map<DocumentKey, SnapshotVersion> readVersions;
   final List<Mutation> mutations;
 
   /// A deferred usage error that occurred previously in this transaction that will cause the
   /// transaction to fail once it actually commits.
-  FirestoreError _lastWriteError;
+  FirestoreError? _lastWriteError;
 
   /// Set of documents that have been written in the transaction.
   ///
@@ -59,15 +65,17 @@ class Transaction {
   /// Stores a set mutation for the given key and value, to be committed when
   /// [commit] is called.
   void set(DocumentKey key, UserDataParsedSetData data) {
-    _write(data.toMutationList(key, _precondition(key)));
+    _ensureWritable();
+    _write(<Mutation>[data.toMutation(key, _precondition(key))]);
     writtenDocs.add(key);
   }
 
   /// Stores an update mutation for the given key and values, to be committed
   /// when [commit] is called.
   void update(DocumentKey key, UserDataParsedUpdateData data) {
+    _ensureWritable();
     try {
-      _write(data.toMutationList(key, _preconditionForUpdate(key)));
+      _write(<Mutation>[data.toMutation(key, _preconditionForUpdate(key))]);
     } on FirestoreError catch (e) {
       _lastWriteError = e;
     }
@@ -76,14 +84,29 @@ class Transaction {
   }
 
   void delete(DocumentKey key) {
+    _ensureWritable();
     _write(<DeleteMutation>[DeleteMutation(key, _precondition(key))]);
     writtenDocs.add(key);
   }
 
   Future<void> commit() {
     _ensureCommitNotCalled();
-    if (_lastWriteError != null) {
-      return Future<void>.error(_lastWriteError);
+    final FirestoreError? lastWriteError = _lastWriteError;
+    if (lastWriteError != null) {
+      return Future<void>.error(lastWriteError);
+    }
+
+    if (readOnly) {
+      // Nothing is written: ask the backend to check that every document read still has the version that was read.
+      // A transaction that read nothing has nothing to verify.
+      committed = true;
+      if (readVersions.isEmpty) {
+        return Future<void>.value();
+      }
+      return _transactionClient.commit(<Mutation>[
+        for (DocumentKey key in readVersions.keys)
+          VerifyMutation(key, _precondition(key))
+      ]);
     }
 
     final Set<DocumentKey> unwritten = Set<DocumentKey>.from(readVersions.keys);
@@ -114,11 +137,10 @@ class Transaction {
     }
 
     if (readVersions.containsKey(doc.key)) {
-      final SnapshotVersion existingVersion = readVersions[doc.key];
-      if (existingVersion != doc.version) {
+      final SnapshotVersion? existingVersion = readVersions[doc.key];
+      if (existingVersion != docVersion) {
         // This transaction will fail no matter what.
-        throw FirestoreError(
-            'Document version changed between two reads.',
+        throw FirestoreError('Document version changed between two reads.',
             FirestoreErrorCode.aborted);
       }
     } else {
@@ -129,9 +151,13 @@ class Transaction {
   /// Returns version of this doc when it was read in this transaction as a
   /// precondition, or no precondition if it was not read.
   Precondition _precondition(DocumentKey key) {
-    final SnapshotVersion version = readVersions[key];
+    final SnapshotVersion? version = readVersions[key];
     if (!writtenDocs.contains(key) && version != null) {
-      return Precondition(updateTime: version);
+      if (version == SnapshotVersion.none) {
+        return Precondition(exists: false);
+      } else {
+        return Precondition(updateTime: version);
+      }
     } else {
       return Precondition.none;
     }
@@ -140,7 +166,7 @@ class Transaction {
   /// Returns the precondition for a document if the operation is an update,
   /// based on the provided [UpdateOptions].
   Precondition _preconditionForUpdate(DocumentKey key) {
-    final SnapshotVersion version = readVersions[key];
+    final SnapshotVersion? version = readVersions[key];
     // The first time a document is written, we want to take into account the
     // read time and existence.
     if (!writtenDocs.contains(key) && version != null) {
@@ -156,8 +182,7 @@ class Transaction {
         //
         // Note: this can change once we can send separate verify writes in the
         // transaction.
-        throw FirestoreError(
-            "Can't update a document that doesn't exist.",
+        throw FirestoreError("Can't update a document that doesn't exist.",
             FirestoreErrorCode.invalidArgument);
       }
       // Document exists, base precondition on document update time.
@@ -166,6 +191,13 @@ class Transaction {
       // Document was not read, so we just use the preconditions for a blind
       // write.
       return Precondition(exists: true);
+    }
+  }
+
+  void _ensureWritable() {
+    if (readOnly) {
+      throw FirestoreError('Read-only transactions cannot write.',
+          FirestoreErrorCode.invalidArgument);
     }
   }
 

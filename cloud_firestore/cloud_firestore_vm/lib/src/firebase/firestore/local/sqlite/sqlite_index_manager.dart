@@ -21,13 +21,16 @@ class SqliteIndexManager extends IndexManager {
   Future<void> addToCollectionParentIndex(ResourcePath collectionPath) async {
     hardAssert(collectionPath.length % 2 == 1, 'Expected a collection path.');
 
-    if (_collectionParentsIndex.add(collectionPath)) {
+    if (!_collectionParentsIndex.contains(collectionPath)) {
       final String collectionId = collectionPath.getLastSegment();
       final ResourcePath parentPath = collectionPath.popLast();
       await db.execute(
         'INSERT OR REPLACE INTO collection_parents (collection_id, parent) VALUES (?, ?)',
         <Object>[collectionId, EncodedPath.encode(parentPath)],
       );
+      // Cache the entry only once it is stored: if the INSERT throws (and the transaction rolls back) the next call
+      // must try again.
+      _collectionParentsIndex.add(collectionPath);
     }
   }
 

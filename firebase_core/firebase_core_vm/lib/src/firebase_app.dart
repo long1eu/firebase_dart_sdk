@@ -7,7 +7,6 @@ import 'dart:convert';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
-import 'package:firebase_core_vm/src/firebase_options.dart';
 import 'package:firebase_core_vm/src/platform_dependencies.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
@@ -22,7 +21,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// error to initialize an app with an already existing name.
   factory FirebaseApp.withOptions(
     FirebaseOptions options, {
-    PlatformDependencies dependencies,
+    PlatformDependencies? dependencies,
     String name = defaultAppName,
   }) {
     if (isWeb) {
@@ -34,7 +33,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
     Preconditions.checkState(!_instances.containsKey(normalizedName),
         'FirebaseApp name $normalizedName already exists!');
 
-    final LocalStorage storage = dependencies?.storage;
+    final LocalStorage? storage = dependencies?.storage;
     final String _dataCollectionDefaultEnabled =
         storage?.get(_dataCollectionDefaultEnabledPreferenceKey) ?? 'true';
     final FirebaseApp firebaseApp = FirebaseApp._(
@@ -50,7 +49,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// Returns the default (first initialized) instance of the [FirebaseApp].
   /// Throws StateError if the default app was not initialized.
   static FirebaseApp get instance {
-    final FirebaseApp defaultApp = _instances[defaultAppName];
+    final FirebaseApp? defaultApp = _instances[defaultAppName];
     if (defaultApp == null) {
       throw StateError(
           'Default FirebaseApp is not initialized. Make sure to call [FirebaseApp()] or [FirebaseApp.withOptions()] first.');
@@ -64,7 +63,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   ///
   /// [name] represents the name of the [FirebaseApp] instance.
   static FirebaseApp getInstance(String name) {
-    final FirebaseApp firebaseApp = _instances[_normalize(name)];
+    final FirebaseApp? firebaseApp = _instances[_normalize(name)];
     if (firebaseApp != null) {
       return firebaseApp;
     }
@@ -75,7 +74,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
         : '';
 
     throw StateError(
-        'FirebaseApp with name $name does\'t exist. $availableAppNamesMessage');
+        'FirebaseApp with name $name doesn\'t exist. $availableAppNamesMessage');
   }
 
   static const String defaultAppName = '[DEFAULT]';
@@ -87,7 +86,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   final String _name;
   final FirebaseOptions _options;
   @override
-  final PlatformDependencies _dependencies;
+  final PlatformDependencies? _dependencies;
 
   final StreamController<bool> _dataCollectionChangeSink =
       StreamController<bool>.broadcast();
@@ -126,14 +125,14 @@ class FirebaseApp with _PlatformDependenciesMixin {
     }
 
     _deleted = true;
-    _instances.remove(this);
+    _instances.remove(_name);
     _deleteSink.add(_name);
   }
 
   /// If set to true it indicates that Firebase should close database
   /// connections automatically when the app is in the background.
   /// Disabled by default.
-  void setAutomaticResourceManagementEnabled({bool enabled}) {
+  void setAutomaticResourceManagementEnabled({required bool enabled}) {
     _checkNotDeleted();
 
     if (_automaticResourceManagementEnabled != enabled) {
@@ -163,7 +162,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   ///
   /// Note: this value is respected by all SDKs unless overridden by the
   /// developer via SDK specific mechanisms.
-  void setDataCollectionDefaultEnabled({bool enabled = false}) {
+  void setDataCollectionDefaultEnabled({required bool enabled}) {
     _checkNotDeleted();
     if (_dataCollectionDefaultEnabled != enabled) {
       _dataCollectionDefaultEnabled = enabled;
@@ -194,9 +193,9 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// persistence key after the app has been deleted.
   static String getPersistenceKeyFor(String name, String applicationId) {
     final String encodedName =
-        base64Encode(utf8.encode(name)).replaceAll('=', '');
+        base64Url.encode(utf8.encode(name)).replaceAll('=', '');
     final String encodedApplicationId =
-        base64Encode(utf8.encode(applicationId)).replaceAll('=', '');
+        base64Url.encode(utf8.encode(applicationId)).replaceAll('=', '');
 
     return '$encodedName+$encodedApplicationId';
   }
@@ -213,7 +212,6 @@ class FirebaseApp with _PlatformDependenciesMixin {
 
   /// Normalizes the app name.
   static String _normalize(String name) {
-    assert(name != null);
     return name.trim();
   }
 
@@ -241,32 +239,38 @@ mixin _PlatformDependenciesMixin
     implements PlatformDependencies, LocalStorage, InternalTokenProvider {
   final Map<String, String> _map = <String, String>{};
 
-  PlatformDependencies get _dependencies;
+  PlatformDependencies? get _dependencies;
 
-  BehaviorSubject<bool> _onBackgroundChanged;
-  BehaviorSubject<bool> _onNetworkConnected;
-  HeaderBuilder _headersBuilder;
-  LocalStorage _storage;
-  InternalTokenProvider _authProvider;
+  BehaviorSubject<bool>? _onBackgroundChanged;
+  BehaviorSubject<bool>? _onNetworkConnected;
+  HeaderBuilder? _headersBuilder;
+  LocalStorage? _storage;
+  InternalTokenProvider? _authProvider;
+  InternalAppCheckTokenProvider? _appCheckProvider;
 
   void _initPlatformDependencies() {
-    _onBackgroundChanged = _dependencies?.onBackgroundChanged;
-    _onNetworkConnected = _dependencies?.onNetworkConnected;
+    // Without platform dependencies the defaults are created once, so that
+    // everything that listens (or adds) works on the same subject.
+    _onBackgroundChanged = _dependencies?.onBackgroundChanged ??
+        BehaviorSubject<bool>.seeded(false);
+    _onNetworkConnected =
+        _dependencies?.onNetworkConnected ?? BehaviorSubject<bool>.seeded(true);
     _headersBuilder = _dependencies?.headersBuilder;
     _storage = _dependencies?.storage;
     _authProvider = _dependencies?.authProvider;
+    _appCheckProvider = _dependencies?.appCheckProvider;
   }
 
   /// This stream should emit true then the app enters in background and false otherwise
   @override
   BehaviorSubject<bool> get onBackgroundChanged {
-    return _onBackgroundChanged ?? BehaviorSubject<bool>.seeded(false);
+    return _onBackgroundChanged!;
   }
 
   /// This stream should emit true when there is an internet connection and false otherwise
   @override
   BehaviorSubject<bool> get onNetworkConnected {
-    return _onNetworkConnected ?? BehaviorSubject<bool>.seeded(true);
+    return _onNetworkConnected!;
   }
 
   @override
@@ -287,20 +291,31 @@ mixin _PlatformDependenciesMixin
 
   // FirebaseAuth can set it self to be the InternalTokenProvider if the user hasn't set one already
   set authProvider(InternalTokenProvider provider) {
-    this
-      .._authProvider = provider
-      .._authProvider.getAccessToken(forceRefresh: true);
+    _authProvider = provider;
+    // Warm up the token; a failing provider must not become an unhandled
+    // asynchronous error here, callers see it when they ask for a token.
+    provider
+        .getAccessToken(forceRefresh: true)
+        .then<void>((GetTokenResult _) {}, onError: (Object _) {});
+  }
+
+  /// The App Check token source, or null when the app has none.
+  @override
+  InternalAppCheckTokenProvider? get appCheckProvider => _appCheckProvider;
+
+  set appCheckProvider(InternalAppCheckTokenProvider? provider) {
+    _appCheckProvider = provider;
   }
 
   // LocalStorage implementation
 
   @override
-  String get(String key) {
+  String? get(String key) {
     return _map[key];
   }
 
   @override
-  Future<void> set(String key, String value) async {
+  Future<void> set(String key, String? value) async {
     if (value == null) {
       _map.remove(key);
     } else {
@@ -311,14 +326,15 @@ mixin _PlatformDependenciesMixin
   // InternalTokenProvider implementation
 
   @override
-  Future<GetTokenResult> getAccessToken({@required bool forceRefresh}) async {
-    return null;
+  Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async {
+    throw StateError('No InternalTokenProvider has been set on this app.');
   }
 
   @override
-  String get uid => null;
+  String get uid =>
+      throw StateError('No InternalTokenProvider has been set on this app.');
 
   @override
   Stream<InternalTokenResult> get onTokenChanged =>
-      BehaviorSubject<InternalTokenResult>.seeded(null);
+      const Stream<InternalTokenResult>.empty();
 }

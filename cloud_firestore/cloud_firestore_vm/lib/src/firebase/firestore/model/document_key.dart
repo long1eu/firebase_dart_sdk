@@ -9,7 +9,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 /// DocumentKey represents the location of a document in the Firestore database.
 class DocumentKey implements Comparable<DocumentKey> {
   DocumentKey._(this.path) {
-    hardAssert(isDocumentKey(path), 'Not a document key path: $path');
+    hardAssertLazy(isDocumentKey(path), () => 'Not a document key path: $path');
   }
 
   /// Returns a document key for the empty path.
@@ -50,9 +50,6 @@ class DocumentKey implements Comparable<DocumentKey> {
   /// Returns true iff the given path is a path to a document.
   @override
   int compareTo(DocumentKey other) {
-    if (other == null) {
-      return 1;
-    }
     return path.compareTo(other.path);
   }
 

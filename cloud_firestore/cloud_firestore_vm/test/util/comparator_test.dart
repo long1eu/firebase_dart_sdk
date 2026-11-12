@@ -3,6 +3,7 @@
 // on 27/09/2018
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:test/test.dart';
 
 /// Tests that a given [Comparator] (or the implementation of [Comparable]) is
 /// correct. To use, repeatedly call [addEqualityGroup] with sets of objects
@@ -13,14 +14,14 @@ class ComparatorTester<T> {
   /// comparator. Or, if the comparator is null, the natural ordering (as
   /// defined by [Comparable])
   ComparatorTester([this._comparator])
-      : _equalityGroups = <List<Object>>[],
+      : _equalityGroups = <List<T>>[],
         _testForEqualsCompatibility = _comparator == null;
 
-  final Comparator<T> _comparator;
+  final Comparator<T>? _comparator;
 
   /// The items that we are checking, stored as a sorted set of equivalence
   /// classes.
-  final List<List<Object>> _equalityGroups;
+  final List<List<T>> _equalityGroups;
 
   /// Whether to enforce a.equals(b) == (a.compareTo(b) == 0)
   bool _testForEqualsCompatibility;
@@ -61,11 +62,12 @@ class ComparatorTester<T> {
   }
 
   int _compare(T a, T b) {
+    final Comparator<T>? comparator = _comparator;
     int compareValue;
-    if (_comparator == null) {
-      compareValue = (a as Comparable<Object>).compareTo(b);
+    if (comparator == null) {
+      compareValue = (a as Comparable<Object>).compareTo(b as Object);
     } else {
-      compareValue = _comparator(a, b);
+      compareValue = comparator(a, b);
     }
     return compareValue;
   }
@@ -86,24 +88,28 @@ class ComparatorTester<T> {
             otherIndex < _equalityGroups.length;
             otherIndex++) {
           for (T other in _equalityGroups[otherIndex]) {
-            assert(_compare(reference, other).sign ==
-                referenceIndex.compareTo(otherIndex).sign);
+            expect(_compare(reference, other).sign,
+                referenceIndex.compareTo(otherIndex).sign,
+                reason: 'compare($reference, $other) must order group '
+                    '$referenceIndex relative to group $otherIndex');
           }
         }
       }
     }
   }
 
+  /// Enforces `a == b` if and only if `compare(a, b) == 0` for every pair of
+  /// items, which means items of different groups must not be equal.
   void _doTestEqualsCompatibility() {
-    for (List<Object> referenceGroup in _equalityGroups) {
+    for (List<T> referenceGroup in _equalityGroups) {
       for (T reference in referenceGroup) {
-        for (List<Object> otherGroup in _equalityGroups) {
+        for (List<T> otherGroup in _equalityGroups) {
           for (T other in otherGroup) {
-            assert(
-                reference == other && _compare(reference, other) == 0,
-                'Testing equals() for compatibility with '
-                'compare()/compareTo(), add a call to '
-                'doNotRequireEqualsCompatibility() if this is not required');
+            expect(reference == other, _compare(reference, other) == 0,
+                reason: 'Testing == for compatibility with '
+                    'compare()/compareTo() on $reference and $other, add a '
+                    'call to permitInconsistencyWithEquals() if this is not '
+                    'required');
           }
         }
       }

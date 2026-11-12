@@ -14,11 +14,13 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/index_range.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/index_cursor.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/lru_garbage_collector.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
@@ -28,6 +30,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/remo
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/stats_collector.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_bundle_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
@@ -62,8 +65,8 @@ part 'sqlite_schema.dart';
 class SQLitePersistence extends Persistence {
   SQLitePersistence._(this.serializer, this.openDatabase, this.databaseName,
       StatsCollector statsCollector)
-      : _statsCollector = statsCollector ?? StatsCollector.noOp,
-        _semaphore = GlobalSemaphore() {
+      : _statsCollector = statsCollector,
+        _semaphore = GlobalSemaphore('persistence') {
     indexManager = SqliteIndexManager(this);
   }
 
@@ -75,22 +78,25 @@ class SQLitePersistence extends Persistence {
   final StatsCollector _statsCollector;
   final Semaphore _semaphore;
 
-  Database _db;
+  late Database _db;
 
   @override
   bool started = false;
 
   @override
-  SQLiteQueryCache queryCache;
+  late SQLiteQueryCache queryCache;
 
   @override
-  SqliteIndexManager indexManager;
+  late final BundleCache bundleCache = SQLiteBundleCache(this, serializer);
 
   @override
-  SQLiteRemoteDocumentCache remoteDocumentCache;
+  late SqliteIndexManager indexManager;
 
   @override
-  SQLiteLruReferenceDelegate referenceDelegate;
+  late SQLiteRemoteDocumentCache remoteDocumentCache;
+
+  @override
+  late SQLiteLruReferenceDelegate referenceDelegate;
 
   Future<int> get byteSize async {
     final int pageSize = await getPageSize();
@@ -155,25 +161,30 @@ class SQLitePersistence extends Persistence {
   @override
   Future<void> start() async {
     await _semaphore.acquire();
-    Log.d(tag, 'Starting SQLite persistance');
-    hardAssert(!started, 'SQLitePersistence double-started!');
-    _db = await _openDb(databaseName, openDatabase);
-    await queryCache.start();
-    started = true;
-    referenceDelegate.start(queryCache.highestListenSequenceNumber);
-    _semaphore.release();
+    try {
+      Log.d(tag, 'Starting SQLite persistance');
+      hardAssert(!started, 'SQLitePersistence double-started!');
+      _db = await _openDb(databaseName, openDatabase);
+      await queryCache.start();
+      started = true;
+      referenceDelegate.start(queryCache.highestListenSequenceNumber);
+    } finally {
+      _semaphore.release();
+    }
   }
 
   @override
   Future<void> shutdown() async {
     await _semaphore.acquire();
-    Log.d(tag, 'Shutingdown SQLite persistance');
-    hardAssert(started, 'SQLitePersistence shutdown without start!');
+    try {
+      Log.d(tag, 'Shutingdown SQLite persistance');
+      hardAssert(started, 'SQLitePersistence shutdown without start!');
 
-    started = false;
-    _db.close();
-    _db = null;
-    _semaphore.release();
+      started = false;
+      _db.close();
+    } finally {
+      _semaphore.release();
+    }
   }
 
   @visibleForTesting
@@ -196,32 +207,42 @@ class SQLitePersistence extends Persistence {
     await _semaphore.acquire();
     Log.d(tag, 'Starting transaction: $action');
 
+    bool began = false;
     try {
       referenceDelegate.onTransactionStarted();
       await _db.execute('BEGIN;');
+      began = true;
       final T result = await operation();
       await _db.execute('COMMIT;');
+      began = false;
       await referenceDelegate.onTransactionCommitted();
-      _semaphore.release();
       return result;
-    } catch (e) {
-      await _db.execute('ROLLBACK;');
-      _semaphore.release();
+    } catch (_) {
+      referenceDelegate.onTransactionRolledBack();
+      if (began) {
+        try {
+          await _db.execute('ROLLBACK;');
+        } catch (e) {
+          Log.w(tag, 'Rollback of transaction "$action" failed: $e');
+        }
+      }
       rethrow;
+    } finally {
+      _semaphore.release();
     }
   }
 
   /// Execute the given non-query SQL statement.
-  Future<void> execute(String statement, [List<Object> args]) {
+  Future<void> execute(String statement, [List<Object?>? args]) {
     return _db.execute(statement, args);
   }
 
   Future<List<Map<String, dynamic>>> query(String statement,
-      [List<dynamic> args]) {
+      [List<Object?>? args]) {
     return _db.query(statement, args);
   }
 
-  Future<int> delete(String statement, [List<dynamic> args]) {
+  Future<int> delete(String statement, [List<Object?>? args]) {
     return _db.delete(statement, args);
   }
 
@@ -326,10 +347,10 @@ class LongQuery {
   /// subqueries take the form:
   ///
   /// [_head][_argsHead][an auto-generated comma-separated list of '?' placeholders][_tail]
-  LongQuery(this._db, this._head, List<dynamic> argsHead,
-      List<dynamic> argsIter, this._tail)
+  LongQuery(this._db, this._head, List<Object?>? argsHead,
+      List<Object?> argsIter, this._tail)
       : _argsIter = argsIter,
-        _argsHead = argsHead ?? <dynamic>[],
+        _argsHead = argsHead ?? <Object?>[],
         _subqueriesPerformed = 0;
 
   final SQLitePersistence _db;
@@ -341,11 +362,11 @@ class LongQuery {
   final String _tail;
 
   // Arguments that will be prepended in each subquery before the main argument list.
-  final List<Object> _argsHead;
+  final List<Object?> _argsHead;
 
   int _subqueriesPerformed;
 
-  final List<Object> _argsIter;
+  final List<Object?> _argsIter;
 
   // Limit for the number of host parameters beyond which a query will be split into several subqueries. Deliberately
   // set way below 999 as a safety measure because this class doesn't attempt to check for placeholders in the query
@@ -362,7 +383,7 @@ class LongQuery {
   Future<List<Map<String, dynamic>>> performNextSubquery() async {
     ++_subqueriesPerformed;
 
-    final List<Object> subqueryArgs = List<Object>.from(_argsHead);
+    final List<Object?> subqueryArgs = List<Object?>.from(_argsHead);
     final StringBuffer placeholdersBuilder = StringBuffer();
 
     for (int i = 0;

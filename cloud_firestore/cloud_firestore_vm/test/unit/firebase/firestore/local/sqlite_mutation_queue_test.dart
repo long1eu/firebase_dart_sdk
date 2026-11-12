@@ -12,12 +12,12 @@ import 'cases/mutation_queue_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  MutationQueueTestCase testCase;
+  late MutationQueueTestCase testCase;
 
   setUp(() async {
     print('setUp');
     final SQLitePersistence persistence = await createSQLitePersistence(
-        'firebase/firestore/local/sqlite_mutation_queue_test-${Uuid().v4()}.db');
+        'firebase/firestore/local/sqlite_mutation_queue_test-${const Uuid().v4()}.db');
     testCase = MutationQueueTestCase(persistence);
     await testCase.setUp();
     print('setUpDone');

@@ -8,7 +8,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/auth/empty_credentials
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
-import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/integration_test_util.dart';
@@ -19,7 +18,7 @@ class MockCredentialsProvider extends EmptyCredentialsProvider {
   final List<String> states = <String>[];
 
   @override
-  Future<String> get token {
+  Future<String?> get token {
     states.add('getToken');
     return super.token;
   }
@@ -69,7 +68,7 @@ void main() {
 
     final Completer<void> completer = Completer<void>();
     final List<StreamEvent> events = <StreamEvent>[];
-    StreamSubscription<StreamEvent> sub;
+    late StreamSubscription<StreamEvent> sub;
     sub = watchStream.listen((StreamEvent value) async {
       events.add(value);
 
@@ -102,9 +101,12 @@ void main() {
 
     final Completer<void> completer = Completer<void>();
     final List<StreamEvent> events = <StreamEvent>[];
-    StreamSubscription<StreamEvent> sub;
+    late StreamSubscription<StreamEvent> sub;
     sub = writeStream.listen((StreamEvent event) async {
       if (event is OpenEvent) {
+        // There is no stream token before the handshake.
+        expect(writeStream.lastStreamToken, isEmpty);
+
         // Writing before the handshake should throw
         expect(() => writeStream.writeMutations(mutations),
             throwsA(isA<AssertionError>()));
@@ -145,7 +147,7 @@ void main() {
 
     final Completer<void> completer = Completer<void>();
     final List<StreamEvent> events = <StreamEvent>[];
-    StreamSubscription<StreamEvent> sub;
+    late StreamSubscription<StreamEvent> sub;
     sub = writeStream.listen((StreamEvent value) async {
       events.add(value);
 

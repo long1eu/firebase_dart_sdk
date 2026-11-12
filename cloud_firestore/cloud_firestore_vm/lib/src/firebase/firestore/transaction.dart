@@ -17,6 +17,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:meta/meta.dart';
 
 /// The signature for providing code to be executed within a transaction context.
 typedef TransactionCallback<T> = Future<T> Function(Transaction);
@@ -28,9 +29,8 @@ typedef TransactionCallback<T> = Future<T> Function(Transaction);
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class Transaction {
-  Transaction(this._transaction, this._firestore)
-      : assert(_transaction != null),
-        assert(_firestore != null);
+  @internal
+  Transaction(this._transaction, this._firestore);
 
   final core.Transaction _transaction;
 
@@ -45,12 +45,11 @@ class Transaction {
   /// [options] An object to configure the set behavior.
   ///
   /// Returns this Transaction instance. Used for chaining method calls.
-  Transaction set(DocumentReference documentRef, Map<String, Object> data,
-      [SetOptions options]) {
+  Transaction set(DocumentReference documentRef, Map<String, Object?> data,
+      [SetOptions? options]) {
     options ??= SetOptions.overwrite;
     _firestore.validateReference(documentRef);
     checkNotNull(data, 'Provided data must not be null.');
-    checkNotNull(options, 'Provided options must not be null.');
     final UserDataParsedSetData parsed = options.merge
         ? _firestore.dataConverter.parseMergeData(data, options.fieldMask)
         : _firestore.dataConverter.parseSetData(data);
@@ -66,7 +65,7 @@ class Transaction {
   /// fields within the document.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  Transaction updateFromList(DocumentReference documentRef, List<Object> data) {
+  Transaction updateFromList(DocumentReference documentRef, List<Object?> data) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
     return _update(documentRef, parsedData);
@@ -80,7 +79,7 @@ class Transaction {
   /// fields within the document.
   ///
   /// Return this [Transaction] instance. Used for chaining method calls.
-  Transaction update(DocumentReference documentRef, Map<String, Object> data) {
+  Transaction update(DocumentReference documentRef, Map<String, Object?> data) {
     final UserDataParsedUpdateData parsedData =
         _firestore.dataConverter.parseUpdateData(data);
     return _update(documentRef, parsedData);

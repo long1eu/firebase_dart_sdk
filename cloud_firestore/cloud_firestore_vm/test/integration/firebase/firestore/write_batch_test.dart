@@ -273,14 +273,21 @@ void main() {
     final QuerySnapshot localSnap = await accumulator.wait();
     expect(localSnap.metadata.hasPendingWrites, isTrue);
     expect(querySnapshotToValues(localSnap), <dynamic>[
-      map<String>(<String>['when', null]),
-      map<String>(<String>['when', null])
+      map<String?>(<String?>['when', null]),
+      map<String?>(<String?>['when', null])
     ]);
 
-    final QuerySnapshot serverSnap = await accumulator.wait();
+    // The emulator serves the watch and the write streams independently, so the watch update that carries the
+    // committed documents can arrive before the write acknowledgement. The client then correctly raises one more
+    // snapshot that still has pending writes (the acknowledgement is what clears them), so wait for the first
+    // snapshot without pending writes.
+    QuerySnapshot serverSnap = await accumulator.wait();
+    if (serverSnap.metadata.hasPendingWrites) {
+      serverSnap = await accumulator.wait();
+    }
     expect(serverSnap.metadata.hasPendingWrites, isFalse);
     expect(serverSnap.length, 2);
-    final Timestamp when = serverSnap.documents[0].getTimestamp('when');
+    final Timestamp when = serverSnap.documents[0].getTimestamp('when')!;
     expect(when, isNotNull);
     expect(querySnapshotToValues(serverSnap), <dynamic>[
       map<dynamic>(<dynamic>['when', when]),
@@ -313,7 +320,7 @@ void main() {
 
     final DocumentSnapshot serverSnap = await accumulator.wait();
     expect(serverSnap.metadata.hasPendingWrites, isFalse);
-    final Timestamp when = serverSnap.getTimestamp('when');
+    final Timestamp when = serverSnap.getTimestamp('when')!;
     expect(when, isNotNull);
     expect(
         serverSnap.data, map<dynamic>(<dynamic>['a', 1, 'b', 2, 'when', when]));

@@ -2,7 +2,6 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:grpc/grpc.dart';
 
@@ -30,7 +29,10 @@ class FirestoreErrorCode {
   static const FirestoreErrorCode unauthenticated = FirestoreErrorCode._(16);
 
   static FirestoreErrorCode fromValue(GrpcError error) {
-    return values[error.code];
+    // Unknown (e.g. forward-compatible or custom) codes map to `unknown`.
+    return error.code >= 0 && error.code < values.length
+        ? values[error.code]
+        : unknown;
   }
 
   static const List<FirestoreErrorCode> values = <FirestoreErrorCode>[
@@ -82,14 +84,11 @@ class FirestoreError extends FirebaseError {
     String message,
     this.code, [
     this.cause,
-    StackTrace stackTrance,
-  ]) : super(message, stackTrance) {
-    Preconditions.checkNotNull(message);
-    Preconditions.checkNotNull(code);
-  }
+    StackTrace? stackTrance,
+  ]) : super(message, stackTrance);
 
   final FirestoreErrorCode code;
-  final dynamic cause;
+  final Object? cause;
 
   @override
   String toString() => '$runtimeType:$code $message $cause $stackTrace';

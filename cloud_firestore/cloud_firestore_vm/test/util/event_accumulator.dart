@@ -17,7 +17,7 @@ class EventAccumulator<T> {
 
   final List<T> _events;
 
-  Completer<void> _completion;
+  Completer<void>? _completion;
   int _maxEvents;
 
   void onData(T data) {
@@ -26,18 +26,18 @@ class EventAccumulator<T> {
     _checkFulfilled();
   }
 
-  void onError(dynamic error, [StackTrace stackTrace]) {
+  void onError(dynamic error, [StackTrace? stackTrace]) {
     hardAssert(false, 'Unexpected error: $error');
   }
 
   Future<List<T>> waitFor([int numEvents = 1]) async {
     hardAssert(
         _completion == null, 'calling await while another await is running');
-    _completion = Completer<void>();
+    final Completer<void> completion = _completion = Completer<void>();
     _maxEvents = _maxEvents + numEvents;
     _checkFulfilled();
 
-    await _completion.future;
+    await completion.future;
     _completion = null;
 
     final List<T> events = _events.sublist(_maxEvents - numEvents, _maxEvents);
@@ -77,7 +77,7 @@ class EventAccumulator<T> {
 
   void _checkFulfilled() {
     if (_completion != null && _events.length >= _maxEvents) {
-      _completion.complete(null);
+      _completion!.complete();
     }
   }
 }

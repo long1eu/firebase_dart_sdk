@@ -78,7 +78,6 @@ class EqualsTester {
 
   void _testItems() {
     for (Object item in _equalityGroups.expand((List<Object> it) => it)) {
-      assert(item != null, '$item must be unequal to null');
       assert(item != _NotAnInstance.equalToNothing,
           '$item must be unequal to an arbitrary object of another class');
       assert(item == item, '$item must be equal to itself');

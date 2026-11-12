@@ -6,8 +6,6 @@ part of filter;
 
 /// Represents a filter to be applied to query.
 class FieldFilter extends Filter {
-  /// Note that if the relation operator is EQUAL and the value is null or NaN, this will return
-  /// the appropriate NullFilter or NaNFilter class instead of a FieldFilter.
   factory FieldFilter(
       FieldPath path, FilterOperator operator, FieldValue value) {
     if (path.isKeyField) {
@@ -15,36 +13,33 @@ class FieldFilter extends Filter {
         hardAssert(value is ArrayValue,
             'Comparing on key with IN, but an array value was not a RefValue');
         return KeyFieldInFilter(path, value);
+      } else if (operator == FilterOperator.NOT_IN) {
+        hardAssert(value is ArrayValue,
+            'Comparing on key with NOT_IN, but an array value was not a RefValue');
+        return KeyFieldNotInFilter(path, value);
       } else {
         hardAssert(value is ReferenceValue,
             'Comparing on key, but filter value not a ReferenceValue');
-        hardAssert(
+        hardAssertLazy(
             operator != FilterOperator.arrayContains &&
                 operator != FilterOperator.arrayContainsAny,
-            '$operator queries don\'t make sense on document keys');
+            () => '$operator queries don\'t make sense on document keys');
         return KeyFieldFilter(path, operator, value);
       }
-    } else if (value == NullValue.nullValue()) {
-      if (operator != FilterOperator.equal) {
-        throw ArgumentError(
-            'Invalid Query. Null supports only equality comparisons (via whereEqualTo()).');
-      }
-      return FieldFilter._(path, operator, value);
-    } else if (value == DoubleValue.nan) {
-      if (operator != FilterOperator.equal) {
-        throw ArgumentError(
-            'Invalid Query. NaN supports only equality comparisons (via whereEqualTo()).');
-      }
-      return FieldFilter._(path, operator, value);
     } else if (operator == FilterOperator.arrayContains) {
       return ArrayContainsFilter(path, value);
     } else if (operator == FilterOperator.IN) {
-      hardAssert(value is ArrayValue, 'IN filter has invalid value: $value');
+      hardAssertLazy(
+          value is ArrayValue, () => 'IN filter has invalid value: $value');
       return InFilter(path, value);
     } else if (operator == FilterOperator.arrayContainsAny) {
-      hardAssert(value is ArrayValue,
-          'ARRAY_CONTAINS_ANY filter has invalid value: $value');
+      hardAssertLazy(value is ArrayValue,
+          () => 'ARRAY_CONTAINS_ANY filter has invalid value: $value');
       return ArrayContainsAnyFilter(path, value);
+    } else if (operator == FilterOperator.NOT_IN) {
+      hardAssertLazy(
+          value is ArrayValue, () => 'NOT_IN filter has invalid value: $value');
+      return NotInFilter(path, value);
     } else {
       return FieldFilter._(path, operator, value);
     }
@@ -56,12 +51,24 @@ class FieldFilter extends Filter {
 
   final FilterOperator operator;
   final FieldValue value;
-  @override
   final FieldPath field;
 
   @override
+  List<Filter> get filters => <Filter>[this];
+
+  @override
+  List<FieldFilter> get flattenedFilters => <FieldFilter>[this];
+
+  @override
   bool matches(Document doc) {
-    final FieldValue other = doc.getField(field);
+    final FieldValue? other = doc.getField(field);
+    // Types do not have to match in NOT_EQUAL filters. Documents where the
+    // field is missing or null are excluded.
+    if (operator == FilterOperator.notEqual) {
+      return other != null &&
+          other is! NullValue &&
+          _matchesComparison(other.compareTo(value));
+    }
     // Only compare types with matching backend order (such as double and int).
     return other != null &&
         value.typeOrder == other.typeOrder &&
@@ -76,6 +83,8 @@ class FieldFilter extends Filter {
         return comp <= 0;
       case FilterOperator.equal:
         return comp == 0;
+      case FilterOperator.notEqual:
+        return comp != 0;
       case FilterOperator.graterThan:
         return comp > 0;
       case FilterOperator.graterThanOrEqual:

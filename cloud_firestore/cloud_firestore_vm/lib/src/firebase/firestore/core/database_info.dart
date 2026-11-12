@@ -4,7 +4,6 @@
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
-import 'package:meta/meta.dart';
 
 /// Contains info about host, project id and database
 class DatabaseInfo {
@@ -12,9 +11,9 @@ class DatabaseInfo {
     this.databaseId,
     this.persistenceKey,
     this.host, {
-    @required this.sslEnabled,
+    required this.sslEnabled,
     this.port = 443,
-  }) : assert(port != null);
+  });
 
   final DatabaseId databaseId;
   final String persistenceKey;

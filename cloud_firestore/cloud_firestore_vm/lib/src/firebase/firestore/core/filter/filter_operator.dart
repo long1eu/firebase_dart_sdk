@@ -12,6 +12,7 @@ class FilterOperator {
   static const FilterOperator lessThan = FilterOperator._('<');
   static const FilterOperator lessThanOrEqual = FilterOperator._('<=');
   static const FilterOperator equal = FilterOperator._('==');
+  static const FilterOperator notEqual = FilterOperator._('!=');
   static const FilterOperator graterThan = FilterOperator._('>');
   static const FilterOperator graterThanOrEqual = FilterOperator._('>=');
   static const FilterOperator arrayContains =
@@ -21,6 +22,9 @@ class FilterOperator {
 
   // ignore: constant_identifier_names
   static const FilterOperator IN = FilterOperator._('in');
+
+  // ignore: constant_identifier_names
+  static const FilterOperator NOT_IN = FilterOperator._('not_in');
 
   static const List<FilterOperator> arrayOperators = <FilterOperator>[
     arrayContains,
@@ -36,7 +40,9 @@ class FilterOperator {
     lessThan,
     lessThanOrEqual,
     graterThan,
-    graterThanOrEqual
+    graterThanOrEqual,
+    notEqual,
+    NOT_IN
   ];
 
   @override

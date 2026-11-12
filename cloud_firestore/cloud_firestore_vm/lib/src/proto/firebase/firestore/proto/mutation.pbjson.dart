@@ -1,25 +1,48 @@
-///
+//
 //  Generated code. Do not modify.
 //  source: firebase/firestore/proto/mutation.proto
 //
-// @dart = 2.3
-// ignore_for_file: camel_case_types,non_constant_identifier_names,library_prefixes,unused_import,unused_shown_name,return_of_invalid_type
+// @dart = 2.12
 
-const MutationQueue$json = const {
+// ignore_for_file: annotate_overrides, camel_case_types, comment_references
+// ignore_for_file: constant_identifier_names, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_final_fields
+// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+
+import 'dart:convert' as $convert;
+import 'dart:core' as $core;
+import 'dart:typed_data' as $typed_data;
+
+@$core.Deprecated('Use mutationQueueDescriptor instead')
+const MutationQueue$json = {
   '1': 'MutationQueue',
-  '2': const [
-    const {'1': 'last_acknowledged_batch_id', '3': 1, '4': 1, '5': 5, '10': 'lastAcknowledgedBatchId'},
-    const {'1': 'last_stream_token', '3': 2, '4': 1, '5': 12, '10': 'lastStreamToken'},
+  '2': [
+    {'1': 'last_acknowledged_batch_id', '3': 1, '4': 1, '5': 5, '10': 'lastAcknowledgedBatchId'},
+    {'1': 'last_stream_token', '3': 2, '4': 1, '5': 12, '10': 'lastStreamToken'},
   ],
 };
 
-const WriteBatch$json = const {
+/// Descriptor for `MutationQueue`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List mutationQueueDescriptor = $convert.base64Decode(
+    'Cg1NdXRhdGlvblF1ZXVlEjsKGmxhc3RfYWNrbm93bGVkZ2VkX2JhdGNoX2lkGAEgASgFUhdsYX'
+    'N0QWNrbm93bGVkZ2VkQmF0Y2hJZBIqChFsYXN0X3N0cmVhbV90b2tlbhgCIAEoDFIPbGFzdFN0'
+    'cmVhbVRva2Vu');
+
+@$core.Deprecated('Use writeBatchDescriptor instead')
+const WriteBatch$json = {
   '1': 'WriteBatch',
-  '2': const [
-    const {'1': 'batch_id', '3': 1, '4': 1, '5': 5, '10': 'batchId'},
-    const {'1': 'writes', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1.Write', '10': 'writes'},
-    const {'1': 'local_write_time', '3': 3, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'localWriteTime'},
-    const {'1': 'base_writes', '3': 4, '4': 3, '5': 11, '6': '.google.firestore.v1.Write', '10': 'baseWrites'},
+  '2': [
+    {'1': 'batch_id', '3': 1, '4': 1, '5': 5, '10': 'batchId'},
+    {'1': 'writes', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1.Write', '10': 'writes'},
+    {'1': 'local_write_time', '3': 3, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'localWriteTime'},
+    {'1': 'base_writes', '3': 4, '4': 3, '5': 11, '6': '.google.firestore.v1.Write', '10': 'baseWrites'},
   ],
 };
+
+/// Descriptor for `WriteBatch`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List writeBatchDescriptor = $convert.base64Decode(
+    'CgpXcml0ZUJhdGNoEhkKCGJhdGNoX2lkGAEgASgFUgdiYXRjaElkEjIKBndyaXRlcxgCIAMoCz'
+    'IaLmdvb2dsZS5maXJlc3RvcmUudjEuV3JpdGVSBndyaXRlcxJEChBsb2NhbF93cml0ZV90aW1l'
+    'GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIObG9jYWxXcml0ZVRpbWUSOwoLYm'
+    'FzZV93cml0ZXMYBCADKAsyGi5nb29nbGUuZmlyZXN0b3JlLnYxLldyaXRlUgpiYXNlV3JpdGVz');
 

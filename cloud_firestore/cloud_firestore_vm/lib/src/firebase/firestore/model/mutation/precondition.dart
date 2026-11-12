@@ -10,9 +10,10 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 /// Encodes a precondition for a mutation. This follows the model that the backend accepts with the
 /// special case of an explicit 'empty' precondition (meaning no precondition).
 class Precondition {
-  Precondition({this.updateTime, this.exists})
-      : assert(updateTime == null || exists == null,
-            'Precondition can specify \'exists\' or \'updateTime\' but not both');
+  Precondition({this.updateTime, this.exists}) {
+    hardAssert(updateTime == null || exists == null,
+        'Precondition can specify \'exists\' or \'updateTime\' but not both');
+  }
 
   const Precondition._()
       : updateTime = null,
@@ -21,17 +22,17 @@ class Precondition {
   static const Precondition none = Precondition._();
 
   /// If set, preconditions a mutation based on the last updateTime.
-  final SnapshotVersion updateTime;
+  final SnapshotVersion? updateTime;
 
   /// If set, preconditions a mutation based on whether the document exists.
-  final bool exists;
+  final bool? exists;
 
   /// Returns whether this Precondition is empty.
   bool get isNone => updateTime == null && exists == null;
 
   /// Returns true if the preconditions is valid for the given document (or null if no document is
   /// available).
-  bool isValidFor(MaybeDocument maybeDoc) {
+  bool isValidFor(MaybeDocument? maybeDoc) {
     if (updateTime != null) {
       return maybeDoc is Document && maybeDoc.version == updateTime;
     } else if (exists != null) {

@@ -23,8 +23,8 @@ class QueryCacheTestCase {
 
   final Persistence _persistence;
 
-  QueryCache _queryCache;
-  int _previousSequenceNumber;
+  late QueryCache _queryCache;
+  late int _previousSequenceNumber;
 
   void setUp() {
     _queryCache = _persistence.queryCache;
@@ -35,7 +35,7 @@ class QueryCacheTestCase {
 
   @testMethod
   Future<void> testReadQueryNotInCache() async {
-    expect(await _queryCache.getQueryData(query('rooms')), isNull);
+    expect(await _queryCache.getQueryData(query('rooms').toTarget()), isNull);
   }
 
   @testMethod
@@ -43,11 +43,11 @@ class QueryCacheTestCase {
     final QueryData queryData = _newQueryData(query('rooms'), 1, 1);
     await _addQueryData(queryData);
 
-    final QueryData result = await _queryCache.getQueryData(query('rooms'));
+    final QueryData? result = await _queryCache.getQueryData(query('rooms').toTarget());
     expect(result, isNotNull);
-    expect(result.query, queryData.query);
-    expect(result.targetId, queryData.targetId);
-    expect(result.resumeToken, queryData.resumeToken);
+    expect(result!.target, queryData.target);
+    expect(result!.targetId, queryData.targetId);
+    expect(result!.resumeToken, queryData.resumeToken);
   }
 
   @testMethod
@@ -62,25 +62,53 @@ class QueryCacheTestCase {
     await _addQueryData(data1);
 
     // Using the other query should not return the query cache entry despite equal canonicalIDs.
-    expect(await _queryCache.getQueryData(q2), isNull);
-    expect(await _queryCache.getQueryData(q1), data1);
+    expect(await _queryCache.getQueryData(q2.toTarget()), isNull);
+    expect(await _queryCache.getQueryData(q1.toTarget()), data1);
 
     final QueryData data2 = _newQueryData(q2, 2, 1);
     await _addQueryData(data2);
     expect(_queryCache.targetCount, 2);
 
-    expect(await _queryCache.getQueryData(q1), data1);
-    expect(await _queryCache.getQueryData(q2), data2);
+    expect(await _queryCache.getQueryData(q1.toTarget()), data1);
+    expect(await _queryCache.getQueryData(q2.toTarget()), data2);
 
     await _removeQueryData(data1);
-    expect(await _queryCache.getQueryData(q1), isNull);
-    expect(await _queryCache.getQueryData(q2), data2);
+    expect(await _queryCache.getQueryData(q1.toTarget()), isNull);
+    expect(await _queryCache.getQueryData(q2.toTarget()), data2);
     expect(_queryCache.targetCount, 1);
 
     await _removeQueryData(data2);
-    expect(await _queryCache.getQueryData(q1), isNull);
-    expect(await _queryCache.getQueryData(q2), isNull);
+    expect(await _queryCache.getQueryData(q1.toTarget()), isNull);
+    expect(await _queryCache.getQueryData(q2.toTarget()), isNull);
     expect(_queryCache.targetCount, 0);
+  }
+
+  @testMethod
+  Future<void> testLimitToLastQueriesAreKeyedByTarget() async {
+    final Query limit = query('rooms').orderBy(orderBy('sort')).limit(2);
+    final Query mirror =
+        query('rooms').orderBy(orderBy('sort', 'desc')).limitToLast(2);
+    final Query sameOrder = query('rooms').orderBy(orderBy('sort')).limitToLast(2);
+    expect(limit.toTarget(), mirror.toTarget());
+    expect(limit.toTarget(), isNot(sameOrder.toTarget()));
+
+    final QueryData data = _newQueryData(limit, 1, 1);
+    await _addQueryData(data);
+
+    // The mirror query finds the target of the limit query.
+    final QueryData? found = await _queryCache.getQueryData(mirror.toTarget());
+    expect(found, data);
+    expect(found!.target, mirror.toTarget());
+
+    // A query that only differs by its limit type does not.
+    expect(await _queryCache.getQueryData(sameOrder.toTarget()), isNull);
+    expect(_queryCache.targetCount, 1);
+
+    final QueryData flipped = _newQueryData(sameOrder, 2, 1);
+    await _addQueryData(flipped);
+    expect(_queryCache.targetCount, 2);
+    expect(await _queryCache.getQueryData(sameOrder.toTarget()), flipped);
+    expect(await _queryCache.getQueryData(limit.toTarget()), data);
   }
 
   @testMethod
@@ -91,14 +119,14 @@ class QueryCacheTestCase {
     final QueryData queryData2 = _newQueryData(query('rooms'), 1, 2);
     await _addQueryData(queryData2);
 
-    final QueryData result = await _queryCache.getQueryData(query('rooms'));
+    final QueryData? result = await _queryCache.getQueryData(query('rooms').toTarget());
 
     // There's no assertArrayNotEquals
     expect(queryData2.resumeToken, isNot(queryData1.resumeToken));
     expect(queryData2.snapshotVersion, isNot(queryData1.snapshotVersion));
     expect(result, isNotNull);
-    expect(result.resumeToken, queryData2.resumeToken);
-    expect(result.snapshotVersion, queryData2.snapshotVersion);
+    expect(result!.resumeToken, queryData2.resumeToken);
+    expect(result!.snapshotVersion, queryData2.snapshotVersion);
   }
 
   @testMethod
@@ -108,7 +136,7 @@ class QueryCacheTestCase {
 
     await _removeQueryData(queryData1);
 
-    final QueryData result = await _queryCache.getQueryData(query('rooms'));
+    final QueryData? result = await _queryCache.getQueryData(query('rooms').toTarget());
     expect(result, isNull);
   }
 
@@ -116,7 +144,7 @@ class QueryCacheTestCase {
   Future<void> testRemoveNonExistentQuery() async {
     // no-op, but make sure it doesn't throw.
     try {
-      await _queryCache.getQueryData(query('rooms'));
+      await _queryCache.getQueryData(query('rooms').toTarget());
       expect(true, true);
     } catch (e) {
       assert(false, 'This should not thow');
@@ -212,9 +240,9 @@ class QueryCacheTestCase {
     final Query halls = query('halls');
     final Query garages = query('garages');
 
-    final QueryData query1 = QueryData(rooms, 1, 10, QueryPurpose.listen);
+    final QueryData query1 = QueryData(rooms.toTarget(), 1, 10, QueryPurpose.listen);
     await _addQueryData(query1);
-    final QueryData query2 = QueryData(halls, 2, 20, QueryPurpose.listen);
+    final QueryData query2 = QueryData(halls.toTarget(), 2, 20, QueryPurpose.listen);
     await _addQueryData(query2);
     expect(_queryCache.highestListenSequenceNumber, 20);
 
@@ -222,7 +250,7 @@ class QueryCacheTestCase {
     await _removeQueryData(query2);
     expect(_queryCache.highestListenSequenceNumber, 20);
 
-    final QueryData query3 = QueryData(garages, 42, 100, QueryPurpose.listen);
+    final QueryData query3 = QueryData(garages.toTarget(), 42, 100, QueryPurpose.listen);
     await _addQueryData(query3);
     expect(_queryCache.highestListenSequenceNumber, 100);
 
@@ -237,7 +265,7 @@ class QueryCacheTestCase {
     expect(_queryCache.highestTargetId, 0);
 
     final QueryData query1 =
-        QueryData(query('rooms'), 1, 10, QueryPurpose.listen);
+        QueryData(query('rooms').toTarget(), 1, 10, QueryPurpose.listen);
     await _addQueryData(query1);
 
     final DocumentKey key1 = key('rooms/bar');
@@ -246,7 +274,7 @@ class QueryCacheTestCase {
     await _addMatchingKey(key2, 1);
 
     final QueryData query2 =
-        QueryData(query('halls'), 2, 20, QueryPurpose.listen);
+        QueryData(query('halls').toTarget(), 2, 20, QueryPurpose.listen);
     await _addQueryData(query2);
     final DocumentKey key3 = key('halls/foo');
     await _addMatchingKey(key3, 2);
@@ -258,7 +286,7 @@ class QueryCacheTestCase {
 
     // A query with an empty result set still counts.
     final QueryData query3 =
-        QueryData(query('garages'), 42, 100, QueryPurpose.listen);
+        QueryData(query('garages').toTarget(), 42, 100, QueryPurpose.listen);
     await _addQueryData(query3);
     expect(_queryCache.highestTargetId, 42);
 
@@ -270,8 +298,10 @@ class QueryCacheTestCase {
 
     if (_persistence is SQLitePersistence) {
       // Verify that the highestTargetID even survives restarts.
-      final SQLitePersistence sqLitePersistence = _persistence;
-      final DatabaseMock databaseMock = sqLitePersistence.database;
+      final SQLitePersistence sqLitePersistence =
+          _persistence as SQLitePersistence;
+      final DatabaseMock databaseMock =
+          sqLitePersistence.database as DatabaseMock;
 
       // ignore: cascade_invocations
       databaseMock.renamePath = false;
@@ -297,8 +327,10 @@ class QueryCacheTestCase {
 
     // Snapshot version persists restarts.
     if (_persistence is SQLitePersistence) {
-      final SQLitePersistence sqLitePersistence = _persistence;
-      final DatabaseMock databaseMock = sqLitePersistence.database;
+      final SQLitePersistence sqLitePersistence =
+          _persistence as SQLitePersistence;
+      final DatabaseMock databaseMock =
+          sqLitePersistence.database as DatabaseMock;
 
       // ignore: cascade_invocations
       databaseMock.renamePath = false;
@@ -318,7 +350,8 @@ class QueryCacheTestCase {
   /// version.
   QueryData _newQueryData(Query query, int targetId, int theVersion) {
     final int sequenceNumber = ++_previousSequenceNumber;
-    return QueryData(query, targetId, sequenceNumber, QueryPurpose.listen,
+    return QueryData(
+        query.toTarget(), targetId, sequenceNumber, QueryPurpose.listen,
         version(theVersion), resumeToken(theVersion));
   }
 

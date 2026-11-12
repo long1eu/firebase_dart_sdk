@@ -49,7 +49,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<MaybeDocument> get(DocumentKey documentKey) async {
+  Future<MaybeDocument?> get(DocumentKey documentKey) async {
     final String path = _pathForKey(documentKey);
 
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, 1);
@@ -72,15 +72,15 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<Map<DocumentKey, MaybeDocument>> getAll(
+  Future<Map<DocumentKey, MaybeDocument?>> getAll(
       Iterable<DocumentKey> documentKeys) async {
-    final List<Object> args = <Object>[];
+    final List<Object?> args = <Object?>[];
     for (DocumentKey key in documentKeys) {
       args.add(EncodedPath.encode(key.path));
     }
 
-    final Map<DocumentKey, MaybeDocument> results =
-        <DocumentKey, MaybeDocument>{};
+    final Map<DocumentKey, MaybeDocument?> results =
+        <DocumentKey, MaybeDocument?>{};
     for (DocumentKey key in documentKeys) {
       // Make sure each key has a corresponding entry, which is null in case the document is not found.
       results[key] = null;

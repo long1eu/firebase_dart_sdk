@@ -13,7 +13,7 @@ class User {
 
   // Porting note: no GOOGLE_CREDENTIALS or FIRST_PARTY on Android, see Token
   // for more details.
-  final String uid;
+  final String? uid;
 
   bool get isAuthenticated => uid != null;
 

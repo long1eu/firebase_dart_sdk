@@ -8,16 +8,23 @@ import 'dart:typed_data';
 
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/online_state.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/serial_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/transaction.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/online_state_tracker.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
@@ -27,6 +34,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/remote/watch_change_ag
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/vector_query.dart';
 import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
@@ -40,8 +48,11 @@ class RemoteStore implements TargetMetadataProvider {
     this._localStore,
     this._datastore,
     this._onNetworkConnected,
-    TaskScheduler scheduler,
-  )   : _listenTargets = <int, QueryData>{},
+    TaskScheduler scheduler, {
+    Duration networkDebounce = const Duration(seconds: 5),
+    SerialQueue? queue,
+  })  : _queue = queue ?? SerialQueue(),
+        _listenTargets = <int, QueryData>{},
         _writePipeline = Queue<MutationBatch>(),
         _onlineStateTracker = OnlineStateTracker(
             scheduler, _remoteStoreCallback.handleOnlineStateChange),
@@ -52,9 +63,12 @@ class RemoteStore implements TargetMetadataProvider {
     // we skip the seed value
     _onNetworkConnectedSub = _onNetworkConnected
         .skip(1)
-        .debounceTime(const Duration(seconds: 5))
-        .listen(_networkEvents);
+        .debounceTime(networkDebounce)
+        .listen(onNetworkConnectivityChanged);
   }
+
+  /// The queue on which every operation and every stream event handler runs, one at a time (see [SerialQueue]).
+  final SerialQueue _queue;
 
   final RemoteStoreCallback _remoteStoreCallback;
   final LocalStore _localStore;
@@ -73,12 +87,12 @@ class RemoteStore implements TargetMetadataProvider {
   final WatchStream _watchStream;
   final WriteStream _writeStream;
 
-  StreamSubscription<StreamEvent> _watchStreamSub;
-  StreamSubscription<StreamEvent> _writeStreamSub;
-  StreamSubscription<bool> _onNetworkConnectedSub;
+  late final StreamSubscription<StreamEvent> _watchStreamSub;
+  late final StreamSubscription<StreamEvent> _writeStreamSub;
+  late final StreamSubscription<bool> _onNetworkConnectedSub;
 
   bool _networkEnabled = false;
-  WatchChangeAggregator _watchChangeAggregator;
+  WatchChangeAggregator? _watchChangeAggregator;
 
   /// The maximum number of pending writes to allow.
   // TODO(long1eu): Negotiate this value with the backend.
@@ -98,7 +112,9 @@ class RemoteStore implements TargetMetadataProvider {
   final Queue<MutationBatch> _writePipeline;
 
   /// Re-enables the network. Only to be called as the counterpart to [disableNetwork].
-  Future<void> enableNetwork() async {
+  Future<void> enableNetwork() => _queue.run<void>(_enableNetwork);
+
+  Future<void> _enableNetwork() async {
     _networkEnabled = true;
 
     if (_canUseNetwork) {
@@ -117,7 +133,9 @@ class RemoteStore implements TargetMetadataProvider {
 
   /// Temporarily disables the network. The network can be re-enabled using
   /// [enableNetwork].
-  Future<void> disableNetwork() async {
+  Future<void> disableNetwork() => _queue.run<void>(_disableNetwork);
+
+  Future<void> _disableNetwork() async {
     _networkEnabled = false;
     await _disableNetworkInternal();
 
@@ -127,6 +145,7 @@ class RemoteStore implements TargetMetadataProvider {
 
   Future<void> _disableNetworkInternal() async {
     Log.d('RemoteStore', 'Performing write stream teardown');
+    _writeHandshakeHandled = false;
 
     await _watchStream.stop();
     await _writeStream.stop();
@@ -138,6 +157,9 @@ class RemoteStore implements TargetMetadataProvider {
     }
 
     _cleanUpWatchStreamState();
+
+    // Everything the torn down streams reported (including their close) is stale from now on.
+    _networkEpoch++;
   }
 
   /// Starts up the remote store, creating streams, restoring state from [LocalStore], etc. This should called before
@@ -149,7 +171,13 @@ class RemoteStore implements TargetMetadataProvider {
 
   /// Shuts down the remote store, tearing down connections and otherwise cleaning up. This is not reversible and
   /// renders the Remote Store unusable.
-  Future<void> shutdown() async {
+  Future<void> shutdown() {
+    // Events that are still waiting for their turn must not run against a store that is going away.
+    _eventsDisabled = true;
+    return _queue.run<void>(_shutdown);
+  }
+
+  Future<void> _shutdown() async {
     Log.d('RemoteStore', 'Shutting down');
     _networkEnabled = false;
     await _disableNetworkInternal();
@@ -166,7 +194,10 @@ class RemoteStore implements TargetMetadataProvider {
   ///
   /// In response the remote store tears down streams and clears up any tracked operations that should not persist
   /// across users. Restarts the streams if appropriate.
-  Future<void> handleCredentialChange() async {
+  Future<void> handleCredentialChange() =>
+      _queue.run<void>(_handleCredentialChange);
+
+  Future<void> _handleCredentialChange() async {
     // If the network has been explicitly disabled, make sure we don't accidentally re-enable it.
     if (_canUseNetwork) {
       // Tear down and re-create our network streams. This will ensure we get a fresh auth token for the new user and
@@ -175,7 +206,7 @@ class RemoteStore implements TargetMetadataProvider {
       _networkEnabled = false;
       await _disableNetworkInternal();
       await _onlineStateTracker.updateState(OnlineState.unknown);
-      await enableNetwork();
+      await _enableNetwork();
     }
   }
 
@@ -189,40 +220,86 @@ class RemoteStore implements TargetMetadataProvider {
     _onlineStateTracker.updateState(OnlineState.online);
   }
 
-  void _restartNetwork() {
+  Future<void> _restartNetwork() async {
+    // If the network has been explicitly disabled, make sure we don't accidentally re-enable it.
+    if (!_canUseNetwork) {
+      return;
+    }
     _networkEnabled = false;
-    _disableNetworkInternal();
-    _onlineStateTracker.updateState(OnlineState.unknown);
-    enableNetwork();
+    await _disableNetworkInternal();
+    await _onlineStateTracker.updateState(OnlineState.unknown);
+    // A stream that failed while the network was down is waiting for its
+    // backoff: reset it so the connection is re-established immediately now
+    // that the connectivity changed (upstream firebase-android-sdk #1706).
+    _writeStream.inhibitBackoff();
+    _watchStream.inhibitBackoff();
+    await _enableNetwork();
   }
 
-  void _networkEvents(bool isConnected) {
-    if (isConnected) {
-      // Tear down and re-create our network streams. This will ensure the
-      // backoffs are reset.
-      Log.d('$runtimeType',
-          'Restarting streams for network reachability change.');
-      _restartNetwork();
+  /// Called when the network reachability changes. Restarts the streams when the network is reachable again, unless
+  /// the user disabled the network.
+  @visibleForTesting
+  Future<void> onNetworkConnectivityChanged(bool isConnected) {
+    if (!isConnected) {
+      return Future<void>.value();
     }
+    // Tear down and re-create our network streams. This will ensure the backoffs are reset.
+    Log.d(
+        '$runtimeType', 'Restarting streams for network reachability change.');
+    return _queue.run<void>(_restartNetwork).catchError(_reportError);
+  }
+
+  void _reportError(Object error, StackTrace stackTrace) {
+    Zone.current.handleUncaughtError(error, stackTrace);
   }
 
   // Watch Stream
 
+  bool _eventsDisabled = false;
+
+  /// Incremented whenever the streams are torn down. Data events that were received from an older generation of the
+  /// streams are dropped: their pipeline and aggregator no longer exist.
+  int _networkEpoch = 0;
+
+  /// Whether the pipeline was already sent for the current write stream handshake. Writes that are added before that
+  /// are sent together with the pipeline, writes added after are sent right away.
+  bool _writeHandshakeHandled = false;
+
+  void _enqueueEvent(Future<void> Function() handler,
+      {bool staleWhenNetworkRestarted = false}) {
+    final int epoch = _networkEpoch;
+    _queue.run<void>(() async {
+      if (_eventsDisabled) {
+        return;
+      }
+      if (staleWhenNetworkRestarted && epoch != _networkEpoch) {
+        return;
+      }
+      await handler();
+    }).catchError(_reportError);
+  }
+
   void _watchEvents(StreamEvent event) {
     if (event is OpenEvent) {
-      _handleWatchStreamOpen();
+      _enqueueEvent(_handleWatchStreamOpen, staleWhenNetworkRestarted: true);
     } else if (event is CloseEvent) {
-      _handleWatchStreamClose(event.error);
+      _enqueueEvent(() => _handleWatchStreamClose(event.error),
+          staleWhenNetworkRestarted: true);
     } else if (event is OnWatchChange) {
-      _handleWatchChange(event.snapshotVersion, event.watchChange);
+      _enqueueEvent(
+          () => _handleWatchChange(event.snapshotVersion, event.watchChange),
+          staleWhenNetworkRestarted: true);
     }
   }
 
   /// Listens to the target identified by the given [QueryData].
+  ///
+  /// It is a no-op if the target of the given query data is already being listened to.
   Future<void> listen(QueryData queryData) async {
     final int targetId = queryData.targetId;
-    hardAssert(!_listenTargets.containsKey(targetId),
-        'listen called with duplicate target ID: $targetId');
+    if (_listenTargets.containsKey(targetId)) {
+      return;
+    }
 
     _listenTargets[targetId] = queryData;
 
@@ -234,7 +311,17 @@ class RemoteStore implements TargetMetadataProvider {
   }
 
   void _sendWatchRequest(QueryData queryData) {
-    _watchChangeAggregator.recordPendingTargetRequest(queryData.targetId);
+    _watchChangeAggregator!.recordPendingTargetRequest(queryData.targetId);
+
+    // When resuming a target, tell the backend how many documents the client currently has for it, so that it can
+    // answer a mismatch with a bloom filter instead of making the client re-run the query.
+    if (queryData.resumeToken.isNotEmpty ||
+        queryData.snapshotVersion.compareTo(SnapshotVersion.none) > 0) {
+      final int expectedCount =
+          getRemoteKeysForTarget(queryData.targetId).length;
+      queryData = queryData.withExpectedCount(expectedCount);
+    }
+
     _watchStream.watchQuery(queryData);
   }
 
@@ -243,9 +330,9 @@ class RemoteStore implements TargetMetadataProvider {
   /// If this is called with the last active targetId, the watch stream enters idle mode and will be  torn down after
   /// one minute of inactivity.
   Future<void> stopListening(int targetId) async {
-    final QueryData queryData = _listenTargets.remove(targetId);
-    hardAssert(queryData != null,
-        'stopListening called on target no currently watched: $targetId');
+    final QueryData? queryData = _listenTargets.remove(targetId);
+    hardAssertLazy(queryData != null,
+        () => 'stopListening called on target no currently watched: $targetId');
 
     // The watch stream might not be started if we're in a disconnected state
     if (_watchStream.isOpen) {
@@ -264,7 +351,7 @@ class RemoteStore implements TargetMetadataProvider {
   }
 
   void _sendUnwatchRequest(int targetId) {
-    _watchChangeAggregator.recordPendingTargetRequest(targetId);
+    _watchChangeAggregator!.recordPendingTargetRequest(targetId);
     _watchStream.unwatchTarget(targetId);
   }
 
@@ -291,11 +378,19 @@ class RemoteStore implements TargetMetadataProvider {
     hardAssert(_shouldStartWatchStream,
         'startWatchStream() called when shouldStartWatchStream() is false.');
     _watchChangeAggregator = WatchChangeAggregator(this);
+    final int epoch = _networkEpoch;
     await _watchStream.start();
+    if (epoch != _networkEpoch) {
+      // The streams were torn down while this one was being started: whoever restarted them tracks the new stream.
+      return;
+    }
     await _onlineStateTracker.handleWatchStreamStart();
   }
 
   Future<void> _handleWatchStreamOpen() async {
+    // A close event of the previous stream can be handled after the new stream was started and has dropped the
+    // aggregator that the new stream needs; every open stream starts with a fresh one.
+    _watchChangeAggregator ??= WatchChangeAggregator(this);
     // Restore any existing watches.
     _listenTargets.values.forEach(_sendWatchRequest);
   }
@@ -305,10 +400,12 @@ class RemoteStore implements TargetMetadataProvider {
     // Mark the connection as ONLINE because we got a message from the server.
     await _onlineStateTracker.updateState(OnlineState.online);
 
-    hardAssert((_watchStream != null) && (_watchChangeAggregator != null),
-        'WatchStream and WatchStreamAggregator should both be non-null');
+    if (_watchChangeAggregator == null) {
+      // The watch stream state was cleaned up (the network was disabled or restarted) while this event was waiting.
+      return;
+    }
 
-    final WatchChangeWatchTargetChange watchTargetChange =
+    final WatchChangeWatchTargetChange? watchTargetChange =
         watchChange is WatchChangeWatchTargetChange ? watchChange : null;
 
     if (watchTargetChange != null &&
@@ -318,11 +415,11 @@ class RemoteStore implements TargetMetadataProvider {
       await _processTargetError(watchTargetChange);
     } else {
       if (watchChange is WatchChangeDocumentChange) {
-        _watchChangeAggregator.handleDocumentChange(watchChange);
+        _watchChangeAggregator!.handleDocumentChange(watchChange);
       } else if (watchChange is WatchChangeExistenceFilterWatchChange) {
-        _watchChangeAggregator.handleExistenceFilter(watchChange);
+        _watchChangeAggregator!.handleExistenceFilter(watchChange);
       } else if (watchChange is WatchChangeWatchTargetChange) {
-        _watchChangeAggregator.handleTargetChange(watchChange);
+        _watchChangeAggregator!.handleTargetChange(watchChange);
       } else {
         fail('Expected watchChange to be an instance of WatchTargetChange');
       }
@@ -361,6 +458,9 @@ class RemoteStore implements TargetMetadataProvider {
     }
   }
 
+  /// Whether the network is enabled (it is not disabled by the user, and the store was not shut down).
+  bool get canUseNetwork => _canUseNetwork;
+
   bool get _canUseNetwork {
     // PORTING NOTE: This method exists mostly because web also has to take into account primary vs. secondary state.
     return _networkEnabled;
@@ -372,7 +472,7 @@ class RemoteStore implements TargetMetadataProvider {
     hardAssert(snapshotVersion != SnapshotVersion.none,
         'Can\'t raise event for unknown SnapshotVersion');
     final RemoteEvent remoteEvent =
-        _watchChangeAggregator.createRemoteEvent(snapshotVersion);
+        _watchChangeAggregator!.createRemoteEvent(snapshotVersion);
 
     // Update in-memory resume tokens. [LocalStore] will update the persistent view of these when applying the
     // completed [RemoteEvent].
@@ -381,7 +481,7 @@ class RemoteStore implements TargetMetadataProvider {
       final TargetChange targetChange = entry.value;
       if (targetChange.resumeToken.isNotEmpty) {
         final int targetId = entry.key;
-        final QueryData queryData = _listenTargets[targetId];
+        final QueryData? queryData = _listenTargets[targetId];
         // A watched target might have been removed already.
         if (queryData != null) {
           _listenTargets[targetId] = queryData.copyWith(
@@ -394,8 +494,10 @@ class RemoteStore implements TargetMetadataProvider {
     }
 
     // Re-establish listens for the targets that have been invalidated by existence filter mismatches.
-    for (int targetId in remoteEvent.targetMismatches) {
-      final QueryData queryData = _listenTargets[targetId];
+    for (MapEntry<int, QueryPurpose> entry
+        in remoteEvent.targetMismatches.entries) {
+      final int targetId = entry.key;
+      final QueryData? queryData = _listenTargets[targetId];
       // A watched target might have been removed already.
       if (queryData != null) {
         // Clear the resume token for the query, since we're in a known mismatch state.
@@ -413,10 +515,10 @@ class RemoteStore implements TargetMetadataProvider {
         // [listenTargets]. This ensures that we flag the first re-listen this way without impacting future listens of
         // this target (that might happen e.g. on reconnect).
         final QueryData requestQueryData = QueryData(
-          queryData.query,
+          queryData.target,
           targetId,
           queryData.sequenceNumber,
-          QueryPurpose.existenceFilterMismatch,
+          entry.value,
         );
         _sendWatchRequest(requestQueryData);
       }
@@ -428,15 +530,14 @@ class RemoteStore implements TargetMetadataProvider {
 
   Future<void> _processTargetError(
       WatchChangeWatchTargetChange targetChange) async {
-    hardAssert(
-        targetChange.cause != null, 'Processing target error without a cause');
+    final GrpcError? cause = targetChange.cause;
+    hardAssert(cause != null, 'Processing target error without a cause');
     for (int targetId in targetChange.targetIds) {
       // Ignore targets that have been removed already.
       if (_listenTargets.containsKey(targetId)) {
         _listenTargets.remove(targetId);
-        _watchChangeAggregator.removeTarget(targetId);
-        await _remoteStoreCallback.handleRejectedListen(
-            targetId, targetChange.cause);
+        _watchChangeAggregator!.removeTarget(targetId);
+        await _remoteStoreCallback.handleRejectedListen(targetId, cause!);
       }
     }
   }
@@ -445,13 +546,22 @@ class RemoteStore implements TargetMetadataProvider {
 
   void _writeEvents(StreamEvent event) {
     if (event is OpenEvent) {
-      _writeStream.writeHandshake();
+      _enqueueEvent(() async {
+        _writeHandshakeHandled = false;
+        if (_writeStream.isOpen) {
+          _writeStream.writeHandshake();
+        }
+      }, staleWhenNetworkRestarted: true);
     } else if (event is CloseEvent) {
-      _handleWriteStreamClose(event.error);
+      _enqueueEvent(() => _handleWriteStreamClose(event.error),
+          staleWhenNetworkRestarted: true);
     } else if (event is HandshakeCompleteEvent) {
-      _handleWriteStreamHandshakeComplete();
+      _enqueueEvent(_handleWriteStreamHandshakeComplete,
+          staleWhenNetworkRestarted: true);
     } else if (event is OnWriteResponse) {
-      _handleWriteStreamMutationResults(event.version, event.results);
+      _enqueueEvent(
+          () => _handleWriteStreamMutationResults(event.version, event.results),
+          staleWhenNetworkRestarted: true);
     }
   }
 
@@ -461,13 +571,15 @@ class RemoteStore implements TargetMetadataProvider {
   /// [SyncEngine] whenever there are new mutations to process.
   ///
   /// Starts the write stream if necessary.
-  Future<void> fillWritePipeline() async {
+  Future<void> fillWritePipeline() => _queue.run<void>(_fillWritePipeline);
+
+  Future<void> _fillWritePipeline() async {
     int lastBatchIdRetrieved = _writePipeline.isEmpty
         ? MutationBatch.unknown
         : _writePipeline.last.batchId;
 
     while (_canAddToWritePipeline()) {
-      final MutationBatch batch =
+      final MutationBatch? batch =
           await _localStore.getNextMutationBatch(lastBatchIdRetrieved);
 
       if (batch == null) {
@@ -499,7 +611,7 @@ class RemoteStore implements TargetMetadataProvider {
 
     _writePipeline.add(mutationBatch);
 
-    if (_writeStream.isOpen && _writeStream.handshakeComplete) {
+    if (_writeStream.isOpen && _writeHandshakeHandled) {
       _writeStream.writeMutations(mutationBatch.mutations);
     }
   }
@@ -513,13 +625,14 @@ class RemoteStore implements TargetMetadataProvider {
   /// Handles a successful handshake response from the server, which is our cue
   /// to send any pending writes.
   Future<void> _handleWriteStreamHandshakeComplete() async {
-    // Record the stream token.
-    await _localStore.setLastStreamToken(_writeStream.lastStreamToken);
-
-    // Send the write pipeline now that stream is established.
+    // Send the write pipeline now that stream is established. From now on new writes are sent right away.
+    _writeHandshakeHandled = true;
     for (MutationBatch batch in _writePipeline) {
       _writeStream.writeMutations(batch.mutations);
     }
+
+    // Record the stream token.
+    await _localStore.setLastStreamToken(_writeStream.lastStreamToken);
   }
 
   /// Handles a successful [StreamingWriteResponse] from the server that contains a mutation result.
@@ -527,6 +640,10 @@ class RemoteStore implements TargetMetadataProvider {
       SnapshotVersion commitVersion, List<MutationResult> results) async {
     // This is a response to a write containing mutations and should be correlated to the first write in our write
     // pipeline.
+    if (_writePipeline.isEmpty) {
+      // The pipeline was cleared (the network was restarted) after this response was received.
+      return;
+    }
     final MutationBatch batch = _writePipeline.removeFirst();
 
     final MutationBatchResult mutationBatchResult = MutationBatchResult.create(
@@ -538,6 +655,7 @@ class RemoteStore implements TargetMetadataProvider {
   }
 
   Future<void> _handleWriteStreamClose(GrpcError status) async {
+    _writeHandshakeHandled = false;
     if (status.code == StatusCode.ok) {
       // Graceful stop (due to stop() or idle timeout). Make sure that's desirable.
       hardAssert(!_shouldStartWriteStream,
@@ -597,11 +715,40 @@ class RemoteStore implements TargetMetadataProvider {
     }
   }
 
-  Transaction createTransaction() => Transaction(_datastore.transactionClient);
+  /// Runs an aggregation query on the server. Fails with an `unavailable`
+  /// error when the network is disabled, since aggregations are never computed
+  /// from the local cache.
+  Future<Map<String, FieldValue>> runAggregateQuery(
+      Query query, List<AggregateField> aggregateFields) {
+    if (_canUseNetwork) {
+      return _datastore.runAggregateQuery(query, aggregateFields);
+    }
+    return Future<Map<String, FieldValue>>.error(FirestoreError(
+        'Failed to get result from server.', FirestoreErrorCode.unavailable));
+  }
+
+  /// Runs a vector query over [query] on the server. Fails with an
+  /// `unavailable` error when the network is disabled, since vector queries are
+  /// never answered from the local cache.
+  Future<List<Document>> runVectorQuery(Query query, VectorQuery vectorQuery) {
+    if (_canUseNetwork) {
+      return _datastore.runVectorQuery(query, vectorQuery);
+    }
+    return Future<List<Document>>.error(FirestoreError(
+        'Failed to get result from server.', FirestoreErrorCode.unavailable));
+  }
+
+  Transaction createTransaction({bool readOnly = false}) =>
+      Transaction(_datastore.transactionClient, readOnly: readOnly);
 
   @override
-  QueryData Function(int targetId) get getQueryDataForTarget {
+  QueryData? Function(int targetId) get getQueryDataForTarget {
     return (int targetId) => _listenTargets[targetId];
+  }
+
+  @override
+  DatabaseId Function() get getDatabaseId {
+    return () => _datastore.databaseInfo.databaseId;
   }
 
   @override

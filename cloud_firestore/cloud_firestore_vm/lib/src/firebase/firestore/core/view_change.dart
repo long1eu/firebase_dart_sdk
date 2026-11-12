@@ -10,7 +10,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dar
 class ViewChange {
   const ViewChange(this.snapshot, this.limboChanges);
 
-  final ViewSnapshot snapshot;
+  final ViewSnapshot? snapshot;
   final List<LimboDocumentChange> limboChanges;
 
   @override

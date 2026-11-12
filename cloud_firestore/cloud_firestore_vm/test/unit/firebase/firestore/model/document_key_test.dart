@@ -38,12 +38,60 @@ void main() {
         .addItem(a)
         .addItem(ab)
         .addItem(b)
-        .permitInconsistencyWithEquals()
         .testCompare();
   });
 
   test('testUnevenNumberOfSegmentsAreRejected', () {
     expect(() => DocumentKey.fromSegments(<String>['a']),
         throwsA(isA<AssertionError>()));
+  });
+
+  test('testUtf8ByteOrderOfSegments', () {
+    // Characters outside the BMP sort after U+E000..U+FFFF in UTF-8 order.
+    final DocumentKey bmp = DocumentKey.fromSegments(<String>['c', '\uE000']);
+    final DocumentKey bmpTop =
+        DocumentKey.fromSegments(<String>['c', '\uFFFF']);
+    final DocumentKey supplementary =
+        DocumentKey.fromSegments(<String>['c', '\u{10000}']);
+    expect(bmp.compareTo(supplementary), lessThan(0));
+    expect(bmpTop.compareTo(supplementary), lessThan(0));
+    expect(supplementary.compareTo(bmp), greaterThan(0));
+  });
+
+  test('testNumericIdSegmentsSortNumericallyFirst', () {
+    final List<String> ids = <String>[
+      'A',
+      'a',
+      'Aa',
+      '7',
+      '12',
+      '__id7__',
+      '__id12__',
+      '__id-2__',
+      '__id1_',
+      '_id1__',
+      '__id',
+      '__id9223372036854775807__',
+      '__id-9223372036854775808__',
+    ];
+    final List<DocumentKey> keys = ids
+        .map((String id) => DocumentKey.fromSegments(<String>['coll', id]))
+        .toList()
+      ..sort();
+    expect(keys.map((DocumentKey key) => key.path.last).toList(), <String>[
+      '__id-9223372036854775808__',
+      '__id-2__',
+      '__id7__',
+      '__id12__',
+      '__id9223372036854775807__',
+      '12',
+      '7',
+      'A',
+      'Aa',
+      '__id',
+      '__id1_',
+      '_id1__',
+      'a',
+    ]);
   });
 }

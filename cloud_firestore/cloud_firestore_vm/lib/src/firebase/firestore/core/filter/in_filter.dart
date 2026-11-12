@@ -11,8 +11,8 @@ class InFilter extends FieldFilter {
 
   @override
   bool matches(Document doc) {
-    final ArrayValue arrayValue = value;
-    final FieldValue other = doc.getField(field);
+    final ArrayValue arrayValue = value as ArrayValue;
+    final FieldValue? other = doc.getField(field);
     return other != null && arrayValue.internalValue.contains(other);
   }
 }

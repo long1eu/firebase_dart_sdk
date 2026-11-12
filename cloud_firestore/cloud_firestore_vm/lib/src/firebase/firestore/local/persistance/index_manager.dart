@@ -33,6 +33,13 @@ class MemoryCollectionParentIndex {
 
   final Map<String, Set<ResourcePath>> _index;
 
+  /// Whether [collectionPath] was already added.
+  bool contains(ResourcePath collectionPath) {
+    return _index[collectionPath.getLastSegment()]
+            ?.contains(collectionPath.popLast()) ??
+        false;
+  }
+
   // Returns false if the entry already existed.
   bool add(ResourcePath collectionPath) {
     hardAssert(collectionPath.length % 2 == 1, 'Expected a collection path.');

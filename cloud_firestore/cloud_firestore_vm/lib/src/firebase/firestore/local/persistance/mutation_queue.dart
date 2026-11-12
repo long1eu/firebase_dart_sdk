@@ -23,6 +23,10 @@ abstract class MutationQueue {
   /// Returns true if this queue contains no mutation batches.
   Future<bool> isEmpty();
 
+  /// Returns the highest batch id in the queue, i.e. of the newest batch that is not yet acknowledged or rejected, or
+  /// [MutationBatch.unknown] if the queue is empty.
+  Future<int> getHighestUnacknowledgedBatchId();
+
   /// Acknowledges the given [batch].
   Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken);
 
@@ -43,7 +47,7 @@ abstract class MutationQueue {
       List<Mutation> baseMutations, List<Mutation> mutations);
 
   /// Loads the mutation batch with the given [batchId].
-  Future<MutationBatch> lookupMutationBatch(int batchId);
+  Future<MutationBatch?> lookupMutationBatch(int batchId);
 
   /// Returns the first unacknowledged mutation batch after the passed in
   /// [batchId] in the mutation queue or null if empty.
@@ -52,7 +56,7 @@ abstract class MutationQueue {
   /// mutation in the queue.
   ///
   /// Returns the next [Mutation] or null if there wasn't one.
-  Future<MutationBatch> getNextMutationBatchAfterBatchId(int batchId);
+  Future<MutationBatch?> getNextMutationBatchAfterBatchId(int batchId);
 
   /// Returns all mutation batches in the mutation queue.
   ///

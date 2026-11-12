@@ -16,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 8;
+  static const int version = 9;
 
   // Remove this constant and increment version to enable indexing support
   static const int indexingSupportVersion = version + 1;
@@ -64,6 +64,13 @@ class SQLiteSchema {
 
     if (fromVersion < 8 && toVersion >= 8) {
       await _createV8CollectionParentsIndex();
+    }
+
+    // Migration 9 corresponds to migration 12 of the Android SDK (`createBundleCache`, added by the bundles feature in
+    // 22.1.0): the port is at its own numbering, so the Android migrations 9 to 11 (overlay, indexing, canonical id
+    // rewrite) are not part of it.
+    if (fromVersion < 9 && toVersion >= 9) {
+      await _createV9BundleCache();
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -172,7 +179,8 @@ class SQLiteSchema {
 
     for (Map<String, dynamic> row in data) {
       final String uid = row['uid'];
-      final int lastAcknowledgedBatchId = row['last_acknowledged_batch_id'];
+      final int lastAcknowledgedBatchId =
+          (row['last_acknowledged_batch_id'] as int?) ?? 0;
 
       final List<Map<String, dynamic>> rows = await db.query(
           'SELECT batch_id FROM mutations WHERE uid = ? AND batch_id <= ?',
@@ -188,10 +196,11 @@ class SQLiteSchema {
     final int deleted = await db.delete(
         'DELETE FROM mutations WHERE uid = ? AND batch_id = ?',
         <dynamic>[uid, batchId]);
-    hardAssert(deleted != 0, 'Mutation batch ($uid, $batchId) did not exist');
+    hardAssertLazy(
+        deleted != 0, () => 'Mutation batch ($uid, $batchId) did not exist');
 
     // Delete all index entries for this batch
-    return db.delete(
+    await db.delete(
         'DELETE FROM document_mutations WHERE uid = ? AND batch_id = ?',
         <dynamic>[uid, batchId]);
   }
@@ -377,7 +386,6 @@ class SQLiteSchema {
         );
     final int sequenceNumber =
         sequenceNumberQuery.first['highest_listen_sequence_number'];
-    assert(sequenceNumber != null, 'Missing highest sequence number');
 
     final List<Map<String, dynamic>> untaggedDocumentsQuery = await db.query(
         // @formatter:off
@@ -482,6 +490,39 @@ class SQLiteSchema {
       final ResourcePath path = EncodedPath.decodeResourcePath(row['path']);
       await addEntry(path.popLast());
     }
+  }
+
+  /// Creates the tables that hold the metadata of the bundles loaded by the client and the named queries they contain.
+  Future<void> _createV9BundleCache() async {
+    await _ifTablesDontExist(<String>['bundles', 'named_queries'], () async {
+      await db.execute(
+          // @formatter:off
+          '''
+            CREATE TABLE bundles (
+              bundle_id           TEXT PRIMARY KEY,
+              create_time_seconds INTEGER,
+              create_time_nanos   INTEGER,
+              schema_version      INTEGER,
+              total_documents     INTEGER,
+              total_bytes         INTEGER
+            );
+          '''
+          // @formatter:on
+          );
+
+      await db.execute(
+          // @formatter:off
+          '''
+            CREATE TABLE named_queries (
+              name                TEXT PRIMARY KEY,
+              read_time_seconds   INTEGER,
+              read_time_nanos     INTEGER,
+              bundled_query_proto BLOB
+            );
+          '''
+          // @formatter:on
+          );
+    });
   }
 
   Future<bool> _tableContainsColumn(String table, String column) async {

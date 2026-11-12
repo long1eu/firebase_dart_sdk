@@ -3,38 +3,37 @@
 // on 16/09/2018
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
-import 'package:meta/meta.dart';
 
 class FirebaseOptions {
   const FirebaseOptions({
-    @required this.apiKey,
-    @required this.applicationId,
+    required this.apiKey,
+    required this.applicationId,
     this.databaseUrl,
     this.gaTrackingId,
     this.gcmSenderId,
     this.storageBucket,
     this.projectId,
     this.dataCollectionEnabled = true,
-  })  : assert(apiKey != null),
-        // ignore: prefer_is_empty
-        assert(applicationId != null && applicationId.length > 0,
-            'ApplicationId must be set.');
+  }) : assert(applicationId != '', 'ApplicationId must be set.');
 
   /// Creates a new [FirebaseOptions] instance that is populated from a map.
-  /// Returns the populated options or null if applicationId is missing from
+  /// Throws an [ArgumentError] if the api key or application id is missing from
   /// the map.
-  factory FirebaseOptions.fromJson(Map<String, String> json) {
-    if (json == null && !json.containsKey(_apiKey)) {
-      return null;
+  factory FirebaseOptions.fromJson(Map<String, dynamic> json) {
+    final String? applicationId = json[_appId] as String?;
+    final String? apiKey = json[_apiKey] as String?;
+    if (apiKey == null || applicationId == null) {
+      throw ArgumentError(
+          'The json must contain the keys $_apiKey and $_appId.');
     }
     return FirebaseOptions(
-      applicationId: json[_appId],
-      apiKey: json[_apiKey],
-      databaseUrl: json[_databaseUrl],
-      gaTrackingId: json[_gaTrackingId],
-      gcmSenderId: json[_gcmSenderId],
-      storageBucket: json[_storageBucket],
-      projectId: json[_projectId],
+      applicationId: applicationId,
+      apiKey: apiKey,
+      databaseUrl: json[_databaseUrl] as String?,
+      gaTrackingId: json[_gaTrackingId] as String?,
+      gcmSenderId: json[_gcmSenderId] as String?,
+      storageBucket: json[_storageBucket] as String?,
+      projectId: json[_projectId] as String?,
     );
   }
 
@@ -55,23 +54,23 @@ class FirebaseOptions {
   final String applicationId;
 
   /// The database root URL, e.g. http://abc-xyz-123.firebaseio.com.
-  final String databaseUrl;
+  final String? databaseUrl;
 
   /// The tracking ID for Google Analytics, e.g. UA-12345678-1, used to
   /// configure Google Analytics.
   // TODO(long1eu): unhide once an API (AppInvite) starts reading it.
-  final String gaTrackingId;
+  final String? gaTrackingId;
 
   /// The Project Number from the Google Developer's console, for example
   /// 012345678901, used to configure Google Cloud Messaging.
-  final String gcmSenderId;
+  final String? gcmSenderId;
 
   /// The Google Cloud Storage bucket name, e.g.
   /// abc-xyz-123.storage.firebase.com.
-  final String storageBucket;
+  final String? storageBucket;
 
   /// The Google Cloud project ID, e.g. my-project-1234
-  final String projectId;
+  final String? projectId;
 
   /// Determine whether automatic data collection is enabled or disabled in all
   /// SDKs.
@@ -79,8 +78,8 @@ class FirebaseOptions {
   /// developer via SDK specific mechanisms.
   final bool dataCollectionEnabled;
 
-  Map<String, String> toJson() {
-    return <String, String>{
+  Map<String, String?> toJson() {
+    return <String, String?>{
       _appId: applicationId,
       _apiKey: apiKey,
       _databaseUrl: databaseUrl,
@@ -102,7 +101,8 @@ class FirebaseOptions {
           gaTrackingId == other.gaTrackingId &&
           gcmSenderId == other.gcmSenderId &&
           storageBucket == other.storageBucket &&
-          projectId == other.projectId;
+          projectId == other.projectId &&
+          dataCollectionEnabled == other.dataCollectionEnabled;
 
   @override
   int get hashCode =>

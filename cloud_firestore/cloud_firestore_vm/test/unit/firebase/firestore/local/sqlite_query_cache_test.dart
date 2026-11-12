@@ -12,12 +12,12 @@ import 'cases/query_cache_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  QueryCacheTestCase testCase;
+  late QueryCacheTestCase testCase;
 
   setUp(() async {
     print('setUp');
     final SQLitePersistence persistence = await createSQLitePersistence(
-        'firebase/firestore/local/sqlite_query_cache_test-${Uuid().v4()}.db');
+        'firebase/firestore/local/sqlite_query_cache_test-${const Uuid().v4()}.db');
     testCase = QueryCacheTestCase(persistence)..setUp();
     print('setUpDone');
   });
@@ -28,6 +28,8 @@ void main() {
   test('testReadQueryNotInCache', () => testCase.testReadQueryNotInCache());
   test('testSetAndReadAQuery', () => testCase.testSetAndReadAQuery());
   test('testCanonicalIdCollision', () => testCase.testCanonicalIdCollision());
+  test('testLimitToLastQueriesAreKeyedByTarget',
+      () => testCase.testLimitToLastQueriesAreKeyedByTarget());
   test('testSetQueryToNewValue', () => testCase.testSetQueryToNewValue());
   test('testRemoveQuery', () => testCase.testRemoveQuery());
   test('testRemoveNonExistentQuery',

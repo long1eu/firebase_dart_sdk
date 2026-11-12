@@ -2,6 +2,7 @@
 // Lung Razvan <long1eu>
 // on 28/09/2018
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:test/test.dart';
 
 import '../../../util/test_util.dart' as util;
@@ -42,5 +43,38 @@ void main() {
     expect(base.hashCode, isNot(noData.hashCode));
     expect(differentPath.hashCode == base.hashCode, isFalse);
     expect(fromCache.hashCode, isNot(base.hashCode));
+  });
+
+  test('testEqualsIgnoresDocumentStateAndVersion', () {
+    // Only the key, the metadata and the data are compared. The internal state
+    // of the underlying document (its version, whether it has local mutations)
+    // does not matter.
+    DocumentSnapshot snapshot(int version, DocumentState state) {
+      return DocumentSnapshot.fromDocument(
+        firestore,
+        util.doc(
+            'rooms/foo', version, util.map<Object>(<dynamic>['a', 1]), state),
+        isFromCache: false,
+        hasPendingWrites: false,
+      );
+    }
+
+    final DocumentSnapshot base = snapshot(1, DocumentState.synced);
+    final DocumentSnapshot otherVersion = snapshot(2, DocumentState.synced);
+    final DocumentSnapshot otherState =
+        snapshot(1, DocumentState.committedMutations);
+
+    expect(otherVersion, base);
+    expect(otherState, base);
+    expect(otherVersion.hashCode, base.hashCode);
+    expect(otherState.hashCode, base.hashCode);
+
+    final DocumentSnapshot differentData = DocumentSnapshot.fromDocument(
+      firestore,
+      util.doc('rooms/foo', 1, util.map<Object>(<dynamic>['a', 2])),
+      isFromCache: false,
+      hasPendingWrites: false,
+    );
+    expect(differentData, isNot(base));
   });
 }

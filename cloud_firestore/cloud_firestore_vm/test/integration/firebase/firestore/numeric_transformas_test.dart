@@ -9,7 +9,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
-import 'package:pedantic/pedantic.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';
@@ -23,14 +22,14 @@ void main() {
   const double doubleEpsilon = 0.000001;
 
   // A document reference to read and write to.
-  DocumentReference docRef;
+  late DocumentReference docRef;
 
   // Accumulator used to capture events during the test.
-  EventAccumulator<DocumentSnapshot> accumulator;
+  late EventAccumulator<DocumentSnapshot> accumulator;
 
   // Listener registration for a listener maintained during the course of the
   // test.
-  StreamSubscription<DocumentSnapshot> listenerRegistration;
+  late StreamSubscription<DocumentSnapshot> listenerRegistration;
 
   setUp(() async {
     docRef = await testDocument();
@@ -51,7 +50,7 @@ void main() {
   });
 
   /// Writes some initialData and consumes the events generated.
-  Future<void> _writeInitialData(Map<String, Object> initialData) async {
+  Future<void> _writeInitialData(Map<String, Object?> initialData) async {
     await docRef.set(initialData);
     await accumulator.awaitRemoteEvent();
   }

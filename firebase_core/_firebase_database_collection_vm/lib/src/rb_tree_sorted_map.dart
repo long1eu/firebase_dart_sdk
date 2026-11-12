@@ -17,7 +17,7 @@ import 'package:_firebase_database_collection_vm/src/lltb_value_node.dart';
 /// in practice than an ArraySortedMap for small collections. It also uses about
 /// twice as much memory.
 class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
-  RBTreeSortedMap(this.comparator, [LLRBNode<K, V> root])
+  RBTreeSortedMap(this.comparator, [LLRBNode<K, V>? root])
       : _root = root ?? LLRBEmptyNode<K, V>();
 
   factory RBTreeSortedMap.fromMap(Map<K, V> values, Comparator<K> comparator) {
@@ -50,10 +50,10 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   LLRBNode<K, V> get root => _root;
 
   // private
-  LLRBNode<K, V> getNode(K key) {
+  LLRBNode<K, V>? getNode(K key) {
     LLRBNode<K, V> node = _root;
     while (!node.isEmpty) {
-      final int cmp = comparator(key, node.key);
+      final int cmp = comparator(key, node.key as K);
       if (cmp < 0) {
         node = node.left;
       } else if (cmp == 0) {
@@ -69,9 +69,9 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   bool containsKey(K key) => getNode(key) != null;
 
   @override
-  V operator [](K key) {
-    final LLRBNode<K, V> node = getNode(key);
-    return node != null ? node.value : null;
+  V? operator [](K key) {
+    final LLRBNode<K, V>? node = getNode(key);
+    return node?.value;
   }
 
   @override
@@ -95,10 +95,10 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   }
 
   @override
-  K get minKey => _root.min.key;
+  K? get minKey => _root.min.key;
 
   @override
-  K get maxKey => _root.max.key;
+  K? get maxKey => _root.max.key;
 
   @override
   int get length => _root.length;
@@ -132,11 +132,11 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   }
 
   @override
-  K getPredecessorKey(K key) {
+  K? getPredecessorKey(K key) {
     LLRBNode<K, V> node = _root;
-    LLRBNode<K, V> rightParent;
+    LLRBNode<K, V>? rightParent;
     while (!node.isEmpty) {
-      final int cmp = comparator(key, node.key);
+      final int cmp = comparator(key, node.key as K);
       if (cmp == 0) {
         if (!node.left.isEmpty) {
           node = node.left;
@@ -161,11 +161,11 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
   }
 
   @override
-  K getSuccessorKey(K key) {
+  K? getSuccessorKey(K key) {
     LLRBNode<K, V> node = _root;
-    LLRBNode<K, V> leftParent;
+    LLRBNode<K, V>? leftParent;
     while (!node.isEmpty) {
-      final int cmp = comparator(node.key, key);
+      final int cmp = comparator(node.key as K, key);
       if (cmp == 0) {
         if (!node.right.isEmpty) {
           node = node.right;
@@ -195,7 +195,7 @@ class RBTreeSortedMap<K, V> extends ImmutableSortedMap<K, V> {
     int prunedNodes = 0;
     LLRBNode<K, V> node = _root;
     while (!node.isEmpty) {
-      final int cmp = comparator(key, node.key);
+      final int cmp = comparator(key, node.key as K);
       if (cmp == 0) {
         return prunedNodes + node.left.length;
       } else if (cmp < 0) {
@@ -218,11 +218,11 @@ class RBTreeSortedMapBuilder<A, B, C> {
   final Map<B, C> values;
   final KeyTranslator<A, B> keyTranslator;
 
-  LLRBValueNode<A, C> _root;
-  LLRBValueNode<A, C> _leaf;
+  LLRBValueNode<A, C>? _root;
+  LLRBValueNode<A, C>? _leaf;
 
   C getValue(A key) {
-    return values[keyTranslator(key)];
+    return values[keyTranslator(key)] as C;
   }
 
   void _buildPennant(LLRBNodeColor color, int chunkSize, int start) {
@@ -239,7 +239,7 @@ class RBTreeSortedMapBuilder<A, B, C> {
       _root = node;
       _leaf = node;
     } else {
-      _leaf.left = node;
+      _leaf!.left = node;
       _leaf = node;
     }
   }
@@ -289,8 +289,8 @@ class RBTreeSortedMapBuilder<A, B, C> {
 }
 
 class BooleanChunk {
-  bool isOne;
-  int chunkSize;
+  late bool isOne;
+  late int chunkSize;
 }
 
 // ignore: camel_case_types
@@ -299,7 +299,7 @@ class Base1_2 extends Iterable<BooleanChunk> {
     final int toCalc = size + 1;
     final int length = (log(toCalc) / log(2)).floor();
 
-    final int mask = pow(2, length) - 1;
+    final int mask = (1 << length) - 1;
     final int value = toCalc & mask;
 
     return Base1_2._(length, value);

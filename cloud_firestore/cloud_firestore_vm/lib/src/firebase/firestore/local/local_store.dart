@@ -8,11 +8,16 @@ import 'dart:typed_data';
 import 'package:_firebase_database_collection_vm/_firebase_database_collection_vm.dart';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/bundle/bundle_callback.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/bundle/bundle_metadata.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/bundle/named_query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/target_id_generator.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_documents_view.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_write_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
@@ -30,6 +35,8 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/remote/remote_event.dart';
@@ -71,7 +78,7 @@ import 'lru_garbage_collector.dart';
 ///
 /// The [LocalStore] must be able to efficiently execute queries against its local cache of the documents, to provide
 /// the initial set of results before any remote changes have been received.
-class LocalStore {
+class LocalStore implements BundleCallback {
   factory LocalStore(Persistence persistence, User initialUser) {
     hardAssert(persistence.started,
         'LocalStore was passed an unstarted persistence implementation');
@@ -103,6 +110,7 @@ class LocalStore {
       queryEngine,
       localViewReferences,
       <int, QueryData>{},
+      persistence.bundleCache,
     );
   }
 
@@ -116,6 +124,7 @@ class LocalStore {
     this._queryEngine,
     this._localViewReferences,
     this._targetIds,
+    this._bundleCache,
   );
 
   /// The maximum time to leave a resume token buffered without writing it out.
@@ -150,6 +159,9 @@ class LocalStore {
 
   /// Maps a targetId to data about its query.
   final Map<int, QueryData> _targetIds;
+
+  /// Holds information about the bundles loaded into the SDK.
+  final BundleCache _bundleCache;
 
   /// Used to generate targetIds for queries tracked locally.
   final TargetIdGenerator _targetIdGenerator;
@@ -223,8 +235,8 @@ class LocalStore {
         // backend sends us an update that already includes our transform.
         final List<Mutation> baseMutations = <Mutation>[];
         for (Mutation mutation in mutations) {
-          final ObjectValue baseValue =
-              mutation.extractBaseValue(existingDocuments[mutation.key]);
+          final ObjectValue? baseValue =
+              mutation.extractTransformBaseValue(existingDocuments[mutation.key]);
           if (baseValue != null) {
             // NOTE: The base state should only be applied if there's some existing
             // document to override, so use a Precondition of exists=true
@@ -271,9 +283,10 @@ class LocalStore {
     return _persistence.runTransactionAndReturn<
             ImmutableSortedMap<DocumentKey, MaybeDocument>>('Reject batch',
         () async {
-      final MutationBatch toReject =
+      final MutationBatch? foundBatch =
           await _mutationQueue.lookupMutationBatch(batchId);
-      hardAssert(toReject != null, 'Attempt to reject nonexistent batch!');
+      hardAssert(foundBatch != null, 'Attempt to reject nonexistent batch!');
+      final MutationBatch toReject = foundBatch!;
 
       await _mutationQueue.removeMutationBatch(toReject);
       await _mutationQueue.performConsistencyCheck();
@@ -311,7 +324,6 @@ class LocalStore {
         'Apply remote event', () async {
       final int sequenceNumber =
           _persistence.referenceDelegate.currentSequenceNumber;
-      final Set<DocumentKey> authoritativeUpdates = <DocumentKey>{};
 
       final Map<int, TargetChange> targetChanges = remoteEvent.targetChanges;
       for (MapEntry<int, TargetChange> entry in targetChanges.entries) {
@@ -319,37 +331,45 @@ class LocalStore {
         final TargetChange change = entry.value;
 
         // Do not ref/unref unassigned targetIds - it may lead to leaks.
-        QueryData queryData = _targetIds[targetId];
-        if (queryData == null) {
+        final QueryData? existingQueryData = _targetIds[targetId];
+        if (existingQueryData == null) {
           continue;
         }
-
-        // When a global snapshot contains updates (either add or modify) we can completely trust these updates as
-        // authoritative and blindly apply them to our cache (as a defensive measure to promote self-healing in the
-        // unfortunate case that our cache is ever somehow corrupted / out-of-sync).
-        //
-        // If the document is only updated while removing it from a target then watch isn't obligated to send the
-        // absolute latest version: it can send the first version that caused the document not to match.
-        change.addedDocuments.forEach(authoritativeUpdates.add);
-        change.modifiedDocuments.forEach(authoritativeUpdates.add);
+        final QueryData queryData = existingQueryData;
 
         await _queryCache.removeMatchingKeys(change.removedDocuments, targetId);
         await _queryCache.addMatchingKeys(change.addedDocuments, targetId);
 
-        // Update the resume token if the change includes one. Don't clear any preexisting value.
-        final Uint8List resumeToken = change.resumeToken;
-        if (resumeToken.isNotEmpty) {
-          final QueryData oldQueryData = queryData;
-          queryData = queryData.copyWith(
-            snapshotVersion: remoteEvent.snapshotVersion,
-            resumeToken: resumeToken,
+        QueryData newQueryData = queryData.copyWith(
+          snapshotVersion: queryData.snapshotVersion,
+          resumeToken: queryData.resumeToken,
+          sequenceNumber: sequenceNumber,
+        );
+        final bool isMismatch = remoteEvent.targetMismatches.containsKey(targetId);
+        if (isMismatch) {
+          // An existence filter mismatch invalidates the target: forget its resume token so that the next listen
+          // (also after a restart) gets a full update.
+          newQueryData = newQueryData.copyWith(
+            snapshotVersion: SnapshotVersion.none,
+            resumeToken: Uint8List(0),
             sequenceNumber: sequenceNumber,
           );
-          _targetIds[targetId] = queryData;
+        } else if (change.resumeToken.isNotEmpty) {
+          // Update the resume token if the change includes one.
+          newQueryData = newQueryData.copyWith(
+            snapshotVersion: remoteEvent.snapshotVersion,
+            resumeToken: change.resumeToken,
+            sequenceNumber: sequenceNumber,
+          );
+        }
 
-          if (_shouldPersistQueryData(oldQueryData, queryData, change)) {
-            await _queryCache.updateQueryData(queryData);
-          }
+        _targetIds[targetId] = newQueryData;
+
+        // Update the query data if there are target changes (or if sufficient time has passed since the last update).
+        // A cleared resume token is always persisted, otherwise the stale token would be used again after a restart.
+        if (isMismatch ||
+            _shouldPersistQueryData(queryData, newQueryData, change)) {
+          await _queryCache.updateQueryData(newQueryData);
         }
       }
 
@@ -361,22 +381,25 @@ class LocalStore {
           remoteEvent.resolvedLimboDocuments;
       // Each loop iteration only affects its "own" doc, so it's safe to get all the remote documents in advance in a
       // single call.
-      final Map<DocumentKey, MaybeDocument> existingDocs =
+      final Map<DocumentKey, MaybeDocument?> existingDocs =
           await _remoteDocuments.getAll(documentUpdates.keys);
       for (MapEntry<DocumentKey, MaybeDocument> entry
           in documentUpdates.entries) {
         final DocumentKey key = entry.key;
         final MaybeDocument doc = entry.value;
-        final MaybeDocument existingDoc = existingDocs[key];
+        final MaybeDocument? existingDoc = existingDocs[key];
 
-        // If a document update isn't authoritative, make sure we don't apply an old document version to the remote
-        // cache. We make an exception for SnapshotVersion.MIN which can happen for manufactured events (e.g. in the
-        // case of a limbo document resolution failing).
-        if (existingDoc == null ||
-            doc.version == SnapshotVersion.none ||
-            (authoritativeUpdates.contains(doc.key) &&
-                !existingDoc.hasPendingWrites) ||
-            doc.version.compareTo(existingDoc.version) >= 0) {
+        // Note: The order of the steps below is important, since we want to ensure that rejected limbo resolutions
+        // (which fabricate NoDocuments with SnapshotVersion.none) never add documents to cache.
+        if (doc is NoDocument && doc.version == SnapshotVersion.none) {
+          // NoDocuments with SnapshotVersion.none are used in manufactured events. We remove these documents from
+          // cache since we lost access.
+          await _remoteDocuments.remove(doc.key);
+          changedDocs[key] = doc;
+        } else if (existingDoc == null ||
+            doc.version.compareTo(existingDoc.version) > 0 ||
+            (doc.version.compareTo(existingDoc.version) == 0 &&
+                existingDoc.hasPendingWrites)) {
           await _remoteDocuments.add(doc);
           changedDocs[key] = doc;
         } else {
@@ -397,8 +420,10 @@ class LocalStore {
           _queryCache.lastRemoteSnapshotVersion;
       final SnapshotVersion remoteVersion = remoteEvent.snapshotVersion;
       if (remoteVersion != SnapshotVersion.none) {
-        hardAssert(remoteVersion.compareTo(lastRemoteVersion) >= 0,
-            'Watch stream reverted to previous snapshot?? ($remoteVersion < $lastRemoteVersion)');
+        hardAssertLazy(
+            remoteVersion.compareTo(lastRemoteVersion) >= 0,
+            () =>
+                'Watch stream reverted to previous snapshot?? ($remoteVersion < $lastRemoteVersion)');
         await _queryCache.setLastRemoteSnapshotVersion(remoteVersion);
       }
 
@@ -414,11 +439,6 @@ class LocalStore {
   /// values from getting too stale after a crash, but this doesn't have to be too frequent.
   static bool _shouldPersistQueryData(
       QueryData oldQueryData, QueryData newQueryData, TargetChange change) {
-    // Avoid clearing any existing value
-    if (newQueryData.resumeToken.isEmpty) {
-      return false;
-    }
-
     // Any resume token is interesting if there isn't one already.
     if (oldQueryData.resumeToken.isEmpty) {
       return true;
@@ -448,6 +468,11 @@ class LocalStore {
       List<LocalViewChanges> viewChanges) async {
     await _persistence.runTransaction('notifyLocalViewChanges', () async {
       for (LocalViewChanges viewChange in viewChanges) {
+        if (!_targetIds.containsKey(viewChange.targetId)) {
+          // The target was released while the view change was in flight: pinning documents for it would never be
+          // undone.
+          continue;
+        }
         _localViewReferences.addReferences(
             viewChange.added, viewChange.targetId);
         final ImmutableSortedSet<DocumentKey> removed = viewChange.removed;
@@ -464,30 +489,40 @@ class LocalStore {
   /// [afterBatchId] The batch to search after, or -1 for the first mutation in the queue.
   ///
   /// Returns the next mutation or null if there wasn't one.
-  Future<MutationBatch> getNextMutationBatch(int afterBatchId) {
+  Future<MutationBatch?> getNextMutationBatch(int afterBatchId) {
     return _mutationQueue.getNextMutationBatchAfterBatchId(afterBatchId);
   }
 
+  /// Returns the highest batch id of the current user's mutation queue (the newest batch that was not yet acknowledged
+  /// or rejected), or [MutationBatch.unknown] if there are no pending writes.
+  Future<int> getHighestUnacknowledgedBatchId() {
+    return _mutationQueue.getHighestUnacknowledgedBatchId();
+  }
+
   /// Returns the current value of a document with a given key, or null if not found.
-  Future<MaybeDocument> readDocument(DocumentKey key) async {
+  Future<MaybeDocument?> readDocument(DocumentKey key) async {
     return _localDocuments.getDocument(key);
   }
 
-  /// Assigns the given query an internal id so that its results can be pinned so they don't get GC'd. A query must be
-  /// allocated in the local store before the store can be used to manage its view.
-  Future<QueryData> allocateQuery(Query query) async {
-    int targetId;
-    QueryData cached = await _queryCache.getQueryData(query);
+  /// Assigns the given target an internal id so that its results can be pinned so they don't get GC'd. A target must
+  /// be allocated in the local store before the store can be used to manage its view.
+  ///
+  /// Allocating an already allocated target will return the existing [QueryData] for that target.
+  Future<QueryData> allocateTarget(Target target) async {
+    late int targetId;
+    late QueryData cached;
+    final QueryData? existing = await _queryCache.getQueryData(target);
 
-    if (cached != null) {
-      // This query has been listened to previously, so reuse the previous targetId.
+    if (existing != null) {
+      // This target has been listened to previously, so reuse the previous targetId.
       // TODO(long1eu): freshen last accessed date?
+      cached = existing;
       targetId = cached.targetId;
     } else {
-      await _persistence.runTransaction('Allocate query', () async {
+      await _persistence.runTransaction('Allocate target', () async {
         targetId = _targetIdGenerator.nextId;
         cached = QueryData(
-          query,
+          target,
           targetId,
           _persistence.referenceDelegate.currentSequenceNumber,
           QueryPurpose.listen,
@@ -497,22 +532,31 @@ class LocalStore {
       });
     }
 
-    // Sanity check to ensure that even when resuming a query it's not currently active.
-    hardAssert(_targetIds[targetId] == null,
-        'Tried to allocate an already allocated query: $query');
+    // Several queries may map to the same target (e.g. a limit query and a mirroring limitToLast query), in which case
+    // the target is already active and its in-memory data must not be replaced.
+    final QueryData? active = _targetIds[targetId];
+    if (active != null) {
+      return active;
+    }
     _targetIds[targetId] = cached;
     return cached;
   }
 
-  /// Unpin all the documents associated with the given query.
-  Future<void> releaseQuery(Query query) {
-    return _persistence.runTransaction('Release query', () async {
-      QueryData queryData = await _queryCache.getQueryData(query);
-      hardAssert(
-          queryData != null, 'Tried to release nonexistent query: $query');
+  /// Unpin all the documents associated with the given target.
+  ///
+  /// Releasing a non-existing target is an error.
+  Future<void> releaseTarget(int targetId) {
+    return _persistence.runTransaction('Release target', () async {
+      final QueryData? cachedQueryData = _targetIds[targetId];
+      hardAssertLazy(cachedQueryData != null,
+          () => 'Tried to release nonexistent target: $targetId');
 
-      final int targetId = queryData.targetId;
-      final QueryData cachedQueryData = _targetIds[targetId];
+      final QueryData? foundQueryData =
+          await _queryCache.getQueryData(cachedQueryData!.target);
+      hardAssertLazy(foundQueryData != null,
+          () => 'Tried to release nonexistent target: $targetId');
+      QueryData queryData = foundQueryData!;
+
       if (cachedQueryData.snapshotVersion.compareTo(queryData.snapshotVersion) >
           0) {
         // If we've been avoiding persisting the [resumeToken] (see [shouldPersistQueryData] for conditions and
@@ -550,17 +594,19 @@ class LocalStore {
     final MutationBatch batch = batchResult.batch;
     final Set<DocumentKey> docKeys = batch.keys;
     for (DocumentKey docKey in docKeys) {
-      final MaybeDocument remoteDoc = await _remoteDocuments.get(docKey);
-      MaybeDocument doc = remoteDoc;
-      final SnapshotVersion ackVersion = batchResult.docVersions[docKey];
+      final MaybeDocument? remoteDoc = await _remoteDocuments.get(docKey);
+      MaybeDocument? doc = remoteDoc;
+      final SnapshotVersion? ackVersion = batchResult.docVersions[docKey];
       hardAssert(ackVersion != null,
           'docVersions should contain every doc in the write.');
 
-      if (doc == null || doc.version.compareTo(ackVersion) < 0) {
+      if (doc == null || doc.version.compareTo(ackVersion!) < 0) {
         doc = batch.applyToRemoteDocument(docKey, doc, batchResult);
         if (doc == null) {
-          hardAssert(remoteDoc == null,
-              'Mutation batch $batch applied to document $remoteDoc resulted in null.');
+          hardAssertLazy(
+              remoteDoc == null,
+              () =>
+                  'Mutation batch $batch applied to document $remoteDoc resulted in null.');
         } else {
           await _remoteDocuments.add(doc);
         }
@@ -574,5 +620,151 @@ class LocalStore {
       LruGarbageCollector garbageCollector) {
     return _persistence.runTransactionAndReturn('Collect garbage',
         () => garbageCollector.collect(_targetIds.keys.toSet()));
+  }
+
+  /// Returns whether the given bundle has already been loaded and its create time is newer or equal to the currently
+  /// loading bundle.
+  Future<bool> hasNewerBundle(BundleMetadata bundleMetadata) {
+    return _persistence.runTransactionAndReturn<bool>('Has newer bundle',
+        () async {
+      final BundleMetadata? cachedMetadata =
+          await _bundleCache.getBundleMetadata(bundleMetadata.bundleId);
+      return cachedMetadata != null &&
+          cachedMetadata.createTime.compareTo(bundleMetadata.createTime) >= 0;
+    });
+  }
+
+  @override
+  Future<void> saveBundle(BundleMetadata bundleMetadata) {
+    return _persistence.runTransaction(
+        'Save bundle', () => _bundleCache.saveBundleMetadata(bundleMetadata));
+  }
+
+  @override
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyBundledDocuments(
+      ImmutableSortedMap<DocumentKey, MaybeDocument> documents,
+      String bundleId) async {
+    // Allocates a target to hold all document keys from the bundle, such that they will not get garbage collected right
+    // away.
+    final QueryData umbrellaQueryData =
+        await allocateTarget(_newUmbrellaQuery(bundleId).toTarget());
+
+    return _persistence.runTransactionAndReturn<
+            ImmutableSortedMap<DocumentKey, MaybeDocument>>(
+        'Apply bundle documents', () async {
+      ImmutableSortedSet<DocumentKey> documentKeys = DocumentKey.emptyKeySet;
+      final Map<DocumentKey, MaybeDocument> documentMap =
+          <DocumentKey, MaybeDocument>{};
+
+      for (final MapEntry<DocumentKey, MaybeDocument> entry in documents) {
+        final DocumentKey documentKey = entry.key;
+        final MaybeDocument document = entry.value;
+
+        if (document is Document) {
+          documentKeys = documentKeys.insert(documentKey);
+        }
+        documentMap[documentKey] = document;
+      }
+
+      await _queryCache
+          .removeMatchingKeysForTargetId(umbrellaQueryData.targetId);
+      await _queryCache.addMatchingKeys(
+          documentKeys, umbrellaQueryData.targetId);
+
+      final Map<DocumentKey, MaybeDocument> changedDocs =
+          await _populateBundledDocumentChanges(documentMap);
+      return _localDocuments.getLocalViewOfDocuments(changedDocs);
+    });
+  }
+
+  /// Populates the remote document cache with the documents from a bundle. Returns the document changes resulting from
+  /// applying those documents.
+  ///
+  /// PORTING NOTE: the port's remote document cache has no read time, so the version of each document is its read time
+  /// (the Android SDK passes the per-document versions for bundles as well).
+  Future<Map<DocumentKey, MaybeDocument>> _populateBundledDocumentChanges(
+      Map<DocumentKey, MaybeDocument> documents) async {
+    final Map<DocumentKey, MaybeDocument> changedDocs =
+        <DocumentKey, MaybeDocument>{};
+
+    // Each loop iteration only affects its 'own' doc, so it's safe to get all the remote documents in advance in a
+    // single call.
+    final Map<DocumentKey, MaybeDocument?> existingDocs =
+        await _remoteDocuments.getAll(documents.keys);
+
+    for (final MapEntry<DocumentKey, MaybeDocument> entry
+        in documents.entries) {
+      final DocumentKey key = entry.key;
+      final MaybeDocument doc = entry.value;
+      final MaybeDocument? existingDoc = existingDocs[key];
+
+      // Note: The order of the steps below is important, since we want to ensure that rejected limbo resolutions (which
+      // fabricate NoDocuments with SnapshotVersion.none) never add documents to cache.
+      if (doc is NoDocument && doc.version == SnapshotVersion.none) {
+        // NoDocuments with SnapshotVersion.none are used in manufactured events. We remove these documents from cache
+        // since we lost access.
+        await _remoteDocuments.remove(doc.key);
+        changedDocs[key] = doc;
+      } else if (existingDoc == null ||
+          doc.version.compareTo(existingDoc.version) > 0 ||
+          (doc.version.compareTo(existingDoc.version) == 0 &&
+              existingDoc.hasPendingWrites)) {
+        hardAssert(doc.version != SnapshotVersion.none,
+            'Cannot add a document when the remote version is zero');
+        await _remoteDocuments.add(doc);
+        changedDocs[key] = doc;
+      } else {
+        Log.d(
+            'LocalStore',
+            'Ignoring outdated bundle document for $key. Current version: ${existingDoc.version}  Bundle version: '
+                '${doc.version}');
+      }
+    }
+    return changedDocs;
+  }
+
+  @override
+  Future<void> saveNamedQuery(NamedQuery namedQuery,
+      ImmutableSortedSet<DocumentKey> documentKeys) async {
+    // Allocate a target for the named query such that it can be resumed from associated read time if users use it to
+    // listen.
+    // NOTE: this also means if no corresponding target exists, the new target will remain active and will not get
+    // collected, unless users happen to unlisten the query somehow.
+    final QueryData existingQueryData =
+        await allocateTarget(namedQuery.bundledQuery.toQuery().toTarget());
+    final int targetId = existingQueryData.targetId;
+
+    await _persistence.runTransaction('Saved named query', () async {
+      // Only update the matching documents if it is newer than what the SDK already has
+      if (namedQuery.readTime.compareTo(existingQueryData.snapshotVersion) >
+          0) {
+        // Update existing target data because the query from the bundle is newer.
+        final QueryData newQueryData = existingQueryData.copyWith(
+          snapshotVersion: namedQuery.readTime,
+          resumeToken: Uint8List(0),
+          sequenceNumber: existingQueryData.sequenceNumber,
+        );
+        _targetIds[targetId] = newQueryData;
+
+        await _queryCache.updateQueryData(newQueryData);
+        await _queryCache.removeMatchingKeysForTargetId(targetId);
+        await _queryCache.addMatchingKeys(documentKeys, targetId);
+      }
+
+      await _bundleCache.saveNamedQuery(namedQuery);
+    });
+  }
+
+  /// Returns the [NamedQuery] associated with [queryName] or null if not found.
+  Future<NamedQuery?> getNamedQuery(String queryName) {
+    return _persistence.runTransactionAndReturn<NamedQuery?>(
+        'Get named query', () => _bundleCache.getNamedQuery(queryName));
+  }
+
+  /// Creates a new query using the given bundle name, which will be used to hold the keys of all documents from the
+  /// bundle in query-document mappings. This ensures that the loaded documents do not get garbage collected right away.
+  static Query _newUmbrellaQuery(String bundleName) {
+    // It is OK that the path used for the query is not valid, because this will not be read and queried.
+    return Query(ResourcePath.fromString('__bundle__/docs/$bundleName'));
   }
 }

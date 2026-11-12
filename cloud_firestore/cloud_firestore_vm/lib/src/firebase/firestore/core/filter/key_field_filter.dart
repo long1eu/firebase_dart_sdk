@@ -11,7 +11,7 @@ class KeyFieldFilter extends FieldFilter {
 
   @override
   bool matches(Document doc) {
-    final ReferenceValue referenceValue = value;
+    final ReferenceValue referenceValue = value as ReferenceValue;
     final int comparator = doc.key.compareTo(referenceValue.value);
     return _matchesComparison(comparator);
   }

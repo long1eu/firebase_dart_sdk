@@ -11,14 +11,14 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   }
 
   final SQLitePersistence persistence;
-  ListenSequence listenSequence;
+  late ListenSequence listenSequence;
   int _currentSequenceNumber;
 
   @override
-  ReferenceSet inMemoryPins;
+  late ReferenceSet inMemoryPins;
 
   @override
-  LruGarbageCollector garbageCollector;
+  late LruGarbageCollector garbageCollector;
 
   void start(int highestSequenceNumber) {
     listenSequence = ListenSequence(highestSequenceNumber);
@@ -29,6 +29,11 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
     hardAssert(_currentSequenceNumber == ListenSequence.invalid,
         'Starting a transaction without committing the previous one');
     _currentSequenceNumber = listenSequence.next;
+  }
+
+  @override
+  void onTransactionRolledBack() {
+    _currentSequenceNumber = ListenSequence.invalid;
   }
 
   @override
@@ -60,7 +65,7 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
             // @formatter:on
             ))
         .first;
-    return targetCount + data['count'];
+    return targetCount + (data['count'] as int);
   }
 
   @override
@@ -111,14 +116,15 @@ class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   /// Returns true if any mutation queue contains the given document.
   Future<bool> _mutationQueuesContainKey(DocumentKey key) async {
     return (await persistence.query(
-        // @formatter:off
-        '''
+            // @formatter:off
+            '''
           SELECT 1
           FROM document_mutations
           WHERE path = ?;
         ''',
-        // @formatter:on
-        <String>[EncodedPath.encode(key.path)])).isNotEmpty;
+            // @formatter:on
+            <String>[EncodedPath.encode(key.path)]))
+        .isNotEmpty;
   }
 
   /// Returns true if anything would prevent this document from being garbage collected, given that the document in

@@ -26,7 +26,7 @@ void main() {
     await IntegrationTestUtil.tearDown();
   });
 
-  Map<String, Object> nestedObject(int number) {
+  Map<String, Object?> nestedObject(int number) {
     return map(<dynamic>[
       'name',
       'room $number',
@@ -43,7 +43,7 @@ void main() {
   /// Creates test data with special characters in field names. Datastore
   /// currently prohibits mixing nested data with special characters so tests
   /// that use this data must be separate.
-  Map<String, Object> dottedObject(int number) {
+  Map<String, Object?> dottedObject(int number) {
     return map(<dynamic>[
       'field',
       'field $number',
@@ -54,7 +54,7 @@ void main() {
     ]);
   }
 
-  Map<String, Object> objectWithTimestamp(Timestamp timestamp) {
+  Map<String, Object?> objectWithTimestamp(Timestamp timestamp) {
     return map(<dynamic>[
       'timestamp',
       timestamp,
@@ -64,7 +64,7 @@ void main() {
   }
 
   test('testNestedFieldsCanBeWrittenWithSet', () async {
-    final Map<String, Object> data = nestedObject(1);
+    final Map<String, Object?> data = nestedObject(1);
     final DocumentReference docRef = (await testCollection()).document();
     await docRef.set(data);
     final DocumentSnapshot result = await docRef.get();
@@ -72,7 +72,7 @@ void main() {
   });
 
   test('testNestedFieldsCanReadDirectly', () async {
-    final Map<String, Object> data = nestedObject(1);
+    final Map<String, Object?> data = nestedObject(1);
     final DocumentReference docRef = (await testCollection()).document();
     await docRef.set(data);
 
@@ -80,21 +80,23 @@ void main() {
     expect(data['name'], result['name']);
     expect(result['metadata'], data['metadata']);
 
-    final Map<String, Object> metadata = data['metadata'];
-    final Map<String, Object> deepObject = metadata['deep'];
+    final Map<String, Object?> metadata =
+        data['metadata']! as Map<String, Object?>;
+    final Map<String, Object?> deepObject =
+        metadata['deep']! as Map<String, Object?>;
     expect(result['metadata.deep.field'], deepObject['field']);
     expect(result['metadata.nofield'], isNull);
     expect(result['nonmetadata.nofield'], isNull);
   });
 
   test('testNestedFieldCanBeUpdated', () async {
-    final Map<String, Object> data = nestedObject(1);
+    final Map<String, Object?> data = nestedObject(1);
     final DocumentReference docRef = (await testCollection()).document();
     await docRef.set(data);
     await docRef.updateFromList(
         <dynamic>['metadata.deep.field', 100.0, 'metadata.added', 200.0]);
     final DocumentSnapshot result = await docRef.get();
-    final Map<String, Object> expectedData = map(<dynamic>[
+    final Map<String, Object?> expectedData = map(<dynamic>[
       'name',
       'room 1',
       'metadata',
@@ -112,7 +114,7 @@ void main() {
   });
 
   test('testNestedFieldsCanBeUsedInQueryFilters', () async {
-    final Map<String, Map<String, Object>> docs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> docs = map(<dynamic>[
       '1',
       nestedObject(300),
       '2',
@@ -121,13 +123,13 @@ void main() {
       nestedObject(200)
     ]);
     // inequality adds implicit sort on field
-    final List<Map<String, Object>> expected = <Map<String, dynamic>>[
+    final List<Map<String, Object?>> expected = <Map<String, Object?>>[
       nestedObject(200),
       nestedObject(300)
     ];
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
-    for (MapEntry<String, Map<String, Object>> entry in docs.entries) {
+    for (MapEntry<String, Map<String, Object?>> entry in docs.entries) {
       tasks.add(collection.document(entry.key).set(entry.value));
     }
 
@@ -139,7 +141,7 @@ void main() {
   });
 
   test('testNestedFieldsCanBeUsedInOrderBy', () async {
-    final Map<String, Map<String, Object>> docs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> docs = map(<dynamic>[
       '1',
       nestedObject(300),
       '2',
@@ -147,14 +149,14 @@ void main() {
       '3',
       nestedObject(200)
     ]);
-    final List<Map<String, Object>> expected = <Map<String, dynamic>>[
+    final List<Map<String, Object?>> expected = <Map<String, Object?>>[
       nestedObject(100),
       nestedObject(200),
       nestedObject(300)
     ];
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
-    for (MapEntry<String, Map<String, Object>> entry in docs.entries) {
+    for (MapEntry<String, Map<String, Object?>> entry in docs.entries) {
       tasks.add(collection.document(entry.key).set(entry.value));
     }
 
@@ -165,7 +167,7 @@ void main() {
   });
 
   test('testFieldsWithSpecialCharsCanBeWrittenWithSet', () async {
-    final Map<String, Object> data = dottedObject(1);
+    final Map<String, Object?> data = dottedObject(1);
     final DocumentReference docRef = (await testCollection()).document();
     await docRef.set(data);
     final DocumentSnapshot doc = await docRef.get();
@@ -173,7 +175,7 @@ void main() {
   });
 
   test('testFieldsWithSpecialCharsCanBeReadDirectly', () async {
-    final Map<String, Object> data = dottedObject(1);
+    final Map<String, Object?> data = dottedObject(1);
     final DocumentReference docRef = (await testCollection()).document();
     await docRef.set(data);
     final DocumentSnapshot doc = await docRef.get();
@@ -184,7 +186,7 @@ void main() {
   });
 
   test('testFieldsWithSpecialCharsCanBeUpdated', () async {
-    final Map<String, Object> data = dottedObject(1);
+    final Map<String, Object?> data = dottedObject(1);
     final DocumentReference docRef = (await testCollection()).document();
     await docRef.set(data);
     await docRef.updateFromList(<dynamic>[
@@ -208,7 +210,7 @@ void main() {
   });
 
   test('testFieldsWithSpecialCharsCanBeUsedInQueryFilters', () async {
-    final Map<String, Map<String, Object>> docs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> docs = map(<dynamic>[
       '1',
       dottedObject(300),
       '2',
@@ -217,13 +219,13 @@ void main() {
       dottedObject(200)
     ]);
     // inequality adds implicit sort on field
-    final List<Map<String, Object>> expected = <Map<String, dynamic>>[
+    final List<Map<String, Object?>> expected = <Map<String, Object?>>[
       dottedObject(200),
       dottedObject(300)
     ];
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
-    for (MapEntry<String, Map<String, Object>> entry in docs.entries) {
+    for (MapEntry<String, Map<String, Object?>> entry in docs.entries) {
       tasks.add(collection.document(entry.key).set(entry.value));
     }
 
@@ -236,7 +238,7 @@ void main() {
   });
 
   test('testFieldsWithSpecialCharsCanBeUsedInOrderBy', () async {
-    final Map<String, Map<String, dynamic>> docs = map(<dynamic>[
+    final Map<String, Map<String, Object?>> docs = map(<dynamic>[
       '1',
       dottedObject(300),
       '2',
@@ -244,7 +246,7 @@ void main() {
       '3',
       dottedObject(200)
     ]);
-    final List<Map<String, Object>> expected = <Map<String, dynamic>>[
+    final List<Map<String, Object?>> expected = <Map<String, Object?>>[
       dottedObject(100),
       dottedObject(200),
       dottedObject(300)
@@ -252,7 +254,7 @@ void main() {
 
     final CollectionReference collection = await testCollection();
     final List<Future<void>> tasks = <Future<void>>[];
-    for (MapEntry<String, Map<String, Object>> entry in docs.entries) {
+    for (MapEntry<String, Map<String, Object?>> entry in docs.entries) {
       tasks.add(collection.document(entry.key).set(entry.value));
     }
 
@@ -268,7 +270,7 @@ void main() {
   });
 
   test('testTimestampsInSnapshots', () async {
-    final Timestamp originalTimestamp = Timestamp(100, 123456789);
+    const Timestamp originalTimestamp = Timestamp(100, 123456789);
     // Timestamps are currently truncated to microseconds after being written to
     // the database.
     final Timestamp truncatedTimestamp = Timestamp(originalTimestamp.seconds,
@@ -277,16 +279,18 @@ void main() {
     final DocumentReference docRef = (await testCollection()).document();
     await docRef.set(objectWithTimestamp(originalTimestamp));
     final DocumentSnapshot snapshot = await docRef.get();
-    final Map<String, Object> data = snapshot.data;
+    final Map<String, Object?> data = snapshot.data!;
 
-    final Timestamp readTimestamp = snapshot['timestamp'];
+    final Timestamp readTimestamp = snapshot['timestamp']! as Timestamp;
     expect(readTimestamp, truncatedTimestamp);
     expect(readTimestamp, data['timestamp']);
 
-    final Timestamp readNestedTimestamp = snapshot['nested.timestamp2'];
+    final Timestamp readNestedTimestamp =
+        snapshot['nested.timestamp2']! as Timestamp;
     expect(readNestedTimestamp, truncatedTimestamp);
 
-    final Map<String, Object> nestedObject = data['nested'];
+    final Map<String, Object?> nestedObject =
+        data['nested']! as Map<String, Object?>;
     expect(nestedObject['timestamp2'], readNestedTimestamp);
   });
 }

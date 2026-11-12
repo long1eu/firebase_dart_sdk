@@ -28,8 +28,9 @@ class DoubleValue extends NumberValue {
       return true;
     }
     if (other is DoubleValue && runtimeType == other.runtimeType) {
-      if ((identical(_value, -0.0) && identical(other._value, 0.0)) ||
-          (identical(_value, 0.0) && identical(other._value, -0.0))) {
+      if (_value == 0 &&
+          other._value == 0 &&
+          _value.isNegative != other._value.isNegative) {
         return false;
       }
 

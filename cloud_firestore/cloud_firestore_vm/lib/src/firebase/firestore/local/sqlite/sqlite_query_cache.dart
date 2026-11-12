@@ -11,16 +11,16 @@ class SQLiteQueryCache implements QueryCache {
   final SQLitePersistence _db;
   final LocalSerializer _localSerializer;
 
-  int _lastListenSequenceNumber;
+  late int _lastListenSequenceNumber;
 
   @override
-  int highestTargetId;
+  late int highestTargetId;
 
   @override
   SnapshotVersion lastRemoteSnapshotVersion = SnapshotVersion.none;
 
   @override
-  int targetCount;
+  late int targetCount;
 
   Future<void> start() async {
     // Store exactly one row in the table. If the row exists at all, it's the global metadata.
@@ -41,13 +41,15 @@ class SQLiteQueryCache implements QueryCache {
 
     final Map<String, dynamic> row = result.first;
 
-    highestTargetId = row['highest_target_id'];
-    _lastListenSequenceNumber = row['highest_listen_sequence_number'];
+    // Columns may be NULL in databases touched by older SDK versions: default to 0 (Java's getInt does the same).
+    highestTargetId = (row['highest_target_id'] as int?) ?? 0;
+    _lastListenSequenceNumber =
+        (row['highest_listen_sequence_number'] as int?) ?? 0;
     lastRemoteSnapshotVersion = SnapshotVersion(Timestamp(
-      row['last_remote_snapshot_version_seconds'],
-      row['last_remote_snapshot_version_nanos'],
+      (row['last_remote_snapshot_version_seconds'] as int?) ?? 0,
+      (row['last_remote_snapshot_version_nanos'] as int?) ?? 0,
     ));
-    targetCount = row['target_count'];
+    targetCount = (row['target_count'] as int?) ?? 0;
   }
 
   @override
@@ -80,7 +82,7 @@ class SQLiteQueryCache implements QueryCache {
 
   Future<void> _saveQueryData(QueryData queryData) async {
     final int targetId = queryData.targetId;
-    final String canonicalId = queryData.query.canonicalId;
+    final String canonicalId = queryData.target.canonicalId;
     final Timestamp version = queryData.snapshotVersion.timestamp;
 
     final proto.Target targetProto =
@@ -220,10 +222,10 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   @override
-  Future<QueryData> getQueryData(Query query) async {
+  Future<QueryData?> getQueryData(Target target) async {
     // Querying the targets table by canonical_id may yield more than one result because canonical_id values are not
     // required to be unique per target. This query depends on the query_targets index to be efficient.
-    final String canonicalId = query.canonicalId;
+    final String canonicalId = target.canonicalId;
 
     final List<Map<String, dynamic>> result = await _db.query(
         // @formatter:off
@@ -235,13 +237,13 @@ class SQLiteQueryCache implements QueryCache {
         // @formatter:on
         <String>[canonicalId]);
 
-    QueryData data;
+    QueryData? data;
     for (Map<String, dynamic> row in result) {
       // TODO(long1eu): break out early if found.
       final QueryData found = _decodeQueryData(row['target_proto']);
 
-      // After finding a potential match, check that the query is actually equal to the requested query.
-      if (query == found.query) {
+      // After finding a potential match, check that the query is actually equal to the requested target.
+      if (target == found.target) {
         data = found;
       }
     }
@@ -302,6 +304,11 @@ class SQLiteQueryCache implements QueryCache {
       await _db.execute(statement, <dynamic>[targetId, path]);
       await delegate.removeReference(key);
     }
+  }
+
+  @override
+  Future<void> removeMatchingKeysForTargetId(int targetId) {
+    return _removeMatchingKeysForTargetId(targetId);
   }
 
   Future<void> _removeMatchingKeysForTargetId(int targetId) async {

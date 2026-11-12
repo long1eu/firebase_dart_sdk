@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
-import 'package:meta/meta.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 typedef TaskFunction = FutureOr<void> Function();
 
@@ -23,11 +23,13 @@ class TaskScheduler {
       throw ArgumentError('The is already a task with this name');
     }
 
-    final TimerTask task = TimerTask._(
+    late final TimerTask task;
+    task = TimerTask._(
       index: ++_index,
       id: id,
       function: function,
-      timer: Timer(delay, () => _tasks[id]._execute()),
+      targetTime: DateTime.now().add(delay),
+      timer: Timer(delay, () => task._execute()),
       scheduler: this,
     );
 
@@ -35,63 +37,81 @@ class TaskScheduler {
     return _tasks[id] = task;
   }
 
-  TimerTask getTask(TaskId id) {
+  TimerTask? getTask(TaskId id) {
     return _tasks[id];
   }
 
+  /// Runs, without waiting for their delay, all scheduled tasks in order of
+  /// their target time, up to and including the task with [id]. With
+  /// [TaskId.all] every scheduled task is run. Throws if [id] is not
+  /// [TaskId.all] and no such task is scheduled.
   void runUntil(TaskId id) {
     _log('Run until $id');
-    (_tasks.values.toList()..sort())
-        .takeWhile((TimerTask value) => value._id == id)
-        .toList()
-        .forEach((TimerTask element) {
-      element._timer.cancel();
-      element._execute();
-    });
+    hardAssert(id == TaskId.all || _tasks.containsKey(id),
+        'Attempted to run tasks until missing id: $id');
+
+    final List<TimerTask> pending = _tasks.values.toList()..sort();
+    for (final TimerTask task in pending) {
+      task._timer.cancel();
+      task._execute();
+      if (id != TaskId.all && task._id == id) {
+        break;
+      }
+    }
   }
 
-  void _remove(TaskId id) {
-    _tasks.remove(id);
+  void _remove(TimerTask task) {
+    // Only remove the entry if it still belongs to this task: a handle that
+    // outlived its task must not unschedule a newer task with the same id.
+    if (identical(_tasks[task._id], task)) {
+      _tasks.remove(task._id);
+    }
   }
 
   void _log(String s) {
-    Log.d('$runtimeType${_name == null || _name.isEmpty ? '' : '-$_name'}', s);
+    Log.d('$runtimeType${_name.isEmpty ? '' : '-$_name'}', s);
   }
 }
 
 class TimerTask implements Comparable<TimerTask> {
   TimerTask._({
-    @required int index,
-    @required TaskId id,
-    @required Timer timer,
-    @required TaskFunction function,
-    @required TaskScheduler scheduler,
-  })  : assert(index != null),
-        assert(id != null),
-        assert(timer != null),
-        assert(function != null),
-        assert(scheduler != null),
-        _index = index,
+    required int index,
+    required TaskId id,
+    required DateTime targetTime,
+    required Timer timer,
+    required TaskFunction function,
+    required TaskScheduler scheduler,
+  })  : _index = index,
         _id = id,
+        _targetTime = targetTime,
         _timer = timer,
         _function = function,
         _scheduler = scheduler;
 
   final int _index;
   final TaskId _id;
+  final DateTime _targetTime;
   final Timer _timer;
   final TaskFunction _function;
   final TaskScheduler _scheduler;
 
+  /// Set once the task ran or was canceled; a finished task is never run again.
+  bool _finished = false;
+
   void cancel() {
     _log('Canceling task $_id');
-    _scheduler._remove(_id);
+    _finished = true;
+    _scheduler._remove(this);
     _timer.cancel();
   }
 
   void _execute() {
+    if (_finished) {
+      return;
+    }
     _log('Executing task $_id');
-    _scheduler._remove(_id);
+    _finished = true;
+    _scheduler._remove(this);
     _function();
   }
 
@@ -100,7 +120,10 @@ class TimerTask implements Comparable<TimerTask> {
   }
 
   @override
-  int compareTo(TimerTask other) => _index.compareTo(other._index);
+  int compareTo(TimerTask other) {
+    final int byTime = _targetTime.compareTo(other._targetTime);
+    return byTime != 0 ? byTime : _index.compareTo(other._index);
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -145,6 +168,9 @@ class TaskId implements Comparable<TaskId> {
   /// A timer used to periodically attempt LRU Garbage collection
   static const TaskId garbageCollection = TaskId._(6);
 
+  /// A timer used to retry transactions with a backoff.
+  static const TaskId retryTransaction = TaskId._(7);
+
   @override
   int compareTo(TaskId other) => _i.compareTo(other._i);
 
@@ -172,6 +198,7 @@ class TaskId implements Comparable<TaskId> {
     'writeStreamConnectionBackoff',
     'onlineStateTimeout',
     'garbageCollection',
+    'retryTransaction',
   ];
 
   @override

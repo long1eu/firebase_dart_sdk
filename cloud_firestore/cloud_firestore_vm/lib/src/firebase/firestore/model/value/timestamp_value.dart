@@ -21,9 +21,6 @@ class TimestampValue extends FieldValue {
   int compareTo(FieldValue other) {
     if (other is TimestampValue) {
       return _value.compareTo(other._value);
-    } else if (other is ServerTimestampValue) {
-      // Concrete timestamps come before server timestamps.
-      return -1;
     } else {
       return defaultCompareTo(other);
     }

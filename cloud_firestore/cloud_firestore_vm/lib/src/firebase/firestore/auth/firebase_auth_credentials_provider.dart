@@ -7,21 +7,61 @@ import 'dart:async';
 import 'package:_firebase_internal_vm/_firebase_internal_vm.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:firebase_core_vm/firebase_core_vm.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// [FirebaseAuthCredentialsProvider] uses Firebase Auth via [FirebaseApp] to
 /// get an auth token.
 class FirebaseAuthCredentialsProvider extends CredentialsProvider {
-  FirebaseAuthCredentialsProvider(this.authProvider)
-      : _onUserChange = BehaviorSubject<User>.seeded(authProvider.uid != null
-            ? User(authProvider.uid)
-            : User.unauthenticated);
+  FirebaseAuthCredentialsProvider(this.authProvider) {
+    _onUserChange = BehaviorSubject<User>.seeded(
+      getUser(),
+      // A listener that comes back after the last one left must get updates
+      // again, so tracking restarts on listen.
+      onListen: _subscribeToTokenChanges,
+      // Like Java's removeChangeListener: stop receiving auth changes once the
+      // (only) listener is gone.
+      onCancel: _unsubscribeFromTokenChanges,
+    );
+    // Like Java's addIdTokenListener: get notified of sign-in, sign-out and
+    // token changes from now on, even before somebody listens to [onChange].
+    _subscribeToTokenChanges();
+  }
+
+  void _subscribeToTokenChanges() {
+    if (_tokenSubscription != null) {
+      return;
+    }
+    _tokenSubscription = authProvider.onTokenChanged.listen(
+      tokenObserver,
+      onError: (Object error) => Log.w(
+          'FirebaseAuthCredentialsProvider', 'Token stream error: $error'),
+    );
+    if (_wasUnsubscribed) {
+      // Changes may have been missed while not listening: invalidate any
+      // outstanding token request and publish the current user.
+      _wasUnsubscribed = false;
+      _tokenCounter++;
+      scheduleMicrotask(() {
+        if (!_onUserChange.isClosed) {
+          _onUserChange.add(getUser());
+        }
+      });
+    }
+  }
+
+  void _unsubscribeFromTokenChanges() {
+    _tokenSubscription?.cancel();
+    _tokenSubscription = null;
+    _wasUnsubscribed = true;
+  }
 
   /// Stream that will receive credential changes (sign-in / sign-out, token
   /// changes).
-  final BehaviorSubject<User> _onUserChange;
+  late final BehaviorSubject<User> _onUserChange;
+
+  StreamSubscription<InternalTokenResult>? _tokenSubscription;
+  bool _wasUnsubscribed = false;
 
   final InternalTokenProvider authProvider;
 
@@ -38,27 +78,27 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   }
 
   @override
-  Future<String> get token async {
+  Future<String?> get token async {
     final bool doForceRefresh = _forceRefresh;
     _forceRefresh = false;
 
     // Take note of the current value of the tokenCounter so that this method
-    // can fail (with a FirebaseFirestoreError) if there is a token change while
-    // the request is outstanding.
+    // can retry if there is a token change while the request is outstanding.
     final int savedCounter = _tokenCounter;
 
     final GetTokenResult result =
         await authProvider.getAccessToken(forceRefresh: doForceRefresh);
 
-    // Cancel the request since the token changed while the request was
-    // outstanding so the response is potentially for a previous user (which
-    // user, we can't be sure).
+    // Discard the response since the token changed while the request was
+    // outstanding, so it is potentially for a previous user (which user, we
+    // can't be sure), and fetch the token again.
     if (savedCounter != _tokenCounter) {
-      throw FirestoreError('getToken aborted due to token change',
-          FirestoreErrorCode.aborted);
+      Log.d('FirebaseAuthCredentialsProvider',
+          'getToken aborted due to token change');
+      return token;
     }
 
-    return result?.token;
+    return result.token;
   }
 
   @override
@@ -67,7 +107,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
   /// Returns the current [User] as obtained from the given [FirebaseApp]
   /// instance.
   User getUser() {
-    final String uid = authProvider.uid;
+    final String? uid = authProvider.uid;
     return uid != null ? User(uid) : User.unauthenticated;
   }
 

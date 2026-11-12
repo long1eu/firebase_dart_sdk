@@ -12,14 +12,14 @@ import 'cases/lru_garbage_collector_test_case.dart';
 import 'persistence_test_helpers.dart';
 
 void main() {
-  LruGarbageCollectorTestCase testCase;
+  late LruGarbageCollectorTestCase testCase;
 
   setUp(() async {
     print('setUp');
 
     testCase = LruGarbageCollectorTestCase((LruGarbageCollectorParams param) =>
         createSQLitePersistence(
-            'firebase/firestore/local/sqlite_lru_garbage_collector_test-${Uuid().v4()}.db',
+            'firebase/firestore/local/sqlite_lru_garbage_collector_test-${const Uuid().v4()}.db',
             param));
     await testCase.setUp();
 
@@ -29,7 +29,6 @@ void main() {
   tearDown(() {
     return Future<void>.delayed(const Duration(milliseconds: 250), () async {
       await testCase.tearDown();
-      testCase = null;
     });
   });
 
@@ -51,6 +50,15 @@ void main() {
       () => testCase.testRemoveQueriesUpThroughSequenceNumber());
   test('testRemoveOrphanedDocuments',
       () => testCase.testRemoveOrphanedDocuments());
+  test('testRemoveOrphanedDocumentsWithNoDocuments',
+      () => testCase.testRemoveOrphanedDocumentsWithNoDocuments());
+  test('testRemoveOrphanedDocumentsWithLargeNumberOfDocuments',
+      () => testCase.testRemoveOrphanedDocumentsWithLargeNumberOfDocuments());
+  test('testRemoveRunToCompleteWhenNoDocumentsIsRemovedWithLargeNumberOfDocs',
+      () => testCase
+          .testRemoveRunToCompleteWhenNoDocumentsIsRemovedWithLargeNumberOfDocs());
+  test('testRemoveWhatCanBeRemovedWithLargeNumberOfDocs',
+      () => testCase.testRemoveWhatCanBeRemovedWithLargeNumberOfDocs());
   test('testRemoveTargetsThenGC', () => testCase.testRemoveTargetsThenGC());
   test('testGetsSize', () => testCase.testGetsSize());
   test('testDisabled', () => testCase.testDisabled());

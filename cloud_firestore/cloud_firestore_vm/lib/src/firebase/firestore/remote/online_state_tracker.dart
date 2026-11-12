@@ -27,6 +27,7 @@ typedef OnlineStateCallback = Future<void> Function(OnlineState onlineState);
 class OnlineStateTracker {
   OnlineStateTracker(this._scheduler, this._onlineStateCallback)
       : _state = OnlineState.unknown,
+        _watchStreamFailures = 0,
         _shouldWarnClientIsOffline = false;
 
   /// The current OnlineState.
@@ -39,7 +40,7 @@ class OnlineStateTracker {
   /// A timer that elapses after [_onlineStateTimeoutMs], at which point we transition from
   /// [OnlineState.unknown] to [OnlineState.offline] without waiting for the stream to actually fail
   /// ([_maxWatchStreamFailures] times).
-  TimerTask _onlineStateTimer;
+  TimerTask? _onlineStateTimer;
 
   /// Whether the client should log a warning message if it fails to connect to the backend
   /// (initially true, cleared after a successful stream, or if we've logged the message already).
@@ -144,10 +145,8 @@ class OnlineStateTracker {
   }
 
   void _clearOnlineStateTimer() {
-    if (_onlineStateTimer != null) {
-      _onlineStateTimer.cancel();
-      _onlineStateTimer = null;
-    }
+    _onlineStateTimer?.cancel();
+    _onlineStateTimer = null;
   }
 
   /// To deal with transient failures, we allow multiple stream attempts before giving up and

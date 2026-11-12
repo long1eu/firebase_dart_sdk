@@ -10,10 +10,11 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/online_state.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 
 /// Signature called when the stream is no longer being actively listened to.
-typedef OnCancelListener = void Function(QueryStream listener);
+typedef OnCancelListener = Future<void> Function(QueryStream listener);
 
 /// [QueryStream] takes a series of internal view snapshots and determines
 /// when to raise events.
@@ -21,16 +22,14 @@ class QueryStream extends Stream<ViewSnapshot> {
   factory QueryStream(
     Query query, [
     ListenOptions options = const ListenOptions(),
-    OnCancelListener onCancel,
+    OnCancelListener? onCancel,
   ]) {
-    assert(options != null);
-
-    QueryStream stream;
+    late final QueryStream stream;
     return stream = QueryStream._(
       query,
       options,
-      StreamController<ViewSnapshot>.broadcast(
-        onCancel: () => onCancel?.call(stream),
+      StreamController<ViewSnapshot>(
+        onCancel: () async => onCancel?.call(stream),
       ),
     );
   }
@@ -39,8 +38,7 @@ class QueryStream extends Stream<ViewSnapshot> {
     this._query,
     this._options,
     this._sink,
-  )   : assert(_options != null),
-        assert(_sink != null);
+  );
 
   final Query _query;
   final ListenOptions _options;
@@ -50,13 +48,18 @@ class QueryStream extends Stream<ViewSnapshot> {
   /// observer. This flag is set to true once we've actually raised an event.
   bool _raisedInitialEvent = false;
   OnlineState _onlineState = OnlineState.unknown;
-  ViewSnapshot _snapshot;
+  ViewSnapshot? _snapshot;
 
   Query get query => _query;
 
   ListenOptions get options => _options;
 
-  Future<void> onViewSnapshot(ViewSnapshot newSnapshot) async {
+  /// Whether this listener needs the backend (false for cache only listeners).
+  bool get listensToRemoteStore => _options.source != ListenSource.cache;
+
+  /// Handles a new view snapshot. Returns true if this raised an event to the listener.
+  Future<bool> onViewSnapshot(ViewSnapshot newSnapshot) async {
+    bool raisedEvent = false;
     hardAssert(newSnapshot.changes.isNotEmpty || newSnapshot.didSyncStateChange,
         'We got a new snapshot with no changes?');
 
@@ -77,25 +80,37 @@ class QueryStream extends Stream<ViewSnapshot> {
 
       if (shouldRaiseInitialEvent) {
         _raiseInitialEvent(newSnapshot);
+        raisedEvent = true;
       }
     } else if (_shouldRaiseEvent(newSnapshot)) {
       _sink.add(newSnapshot);
+      raisedEvent = true;
     }
 
     _snapshot = newSnapshot;
+    return raisedEvent;
   }
 
   void onError(FirestoreError error) {
     _sink.addError(error);
+    // An error is terminal: the event manager already dropped this listener, so close the stream instead of leaving
+    // the subscriber waiting forever.
+    if (!_sink.isClosed) {
+      _sink.close();
+    }
   }
 
-  void onOnlineStateChanged(OnlineState onlineState) {
+  /// Handles a change of the online state. Returns true if this raised an event to the listener.
+  bool onOnlineStateChanged(OnlineState onlineState) {
     _onlineState = onlineState;
-    if (_snapshot != null &&
+    final ViewSnapshot? snapshot = _snapshot;
+    if (snapshot != null &&
         !_raisedInitialEvent &&
-        _shouldRaiseInitialEvent(_snapshot, onlineState)) {
-      _raiseInitialEvent(_snapshot);
+        _shouldRaiseInitialEvent(snapshot, onlineState)) {
+      _raiseInitialEvent(snapshot);
+      return true;
     }
+    return false;
   }
 
   bool _shouldRaiseInitialEvent(
@@ -107,6 +122,12 @@ class QueryStream extends Stream<ViewSnapshot> {
 
     // Always raise the first event when we're synced
     if (!snapshot.isFromCache) {
+      return true;
+    }
+
+    // Always raise the event if listening to the cache only: there is nothing
+    // to wait for.
+    if (!listensToRemoteStore) {
       return true;
     }
 
@@ -122,7 +143,9 @@ class QueryStream extends Stream<ViewSnapshot> {
     }
 
     // Raise data from cache if we have any documents or we are offline
-    return snapshot.documents.isNotEmpty || onlineState == OnlineState.offline;
+    return snapshot.documents.isNotEmpty ||
+        snapshot.hasCachedResults ||
+        onlineState == OnlineState.offline;
   }
 
   bool _shouldRaiseEvent(ViewSnapshot snapshot) {
@@ -134,7 +157,7 @@ class QueryStream extends Stream<ViewSnapshot> {
     }
 
     final bool hasPendingWritesChanged = _snapshot != null &&
-        _snapshot.hasPendingWrites != snapshot.hasPendingWrites;
+        _snapshot!.hasPendingWrites != snapshot.hasPendingWrites;
     if (snapshot.didSyncStateChange || hasPendingWritesChanged) {
       return options.includeQueryMetadataChanges;
     }
@@ -155,15 +178,16 @@ class QueryStream extends Stream<ViewSnapshot> {
       snapshot.mutatedKeys,
       isFromCache: snapshot.isFromCache,
       excludesMetadataChanges: snapshot.excludesMetadataChanges,
+      hasCachedResults: snapshot.hasCachedResults,
     ));
   }
 
   @override
   StreamSubscription<ViewSnapshot> listen(
-      void Function(ViewSnapshot event) onData,
-      {Function onError,
-      void Function() onDone,
-      bool cancelOnError}) {
+      void Function(ViewSnapshot event)? onData,
+      {Function? onError,
+      void Function()? onDone,
+      bool? cancelOnError}) {
     return _sink.stream.listen(onData,
         onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }

@@ -16,7 +16,7 @@ class EmptyCredentialsProvider extends CredentialsProvider {
       BehaviorSubject<User>.seeded(User.unauthenticated);
 
   @override
-  Future<String> get token => Future<String>.value(null);
+  Future<String?> get token => Future<String?>.value(null);
 
   @override
   void invalidateToken() {}

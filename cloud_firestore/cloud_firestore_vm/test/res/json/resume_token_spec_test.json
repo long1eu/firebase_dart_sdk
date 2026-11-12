@@ -2,29 +2,36 @@
   "Resume tokens are sent after watch stream restarts": {
     "describeName": "Resume tokens:",
     "itName": "Resume tokens are sent after watch stream restarts",
-    "tags": [],
+    "tags": [
+    ],
     "config": {
-      "useGarbageCollection": true,
-      "numClients": 1
+      "numClients": 1,
+      "useEagerGCForMemory": true
     },
     "steps": [
       {
-        "userListen": [
-          2,
-          {
-            "path": "collection",
-            "filters": [],
-            "orderBys": []
-          }
-        ],
-        "stateExpect": {
+        "userListen": {
+          "query": {
+            "filters": [
+            ],
+            "orderBys": [
+            ],
+            "path": "collection"
+          },
+          "targetId": 2
+        },
+        "expectedState": {
           "activeTargets": {
             "2": {
-              "query": {
-                "path": "collection",
-                "filters": [],
-                "orderBys": []
-              },
+              "queries": [
+                {
+                  "filters": [
+                  ],
+                  "orderBys": [
+                  ],
+                  "path": "collection"
+                }
+              ],
               "resumeToken": ""
             }
           }
@@ -39,15 +46,16 @@
         "watchEntity": {
           "docs": [
             {
+              "createTime": 0,
               "key": "collection/a",
-              "version": 1000,
+              "options": {
+                "hasCommittedMutations": false,
+                "hasLocalMutations": false
+              },
               "value": {
                 "key": "a"
               },
-              "options": {
-                "hasLocalMutations": false,
-                "hasCommittedMutations": false
-              }
+              "version": 1000
             }
           ],
           "targets": [
@@ -65,32 +73,36 @@
       },
       {
         "watchSnapshot": {
-          "version": 1000,
-          "targetIds": []
+          "targetIds": [
+          ],
+          "version": 1000
         },
-        "expect": [
+        "expectedSnapshotEvents": [
           {
-            "query": {
-              "path": "collection",
-              "filters": [],
-              "orderBys": []
-            },
             "added": [
               {
+                "createTime": 0,
                 "key": "collection/a",
-                "version": 1000,
+                "options": {
+                  "hasCommittedMutations": false,
+                  "hasLocalMutations": false
+                },
                 "value": {
                   "key": "a"
                 },
-                "options": {
-                  "hasLocalMutations": false,
-                  "hasCommittedMutations": false
-                }
+                "version": 1000
               }
             ],
             "errorCode": 0,
             "fromCache": false,
-            "hasPendingWrites": false
+            "hasPendingWrites": false,
+            "query": {
+              "filters": [
+              ],
+              "orderBys": [
+              ],
+              "path": "collection"
+            }
           }
         ]
       },
@@ -102,14 +114,18 @@
           },
           "runBackoffTimer": true
         },
-        "stateExpect": {
+        "expectedState": {
           "activeTargets": {
             "2": {
-              "query": {
-                "path": "collection",
-                "filters": [],
-                "orderBys": []
-              },
+              "queries": [
+                {
+                  "filters": [
+                  ],
+                  "orderBys": [
+                  ],
+                  "path": "collection"
+                }
+              ],
               "resumeToken": "custom-query-resume-token"
             }
           }
@@ -120,29 +136,36 @@
   "Resume tokens are used across new listens": {
     "describeName": "Resume tokens:",
     "itName": "Resume tokens are used across new listens",
-    "tags": [],
+    "tags": [
+    ],
     "config": {
-      "useGarbageCollection": false,
-      "numClients": 1
+      "numClients": 1,
+      "useEagerGCForMemory": false
     },
     "steps": [
       {
-        "userListen": [
-          2,
-          {
-            "path": "collection",
-            "filters": [],
-            "orderBys": []
-          }
-        ],
-        "stateExpect": {
+        "userListen": {
+          "query": {
+            "filters": [
+            ],
+            "orderBys": [
+            ],
+            "path": "collection"
+          },
+          "targetId": 2
+        },
+        "expectedState": {
           "activeTargets": {
             "2": {
-              "query": {
-                "path": "collection",
-                "filters": [],
-                "orderBys": []
-              },
+              "queries": [
+                {
+                  "filters": [
+                  ],
+                  "orderBys": [
+                  ],
+                  "path": "collection"
+                }
+              ],
               "resumeToken": ""
             }
           }
@@ -157,15 +180,16 @@
         "watchEntity": {
           "docs": [
             {
+              "createTime": 0,
               "key": "collection/a",
-              "version": 1000,
+              "options": {
+                "hasCommittedMutations": false,
+                "hasLocalMutations": false
+              },
               "value": {
                 "key": "a"
               },
-              "options": {
-                "hasLocalMutations": false,
-                "hasCommittedMutations": false
-              }
+              "version": 1000
             }
           ],
           "targets": [
@@ -183,32 +207,36 @@
       },
       {
         "watchSnapshot": {
-          "version": 1000,
-          "targetIds": []
+          "targetIds": [
+          ],
+          "version": 1000
         },
-        "expect": [
+        "expectedSnapshotEvents": [
           {
-            "query": {
-              "path": "collection",
-              "filters": [],
-              "orderBys": []
-            },
             "added": [
               {
+                "createTime": 0,
                 "key": "collection/a",
-                "version": 1000,
+                "options": {
+                  "hasCommittedMutations": false,
+                  "hasLocalMutations": false
+                },
                 "value": {
                   "key": "a"
                 },
-                "options": {
-                  "hasLocalMutations": false,
-                  "hasCommittedMutations": false
-                }
+                "version": 1000
               }
             ],
             "errorCode": 0,
             "fromCache": false,
-            "hasPendingWrites": false
+            "hasPendingWrites": false,
+            "query": {
+              "filters": [
+              ],
+              "orderBys": [
+              ],
+              "path": "collection"
+            }
           }
         ]
       },
@@ -216,61 +244,73 @@
         "userUnlisten": [
           2,
           {
-            "path": "collection",
-            "filters": [],
-            "orderBys": []
+            "filters": [
+            ],
+            "orderBys": [
+            ],
+            "path": "collection"
           }
         ],
-        "stateExpect": {
-          "activeTargets": {}
+        "expectedState": {
+          "activeTargets": {
+          }
         }
       },
       {
-        "userListen": [
-          2,
-          {
-            "path": "collection",
-            "filters": [],
-            "orderBys": []
-          }
-        ],
-        "stateExpect": {
-          "activeTargets": {
-            "2": {
-              "query": {
-                "path": "collection",
-                "filters": [],
-                "orderBys": []
-              },
-              "resumeToken": "custom-query-resume-token"
-            }
-          }
+        "userListen": {
+          "query": {
+            "filters": [
+            ],
+            "orderBys": [
+            ],
+            "path": "collection"
+          },
+          "targetId": 2
         },
-        "expect": [
+        "expectedSnapshotEvents": [
           {
-            "query": {
-              "path": "collection",
-              "filters": [],
-              "orderBys": []
-            },
             "added": [
               {
+                "createTime": 0,
                 "key": "collection/a",
-                "version": 1000,
+                "options": {
+                  "hasCommittedMutations": false,
+                  "hasLocalMutations": false
+                },
                 "value": {
                   "key": "a"
                 },
-                "options": {
-                  "hasLocalMutations": false,
-                  "hasCommittedMutations": false
-                }
+                "version": 1000
               }
             ],
             "errorCode": 0,
             "fromCache": true,
-            "hasPendingWrites": false
+            "hasPendingWrites": false,
+            "query": {
+              "filters": [
+              ],
+              "orderBys": [
+              ],
+              "path": "collection"
+            }
           }
-        ]
+        ],
+        "expectedState": {
+          "activeTargets": {
+            "2": {
+              "queries": [
+                {
+                  "filters": [
+                  ],
+                  "orderBys": [
+                  ],
+                  "path": "collection"
+                }
+              ],
+              "resumeToken": "custom-query-resume-token"
+            }
+          }
+        }
       },
       {
         "watchAck": [
@@ -279,8 +319,9 @@
       },
       {
         "watchSnapshot": {
-          "version": 1001,
-          "targetIds": []
+          "targetIds": [
+          ],
+          "version": 1001
         }
       }
     ]

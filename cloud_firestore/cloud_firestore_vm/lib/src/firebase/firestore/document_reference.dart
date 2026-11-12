@@ -6,25 +6,28 @@ import 'dart:async';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/event_manager.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/listen_to_query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart'
     as core;
-import 'package:cloud_firestore_vm/src/firebase/firestore/core/query_stream.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/user_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/delete_mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/snapshot_listen_options.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
-import 'package:rxdart/rxdart.dart';
+import 'package:meta/meta.dart';
 
 /// A [DocumentReference] refers to a document location in a Firestore database and can be used to write, read, or
 /// listen to the location. There may or may not exist a document at the referenced location. A [DocumentReference] can
@@ -34,10 +37,11 @@ import 'package:rxdart/rxdart.dart';
 /// is not supported in production code and new SDK releases may break code that does so.
 class DocumentReference {
   // TODO(long1eu): We should checkNotNull(firestore), but tests are currently cheating and setting it to null.
-  DocumentReference(this.key, this.firestore) : assert(key != null);
+  @internal
+  DocumentReference(this.key, this.firestore);
 
-  factory DocumentReference.forPath(
-      ResourcePath path, Firestore firestore) {
+  @internal
+  factory DocumentReference.forPath(ResourcePath path, Firestore firestore) {
     if (path.length.remainder(2) != 0) {
       throw ArgumentError(
           'Invalid document reference. Document references must have an even number of segments, but '
@@ -86,16 +90,16 @@ class DocumentReference {
   /// [options] an object to configure the set behavior.
   ///
   /// Returns a Future that will be resolved when the write finishes.
-  Future<void> set(Map<String, Object> data, [SetOptions options]) async {
-    options ??= SetOptions.overwrite;
+  Future<void> set(Map<String, Object?> data, [SetOptions? options]) async {
+    final SetOptions setOptions = options ?? SetOptions.overwrite;
     checkNotNull(data, 'Provided data must not be null.');
-    checkNotNull(options, 'Provided options must not be null.');
-    final UserDataParsedSetData parsed = options.merge
-        ? firestore.dataConverter.parseMergeData(data, options.fieldMask)
+    final UserDataParsedSetData parsed = setOptions.merge
+        ? firestore.dataConverter.parseMergeData(data, setOptions.fieldMask)
         : firestore.dataConverter.parseSetData(data);
 
     await voidErrorTransformer(() =>
-        firestore.client.write(parsed.toMutationList(key, Precondition.none)));
+        firestore.client
+        .write(<Mutation>[parsed.toMutation(key, Precondition.none)]));
   }
 
   /// Updates fields in the document referred to by this DocumentReference. If no document exists yet, the update will
@@ -107,11 +111,13 @@ class DocumentReference {
   /// field/value pairs.
   ///
   /// Returns a Future that will be resolved when the write finishes.
-  Future<void> updateFromList(List<Object> data) async {
+  Future<void> updateFromList(List<Object?> data) async {
     final UserDataParsedUpdateData parsedData = firestore.dataConverter
         .parseUpdateDataFromList(collectUpdateArguments(1, data));
     await voidErrorTransformer(() => firestore.client
-        .write(parsedData.toMutationList(key, Precondition(exists: true))));
+        .write(<Mutation>[
+      parsedData.toMutation(key, Precondition(exists: true))
+    ]));
   }
 
   /// Updates fields in the document referred to by this [DocumentReference]. If no document exists yet, the update will
@@ -121,11 +127,13 @@ class DocumentReference {
   /// document.
   ///
   /// Returns a Future that will be resolved when the write finishes.
-  Future<void> update(Map<String, Object> data) async {
+  Future<void> update(Map<String, Object?> data) async {
     final UserDataParsedUpdateData parsedData =
         firestore.dataConverter.parseUpdateData(data);
     await voidErrorTransformer(() => firestore.client
-        .write(parsedData.toMutationList(key, Precondition(exists: true))));
+        .write(<Mutation>[
+      parsedData.toMutation(key, Precondition(exists: true))
+    ]));
   }
 
   /// Deletes the document referred to by this [DocumentReference].
@@ -145,11 +153,11 @@ class DocumentReference {
   /// [source] a value to configure the get behavior.
   ///
   /// Returns a Future that will be resolved with the contents of the [Document] at this [DocumentReference].
-  Future<DocumentSnapshot> get([Source source]) async {
+  Future<DocumentSnapshot> get([Source? source]) async {
     source ??= Source.defaultSource;
 
     if (source == Source.cache) {
-      final Document doc =
+      final Document? doc =
           await firestore.client.getDocumentFromLocalCache(key);
       final bool hasPendingWrites = doc != null && doc.hasLocalMutations;
 
@@ -166,7 +174,7 @@ class DocumentReference {
   }
 
   Future<DocumentSnapshot> _getViaSnapshotListener(Source source) {
-    return _getSnapshotsInternal(const ListenOptions.all())
+    return _firstAndCancel(_getSnapshotsInternal(const ListenOptions.all())
         .map((DocumentSnapshot snapshot) {
       if (!snapshot.exists && snapshot.metadata.isFromCache) {
         // TODO(long1eu): Reconsider how to raise missing documents when offline.
@@ -187,7 +195,7 @@ class DocumentReference {
       } else {
         return snapshot;
       }
-    }).first;
+    }));
   }
 
   Stream<DocumentSnapshot> get snapshots {
@@ -195,22 +203,28 @@ class DocumentReference {
     return _getSnapshotsInternal(options);
   }
 
-  Stream<DocumentSnapshot> getSnapshots([MetadataChanges changes]) {
+  Stream<DocumentSnapshot> getSnapshots([MetadataChanges? changes]) {
     final ListenOptions options =
         _internalOptions(changes ?? MetadataChanges.exclude);
     return _getSnapshotsInternal(options);
   }
 
+  /// Starts listening with the given [options], which also select the
+  /// [ListenSource]: with [ListenSource.cache] the events are raised from the
+  /// local cache only (local writes, cache updates) and the backend is not
+  /// contacted for this listener.
+  Stream<DocumentSnapshot> getSnapshotsWithOptions(SnapshotListenOptions options) {
+    return _getSnapshotsInternal(
+        _internalOptions(options.metadataChanges, options.source));
+  }
+
   Stream<DocumentSnapshot> _getSnapshotsInternal(ListenOptions options) {
     final core.Query query = core.Query(key.path);
 
-    return Stream<QueryStream>.fromFuture(
-            firestore.client.listen(query, options))
-        .flatMap((QueryStream it) => it)
-        .map((ViewSnapshot snapshot) {
+    return listenToQuery(firestore.client, query, options).map((ViewSnapshot snapshot) {
       hardAssert(snapshot.documents.length <= 1,
           'Too many documents returned on a document query');
-      final Document document = snapshot.documents.getDocument(key);
+      final Document? document = snapshot.documents.getDocument(key);
 
       if (document != null) {
         final bool hasPendingWrites =
@@ -235,8 +249,10 @@ class DocumentReference {
   }
 
   /// Converts the  API [MetadataChanges] object to the internal options object.
-  static ListenOptions _internalOptions(MetadataChanges metadataChanges) {
+  static ListenOptions _internalOptions(MetadataChanges metadataChanges,
+      [ListenSource source = ListenSource.defaultSource]) {
     return ListenOptions(
+      source: source,
       includeDocumentMetadataChanges:
           metadataChanges == MetadataChanges.include,
       includeQueryMetadataChanges: metadataChanges == MetadataChanges.include,
@@ -253,4 +269,14 @@ class DocumentReference {
 
   @override
   int get hashCode => key.hashCode * 31 ^ firestore.hashCode * 31;
+}
+
+/// Returns the first event of [stream] and waits for the subscription to be
+/// completely cancelled, so a subsequent listen on the same query doesn't race
+/// with the removal of the previous listener.
+Future<T> _firstAndCancel<T>(Stream<T> stream) async {
+  await for (final T value in stream) {
+    return value;
+  }
+  throw StateError('No element');
 }

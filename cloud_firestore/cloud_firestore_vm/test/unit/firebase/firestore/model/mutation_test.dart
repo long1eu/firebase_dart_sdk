@@ -9,14 +9,19 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dar
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/array_transform_operation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/delete_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/numeric_extremum_transform_operation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/numeric_increment_transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/set_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/unknown_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
@@ -30,10 +35,10 @@ void main() {
     List<Map<String, Object>> transforms,
     Map<String, Object> expectedData,
   ) {
-    MaybeDocument currentDoc = doc('collection/key', 0, baseData);
+    MaybeDocument? currentDoc = doc('collection/key', 0, baseData);
 
     for (Map<String, Object> transformData in transforms) {
-      final TransformMutation transform =
+      final Mutation transform =
           transformMutation('collection/key', transformData);
       currentDoc =
           transform.applyToLocalView(currentDoc, currentDoc, Timestamp.now());
@@ -53,6 +58,31 @@ void main() {
         baseData, <Map<String, Object>>[transformData], expectedData);
   }
 
+  test('testLocalMutationsCarryNoServerVersion', () {
+    final Document base = doc('collection/key', 5, map(<String>['a', 'b']));
+
+    final MaybeDocument? set = SetMutation(key('collection/key'),
+            wrapMap(map(<String>['c', 'd'])), Precondition.none)
+        .applyToLocalView(base, null, Timestamp.now());
+    expect(set!.version, SnapshotVersion.none);
+    expect((set as Document).hasLocalMutations, isTrue);
+
+    final MaybeDocument? patch = PatchMutation(
+            key('collection/key'),
+            wrapMap(map(<String>['c', 'd'])),
+            FieldMask(<FieldPath>{field('c')}),
+            Precondition.none)
+        .applyToLocalView(base, null, Timestamp.now());
+    expect(patch!.version, SnapshotVersion.none);
+    expect((patch as Document).hasLocalMutations, isTrue);
+
+    final MaybeDocument? delete = DeleteMutation(
+            key('collection/key'), Precondition.none)
+        .applyToLocalView(base, null, Timestamp.now());
+    expect(delete, isA<NoDocument>());
+    expect(delete!.version, SnapshotVersion.none);
+  });
+
   test('testAppliesSetsToDocuments', () {
     final Map<String, Object> data =
         map(<String>['foo', 'foo-value', 'baz', 'baz-value']);
@@ -60,12 +90,193 @@ void main() {
 
     final Mutation set =
         setMutation('collection/key', map(<String>['bar', 'bar-value']));
-    final MaybeDocument setDoc =
+    final MaybeDocument? setDoc =
         set.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
     expect(
         setDoc,
         doc('collection/key', 0, map(<String>['bar', 'bar-value']),
             DocumentState.localMutations));
+  });
+
+  group('set and patch with transforms', () {
+    final List<FieldTransform> serverTs = <FieldTransform>[
+      FieldTransform(field('ts'), ServerTimestampOperation()),
+    ];
+    final List<FieldTransform> arrUnion = <FieldTransform>[
+      FieldTransform(
+          field('arr'), ArrayTransformOperationUnion(<FieldValue>[wrap(2)])),
+    ];
+
+    test('testSetWithTransformAppliesTransformOnTopOfNewData', () {
+      // The set replaces the whole document, so the transform is evaluated on
+      // top of the written data and not on the old value of the field (no
+      // base document is given here; see the local store tests for the
+      // base-document fallback).
+      final Document baseDoc = doc(
+          'collection/key',
+          3,
+          map(<dynamic>[
+            'arr',
+            <int>[9],
+            'other',
+            1
+          ]));
+      final Mutation set = SetMutation(key('collection/key'),
+          wrapMap(map(<String>['foo', 'bar'])), Precondition.none, arrUnion);
+      final Document local =
+          set.applyToLocalView(baseDoc, null, Timestamp.now())! as Document;
+      expect(
+          local.data,
+          wrapMap(map(<dynamic>[
+            'foo',
+            'bar',
+            'arr',
+            <int>[2]
+          ])));
+      // Locally mutated documents carry no server version.
+      expect(local.version, version(0));
+      expect(local.hasLocalMutations, isTrue);
+    });
+
+    test('testPatchWithTransformKeepsUnmaskedFields', () {
+      final Document baseDoc = doc(
+          'collection/key',
+          3,
+          map(<dynamic>[
+            'arr',
+            <int>[1],
+            'a',
+            1,
+            'b',
+            2
+          ]));
+      final Mutation patch = PatchMutation(
+          key('collection/key'),
+          wrapMap(map(<dynamic>['a', 10])),
+          fieldMask(<String>['a']),
+          Precondition(exists: true),
+          arrUnion);
+      final Document local = patch.applyToLocalView(
+          baseDoc, baseDoc, Timestamp.now())! as Document;
+      expect(
+          local.data,
+          wrapMap(map(<dynamic>[
+            'arr',
+            <int>[1, 2],
+            'a',
+            10,
+            'b',
+            2
+          ])));
+    });
+
+    test(
+        'testPatchWithTransformDoesNotCreateMissingDocumentWithExistsPrecondition',
+        () {
+      final Mutation patch = PatchMutation(
+          key('collection/key'),
+          ObjectValue.empty,
+          const FieldMask(<FieldPath>{}),
+          Precondition(exists: true),
+          serverTs);
+      expect(patch.applyToLocalView(null, null, Timestamp.now()), isNull);
+    });
+
+    test('testSetWithTransformUsesServerResultsWhenAcknowledged', () {
+      final Mutation set = SetMutation(
+          key('collection/key'),
+          wrapMap(map(<String>['foo', 'bar'])),
+          Precondition.none, <FieldTransform>[
+        FieldTransform(field('inc'),
+            NumericIncrementTransformOperation(wrap(1) as NumberValue)),
+        FieldTransform(field('ts'), ServerTimestampOperation()),
+      ]);
+      const Timestamp serverTime = Timestamp(100, 0);
+      final MaybeDocument result = set.applyToRemoteDocument(
+          null,
+          MutationResult(version(7), <FieldValue>[
+            wrap(5),
+            wrap(serverTime),
+          ]));
+      expect(
+          result,
+          doc(
+              'collection/key',
+              7,
+              map(<dynamic>['foo', 'bar', 'inc', 5, 'ts', serverTime]),
+              DocumentState.committedMutations));
+    });
+
+    test('testPatchWithTransformUsesServerResultsWhenAcknowledged', () {
+      final Document baseDoc = doc(
+          'collection/key',
+          3,
+          map(<dynamic>[
+            'a',
+            1,
+            'b',
+            2,
+            'arr',
+            <int>[7]
+          ]));
+      final Mutation patch = PatchMutation(
+          key('collection/key'),
+          wrapMap(map(<dynamic>['a', 10])),
+          fieldMask(<String>['a']),
+          Precondition(exists: true),
+          arrUnion);
+      final MaybeDocument result = patch.applyToRemoteDocument(
+          baseDoc,
+          MutationResult(version(7), <FieldValue>[
+            wrap(<int>[7, 2])
+          ]));
+      expect(
+          result,
+          doc(
+              'collection/key',
+              7,
+              map(<dynamic>[
+                'a',
+                10,
+                'b',
+                2,
+                'arr',
+                <int>[7, 2]
+              ]),
+              DocumentState.committedMutations));
+    });
+
+    test('testMutationsWithDifferentTransformsAreNotEqual', () {
+      final Mutation plain = setMutation('collection/key', map());
+      final Mutation withTransform = SetMutation(key('collection/key'),
+          ObjectValue.empty, Precondition.none, serverTs);
+      expect(plain, isNot(withTransform));
+      expect(
+          withTransform,
+          SetMutation(key('collection/key'), ObjectValue.empty,
+              Precondition.none, serverTs));
+      expect(
+          withTransform.hashCode,
+          SetMutation(key('collection/key'), ObjectValue.empty,
+                  Precondition.none, serverTs)
+              .hashCode);
+    });
+
+    test('testTransformBaseValueExtractedFromSetAndPatch', () {
+      final Document baseDoc = doc('collection/key', 3, map(<dynamic>['n', 4]));
+      final List<FieldTransform> inc = <FieldTransform>[
+        FieldTransform(field('n'),
+            NumericIncrementTransformOperation(wrap(1) as NumberValue)),
+      ];
+      final Mutation set = SetMutation(
+          key('collection/key'), ObjectValue.empty, Precondition.none, inc);
+      expect(set.extractTransformBaseValue(baseDoc),
+          wrapMap(map(<dynamic>['n', 4])));
+      expect(
+          setMutation('collection/key', map())
+              .extractTransformBaseValue(baseDoc),
+          isNull);
+    });
   });
 
   test('testAppliesPatchToDocuments', () {
@@ -80,7 +291,7 @@ void main() {
     final Mutation patch = patchMutation(
         'collection/key', map(<String>['foo.bar', 'new-bar-value']));
 
-    final MaybeDocument local =
+    final MaybeDocument? local =
         patch.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
 
     final Map<String, Object> expectedData = map(<dynamic>[
@@ -94,12 +305,12 @@ void main() {
   });
 
   test('testAppliesPatchWithMergeToDocuments', () {
-    final MaybeDocument baseDoc = deletedDoc('collection/key', 0);
+    final MaybeDocument? baseDoc = deletedDoc('collection/key', 0);
     final Mutation upsert = patchMutation(
         'collection/key',
         map(<String>['foo.bar', 'new-bar-value']),
         <FieldPath>[field('foo.bar')]);
-    final MaybeDocument newDoc =
+    final MaybeDocument? newDoc =
         upsert.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
     final Map<String, Object> expectedData = map(<dynamic>[
       'foo',
@@ -110,12 +321,12 @@ void main() {
   });
 
   test('testAppliesPatchToNullDocWithMergeToDocuments', () {
-    MaybeDocument baseDoc;
+    MaybeDocument? baseDoc;
     final Mutation upsert = patchMutation(
         'collection/key',
         map(<String>['foo.bar', 'new-bar-value']),
         <FieldPath>[field('foo.bar')]);
-    final MaybeDocument newDoc =
+    final MaybeDocument? newDoc =
         upsert.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
     final Map<String, Object> expectedData = map(<dynamic>[
       'foo',
@@ -137,7 +348,7 @@ void main() {
     final Mutation patch =
         PatchMutation(_key, ObjectValue.empty, mask, Precondition.none);
 
-    final MaybeDocument patchDoc =
+    final MaybeDocument? patchDoc =
         patch.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
     final Map<String, Object> expectedData = map(<dynamic>[
       'foo',
@@ -154,7 +365,7 @@ void main() {
 
     final Mutation patch = patchMutation(
         'collection/key', map(<String>['foo.bar', 'new-bar-value']));
-    final MaybeDocument patchedDoc =
+    final MaybeDocument? patchedDoc =
         patch.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
     final Map<String, Object> expectedData = map(<dynamic>[
       'foo',
@@ -167,10 +378,10 @@ void main() {
   });
 
   test('testPatchingDeletedDocumentsDoesNothing', () {
-    final MaybeDocument baseDoc = deletedDoc('collection/key', 0);
+    final MaybeDocument? baseDoc = deletedDoc('collection/key', 0);
     final Mutation patch =
         patchMutation('collection/key', map(<String>['foo', 'bar']));
-    final MaybeDocument patchedDoc =
+    final MaybeDocument? patchedDoc =
         patch.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
     expect(patchedDoc, baseDoc);
   });
@@ -187,7 +398,7 @@ void main() {
     final Timestamp timestamp = Timestamp.now();
     final Mutation transform = transformMutation('collection/key',
         map(<dynamic>['foo.bar', firestore.FieldValue.serverTimestamp()]));
-    final MaybeDocument transformedDoc =
+    final MaybeDocument? transformedDoc =
         transform.applyToLocalView(baseDoc, baseDoc, timestamp);
 
     // Server timestamps aren't parsed, so we manually insert it.
@@ -364,13 +575,13 @@ void main() {
   // NOTE: This is more a test of UserDataConverter code than Mutation code but we don't have unit tests for it
   // currently. We could consider removing this test once we have integration tests.
   test('testCreateArrayUnionTransform', () {
-    final TransformMutation transform = transformMutation(
+    final Mutation transform = transformMutation(
         'collection/key',
         map(<dynamic>[
           'a',
           firestore.FieldValue.arrayUnion(<String>['tag']),
           'bar.baz',
-          firestore.FieldValue.arrayUnion(<dynamic>[
+          firestore.FieldValue.arrayUnion(<Object>[
             true,
             map<dynamic>(<dynamic>[
               'nested',
@@ -407,7 +618,7 @@ void main() {
   // NOTE: This is more a test of UserDataConverter code than Mutation code but we don't have unit tests for it
   // currently. We could consider removing this test once we have integration tests.
   test('testCreateArrayRemoveTransform', () {
-    final TransformMutation transform = transformMutation(
+    final Mutation transform = transformMutation(
         'collection/key',
         map(<dynamic>[
           'foo',
@@ -651,7 +862,7 @@ void main() {
     final MutationResult mutationResult =
         MutationResult(version(1), <IntegerValue>[IntegerValue.valueOf(3)]);
 
-    final MaybeDocument transformedDoc =
+    final MaybeDocument? transformedDoc =
         transform.applyToRemoteDocument(baseDoc, mutationResult);
 
     final Map<String, Object> expectedData = map(<dynamic>['sum', 3]);
@@ -678,7 +889,7 @@ void main() {
     final MutationResult mutationResult = MutationResult(
         version(1), <TimestampValue>[TimestampValue.valueOf(serverTimestamp)]);
 
-    final MaybeDocument transformedDoc =
+    final MaybeDocument? transformedDoc =
         transform.applyToRemoteDocument(baseDoc, mutationResult);
 
     final Map<String, Object> expectedData = map(<dynamic>[
@@ -713,7 +924,7 @@ void main() {
     // Server just sends null transform results for array operations.
     final MutationResult mutationResult =
         MutationResult(version(1), <FieldValue>[wrap(null), wrap(null)]);
-    final MaybeDocument transformedDoc =
+    final MaybeDocument? transformedDoc =
         transform.applyToRemoteDocument(baseDoc, mutationResult);
 
     final Map<String, Object> expectedData = map(<dynamic>[
@@ -733,7 +944,7 @@ void main() {
     final Document baseDoc = doc('collection/key', 0, data);
 
     final Mutation delete = deleteMutation('collection/key');
-    final MaybeDocument deletedDocument =
+    final MaybeDocument? deletedDocument =
         delete.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
     expect(deletedDocument, deletedDoc('collection/key', 0));
   });
@@ -744,7 +955,7 @@ void main() {
 
     final Mutation set =
         setMutation('collection/key', map(<String>['foo', 'new-bar']));
-    final MaybeDocument setDoc =
+    final MaybeDocument? setDoc =
         set.applyToRemoteDocument(baseDoc, mutationResult(4));
 
     expect(
@@ -759,7 +970,7 @@ void main() {
 
     final Mutation patch =
         patchMutation('collection/key', map(<String>['foo', 'new-bar']));
-    final MaybeDocument patchDoc =
+    final MaybeDocument? patchDoc =
         patch.applyToRemoteDocument(baseDoc, mutationResult(4));
 
     expect(
@@ -768,9 +979,9 @@ void main() {
             DocumentState.committedMutations));
   });
 
-  void _assertVersionTransitions(Mutation mutation, MaybeDocument base,
+  void _assertVersionTransitions(Mutation mutation, MaybeDocument? base,
       MutationResult mutationResult, MaybeDocument expected) {
-    final MaybeDocument actual =
+    final MaybeDocument? actual =
         mutation.applyToRemoteDocument(base, mutationResult);
     expect(actual, expected);
   }
@@ -790,8 +1001,7 @@ void main() {
         doc('collection/key', 7, map(), DocumentState.committedMutations);
     final UnknownDocument docV7Unknown = unknownDoc('collection/key', 7);
 
-    final MutationResult mutationResult =
-        MutationResult(version(7), /*transformResults:*/ null);
+    final MutationResult mutationResult = MutationResult(version(7));
     final MutationResult transformResult =
         MutationResult(version(7), <FieldValue>[]);
 
@@ -825,46 +1035,43 @@ void main() {
     // Server timestamps are idempotent and don't have base values.
     final Mutation _transformMutation = transformMutation(
         'collection/key', <String, Object>{'nested': allTransforms});
-    expect(_transformMutation.extractBaseValue(baseDoc), isNull);
+    expect(_transformMutation.extractTransformBaseValue(baseDoc), isNull);
   });
 
   test('testNumericIncrementBaseValue', () {
-    final Document baseDoc = doc(
-      'collection/key',
-      0,
-      <String, Object>{
-        'nested': map<dynamic>(<dynamic>[
-          'ignore',
-          'foo',
-          'double',
-          42.0,
-          'long',
-          42,
-          'string',
-          'foo',
-          'map',
-          map<dynamic>(<dynamic>[])
-        ]),
-      },
-    );
+    final Map<String, Object> allValues = map<Object>(<dynamic>[
+      'ignore',
+      'foo',
+      'double',
+      42.0,
+      'long',
+      42,
+      'string',
+      'foo',
+      'map',
+      map<dynamic>(<dynamic>[])
+    ]);
+    allValues['nested'] = Map<String, Object>.from(allValues);
+    final Document baseDoc = doc('collection/key', 0, allValues);
+
+    final Map<String, Object> allTransforms = map<Object>(<dynamic>[
+      'double',
+      firestore.FieldValue.increment(1),
+      'long',
+      firestore.FieldValue.increment(1),
+      'string',
+      firestore.FieldValue.increment(1),
+      'map',
+      firestore.FieldValue.increment(1),
+      'missing',
+      firestore.FieldValue.increment(1)
+    ]);
+    allTransforms['nested'] = Map<String, Object>.from(allTransforms);
 
     final ObjectValue baseValue = transformMutation(
       'collection/key',
-      <String, Object>{
-        'nested': map<dynamic>(<dynamic>[
-          'double',
-          firestore.FieldValue.increment(1),
-          'long',
-          firestore.FieldValue.increment(1),
-          'string',
-          firestore.FieldValue.increment(1),
-          'map',
-          firestore.FieldValue.increment(1),
-          'missing',
-          firestore.FieldValue.increment(1)
-        ]),
-      },
-    ).extractBaseValue(baseDoc);
+      allTransforms,
+    ).extractTransformBaseValue(baseDoc)!;
 
     final FieldValue expected = wrapMap(map<dynamic>(<dynamic>[
       'double',
@@ -903,12 +1110,203 @@ void main() {
     final Mutation _transformMutation =
         transformMutation('collection/key', increment);
 
-    MaybeDocument mutatedDoc =
+    MaybeDocument? mutatedDoc =
         _transformMutation.applyToLocalView(baseDoc, baseDoc, Timestamp.now());
     mutatedDoc = _transformMutation.applyToLocalView(
         mutatedDoc, baseDoc, Timestamp.now());
 
-    final Document _mutatedDoc = mutatedDoc;
+    final Document _mutatedDoc = mutatedDoc! as Document;
     expect(_mutatedDoc.getField(field('sum')), wrap(2));
   });
+
+  test('testAppliesMinimumTransformToDocument', () async {
+    final Map<String, Object> baseDoc = map(<dynamic>[
+      'longMinLong', 5,
+      'longMinDouble', 5,
+      'doubleMinLong', 5.5,
+      'doubleMinDouble', 5.5,
+      'longMinNan', 5,
+      'doubleMinNan', 5.5,
+    ]);
+    final Map<String, Object> transform = map(<dynamic>[
+      'longMinLong', firestore.FieldValue.minimum(2),
+      'longMinDouble', firestore.FieldValue.minimum(2.2),
+      'doubleMinLong', firestore.FieldValue.minimum(2),
+      'doubleMinDouble', firestore.FieldValue.minimum(2.2),
+      'longMinNan', firestore.FieldValue.minimum(double.nan),
+      'doubleMinNan', firestore.FieldValue.minimum(double.nan),
+    ]);
+    final Map<String, Object> expected = map(<dynamic>[
+      'longMinLong', 2,
+      'longMinDouble', 2.2,
+      'doubleMinLong', 2,
+      'doubleMinDouble', 2.2,
+      'longMinNan', double.nan,
+      'doubleMinNan', double.nan,
+    ]);
+    _verifyTransform(baseDoc, transform, expected);
+  });
+
+  test('testAppliesMaximumTransformToDocument', () async {
+    final Map<String, Object> baseDoc = map(<dynamic>[
+      'longMaxLong', 5,
+      'longMaxDouble', 5,
+      'doubleMaxLong', 5.5,
+      'doubleMaxDouble', 5.5,
+      'longMaxNan', 5,
+      'doubleMaxNan', 5.5,
+    ]);
+    final Map<String, Object> transform = map(<dynamic>[
+      'longMaxLong', firestore.FieldValue.maximum(8),
+      'longMaxDouble', firestore.FieldValue.maximum(8.8),
+      'doubleMaxLong', firestore.FieldValue.maximum(8),
+      'doubleMaxDouble', firestore.FieldValue.maximum(8.8),
+      'longMaxNan', firestore.FieldValue.maximum(double.nan),
+      'doubleMaxNan', firestore.FieldValue.maximum(double.nan),
+    ]);
+    final Map<String, Object> expected = map(<dynamic>[
+      'longMaxLong', 8,
+      'longMaxDouble', 8.8,
+      'doubleMaxLong', 8,
+      'doubleMaxDouble', 8.8,
+      'longMaxNan', double.nan,
+      'doubleMaxNan', double.nan,
+    ]);
+    _verifyTransform(baseDoc, transform, expected);
+  });
+
+  test('testMinimumAndMaximumKeepPreviousValueWhenPreviousWins', () async {
+    // The previous value is already the winner: it keeps its own type.
+    _verifyTransform(
+        map(<dynamic>['a', 1, 'b', 1.5, 'c', 10, 'd', 10.5]),
+        map(<dynamic>[
+          'a', firestore.FieldValue.minimum(5.5),
+          'b', firestore.FieldValue.minimum(5),
+          'c', firestore.FieldValue.maximum(5.5),
+          'd', firestore.FieldValue.maximum(5),
+        ]),
+        map(<dynamic>['a', 1, 'b', 1.5, 'c', 10, 'd', 10.5]));
+  });
+
+  test('testMinimumAndMaximumEquivalentValuesKeepPreviousType', () async {
+    _verifyTransform(
+        map(<dynamic>['a', 3, 'b', 3.0, 'c', 3, 'd', 3.0]),
+        map(<dynamic>[
+          'a', firestore.FieldValue.minimum(3.0),
+          'b', firestore.FieldValue.minimum(3),
+          'c', firestore.FieldValue.maximum(3.0),
+          'd', firestore.FieldValue.maximum(3),
+        ]),
+        map(<dynamic>['a', 3, 'b', 3.0, 'c', 3, 'd', 3.0]));
+  });
+
+  test('testMinimumAndMaximumWithNaNPreviousValue', () async {
+    _verifyTransform(
+        map(<dynamic>['a', double.nan, 'b', double.nan]),
+        map(<dynamic>[
+          'a', firestore.FieldValue.minimum(5),
+          'b', firestore.FieldValue.maximum(5),
+        ]),
+        map(<dynamic>['a', double.nan, 'b', double.nan]));
+  });
+
+  test('testAppliesMinimumTransformToUnexpectedType', () async {
+    _verifyTransform(map(<dynamic>['string', 'value']),
+        map(<dynamic>['string', firestore.FieldValue.minimum(1)]),
+        map(<dynamic>['string', 1]));
+  });
+
+  test('testAppliesMaximumTransformToUnexpectedType', () async {
+    _verifyTransform(map(<dynamic>['string', 'value']),
+        map(<dynamic>['string', firestore.FieldValue.maximum(1)]),
+        map(<dynamic>['string', 1]));
+  });
+
+  test('testAppliesMinimumTransformToMissingField', () async {
+    _verifyTransform(map(),
+        map(<dynamic>['missing', firestore.FieldValue.minimum(1)]),
+        map(<dynamic>['missing', 1]));
+  });
+
+  test('testAppliesMaximumTransformToMissingField', () async {
+    _verifyTransform(map(),
+        map(<dynamic>['missing', firestore.FieldValue.maximum(1)]),
+        map(<dynamic>['missing', 1]));
+  });
+
+  test('testAppliesServerAckedMinimumAndMaximumTransformToDocuments',
+      () async {
+    final Document baseDoc =
+        doc('collection/key', 0, map(<dynamic>['min', 10, 'max', 10]));
+
+    final Mutation transform = transformMutation(
+        'collection/key',
+        map(<dynamic>[
+          'min', firestore.FieldValue.minimum(2),
+          'max', firestore.FieldValue.maximum(20),
+        ]));
+    final MutationResult mutationResult = MutationResult(version(1),
+        <FieldValue>[IntegerValue.valueOf(20), IntegerValue.valueOf(2)]);
+
+    final MaybeDocument? transformedDoc =
+        transform.applyToRemoteDocument(baseDoc, mutationResult);
+
+    expect(
+        transformedDoc,
+        doc('collection/key', 1, map(<dynamic>['min', 2, 'max', 20]),
+            DocumentState.committedMutations));
+  });
+
+  test('testNumericMinimumBaseValue', () {
+    _expectNoBaseValue(firestore.FieldValue.minimum(1));
+  });
+
+  test('testNumericMaximumBaseValue', () {
+    _expectNoBaseValue(firestore.FieldValue.maximum(1));
+  });
+
+  test('testNumericTransformOperationEquality', () {
+    final NumberValue one = IntegerValue.valueOf(1);
+    final NumberValue two = IntegerValue.valueOf(2);
+    expect(NumericMinimumTransformOperation(one),
+        NumericMinimumTransformOperation(IntegerValue.valueOf(1)));
+    expect(NumericMinimumTransformOperation(one).hashCode,
+        NumericMinimumTransformOperation(IntegerValue.valueOf(1)).hashCode);
+    expect(NumericMaximumTransformOperation(one),
+        NumericMaximumTransformOperation(IntegerValue.valueOf(1)));
+    expect(NumericMinimumTransformOperation(one),
+        isNot(NumericMinimumTransformOperation(two)));
+    expect(NumericMinimumTransformOperation(one),
+        isNot(NumericMaximumTransformOperation(one)));
+    expect(NumericMaximumTransformOperation(one),
+        isNot(NumericIncrementTransformOperation(one)));
+    expect(NumericIncrementTransformOperation(one),
+        NumericIncrementTransformOperation(IntegerValue.valueOf(1)));
+  });
+}
+
+void _expectNoBaseValue(firestore.FieldValue sentinel) {
+  final Map<String, Object> allValues = map<Object>(<dynamic>[
+    'ignore', 'foo',
+    'double', 42.0,
+    'long', 42,
+    'string', 'foo',
+    'map', map<dynamic>(<dynamic>[]),
+  ]);
+  allValues['nested'] = Map<String, Object>.from(allValues);
+  final Document baseDoc = doc('collection/key', 0, allValues);
+
+  final Map<String, Object> allTransforms = map<Object>(<dynamic>[
+    'double', sentinel,
+    'long', sentinel,
+    'string', sentinel,
+    'map', sentinel,
+    'missing', sentinel,
+  ]);
+  allTransforms['nested'] = Map<String, Object>.from(allTransforms);
+
+  expect(
+      transformMutation('collection/key', allTransforms)
+          .extractTransformBaseValue(baseDoc),
+      isNull);
 }

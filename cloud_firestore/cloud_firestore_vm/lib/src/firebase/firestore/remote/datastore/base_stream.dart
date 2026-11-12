@@ -11,10 +11,7 @@ abstract class BaseStream<Req extends GeneratedMessage,
     TaskScheduler scheduler,
     TaskId idleTaskId,
     TaskId connectionTaskId,
-  )   : assert(eventsController != null),
-        assert(scheduler != null),
-        assert(idleTaskId != null),
-        _backoff = ExponentialBackoff(scheduler, connectionTaskId),
+  )   : _backoff = ExponentialBackoff(scheduler, connectionTaskId),
         _eventsController = eventsController,
         _scheduler = scheduler,
         _idleTimerId = idleTaskId,
@@ -26,11 +23,18 @@ abstract class BaseStream<Req extends GeneratedMessage,
   final TaskId _idleTimerId;
 
   State _state = State.initial;
-  TimerTask _idleTimer;
+  TimerTask? _idleTimer;
 
-  ResponseStream<Res> _writeResponse;
-  StreamSubscription<Res> _responseSub;
-  StreamController<Req> _requestsController;
+  ResponseStream<Res>? _writeResponse;
+  StreamSubscription<Res>? _responseSub;
+  StreamController<Req>? _requestsController;
+
+  /// Incremented whenever a call is opened or closed. A start() that finds a
+  /// different value after an await knows its call is stale.
+  int _generation = 0;
+
+  /// Completes when the close in flight (if any) has finished tearing down.
+  Future<void>? _closeFuture;
 
   bool get isStarted =>
       _state == State.starting ||
@@ -41,6 +45,12 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
   @mustCallSuper
   Future<void> start() async {
+    // A close that is still releasing its call must finish first, otherwise it
+    // would reset the state of this new call.
+    while (_closeFuture != null) {
+      await _closeFuture;
+    }
+
     assert(_requestsController == null, 'Last stream is still active');
     assert(_responseSub == null, 'Last subscription is still active');
     assert(_idleTimer == null, 'Idle timer still set');
@@ -52,18 +62,36 @@ abstract class BaseStream<Req extends GeneratedMessage,
 
     assert(_state == State.initial, 'Already started');
     _changeState(State.starting);
-    _requestsController = StreamController<Req>.broadcast();
-    _writeResponse = await _buildCall(_requestsController.stream);
+    final int generation = ++_generation;
+    // Not a broadcast controller: gRPC only starts listening to the requests
+    // once the connection is up, anything written before must be buffered.
+    final StreamController<Req> requestsController = StreamController<Req>();
+    _requestsController = requestsController;
+    final ResponseStream<Res> writeResponse =
+        await _buildCall(requestsController.stream);
 
-    _responseSub = _writeResponse.listen(_onData,
+    // The stream might have been stopped while the call was being built (for
+    // example when the network was toggled). In that case the call is stale and
+    // must not be opened, as its requests controller was already torn down.
+    if (_generation != generation ||
+        _state != State.starting ||
+        _requestsController != requestsController) {
+      await writeResponse.cancel();
+      return;
+    }
+    _writeResponse = writeResponse;
+
+    _responseSub = writeResponse.listen(_onData,
         onError: _onError, onDone: _onDone, cancelOnError: false);
-    unawaited(_writeResponse.headers.then(_onHeaders));
+    // A call that fails before the headers arrive completes this future with
+    // the error. It is reported through the response stream instead.
+    unawaited(writeResponse.headers.then(_onHeaders, onError: (Object _) {}));
     _changeState(State.open);
   }
 
   Future<void> stop() async {
     if (isStarted) {
-      return _close(State.initial, GrpcError.ok());
+      return _close(State.initial, const GrpcError.ok());
     }
   }
 
@@ -76,10 +104,20 @@ abstract class BaseStream<Req extends GeneratedMessage,
   }
 
   void writeRequest(Req request) {
-    Log.d('$runtimeType',
-        '($hashCode) Stream sending: ${request.toProto3Json()}');
+    if (Log.isDebugEnabled) {
+      Log.d('$runtimeType',
+          '($hashCode) Stream sending: ${describeForLog(request)}');
+    }
     _cancelIdleCheck();
-    _requestsController.add(request);
+    final StreamController<Req>? requestsController = _requestsController;
+    if (requestsController == null) {
+      // The stream was torn down in the meantime. The request will be sent
+      // again when the stream restarts.
+      Log.d('$runtimeType',
+          '($hashCode) Dropping request, the stream is not active.');
+      return;
+    }
+    requestsController.add(request);
   }
 
   /// Marks this stream as idle. If no further actions are performed on the
@@ -95,8 +133,8 @@ abstract class BaseStream<Req extends GeneratedMessage,
     // already running a timer (in which case the previous idle timeout still
     // applies).
     if (isOpen && _idleTimer == null) {
-      _idleTimer = _scheduler.add(
-          _idleTimerId, const Duration(seconds: 10), _handleIdleCloseTimer);
+      _idleTimer =
+          _scheduler.add(_idleTimerId, idleTimeout, _handleIdleCloseTimer);
     }
   }
 
@@ -123,16 +161,16 @@ abstract class BaseStream<Req extends GeneratedMessage,
     if (_state != State.closing) {
       if (Log.isDebugEnabled) {
         Log.d('$runtimeType',
-            '($hashCode) Stream received: ${response.toProto3Json()}');
+            '($hashCode) Stream received: ${describeForLog(response)}');
       }
     }
   }
 
   void _onHeaders(Map<String, String> headers) {
     if (Log.isDebugEnabled) {
-      final Iterable<MapEntry<String, String>> entries = headers.keys
-          .where((String key) => whiteListedHeaders.contains(key.toLowerCase()))
-          .map((String key) => MapEntry<String, String>(key, headers[key]));
+      final Iterable<MapEntry<String, String>> entries = headers.entries.where(
+          (MapEntry<String, String> entry) =>
+              whiteListedHeaders.contains(entry.key.toLowerCase()));
 
       final Map<String, String> values =
           Map<String, String>.fromEntries(entries);
@@ -142,17 +180,21 @@ abstract class BaseStream<Req extends GeneratedMessage,
     }
   }
 
-  void _onError(dynamic error, StackTrace stackTrace) {
+  void _onError(Object error, StackTrace stackTrace) {
     if (_state != State.closing) {
-      if (error is GrpcError) {
-        if (error.code == StatusCode.ok) {
+      // FirestoreClient converts gRPC errors into FirestoreErrors, restore the
+      // original status here so the stream can classify it.
+      final Object err = error is FirestoreError
+          ? GrpcError.custom(error.code.value, error.message)
+          : error;
+      if (err is GrpcError) {
+        if (err.code == StatusCode.ok) {
           Log.d('$runtimeType', '($hashCode) Stream closed.');
         } else {
-          Log.d(
-              '$runtimeType', '($hashCode) Stream closed with status: $error.');
+          Log.d('$runtimeType', '($hashCode) Stream closed with status: $err.');
         }
 
-        handleServerClose(error);
+        handleServerClose(err);
       } else {
         Log.d('$runtimeType',
             '($hashCode) Stream closed with status: ${StatusCode.unknown} $error.');
@@ -161,7 +203,23 @@ abstract class BaseStream<Req extends GeneratedMessage,
     }
   }
 
-  void _onDone() {}
+  /// The response stream finished without an error event. Streams are only
+  /// ever stopped by this class (which cancels the subscription first, so this
+  /// callback is not reached), hence a clean finish is the server hanging up.
+  /// Treat it as an error-state close so the stream backs off and restarts,
+  /// like the Java client (whose onClose always calls handleServerClose).
+  ///
+  /// PORTING NOTE: the status is reported as UNAVAILABLE rather than OK so the
+  /// stream owner does not mistake it for a requested stop (its OK path
+  /// asserts that the stream is no longer needed).
+  void _onDone() {
+    if (_state == State.closing || !isOpen) {
+      return;
+    }
+    Log.d('$runtimeType', '($hashCode) Stream closed by the server.');
+    handleServerClose(
+        const GrpcError.unavailable('Stream closed by the server'));
+  }
 
   void _performBackoff() {
     assert(
@@ -215,13 +273,29 @@ abstract class BaseStream<Req extends GeneratedMessage,
       Log.d('$runtimeType', '($hashCode) Closing stream client-side');
     }
 
-    // this are null only when called from tests
+    // Detach the call synchronously: from here on a new call can be opened
+    // (once this close completes) without this close touching its fields.
+    final StreamController<Req>? requestsController = _requestsController;
+    final StreamSubscription<Res>? responseSub = _responseSub;
+    final ResponseStream<Res>? writeResponse = _writeResponse;
+    _requestsController = null;
+    _responseSub = null;
+    _writeResponse = null;
+    _generation++;
 
-    await _requestsController
-        ?.close()
-        ?.then((dynamic _) => _requestsController = null);
-    await _responseSub?.cancel()?.then((dynamic _) => _responseSub = null);
-    await _writeResponse?.cancel()?.then((_) => _writeResponse = null);
+    final Completer<void> closing = Completer<void>();
+    _closeFuture = closing.future;
+    try {
+      // these are null only when called from tests
+      // Not awaited: the future of a buffering controller only completes once
+      // gRPC consumed the requests, which never happens if it never connected.
+      unawaited(requestsController?.close());
+      await responseSub?.cancel();
+      await writeResponse?.cancel();
+    } finally {
+      _closeFuture = null;
+      closing.complete();
+    }
 
     // This state must be assigned before emitting [CloseEvent] to allow the
     // callback to inhibit backoff or otherwise manipulate the state in its
@@ -233,10 +307,8 @@ abstract class BaseStream<Req extends GeneratedMessage,
   }
 
   void _cancelIdleCheck() {
-    if (_idleTimer != null) {
-      _idleTimer.cancel();
-      _idleTimer = null;
-    }
+    _idleTimer?.cancel();
+    _idleTimer = null;
   }
 
   /// Called by the idle timer when the stream should close due to inactivity.
@@ -245,7 +317,7 @@ abstract class BaseStream<Req extends GeneratedMessage,
       // When timing out an idle stream there's no reason to force the stream
       // into backoff when it restarts so set the stream state to initial
       // instead of error.
-      return _close(State.initial, GrpcError.ok());
+      return _close(State.initial, const GrpcError.ok());
     }
   }
 
@@ -255,6 +327,10 @@ abstract class BaseStream<Req extends GeneratedMessage,
       addEvent(const OpenEvent());
     }
   }
+
+  /// The time a stream stays open after it is marked idle (one minute, as on
+  /// Android).
+  static const Duration idleTimeout = Duration(minutes: 1);
 
   static final Set<String> whiteListedHeaders = <String>{
     'date',

@@ -13,7 +13,7 @@ import 'immutable_sorted_map.dart';
 /// performance with increasing collection size it will automatically convert to
 /// a [RBTreeSortedMap] after an insert call above a certain threshold.
 class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
-  ArraySortedMap(this.comparator, [List<K> keys, List<V> values])
+  ArraySortedMap(this.comparator, [List<K>? keys, List<V>? values])
       : keys = keys ?? <K>[],
         values = values ?? <V>[];
 
@@ -27,16 +27,10 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   static ArraySortedMap<A, C> buildFrom<A, B, C>(List<A> keys, Map<B, C> values,
       KeyTranslator<A, B> translator, Comparator<A> comparator) {
     keys.sort(comparator);
-    final int length = keys.length;
-    final List<A> keyArray = List<A>(length);
-    final List<C> valueArray = List<C>(length);
-    int pos = 0;
-    for (A k in keys) {
-      keyArray[pos] = k;
-      final C value = values[translator(k)];
-      valueArray[pos] = value;
-      pos++;
-    }
+    final List<A> keyArray = List<A>.of(keys);
+    final List<C> valueArray = <C>[
+      for (A k in keys) values[translator(k)] as C,
+    ];
     return ArraySortedMap<A, C>(comparator, keyArray, valueArray);
   }
 
@@ -50,7 +44,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   bool containsKey(K key) => findKey(key) != -1;
 
   @override
-  V operator [](K key) {
+  V? operator [](K key) {
     final int pos = findKey(key);
     return pos != -1 ? values[pos] : null;
   }
@@ -99,10 +93,10 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   }
 
   @override
-  K get minKey => keys.isNotEmpty ? keys[0] : null;
+  K? get minKey => keys.isNotEmpty ? keys[0] : null;
 
   @override
-  K get maxKey => keys.isNotEmpty ? keys[keys.length - 1] : null;
+  K? get maxKey => keys.isNotEmpty ? keys[keys.length - 1] : null;
 
   @override
   int get length => keys.length;
@@ -161,7 +155,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   }
 
   @override
-  K getPredecessorKey(K key) {
+  K? getPredecessorKey(K key) {
     final int pos = findKey(key);
     if (pos == -1) {
       throw ArgumentError('Can\'t find predecessor of nonexistent key');
@@ -171,7 +165,7 @@ class ArraySortedMap<K, V> extends ImmutableSortedMap<K, V> {
   }
 
   @override
-  K getSuccessorKey(K key) {
+  K? getSuccessorKey(K key) {
     final int pos = findKey(key);
     if (pos == -1) {
       throw ArgumentError('Can\'t find successor of nonexistent key');

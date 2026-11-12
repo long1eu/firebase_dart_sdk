@@ -64,9 +64,13 @@ class EncodedPath {
     for (int i = 0; i < length; i++) {
       final int c = segment.codeUnitAt(i);
       if (c == 0x0) {
-        result..writeCharCode(_escape)..writeCharCode(_encodedNul);
+        result
+          ..writeCharCode(_escape)
+          ..writeCharCode(_encodedNul);
       } else if (c == _escape) {
-        result..writeCharCode(_escape)..writeCharCode(_encodedEscape);
+        result
+          ..writeCharCode(_escape)
+          ..writeCharCode(_encodedEscape);
       } else {
         result.writeCharCode(c);
       }
@@ -75,7 +79,9 @@ class EncodedPath {
 
   /// Encodes a path separator into the given [StringBuffer].
   static void _encodeSeparator(StringBuffer result) {
-    result..writeCharCode(_escape)..writeCharCode(_encodedSeparator);
+    result
+      ..writeCharCode(_escape)
+      ..writeCharCode(_encodedSeparator);
   }
 
   /// Decodes the given SQLite-compatible string form of a resource path into a [ResourcePath] instance. Note that this
@@ -93,13 +99,12 @@ class EncodedPath {
     // Even the empty path must encode as a path of at least length 2. A path with length of exactly 2 must be the empty
     // path.
     final int length = path.length;
-    hardAssert(length >= 2, 'Invalid path \'$path\'');
+    hardAssertLazy(length >= 2, () => 'Invalid path \'$path\'');
     if (length == 2) {
-      hardAssert(
-        path.codeUnitAt(0) == _escape &&
-            path.codeUnitAt(1) == _encodedSeparator,
-        'Non-empty path \'$path\' had length 2',
-      );
+      hardAssertLazy(
+          path.codeUnitAt(0) == _escape &&
+              path.codeUnitAt(1) == _encodedSeparator,
+          () => 'Non-empty path \'$path\' had length 2');
       return <String>[];
     }
 

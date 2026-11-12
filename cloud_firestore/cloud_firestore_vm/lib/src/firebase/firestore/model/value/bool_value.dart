@@ -26,7 +26,11 @@ class BoolValue extends FieldValue {
   @override
   int compareTo(FieldValue other) {
     if (other is BoolValue) {
-      return _value == other._value ? 0 : _value ? 1 : -1;
+      return _value == other._value
+          ? 0
+          : _value
+              ? 1
+              : -1;
     } else {
       return defaultCompareTo(other);
     }

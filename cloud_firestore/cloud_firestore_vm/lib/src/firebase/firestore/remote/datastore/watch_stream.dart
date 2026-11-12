@@ -7,9 +7,9 @@ part of datastore;
 class WatchStream
     extends BaseStream<proto.ListenRequest, proto.ListenResponse> {
   factory WatchStream({
-    @required FirestoreClient client,
-    @required TaskScheduler scheduler,
-    @required RemoteSerializer serializer,
+    required FirestoreClient client,
+    required TaskScheduler scheduler,
+    required RemoteSerializer serializer,
   }) {
     // ignore: close_sinks
     final StreamController<StreamEvent> controller =
@@ -23,9 +23,7 @@ class WatchStream
     TaskScheduler scheduler,
     RemoteSerializer serializer,
     StreamController<StreamEvent> eventsController,
-  )   : assert(client != null),
-        assert(serializer != null),
-        _client = client,
+  )   : _client = client,
         _serializer = serializer,
         super(
           eventsController,

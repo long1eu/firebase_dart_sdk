@@ -187,10 +187,10 @@ class LruGarbageCollectorParams {
 
 class LruGarbageCollectorResults {
   const LruGarbageCollectorResults({
-    this.hasRun,
-    this.sequenceNumbersCollected,
-    this.targetsRemoved,
-    this.documentsRemoved,
+    required this.hasRun,
+    required this.sequenceNumbersCollected,
+    required this.targetsRemoved,
+    required this.documentsRemoved,
   });
 
   static const LruGarbageCollectorResults didNotRun =
@@ -230,7 +230,8 @@ class LruGarbageCollectorScheduler {
   final TaskScheduler _scheduler;
 
   bool _hasRun = false;
-  TimerTask _gcTask;
+  bool _stopped = false;
+  TimerTask? _gcTask;
 
   /// How long we wait to try running LRU GC after SDK initialization.
   static const Duration _initialGcDelay = Duration(minutes: 1);
@@ -246,9 +247,9 @@ class LruGarbageCollectorScheduler {
   }
 
   void stop() {
-    if (_gcTask != null) {
-      _gcTask.cancel();
-    }
+    // A run that is already in flight must not reschedule itself afterwards.
+    _stopped = true;
+    _gcTask?.cancel();
   }
 
   void _scheduleGC() {
@@ -258,9 +259,16 @@ class LruGarbageCollectorScheduler {
       TaskId.garbageCollection,
       delay,
       () async {
-        await _localStore.collectGarbage(_garbageCollector);
+        try {
+          await _localStore.collectGarbage(_garbageCollector);
+        } catch (e) {
+          // A failed run (e.g. a locked or closed database) must not end the scheduling for the whole process.
+          Log.w('LruGarbageCollectorScheduler', 'Garbage collection failed: $e');
+        }
         _hasRun = true;
-        _scheduleGC();
+        if (!_stopped) {
+          _scheduleGC();
+        }
       },
     );
   }

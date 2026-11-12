@@ -10,11 +10,9 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/set_mutation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
-import 'package:meta/meta.dart';
 
 /// Represents what type of API method provided the data being parsed; useful for determining which error conditions
 /// apply during parsing and providing better error messages.
@@ -36,20 +34,26 @@ class UserDataSource {
   /// UserDataParseContext.isWrite() will return false.
   static const UserDataSource argument = UserDataSource._(3);
 
+  /// Indicates that the source is an argument that may directly contain nested arrays (e.g. the operand of a `whereIn`
+  /// or `whereNotIn` query).
+  static const UserDataSource arrayArgument = UserDataSource._(4);
+
   String get name => _stringValues[_value];
 
   static const List<UserDataSource> values = <UserDataSource>[
     set,
     mergeSet,
     update,
-    argument
+    argument,
+    arrayArgument
   ];
 
   static const List<String> _stringValues = <String>[
     'set',
     'mergeSet',
     'update',
-    'argument'
+    'argument',
+    'arrayArgument'
   ];
 }
 
@@ -65,15 +69,15 @@ class UserDataParseContext {
   // TODO(long1eu): We don't support array paths right now, so path can be null to indicate the context represents any
   //  location within an array (in which case certain features will not work and errors will be somewhat compromised).
   const UserDataParseContext._(this._accumulator, this.path,
-      {@required this.arrayElement});
+      {required this.arrayElement});
 
-  static final Pattern _reservedFieldRegex = RegExp('^__.*__\$');
+  static const String _reservedFieldDesignator = '__';
 
   final UserDataParseAccumulator _accumulator;
 
   /// The current path being parsed.
   // TODO(long1eu): path should never be null, but we don't support array paths right now.
-  final FieldPath path;
+  final FieldPath? path;
 
   /// Whether or not this context corresponds to an element of an array.
   final bool arrayElement;
@@ -90,6 +94,7 @@ class UserDataParseContext {
       case UserDataSource.update:
         return true;
       case UserDataSource.argument:
+      case UserDataSource.arrayArgument:
         return false;
       default:
         throw fail('Unexpected case for UserDataSource: '
@@ -98,7 +103,8 @@ class UserDataParseContext {
   }
 
   UserDataParseContext childContextForSegment(String fieldName) {
-    final FieldPath childPath =
+    final FieldPath? path = this.path;
+    final FieldPath? childPath =
         path == null ? null : path.appendSegment(fieldName);
     final UserDataParseContext context =
         UserDataParseContext._(_accumulator, childPath, arrayElement: false);
@@ -106,7 +112,8 @@ class UserDataParseContext {
   }
 
   UserDataParseContext childContextForField(FieldPath fieldPath) {
-    final FieldPath childPath =
+    final FieldPath? path = this.path;
+    final FieldPath? childPath =
         path == null ? null : path.appendField(fieldPath);
     final UserDataParseContext context =
         UserDataParseContext._(_accumulator, childPath, arrayElement: false);
@@ -132,6 +139,7 @@ class UserDataParseContext {
 
   /// Creates an error including the given reason and the current field path.
   Error createError(String reason) {
+    final FieldPath? path = this.path;
     final String fieldDescription =
         (path == null || path.isEmpty) ? '' : ' (found in field $path)';
     return ArgumentError('Invalid data. $reason$fieldDescription');
@@ -139,6 +147,7 @@ class UserDataParseContext {
 
   void _validatePath() {
     // TODO(long1eu): Remove null check once we have proper paths for fields within arrays.
+    final FieldPath? path = this.path;
     if (path == null) {
       return;
     }
@@ -148,8 +157,14 @@ class UserDataParseContext {
   }
 
   void _validatePathSegment(String segment) {
-    if (isWrite && _reservedFieldRegex.allMatches(segment).isNotEmpty) {
-      throw createError('Document fields cannot begin and end with __');
+    if (segment.isEmpty) {
+      throw createError('Document fields must not be empty');
+    }
+
+    if (isWrite &&
+        segment.startsWith(_reservedFieldDesignator) &&
+        segment.endsWith(_reservedFieldDesignator)) {
+      throw createError('Document fields cannot begin and end with "__"');
     }
   }
 }
@@ -159,20 +174,17 @@ class UserDataParsedSetData {
   UserDataParsedSetData(this._data, this._fieldMask, this._fieldTransforms);
 
   final ObjectValue _data;
-  final FieldMask _fieldMask;
+  final FieldMask? _fieldMask;
   final List<FieldTransform> _fieldTransforms;
 
-  List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
-    final List<Mutation> mutations = <Mutation>[];
-    if (_fieldMask != null) {
-      mutations.add(PatchMutation(key, _data, _fieldMask, precondition));
+  Mutation toMutation(DocumentKey key, Precondition precondition) {
+    final FieldMask? fieldMask = _fieldMask;
+    if (fieldMask != null) {
+      return PatchMutation(
+          key, _data, fieldMask, precondition, _fieldTransforms);
     } else {
-      mutations.add(SetMutation(key, _data, precondition));
+      return SetMutation(key, _data, precondition, _fieldTransforms);
     }
-    if (_fieldTransforms.isNotEmpty) {
-      mutations.add(TransformMutation(key, _fieldTransforms));
-    }
-    return mutations;
   }
 }
 
@@ -186,14 +198,8 @@ class UserDataParsedUpdateData {
 
   final List<FieldTransform> fieldTransforms;
 
-  List<Mutation> toMutationList(DocumentKey key, Precondition precondition) {
-    final List<Mutation> mutations = <Mutation>[
-      PatchMutation(key, _data, _fieldMask, precondition)
-    ];
-    if (fieldTransforms.isNotEmpty) {
-      mutations.add(TransformMutation(key, fieldTransforms));
-    }
-    return mutations;
+  Mutation toMutation(DocumentKey key, Precondition precondition) {
+    return PatchMutation(key, _data, _fieldMask, precondition, fieldTransforms);
   }
 }
 
@@ -263,7 +269,7 @@ class UserDataParseAccumulator {
   /// (Optional) The field mask in the result will be the [userFieldMask] and only transforms that are covered by the
   /// mask will be included.
   UserDataParsedSetData toMergeData(ObjectValue data,
-      [FieldMask userFieldMask]) {
+      [FieldMask? userFieldMask]) {
     if (userFieldMask == null) {
       return UserDataParsedSetData(
           data, FieldMask(_fieldMask), fieldTransforms.toList(growable: false));

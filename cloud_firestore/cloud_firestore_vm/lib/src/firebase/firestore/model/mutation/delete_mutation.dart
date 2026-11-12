@@ -10,7 +10,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutatio
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 
@@ -21,10 +20,10 @@ class DeleteMutation extends Mutation {
 
   @override
   MaybeDocument applyToRemoteDocument(
-      MaybeDocument maybeDoc, MutationResult mutationResult) {
+      MaybeDocument? maybeDoc, MutationResult mutationResult) {
     verifyKeyMatches(maybeDoc);
 
-    hardAssert(mutationResult.transformResults == null,
+    hardAssert(mutationResult.transformResults.isEmpty,
         'Transform results received by DeleteMutation.');
 
     // Unlike applyToLocalView, if we're applying a mutation to a remote document the server has
@@ -37,8 +36,8 @@ class DeleteMutation extends Mutation {
   }
 
   @override
-  MaybeDocument applyToLocalView(
-      MaybeDocument maybeDoc, MaybeDocument baseDoc, Timestamp localWriteTime) {
+  MaybeDocument? applyToLocalView(MaybeDocument? maybeDoc,
+      MaybeDocument? baseDoc, Timestamp localWriteTime) {
     verifyKeyMatches(maybeDoc);
 
     if (!precondition.isValidFor(maybeDoc)) {
@@ -51,9 +50,6 @@ class DeleteMutation extends Mutation {
       hasCommittedMutations: false,
     );
   }
-
-  @override
-  ObjectValue extractBaseValue(MaybeDocument maybeDoc) => null;
 
   @override
   bool operator ==(Object other) =>

@@ -23,14 +23,14 @@ void main() {
   IntegrationTestUtil.currentDatabasePath = 'integration/array_transforms';
 
   // A document reference to read and write to.
-  DocumentReference docRef;
+  late DocumentReference docRef;
 
   // Accumulator used to capture events during the test.
-  EventAccumulator<DocumentSnapshot> accumulator;
+  late EventAccumulator<DocumentSnapshot> accumulator;
 
   // Listener registration for a listener maintained during the course of the
   // test.
-  StreamSubscription<DocumentSnapshot> listenerRegistration;
+  late StreamSubscription<DocumentSnapshot> listenerRegistration;
 
   setUp(() async {
     docRef = await testDocument();
@@ -51,7 +51,7 @@ void main() {
   });
 
   Future<void> expectLocalAndRemoteEvent(
-      Map<String, Object> expectedData) async {
+      Map<String, Object?> expectedData) async {
     DocumentSnapshot snap = await accumulator.awaitLocalEvent();
     expect(snap.data, expectedData);
     snap = await accumulator.awaitRemoteEvent();
@@ -59,7 +59,7 @@ void main() {
   }
 
   /// Writes some initialData and consumes the events generated.
-  Future<void> writeInitialData(Map<String, Object> initialData) async {
+  Future<void> writeInitialData(Map<String, Object?> initialData) async {
     await docRef.set(initialData);
     await expectLocalAndRemoteEvent(initialData);
   }

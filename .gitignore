@@ -14,3 +14,11 @@
 *.ipr
 *.iws
 .idea/
+# Dart / build output
+.dart_tool/
+build/
+.packages
+
+# Local Firestore emulator install and logs (npm install firebase-tools here)
+.emulator/
+.protoc-venv/

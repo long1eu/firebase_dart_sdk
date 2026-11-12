@@ -23,11 +23,11 @@ class FieldPath {
   ///
   /// Return a FieldPath that points to a field location in a document.
   factory FieldPath.of(List<String> fieldNames) {
-    checkArgument(fieldNames != null && fieldNames.isNotEmpty,
+    checkArgument(fieldNames.isNotEmpty,
         'Invalid field path. Provided path must not be null or empty.');
 
     for (int i = 0; i < fieldNames.length; ++i) {
-      checkArgument(fieldNames[i] != null && fieldNames[i].isNotEmpty,
+      checkArgument(fieldNames[i].isNotEmpty,
           'Invalid field name at argument ${i + 1}. Field names must not be null or empty.');
     }
 
@@ -58,7 +58,15 @@ class FieldPath {
 
   /// Returns a special sentinel [FieldPath] to refer to the id of a document. It can be used in
   /// queries to sort or filter by the document id.
-  static FieldPath documentId() => documentIdInstance;
+  @Deprecated('Use documentIdField instead.')
+  static FieldPath documentId() => documentIdField;
+
+  /// A special sentinel [FieldPath] to refer to the id of a document. It can be
+  /// used in queries to sort or filter by the document id.
+  ///
+  /// A getter named `documentId` (the official spelling) cannot exist next to
+  /// the method [documentId] until that method is removed.
+  static FieldPath get documentIdField => documentIdInstance;
 
   @override
   String toString() {

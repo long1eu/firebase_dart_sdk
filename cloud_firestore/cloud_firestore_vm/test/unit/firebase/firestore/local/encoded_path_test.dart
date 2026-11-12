@@ -14,7 +14,7 @@ import 'mock/database_mock.dart';
 
 void main() {
   const String _sep = '\u0001\u0001';
-  Database db;
+  late Database db;
 
   setUp(() async {
     db = await DatabaseMock.create(
@@ -47,7 +47,7 @@ void main() {
     await db.execute('DELETE FROM keys');
 
     // Compute the encoded forms of all the given paths
-    final List<String> encoded = List<String>(paths.length);
+    final List<String> encoded = List<String>.filled(paths.length, '');
     for (int i = 0; i < paths.length; i++) {
       encoded[i] = EncodedPath.encode(paths[i]);
     }
@@ -60,7 +60,7 @@ void main() {
     await db.execute('COMMIT;');
 
     // Read the values out, requiring SQLite to order the keys
-    final List<String> selected = List<String>(paths.length);
+    final List<String> selected = List<String>.filled(paths.length, '');
     final List<Map<String, dynamic>> result =
         await db.query('SELECT key FROM keys ORDER BY key', null);
 

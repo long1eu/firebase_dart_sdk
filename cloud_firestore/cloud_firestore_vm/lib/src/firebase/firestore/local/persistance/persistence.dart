@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/local_store.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/persistance/reference_delegate.dart';
@@ -77,6 +78,9 @@ abstract class Persistence {
 
   /// Creates a [QueryCache] representing the persisted cache of queries.
   QueryCache get queryCache;
+
+  /// Returns a [BundleCache] representing the persisted cache of loaded bundles.
+  BundleCache get bundleCache;
 
   /// Creates a [RemoteDocumentCache] representing the persisted cache of remote
   /// documents.

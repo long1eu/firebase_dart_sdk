@@ -9,8 +9,8 @@ part of memory_persistence;
 class MemoryQueryCache implements QueryCache {
   MemoryQueryCache(this.persistence);
 
-  /// Maps a query to the data about that query.
-  final Map<Query, QueryData> queries = <Query, QueryData>{};
+  /// Maps a target to the data about that target.
+  final Map<Target, QueryData> queries = <Target, QueryData>{};
 
   /// A ordered bidirectional mapping between documents and the remote target ids.
   final ReferenceSet references = ReferenceSet();
@@ -48,7 +48,7 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<void> addQueryData(QueryData queryData) async {
-    queries[queryData.query] = queryData;
+    queries[queryData.target] = queryData;
     final int targetId = queryData.targetId;
     if (targetId > highestTargetId) {
       highestTargetId = targetId;
@@ -66,7 +66,7 @@ class MemoryQueryCache implements QueryCache {
 
   @override
   Future<void> removeQueryData(QueryData queryData) async {
-    queries.remove(queryData.query);
+    queries.remove(queryData.target);
     references.removeReferencesForId(queryData.targetId);
   }
 
@@ -74,7 +74,7 @@ class MemoryQueryCache implements QueryCache {
   /// [activeTargetIds]. Document associations for the removed targets are also removed.
   int removeQueries(int upperBound, Set<int> activeTargetIds) {
     int removed = 0;
-    queries.removeWhere((Query query, QueryData queryData) {
+    queries.removeWhere((Target target, QueryData queryData) {
       final int targetId = queryData.targetId;
       final int sequenceNumber = queryData.sequenceNumber;
 
@@ -90,7 +90,7 @@ class MemoryQueryCache implements QueryCache {
   }
 
   @override
-  Future<QueryData> getQueryData(Query query) async => queries[query];
+  Future<QueryData?> getQueryData(Target target) async => queries[target];
 
   // Reference tracking
 
@@ -114,6 +114,11 @@ class MemoryQueryCache implements QueryCache {
     for (DocumentKey key in keys) {
       await referenceDelegate.removeReference(key);
     }
+  }
+
+  @override
+  Future<void> removeMatchingKeysForTargetId(int targetId) async {
+    _removeMatchingKeysForTargetId(targetId);
   }
 
   void _removeMatchingKeysForTargetId(int targetId) {

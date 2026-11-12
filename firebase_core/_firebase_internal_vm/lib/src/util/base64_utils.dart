@@ -5,7 +5,7 @@
 import 'dart:convert';
 
 class Base64Utils {
-  static String encodeUrlSafeNoPadding(List<int> url) {
-    return url == null ? null : base64Encode(url);
+  static String? encodeUrlSafeNoPadding(List<int>? url) {
+    return url == null ? null : base64Url.encode(url).replaceAll('=', '');
   }
 }

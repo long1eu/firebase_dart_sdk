@@ -8,7 +8,7 @@ part of sqlite_persistence;
 class SQLiteMutationQueue implements MutationQueue {
   /// Creates a mutation queue for the given user, in the SQLite database wrapped by the persistence interface.
   SQLiteMutationQueue(this.db, this.serializer, this._statsCollector, User user)
-      : uid = user.isAuthenticated ? user.uid : '',
+      : uid = user.uid ?? '',
         _lastStreamToken = Uint8List(0);
 
   final SQLitePersistence db;
@@ -22,7 +22,7 @@ class SQLiteMutationQueue implements MutationQueue {
   ///
   /// NOTE: There can only be one [SQLiteMutationQueue] for a given db at a time, hence it is safe to track
   /// [_nextBatchId] as an instance-level property. Should we ever relax this constraint we'll need to revisit this.
-  int _nextBatchId;
+  late int _nextBatchId;
 
   /// A stream token that was previously sent by the server.
   ///
@@ -48,7 +48,8 @@ class SQLiteMutationQueue implements MutationQueue {
 
     if (result.isNotEmpty) {
       final Map<String, dynamic> row = result.first;
-      final Uint8List lastStreamToken = row['last_stream_token'];
+      final Uint8List lastStreamToken =
+          (row['last_stream_token'] as Uint8List?) ?? Uint8List(0);
       _lastStreamToken = lastStreamToken;
     }
 
@@ -104,7 +105,7 @@ class SQLiteMutationQueue implements MutationQueue {
           <String>[uid]);
 
       for (Map<String, dynamic> row in result) {
-        final int batchId = row['MAX(batch_id)'];
+        final int? batchId = row['MAX(batch_id)'];
         _nextBatchId =
             batchId == null ? _nextBatchId : max(_nextBatchId, batchId);
       }
@@ -116,15 +117,30 @@ class SQLiteMutationQueue implements MutationQueue {
   @override
   Future<bool> isEmpty() async {
     return (await db.query(
-        // @formatter:off
-        '''
+            // @formatter:off
+            '''
           SELECT batch_id
           FROM mutations
           WHERE uid = ?
           LIMIT 1;
         ''',
+            // @formatter:on
+            <String>[uid]))
+        .isEmpty;
+  }
+
+  @override
+  Future<int> getHighestUnacknowledgedBatchId() async {
+    final List<Map<String, dynamic>> result = await db.query(
+        // @formatter:off
+        '''
+          SELECT IFNULL(MAX(batch_id), ?) AS highest
+          FROM mutations
+          WHERE uid = ?;
+        ''',
         // @formatter:on
-        <String>[uid])).isEmpty;
+        <Object?>[MutationBatch.unknown, uid]);
+    return result.first['highest'] as int;
   }
 
   @override
@@ -210,7 +226,7 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<MutationBatch> lookupMutationBatch(int batchId) async {
+  Future<MutationBatch?> lookupMutationBatch(int batchId) async {
     _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
     final List<Map<String, dynamic>> result = await db.query(
         // @formatter:off
@@ -231,7 +247,7 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<MutationBatch> getNextMutationBatchAfterBatchId(int batchId) async {
+  Future<MutationBatch?> getNextMutationBatchAfterBatchId(int batchId) async {
     _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
     final int _nextBatchId = batchId + 1;
 
@@ -440,8 +456,8 @@ class SQLiteMutationQueue implements MutationQueue {
     final int deleted =
         await db.delete(mutationDeleter, <dynamic>[uid, batchId]);
 
-    hardAssert(
-        deleted != 0, 'Mutation batch ($uid, ${batch.batchId}) did not exist');
+    hardAssertLazy(deleted != 0,
+        () => 'Mutation batch ($uid, ${batch.batchId}) did not exist');
 
     for (Mutation mutation in batch.mutations) {
       final DocumentKey key = mutation.key;
@@ -475,10 +491,11 @@ class SQLiteMutationQueue implements MutationQueue {
         danglingMutationReferences.add(path);
       }
 
-      hardAssert(
+      hardAssertLazy(
           danglingMutationReferences.isEmpty,
-          'Document leak -- detected dangling mutation references when queue '
-          'is empty. Dangling keys: $danglingMutationReferences');
+          () =>
+              'Document leak -- detected dangling mutation references when queue '
+              'is empty. Dangling keys: $danglingMutationReferences');
     }
   }
 

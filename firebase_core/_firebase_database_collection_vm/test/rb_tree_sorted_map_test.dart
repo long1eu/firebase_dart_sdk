@@ -2,12 +2,13 @@
 // Lung Razvan <long1eu>
 // on 19/09/2018
 
-import 'package:dart_quickcheck/dart_quickcheck.dart';
 import 'package:_firebase_database_collection_vm/src/array_sorted_map.dart';
 import 'package:_firebase_database_collection_vm/src/immutable_sorted_map.dart';
 import 'package:_firebase_database_collection_vm/src/rb_tree_sorted_map.dart';
 import 'package:_firebase_database_collection_vm/src/standard_compartor.dart';
 import 'package:test/test.dart';
+
+import 'quickcheck_lite.dart';
 
 void main() {
   final Comparator<num> intComparator = standardComparator<num>();
@@ -43,13 +44,13 @@ void main() {
   });
 
   test('almostEmptyMap', () {
-    final Map<String, int> data = <String, int>{
+    final Map<String, int?> data = <String, int?>{
       'a': 1,
       'b': null,
     };
 
-    final ImmutableSortedMap<String, int> map =
-        RBTreeSortedMap<String, int>.fromMap(data, standardComparator());
+    final ImmutableSortedMap<String, int?> map =
+        RBTreeSortedMap<String, int?>.fromMap(data, standardComparator());
 
     expect(map.length, data.length);
     expect(map.isNotEmpty, isTrue);
@@ -144,7 +145,7 @@ void main() {
 
   // QuickCheck Tests
   const Iterable<Map<K, V>> Function<K, V>(
-          Generator<K> keys, Generator<V> values) someMaps =
+      Generator<K> keys, Generator<V> values) someMaps =
       CombinedGeneratorsIterables.someMaps;
   const Iterable<Map<K, V>> Function<K, V>(
           Generator<K> keys, Generator<V> values, Generator<int> size)
@@ -274,7 +275,7 @@ void main() {
       final ImmutableSortedMap<int, int> map =
           RBTreeSortedMap<int, int>.fromMap(any, intComparator);
 
-      int predecessorKey;
+      int? predecessorKey;
 
       for (MapEntry<int, int> entry in map) {
         expect(map.getPredecessorKey(entry.key), predecessorKey);
@@ -288,7 +289,7 @@ void main() {
       final ImmutableSortedMap<int, int> map =
           RBTreeSortedMap<int, int>.fromMap(any, intComparator);
 
-      int lastKey;
+      int? lastKey;
 
       for (MapEntry<int, int> entry in map) {
         if (lastKey != null) {
@@ -304,10 +305,10 @@ void main() {
   });
 
   test('equalsIsCorrect', () {
-    ImmutableSortedMap<int, int> map;
-    ImmutableSortedMap<int, int> copy;
-    ImmutableSortedMap<int, int> arrayCopy;
-    ImmutableSortedMap<int, int> copyWithDifferentComparator;
+    late ImmutableSortedMap<int, int> map;
+    late ImmutableSortedMap<int, int> copy;
+    late ImmutableSortedMap<int, int> arrayCopy;
+    late ImmutableSortedMap<int, int> copyWithDifferentComparator;
     map = RBTreeSortedMap<int, int>(intComparator);
     copy = RBTreeSortedMap<int, int>(intComparator);
     arrayCopy = ArraySortedMap<int, int>(intComparator);
@@ -335,8 +336,8 @@ void main() {
     expect(arrayCopy, map);
 
     expect(map, isNot(copyWithDifferentComparator));
-    expect(map, isNot(copy.remove(copy.maxKey)));
-    expect(map, isNot(copy.insert(copy.maxKey + 1, 1)));
-    expect(map, isNot(arrayCopy.remove(arrayCopy.maxKey)));
+    expect(map, isNot(copy.remove(copy.maxKey!)));
+    expect(map, isNot(copy.insert(copy.maxKey! + 1, 1)));
+    expect(map, isNot(arrayCopy.remove(arrayCopy.maxKey!)));
   });
 }

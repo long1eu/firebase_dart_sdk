@@ -12,7 +12,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/value/field_valu
 /// positionally: for each entry in the array of [Mutations], there's a corresponding entry in the
 /// array of [MutationResults].
 class MutationResult {
-  const MutationResult(this.version, this.transformResults);
+  const MutationResult(this.version, [this.transformResults = const <FieldValue>[]]);
 
   /// The version at which the mutation was committed.
   ///   * For most operations, this is the [updateTime] in the [WriteResult].
@@ -23,9 +23,10 @@ class MutationResult {
   /// though the [commitTime] advances.
   final SnapshotVersion version;
 
-  /// The resulting fields returned from the backend after a [TransformMutation] has been committed.
-  /// Contains one [FieldValue] for each [FieldTransform] that was in the mutation.
+  /// The resulting fields returned from the backend after a mutation containing field transforms
+  /// has been committed. Contains one [FieldValue] for each [FieldTransform] that was in the
+  /// mutation.
   ///
-  /// Will be null if the mutation was not a [TransformMutation].
+  /// Will be empty if the mutation did not contain any field transforms.
   final List<FieldValue> transformResults;
 }

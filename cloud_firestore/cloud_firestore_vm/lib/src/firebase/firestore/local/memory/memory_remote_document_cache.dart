@@ -30,21 +30,21 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   @override
-  Future<MaybeDocument> get(DocumentKey key) async {
+  Future<MaybeDocument?> get(DocumentKey key) async {
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, 1);
     return documents[key];
   }
 
   @override
-  Future<Map<DocumentKey, MaybeDocument>> getAll(
+  Future<Map<DocumentKey, MaybeDocument?>> getAll(
       Iterable<DocumentKey> documentKeys) async {
-    final List<MapEntry<DocumentKey, MaybeDocument>> entries =
+    final List<MapEntry<DocumentKey, MaybeDocument?>> entries =
         await Future.wait(documentKeys.map((DocumentKey key) async =>
-            MapEntry<DocumentKey, MaybeDocument>(key, await get(key))));
+            MapEntry<DocumentKey, MaybeDocument?>(key, await get(key))));
 
     _statsCollector.recordRowsRead(
         RemoteDocumentCache.statsTag, entries.length);
-    return Map<DocumentKey, MaybeDocument>.fromEntries(entries);
+    return Map<DocumentKey, MaybeDocument?>.fromEntries(entries);
   }
 
   @override
@@ -72,7 +72,7 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
       }
 
       final MaybeDocument maybeDoc = entry.value;
-      if (!(maybeDoc is Document)) {
+      if (maybeDoc is! Document) {
         continue;
       }
 

@@ -7,45 +7,58 @@ part of field_value;
 /// Represents a locally-applied Server Timestamp.
 ///
 /// Notes:
-///   - ServerTimestampValue instances are created as the result of applying a [TransformMutation]
-///   (see TransformMutation.applyTo methods). They can only exist in the local view of a document.
-///   Therefore they do not need to be parsed or serialized.
+///   - ServerTimestampValue instances are created as the result of applying a transform. They can
+///   only exist in the local view of a document. Therefore they do not need to be parsed or
+///   serialized.
 ///   - When evaluated locally (e.g. via [DocumentSnapshot.ata]), they evaluate to null.
 ///   - They sort after all [TimestampValue]s. With respect to other [ServerTimestampValue]s, they
 ///   sort by their [localWriteTime].
 class ServerTimestampValue extends FieldValue {
-  const ServerTimestampValue(this.localWriteTime, this._previousValue);
+  /// Creates a pending server timestamp.
+  ///
+  /// Deeply nested server timestamp values are avoided because the
+  /// intermediate "previous values" are never used:
+  ///
+  ///     previous: 42, add: t1, result: t1 -> 42
+  ///     previous: t1, add: t2, result: t2 -> 42 (NOT t2 -> t1 -> 42)
+  factory ServerTimestampValue(
+      Timestamp localWriteTime, FieldValue? previousValue) {
+    return ServerTimestampValue._(
+      localWriteTime,
+      previousValue is ServerTimestampValue
+          ? previousValue._previousValue
+          : previousValue,
+    );
+  }
+
+  const ServerTimestampValue._(this.localWriteTime, this._previousValue);
 
   final Timestamp localWriteTime;
-  final FieldValue _previousValue;
+  final FieldValue? _previousValue;
 
   @override
-  int get typeOrder => FieldValue.typeOrderTimestamp;
+  int get typeOrder => FieldValue.typeOrderServerTimestamp;
 
   @override
-  Object get value => null;
+  Object? get value => null;
 
   /// Returns the value of the field before this ServerTimestamp was set.
   ///
   /// Preserving the previous values allows the user to display the last resoled
   /// value until the backend responds with the timestamp
   /// [ServerTimestampBehavior].
-  Object get previousValue {
-    if (_previousValue is ServerTimestampValue) {
-      final ServerTimestampValue value = _previousValue;
-      return value._previousValue;
-    }
+  /// The same value as [previousValue] but as the model [FieldValue], so that
+  /// callers can convert it (references, timestamps, maps) like a regular value.
+  FieldValue? get previousFieldValue => _previousValue;
 
-    return _previousValue != null ? _previousValue.value : null;
+  Object? get previousValue {
+    return _previousValue?.value;
   }
 
   @override
   int compareTo(FieldValue other) {
     if (other is ServerTimestampValue) {
       return localWriteTime.compareTo(other.localWriteTime);
-    } else if (other is TimestampValue) {
-      // Server timestamps come after all concrete timestamps.
-      return 1;
     } else {
       return defaultCompareTo(other);
     }
@@ -65,8 +78,8 @@ class ServerTimestampValue extends FieldValue {
       other is ServerTimestampValue &&
           runtimeType == other.runtimeType &&
           localWriteTime == other.localWriteTime &&
-          previousValue == other.previousValue;
+          _previousValue == other._previousValue;
 
   @override
-  int get hashCode => localWriteTime.hashCode ^ previousValue.hashCode;
+  int get hashCode => localWriteTime.hashCode ^ _previousValue.hashCode;
 }

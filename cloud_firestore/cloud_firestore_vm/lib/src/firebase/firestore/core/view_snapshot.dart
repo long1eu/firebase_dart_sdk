@@ -10,7 +10,6 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_set.dart';
 import 'package:collection/collection.dart';
-import 'package:meta/meta.dart';
 
 /// The possibly states a document can be in w.r.t syncing from local storage to the backend.
 enum ViewSnapshotSyncState {
@@ -26,9 +25,10 @@ class ViewSnapshot {
     this.oldDocuments,
     this.changes,
     this.mutatedKeys, {
-    @required this.isFromCache,
-    @required this.didSyncStateChange,
-    @required this.excludesMetadataChanges,
+    required this.isFromCache,
+    required this.didSyncStateChange,
+    required this.excludesMetadataChanges,
+    required this.hasCachedResults,
   });
 
   /// Returns a view snapshot as if all documents in the snapshot were added.
@@ -36,8 +36,9 @@ class ViewSnapshot {
     Query query,
     DocumentSet documents,
     ImmutableSortedSet<DocumentKey> mutatedKeys, {
-    @required bool isFromCache,
-    @required bool excludesMetadataChanges,
+    required bool isFromCache,
+    required bool excludesMetadataChanges,
+    required bool hasCachedResults,
   }) {
     final List<DocumentViewChange> viewChanges = <DocumentViewChange>[];
     for (Document doc in documents) {
@@ -52,6 +53,7 @@ class ViewSnapshot {
       isFromCache: isFromCache,
       didSyncStateChange: true,
       excludesMetadataChanges: excludesMetadataChanges,
+      hasCachedResults: hasCachedResults,
     );
   }
 
@@ -64,17 +66,22 @@ class ViewSnapshot {
   final bool didSyncStateChange;
   final bool excludesMetadataChanges;
 
+  /// Whether the snapshot was computed from a target that has been synced with the backend before (it has a resume
+  /// token), so that even an empty result is a meaningful cached result.
+  final bool hasCachedResults;
+
   bool get hasPendingWrites => mutatedKeys.isNotEmpty;
 
   ViewSnapshot copyWith({
-    Query query,
-    DocumentSet documents,
-    DocumentSet oldDocuments,
-    List<DocumentViewChange> changes,
-    bool isFromCache,
-    ImmutableSortedSet<DocumentKey> mutatedKeys,
-    bool didSyncStateChange,
-    bool excludesMetadataChanges,
+    Query? query,
+    DocumentSet? documents,
+    DocumentSet? oldDocuments,
+    List<DocumentViewChange>? changes,
+    bool? isFromCache,
+    ImmutableSortedSet<DocumentKey>? mutatedKeys,
+    bool? didSyncStateChange,
+    bool? excludesMetadataChanges,
+    bool? hasCachedResults,
   }) {
     return ViewSnapshot(
       query ?? this.query,
@@ -86,6 +93,7 @@ class ViewSnapshot {
       didSyncStateChange: didSyncStateChange ?? this.didSyncStateChange,
       excludesMetadataChanges:
           excludesMetadataChanges ?? this.excludesMetadataChanges,
+      hasCachedResults: hasCachedResults ?? this.hasCachedResults,
     );
   }
 
@@ -100,6 +108,7 @@ class ViewSnapshot {
           mutatedKeys == other.mutatedKeys &&
           didSyncStateChange == other.didSyncStateChange &&
           excludesMetadataChanges == other.excludesMetadataChanges &&
+          hasCachedResults == other.hasCachedResults &&
           query == other.query &&
           documents == other.documents &&
           oldDocuments == other.oldDocuments &&
@@ -118,7 +127,8 @@ class ViewSnapshot {
       mutatedKeys.hashCode ^
       (isFromCache ? 0 : 1) ^
       (didSyncStateChange ? 2 : 3) ^
-      (excludesMetadataChanges ? 4 : 5);
+      (excludesMetadataChanges ? 4 : 5) ^
+      (hasCachedResults ? 6 : 7);
 
   @override
   String toString() {
@@ -130,7 +140,8 @@ class ViewSnapshot {
           ..add('isFromCache', isFromCache)
           ..add('mutatedKeys', mutatedKeys)
           ..add('didSyncStateChange', didSyncStateChange)
-          ..add('excludesMetadataChanges', excludesMetadataChanges))
+          ..add('excludesMetadataChanges', excludesMetadataChanges)
+          ..add('hasCachedResults', hasCachedResults))
         .toString();
   }
 }

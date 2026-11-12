@@ -9,6 +9,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/core/bound.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/geo_point.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/query_purpose.dart';
@@ -23,13 +24,14 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_m
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/mutation_result.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/numeric_extremum_transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/numeric_increment_transform_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/set_mutation.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_operation.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/verify_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/snapshot_version.dart';
@@ -134,8 +136,8 @@ class RemoteSerializer {
   /// encoded in the path. There are no guarantees that a local path is also encoded in this resource name.
   ResourcePath _decodeResourceName(String encoded) {
     final ResourcePath resource = ResourcePath.fromString(encoded);
-    hardAssert(_isValidResourceName(resource),
-        'Tried to deserialize invalid key $resource');
+    hardAssertLazy(_isValidResourceName(resource),
+        () => 'Tried to deserialize invalid key $resource');
     return resource;
   }
 
@@ -153,8 +155,8 @@ class RemoteSerializer {
   /// encoded in the path along with a local path.
   static ResourcePath _extractLocalPathFromResourceName(
       ResourcePath resourceName) {
-    hardAssert(resourceName.length > 4 && resourceName[4] == 'documents',
-        'Tried to deserialize invalid key $resourceName');
+    hardAssertLazy(resourceName.length > 4 && resourceName[4] == 'documents',
+        () => 'Tried to deserialize invalid key $resourceName');
     return resourceName.popFirst(5);
   }
 
@@ -188,6 +190,8 @@ class RemoteSerializer {
       builder.stringValue = value.value;
     } else if (value is ArrayValue) {
       builder.arrayValue = _encodeArrayValue(value);
+    } else if (value is VectorFieldValue) {
+      builder.mapValue = _encodeVector(value);
     } else if (value is ObjectValue) {
       builder.mapValue = _encodeMapValue(value);
     } else if (value is TimestampValue) {
@@ -259,11 +263,8 @@ class RemoteSerializer {
   }
 
   ArrayValue _decodeArrayValue(proto.ArrayValue protoArray) {
-    final int count = protoArray.values.length;
-    final List<FieldValue> wrappedList = List<FieldValue>(count);
-    for (int i = 0; i < count; i++) {
-      wrappedList[i] = decodeValue(protoArray.values[i]);
-    }
+    final List<FieldValue> wrappedList =
+        protoArray.values.map(decodeValue).toList();
     return ArrayValue.fromList(wrappedList);
   }
 
@@ -275,7 +276,53 @@ class RemoteSerializer {
     return builder..freeze();
   }
 
-  ObjectValue _decodeMapValue(proto.MapValue value) {
+  proto.MapValue _encodeVector(VectorFieldValue value) {
+    final proto.MapValue builder = proto.MapValue.create();
+    builder.fields[VectorFieldValue.typeKey] = proto_v1.Value.create()
+      ..stringValue = VectorFieldValue.vectorTypeValue;
+    final proto.ArrayValue array = proto.ArrayValue.create();
+    for (final double d in value.internalValue) {
+      array.values.add(proto_v1.Value.create()..doubleValue = d);
+    }
+    builder.fields[VectorFieldValue.vectorKey] =
+        proto_v1.Value.create()..arrayValue = array;
+    return builder..freeze();
+  }
+
+  /// Returns the vector encoded by [value] or null if it is not a vector map.
+  VectorFieldValue? _tryDecodeVector(proto.MapValue value) {
+    final proto_v1.Value? type = value.fields[VectorFieldValue.typeKey];
+    if (type == null ||
+        type.whichValueType() != proto_v1.Value_ValueType.stringValue ||
+        type.stringValue != VectorFieldValue.vectorTypeValue) {
+      return null;
+    }
+    final proto_v1.Value? array = value.fields[VectorFieldValue.vectorKey];
+    if (array == null ||
+        array.whichValueType() != proto_v1.Value_ValueType.arrayValue) {
+      return null;
+    }
+    final List<double> doubles = <double>[];
+    for (final proto_v1.Value element in array.arrayValue.values) {
+      switch (element.whichValueType()) {
+        case proto_v1.Value_ValueType.doubleValue:
+          doubles.add(element.doubleValue);
+          break;
+        case proto_v1.Value_ValueType.integerValue:
+          doubles.add(element.integerValue.toInt().toDouble());
+          break;
+        default:
+          return null;
+      }
+    }
+    return VectorFieldValue.fromList(doubles);
+  }
+
+  FieldValue _decodeMapValue(proto.MapValue value) {
+    final VectorFieldValue? vector = _tryDecodeVector(value);
+    if (vector != null) {
+      return vector;
+    }
     return decodeMapFields(value.fields);
   }
 
@@ -283,9 +330,9 @@ class RemoteSerializer {
   // involve creating a temporary map.
   ObjectValue decodeMapFields(Map<String, proto_v1.Value> fields) {
     ObjectValue result = ObjectValue.empty;
-    for (String key in fields.keys) {
-      final FieldPath path = FieldPath.fromSingleSegment(key);
-      final FieldValue value = decodeValue(fields[key]);
+    for (MapEntry<String, proto_v1.Value> entry in fields.entries) {
+      final FieldPath path = FieldPath.fromSingleSegment(entry.key);
+      final FieldValue value = decodeValue(entry.value);
       result = result.set(path, value);
     }
     return result;
@@ -293,9 +340,9 @@ class RemoteSerializer {
 
   ObjectValue decodeDocumentFields(Map<String, proto_v1.Value> fields) {
     ObjectValue result = ObjectValue.empty;
-    for (String key in fields.keys) {
-      final FieldPath path = FieldPath.fromSingleSegment(key);
-      final FieldValue value = decodeValue(fields[key]);
+    for (MapEntry<String, proto_v1.Value> entry in fields.entries) {
+      final FieldPath path = FieldPath.fromSingleSegment(entry.key);
+      final FieldValue value = decodeValue(entry.value);
       result = result.set(path, value);
     }
     return result;
@@ -355,20 +402,16 @@ class RemoteSerializer {
       builder
         ..update = encodeDocument(mutation.key, mutation.value)
         ..updateMask = _encodeDocumentMask(mutation.mask);
-    } else if (mutation is TransformMutation) {
-      final proto.DocumentTransform transformBuilder =
-          proto.DocumentTransform.create()..document = encodeKey(mutation.key);
-
-      for (FieldTransform fieldTransform in mutation.fieldTransforms) {
-        transformBuilder.fieldTransforms
-            .add(_encodeFieldTransform(fieldTransform));
-      }
-
-      builder.transform = transformBuilder;
     } else if (mutation is DeleteMutation) {
       builder.delete = encodeKey(mutation.key);
+    } else if (mutation is VerifyMutation) {
+      builder.verify = encodeKey(mutation.key);
     } else {
       throw fail('unknown mutation type ${mutation.runtimeType}');
+    }
+
+    for (FieldTransform fieldTransform in mutation.fieldTransforms) {
+      builder.updateTransforms.add(_encodeFieldTransform(fieldTransform));
     }
 
     if (!mutation.precondition.isNone) {
@@ -383,29 +426,24 @@ class RemoteSerializer {
         : Precondition.none;
 
     if (mutation.hasUpdate()) {
+      final List<FieldTransform> fieldTransforms =
+          mutation.updateTransforms.map(_decodeFieldTransform).toList();
       if (mutation.hasUpdateMask()) {
         return PatchMutation(
             decodeKey(mutation.update.name),
             decodeDocumentFields(mutation.update.fields),
             _decodeDocumentMask(mutation.updateMask),
-            precondition);
+            precondition,
+            fieldTransforms);
       } else {
         return SetMutation(decodeKey(mutation.update.name),
-            decodeDocumentFields(mutation.update.fields), precondition);
+            decodeDocumentFields(mutation.update.fields), precondition,
+            fieldTransforms);
       }
     } else if (mutation.hasDelete()) {
       return DeleteMutation(decodeKey(mutation.delete), precondition);
-    } else if (mutation.hasTransform()) {
-      final List<FieldTransform> fieldTransforms = <FieldTransform>[];
-      for (proto.DocumentTransform_FieldTransform fieldTransform
-          in mutation.transform.fieldTransforms) {
-        fieldTransforms.add(_decodeFieldTransform(fieldTransform));
-      }
-      final bool exists = precondition.exists;
-      hardAssert(exists != null && exists,
-          'Transforms only support precondition \'exists == true\'');
-      return TransformMutation(
-          decodeKey(mutation.transform.document), fieldTransforms);
+    } else if (mutation.hasVerify()) {
+      return VerifyMutation(decodeKey(mutation.verify), precondition);
     } else {
       throw fail('Unknown mutation operation: $mutation');
     }
@@ -414,13 +452,15 @@ class RemoteSerializer {
   proto.Precondition _encodePrecondition(Precondition precondition) {
     hardAssert(!precondition.isNone, 'Can\'t serialize an empty precondition');
     final proto.Precondition builder = proto.Precondition.create();
-    if (precondition.updateTime != null) {
+    final SnapshotVersion? updateTime = precondition.updateTime;
+    final bool? exists = precondition.exists;
+    if (updateTime != null) {
       return builder
-        ..updateTime = encodeVersion(precondition.updateTime)
+        ..updateTime = encodeVersion(updateTime)
         ..freeze();
-    } else if (precondition.exists != null) {
+    } else if (exists != null) {
       return builder
-        ..exists = precondition.exists
+        ..exists = exists
         ..freeze();
     } else {
       throw fail('Unknown Precondition');
@@ -447,7 +487,7 @@ class RemoteSerializer {
 
   FieldMask _decodeDocumentMask(proto.DocumentMask mask) {
     final Set<FieldPath> paths = mask.fieldPaths
-        .map((String path) => FieldPath.fromServerFormat(path))
+        .map(FieldPath.fromServerFormat)
         .toSet();
     return FieldMask(paths);
   }
@@ -477,6 +517,16 @@ class RemoteSerializer {
         ..fieldPath = fieldTransform.fieldPath.canonicalString
         ..increment = encodeValue(transform.operand)
         ..freeze();
+    } else if (transform is NumericMinimumTransformOperation) {
+      return proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = fieldTransform.fieldPath.canonicalString
+        ..minimum = encodeValue(transform.operand)
+        ..freeze();
+    } else if (transform is NumericMaximumTransformOperation) {
+      return proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = fieldTransform.fieldPath.canonicalString
+        ..maximum = encodeValue(transform.operand)
+        ..freeze();
     } else {
       throw fail('Unknown transform: $transform');
     }
@@ -493,10 +543,11 @@ class RemoteSerializer {
   FieldTransform _decodeFieldTransform(
       proto.DocumentTransform_FieldTransform fieldTransform) {
     if (fieldTransform.hasSetToServerValue()) {
-      hardAssert(
+      hardAssertLazy(
           fieldTransform.setToServerValue ==
               proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME,
-          'Unknown transform setToServerValue: ${fieldTransform.setToServerValue}');
+          () =>
+              'Unknown transform setToServerValue: ${fieldTransform.setToServerValue}');
       return FieldTransform(
           FieldPath.fromServerFormat(fieldTransform.fieldPath),
           ServerTimestampOperation.sharedInstance);
@@ -514,7 +565,17 @@ class RemoteSerializer {
       return FieldTransform(
           FieldPath.fromServerFormat(fieldTransform.fieldPath),
           NumericIncrementTransformOperation(
-              decodeValue(fieldTransform.increment)));
+              decodeValue(fieldTransform.increment) as NumberValue));
+    } else if (fieldTransform.hasMinimum()) {
+      return FieldTransform(
+          FieldPath.fromServerFormat(fieldTransform.fieldPath),
+          NumericMinimumTransformOperation(
+              decodeValue(fieldTransform.minimum) as NumberValue));
+    } else if (fieldTransform.hasMaximum()) {
+      return FieldTransform(
+          FieldPath.fromServerFormat(fieldTransform.fieldPath),
+          NumericMaximumTransformOperation(
+              decodeValue(fieldTransform.maximum) as NumberValue));
     } else {
       throw fail(
         'Unknown FieldTransform proto: $fieldTransform',
@@ -524,12 +585,7 @@ class RemoteSerializer {
 
   List<FieldValue> _decodeArrayTransformElements(
       proto.ArrayValue elementsProto) {
-    final int count = elementsProto.values.length;
-    final List<FieldValue> result = List<FieldValue>(count);
-    for (int i = 0; i < count; i++) {
-      result[i] = decodeValue(elementsProto.values[i]);
-    }
-    return result;
+    return elementsProto.values.map(decodeValue).toList();
   }
 
   MutationResult decodeMutationResult(
@@ -543,21 +599,15 @@ class RemoteSerializer {
       version = commitVersion;
     }
 
-    List<FieldValue> transformResults;
-    final int transformResultsCount = proto.transformResults.length;
-    if (transformResultsCount > 0) {
-      transformResults = List<FieldValue>(transformResultsCount);
-      for (int i = 0; i < transformResultsCount; i++) {
-        transformResults[i] = decodeValue(proto.transformResults[i]);
-      }
-    }
+    final List<FieldValue> transformResults =
+        proto.transformResults.map(decodeValue).toList();
     return MutationResult(version, transformResults);
   }
 
   // Queries
 
   Map<String, String> encodeListenRequestLabels(QueryData queryData) {
-    final String value = _encodeLabel(queryData.purpose);
+    final String? value = _encodeLabel(queryData.purpose);
     if (value == null) {
       return <String, String>{};
     }
@@ -565,63 +615,80 @@ class RemoteSerializer {
     return <String, String>{'goog-listen-tags': value};
   }
 
-  String _encodeLabel(QueryPurpose purpose) {
+  String? _encodeLabel(QueryPurpose purpose) {
     switch (purpose) {
       case QueryPurpose.listen:
         return null;
       case QueryPurpose.existenceFilterMismatch:
         return 'existence-filter-mismatch';
+      case QueryPurpose.existenceFilterMismatchBloom:
+        return 'existence-filter-mismatch-bloom';
       case QueryPurpose.limboResolution:
         return 'limbo-document';
-      default:
-        throw fail('Unrecognized query purpose: $purpose');
     }
   }
 
   proto_v1.Target encodeTarget(QueryData queryData) {
     final proto_v1.Target builder = proto_v1.Target.create();
-    final Query query = queryData.query;
+    final Target target = queryData.target;
 
-    if (query.isDocumentQuery) {
-      builder.documents = encodeDocumentsTarget(query);
+    if (target.isDocumentQuery) {
+      builder.documents = encodeDocumentsTarget(target);
     } else {
-      builder.query = encodeQueryTarget(query);
+      builder.query = encodeQueryTarget(target);
     }
 
-    return builder
-      ..targetId = queryData.targetId
-      ..resumeToken = queryData.resumeToken
-      ..freeze();
+    builder.targetId = queryData.targetId;
+
+    if (queryData.resumeToken.isEmpty &&
+        queryData.snapshotVersion.compareTo(SnapshotVersion.none) > 0) {
+      // A target without a resume token but with a snapshot version (for example a named query loaded from a bundle)
+      // is resumed from that read time.
+      builder.readTime = encodeTimestamp(queryData.snapshotVersion.timestamp);
+    } else {
+      builder.resumeToken = queryData.resumeToken;
+    }
+
+    // The expected count only makes sense relative to a resume token: it is the
+    // number of documents the client had when that token was handed out.
+    // PORTING NOTE: upstream also sends it together with a read time; this port
+    // only does so for resume tokens.
+    if (queryData.expectedCount != null && queryData.resumeToken.isNotEmpty) {
+      builder.expectedCount = proto.Int32Value(value: queryData.expectedCount);
+    }
+
+    return builder..freeze();
   }
 
-  proto.Target_DocumentsTarget encodeDocumentsTarget(Query query) {
+  proto.Target_DocumentsTarget encodeDocumentsTarget(Target target) {
     return proto.Target_DocumentsTarget.create()
-      ..documents.add(_encodeQueryPath(query.path))
+      ..documents.add(_encodeQueryPath(target.path))
       ..freeze();
   }
 
-  Query decodeDocumentsTarget(proto.Target_DocumentsTarget target) {
+  Target decodeDocumentsTarget(proto.Target_DocumentsTarget target) {
     final int count = target.documents.length;
-    hardAssert(
-        count == 1, 'DocumentsTarget contained other than 1 document $count');
+    hardAssertLazy(count == 1,
+        () => 'DocumentsTarget contained other than 1 document $count');
 
     final String name = target.documents[0];
-    return Query(_decodeQueryPath(name));
+    return Query(_decodeQueryPath(name)).toTarget();
   }
 
-  proto.Target_QueryTarget encodeQueryTarget(Query query) {
+  proto.Target_QueryTarget encodeQueryTarget(Target target) {
     // Dissect the path into [parent], [collectionId], and optional [key] filter.
     final proto.Target_QueryTarget builder = proto.Target_QueryTarget.create();
     final proto.StructuredQuery structuredQueryBuilder =
         proto.StructuredQuery.create();
-    final ResourcePath path = query.path;
-    if (query.collectionGroup != null) {
+    final ResourcePath path = target.path;
+    final String? collectionGroup = target.collectionGroup;
+    if (collectionGroup != null) {
       hardAssert(path.length % 2 == 0,
           'Collection Group queries should be within a document path or root.');
       builder.parent = _encodeQueryPath(path);
 
       structuredQueryBuilder.from.add(proto.StructuredQuery_CollectionSelector()
-        ..collectionId = query.collectionGroup
+        ..collectionId = collectionGroup
         ..allDescendants = true);
     } else {
       hardAssert(path.length.remainder(2) != 0,
@@ -635,45 +702,52 @@ class RemoteSerializer {
     }
 
     // Encode the filters.
-    if (query.filters.isNotEmpty) {
-      structuredQueryBuilder.where = _encodeFilters(query.filters);
+    if (target.filters.isNotEmpty) {
+      structuredQueryBuilder.where = _encodeFilters(target.filters);
     }
 
     // Encode the orders.
-    for (OrderBy orderBy in query.orderByConstraints) {
+    for (OrderBy orderBy in target.orderBy) {
       structuredQueryBuilder.orderBy.add(_encodeOrderBy(orderBy));
     }
 
     // Encode the limit.
-    if (query.hasLimit) {
+    if (target.hasLimit) {
       final proto.Int32Value limit = proto.Int32Value.create()
-        ..value = query.getLimit();
+        ..value = target.getLimit();
       structuredQueryBuilder.limit = limit;
     }
 
-    if (query.getStartAt() != null) {
-      structuredQueryBuilder.startAt = _encodeBound(query.getStartAt());
+    final Bound? startAt = target.startAt;
+    if (startAt != null) {
+      structuredQueryBuilder.startAt = _encodeBound(startAt);
     }
 
-    if (query.getEndAt() != null) {
-      structuredQueryBuilder.endAt = _encodeBound(query.getEndAt());
+    final Bound? endAt = target.endAt;
+    if (endAt != null) {
+      structuredQueryBuilder.endAt = _encodeBound(endAt);
     }
 
     builder.structuredQuery = structuredQueryBuilder;
     return builder..freeze();
   }
 
-  Query decodeQueryTarget(proto.Target_QueryTarget target) {
+  Target decodeQueryTarget(proto.Target_QueryTarget target) {
     ResourcePath path = _decodeQueryPath(target.parent);
 
     final proto.StructuredQuery query = target.structuredQuery;
+    String? collectionGroup;
     final int fromCount = query.from.length;
     if (fromCount > 0) {
       hardAssert(fromCount == 1,
           'StructuredQuery.from with more than one collection is not supported.');
 
       final proto.StructuredQuery_CollectionSelector from = query.from[0];
-      path = path.appendSegment(from.collectionId);
+      if (from.allDescendants) {
+        collectionGroup = from.collectionId;
+      } else {
+        path = path.appendSegment(from.collectionId);
+      }
     }
 
     List<Filter> filterBy;
@@ -683,112 +757,144 @@ class RemoteSerializer {
       filterBy = <Filter>[];
     }
 
-    List<OrderBy> orderBy;
-    final int orderByCount = query.orderBy.length;
-    if (orderByCount > 0) {
-      orderBy = List<OrderBy>(orderByCount);
-      for (int i = 0; i < orderByCount; i++) {
-        orderBy[i] = _decodeOrderBy(query.orderBy[i]);
-      }
-    } else {
-      orderBy = <OrderBy>[];
-    }
+    final List<OrderBy> orderBy = query.orderBy.map(_decodeOrderBy).toList();
 
-    int limit = Query.noLimit;
+    int limit = Target.noLimit;
     if (query.hasLimit()) {
       limit = query.limit.value;
     }
 
-    Bound startAt;
+    Bound? startAt;
     if (query.hasStartAt()) {
       startAt = _decodeBound(query.startAt);
     }
 
-    Bound endAt;
+    Bound? endAt;
     if (query.hasEndAt()) {
       endAt = _decodeBound(query.endAt);
     }
 
     return Query(
       path,
+      collectionGroup: collectionGroup,
       filters: filterBy,
       explicitSortOrder: orderBy,
       limit: limit,
       startAt: startAt,
       endAt: endAt,
-    );
+    ).toTarget();
   }
 
   // Filters
 
   proto.StructuredQuery_Filter _encodeFilters(List<Filter> filters) {
-    final List<proto.StructuredQuery_Filter> protos =
-        List<proto.StructuredQuery_Filter>(filters.length);
-    int i = 0;
-    for (Filter filter in filters) {
-      if (filter is FieldFilter) {
-        protos[i] = encodeUnaryOrFieldFilter(filter);
-      }
-      i++;
-    }
-    if (filters.length == 1) {
-      return protos[0];
-    } else {
-      final proto.StructuredQuery_CompositeFilter composite =
-          proto.StructuredQuery_CompositeFilter.create()
-            ..op = proto.StructuredQuery_CompositeFilter_Operator.AND
-            ..filters.addAll(protos);
-
-      return proto.StructuredQuery_Filter.create()
-        ..compositeFilter = composite
-        ..freeze();
-    }
+    // A target's filter list is implicitly a composite AND filter.
+    return encodeFilter(
+        CompositeFilter(filters, CompositeFilterOperator.and));
   }
 
   List<Filter> _decodeFilters(proto.StructuredQuery_Filter value) {
-    List<proto.StructuredQuery_Filter> filters;
-    if (value.hasCompositeFilter()) {
-      hardAssert(
-          value.compositeFilter.op ==
-              proto.StructuredQuery_CompositeFilter_Operator.AND,
-          'Only AND-type composite filters are supported, got ${value.compositeFilter.op}');
-      filters = value.compositeFilter.filters;
+    // Instead of a singleton list containing AND(F1, F2, ...), return a list
+    // containing F1, F2, ... to stay consistent with the older SDK versions
+    // (the filters of a target are an implicit AND, see
+    // CompositeFilter.conjunctionTerms).
+    return CompositeFilter.conjunctionTerms(decodeFilter(value));
+  }
+
+  @visibleForTesting
+  proto.StructuredQuery_Filter encodeFilter(Filter filter) {
+    if (filter is FieldFilter) {
+      return encodeUnaryOrFieldFilter(filter);
+    } else if (filter is CompositeFilter) {
+      return encodeCompositeFilter(filter);
     } else {
-      filters = <proto.StructuredQuery_Filter>[value];
+      throw fail('Unrecognized filter type $filter');
+    }
+  }
+
+  proto.StructuredQuery_CompositeFilter_Operator _encodeCompositeFilterOperator(
+      CompositeFilterOperator operator) {
+    switch (operator) {
+      case CompositeFilterOperator.and:
+        return proto.StructuredQuery_CompositeFilter_Operator.AND;
+      case CompositeFilterOperator.or:
+        return proto.StructuredQuery_CompositeFilter_Operator.OR;
+    }
+  }
+
+  CompositeFilterOperator _decodeCompositeFilterOperator(
+      proto.StructuredQuery_CompositeFilter_Operator operator) {
+    switch (operator) {
+      case proto.StructuredQuery_CompositeFilter_Operator.AND:
+        return CompositeFilterOperator.and;
+      case proto.StructuredQuery_CompositeFilter_Operator.OR:
+        return CompositeFilterOperator.or;
+      default:
+        throw fail('Only AND and OR composite filter types are supported.');
+    }
+  }
+
+  @visibleForTesting
+  proto.StructuredQuery_Filter encodeCompositeFilter(CompositeFilter filter) {
+    final List<proto.StructuredQuery_Filter> protos =
+        filter.filters.map(encodeFilter).toList();
+
+    // If there's only one filter in the composite filter, use it directly.
+    if (protos.length == 1) {
+      return protos[0];
     }
 
-    final List<Filter> result = List<Filter>(filters.length);
-    int i = 0;
-    for (proto.StructuredQuery_Filter filter in filters) {
-      if (filter.hasCompositeFilter()) {
-        throw fail('Nested composite filters are not supported.');
-      } else if (filter.hasFieldFilter()) {
-        result[i] = decodeFieldFilter(filter.fieldFilter);
-      } else if (filter.hasUnaryFilter()) {
-        result[i] = _decodeUnaryFilter(filter.unaryFilter);
-      } else {
-        throw fail('Unrecognized Filter.filterType $filter');
-      }
-      i++;
-    }
+    final proto.StructuredQuery_CompositeFilter composite =
+        proto.StructuredQuery_CompositeFilter.create()
+          ..op = _encodeCompositeFilterOperator(filter.operator)
+          ..filters.addAll(protos);
 
-    return result;
+    return proto.StructuredQuery_Filter.create()
+      ..compositeFilter = composite
+      ..freeze();
+  }
+
+  @visibleForTesting
+  Filter decodeFilter(proto.StructuredQuery_Filter value) {
+    if (value.hasCompositeFilter()) {
+      return decodeCompositeFilter(value.compositeFilter);
+    } else if (value.hasFieldFilter()) {
+      return decodeFieldFilter(value.fieldFilter);
+    } else if (value.hasUnaryFilter()) {
+      return _decodeUnaryFilter(value.unaryFilter);
+    } else {
+      throw fail('Unrecognized Filter.filterType $value');
+    }
+  }
+
+  @visibleForTesting
+  CompositeFilter decodeCompositeFilter(
+      proto.StructuredQuery_CompositeFilter value) {
+    return CompositeFilter(
+      value.filters.map(decodeFilter).toList(),
+      _decodeCompositeFilterOperator(value.op),
+    );
   }
 
   @visibleForTesting
   proto.StructuredQuery_Filter encodeUnaryOrFieldFilter(FieldFilter filter) {
-    if (filter.operator == FilterOperator.equal) {
+    if (filter.operator == FilterOperator.equal ||
+        filter.operator == FilterOperator.notEqual) {
       final proto.StructuredQuery_UnaryFilter unaryProto =
           proto.StructuredQuery_UnaryFilter()
             ..field_2 = _encodeFieldPath(filter.field);
 
       if (filter.value == DoubleValue.nan) {
-        unaryProto.op = proto_v1.StructuredQuery_UnaryFilter_Operator.IS_NAN;
+        unaryProto.op = filter.operator == FilterOperator.equal
+            ? proto_v1.StructuredQuery_UnaryFilter_Operator.IS_NAN
+            : proto_v1.StructuredQuery_UnaryFilter_Operator.IS_NOT_NAN;
         return proto.StructuredQuery_Filter()
           ..unaryFilter = unaryProto
           ..freeze();
       } else if (filter.value == NullValue.nullValue()) {
-        unaryProto.op = proto_v1.StructuredQuery_UnaryFilter_Operator.IS_NULL;
+        unaryProto.op = filter.operator == FilterOperator.equal
+            ? proto_v1.StructuredQuery_UnaryFilter_Operator.IS_NULL
+            : proto_v1.StructuredQuery_UnaryFilter_Operator.IS_NOT_NULL;
         return proto.StructuredQuery_Filter()
           ..unaryFilter = unaryProto
           ..freeze();
@@ -806,7 +912,7 @@ class RemoteSerializer {
   }
 
   @visibleForTesting
-  Filter decodeFieldFilter(proto.StructuredQuery_FieldFilter builder) {
+  FieldFilter decodeFieldFilter(proto.StructuredQuery_FieldFilter builder) {
     final FieldPath fieldPath =
         FieldPath.fromServerFormat(builder.field_1.fieldPath);
 
@@ -816,7 +922,7 @@ class RemoteSerializer {
     return FieldFilter(fieldPath, filterOperator, value);
   }
 
-  Filter _decodeUnaryFilter(proto.StructuredQuery_UnaryFilter value) {
+  FieldFilter _decodeUnaryFilter(proto.StructuredQuery_UnaryFilter value) {
     final FieldPath fieldPath =
         FieldPath.fromServerFormat(value.field_2.fieldPath);
     switch (value.op) {
@@ -825,6 +931,11 @@ class RemoteSerializer {
       case proto.StructuredQuery_UnaryFilter_Operator.IS_NULL:
         return FieldFilter(
             fieldPath, FilterOperator.equal, NullValue.nullValue());
+      case proto.StructuredQuery_UnaryFilter_Operator.IS_NOT_NAN:
+        return FieldFilter(fieldPath, FilterOperator.notEqual, DoubleValue.nan);
+      case proto.StructuredQuery_UnaryFilter_Operator.IS_NOT_NULL:
+        return FieldFilter(
+            fieldPath, FilterOperator.notEqual, NullValue.nullValue());
       default:
         throw fail('Unrecognized UnaryFilter.operator ${value.op}');
     }
@@ -845,6 +956,8 @@ class RemoteSerializer {
         return proto.StructuredQuery_FieldFilter_Operator.LESS_THAN_OR_EQUAL;
       case FilterOperator.equal:
         return proto.StructuredQuery_FieldFilter_Operator.EQUAL;
+      case FilterOperator.notEqual:
+        return proto.StructuredQuery_FieldFilter_Operator.NOT_EQUAL;
       case FilterOperator.graterThan:
         return proto.StructuredQuery_FieldFilter_Operator.GREATER_THAN;
       case FilterOperator.graterThanOrEqual:
@@ -855,6 +968,8 @@ class RemoteSerializer {
         return proto.StructuredQuery_FieldFilter_Operator.ARRAY_CONTAINS_ANY;
       case FilterOperator.IN:
         return proto.StructuredQuery_FieldFilter_Operator.IN;
+      case FilterOperator.NOT_IN:
+        return proto.StructuredQuery_FieldFilter_Operator.NOT_IN;
       default:
         throw fail('Unknown operator $operator');
     }
@@ -869,6 +984,8 @@ class RemoteSerializer {
         return FilterOperator.lessThanOrEqual;
       case proto.StructuredQuery_FieldFilter_Operator.EQUAL:
         return FilterOperator.equal;
+      case proto.StructuredQuery_FieldFilter_Operator.NOT_EQUAL:
+        return FilterOperator.notEqual;
       case proto.StructuredQuery_FieldFilter_Operator.GREATER_THAN_OR_EQUAL:
         return FilterOperator.graterThanOrEqual;
       case proto.StructuredQuery_FieldFilter_Operator.GREATER_THAN:
@@ -879,6 +996,8 @@ class RemoteSerializer {
         return FilterOperator.arrayContainsAny;
       case proto.StructuredQuery_FieldFilter_Operator.IN:
         return FilterOperator.IN;
+      case proto.StructuredQuery_FieldFilter_Operator.NOT_IN:
+        return FilterOperator.NOT_IN;
       default:
         throw fail('Unhandled FieldFilter.operator $operator');
     }
@@ -929,25 +1048,20 @@ class RemoteSerializer {
   }
 
   Bound _decodeBound(proto.Cursor value) {
-    final int valuesCount = value.values.length;
-    final List<FieldValue> indexComponents = List<FieldValue>(valuesCount);
-
-    for (int i = 0; i < valuesCount; i++) {
-      final proto_v1.Value valueProto = value.values[i];
-      indexComponents[i] = decodeValue(valueProto);
-    }
+    final List<FieldValue> indexComponents =
+        value.values.map(decodeValue).toList();
     return Bound(position: indexComponents, before: value.before);
   }
 
   // Watch changes
 
   WatchChange decodeWatchChange(proto.ListenResponse protoChange) {
-    WatchChange watchChange;
+    final WatchChange watchChange;
 
     if (protoChange.hasTargetChange()) {
       final proto.TargetChange targetChange = protoChange.targetChange;
       WatchTargetChangeType changeType;
-      GrpcError cause;
+      GrpcError? cause;
       switch (targetChange.targetChangeType) {
         case proto.TargetChange_TargetChangeType.NO_CHANGE:
           changeType = WatchTargetChangeType.noChange;
@@ -1003,8 +1117,10 @@ class RemoteSerializer {
       watchChange = WatchChangeDocumentChange(<int>[], removed, key, null);
     } else if (protoChange.hasFilter()) {
       final proto.ExistenceFilter protoFilter = protoChange.filter;
-      // TODO(long1eu): implement existence filter parsing (see b/33076578)
-      final ExistenceFilter filter = ExistenceFilter(protoFilter.count);
+      final ExistenceFilter filter = ExistenceFilter(
+        protoFilter.count,
+        protoFilter.hasUnchangedNames() ? protoFilter.unchangedNames : null,
+      );
       final int targetId = protoFilter.targetId;
       watchChange = WatchChangeExistenceFilterWatchChange(targetId, filter);
     } else {

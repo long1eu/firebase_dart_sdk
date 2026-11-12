@@ -24,7 +24,7 @@ class StringValue extends FieldValue {
   @override
   int compareTo(FieldValue other) {
     if (other is StringValue) {
-      return _value.compareTo(other._value);
+      return compareUtf8Strings(_value, other._value);
     } else {
       return defaultCompareTo(other);
     }

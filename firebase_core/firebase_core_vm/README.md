@@ -2,9 +2,11 @@
 
 Dart implementation of the Firebase Core API, which enables connecting to multiple Firebase apps.
 
-*Note*: This library is still under development, and some APIs might not be available yet or work correctly. 
-Please feel free to open an issue [here](https://github.com/fluttercommunity/firebase_flutter_sdk/issues) or even a
-[pull requests](https://github.com/fluttercommunity/firebase_flutter_sdk/pulls) if you feel brave.
+*Status*: part of the unofficial Firestore revival (see the [repository README](../../README.md)).
+It is the `FirebaseApp` / `FirebaseOptions` layer needed by `cloud_firestore_vm`. It builds on
+Dart 3 with null safety and its unit tests pass. Some APIs described below date from the original
+project and have not been re-verified. Issues and pull requests:
+https://github.com/long1eu/firebase_dart_sdk
 
 *NOTES*
 * can be used in CLIs, servers and Flutter. 
@@ -33,37 +35,37 @@ If you already have a Firebase project for you mobile/web apps you can skip this
 FirebaseOptions options;
 if (Platform.isLinux) {
   options = const FirebaseOptions(
-    apiKey: 'AIzaSyD9HeqeXUOXJh_DPDl211x8seUXlNmiJj0',
+    apiKey: '<YOUR_API_KEY>',
     applicationId:
-        '1:233259864964:linux:0034c73393cdd58c1d50ac24850d6d01f1e57aff',
+        '<YOUR_APP_ID>',
   );
 } else if (Platform.isMacOS) {
   options = const FirebaseOptions(
-    apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
+    apiKey: '<YOUR_API_KEY>',
     applicationId:
-        '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
+        '<YOUR_APP_ID>',
   );
 } else if (Platform.isWindows) {
   options = const FirebaseOptions(
-    apiKey: 'AIzaSyBNeYDWMlalWRL2M2_UhE5kiMmvVf3o9BM',
+    apiKey: '<YOUR_API_KEY>',
     applicationId:
-        '1:233259864964:windows:0034c73393cdd58c1d50ac24850d6d01f1e57aff',
+        '<YOUR_APP_ID>',
   );
 } else if (Platform.isAndroid) {
   options = const FirebaseOptions(
-    apiKey: 'AIzaSyAM1bGAY-Bd4onFPFb2dBCJA3kx0eiWnSg',
-    applicationId: '1:233259864964:android:b2ec71b130a3170cd583d1',
+    apiKey: '<YOUR_API_KEY>',
+    applicationId: '<YOUR_APP_ID>',
   );
 } else if (Platform.isIOS) {
   options = const FirebaseOptions(
-    apiKey: 'AIzaSyBguTk4w2Xk2LD0mSdB2Pi9LTtt5BeAE6U',
-    applicationId: '1:233259864964:ios:fff621fea008bff1d583d1',
+    apiKey: '<YOUR_API_KEY>',
+    applicationId: '<YOUR_APP_ID>',
   );
 } else if (Platform.isFuchsia) {
   options = const FirebaseOptions(
-    apiKey: 'AIzaSyBOPFxmw3fni8Inzb_RhFDjb9zznXHfaRo',
+    apiKey: '<YOUR_API_KEY>',
     applicationId:
-        '1:233259864964:fuchsia:8fc440667cd119c335cf58c7cbfd4374f96fe786',
+        '<YOUR_APP_ID>',
   );
 }
 
@@ -88,7 +90,7 @@ Since desktop is not an officially supported platform, we need to create `applic
     - `os` - `windows`, `macos`, `linux`, `my-custom-os-because-i-can`
 1. Generate the SHA1 hash of this part. You can use this [tool](http://www.sha1-online.com/)
 1. Add the SHA1 hash to the first part, so you `applicationId` looks like this `<appNumber>:<gcmSenderID>:<os>:sha1(<appNumber>:<gcmSenderID>:<os>)`
-(eg. `1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1`)    
+(eg. `<YOUR_APP_ID>`)    
  
 ### 4. Initialize multiple `FirebaseApp`s           
    1. make sure you first register this package:
@@ -110,15 +112,15 @@ Since desktop is not an officially supported platform, we need to create `applic
           final FirebaseApp app = await FirebaseApp.configure(
             name: 'foo',
             options: const FirebaseOptions(
-              apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
-              databaseURL: 'https://flutter-sdk.firebaseio.com',
-              projectID: 'flutter-sdk',
-              storageBucket: 'flutter-sdk.appspot.com',
-              gcmSenderID: '233259864964',
+              apiKey: '<YOUR_API_KEY>',
+              databaseURL: 'https://<project-id>.firebaseio.com',
+              projectID: '<project-id>',
+              storageBucket: '<project-id>.appspot.com',
+              gcmSenderID: '<sender-id>',
               clientID:
-                  '233259864964-go57eg1ones74e03adlqvbtg2av6tivb.apps.googleusercontent.com',
+                  '<client-id>.apps.googleusercontent.com',
               googleAppID:
-                  '1:233259864964:macos:0bdc69800dd31cde15627229f39a6379865e8be1',
+                  '<YOUR_APP_ID>',
             ),
           );
           assert(app != null);

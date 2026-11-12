@@ -8,6 +8,7 @@ import 'dart:math';
 import 'package:cloud_firestore_vm/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/firestore_error.dart';
 import 'package:grpc/grpc.dart';
+import 'package:protobuf/protobuf.dart' show GeneratedMessage;
 
 const int _autoIdLength = 20;
 
@@ -15,6 +16,23 @@ const String _autoIdAlphabet =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 final Random rand = Random();
+
+const int _maxLoggedMessageBytes = 128 * 1024;
+
+/// Describes a proto [message] for debug logging. Messages that serialize to
+/// more than 128 KiB (e.g. a write of a very large document) are not turned
+/// into JSON, which could exhaust memory; a type and size marker is returned
+/// instead.
+String describeForLog(GeneratedMessage message) {
+  final int size = message.writeToBuffer().length;
+  if (size > _maxLoggedMessageBytes) {
+    final String readable = size >= 1024 * 1024
+        ? '${(size / (1024 * 1024)).toStringAsFixed(2)} MB'
+        : '${(size / 1024).toStringAsFixed(1)} KB';
+    return '<${message.runtimeType} truncated for logging (Size: $readable)>';
+  }
+  return '${message.toProto3Json()}';
+}
 
 String toDebugString(List<int> bytes) {
   final int size = bytes.length;
@@ -41,17 +59,49 @@ int compareBools(bool b1, bool b2) {
 
 FirestoreError exceptionFromStatus(GrpcError error) {
   return FirestoreError(
-    error.message,
-    FirestoreErrorCode.values[error.code],
+    error.message ?? '',
+    FirestoreErrorCode.fromValue(error),
   );
 }
 
-Comparator<T> comparator<T extends Comparable<T>>() {
-  return (T a, T b) => a.compareTo(b);
+/// Compares strings in UTF-8 encoded byte order, without allocating.
+///
+/// Finds the first differing UTF-16 code unit. If both units are surrogates or
+/// neither is, their numeric order equals the UTF-8 byte order of the code
+/// points they belong to. Otherwise the string holding the surrogate (a code
+/// point above U+FFFF, encoded with 4 bytes) sorts after the other one (1 to 3
+/// bytes).
+int compareUtf8Strings(String left, String right) {
+  if (identical(left, right)) {
+    return 0;
+  }
+
+  final int length = left.length < right.length ? left.length : right.length;
+  for (int i = 0; i < length; i++) {
+    final int leftUnit = left.codeUnitAt(i);
+    final int rightUnit = right.codeUnitAt(i);
+    if (leftUnit != rightUnit) {
+      final bool leftSurrogate = _isSurrogate(leftUnit);
+      final bool rightSurrogate = _isSurrogate(rightUnit);
+      if (leftSurrogate == rightSurrogate) {
+        return leftUnit < rightUnit ? -1 : 1;
+      }
+      return leftSurrogate ? 1 : -1;
+    }
+  }
+
+  return left.length.compareTo(right.length);
 }
 
+bool _isSurrogate(int codeUnit) => codeUnit >= 0xD800 && codeUnit <= 0xDFFF;
+
+// Shared instance so that maps built with comparator() compare equal.
+int _compare(dynamic a, dynamic b) => (a as Comparable<dynamic>).compareTo(b);
+
+Comparator<T> comparator<T extends Comparable<T>>() => _compare;
+
 /// Describes the type of an object, handling null objects gracefully.
-String typeName(Object value) {
+String typeName(Object? value) {
   return value == null ? 'null' : '${value.runtimeType}';
 }
 
@@ -82,16 +132,16 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
 ///
 /// [fieldPathOffset] is the offset of the first field path in the original update API (used as the
 /// index in error messages)
-List<Object> collectUpdateArguments(
-    int fieldPathOffset, List<Object> fieldsAndValues) {
+List<Object?> collectUpdateArguments(
+    int fieldPathOffset, List<Object?> fieldsAndValues) {
   if (fieldsAndValues.length % 2 == 1) {
     throw ArgumentError(
         'Missing value in call to update().  There must be an even number of '
         'arguments that alternate between field names and values');
   }
-  final List<Object> argumentList = fieldsAndValues.toList(growable: false);
+  final List<Object?> argumentList = fieldsAndValues.toList(growable: false);
   for (int i = 0; i < argumentList.length; i += 2) {
-    final Object fieldPath = argumentList[i];
+    final Object? fieldPath = argumentList[i];
     if (fieldPath is! String && fieldPath is! FieldPath) {
       throw ArgumentError(
           'Excepted field name at argument position ${i + fieldPathOffset + 1} but '

@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/encoded_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
@@ -17,8 +18,8 @@ import '../../../../util/test_util.dart';
 import 'mock/database_mock.dart';
 
 void main() {
-  Database db;
-  SQLiteSchema schema;
+  late Database db;
+  late SQLiteSchema schema;
 
   setUp(() async {
     const String name = 'firebase/firestore/local/sqlite_schema_test.db';
@@ -272,7 +273,7 @@ void main() {
       final String collectionId = row['collection_id'];
       final String parent =
           EncodedPath.decodeResourcePath(row['parent']).toString();
-      List<String> parents = actualParents[collectionId];
+      List<String>? parents = actualParents[collectionId];
       if (parents == null) {
         parents = <String>[];
         actualParents[collectionId] = parents;
@@ -287,10 +288,83 @@ void main() {
 
     expect(actualParents, expectedParents);
   });
+
+  // Migration 9 is the port of the Android migration 12 (bundle cache); the tests below are the Android
+  // `createsBundlesTable` and `createsNamedQueriesTable`, plus the migration from version 8.
+  test('createsBundlesTable', () async {
+    await schema.runMigrations();
+
+    await _assertNoResultsForQuery(db, 'SELECT * FROM bundles');
+
+    await db.execute(
+        'INSERT INTO bundles (bundle_id, create_time_seconds, create_time_nanos, schema_version) '
+        "VALUES ('foo', 1, 2, 3)");
+
+    final List<Map<String, dynamic>> result = await db.query(
+        'SELECT bundle_id, create_time_seconds, create_time_nanos, schema_version FROM bundles');
+    expect(result.length, 1);
+    expect(result.first['bundle_id'], 'foo');
+    expect(result.first['create_time_seconds'], 1);
+    expect(result.first['create_time_nanos'], 2);
+    expect(result.first['schema_version'], 3);
+  });
+
+  test('createsNamedQueriesTable', () async {
+    await schema.runMigrations();
+
+    await _assertNoResultsForQuery(db, 'SELECT * FROM named_queries');
+
+    await db.execute(
+        'INSERT INTO named_queries (name, read_time_seconds, read_time_nanos, bundled_query_proto) '
+        "VALUES ('foo', 1, 2, ?)",
+        <dynamic>[Uint8List(0)]);
+
+    final List<Map<String, dynamic>> result = await db.query(
+        'SELECT name, read_time_seconds, read_time_nanos, bundled_query_proto FROM named_queries');
+    expect(result.length, 1);
+    expect(result.first['name'], 'foo');
+    expect(result.first['read_time_seconds'], 1);
+    expect(result.first['read_time_nanos'], 2);
+    expect(result.first['bundled_query_proto'], isEmpty);
+  });
+
+  test('migratesFromVersion8ToTheBundleCache', () async {
+    await schema.runMigrations(0, 8);
+    expect(SQLiteSchema.version, greaterThanOrEqualTo(9));
+    final Map<String, Set<String>> before = await _getCurrentSchema(schema, db);
+    expect(before.containsKey('bundles'), isFalse);
+    expect(before.containsKey('named_queries'), isFalse);
+
+    // Existing data survives the migration.
+    await db.execute(
+        "INSERT INTO targets (canonical_id, target_id) VALUES ('foo1', 1)");
+
+    await schema.runMigrations(8, 9);
+
+    final Map<String, Set<String>> after = await _getCurrentSchema(schema, db);
+    expect(after['bundles'], <String>{
+      'bundle_id',
+      'create_time_seconds',
+      'create_time_nanos',
+      'schema_version',
+      'total_documents',
+      'total_bytes',
+    });
+    expect(after['named_queries'], <String>{
+      'name',
+      'read_time_seconds',
+      'read_time_nanos',
+      'bundled_query_proto',
+    });
+    expect((await db.query('SELECT * FROM targets')).length, 1);
+
+    // The migration can be run again.
+    await schema.runMigrations(8, 9);
+  });
 }
 
 Future<void> _assertNoResultsForQuery(Database db, String query,
-    [List<String> args]) async {
+    [List<String>? args]) async {
   final List<Map<String, dynamic>> result = await db.query(query, args);
   expect(result, isEmpty);
 }
@@ -316,12 +390,12 @@ void _assertNoRemovals(Map<String, Set<String>> oldSchema,
     Map<String, Set<String>> newSchema, int newVersion) {
   for (MapEntry<String, Set<String>> entry in oldSchema.entries) {
     final String table = entry.key;
-    final Set<String> newColumns = newSchema[table];
+    final Set<String>? newColumns = newSchema[table];
     expect(newColumns, isNotNull,
         reason: 'Table $table was deleted at version $newVersion');
     final Set<String> oldColumns = entry.value;
     for (String column in oldColumns) {
-      expect(newColumns.contains(column), isTrue,
+      expect(newColumns!.contains(column), isTrue,
           reason:
               'Column $column was deleted from table $table at version $newVersion');
     }

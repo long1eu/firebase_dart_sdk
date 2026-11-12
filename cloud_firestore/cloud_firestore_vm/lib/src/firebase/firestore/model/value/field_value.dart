@@ -14,10 +14,10 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/database_id.dart
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/field_mask.dart';
-import 'package:cloud_firestore_vm/src/firebase/firestore/model/mutation/transform_mutation.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_vm/src/firebase/timestamp.dart';
 import 'package:collection/collection.dart';
 
@@ -34,6 +34,7 @@ part 'reference_value.dart';
 part 'server_timestamp_value.dart';
 part 'string_value.dart';
 part 'timestamp_value.dart';
+part 'vector_field_value.dart';
 
 /// A field value represents a data type as stored by Firestore.
 ///
@@ -56,18 +57,20 @@ abstract class FieldValue implements Comparable<FieldValue> {
   static const int typeOrderBool = 1;
   static const int typeOrderNumber = 2;
   static const int typeOrderTimestamp = 3;
-  static const int typeOrderString = 4;
-  static const int typeOrderBlob = 5;
-  static const int typeOrderReference = 6;
-  static const int typeOrderGeopoint = 7;
-  static const int typeOrderArray = 8;
-  static const int typeOrderObject = 9;
+  static const int typeOrderServerTimestamp = 4;
+  static const int typeOrderString = 5;
+  static const int typeOrderBlob = 6;
+  static const int typeOrderReference = 7;
+  static const int typeOrderGeopoint = 8;
+  static const int typeOrderArray = 9;
+  static const int typeOrderVector = 10;
+  static const int typeOrderObject = 11;
 
   int get typeOrder;
 
   /// Converts a [FieldValue] into the value that users will see in document snapshots using the
   /// default deserialization options.
-  Object get value;
+  Object? get value;
 
   @override
   bool operator ==(Object other);
@@ -80,7 +83,7 @@ abstract class FieldValue implements Comparable<FieldValue> {
 
   @override
   String toString() {
-    final Object val = value;
+    final Object? val = value;
     return val == null ? 'null' : val.toString();
   }
 

@@ -50,12 +50,12 @@ void main() {
     expect(() {
       return Timestamp.fromDate(
           DateTime.fromMillisecondsSinceEpoch(-70000000000000));
-    }, throwsA(isA<AssertionError>()));
+    }, throwsA(isA<ArgumentError>()));
 
     expect(() {
       return Timestamp.fromDate(
           DateTime.fromMillisecondsSinceEpoch(300000000000000));
-    }, throwsA(isA<AssertionError>()));
+    }, throwsA(isA<ArgumentError>()));
 
     expect(() => Timestamp(0, -1), throwsA(isA<AssertionError>()));
     expect(() => Timestamp(0, 1000000000), throwsA(isA<AssertionError>()));

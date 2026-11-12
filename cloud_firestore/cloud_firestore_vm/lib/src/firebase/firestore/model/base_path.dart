@@ -2,8 +2,9 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-import 'package:collection/collection.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:collection/collection.dart';
 
 /// BasePath represents a path sequence in the Firestore database. It is composed of an ordered
 /// sequence of string segments.
@@ -37,8 +38,8 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
   /// Otherwise will return a new path with the current path's first [count] segments removed.
   B popFirst([int count = 1]) {
     final int length = this.length;
-    hardAssert(length >= count,
-        'Can\'t call popFirst with count > length() ($count > $length)');
+    hardAssertLazy(length >= count,
+        () => 'Can\'t call popFirst with count > length() ($count > $length)');
     return createPathWithSegments(segments.sublist(count, length));
   }
 
@@ -54,15 +55,11 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
 
   @override
   int compareTo(B o) {
-    if (o == null) {
-      return 1;
-    }
-
     int i = 0;
     final int myLength = length;
     final int theirLength = o.length;
     while (i < myLength && i < theirLength) {
-      final int localCompare = getSegment(i).compareTo(o.getSegment(i));
+      final int localCompare = _compareSegments(getSegment(i), o.getSegment(i));
       if (localCompare != 0) {
         return localCompare;
       }
@@ -70,6 +67,37 @@ abstract class BasePath<B extends BasePath<B>> implements Comparable<B> {
     }
 
     return myLength.compareTo(theirLength);
+  }
+
+  /// Compares two segments. Numeric ids (`__id<n>__`) sort numerically and
+  /// before all other segments; other segments are compared in UTF-8 byte
+  /// order.
+  static int _compareSegments(String lhs, String rhs) {
+    final int? lhsId = _numericId(lhs);
+    final int? rhsId = _numericId(rhs);
+    if (lhsId != null && rhsId == null) {
+      return -1;
+    } else if (lhsId == null && rhsId != null) {
+      return 1;
+    } else if (lhsId != null && rhsId != null) {
+      return lhsId.compareTo(rhsId);
+    }
+    return compareUtf8Strings(lhs, rhs);
+  }
+
+  static final RegExp _digits = RegExp(r'^-?[0-9]+$');
+
+  /// Returns the number of a segment of the form `__id<n>__`, or null.
+  static int? _numericId(String segment) {
+    if (segment.length > 6 &&
+        segment.startsWith('__id') &&
+        segment.endsWith('__')) {
+      final String digits = segment.substring(4, segment.length - 2);
+      if (_digits.hasMatch(digits)) {
+        return int.tryParse(digits);
+      }
+    }
+    return null;
   }
 
   bool operator >(B other) => compareTo(other) > 0;

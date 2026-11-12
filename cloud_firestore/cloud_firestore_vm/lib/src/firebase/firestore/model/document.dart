@@ -46,50 +46,57 @@ class Document extends MaybeDocument implements Comparable<Document> {
         super(key, version);
 
   final DocumentState documentState;
-  final pb.Document proto;
-  final Converter converter;
+  final pb.Document? proto;
+  final Converter? converter;
 
   /// A cache for FieldValues that have already been deserialized in [getField]
-  Map<FieldPath, FieldValue> _fieldValueCache;
-  ObjectValue _objectValue;
+  Map<FieldPath, FieldValue>? _fieldValueCache;
+  ObjectValue? _objectValue;
 
   ObjectValue get data {
-    if (_objectValue == null) {
+    ObjectValue? objectValue = _objectValue;
+    if (objectValue == null) {
+      final pb.Document? proto = this.proto;
+      final Converter? converter = this.converter;
       hardAssert(proto != null && converter != null,
           'Expected proto and converter to be non-null');
 
       ObjectValue result = ObjectValue.empty;
-      for (MapEntry<String, Value> entry in proto.fields.entries) {
+      for (MapEntry<String, Value> entry in proto!.fields.entries) {
         final FieldPath path = FieldPath.fromSingleSegment(entry.key);
-        final FieldValue value = converter(entry.value);
+        final FieldValue value = converter!(entry.value);
         result = result.set(path, value);
       }
-      _objectValue = result;
+      _objectValue = objectValue = result;
 
       // Once objectValue is computed, values inside the fieldValueCache are no
       // longer accessed.
       _fieldValueCache = null;
     }
 
-    return _objectValue;
+    return objectValue;
   }
 
-  FieldValue getField(FieldPath path) {
-    if (_objectValue != null) {
-      return _objectValue.get(path);
+  FieldValue? getField(FieldPath path) {
+    final ObjectValue? objectValue = _objectValue;
+    if (objectValue != null) {
+      return objectValue.get(path);
     } else {
+      final pb.Document? proto = this.proto;
+      final Converter? converter = this.converter;
       hardAssert(proto != null && converter != null,
           'Expected proto and converter to be non-null');
 
       // TODO(b-136090445): Remove the cache when `getField` is no longer called
       //  during Query ordering.
-      _fieldValueCache ??= <FieldPath, FieldValue>{};
-      FieldValue fieldValue = _fieldValueCache[path];
+      final Map<FieldPath, FieldValue> cache =
+          _fieldValueCache ??= <FieldPath, FieldValue>{};
+      FieldValue? fieldValue = cache[path];
       if (fieldValue == null) {
         // Instead of deserializing the full Document proto, we only deserialize
         // the value at the requested field path. This speeds up Query execution
         // as query filters can discard documents based on a single field.
-        Value protoValue = proto.fields[path.getFirstSegment()];
+        Value? protoValue = proto!.fields[path.getFirstSegment()];
         for (int i = 1; protoValue != null && i < path.length; ++i) {
           if (protoValue.whichValueType() != Value_ValueType.mapValue) {
             return null;
@@ -98,8 +105,8 @@ class Document extends MaybeDocument implements Comparable<Document> {
         }
 
         if (protoValue != null) {
-          fieldValue = converter(protoValue);
-          _fieldValueCache[path] = fieldValue;
+          fieldValue = converter!(protoValue);
+          cache[path] = fieldValue;
         }
       }
 
@@ -107,8 +114,8 @@ class Document extends MaybeDocument implements Comparable<Document> {
     }
   }
 
-  Object getFieldValue(FieldPath path) {
-    final FieldValue value = getField(path);
+  Object? getFieldValue(FieldPath path) {
+    final FieldValue? value = getField(path);
     return value?.value;
   }
 

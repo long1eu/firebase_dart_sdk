@@ -58,5 +58,5 @@ class SetOptions {
   static const SetOptions mergeAllFields = SetOptions._mergeAll();
 
   final bool merge;
-  final FieldMask fieldMask;
+  final FieldMask? fieldMask;
 }

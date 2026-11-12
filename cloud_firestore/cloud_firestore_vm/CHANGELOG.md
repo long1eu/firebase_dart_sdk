@@ -1,3 +1,62 @@
+## Unreleased (revival of the port)
+
+One entry for the whole revival. The pubspec version is still `0.0.7`; no release has been cut
+and nothing here is published. Everything below was verified with the unit suite and the local
+Firestore emulator only. **Nothing was run against production Firestore.**
+
+### Breaking changes
+
+- Dart 3 (`sdk: ^3.0.0`) with sound null safety; dependencies updated (`grpc`, `protobuf`,
+  `rxdart`, `sqlite3`, ...).
+- Default transaction attempts changed from 6 to 5 (now `TransactionOptions.defaultMaxAttempts`).
+- Idle stream timeout changed from 10 seconds to 1 minute (as Android).
+- `FirebaseApp.setDataCollectionDefaultEnabled` (`firebase_core_vm`) now takes a required
+  named `enabled` parameter.
+- `FirebaseApp.persistenceKey` now uses URL-safe base64 without padding; keys computed by older
+  versions differ.
+- `TransformMutation` is removed: field transforms are folded into set/patch mutations
+  (`update_transforms`). Stored legacy transform writes are squashed on load by the local
+  serializer.
+- A clean close of a stream by the server is now reported as `UNAVAILABLE` instead of being
+  ignored (fixes a start hang).
+- Locally mutated documents carry `SnapshotVersion.none`, as upstream.
+- Deprecated, still working: `Firestore.getInstance` (use `instanceFor`), `document` (use
+  `doc`), `DocumentSnapshot.reference` (use `ref`), `QuerySnapshot.documents` /
+  `documentChanges` (use `docs` / `docChanges`), `FieldPath.documentId()` (use
+  `documentIdField`), `Source.defaultSource` (use `serverAndCache`). `FirebaseFirestore` and
+  `Settings` are typedefs of `Firestore` and `FirestoreSettings`.
+
+### Added
+
+- Read-only transactions: `TransactionOptions(readOnly: true)`, verified at commit with a `VerifyMutation`
+  (new `verify` field in the vendored `write.proto`). Emulator-verified only.
+
+- Queries: `!=` / `not-in`, composite `Filter.or` / `Filter.and` (OR queries), multiple
+  inequality filters, `limitToLast`, arrays in `whereIn` values.
+- Aggregations: `count()`, `sum`, `average` through `RunAggregationQuery`.
+- Vector values and `Query.findNearest` (server only).
+- Data bundles and named queries (`loadBundle`, `loadBundleStream`, `getNamedQuery`).
+- `FieldValue.maximum` / `FieldValue.minimum`.
+- `FirestoreSettings.withEmulator`, cache settings (`PersistentCacheSettings`,
+  `MemoryCacheSettings`), `ListenSource.cache` and `SnapshotListenOptions`.
+- `Firestore.waitForPendingWrites`, `terminate`, `snapshotsInSync`; transaction retry with
+  exponential backoff and `TransactionOptions(maxAttempts)`.
+- App Check token plumbing (`x-firebase-appcheck` header); the enforcement side was not tested.
+- Bloom-filter existence-filter handling, gRPC keepalive and connect timeout, backoff reset on
+  connectivity change, instance cache per app and database, serial queue for remote store work.
+- `ServerTimestampBehavior` is exported; `@internal` on constructors that leaked internals.
+- Fixes from the upstream sync (UTF-8 string ordering, limbo handling, limbo-resolution
+  document removal, transaction precondition, listener lifecycle and others); see
+  `docs/upstream_sync/UPSTREAM_PLAN.md`.
+- Test suite: unit tests, current-format upstream spec tests, a public API golden file, and an
+  emulator integration suite. Protos resynced with current googleapis
+  (`tool/gen_protos.sh`).
+
+### Not done
+
+BSON value types, index-free queries / overlays / index engine, persistence clearing (API to be
+decided), Pipelines.
+
 ## [0.0.7] - April 22, 2020 
 * make Firestore.newInstance register the new instance with the multi db component
 * add warning in case of not initializing FirebaseAuth prior to calling Firestore.instance 

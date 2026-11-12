@@ -20,7 +20,8 @@ import 'dart:async';
 ///       .listen(print); // prints 0
 class OnErrorResumeStreamTransformer<T> extends StreamTransformerBase<T, T> {
   OnErrorResumeStreamTransformer(Stream<T> Function(dynamic error) recoveryFn)
-      : transformer = _buildTransformer(recoveryFn);
+      : transformer = _buildTransformer<T>(
+            (dynamic error, [StackTrace? stackTrace]) => recoveryFn(error));
 
   final StreamTransformer<T, T> transformer;
 
@@ -28,11 +29,11 @@ class OnErrorResumeStreamTransformer<T> extends StreamTransformerBase<T, T> {
   Stream<T> bind(Stream<T> stream) => transformer.bind(stream);
 
   static StreamTransformer<T, T> _buildTransformer<T>(
-      Stream<T> Function(dynamic error, [StackTrace stackTrace]) recoveryFn) {
+      Stream<T> Function(dynamic error, [StackTrace? stackTrace]) recoveryFn) {
     return StreamTransformer<T, T>((Stream<T> input, bool cancelOnError) {
-      StreamSubscription<T> inputSubscription;
-      StreamSubscription<T> recoverySubscription;
-      StreamController<T> controller;
+      StreamSubscription<T>? inputSubscription;
+      StreamSubscription<T>? recoverySubscription;
+      late StreamController<T> controller;
       bool shouldCloseController = true;
 
       void safeClose() {
@@ -56,25 +57,25 @@ class OnErrorResumeStreamTransformer<T> extends StreamTransformerBase<T, T> {
                   cancelOnError: cancelOnError,
                 );
 
-                inputSubscription.cancel();
+                inputSubscription?.cancel();
               },
               onDone: safeClose,
               cancelOnError: cancelOnError,
             );
           },
-          onPause: ([Future<dynamic> resumeSignal]) {
-            inputSubscription?.pause(resumeSignal);
-            recoverySubscription?.pause(resumeSignal);
+          onPause: () {
+            inputSubscription?.pause();
+            recoverySubscription?.pause();
           },
           onResume: () {
             inputSubscription?.resume();
             recoverySubscription?.resume();
           },
           onCancel: () {
-            return Future.wait<dynamic>(<Future<dynamic>>[
-              inputSubscription?.cancel(),
-              recoverySubscription?.cancel()
-            ].where((Future<dynamic> future) => future != null));
+            return Future.wait<void>(<Future<void>>[
+              if (inputSubscription != null) inputSubscription!.cancel(),
+              if (recoverySubscription != null) recoverySubscription!.cancel(),
+            ]);
           });
 
       return controller.stream.listen(null);

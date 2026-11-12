@@ -82,7 +82,6 @@ void main() {
         .addItem(a)
         .addItem(ab)
         .addItem(b)
-        .permitInconsistencyWithEquals()
         .testCompare();
   });
 

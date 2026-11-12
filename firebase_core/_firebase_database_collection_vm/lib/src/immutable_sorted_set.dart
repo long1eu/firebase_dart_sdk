@@ -3,15 +3,15 @@
 // on 19/09/2018
 
 import 'package:_firebase_database_collection_vm/src/immutable_sorted_map.dart';
+import 'package:_firebase_database_collection_vm/src/standard_compartor.dart';
 
 class ImmutableSortedSet<T> extends Iterable<T> {
-  factory ImmutableSortedSet([List<T> elements, Comparator<T> comparator]) {
+  factory ImmutableSortedSet([List<T>? elements, Comparator<T>? comparator]) {
     return ImmutableSortedSet<T>._(ImmutableSortedMap.buildFrom(
       elements ?? <T>[],
       <T, void>{},
       ImmutableSortedMap.identityTranslator(),
-      // ignore: avoid_as
-      comparator ?? (T a, T b) => (a as Comparable<T>).compareTo(b),
+      comparator ?? naturalComparator<T>(),
     ));
   }
 
@@ -20,7 +20,7 @@ class ImmutableSortedSet<T> extends Iterable<T> {
   final ImmutableSortedMap<T, void> _map;
 
   @override
-  bool contains(Object element) {
+  bool contains(Object? element) {
     return element is T && _map.containsKey(element);
   }
 
@@ -33,9 +33,9 @@ class ImmutableSortedSet<T> extends Iterable<T> {
     return ImmutableSortedSet<T>._(_map.insert(entry, null));
   }
 
-  T get minEntry => _map.minKey;
+  T? get minEntry => _map.minKey;
 
-  T get maxEntry => _map.maxKey;
+  T? get maxEntry => _map.maxKey;
 
   @override
   int get length => _map.length;
@@ -58,7 +58,7 @@ class ImmutableSortedSet<T> extends Iterable<T> {
     return _getIterator(_map.reverseIteratorFrom(key)).iterator;
   }
 
-  T getPredecessorEntry(T entry) => _map.getPredecessorKey(entry);
+  T? getPredecessorEntry(T entry) => _map.getPredecessorKey(entry);
 
   int indexOf(T entry) => _map.indexOf(entry);
 

@@ -28,7 +28,7 @@ class PlatformDependencies extends LocalStorage {
 
   /// Used by Firebase services when a network call is made and the user are
   /// allowed to add their own headers
-  HeaderBuilder get headersBuilder => null;
+  HeaderBuilder? get headersBuilder => null;
 
   /// Used by Firebase services to persist various data (eg. user session)
   ///
@@ -40,15 +40,19 @@ class PlatformDependencies extends LocalStorage {
   /// If you are planing to also use FirebaseAuth you don't need to worry about
   /// this field. Firebase Auth SDK automatically registers as
   /// [InternalTokenProvider] if none is set.
-  InternalTokenProvider get authProvider => null;
+  InternalTokenProvider? get authProvider => null;
+
+  /// Firestore sends the token of this provider in the `x-firebase-appcheck`
+  /// header of every request. When null no App Check header is sent.
+  InternalAppCheckTokenProvider? get appCheckProvider => null;
 
   @override
-  String get(String key) {
+  String? get(String key) {
     return _map[key];
   }
 
   @override
-  Future<void> set(String key, String value) async {
+  Future<void> set(String key, String? value) async {
     if (value == null) {
       _map.remove(key);
     } else {
@@ -60,12 +64,12 @@ class PlatformDependencies extends LocalStorage {
 /// Local persistence interface to store key/value pairs
 abstract class LocalStorage {
   /// Gets the values at [key], or null if none found.
-  String get(String key);
+  String? get(String key);
 
   /// Saves the value at [key].
   ///
   /// When a null value is provided the implementation should remove the value.
-  Future<void> set(String key, String value);
+  Future<void> set(String key, String? value);
 }
 
 /// Signature used to retrieved platform specific headers for every request made

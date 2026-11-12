@@ -13,6 +13,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/model/resource_path.da
 import 'package:cloud_firestore_vm/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
+import 'package:meta/meta.dart';
 
 /// A [CollectionReference] can be used for adding documents, getting document references, and
 /// querying for documents (using the methods inherited from [Query]).
@@ -21,6 +22,7 @@ import 'package:cloud_firestore_vm/src/firebase/firestore/util/util.dart';
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class CollectionReference extends Query {
+  @internal
   CollectionReference(ResourcePath path, Firestore firestore)
       : assert(
             path.length.remainder(2) == 1,
@@ -36,7 +38,7 @@ class CollectionReference extends Query {
   ///
   /// Returns the [DocumentReference] that contains this collection or null if this is a root
   /// collection.
-  DocumentReference get parent {
+  DocumentReference? get parent {
     final ResourcePath parentPath = query.path.popLast();
     if (parentPath.isEmpty) {
       return null;
@@ -57,12 +59,15 @@ class CollectionReference extends Query {
   /// [documentPath] a slash-separated relative path to a document.
   ///
   /// Returns the [DocumentReference] instance.
-  DocumentReference document([String documentPath]) {
-    documentPath ??= autoId();
-    checkNotNull(documentPath, 'Provided document path must not be null.');
+  DocumentReference doc([String? documentPath]) => document(documentPath);
+
+  /// Gets a [DocumentReference] instance that refers to the document at the specified path within
+  /// this collection. Same as [doc].
+  @Deprecated('Use doc instead.')
+  DocumentReference document([String? documentPath]) {
+    final String path = documentPath ?? autoId();
     return DocumentReference.forPath(
-        query.path.appendField(ResourcePath.fromString(documentPath)),
-        firestore);
+        query.path.appendField(ResourcePath.fromString(path)), firestore);
   }
 
   /// Adds a new document to this collection with the specified data, assigning it a document ID
@@ -72,7 +77,7 @@ class CollectionReference extends Query {
   ///
   /// Returns a Future that will be resolved with the [DocumentReference] of the newly created
   /// document.
-  Future<DocumentReference> add(Map<String, Object> data) async {
+  Future<DocumentReference> add(Map<String, Object?> data) async {
     checkNotNull(data, 'Provided data must not be null.');
     final DocumentReference ref = document();
     await ref.set(data);
