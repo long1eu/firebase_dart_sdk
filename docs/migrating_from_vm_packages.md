@@ -39,7 +39,7 @@ After:
 
 ```yaml
 environment:
-  sdk: ^3.0.0
+  sdk: ^3.8.0
 dependencies:
   cloud_firestore_dart: ^0.1.0
   firebase_app_dart: ^0.1.0
@@ -65,7 +65,7 @@ moved with the package name; most of what was reachable that way is now internal
 
 ## 2. Dart 3 and null safety
 
-Both packages need Dart `^3.0.0` and are null safe. Values that could always be missing are now
+`cloud_firestore_dart` needs Dart `^3.8.0` (the minimum of `grpc` 5), `firebase_app_dart` Dart `^3.0.0`; both are null safe. Values that could always be missing are now
 typed as nullable:
 
 - `DocumentSnapshot.data` is `null` for a document that does not exist, and field values are

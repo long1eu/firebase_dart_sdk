@@ -1,13 +1,15 @@
+// This is a generated file - do not edit.
 //
-//  Generated code. Do not modify.
-//  source: google/firestore/admin/v1/index.proto
-//
-// @dart = 2.12
+// Generated from google/firestore/admin/v1/index.proto.
+
+// @dart = 3.3
 
 // ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: unused_import
 
 import 'dart:convert' as $convert;
 import 'dart:core' as $core;
@@ -18,9 +20,30 @@ const Index$json = {
   '1': 'Index',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
-    {'1': 'query_scope', '3': 2, '4': 1, '5': 14, '6': '.google.firestore.admin.v1.Index.QueryScope', '10': 'queryScope'},
-    {'1': 'fields', '3': 3, '4': 3, '5': 11, '6': '.google.firestore.admin.v1.Index.IndexField', '10': 'fields'},
-    {'1': 'state', '3': 4, '4': 1, '5': 14, '6': '.google.firestore.admin.v1.Index.State', '10': 'state'},
+    {
+      '1': 'query_scope',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.google.firestore.admin.v1.Index.QueryScope',
+      '10': 'queryScope'
+    },
+    {
+      '1': 'fields',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.admin.v1.Index.IndexField',
+      '10': 'fields'
+    },
+    {
+      '1': 'state',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.google.firestore.admin.v1.Index.State',
+      '10': 'state'
+    },
   ],
   '3': [Index_IndexField$json],
   '4': [Index_QueryScope$json, Index_State$json],
@@ -31,8 +54,24 @@ const Index_IndexField$json = {
   '1': 'IndexField',
   '2': [
     {'1': 'field_path', '3': 1, '4': 1, '5': 9, '10': 'fieldPath'},
-    {'1': 'order', '3': 2, '4': 1, '5': 14, '6': '.google.firestore.admin.v1.Index.IndexField.Order', '9': 0, '10': 'order'},
-    {'1': 'array_config', '3': 3, '4': 1, '5': 14, '6': '.google.firestore.admin.v1.Index.IndexField.ArrayConfig', '9': 0, '10': 'arrayConfig'},
+    {
+      '1': 'order',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.google.firestore.admin.v1.Index.IndexField.Order',
+      '9': 0,
+      '10': 'order'
+    },
+    {
+      '1': 'array_config',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.google.firestore.admin.v1.Index.IndexField.ArrayConfig',
+      '9': 0,
+      '10': 'arrayConfig'
+    },
   ],
   '4': [Index_IndexField_Order$json, Index_IndexField_ArrayConfig$json],
   '8': [
@@ -96,4 +135,3 @@ final $typed_data.Uint8List indexDescriptor = $convert.base64Decode(
     '9TQ09QRV9VTlNQRUNJRklFRBAAEg4KCkNPTExFQ1RJT04QARIUChBDT0xMRUNUSU9OX0dST1VQ'
     'EAIiSQoFU3RhdGUSFQoRU1RBVEVfVU5TUEVDSUZJRUQQABIMCghDUkVBVElORxABEgkKBVJFQU'
     'RZEAISEAoMTkVFRFNfUkVQQUlSEAM=');
-

@@ -62,7 +62,7 @@ class RemoteSerializer {
 
   // Timestamps and Versions
   proto.Timestamp encodeTimestamp(Timestamp timestamp) {
-    return proto.Timestamp.create()
+    return proto.Timestamp()
       ..seconds = Int64(timestamp.seconds)
       ..nanos = timestamp.nanoseconds;
   }
@@ -866,7 +866,7 @@ class RemoteSerializer {
 
     // Encode the limit.
     if (target.hasLimit) {
-      final proto.Int32Value limit = proto.Int32Value.create()
+      final proto.Int32Value limit = proto.Int32Value()
         ..value = target.getLimit();
       structuredQueryBuilder.limit = limit;
     }

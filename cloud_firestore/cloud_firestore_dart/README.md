@@ -40,7 +40,7 @@ yet**, so the `dart pub add` command above only works once it is.
 ## Platforms
 
 Pure Dart on the VM (`dart:io`, `package:grpc`, SQLite through an `OpenDatabase` function you
-supply, for example with `package:sqlite3`). Targets Dart `^3.0.0`. Developed and tested on
+supply, for example with `package:sqlite3`). Targets Dart `^3.8.0` (the minimum of `grpc` 5). Developed and tested on
 macOS; Linux and Windows are expected to work but are not tested. Flutter apps (Android, iOS,
 desktop) can use it as a plain Dart package.
 

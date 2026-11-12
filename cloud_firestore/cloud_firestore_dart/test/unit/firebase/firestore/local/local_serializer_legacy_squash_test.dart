@@ -94,7 +94,7 @@ void main() {
   late RemoteSerializer remoteSerializer;
   late LocalSerializer serializer;
   final Timestamp writeTime = Timestamp.now();
-  final proto.Timestamp writeTimeProto = proto.Timestamp.create()
+  final proto.Timestamp writeTimeProto = proto.Timestamp()
     ..seconds = Int64(writeTime.seconds)
     ..nanos = writeTime.nanoseconds;
 

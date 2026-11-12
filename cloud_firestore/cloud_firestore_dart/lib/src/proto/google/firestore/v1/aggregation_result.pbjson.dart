@@ -1,13 +1,15 @@
+// This is a generated file - do not edit.
 //
-//  Generated code. Do not modify.
-//  source: google/firestore/v1/aggregation_result.proto
-//
-// @dart = 2.12
+// Generated from google/firestore/v1/aggregation_result.proto.
+
+// @dart = 3.3
 
 // ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: unused_import
 
 import 'dart:convert' as $convert;
 import 'dart:core' as $core;
@@ -17,7 +19,14 @@ import 'dart:typed_data' as $typed_data;
 const AggregationResult$json = {
   '1': 'AggregationResult',
   '2': [
-    {'1': 'aggregate_fields', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1.AggregationResult.AggregateFieldsEntry', '10': 'aggregateFields'},
+    {
+      '1': 'aggregate_fields',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.AggregationResult.AggregateFieldsEntry',
+      '10': 'aggregateFields'
+    },
   ],
   '3': [AggregationResult_AggregateFieldsEntry$json],
 };
@@ -27,7 +36,14 @@ const AggregationResult_AggregateFieldsEntry$json = {
   '1': 'AggregateFieldsEntry',
   '2': [
     {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
-    {'1': 'value', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.Value', '10': 'value'},
+    {
+      '1': 'value',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Value',
+      '10': 'value'
+    },
   ],
   '7': {'7': true},
 };
@@ -38,4 +54,3 @@ final $typed_data.Uint8List aggregationResultDescriptor = $convert.base64Decode(
     'ZpcmVzdG9yZS52MS5BZ2dyZWdhdGlvblJlc3VsdC5BZ2dyZWdhdGVGaWVsZHNFbnRyeVIPYWdn'
     'cmVnYXRlRmllbGRzGl4KFEFnZ3JlZ2F0ZUZpZWxkc0VudHJ5EhAKA2tleRgBIAEoCVIDa2V5Ej'
     'AKBXZhbHVlGAIgASgLMhouZ29vZ2xlLmZpcmVzdG9yZS52MS5WYWx1ZVIFdmFsdWU6AjgB');
-

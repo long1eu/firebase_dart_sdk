@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerates lib/src/proto from res/protos. Requires protoc_plugin 21.1.2 (matches protobuf 3.x): dart pub global activate protoc_plugin 21.1.2;
+# Regenerates lib/src/proto from res/protos. Requires protoc_plugin 25.1.0 (matches protobuf 6.x): dart pub global activate protoc_plugin 25.1.0;
 # and either a working `protoc` or `python -m grpc_tools.protoc` (set PROTOC to override).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -12,8 +12,14 @@ fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 # Option-only / descriptor protos are needed on the include path but have no Dart consumers.
-EXCLUDE='^google/api/(client|field_behavior|routing|launch_stage)\.proto$|^google/protobuf/descriptor\.proto$'
-( cd res/protos && $PROTOC -I. $(find . -name '*.proto' | sed 's|^\./||' | sort | grep -Ev "$EXCLUDE") --dart_out=grpc:"$TMP" )
+# The well-known types (google/protobuf/*.proto) are not generated either: since protoc_plugin
+# 22 the generated code imports them from package:protobuf/well_known_types, and the barrel
+# lib/src/proto/google/protobuf/index.dart (written below) re-exports them from there.
+EXCLUDE='^google/api/(client|field_behavior|routing|launch_stage)\.proto$|^google/protobuf/'
+# PROTOC_GEN_DART: path of a protoc-gen-dart executable to use instead of the one on PATH.
+PLUGIN=()
+if [ -n "${PROTOC_GEN_DART:-}" ]; then PLUGIN=(--plugin="protoc-gen-dart=$PROTOC_GEN_DART"); fi
+( cd res/protos && $PROTOC -I. ${PLUGIN[@]+"${PLUGIN[@]}"} $(find . -name '*.proto' | sed 's|^\./||' | sort | grep -Ev "$EXCLUDE") --dart_out=grpc:"$TMP" )
 # Keep hand-written barrel files, drop old generated output.
 find "$OUT" -name '*.pb*.dart' -delete
 cp -R "$TMP"/. "$OUT"/
@@ -24,3 +30,13 @@ find "$OUT" -type d | while read -r d; do
   [ "$d" = "$OUT" ] && { rm "$d/index.dart.tmp"; continue; }
   mv "$d/index.dart.tmp" "$d/index.dart"
 done
+# The well-known types that res/protos imports, from package:protobuf.
+WKT=package:protobuf/well_known_types/google/protobuf
+{
+  for t in any duration empty struct timestamp wrappers; do
+    echo "export '$WKT/$t.pb.dart';"
+    [ "$t" = struct ] && echo "export '$WKT/$t.pbenum.dart';"
+    echo "export '$WKT/$t.pbjson.dart';"
+  done
+} > "$OUT/google/protobuf/index.dart"
+dart format "$OUT/google/protobuf/index.dart" >/dev/null

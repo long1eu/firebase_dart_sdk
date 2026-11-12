@@ -1,13 +1,15 @@
+// This is a generated file - do not edit.
 //
-//  Generated code. Do not modify.
-//  source: google/firestore/v1/firestore.proto
-//
-// @dart = 2.12
+// Generated from google/firestore/v1/firestore.proto.
+
+// @dart = 3.3
 
 // ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: unused_import
 
 import 'dart:convert' as $convert;
 import 'dart:core' as $core;
@@ -18,10 +20,33 @@ const GetDocumentRequest$json = {
   '1': 'GetDocumentRequest',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'name'},
-    {'1': 'mask', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentMask', '10': 'mask'},
+    {
+      '1': 'mask',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.DocumentMask',
+      '10': 'mask'
+    },
     {'1': 'transaction', '3': 3, '4': 1, '5': 12, '9': 0, '10': 'transaction'},
-    {'1': 'read_time', '3': 5, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 0, '10': 'readTime'},
-    {'1': 'request_options', '3': 10, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'read_time',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 0,
+      '10': 'readTime'
+    },
+    {
+      '1': 'request_options',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '8': [
     {'1': 'consistency_selector'},
@@ -42,15 +67,46 @@ const ListDocumentsRequest$json = {
   '1': 'ListDocumentsRequest',
   '2': [
     {'1': 'parent', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'parent'},
-    {'1': 'collection_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'collectionId'},
+    {
+      '1': 'collection_id',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '10': 'collectionId'
+    },
     {'1': 'page_size', '3': 3, '4': 1, '5': 5, '8': {}, '10': 'pageSize'},
     {'1': 'page_token', '3': 4, '4': 1, '5': 9, '8': {}, '10': 'pageToken'},
     {'1': 'order_by', '3': 6, '4': 1, '5': 9, '8': {}, '10': 'orderBy'},
-    {'1': 'mask', '3': 7, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentMask', '8': {}, '10': 'mask'},
+    {
+      '1': 'mask',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.DocumentMask',
+      '8': {},
+      '10': 'mask'
+    },
     {'1': 'transaction', '3': 8, '4': 1, '5': 12, '9': 0, '10': 'transaction'},
-    {'1': 'read_time', '3': 10, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 0, '10': 'readTime'},
+    {
+      '1': 'read_time',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 0,
+      '10': 'readTime'
+    },
     {'1': 'show_missing', '3': 12, '4': 1, '5': 8, '10': 'showMissing'},
-    {'1': 'request_options', '3': 13, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'request_options',
+      '3': 13,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '8': [
     {'1': 'consistency_selector'},
@@ -74,7 +130,14 @@ final $typed_data.Uint8List listDocumentsRequestDescriptor = $convert.base64Deco
 const ListDocumentsResponse$json = {
   '1': 'ListDocumentsResponse',
   '2': [
-    {'1': 'documents', '3': 1, '4': 3, '5': 11, '6': '.google.firestore.v1.Document', '10': 'documents'},
+    {
+      '1': 'documents',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Document',
+      '10': 'documents'
+    },
     {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
   ],
 };
@@ -90,11 +153,41 @@ const CreateDocumentRequest$json = {
   '1': 'CreateDocumentRequest',
   '2': [
     {'1': 'parent', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'parent'},
-    {'1': 'collection_id', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'collectionId'},
+    {
+      '1': 'collection_id',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '8': {},
+      '10': 'collectionId'
+    },
     {'1': 'document_id', '3': 3, '4': 1, '5': 9, '10': 'documentId'},
-    {'1': 'document', '3': 4, '4': 1, '5': 11, '6': '.google.firestore.v1.Document', '8': {}, '10': 'document'},
-    {'1': 'mask', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentMask', '10': 'mask'},
-    {'1': 'request_options', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'document',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Document',
+      '8': {},
+      '10': 'document'
+    },
+    {
+      '1': 'mask',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.DocumentMask',
+      '10': 'mask'
+    },
+    {
+      '1': 'request_options',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
 };
 
@@ -111,11 +204,48 @@ final $typed_data.Uint8List createDocumentRequestDescriptor = $convert.base64Dec
 const UpdateDocumentRequest$json = {
   '1': 'UpdateDocumentRequest',
   '2': [
-    {'1': 'document', '3': 1, '4': 1, '5': 11, '6': '.google.firestore.v1.Document', '8': {}, '10': 'document'},
-    {'1': 'update_mask', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentMask', '10': 'updateMask'},
-    {'1': 'mask', '3': 3, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentMask', '10': 'mask'},
-    {'1': 'current_document', '3': 4, '4': 1, '5': 11, '6': '.google.firestore.v1.Precondition', '10': 'currentDocument'},
-    {'1': 'request_options', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'document',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Document',
+      '8': {},
+      '10': 'document'
+    },
+    {
+      '1': 'update_mask',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.DocumentMask',
+      '10': 'updateMask'
+    },
+    {
+      '1': 'mask',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.DocumentMask',
+      '10': 'mask'
+    },
+    {
+      '1': 'current_document',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Precondition',
+      '10': 'currentDocument'
+    },
+    {
+      '1': 'request_options',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
 };
 
@@ -134,8 +264,23 @@ const DeleteDocumentRequest$json = {
   '1': 'DeleteDocumentRequest',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'name'},
-    {'1': 'current_document', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.Precondition', '10': 'currentDocument'},
-    {'1': 'request_options', '3': 3, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'current_document',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Precondition',
+      '10': 'currentDocument'
+    },
+    {
+      '1': 'request_options',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
 };
 
@@ -152,11 +297,42 @@ const BatchGetDocumentsRequest$json = {
   '2': [
     {'1': 'database', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'database'},
     {'1': 'documents', '3': 2, '4': 3, '5': 9, '10': 'documents'},
-    {'1': 'mask', '3': 3, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentMask', '10': 'mask'},
+    {
+      '1': 'mask',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.DocumentMask',
+      '10': 'mask'
+    },
     {'1': 'transaction', '3': 4, '4': 1, '5': 12, '9': 0, '10': 'transaction'},
-    {'1': 'new_transaction', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1.TransactionOptions', '9': 0, '10': 'newTransaction'},
-    {'1': 'read_time', '3': 7, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 0, '10': 'readTime'},
-    {'1': 'request_options', '3': 8, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'new_transaction',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.TransactionOptions',
+      '9': 0,
+      '10': 'newTransaction'
+    },
+    {
+      '1': 'read_time',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 0,
+      '10': 'readTime'
+    },
+    {
+      '1': 'request_options',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '8': [
     {'1': 'consistency_selector'},
@@ -178,10 +354,25 @@ final $typed_data.Uint8List batchGetDocumentsRequestDescriptor = $convert.base64
 const BatchGetDocumentsResponse$json = {
   '1': 'BatchGetDocumentsResponse',
   '2': [
-    {'1': 'found', '3': 1, '4': 1, '5': 11, '6': '.google.firestore.v1.Document', '9': 0, '10': 'found'},
+    {
+      '1': 'found',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Document',
+      '9': 0,
+      '10': 'found'
+    },
     {'1': 'missing', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'missing'},
     {'1': 'transaction', '3': 3, '4': 1, '5': 12, '10': 'transaction'},
-    {'1': 'read_time', '3': 4, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'readTime'},
+    {
+      '1': 'read_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'readTime'
+    },
   ],
   '8': [
     {'1': 'result'},
@@ -200,8 +391,23 @@ const BeginTransactionRequest$json = {
   '1': 'BeginTransactionRequest',
   '2': [
     {'1': 'database', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'database'},
-    {'1': 'options', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.TransactionOptions', '10': 'options'},
-    {'1': 'request_options', '3': 3, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'options',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.TransactionOptions',
+      '10': 'options'
+    },
+    {
+      '1': 'request_options',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
 };
 
@@ -221,18 +427,34 @@ const BeginTransactionResponse$json = {
 };
 
 /// Descriptor for `BeginTransactionResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List beginTransactionResponseDescriptor = $convert.base64Decode(
-    'ChhCZWdpblRyYW5zYWN0aW9uUmVzcG9uc2USIAoLdHJhbnNhY3Rpb24YASABKAxSC3RyYW5zYW'
-    'N0aW9u');
+final $typed_data.Uint8List beginTransactionResponseDescriptor =
+    $convert.base64Decode(
+        'ChhCZWdpblRyYW5zYWN0aW9uUmVzcG9uc2USIAoLdHJhbnNhY3Rpb24YASABKAxSC3RyYW5zYW'
+        'N0aW9u');
 
 @$core.Deprecated('Use commitRequestDescriptor instead')
 const CommitRequest$json = {
   '1': 'CommitRequest',
   '2': [
     {'1': 'database', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'database'},
-    {'1': 'writes', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1.Write', '10': 'writes'},
+    {
+      '1': 'writes',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Write',
+      '10': 'writes'
+    },
     {'1': 'transaction', '3': 3, '4': 1, '5': 12, '10': 'transaction'},
-    {'1': 'request_options', '3': 4, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'request_options',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
 };
 
@@ -247,8 +469,22 @@ final $typed_data.Uint8List commitRequestDescriptor = $convert.base64Decode(
 const CommitResponse$json = {
   '1': 'CommitResponse',
   '2': [
-    {'1': 'write_results', '3': 1, '4': 3, '5': 11, '6': '.google.firestore.v1.WriteResult', '10': 'writeResults'},
-    {'1': 'commit_time', '3': 2, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'commitTime'},
+    {
+      '1': 'write_results',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.WriteResult',
+      '10': 'writeResults'
+    },
+    {
+      '1': 'commit_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'commitTime'
+    },
   ],
 };
 
@@ -264,7 +500,15 @@ const RollbackRequest$json = {
   '2': [
     {'1': 'database', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'database'},
     {'1': 'transaction', '3': 2, '4': 1, '5': 12, '8': {}, '10': 'transaction'},
-    {'1': 'request_options', '3': 3, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'request_options',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
 };
 
@@ -280,12 +524,52 @@ const RunQueryRequest$json = {
   '1': 'RunQueryRequest',
   '2': [
     {'1': 'parent', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'parent'},
-    {'1': 'structured_query', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.StructuredQuery', '9': 0, '10': 'structuredQuery'},
+    {
+      '1': 'structured_query',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.StructuredQuery',
+      '9': 0,
+      '10': 'structuredQuery'
+    },
     {'1': 'transaction', '3': 5, '4': 1, '5': 12, '9': 1, '10': 'transaction'},
-    {'1': 'new_transaction', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1.TransactionOptions', '9': 1, '10': 'newTransaction'},
-    {'1': 'read_time', '3': 7, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 1, '10': 'readTime'},
-    {'1': 'explain_options', '3': 10, '4': 1, '5': 11, '6': '.google.firestore.v1.ExplainOptions', '8': {}, '10': 'explainOptions'},
-    {'1': 'request_options', '3': 11, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'new_transaction',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.TransactionOptions',
+      '9': 1,
+      '10': 'newTransaction'
+    },
+    {
+      '1': 'read_time',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 1,
+      '10': 'readTime'
+    },
+    {
+      '1': 'explain_options',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.ExplainOptions',
+      '8': {},
+      '10': 'explainOptions'
+    },
+    {
+      '1': 'request_options',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '8': [
     {'1': 'query_type'},
@@ -311,11 +595,32 @@ const RunQueryResponse$json = {
   '1': 'RunQueryResponse',
   '2': [
     {'1': 'transaction', '3': 2, '4': 1, '5': 12, '10': 'transaction'},
-    {'1': 'document', '3': 1, '4': 1, '5': 11, '6': '.google.firestore.v1.Document', '10': 'document'},
-    {'1': 'read_time', '3': 3, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'readTime'},
+    {
+      '1': 'document',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Document',
+      '10': 'document'
+    },
+    {
+      '1': 'read_time',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'readTime'
+    },
     {'1': 'skipped_results', '3': 4, '4': 1, '5': 5, '10': 'skippedResults'},
     {'1': 'done', '3': 6, '4': 1, '5': 8, '9': 0, '10': 'done'},
-    {'1': 'explain_metrics', '3': 11, '4': 1, '5': 11, '6': '.google.firestore.v1.ExplainMetrics', '10': 'explainMetrics'},
+    {
+      '1': 'explain_metrics',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.ExplainMetrics',
+      '10': 'explainMetrics'
+    },
   ],
   '8': [
     {'1': 'continuation_selector'},
@@ -337,12 +642,51 @@ const ExecutePipelineRequest$json = {
   '1': 'ExecutePipelineRequest',
   '2': [
     {'1': 'database', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'database'},
-    {'1': 'structured_pipeline', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.StructuredPipeline', '9': 0, '10': 'structuredPipeline'},
+    {
+      '1': 'structured_pipeline',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.StructuredPipeline',
+      '9': 0,
+      '10': 'structuredPipeline'
+    },
     {'1': 'transaction', '3': 5, '4': 1, '5': 12, '9': 1, '10': 'transaction'},
-    {'1': 'new_transaction', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1.TransactionOptions', '9': 1, '10': 'newTransaction'},
-    {'1': 'read_time', '3': 7, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 1, '10': 'readTime'},
-    {'1': 'auto_commit_transaction', '3': 9, '4': 1, '5': 8, '8': {}, '10': 'autoCommitTransaction'},
-    {'1': 'request_options', '3': 10, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'new_transaction',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.TransactionOptions',
+      '9': 1,
+      '10': 'newTransaction'
+    },
+    {
+      '1': 'read_time',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 1,
+      '10': 'readTime'
+    },
+    {
+      '1': 'auto_commit_transaction',
+      '3': 9,
+      '4': 1,
+      '5': 8,
+      '8': {},
+      '10': 'autoCommitTransaction'
+    },
+    {
+      '1': 'request_options',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '8': [
     {'1': 'pipeline_type'},
@@ -368,9 +712,30 @@ const ExecutePipelineResponse$json = {
   '1': 'ExecutePipelineResponse',
   '2': [
     {'1': 'transaction', '3': 1, '4': 1, '5': 12, '10': 'transaction'},
-    {'1': 'results', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1.Document', '10': 'results'},
-    {'1': 'execution_time', '3': 3, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'executionTime'},
-    {'1': 'explain_stats', '3': 4, '4': 1, '5': 11, '6': '.google.firestore.v1.ExplainStats', '10': 'explainStats'},
+    {
+      '1': 'results',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Document',
+      '10': 'results'
+    },
+    {
+      '1': 'execution_time',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'executionTime'
+    },
+    {
+      '1': 'explain_stats',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.ExplainStats',
+      '10': 'explainStats'
+    },
   ],
 };
 
@@ -387,12 +752,52 @@ const RunAggregationQueryRequest$json = {
   '1': 'RunAggregationQueryRequest',
   '2': [
     {'1': 'parent', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'parent'},
-    {'1': 'structured_aggregation_query', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.StructuredAggregationQuery', '9': 0, '10': 'structuredAggregationQuery'},
+    {
+      '1': 'structured_aggregation_query',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.StructuredAggregationQuery',
+      '9': 0,
+      '10': 'structuredAggregationQuery'
+    },
     {'1': 'transaction', '3': 4, '4': 1, '5': 12, '9': 1, '10': 'transaction'},
-    {'1': 'new_transaction', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1.TransactionOptions', '9': 1, '10': 'newTransaction'},
-    {'1': 'read_time', '3': 6, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 1, '10': 'readTime'},
-    {'1': 'explain_options', '3': 8, '4': 1, '5': 11, '6': '.google.firestore.v1.ExplainOptions', '8': {}, '10': 'explainOptions'},
-    {'1': 'request_options', '3': 9, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'new_transaction',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.TransactionOptions',
+      '9': 1,
+      '10': 'newTransaction'
+    },
+    {
+      '1': 'read_time',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 1,
+      '10': 'readTime'
+    },
+    {
+      '1': 'explain_options',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.ExplainOptions',
+      '8': {},
+      '10': 'explainOptions'
+    },
+    {
+      '1': 'request_options',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '8': [
     {'1': 'query_type'},
@@ -418,10 +823,31 @@ final $typed_data.Uint8List runAggregationQueryRequestDescriptor = $convert.base
 const RunAggregationQueryResponse$json = {
   '1': 'RunAggregationQueryResponse',
   '2': [
-    {'1': 'result', '3': 1, '4': 1, '5': 11, '6': '.google.firestore.v1.AggregationResult', '10': 'result'},
+    {
+      '1': 'result',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.AggregationResult',
+      '10': 'result'
+    },
     {'1': 'transaction', '3': 2, '4': 1, '5': 12, '10': 'transaction'},
-    {'1': 'read_time', '3': 3, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'readTime'},
-    {'1': 'explain_metrics', '3': 10, '4': 1, '5': 11, '6': '.google.firestore.v1.ExplainMetrics', '10': 'explainMetrics'},
+    {
+      '1': 'read_time',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'readTime'
+    },
+    {
+      '1': 'explain_metrics',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.ExplainMetrics',
+      '10': 'explainMetrics'
+    },
   ],
 };
 
@@ -438,12 +864,36 @@ const PartitionQueryRequest$json = {
   '1': 'PartitionQueryRequest',
   '2': [
     {'1': 'parent', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'parent'},
-    {'1': 'structured_query', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.StructuredQuery', '9': 0, '10': 'structuredQuery'},
+    {
+      '1': 'structured_query',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.StructuredQuery',
+      '9': 0,
+      '10': 'structuredQuery'
+    },
     {'1': 'partition_count', '3': 3, '4': 1, '5': 3, '10': 'partitionCount'},
     {'1': 'page_token', '3': 4, '4': 1, '5': 9, '10': 'pageToken'},
     {'1': 'page_size', '3': 5, '4': 1, '5': 5, '10': 'pageSize'},
-    {'1': 'read_time', '3': 6, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 1, '10': 'readTime'},
-    {'1': 'request_options', '3': 7, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'read_time',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 1,
+      '10': 'readTime'
+    },
+    {
+      '1': 'request_options',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '8': [
     {'1': 'query_type'},
@@ -466,7 +916,14 @@ final $typed_data.Uint8List partitionQueryRequestDescriptor = $convert.base64Dec
 const PartitionQueryResponse$json = {
   '1': 'PartitionQueryResponse',
   '2': [
-    {'1': 'partitions', '3': 1, '4': 3, '5': 11, '6': '.google.firestore.v1.Cursor', '10': 'partitions'},
+    {
+      '1': 'partitions',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Cursor',
+      '10': 'partitions'
+    },
     {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
   ],
 };
@@ -483,10 +940,32 @@ const WriteRequest$json = {
   '2': [
     {'1': 'database', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'database'},
     {'1': 'stream_id', '3': 2, '4': 1, '5': 9, '10': 'streamId'},
-    {'1': 'writes', '3': 3, '4': 3, '5': 11, '6': '.google.firestore.v1.Write', '10': 'writes'},
+    {
+      '1': 'writes',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Write',
+      '10': 'writes'
+    },
     {'1': 'stream_token', '3': 4, '4': 1, '5': 12, '10': 'streamToken'},
-    {'1': 'labels', '3': 5, '4': 3, '5': 11, '6': '.google.firestore.v1.WriteRequest.LabelsEntry', '10': 'labels'},
-    {'1': 'request_options', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'labels',
+      '3': 5,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.WriteRequest.LabelsEntry',
+      '10': 'labels'
+    },
+    {
+      '1': 'request_options',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '3': [WriteRequest_LabelsEntry$json],
 };
@@ -517,8 +996,22 @@ const WriteResponse$json = {
   '2': [
     {'1': 'stream_id', '3': 1, '4': 1, '5': 9, '10': 'streamId'},
     {'1': 'stream_token', '3': 2, '4': 1, '5': 12, '10': 'streamToken'},
-    {'1': 'write_results', '3': 3, '4': 3, '5': 11, '6': '.google.firestore.v1.WriteResult', '10': 'writeResults'},
-    {'1': 'commit_time', '3': 4, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'commitTime'},
+    {
+      '1': 'write_results',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.WriteResult',
+      '10': 'writeResults'
+    },
+    {
+      '1': 'commit_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'commitTime'
+    },
   ],
 };
 
@@ -534,10 +1027,40 @@ const ListenRequest$json = {
   '1': 'ListenRequest',
   '2': [
     {'1': 'database', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'database'},
-    {'1': 'add_target', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.Target', '9': 0, '10': 'addTarget'},
-    {'1': 'remove_target', '3': 3, '4': 1, '5': 5, '9': 0, '10': 'removeTarget'},
-    {'1': 'labels', '3': 4, '4': 3, '5': 11, '6': '.google.firestore.v1.ListenRequest.LabelsEntry', '10': 'labels'},
-    {'1': 'request_options', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'add_target',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Target',
+      '9': 0,
+      '10': 'addTarget'
+    },
+    {
+      '1': 'remove_target',
+      '3': 3,
+      '4': 1,
+      '5': 5,
+      '9': 0,
+      '10': 'removeTarget'
+    },
+    {
+      '1': 'labels',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.ListenRequest.LabelsEntry',
+      '10': 'labels'
+    },
+    {
+      '1': 'request_options',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '3': [ListenRequest_LabelsEntry$json],
   '8': [
@@ -569,11 +1092,51 @@ final $typed_data.Uint8List listenRequestDescriptor = $convert.base64Decode(
 const ListenResponse$json = {
   '1': 'ListenResponse',
   '2': [
-    {'1': 'target_change', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.TargetChange', '9': 0, '10': 'targetChange'},
-    {'1': 'document_change', '3': 3, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentChange', '9': 0, '10': 'documentChange'},
-    {'1': 'document_delete', '3': 4, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentDelete', '9': 0, '10': 'documentDelete'},
-    {'1': 'document_remove', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1.DocumentRemove', '9': 0, '10': 'documentRemove'},
-    {'1': 'filter', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1.ExistenceFilter', '9': 0, '10': 'filter'},
+    {
+      '1': 'target_change',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.TargetChange',
+      '9': 0,
+      '10': 'targetChange'
+    },
+    {
+      '1': 'document_change',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.DocumentChange',
+      '9': 0,
+      '10': 'documentChange'
+    },
+    {
+      '1': 'document_delete',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.DocumentDelete',
+      '9': 0,
+      '10': 'documentDelete'
+    },
+    {
+      '1': 'document_remove',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.DocumentRemove',
+      '9': 0,
+      '10': 'documentRemove'
+    },
+    {
+      '1': 'filter',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.ExistenceFilter',
+      '9': 0,
+      '10': 'filter'
+    },
   ],
   '8': [
     {'1': 'response_type'},
@@ -595,13 +1158,44 @@ final $typed_data.Uint8List listenResponseDescriptor = $convert.base64Decode(
 const Target$json = {
   '1': 'Target',
   '2': [
-    {'1': 'query', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.Target.QueryTarget', '9': 0, '10': 'query'},
-    {'1': 'documents', '3': 3, '4': 1, '5': 11, '6': '.google.firestore.v1.Target.DocumentsTarget', '9': 0, '10': 'documents'},
+    {
+      '1': 'query',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Target.QueryTarget',
+      '9': 0,
+      '10': 'query'
+    },
+    {
+      '1': 'documents',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Target.DocumentsTarget',
+      '9': 0,
+      '10': 'documents'
+    },
     {'1': 'resume_token', '3': 4, '4': 1, '5': 12, '9': 1, '10': 'resumeToken'},
-    {'1': 'read_time', '3': 11, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 1, '10': 'readTime'},
+    {
+      '1': 'read_time',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 1,
+      '10': 'readTime'
+    },
     {'1': 'target_id', '3': 5, '4': 1, '5': 5, '10': 'targetId'},
     {'1': 'once', '3': 6, '4': 1, '5': 8, '10': 'once'},
-    {'1': 'expected_count', '3': 12, '4': 1, '5': 11, '6': '.google.protobuf.Int32Value', '10': 'expectedCount'},
+    {
+      '1': 'expected_count',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Int32Value',
+      '10': 'expectedCount'
+    },
   ],
   '3': [Target_DocumentsTarget$json, Target_QueryTarget$json],
   '8': [
@@ -623,7 +1217,15 @@ const Target_QueryTarget$json = {
   '1': 'QueryTarget',
   '2': [
     {'1': 'parent', '3': 1, '4': 1, '5': 9, '10': 'parent'},
-    {'1': 'structured_query', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.StructuredQuery', '9': 0, '10': 'structuredQuery'},
+    {
+      '1': 'structured_query',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.StructuredQuery',
+      '9': 0,
+      '10': 'structuredQuery'
+    },
   ],
   '8': [
     {'1': 'query_type'},
@@ -648,11 +1250,32 @@ final $typed_data.Uint8List targetDescriptor = $convert.base64Decode(
 const TargetChange$json = {
   '1': 'TargetChange',
   '2': [
-    {'1': 'target_change_type', '3': 1, '4': 1, '5': 14, '6': '.google.firestore.v1.TargetChange.TargetChangeType', '10': 'targetChangeType'},
+    {
+      '1': 'target_change_type',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.google.firestore.v1.TargetChange.TargetChangeType',
+      '10': 'targetChangeType'
+    },
     {'1': 'target_ids', '3': 2, '4': 3, '5': 5, '10': 'targetIds'},
-    {'1': 'cause', '3': 3, '4': 1, '5': 11, '6': '.google.rpc.Status', '10': 'cause'},
+    {
+      '1': 'cause',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.rpc.Status',
+      '10': 'cause'
+    },
     {'1': 'resume_token', '3': 4, '4': 1, '5': 12, '10': 'resumeToken'},
-    {'1': 'read_time', '3': 6, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'readTime'},
+    {
+      '1': 'read_time',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'readTime'
+    },
   ],
   '4': [TargetChange_TargetChangeType$json],
 };
@@ -686,8 +1309,24 @@ const ListCollectionIdsRequest$json = {
     {'1': 'parent', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'parent'},
     {'1': 'page_size', '3': 2, '4': 1, '5': 5, '10': 'pageSize'},
     {'1': 'page_token', '3': 3, '4': 1, '5': 9, '10': 'pageToken'},
-    {'1': 'read_time', '3': 4, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 0, '10': 'readTime'},
-    {'1': 'request_options', '3': 5, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'read_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 0,
+      '10': 'readTime'
+    },
+    {
+      '1': 'request_options',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '8': [
     {'1': 'consistency_selector'},
@@ -713,18 +1352,41 @@ const ListCollectionIdsResponse$json = {
 };
 
 /// Descriptor for `ListCollectionIdsResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List listCollectionIdsResponseDescriptor = $convert.base64Decode(
-    'ChlMaXN0Q29sbGVjdGlvbklkc1Jlc3BvbnNlEiUKDmNvbGxlY3Rpb25faWRzGAEgAygJUg1jb2'
-    'xsZWN0aW9uSWRzEiYKD25leHRfcGFnZV90b2tlbhgCIAEoCVINbmV4dFBhZ2VUb2tlbg==');
+final $typed_data.Uint8List listCollectionIdsResponseDescriptor =
+    $convert.base64Decode(
+        'ChlMaXN0Q29sbGVjdGlvbklkc1Jlc3BvbnNlEiUKDmNvbGxlY3Rpb25faWRzGAEgAygJUg1jb2'
+        'xsZWN0aW9uSWRzEiYKD25leHRfcGFnZV90b2tlbhgCIAEoCVINbmV4dFBhZ2VUb2tlbg==');
 
 @$core.Deprecated('Use batchWriteRequestDescriptor instead')
 const BatchWriteRequest$json = {
   '1': 'BatchWriteRequest',
   '2': [
     {'1': 'database', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'database'},
-    {'1': 'writes', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1.Write', '10': 'writes'},
-    {'1': 'labels', '3': 3, '4': 3, '5': 11, '6': '.google.firestore.v1.BatchWriteRequest.LabelsEntry', '10': 'labels'},
-    {'1': 'request_options', '3': 4, '4': 1, '5': 11, '6': '.google.firestore.v1.RequestOptions', '8': {}, '10': 'requestOptions'},
+    {
+      '1': 'writes',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Write',
+      '10': 'writes'
+    },
+    {
+      '1': 'labels',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.BatchWriteRequest.LabelsEntry',
+      '10': 'labels'
+    },
+    {
+      '1': 'request_options',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.RequestOptions',
+      '8': {},
+      '10': 'requestOptions'
+    },
   ],
   '3': [BatchWriteRequest_LabelsEntry$json],
 };
@@ -752,8 +1414,22 @@ final $typed_data.Uint8List batchWriteRequestDescriptor = $convert.base64Decode(
 const BatchWriteResponse$json = {
   '1': 'BatchWriteResponse',
   '2': [
-    {'1': 'write_results', '3': 1, '4': 3, '5': 11, '6': '.google.firestore.v1.WriteResult', '10': 'writeResults'},
-    {'1': 'status', '3': 2, '4': 3, '5': 11, '6': '.google.rpc.Status', '10': 'status'},
+    {
+      '1': 'write_results',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.WriteResult',
+      '10': 'writeResults'
+    },
+    {
+      '1': 'status',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.google.rpc.Status',
+      '10': 'status'
+    },
   ],
 };
 
@@ -762,4 +1438,3 @@ final $typed_data.Uint8List batchWriteResponseDescriptor = $convert.base64Decode
     'ChJCYXRjaFdyaXRlUmVzcG9uc2USRQoNd3JpdGVfcmVzdWx0cxgBIAMoCzIgLmdvb2dsZS5maX'
     'Jlc3RvcmUudjEuV3JpdGVSZXN1bHRSDHdyaXRlUmVzdWx0cxIqCgZzdGF0dXMYAiADKAsyEi5n'
     'b29nbGUucnBjLlN0YXR1c1IGc3RhdHVz');
-

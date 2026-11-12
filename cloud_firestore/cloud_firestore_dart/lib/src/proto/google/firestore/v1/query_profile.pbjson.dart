@@ -1,13 +1,15 @@
+// This is a generated file - do not edit.
 //
-//  Generated code. Do not modify.
-//  source: google/firestore/v1/query_profile.proto
-//
-// @dart = 2.12
+// Generated from google/firestore/v1/query_profile.proto.
+
+// @dart = 3.3
 
 // ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: unused_import
 
 import 'dart:convert' as $convert;
 import 'dart:core' as $core;
@@ -29,8 +31,22 @@ final $typed_data.Uint8List explainOptionsDescriptor = $convert.base64Decode(
 const ExplainMetrics$json = {
   '1': 'ExplainMetrics',
   '2': [
-    {'1': 'plan_summary', '3': 1, '4': 1, '5': 11, '6': '.google.firestore.v1.PlanSummary', '10': 'planSummary'},
-    {'1': 'execution_stats', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.ExecutionStats', '10': 'executionStats'},
+    {
+      '1': 'plan_summary',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.PlanSummary',
+      '10': 'planSummary'
+    },
+    {
+      '1': 'execution_stats',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.ExecutionStats',
+      '10': 'executionStats'
+    },
   ],
 };
 
@@ -44,7 +60,14 @@ final $typed_data.Uint8List explainMetricsDescriptor = $convert.base64Decode(
 const PlanSummary$json = {
   '1': 'PlanSummary',
   '2': [
-    {'1': 'indexes_used', '3': 1, '4': 3, '5': 11, '6': '.google.protobuf.Struct', '10': 'indexesUsed'},
+    {
+      '1': 'indexes_used',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.google.protobuf.Struct',
+      '10': 'indexesUsed'
+    },
   ],
 };
 
@@ -58,9 +81,23 @@ const ExecutionStats$json = {
   '1': 'ExecutionStats',
   '2': [
     {'1': 'results_returned', '3': 1, '4': 1, '5': 3, '10': 'resultsReturned'},
-    {'1': 'execution_duration', '3': 3, '4': 1, '5': 11, '6': '.google.protobuf.Duration', '10': 'executionDuration'},
+    {
+      '1': 'execution_duration',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Duration',
+      '10': 'executionDuration'
+    },
     {'1': 'read_operations', '3': 4, '4': 1, '5': 3, '10': 'readOperations'},
-    {'1': 'debug_stats', '3': 5, '4': 1, '5': 11, '6': '.google.protobuf.Struct', '10': 'debugStats'},
+    {
+      '1': 'debug_stats',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Struct',
+      '10': 'debugStats'
+    },
   ],
 };
 
@@ -71,4 +108,3 @@ final $typed_data.Uint8List executionStatsDescriptor = $convert.base64Decode(
     'aW9uUhFleGVjdXRpb25EdXJhdGlvbhInCg9yZWFkX29wZXJhdGlvbnMYBCABKANSDnJlYWRPcG'
     'VyYXRpb25zEjgKC2RlYnVnX3N0YXRzGAUgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdFIK'
     'ZGVidWdTdGF0cw==');
-

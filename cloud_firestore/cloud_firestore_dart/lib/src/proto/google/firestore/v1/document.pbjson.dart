@@ -1,13 +1,15 @@
+// This is a generated file - do not edit.
 //
-//  Generated code. Do not modify.
-//  source: google/firestore/v1/document.proto
-//
-// @dart = 2.12
+// Generated from google/firestore/v1/document.proto.
+
+// @dart = 3.3
 
 // ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: unused_import
 
 import 'dart:convert' as $convert;
 import 'dart:core' as $core;
@@ -18,9 +20,30 @@ const Document$json = {
   '1': 'Document',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
-    {'1': 'fields', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1.Document.FieldsEntry', '10': 'fields'},
-    {'1': 'create_time', '3': 3, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'createTime'},
-    {'1': 'update_time', '3': 4, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'updateTime'},
+    {
+      '1': 'fields',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Document.FieldsEntry',
+      '10': 'fields'
+    },
+    {
+      '1': 'create_time',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'createTime'
+    },
+    {
+      '1': 'update_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'updateTime'
+    },
   ],
   '3': [Document_FieldsEntry$json],
 };
@@ -30,7 +53,14 @@ const Document_FieldsEntry$json = {
   '1': 'FieldsEntry',
   '2': [
     {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
-    {'1': 'value', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.Value', '10': 'value'},
+    {
+      '1': 'value',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Value',
+      '10': 'value'
+    },
   ],
   '7': {'7': true},
 };
@@ -48,21 +78,112 @@ final $typed_data.Uint8List documentDescriptor = $convert.base64Decode(
 const Value$json = {
   '1': 'Value',
   '2': [
-    {'1': 'null_value', '3': 11, '4': 1, '5': 14, '6': '.google.protobuf.NullValue', '9': 0, '10': 'nullValue'},
-    {'1': 'boolean_value', '3': 1, '4': 1, '5': 8, '9': 0, '10': 'booleanValue'},
-    {'1': 'integer_value', '3': 2, '4': 1, '5': 3, '9': 0, '10': 'integerValue'},
+    {
+      '1': 'null_value',
+      '3': 11,
+      '4': 1,
+      '5': 14,
+      '6': '.google.protobuf.NullValue',
+      '9': 0,
+      '10': 'nullValue'
+    },
+    {
+      '1': 'boolean_value',
+      '3': 1,
+      '4': 1,
+      '5': 8,
+      '9': 0,
+      '10': 'booleanValue'
+    },
+    {
+      '1': 'integer_value',
+      '3': 2,
+      '4': 1,
+      '5': 3,
+      '9': 0,
+      '10': 'integerValue'
+    },
     {'1': 'double_value', '3': 3, '4': 1, '5': 1, '9': 0, '10': 'doubleValue'},
-    {'1': 'timestamp_value', '3': 10, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '9': 0, '10': 'timestampValue'},
+    {
+      '1': 'timestamp_value',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '9': 0,
+      '10': 'timestampValue'
+    },
     {'1': 'string_value', '3': 17, '4': 1, '5': 9, '9': 0, '10': 'stringValue'},
     {'1': 'bytes_value', '3': 18, '4': 1, '5': 12, '9': 0, '10': 'bytesValue'},
-    {'1': 'reference_value', '3': 5, '4': 1, '5': 9, '9': 0, '10': 'referenceValue'},
-    {'1': 'geo_point_value', '3': 8, '4': 1, '5': 11, '6': '.google.type.LatLng', '9': 0, '10': 'geoPointValue'},
-    {'1': 'array_value', '3': 9, '4': 1, '5': 11, '6': '.google.firestore.v1.ArrayValue', '9': 0, '10': 'arrayValue'},
-    {'1': 'map_value', '3': 6, '4': 1, '5': 11, '6': '.google.firestore.v1.MapValue', '9': 0, '10': 'mapValue'},
-    {'1': 'field_reference_value', '3': 19, '4': 1, '5': 9, '9': 0, '10': 'fieldReferenceValue'},
-    {'1': 'variable_reference_value', '3': 22, '4': 1, '5': 9, '9': 0, '10': 'variableReferenceValue'},
-    {'1': 'function_value', '3': 20, '4': 1, '5': 11, '6': '.google.firestore.v1.Function', '9': 0, '10': 'functionValue'},
-    {'1': 'pipeline_value', '3': 21, '4': 1, '5': 11, '6': '.google.firestore.v1.Pipeline', '9': 0, '10': 'pipelineValue'},
+    {
+      '1': 'reference_value',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'referenceValue'
+    },
+    {
+      '1': 'geo_point_value',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.google.type.LatLng',
+      '9': 0,
+      '10': 'geoPointValue'
+    },
+    {
+      '1': 'array_value',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.ArrayValue',
+      '9': 0,
+      '10': 'arrayValue'
+    },
+    {
+      '1': 'map_value',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.MapValue',
+      '9': 0,
+      '10': 'mapValue'
+    },
+    {
+      '1': 'field_reference_value',
+      '3': 19,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'fieldReferenceValue'
+    },
+    {
+      '1': 'variable_reference_value',
+      '3': 22,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'variableReferenceValue'
+    },
+    {
+      '1': 'function_value',
+      '3': 20,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Function',
+      '9': 0,
+      '10': 'functionValue'
+    },
+    {
+      '1': 'pipeline_value',
+      '3': 21,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Pipeline',
+      '9': 0,
+      '10': 'pipelineValue'
+    },
   ],
   '8': [
     {'1': 'value_type'},
@@ -92,7 +213,14 @@ final $typed_data.Uint8List valueDescriptor = $convert.base64Decode(
 const ArrayValue$json = {
   '1': 'ArrayValue',
   '2': [
-    {'1': 'values', '3': 1, '4': 3, '5': 11, '6': '.google.firestore.v1.Value', '10': 'values'},
+    {
+      '1': 'values',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Value',
+      '10': 'values'
+    },
   ],
 };
 
@@ -105,7 +233,14 @@ final $typed_data.Uint8List arrayValueDescriptor = $convert.base64Decode(
 const MapValue$json = {
   '1': 'MapValue',
   '2': [
-    {'1': 'fields', '3': 1, '4': 3, '5': 11, '6': '.google.firestore.v1.MapValue.FieldsEntry', '10': 'fields'},
+    {
+      '1': 'fields',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.MapValue.FieldsEntry',
+      '10': 'fields'
+    },
   ],
   '3': [MapValue_FieldsEntry$json],
 };
@@ -115,7 +250,14 @@ const MapValue_FieldsEntry$json = {
   '1': 'FieldsEntry',
   '2': [
     {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
-    {'1': 'value', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.Value', '10': 'value'},
+    {
+      '1': 'value',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Value',
+      '10': 'value'
+    },
   ],
   '7': {'7': true},
 };
@@ -131,8 +273,24 @@ const Function_$json = {
   '1': 'Function',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'name'},
-    {'1': 'args', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1.Value', '8': {}, '10': 'args'},
-    {'1': 'options', '3': 3, '4': 3, '5': 11, '6': '.google.firestore.v1.Function.OptionsEntry', '8': {}, '10': 'options'},
+    {
+      '1': 'args',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Value',
+      '8': {},
+      '10': 'args'
+    },
+    {
+      '1': 'options',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Function.OptionsEntry',
+      '8': {},
+      '10': 'options'
+    },
   ],
   '3': [Function__OptionsEntry$json],
 };
@@ -142,7 +300,14 @@ const Function__OptionsEntry$json = {
   '1': 'OptionsEntry',
   '2': [
     {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
-    {'1': 'value', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.Value', '10': 'value'},
+    {
+      '1': 'value',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Value',
+      '10': 'value'
+    },
   ],
   '7': {'7': true},
 };
@@ -159,7 +324,15 @@ final $typed_data.Uint8List function_Descriptor = $convert.base64Decode(
 const Pipeline$json = {
   '1': 'Pipeline',
   '2': [
-    {'1': 'stages', '3': 1, '4': 3, '5': 11, '6': '.google.firestore.v1.Pipeline.Stage', '8': {}, '10': 'stages'},
+    {
+      '1': 'stages',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Pipeline.Stage',
+      '8': {},
+      '10': 'stages'
+    },
   ],
   '3': [Pipeline_Stage$json],
 };
@@ -169,8 +342,24 @@ const Pipeline_Stage$json = {
   '1': 'Stage',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'name'},
-    {'1': 'args', '3': 2, '4': 3, '5': 11, '6': '.google.firestore.v1.Value', '8': {}, '10': 'args'},
-    {'1': 'options', '3': 3, '4': 3, '5': 11, '6': '.google.firestore.v1.Pipeline.Stage.OptionsEntry', '8': {}, '10': 'options'},
+    {
+      '1': 'args',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Value',
+      '8': {},
+      '10': 'args'
+    },
+    {
+      '1': 'options',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.google.firestore.v1.Pipeline.Stage.OptionsEntry',
+      '8': {},
+      '10': 'options'
+    },
   ],
   '3': [Pipeline_Stage_OptionsEntry$json],
 };
@@ -180,7 +369,14 @@ const Pipeline_Stage_OptionsEntry$json = {
   '1': 'OptionsEntry',
   '2': [
     {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
-    {'1': 'value', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.Value', '10': 'value'},
+    {
+      '1': 'value',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Value',
+      '10': 'value'
+    },
   ],
   '7': {'7': true},
 };
@@ -194,4 +390,3 @@ final $typed_data.Uint8List pipelineDescriptor = $convert.base64Decode(
     'T3B0aW9uc0VudHJ5QgTiQQEBUgdvcHRpb25zGlYKDE9wdGlvbnNFbnRyeRIQCgNrZXkYASABKA'
     'lSA2tleRIwCgV2YWx1ZRgCIAEoCzIaLmdvb2dsZS5maXJlc3RvcmUudjEuVmFsdWVSBXZhbHVl'
     'OgI4AQ==');
-

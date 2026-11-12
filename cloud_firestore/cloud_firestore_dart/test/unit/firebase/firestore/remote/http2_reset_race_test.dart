@@ -1,5 +1,6 @@
 // Characterisation test of a package:http2 behaviour that the client has to
-// work around (seen with http2 2.3.1 and grpc 4.1.0).
+// work around (seen with http2 2.3.1 and grpc 4.1.0, and unchanged with grpc
+// 5.2.0, which still resolves http2 2.3.1).
 //
 // When a client resets a stream (RST_STREAM, which is what cancelling a gRPC
 // call or the subscription of its responses does) while the server's trailers
@@ -11,6 +12,12 @@
 // This is why the client never cancels a call that the server may be
 // finishing (see call_release.dart). If this test starts failing because the
 // other call survives, package:http2 was fixed and the workaround can go.
+//
+// package:http2 3.1.0 fixes it ("Gracefully handle receiving headers on a
+// stream that the client has canceled"): with that version forced through a
+// dependency override the first test below fails because the other call
+// survives. grpc 5.2.0 still requires http2 ^2.3.1, so the fix cannot be
+// resolved yet and the workaround stays.
 
 import 'dart:async';
 import 'dart:io';
@@ -20,6 +27,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/cal
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_channel.dart';
 import 'package:grpc/grpc.dart';
 import 'package:grpc/grpc_connection_interface.dart' show ClientChannelBase;
+import 'package:http2/transport.dart' show ServerTransportConnection;
 import 'package:test/test.dart';
 
 List<int> _encode(int value) => <int>[value];
@@ -182,6 +190,24 @@ void main() {
   tearDown(() async {
     await channel.terminate();
     await proxy.close();
+    // `Server.shutdown` calls `finish()` on the connections the server still
+    // has, and http2's `finish()` never completes when the transport dies
+    // while a call is open on it (the call in flight here). So let the server
+    // notice that the proxy closed its sockets first (same as in
+    // keepalive_test.dart); under load it could notice late and the test hung
+    // here until its timeout.
+    final Stopwatch stopwatch = Stopwatch()..start();
+    // ignore: invalid_use_of_visible_for_testing_member
+    while (server.handlers.isNotEmpty &&
+        stopwatch.elapsed < const Duration(seconds: 10)) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    // ignore: invalid_use_of_visible_for_testing_member
+    for (final ServerTransportConnection connection
+        in server.handlers.keys.toList()) {
+      // Not expected: drop what is left without waiting for its calls.
+      await connection.terminate();
+    }
     await server.shutdown();
   });
 

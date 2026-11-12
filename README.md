@@ -128,7 +128,7 @@ See `tool/README.md` for details, and the Testing section of
 
 ## Regenerating protos
 
-    dart pub global activate protoc_plugin 21.1.2
+    dart pub global activate protoc_plugin 25.1.0   # generates code for protobuf 6.x
     cloud_firestore/cloud_firestore_dart/tool/gen_protos.sh
 
 If the installed `protoc` is unusable, set up the Python wrapper (instructions at the top of

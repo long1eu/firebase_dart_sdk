@@ -92,7 +92,7 @@ void main() {
         (proto.Write.create()..delete = 'projects/p/databases/d/documents/baz/quux')
           ..freeze();
 
-    final proto.Timestamp writeTimeProto = (proto.Timestamp.create()
+    final proto.Timestamp writeTimeProto = (proto.Timestamp()
       ..seconds = Int64(writeTime.seconds)
       ..nanos = writeTime.nanoseconds)
       ..freeze();
@@ -152,7 +152,7 @@ void main() {
         ..batchId = 7
         ..baseWrites.addAll(base)
         ..writes.addAll(writes)
-        ..localWriteTime = (proto.Timestamp.create()
+        ..localWriteTime = (proto.Timestamp()
           ..seconds = Int64(1)
           ..nanos = 2))
         ..freeze();
@@ -264,7 +264,7 @@ void main() {
       ..document = (proto.Document.create()
         ..name = 'projects/p/databases/d/documents/some/path'
         ..fields['foo'] = (proto_.Value.create()..stringValue = 'bar')
-        ..updateTime = (proto.Timestamp.create()
+        ..updateTime = (proto.Timestamp()
           ..seconds = Int64()
           ..nanos = 42000))
       ..hasCommittedMutations = false;
@@ -280,7 +280,7 @@ void main() {
     final proto.MaybeDocument maybeDocProto = (proto.MaybeDocument.create()
       ..noDocument = (proto.NoDocument.create()
         ..name = 'projects/p/databases/d/documents/some/path'
-        ..readTime = (proto.Timestamp.create()
+        ..readTime = (proto.Timestamp()
           ..seconds = Int64()
           ..nanos = 42000))
       ..hasCommittedMutations = false)
@@ -297,7 +297,7 @@ void main() {
     final proto.MaybeDocument maybeDocProto = proto.MaybeDocument.create()
       ..unknownDocument = (proto.UnknownDocument.create()
         ..name = 'projects/p/databases/d/documents/some/path'
-        ..version = (proto.Timestamp.create()
+        ..version = (proto.Timestamp()
           ..seconds = Int64()
           ..nanos = 42000))
       ..hasCommittedMutations = true
@@ -334,14 +334,14 @@ void main() {
     final proto.Target expected = (proto.Target.create()
       ..targetId = targetId
       ..lastListenSequenceNumber = Int64(sequenceNumber)
-      ..snapshotVersion = (proto.Timestamp.create()
+      ..snapshotVersion = (proto.Timestamp()
         ..seconds = Int64()
         ..nanos = 1039000)
       ..resumeToken = _resumeToken
       ..query = (proto.Target_QueryTarget.create()
         ..parent = queryTarget.parent
         ..structuredQuery = queryTarget.structuredQuery)
-      ..lastLimboFreeSnapshotVersion = (proto.Timestamp.create()
+      ..lastLimboFreeSnapshotVersion = (proto.Timestamp()
         ..seconds = Int64()
         ..nanos = 1000000))
       ..freeze();

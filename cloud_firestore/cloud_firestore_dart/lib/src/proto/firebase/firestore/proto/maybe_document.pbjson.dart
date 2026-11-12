@@ -1,13 +1,15 @@
+// This is a generated file - do not edit.
 //
-//  Generated code. Do not modify.
-//  source: firebase/firestore/proto/maybe_document.proto
-//
-// @dart = 2.12
+// Generated from firebase/firestore/proto/maybe_document.proto.
+
+// @dart = 3.3
 
 // ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
+// ignore_for_file: unused_import
 
 import 'dart:convert' as $convert;
 import 'dart:core' as $core;
@@ -18,7 +20,14 @@ const NoDocument$json = {
   '1': 'NoDocument',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
-    {'1': 'read_time', '3': 2, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'readTime'},
+    {
+      '1': 'read_time',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'readTime'
+    },
   ],
 };
 
@@ -32,7 +41,14 @@ const UnknownDocument$json = {
   '1': 'UnknownDocument',
   '2': [
     {'1': 'name', '3': 1, '4': 1, '5': 9, '10': 'name'},
-    {'1': 'version', '3': 2, '4': 1, '5': 11, '6': '.google.protobuf.Timestamp', '10': 'version'},
+    {
+      '1': 'version',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'version'
+    },
   ],
 };
 
@@ -45,10 +61,40 @@ final $typed_data.Uint8List unknownDocumentDescriptor = $convert.base64Decode(
 const MaybeDocument$json = {
   '1': 'MaybeDocument',
   '2': [
-    {'1': 'no_document', '3': 1, '4': 1, '5': 11, '6': '.firestore.client.NoDocument', '9': 0, '10': 'noDocument'},
-    {'1': 'document', '3': 2, '4': 1, '5': 11, '6': '.google.firestore.v1.Document', '9': 0, '10': 'document'},
-    {'1': 'unknown_document', '3': 3, '4': 1, '5': 11, '6': '.firestore.client.UnknownDocument', '9': 0, '10': 'unknownDocument'},
-    {'1': 'has_committed_mutations', '3': 4, '4': 1, '5': 8, '10': 'hasCommittedMutations'},
+    {
+      '1': 'no_document',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.firestore.client.NoDocument',
+      '9': 0,
+      '10': 'noDocument'
+    },
+    {
+      '1': 'document',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.google.firestore.v1.Document',
+      '9': 0,
+      '10': 'document'
+    },
+    {
+      '1': 'unknown_document',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.firestore.client.UnknownDocument',
+      '9': 0,
+      '10': 'unknownDocument'
+    },
+    {
+      '1': 'has_committed_mutations',
+      '3': 4,
+      '4': 1,
+      '5': 8,
+      '10': 'hasCommittedMutations'
+    },
   ],
   '8': [
     {'1': 'document_type'},
@@ -63,4 +109,3 @@ final $typed_data.Uint8List maybeDocumentDescriptor = $convert.base64Decode(
     'syIS5maXJlc3RvcmUuY2xpZW50LlVua25vd25Eb2N1bWVudEgAUg91bmtub3duRG9jdW1lbnQS'
     'NgoXaGFzX2NvbW1pdHRlZF9tdXRhdGlvbnMYBCABKAhSFWhhc0NvbW1pdHRlZE11dGF0aW9uc0'
     'IPCg1kb2N1bWVudF90eXBl');
-

@@ -32,9 +32,10 @@ How this was verified:
 
 Requirements:
 
-- Dart 3 (`sdk: ^3.0.0`) with sound null safety; dependencies updated (`grpc`, `protobuf`,
-  `rxdart`, `sqlite3`, ...). Values that can be missing are nullable: `DocumentSnapshot.data` is
-  null for a missing document and field values are `Object?`.
+- Dart 3.8 (`sdk: ^3.8.0`, required by `grpc` 5) with sound null safety; dependencies updated
+  to the current majors (`grpc` ^5.1.0, `protobuf` ^6.1.0, `rxdart`, ...). Values that can be
+  missing are nullable: `DocumentSnapshot.data` is null for a missing document and field values
+  are `Object?`.
 
 API changes that need code changes:
 

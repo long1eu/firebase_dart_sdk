@@ -23,7 +23,7 @@ platforms:
   windows:
 
 environment:
-  sdk: ^3.0.0
+  sdk: ^3.8.0
 
 dependencies:
   async: ^2.11.0
@@ -33,11 +33,13 @@ dependencies:
   # through pubspec_overrides.yaml (not published).
   firebase_app_dart: ^0.1.0
   fixnum: ^1.1.0
-  grpc: ^4.0.0
-  http2: ^2.2.0
+  grpc: ^5.1.0
+  # grpc 5.2 requires http2 ^2.3.1; move to 3.x together with grpc (the keepalive transport
+  # implements ClientTransportConnection, which gains a member in 3.1).
+  http2: ^2.3.1
   meta: ^1.11.0
   path: ^1.9.0
-  protobuf: ^3.1.0
+  protobuf: ^6.1.0
   rxdart: ^0.28.0
   semaphore: ^1.0.1
   web: ^1.1.0

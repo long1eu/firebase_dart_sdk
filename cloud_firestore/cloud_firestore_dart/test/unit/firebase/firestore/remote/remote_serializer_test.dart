@@ -259,11 +259,11 @@ void main() {
 
     final List<DateTime> tests = <DateTime>[date1, date2];
 
-    final proto.Timestamp ts1 = proto.Timestamp.create()
+    final proto.Timestamp ts1 = proto.Timestamp()
       ..nanos = 500000000
       ..seconds = Int64(1451730050);
 
-    final proto.Timestamp ts2 = proto.Timestamp.create()
+    final proto.Timestamp ts2 = proto.Timestamp()
       ..nanos = 0
       ..seconds = Int64(1466160615);
 
@@ -1357,7 +1357,7 @@ void main() {
           ..from.add(proto.StructuredQuery_CollectionSelector.create()
             ..collectionId = 'docs')
           ..orderBy.add(defaultKeyOrder())
-          ..limit = (proto.Int32Value.create()..value = 26);
+          ..limit = (proto.Int32Value()..value = 26);
 
     final proto_.Target_QueryTarget queryBuilder =
         proto.Target_QueryTarget.create()
@@ -1402,7 +1402,7 @@ void main() {
             ..direction = proto.StructuredQuery_Direction.DESCENDING
             ..field_1 = (proto.StructuredQuery_FieldReference.create()
               ..fieldPath = DocumentKey.keyFieldName))
-          ..limit = (proto.Int32Value.create()..value = 5)
+          ..limit = (proto.Int32Value()..value = 5)
           // The cursors are swapped and flipped to match the flipped ordering.
           ..startAt = (proto.Cursor.create()
             ..before = true
