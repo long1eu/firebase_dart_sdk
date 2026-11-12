@@ -1,7 +1,7 @@
 # Firebase Dart SDK: Cloud Firestore for pure Dart
 
 A pure-Dart client for Cloud Firestore: no Flutter plugin, no native SDK, just `dart:io`, gRPC and
-SQLite. Use it from Dart servers, CLIs and Flutter apps.
+SQLite. Use it from Dart servers, CLIs and Flutter apps. (Web support is experimental.)
 
 It is an unofficial port of the open-source
 [Firebase Android SDK](https://github.com/firebase/firebase-android-sdk), including its offline
@@ -30,35 +30,46 @@ firestore
 `cloud_firestore/cloud_firestore_dart/example/main.dart` for a runnable program.)
 
 ```shell
-dart pub add cloud_firestore_dart firebase_app_dart
+dart pub add cloud_firestore_dart firebase_app_dart   # once 0.1.0 is published; it is not yet
 ```
 
 ## What it does
 
-- Documents, collections, collection groups, queries with `!=`, `not-in`, OR / AND filters,
-  `limitToLast`, cursors and aggregations (count, sum, average).
-- Real-time listeners, offline persistence in SQLite, write queue with pending-write snapshots,
-  `waitForPendingWrites`, `snapshotsInSync`, `terminate`.
+- Documents, collections, collection groups, typed data converters (`withConverter`), queries
+  with `!=`, `not-in`, OR / AND filters, `limitToLast`, cursors and aggregations (count, sum,
+  average).
+- Real-time listeners, offline persistence in SQLite (index-free queries, document overlays),
+  write queue with pending-write snapshots, `waitForPendingWrites`, `snapshotsInSync`,
+  `terminate`, `clearPersistence`.
 - Transactions (read-write and read-only) with retry and backoff, write batches, field transforms
   (server timestamp, increment, min/max, array union/remove).
-- Data bundles and named queries, vector values with `findNearest`, App Check token plumbing.
+- Data bundles and named queries, snapshots as JSON (in the format of the JS SDK), vector values
+  with `findNearest`, App Check token plumbing, emulator support with a mock user token.
+- For Enterprise edition databases: the BSON value types, and Pipelines as a preview library
+  (server-executed only).
 
 ## Status
 
 Revival of the original port, which stopped at the 2019 Android SDK; it now follows the Android
-SDK's behaviour up to late 2026 on Dart 3 with sound null safety.
+SDK's behaviour up to late 2026 on Dart 3 with sound null safety, and parts of its public API
+follow the JS SDK.
 
 - **Tested against the Firestore emulator only. Nothing has been run against production Firestore.**
-  Treat it as untested there, and test against your own project before relying on it.
-- Version 0.1.0 is prepared for pub.dev as `cloud_firestore_dart` and `firebase_app_dart`. They
-  replace the packages published as `cloud_firestore_vm` and `firebase_core_vm` (and the internal
-  `_firebase_internal_vm` and `_firebase_database_collection_vm`, now folded in). See
+  Treat it as untested there, and test against your own project before relying on it. The
+  Enterprise edition features (BSON value types, Pipelines) were tested against the emulator in
+  Enterprise edition only.
+- Version 0.1.0 is prepared for pub.dev as `cloud_firestore_dart` and `firebase_app_dart`, and is
+  **not published yet**. They replace the packages published as `cloud_firestore_vm` and
+  `firebase_core_vm` (and the internal `_firebase_internal_vm` and
+  `_firebase_database_collection_vm`, now folded in). See
   [docs/migrating_from_vm_packages.md](docs/migrating_from_vm_packages.md).
-- Not implemented: BSON value types, index-free queries and overlays, the client-side index engine,
-  clearing persistence (API undecided), Pipelines. Web is not supported yet (the transport uses native gRPC from `dart:io`; web
-  support is planned).
-- The JS SDK is the reference for the public API of other Firebase clients. A comparison and a
-  roadmap are in `docs/` notes; typed converters (`withConverter`) are the main API gap.
+- Web support is experimental. In a browser the client uses REST and WebChannel over `fetch`
+  instead of gRPC, with a memory cache only. A small smoke test passes in Chrome against the
+  emulator (dart2wasm and dart2js); no other browser and no production backend was tried.
+- Not implemented: the client-side index engine (`setIndexConfiguration`, auto-indexing; only
+  its internal building blocks exist), sharing one cache between running clients, and Pipelines
+  beyond the preview (no search, no local evaluation, no listeners). The package README lists the
+  known gaps.
 
 This repository ports Firestore and the Firebase Core pieces it needs. There is no Auth, Storage or
 Realtime Database client here; for those see
@@ -128,7 +139,7 @@ If the installed `protoc` is unusable, set up the Python wrapper (instructions a
 [`docs/upstream_sync/UPSTREAM_PLAN.md`](docs/upstream_sync/UPSTREAM_PLAN.md) lists the
 upstream Android SDK commits since the sync point, triaged per commit (`analysis_0.md` to
 `analysis_4.md`), and the order in which they are being ported. Rows the analysis did not read in
-depth are marked unverified there. The top of that file has the current done/deferred status. Behaviour is ported in Dart, not copied verbatim.
+depth are marked unverified there. The top of that file has the current status. Behaviour is ported in Dart, not copied verbatim.
 
 ## Contributing
 

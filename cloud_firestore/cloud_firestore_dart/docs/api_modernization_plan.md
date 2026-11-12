@@ -1,8 +1,9 @@
 # cloud_firestore_dart: API modernization plan
 
-Status (updated at the end of the revival): stage 0 (hygiene) and the non-breaking part of stage 1 (aliases) are
-merged. Several Stage 2-4 feature items were also delivered (see "Status at the end of the revival" below); the
-idiom-level renames of stage 1-3 that change signatures are still a plan. Written 2026-11-12. The listings in
+Status (updated 2026-11-13): stage 0 (hygiene), the non-breaking part of stage 1 (aliases), the named-argument
+`where`, typed converters with generics and most Stage 2-4 feature items are merged (see "Status at the end of the
+revival" at the bottom, which is the current state); the idiom-level renames of stage 1-3 that change existing
+signatures are still a plan. Written 2026-11-12. The listings in
 sections 0-4 describe the plan and the baseline at the time of writing and are not rewritten; the golden file
 `test/unit/api/public_api.golden.txt` is the source of truth for the current surface.
 
@@ -228,31 +229,38 @@ Both new test files live under `test/unit/` so `tool/test_all.sh` runs them.
 
 ## Status at the end of the revival
 
-Checklist items from section 4, as of the head of `revival/dart3-null-safety` (derived from the golden API file and
-the merge history; verified on the emulator only, never against production Firestore).
+Checklist items from section 4, as of `main` on 2026-11-13 (checked against the golden API file
+`test/unit/api/public_api.golden.txt` and the code; verified with unit tests and the emulator only, never against
+production Firestore). The sections above this one describe the plan and the state when it was written and were not
+rewritten; where they disagree with this table, the table is right.
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Export `ServerTimestampBehavior`, `@internal` | done |
+| 1 | Export `ServerTimestampBehavior`, `@internal` | done; `@internal` was extended to every member that exposes an internal type (`Firestore.client`, `Query.query`, `DocumentSnapshot.document`, ...) |
 | 2 | `GeoPoint` assert, `@required` sweep | done |
-| 3 | `doc`, `docs`, `docChanges`, `ref`, `terminate`, `instanceFor`, `documentIdField`, `Source.serverAndCache` | done (`instanceFor` still returns a `Future`) |
+| 3 | `doc`, `docs`, `docChanges`, `ref`, `terminate`, `instanceFor`, `documentIdField`, `Source.serverAndCache` | done (`instanceFor` still returns a `Future`); `shutdown` is deprecated in favour of `terminate` |
 | 4 | `FirebaseFirestore` / `Settings` typedefs | done |
-| 5 | `FirestoreErrorCode` as enhanced enum / `FirebaseException` alignment | not done |
-| 6 | Drop dead `checkNotNull` in the public layer | not done |
-| 7 | `where({named})`, `orderByField`, `update(Map<Object, Object?>)` | not done (Java-style `where*` kept; `where(Filter)` added) |
-| 8 | `snapshots` options method, `GetOptions` | partly: `SnapshotListenOptions` and `ListenSource` exist; `GetOptions` not added |
-| 9 | `sealed` FieldValue hierarchy | not done (`FieldValue.maximum/minimum/vector` added) |
-| 10 | Typed accessors as extensions, `get<T>`, `[]` | not done |
-| 11 | `useFirestoreEmulator`, `waitForPendingWrites`, `clearPersistence` | `FirestoreSettings.withEmulator` and `waitForPendingWrites` done; `clearPersistence` pending an API decision |
+| 5 | `FirestoreErrorCode` as enhanced enum / `FirebaseException` alignment | not done (`FirestoreErrorCode` is still a class with constants; `FirestoreError.code` is a `FirestoreErrorCode`) |
+| 6 | Drop dead `checkNotNull` in the public layer | not done (18 calls left in the seven public files) |
+| 7 | `where({named})`, `orderByField`, `update(Map<Object, Object?>)` | partly: `where(field, isEqualTo: ..., ...)` with named arguments is done (the `where*` methods and `where(Filter)` are kept, not deprecated); `orderBy` still takes a `Direction`, and `update` still takes `Map<String, Object?>` next to `updateFromList` |
+| 8 | `snapshots` options method, `GetOptions` | partly: `getSnapshotsWithOptions(SnapshotListenOptions)` and `ListenSource` exist next to the `snapshots` getter and `getSnapshots([MetadataChanges])`; `GetOptions` not added (`get([Source])`) |
+| 9 | `sealed` FieldValue hierarchy | not done; the `isX` getters, `elements` and `methodName` are marked `@internal` instead (`FieldValue.maximum/minimum/vector` added) |
+| 10 | Typed accessors as extensions, `get<T>`, `[]` | partly: `operator []` exists; the typed getters are still members and `get` is not generic |
+| 11 | `useFirestoreEmulator`, `waitForPendingWrites`, `clearPersistence` | done: `FirestoreSettings.withEmulator(host, port, mockUserToken: ...)`, `waitForPendingWrites`, `clearPersistence` (after `terminate`) |
 | 12 | `limitToLast` | done (Query/Target split) |
-| 13 | `!=`, `not-in` | done (`whereNotEqualTo`, `whereNotIn`); `isNull` shorthand not added |
-| 14 | Generics + `withConverter` | not done |
-| 15 | `count()` | done, plus `sum`, `average` and `aggregate([...])` |
+| 13 | `!=`, `not-in` | done (`whereNotEqualTo`, `whereNotIn`, and `isNotEqualTo` / `whereNotIn` / `isNull` as named arguments of `where`) |
+| 14 | Generics + `withConverter` | done: `FirestoreDataConverter<T>`, `withConverter` / `withoutConverter`, generic references and snapshots, `runTransaction<T>` |
+| 15 | `count()` | done, plus `sum`, `average`, `aggregate([...])` and `aggregateWithAliases({...})` |
 | 16 | `Filter.or/and` | done (`Filter` class, `where(Filter)`) |
-| 17 | Breaking release: move `util/database.dart`, private constructors, remove deprecated names | not done |
+| 17 | Breaking release: move `util/database.dart`, private constructors, remove deprecated names | partly: `ConflictAlgorithm` is no longer exported and `Database.file` became `Database.path`; the opener types are still exported from the main library, the leaking constructors are `@internal` rather than private, and the deprecated names are still there |
 | 18 | Bundles | done (`loadBundle`, `loadBundleStream`, `getNamedQuery`) |
-| 19 | Golden surface test, emulator CI | golden test done; CI workflow exists (`.github/workflows/ci.yml`) |
+| 19 | Golden surface test, emulator CI | golden tests done for both libraries (`public_api.golden.txt`, `pipelines_api.golden.txt`); a CI workflow exists (`.github/workflows/ci.yml`) but has not been run |
 
 Also added beyond the original list: vector values and `Query.findNearest`, cache settings
-(`PersistentCacheSettings`, `MemoryCacheSettings`), `TransactionOptions`, `snapshotsInSync`, App Check plumbing.
-Read-only transactions (`TransactionOptions.readOnly`) were added later and are not counted here.
+(`PersistentCacheSettings`, `MemoryCacheSettings`), `TransactionOptions` (`maxAttempts`, `readOnly`),
+`snapshotsInSync`, App Check plumbing, `Firestore.setLogLevel`, `Firestore.projectId` / `databaseName`, value helpers
+(`Timestamp.fromMillis` / `toMillis`, `Blob` base64, `toJson` / `fromJson` on the value types), snapshot and reference
+JSON (`toJson` / `fromJson`, `documentSnapshotsFromJson` / `querySnapshotsFromJson`), the BSON value types, and
+Pipelines as a preview in a separate library (`package:cloud_firestore_dart/pipelines.dart`).
+
+Still open from this plan, in the order it suggests: 5, 6, the rest of 7 and 8, 9, 10, and the breaking clean-up of 17.

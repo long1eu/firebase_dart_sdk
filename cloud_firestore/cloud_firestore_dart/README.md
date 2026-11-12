@@ -2,7 +2,8 @@
 
 An unofficial, pure-Dart Cloud Firestore client (gRPC, no Flutter plugin), ported from the
 open-source Firebase Android SDK and brought forward to roughly current upstream `main`
-behaviour. It is not affiliated with or endorsed by Google or Firebase.
+behaviour, with parts of the public API following the JS SDK. It is not affiliated with or
+endorsed by Google or Firebase.
 
 ## Install
 
@@ -22,15 +23,19 @@ for before/after code.
 
 ## Status
 
-First release of the revived port (0.1.0).
+First release of the revived port (0.1.0). It is prepared for pub.dev but **not published
+yet**, so the `dart pub add` command above only works once it is.
 
-- Unit tests and the local-emulator integration suite are the only verification. See the
-  [repository README](https://github.com/long1eu/firebase_dart_sdk#running-the-tests) for how
-  to run them.
+- Unit tests, the spec tests shared with the official SDKs and the local-emulator integration
+  suite are the only verification. See [Testing](#testing) for how to run them.
 - **Everything was verified against the Firestore emulator only. Nothing has been run against
   production Firestore.** Behaviour that the emulator does not enforce (security rules in
   production, quotas, App Check enforcement, real index requirements, real latency and
   connectivity changes) is untested.
+- Features of the Enterprise edition (BSON value types, Pipelines) were verified against the
+  emulator in Enterprise edition only, never against a production Enterprise database.
+- Web support is experimental: a smoke test passes in Chrome against the emulator, with a
+  memory cache only. See [Platforms](#platforms).
 
 ## Platforms
 
@@ -52,26 +57,34 @@ listen and write streams, over `fetch`. What to know:
 ## Features
 
 - Documents, collections, collection groups, set/update/delete, `SetOptions` merge.
-- Queries: `where` filters including `!=` and `not-in`, `arrayContains(Any)`, `in`; composite
-  `Filter.or` / `Filter.and` (OR queries, multiple inequality filters); `orderBy`, cursors,
-  `limit` and `limitToLast`.
+- Typed data converters: `withConverter<T>` on references and queries, generic snapshots.
+- Queries: `where` filters including `!=` and `not-in`, `arrayContains(Any)`, `in`, as
+  `whereEqualTo(...)`-style methods, `where('age', isGreaterThan: 18)` named arguments or
+  `Filter` objects; composite `Filter.or` / `Filter.and` (OR queries, multiple inequality
+  filters); `orderBy`, cursors, `limit` and `limitToLast`.
 - Real-time listeners with `MetadataChanges`, and `ListenSource.cache` to listen to the local
   cache only.
-- Aggregations: `Query.count()`, `Query.aggregate([...])` with `AggregateField.count/sum/average`.
+- Aggregations: `Query.count()`, `Query.aggregate([...])` with `AggregateField.count/sum/average`,
+  `Query.aggregateWithAliases({...})`.
 - Vector values (`FieldValue.vector`) and `Query.findNearest` (server only; no local evaluation).
 - BSON value types of Enterprise edition databases: `MinKey`, `MaxKey`, `Int32Value`,
   `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue` and `Blob.bsonBinary`.
 - Pipelines (**preview**, Enterprise edition databases, server only): see
   [Pipelines](#pipelines-preview).
-- Transactions with `TransactionOptions(maxAttempts)` and retry with exponential backoff; write
-  batches.
+- Transactions with `TransactionOptions(maxAttempts)` and retry with exponential backoff,
+  read-only transactions (`TransactionOptions(readOnly: true)`); write batches.
 - Field transforms: server timestamp, increment, `FieldValue.maximum` / `minimum`, array union
   and remove. Transforms are folded into set/patch writes (the old `TransformMutation` is gone).
 - Data bundles: `loadBundle`, `loadBundleStream`, `getNamedQuery`.
+- Snapshots and references as JSON (`toJson` / `fromJson`, in the format of the JS SDK), and
+  listeners resumed from a serialized snapshot.
 - Offline cache in SQLite with LRU garbage collection; `FirestoreSettings.cacheSettings`
-  (`PersistentCacheSettings`, `MemoryCacheSettings` with eager or LRU GC).
-- `Firestore.waitForPendingWrites()`, `terminate()`, `snapshotsInSync` stream,
-  `enableNetwork` / `disableNetwork`.
+  (`PersistentCacheSettings`, `MemoryCacheSettings` with eager or LRU GC). Queries against the
+  cache use the results of earlier listens instead of scanning the collection (index-free
+  queries), and pending writes are kept as per-document overlays.
+- `Firestore.waitForPendingWrites()`, `terminate()`, `clearPersistence()`, `snapshotsInSync`
+  stream, `enableNetwork` / `disableNetwork`.
+- Emulator support with a mock user token; `Firestore.setLogLevel`.
 - Bloom-filter existence-filter handling on reconnect (server `expected_count`).
 - gRPC keepalive, connect timeout, backoff reset on connectivity change, streams closed after
   one minute idle.
@@ -93,7 +106,8 @@ final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
 ```
 
 (Filters are the Java-style `whereEqualTo`, `whereGreaterThan`, ... family, plus
-`where(Filter)`. See `test/integration/` for working calls of every feature below.)
+`where('age', isGreaterThanOrEqualTo: 18)` with named arguments and `where(Filter)`. See
+`example/` and `test/integration/` for working calls of every feature below.)
 
 Emulator (the settings must be passed when the instance is created):
 
@@ -396,6 +410,7 @@ Run everything from this directory. The scripts are in `tool/` at the repository
 | Unit | `dart test test/unit` | none |
 | Integration | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration` | standard emulator (`tool/start_emulator.sh`) |
 | Enterprise | `FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise` | Enterprise edition emulator (`tool/start_enterprise_emulator.sh`) |
+| Browser smoke test | `dart test -p chrome -c dart2wasm test/browser` | standard emulator on 127.0.0.1:8080, Chrome |
 | Standard suite on Enterprise | `FIRESTORE_EMULATOR_HOST=127.0.0.1:8181 FIRESTORE_EMULATOR_EDITION=enterprise dart test test/integration` | Enterprise edition emulator |
 
 The environment variables are read by `test/util/test_backend.dart`:
@@ -473,24 +488,47 @@ not set (the emulator always wins, so an emulator run can never reach a real pro
 
 ## Not supported or not done
 
-- BSON value types (`MinKey`, `MaxKey`, `Int32Value`, `Decimal128Value`, `BsonObjectId`,
-  `BsonTimestamp`, `RegexValue`, `Blob.bsonBinary`) are supported, with one known gap. `in`,
-  `not-in`, `array-contains` and `array-contains-any` match a number against the local cache
-  only if it has the same type (`Int32Value(5)` does not match `5`), while the backend compares
-  numbers by value; the JS SDK has the same gap. A plain `Map` with one of the reserved keys (for
-  example `{'__int__': 5}`) is rejected in document data, like every field name that begins and
-  ends with `__`; as a query value or an `arrayUnion` / `arrayRemove` element it is read as the
-  BSON value, like the backend does. The sum and the average of an aggregation that includes a
-  `Decimal128Value` are a `Decimal128Value` (`getDouble` and `getInt` convert it).
-- Index-free queries, document overlays, the client-side index engine and persistent-cache
-  auto-indexing: not implemented. Queries run against the local cache as in the 2019 design
-  (SQLite schema version 8 lineage, plus the changes listed in the CHANGELOG).
-- Clearing persistence (`clearPersistence`): not available; the API shape is still to be decided.
-- Pipelines beyond the [preview](#pipelines-preview) described above (no local evaluation, no
-  real-time pipelines), `Query.findNearest` evaluation against the local cache, Android-specific
-  pieces.
+Not done:
+
+- **Production.** Nothing has been run against production Firestore, and the Enterprise edition
+  features only against the Enterprise edition emulator. The opt-in real-project test mode
+  exists but has not been run.
+- **Web beyond the experiment**: persistence on the web (the cache is in memory only there) and
+  any browser other than Chrome.
+- **The client-side index engine**: `setIndexConfiguration` and persistent-cache
+  auto-indexing. The index value encoding, the `FieldIndex` model and the matching of a query
+  to an index exist internally, but nothing uses them yet and there is no public API. Queries
+  against the cache use index-free execution (the results of an earlier listen plus the
+  documents changed since) or scan the collection.
+- **Pipelines** beyond the [preview](#pipelines-preview) described above: full-text search,
+  window functions, pipelines in a `Transaction`, local evaluation and real-time pipelines.
+- `Query.findNearest` evaluation against the local cache.
+- **Sharing one cache between running clients** (the multi-tab support of the JS SDK): see
+  [Persistence and connectivity](#persistence-and-connectivity).
+- Android-specific pieces of the Android SDK.
 - Auth, Storage, Realtime Database: see
   [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart).
+
+Known gaps in what is done:
+
+- **BSON numbers in membership filters.** `in`, `not-in`, `array-contains` and
+  `array-contains-any` match a number against the local cache only if it has the same type
+  (`Int32Value(5)` does not match `5`), while the backend compares numbers by value; the JS SDK
+  has the same gap. Comparisons and ordering compare numbers by value, as the backend does.
+- **Plain maps with a reserved key.** A plain `Map` with one of the reserved keys (for example
+  `{'__int__': 5}`) is rejected in document data, like every field name that begins and ends
+  with `__`; as a query value or an `arrayUnion` / `arrayRemove` element it is read as the BSON
+  value, like the backend does.
+- **`Decimal128Value` aggregates.** The sum and the average of an aggregation that includes a
+  `Decimal128Value` are a `Decimal128Value` (`getDouble` and `getInt` convert it).
+- **Increments on BSON numbers.** The emulator (v1.22.0) replaces an `Int32Value` or
+  `Decimal128Value` field with the operand of `FieldValue.increment` instead of adding to it, so
+  the local result (which adds) could not be compared with a backend.
+- **Transactions** can be applied twice when the answer to a commit is lost; see
+  [Transactions](#transactions).
+- **App Check** tokens are sent, but enforcement cannot be tested on the emulator.
+- The Enterprise edition differences listed under [Testing](#enterprise-edition) and the
+  emulator gaps listed under [Pipelines](#pipelines-preview).
 
 ## Design notes
 

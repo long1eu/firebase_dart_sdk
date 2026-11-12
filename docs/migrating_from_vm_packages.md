@@ -6,6 +6,9 @@ Dart 3 with null safety and synced with newer versions of the official SDKs. Thi
 what you have to change, in the order you will hit it. Each item is a breaking change from the
 0.1.0 CHANGELOG of one of the two packages.
 
+0.1.0 is prepared for pub.dev but not published yet. It was verified with unit tests and the
+Firestore emulator only; nothing was run against production Firestore.
+
 The code blocks marked "after" are compiled by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`. They assume an
 `app` (`FirebaseApp`), a `firestore` (`Firestore`) and a `users` collection in scope.
@@ -199,9 +202,11 @@ A complete implementation on top of `package:sqlite3` that you can copy is
 
 The database name passed to the opener is built the same way as in 0.0.7
 (`firestore.<app name>.<project id>.<database>`), so an opener that maps names to files the same
-way finds the existing cache. 0.0.7 wrote schema version 8; the first open with the new package
+way finds the existing cache. 0.0.7 wrote schema version 8 and this version is at 11 (bundle
+tables, read times on cached documents, document overlays); the first open with the new package
 runs the newer migrations through your opener's `onUpgrade` callback (it must call it when the
-stored `user_version` is lower than the requested one, see the contract on `OpenDatabase`).
+stored `user_version` is lower than the requested one, see the contract on `OpenDatabase`), and
+pending writes are converted to overlays the first time the client starts.
 
 After the upgrade:
 
@@ -383,6 +388,13 @@ print('${firestore.projectId} / ${firestore.databaseName}');
 
 - **`Timestamp.fromDate` / `toDate`** keep microseconds (they truncated to milliseconds).
   Results for millisecond inputs are unchanged.
+- **Array transforms on top of newer server data.** The local view of a document with pending
+  writes is now stored as an overlay. A pending `arrayUnion` / `arrayRemove` keeps the result it
+  had when it was written until the backend acknowledges it, instead of being applied again on
+  top of data that arrived from the server in the meantime (as in the official SDKs).
+- **`Blob.bytes`** returns a copy, so changing the returned list no longer changes the blob.
+- **Out-of-range `Timestamp`s** (before year 1 or after year 9999) are rejected with an
+  `ArgumentError` when they are written, also in builds without asserts.
 
 ## 10. The example app
 

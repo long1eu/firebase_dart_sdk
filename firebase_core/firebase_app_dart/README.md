@@ -10,11 +10,14 @@ Renamed: this package was published as
 `firebase_app_dart` and the import with `package:firebase_app_dart/firebase_app_dart.dart`;
 class names did not change.
 
-*Status*: part of the unofficial Firestore revival (see the
-[repository README](https://github.com/long1eu/firebase_dart_sdk)). It builds on Dart 3 with
-null safety and its unit tests pass; it is exercised by `cloud_firestore_dart`'s integration
-suite, which runs against the local Firestore emulator only. Some APIs described below date
-from the original project and have not been re-verified. Issues and pull requests:
+*Status*: version 0.1.0, prepared for pub.dev but not published yet. Part of the unofficial
+Firestore revival (see the [repository README](https://github.com/long1eu/firebase_dart_sdk)).
+It builds on Dart 3 with null safety and has unit tests; beyond those it is exercised only by
+`cloud_firestore_dart`'s integration suite, which runs against the local Firestore emulator.
+**Nothing has been run against production Firebase.** The only Firebase service in this
+repository that uses it is Firestore: the parts of `PlatformDependencies` that exist for other
+services (`headersBuilder`, `onBackgroundChanged`) date from the original project and are not
+exercised by it. Issues and pull requests:
 https://github.com/long1eu/firebase_dart_sdk
 
 `package:firebase_app_dart/internal.dart` is shared plumbing for `cloud_firestore_dart`. It is
@@ -22,9 +25,9 @@ https://github.com/long1eu/firebase_dart_sdk
 
 ## Platforms
 
-Android, iOS, Linux, macOS and Windows (Dart VM, including Flutter apps). Web is not supported
-yet: `FirebaseApp.withOptions` throws `UnimplementedError` in a browser, and
-`cloud_firestore_dart` needs a native gRPC transport. Web support is planned.
+Android, iOS, Linux, macOS and Windows (Dart VM, including Flutter apps). Developed and tested
+on macOS only. Web support is experimental: creating an app and using it with
+`cloud_firestore_dart` was tried in Chrome, nothing else.
 
 ## Usage
 
@@ -133,16 +136,19 @@ implementations assumes the app never goes in background.
 1. `onNetworkConnected` is a `BehaviorSubject` that should emit true when the app have internet connection. Default
 implementation assumes there is always internet connection.
 
-1. `headersBuilder` provides you a way to add headers to firebase services request. This is currently only used by 
-`Firebase Auth`. Defaults to null.
+1. `headersBuilder` provides you a way to add headers to firebase services request. `cloud_firestore_dart` does not
+use it. Defaults to null.
 
 1. `storage` is a simple interface that should allow to persisting key/value pairs. It's your responsibility to make sure 
 the store is safe and survives app restarts. Default implementation uses an in memory storage that does not survives 
 app restarts.
 
-1. `authProvider` is used to generate authorization headers. If you plan to use `Firebase Auth`, the `authProvider` 
-functionality will be provided by the corresponding `FirebaseAuth` instance. If `Firebase Auth` is not used it defaults 
-to null.
+1. `authProvider` (an `InternalTokenProvider`) supplies the ID token that `cloud_firestore_dart` sends with its
+requests. This repository has no maintained Auth client, so you implement it yourself if your security rules need a
+signed-in user. Defaults to null (unauthenticated requests).
+
+1. `appCheckProvider` (an `InternalAppCheckTokenProvider`) supplies the App Check token that `cloud_firestore_dart`
+sends in the `x-firebase-appcheck` header. Defaults to null.
 
 All Firebase services can work with the default implementation. However it is a good idea to provide your own based on 
 the application that you are trying to use. A minimal program is in `example/main.dart`.  
