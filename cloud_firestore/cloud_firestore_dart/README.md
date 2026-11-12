@@ -84,6 +84,10 @@ listen and write streams, over `fetch`. What to know:
   (`PersistentCacheSettings`, `MemoryCacheSettings` with eager or LRU GC). Queries against the
   cache use the results of earlier listens instead of scanning the collection (index-free
   queries), and pending writes are kept as per-document overlays.
+- Persistent cache indexes: `Firestore.persistentCacheIndexManager` lets the SDK create
+  indexes for cache queries on its own (`enableIndexAutoCreation`), and the deprecated
+  `Firestore.setIndexConfiguration` takes a `firestore.indexes.json` definition. See
+  [Persistent cache indexes](#persistent-cache-indexes).
 - `Firestore.waitForPendingWrites()`, `terminate()`, `clearPersistence()`, `snapshotsInSync`
   stream, `enableNetwork` / `disableNetwork`.
 - Emulator support with a mock user token; `Firestore.setLogLevel`.
@@ -423,6 +427,40 @@ then fails whichever test is running.
   `onNetworkConnected` and feed it from your own source (for example the `connectivity_plus`
   plugin in a Flutter app, or a periodic reachability probe in a server process).
 
+## Persistent cache indexes
+
+Queries against the SQLite cache (offline, `Source.cache`, and the first results of a
+listener) normally scan the cached documents of the collection, or start from the result of an
+earlier listen. A persistent cache index lets them read only the matching documents. The index
+only exists inside the SDK, on the device; it is not a Cloud Firestore index and it never
+changes what a query returns.
+
+```dart
+final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
+await indexes?.enableIndexAutoCreation();
+```
+
+- **Automatic creation** (off by default, not stored: turn it on after creating the instance).
+  When a cache query was run as a collection scan that read at least 100 cached documents and
+  more than twice as many as it returned, the SDK creates an index for that query. Only
+  documents that came from the backend are counted, not pending writes.
+- **Filling.** An index is filled in the background while the app runs: 50 documents per run,
+  the first run 15 seconds after the instance was created and then one per minute. A query uses
+  an index as far as it is filled and reads the rest, so results are complete at every moment.
+- `disableIndexAutoCreation()` stops creating indexes (existing ones stay in use);
+  `deleteAllIndexes()` removes them all.
+- `Firestore.setIndexConfiguration(json)` (deprecated, as in the other SDKs) configures the
+  indexes from a definition in the format of `firestore.indexes.json`; `queryScope` and
+  `fieldOverrides` are ignored. It replaces the previous configuration.
+- All query forms can be served: comparison operators, `in` / `not-in`, `array-contains(-any)`,
+  `Filter.or` / `Filter.and`, `orderBy`, cursors, `limit` and `limitToLast`, also with BSON
+  values. Queries with inequalities on several fields are scanned, as upstream.
+- The index state is kept per signed-in user; the list of indexes is shared.
+
+`example/cache_indexes.dart` is a runnable example. The stored index entries are not
+byte-compatible with the ones of the Android SDK (they are never exchanged); the differences
+are listed in `docs/ARCHITECTURE.md` in the repository.
+
 ## Testing
 
 Run everything from this directory. The scripts are in `tool/` at the repository root (see
@@ -519,11 +557,6 @@ Not done:
   exists but has not been run.
 - **Web beyond the experiment**: persistence on the web (the cache is in memory only there) and
   any browser other than Chrome.
-- **The client-side index engine**: `setIndexConfiguration` and persistent-cache
-  auto-indexing. The index value encoding, the `FieldIndex` model, the matching of a query to
-  an index and the index manager exist internally, but no query reads the indexes yet. Queries
-  against the cache use index-free execution (the results of an earlier listen plus the
-  documents changed since) or scan the collection.
 - **Pipelines** beyond the [preview](#pipelines-preview) described above: full-text search,
   window functions, pipelines in a `Transaction`, local evaluation and real-time pipelines.
 - `Query.findNearest` evaluation against the local cache.

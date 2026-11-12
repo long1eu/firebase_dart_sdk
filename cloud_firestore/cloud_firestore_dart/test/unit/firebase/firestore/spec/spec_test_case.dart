@@ -21,6 +21,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_configuration.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_delegate.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_collector.dart';
@@ -31,6 +32,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_transform.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
@@ -891,8 +894,35 @@ class SpecTestCase implements RemoteStoreCallback {
     'shutdown',
     'failDatabase',
     'clearPersistence',
-    'setIndexConfiguration',
   };
+
+  /// The step carries the index definition as a JSON object (the JS spec builder) or as its string form.
+  Future<void> _doSetIndexConfiguration(Object? configuration) async {
+    await _localStore.configureFieldIndexes(
+      configuration is String
+          ? parseIndexConfiguration(configuration)
+          : parseIndexConfigurationMap(configuration),
+    );
+  }
+
+  /// Parses an index of `expectedState.indexes`, which is the JSON form of a `FieldIndex` of the JS SDK: the field
+  /// paths as `{segments: [...]}` and the kinds as numbers (0 ascending, 1 descending, 2 contains).
+  static FieldIndex _parseExpectedIndex(Map<String, dynamic> json) {
+    return FieldIndex(
+      FieldIndex.unknownId,
+      json['collectionGroup'] as String,
+      <IndexSegment>[
+        for (final dynamic field in json['fields'] as List<dynamic>)
+          IndexSegment(
+            FieldPath.fromSegments(
+              (field['fieldPath']['segments'] as List<dynamic>).cast<String>(),
+            ),
+            SegmentKind.values[field['kind'] as int],
+          ),
+      ],
+      FieldIndex.initialState,
+    );
+  }
 
   Future<void> _doLoadBundle(String json) async {
     final BundleReader bundleReader =
@@ -961,6 +991,8 @@ class SpecTestCase implements RemoteStoreCallback {
       _doRemoveSnapshotsInSyncListener();
     } else if (step.containsKey('waitForPendingWrites')) {
       await _doWaitForPendingWrites();
+    } else if (step.containsKey('setIndexConfiguration')) {
+      await _doSetIndexConfiguration(step['setIndexConfiguration']);
     } else if (step.containsKey('drainQueue')) {
       // Upstream waits for its AsyncQueue to be empty. Here the equivalent is letting the event loop settle, which
       // runSteps does after every step anyway.
@@ -1139,6 +1171,29 @@ class SpecTestCase implements RemoteStoreCallback {
           _datastore.watchStreamRequestCount,
           expected['watchStreamRequestCount'],
         );
+      }
+
+      if (expected.containsKey('indexes')) {
+        // Like the JS runner: the configured indexes are compared by collection group and segments, ignoring ids
+        // and backfill state.
+        final List<FieldIndex> expectedIndexes = <FieldIndex>[
+          for (final dynamic index in expected['indexes'] as List<dynamic>)
+            _parseExpectedIndex(index as Map<String, dynamic>),
+        ]..sort(FieldIndex.semanticCompare);
+        final List<FieldIndex> actualIndexes = _localStore.getFieldIndexes()
+          ..sort(FieldIndex.semanticCompare);
+        expect(
+          actualIndexes.length,
+          expectedIndexes.length,
+          reason: 'configured indexes: $actualIndexes',
+        );
+        for (int i = 0; i < expectedIndexes.length; i++) {
+          expect(
+            FieldIndex.semanticCompare(actualIndexes[i], expectedIndexes[i]),
+            0,
+            reason: 'expected ${expectedIndexes[i]}, got ${actualIndexes[i]}',
+          );
+        }
       }
 
       if (expected.containsKey('activeLimboDocs')) {

@@ -35,6 +35,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/re
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/stats_collector.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_bundle_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_database_files.dart';

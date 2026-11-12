@@ -37,8 +37,9 @@ const Map<String, String?> skippedSpecFeatures = <String, String?>{
 
   // --- Features the port lacks ---
   'bundles': null,
-  'indexing':
-      'Local indexing (setIndexConfiguration, index-backed queries, expectedState.indexes) is not ported; both specs using it are also multi-client.',
+  // Landed (field indexes, the setIndexConfiguration step and expectedState.indexes). Both specs that use it are
+  // multi-client and stay skipped for that reason; index_spec_single_client_test.dart runs their single-client form.
+  'indexing': null,
   // Landed (ListenSource.cache): enabled again, kept as a null entry to show how a feature is switched on.
   'listen-source-cache': null,
   'limit-to-last': null,

@@ -20,6 +20,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_documents_view.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -27,6 +28,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:meta/meta.dart';
 
 /// Firestore queries can be executed in three modes. The Query Engine determines what mode to use based on what data is
 /// persisted. The mode only determines the runtime complexity of the query - the result set is equivalent across all
@@ -53,7 +55,28 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 class DefaultQueryEngine implements QueryEngine {
   static const String _tag = 'DefaultQueryEngine';
 
+  static const int _defaultIndexAutoCreationMinCollectionSize = 100;
+
+  /// This cost represents the evaluation result of (([index, docKey] + [docKey, docContent]) per document in the
+  /// result set) / ([docKey, docContent] per documents in full collection scan) coming from the experiment of
+  /// https://github.com/firebase/firebase-android-sdk/pull/5064.
+  static const double _defaultRelativeIndexReadCostPerDocument = 2;
+
   LocalDocumentsView? _localDocumentsView;
+
+  @override
+  bool indexAutoCreationEnabled = false;
+
+  /// SDK only decides whether it should create index when collection size is larger than this. Can be changed by
+  /// tests.
+  @visibleForTesting
+  int indexAutoCreationMinCollectionSize =
+      _defaultIndexAutoCreationMinCollectionSize;
+
+  /// Can be changed by tests.
+  @visibleForTesting
+  double relativeIndexReadCostPerDocument =
+      _defaultRelativeIndexReadCostPerDocument;
 
   @override
   void setLocalDocumentsView(LocalDocumentsView localDocuments) {
@@ -80,7 +103,40 @@ class DefaultQueryEngine implements QueryEngine {
       return result;
     }
 
-    return _executeFullCollectionScan(query);
+    final QueryContext context = QueryContext();
+    result = await _executeFullCollectionScan(query, context);
+    if (indexAutoCreationEnabled) {
+      await _createCacheIndexes(query, context, result.length);
+    }
+    return result;
+  }
+
+  /// Decides whether SDK should create a full matched field index for this query based on query context and query
+  /// result size.
+  Future<void> _createCacheIndexes(
+      Query query, QueryContext context, int resultSize) async {
+    if (context.documentReadCount < indexAutoCreationMinCollectionSize) {
+      Log.d(
+          _tag,
+          'SDK will not create cache indexes for query: $query, since it only creates cache indexes for collection '
+          'contains more than or equal to $indexAutoCreationMinCollectionSize documents.');
+      return;
+    }
+
+    Log.d(
+        _tag,
+        'Query: $query, scans ${context.documentReadCount} local documents and returns $resultSize documents as '
+        'results.');
+
+    if (context.documentReadCount >
+        relativeIndexReadCostPerDocument * resultSize) {
+      await _localDocumentsView!.indexManager
+          .createTargetIndexes(query.toTarget());
+      Log.d(
+          _tag,
+          'The SDK decides to create cache indexes for query: $query, as using cache indexes may help improve '
+          'performance.');
+    }
   }
 
   /// Performs an indexed query that evaluates the query based on a collection's persisted index values. Returns null
@@ -234,12 +290,12 @@ class DefaultQueryEngine implements QueryEngine {
   }
 
   Future<ImmutableSortedMap<DocumentKey, Document>> _executeFullCollectionScan(
-      Query query) {
+      Query query, QueryContext context) {
     if (Log.isDebugEnabled) {
       Log.d(_tag, 'Using full collection scan to execute query: $query');
     }
     return _localDocumentsView!
-        .getDocumentsMatchingQuery(query, IndexOffset.none);
+        .getDocumentsMatchingQuery(query, IndexOffset.none, context);
   }
 
   /// Combines the results from an indexed execution with the remaining documents that have not yet been indexed.

@@ -8,6 +8,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/view.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/default_query_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_backfiller.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_documents_view.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
@@ -50,10 +51,11 @@ class _ExpectingLocalDocumentsView extends LocalDocumentsView {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      Query query, IndexOffset offset) {
+      Query query, IndexOffset offset,
+      [QueryContext? context]) {
     expect(offset == IndexOffset.none, expectFullCollectionScan,
         reason: 'Observed query execution mode did not match expectation');
-    return super.getDocumentsMatchingQuery(query, offset);
+    return super.getDocumentsMatchingQuery(query, offset, context);
   }
 }
 

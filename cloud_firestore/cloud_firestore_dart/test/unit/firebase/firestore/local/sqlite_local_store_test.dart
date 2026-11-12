@@ -178,4 +178,17 @@ void main() {
   test('testIndexesAllBsonTypesTogether', () => testCase.testIndexesAllBsonTypesTogether());
   test('testIndexesAllTypesTogether', () => testCase.testIndexesAllTypesTogether());
   test('testIndexesServerTimestamps', () => testCase.testIndexesServerTimestamps());
+
+  // The automatic index creation cases of SQLiteLocalStoreTest of the Android SDK.
+  test('testCanAutoCreateIndexes', () => testCase.testCanAutoCreateIndexes());
+  test('testCanAutoCreateIndexesWorksWithOrQuery', () => testCase.testCanAutoCreateIndexesWorksWithOrQuery());
+  test('testDoesNotAutoCreateIndexesForSmallCollections', () => testCase.testDoesNotAutoCreateIndexesForSmallCollections());
+  test('testDoesNotAutoCreateIndexesWhenIndexLookUpIsExpensive', () => testCase.testDoesNotAutoCreateIndexesWhenIndexLookUpIsExpensive());
+  test('testIndexAutoCreationWorksWhenBackfillerRunsHalfway', () => testCase.testIndexAutoCreationWorksWhenBackfillerRunsHalfway());
+  test('testIndexCreatedByIndexAutoCreationExistsAfterTurnOffAutoCreation', () => testCase.testIndexCreatedByIndexAutoCreationExistsAfterTurnOffAutoCreation());
+  test('testDisableIndexAutoCreationWorks', () => testCase.testDisableIndexAutoCreationWorks());
+  test('testDeleteAllIndexesWorksWithIndexAutoCreation', () => testCase.testDeleteAllIndexesWorksWithIndexAutoCreation());
+  test('testDeleteAllIndexesWorksWithManualAddedIndexes', () => testCase.testDeleteAllIndexesWorksWithManualAddedIndexes());
+  test('testIndexAutoCreationWorksWithMutation', () => testCase.testIndexAutoCreationWorksWithMutation());
+  test('testIndexAutoCreationDoesnotWorkWithMultipleInequality', () => testCase.testIndexAutoCreationDoesnotWorkWithMultipleInequality());
 }

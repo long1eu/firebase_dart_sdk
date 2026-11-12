@@ -247,6 +247,12 @@ class LocalStore implements BundleCallback {
         'Delete All Indexes', _indexManager.deleteAllFieldIndexes);
   }
 
+  /// Lets the query engine create field indexes for the queries it would have served faster with one.
+  // ignore: avoid_setters_without_getters
+  set indexAutoCreationEnabled(bool isEnabled) {
+    _queryEngine.indexAutoCreationEnabled = isEnabled;
+  }
+
   Future<void> startMutationQueue() {
     return _persistence.runTransaction(
         'Start MutationQueue', _mutationQueue.start);

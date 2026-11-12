@@ -70,7 +70,8 @@ class MemoryRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query, IndexOffset offset) async {
+      getAllDocumentsMatchingQuery(Query query, IndexOffset offset,
+          [QueryContext? context]) async {
     hardAssert(!query.isCollectionGroupQuery,
         'CollectionGroup queries should be handled in LocalDocumentsView');
     ImmutableSortedMap<DocumentKey, Document> result =

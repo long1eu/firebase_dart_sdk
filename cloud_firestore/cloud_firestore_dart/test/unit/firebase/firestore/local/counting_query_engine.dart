@@ -18,6 +18,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_documents_view.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
@@ -77,6 +78,13 @@ class CountingQueryEngine implements QueryEngine {
     documentsReadByQuery = 0;
     documentsReadByKey = 0;
   }
+
+  @override
+  bool get indexAutoCreationEnabled => subject.indexAutoCreationEnabled;
+
+  @override
+  set indexAutoCreationEnabled(bool value) =>
+      subject.indexAutoCreationEnabled = value;
 
   @override
   void setLocalDocumentsView(LocalDocumentsView localDocuments) {
@@ -150,9 +158,10 @@ class _CountingRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query, IndexOffset offset) async {
+      getAllDocumentsMatchingQuery(Query query, IndexOffset offset,
+          [QueryContext? context]) async {
     final ImmutableSortedMap<DocumentKey, Document> result =
-        await _subject.getAllDocumentsMatchingQuery(query, offset);
+        await _subject.getAllDocumentsMatchingQuery(query, offset, context);
     _counter.documentsReadByQuery += result.length;
     return result;
   }

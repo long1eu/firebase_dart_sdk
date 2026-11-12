@@ -12,6 +12,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/do
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_collections.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -306,14 +307,15 @@ class LocalDocumentsView {
   /// [offset] is the read time and document key to start scanning the remote documents at (exclusive);
   /// [IndexOffset.none] considers all of them. Documents with local mutations are always included.
   Future<ImmutableSortedMap<DocumentKey, Document>> getDocumentsMatchingQuery(
-      Query query, IndexOffset offset) async {
+      Query query, IndexOffset offset,
+      [QueryContext? context]) async {
     final ResourcePath path = query.path;
     if (query.isDocumentQuery) {
       return _getDocumentsMatchingDocumentQuery(path);
     } else if (query.isCollectionGroupQuery) {
-      return _getDocumentsMatchingCollectionGroupQuery(query, offset);
+      return _getDocumentsMatchingCollectionGroupQuery(query, offset, context);
     } else {
-      return _getDocumentsMatchingCollectionQuery(query, offset);
+      return _getDocumentsMatchingCollectionQuery(query, offset, context);
     }
   }
 
@@ -332,7 +334,7 @@ class LocalDocumentsView {
 
   Future<ImmutableSortedMap<DocumentKey, Document>>
       _getDocumentsMatchingCollectionGroupQuery(
-          Query query, IndexOffset offset) async {
+          Query query, IndexOffset offset, QueryContext? context) async {
     hardAssert(query.path.isEmpty,
         'Currently we only support collection group queries at the root.');
     final String collectionId = query.collectionGroup!;
@@ -348,7 +350,7 @@ class LocalDocumentsView {
           query.asCollectionQueryAtPath(parent.appendSegment(collectionId));
       final ImmutableSortedMap<DocumentKey, Document> collectionResults =
           await _getDocumentsMatchingCollectionQuery(
-              collectionQuery, offset);
+              collectionQuery, offset, context);
       for (MapEntry<DocumentKey, Document> docEntry in collectionResults) {
         results = results.insert(docEntry.key, docEntry.value);
       }
@@ -359,7 +361,7 @@ class LocalDocumentsView {
   /// Queries the remote documents and applies the overlays of the collection.
   Future<ImmutableSortedMap<DocumentKey, Document>>
       _getDocumentsMatchingCollectionQuery(
-          Query query, IndexOffset offset) async {
+          Query query, IndexOffset offset, QueryContext? context) async {
     // With an offset that comes from a field index only the overlays of the batches after the offset are read: the
     // documents of the earlier batches are in the index with their overlay applied.
     final bool overlaysSinceBatch =
@@ -373,7 +375,7 @@ class LocalDocumentsView {
     // that case and looks their overlays up by key.
     final ImmutableSortedMap<DocumentKey, Document> remoteDocuments =
         await remoteDocumentCache.getAllDocumentsMatchingQuery(
-            overlaysSinceBatch ? Query(query.path) : query, offset);
+            overlaysSinceBatch ? Query(query.path) : query, offset, context);
     if (overlaysSinceBatch) {
       final List<DocumentKey> withoutOverlay = <DocumentKey>[
         for (final MapEntry<DocumentKey, Document> entry in remoteDocuments)

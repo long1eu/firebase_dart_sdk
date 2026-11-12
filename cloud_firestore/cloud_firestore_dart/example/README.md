@@ -18,7 +18,8 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/main.dart
 | `bundles.dart` | `loadBundle`, progress, reading bundled documents from the cache, `getNamedQuery`. |
 | `snapshot_json.dart` | `toJson` / `fromJson` on snapshots and references, `querySnapshotsFromJson` to resume a listener. |
 | `offline_persistence.dart` | A SQLite cache on disk: reading and writing offline, syncing when back online. |
-| `sqlite_database.dart` | The complete `OpenDatabase` on top of `package:sqlite3` used by the two examples around it. Copy it into your app. |
+| `cache_indexes.dart` | Persistent cache indexes: `persistentCacheIndexManager`, automatic index creation, `deleteAllIndexes`. |
+| `sqlite_database.dart` | The complete `OpenDatabase` on top of `package:sqlite3` used by the examples around it. Copy it into your app. |
 | `emulator_mock_user_token.dart` | `withEmulator` and `mockUserToken` to act as a signed-in user. |
 | `lifecycle.dart` | `setLogLevel`, `waitForPendingWrites`, `snapshotsInSync`, `terminate`, `clearPersistence`. |
 | `pipelines.dart` | Pipelines (preview): stages, expressions, grouped aggregation, lambdas, `createFrom(query)`, subqueries, an atomic `update`. Needs an Enterprise edition emulator (`FIRESTORE_ENTERPRISE_EMULATOR_HOST`); prints a note and exits without one. |

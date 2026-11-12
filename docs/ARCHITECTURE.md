@@ -94,6 +94,19 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
 | A patch that creates a document, and a patch of no fields, are treated as mutating the whole document when the overlay mask is computed. | Android's mask loses the document for a merge of no fields on a deleted document. | no test that names this case was found; the overlay mask cases are in `test/unit/firebase/firestore/model/mutation/overlay_mutation_test.dart` |
 | The canonical id of a target writes cursor positions without a separator (upstream uses a comma). | Canonical ids are persisted with the targets; changing the format would orphan cached targets. | `test/unit/firebase/firestore/core/bound_order_by_test.dart`, `legacy_cache_upgrade_test.dart` |
 
+### Persistent cache indexes
+
+| Deviation | Why | Pinned by |
+|---|---|---|
+| A reference ends with a truncation marker in the index encoding (Android writes no terminator). | Without it `a/b` sorts after `a/b/c/d` and the lowest reference after every reference: index scans for `<`, `<=`, `>`, `>=`, cursors and limits on a reference field return other documents than a collection scan. The entries are local only and never exchanged. | `test/unit/firebase/firestore/index/firestore_index_value_writer_test.dart`, `local/sqlite_field_index_manager_extra_test.dart` ("references") |
+| A BSON timestamp is encoded as two numbers, seconds and increment (Android packs them into one signed 64-bit long). | The packed long is negative for seconds >= 2^31 (the year 2038), so those timestamps sort first and range scans on them are wrong. | the same two files ("BSON timestamps"), and `test/integration_enterprise/index_engine_bson_test.dart` |
+| With an index offset, the remote documents read after the offset are read unfiltered and their overlays are looked up by key (Android reads only the overlays of later batches and filters the documents by the query). | A document that was read after the last backfill and has a pending patch from an earlier batch is otherwise returned without the patch, or wrongly in or out of the result, until the next backfill. | `test/unit/firebase/firestore/local/sqlite_query_engine_test.dart` ("documents read after the index offset") |
+| `Persistence.indexManager` is a shared collection parent index next to the user scoped `Persistence.getIndexManager(user)` (Android only has the latter). | The remote document cache and the mutation queues of the port maintain the collection parents without knowing the user; the field index methods of the shared one assert. | `test/unit/firebase/firestore/local/sqlite_field_index_manager_extra_test.dart` ("the shared index manager of the persistence") |
+| Read times are returned next to the documents (`ReadDocument`, `LocalDocumentsResult.readTimes`) instead of being a property of the document. | The immutable documents of the port have no read time. | `test/unit/firebase/firestore/local/sqlite_next_documents_test.dart` |
+| The lowest timestamp used as an index bound is year 1 (Android: `Long.MIN_VALUE` seconds). | The earliest value a `Timestamp` of the port can hold; no stored timestamp is lower. | `test/unit/firebase/firestore/model/value_bounds_test.dart` |
+| An index definition is parsed the way Android does: a field that is neither `CONTAINS` nor `ASCENDING` is descending (the JS SDK drops such a field). | One rule had to be picked; Android's keeps the field. | `test/unit/firebase/firestore/index/index_configuration_test.dart` |
+| `PersistentCacheIndexManager` methods return a `Future` that completes when the change is applied (void in Android and JS). | So that a caller, and a test, can wait for it and see a failure on a terminated instance. | `test/unit/firebase/firestore/persistent_cache_index_manager_test.dart` |
+
 ### Networking
 
 | Deviation | Why | Pinned by |

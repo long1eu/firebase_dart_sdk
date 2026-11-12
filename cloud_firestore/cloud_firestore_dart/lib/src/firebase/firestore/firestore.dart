@@ -27,10 +27,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_multi_db_component.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_configuration.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/log_level.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/persistent_cache_index_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction_options.dart';
@@ -418,6 +420,41 @@ class Firestore {
     }
     await client.clearPersistence();
   }
+
+  /// Configures the persistent cache indexes of this instance from an index definition in the JSON format of the
+  /// Firebase CLI (`firestore.indexes.json`, see
+  /// https://firebase.google.com/docs/reference/firestore/indexes/#json_format). The `queryScope` of an index and
+  /// the `fieldOverrides` are ignored. The indexes replace the ones that were configured before; an index that is
+  /// configured again keeps its entries.
+  ///
+  /// The index entries are written in the background while the app runs. A query against the local cache uses an
+  /// index as far as it is filled, and the result of a query is the same with or without an index.
+  ///
+  /// The future fails with an [ArgumentError] when [json] is not a valid index definition and with a [StateError] when
+  /// this instance does not use the persistent (SQLite) cache.
+  @Deprecated(
+      'Instead of creating cache indexes manually, consider using '
+      'persistentCacheIndexManager.enableIndexAutoCreation() to let the SDK '
+      'decide whether to create cache indexes for queries running locally.')
+  Future<void> setIndexConfiguration(String json) async {
+    if (!client.supportsFieldIndexes) {
+      throw StateError('Cannot enable indexes when persistence is disabled');
+    }
+    return client.configureFieldIndexes(parseIndexConfiguration(json));
+  }
+
+  /// The [PersistentCacheIndexManager] of this instance, or null when it does not use the persistent (SQLite) cache.
+  ///
+  /// Persistent cache indexes are optional indexes that only exist within the SDK to assist in local query execution;
+  /// they are not the same as Cloud Firestore indexes.
+  PersistentCacheIndexManager? get persistentCacheIndexManager {
+    if (!client.supportsFieldIndexes) {
+      return null;
+    }
+    return _persistentCacheIndexManager ??= PersistentCacheIndexManager(client);
+  }
+
+  PersistentCacheIndexManager? _persistentCacheIndexManager;
 
   /// Re-enables network usage for this instance after a prior call to [disableNetwork].
   ///

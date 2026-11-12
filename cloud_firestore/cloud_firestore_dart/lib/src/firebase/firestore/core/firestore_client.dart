@@ -37,6 +37,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
@@ -54,6 +55,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:firebase_app_dart/internal.dart';
+import 'package:meta/meta.dart';
 import 'package:grpc/grpc.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -81,6 +83,10 @@ class FirestoreClient implements RemoteStoreCallback {
 
   /// Fills the field indexes in the background. Only with SQLite persistence: memory persistence has no field indexes.
   IndexBackfillerScheduler? _indexBackfillScheduler;
+  IndexBackfiller? _indexBackfiller;
+
+  /// Whether this client has field indexes: only with SQLite persistence.
+  bool get supportsFieldIndexes => _indexBackfiller != null;
 
   static Future<FirestoreClient> initialize(
     DatabaseInfo databaseInfo,
@@ -294,6 +300,38 @@ class FirestoreClient implements RemoteStoreCallback {
         () => syncEngine.loadBundle(bundleReader, resultTask));
   }
 
+  /// Makes [fieldIndexes] the configured field indexes, see [LocalStore.configureFieldIndexes].
+  Future<void> configureFieldIndexes(List<FieldIndex> fieldIndexes) async {
+    _verifyNotShutdown();
+    return _enqueue<void>(
+        () => localStore.configureFieldIndexes(fieldIndexes));
+  }
+
+  /// Turns the automatic creation of field indexes on or off.
+  Future<void> setIndexAutoCreationEnabled({required bool enabled}) async {
+    _verifyNotShutdown();
+    return _enqueue<void>(
+        () async => localStore.indexAutoCreationEnabled = enabled);
+  }
+
+  /// Removes all field indexes and their entries.
+  Future<void> deleteAllFieldIndexes() async {
+    _verifyNotShutdown();
+    return _enqueue<void>(localStore.deleteAllFieldIndexes);
+  }
+
+  /// Runs one index backfill now, without waiting for the scheduled one, and returns the number of documents that
+  /// were processed (at most 50 per run; 0 when the indexes are up to date or the client has no field indexes).
+  @visibleForTesting
+  Future<int> backfillIndexes() async {
+    _verifyNotShutdown();
+    final IndexBackfiller? backfiller = _indexBackfiller;
+    if (backfiller == null) {
+      return 0;
+    }
+    return _enqueue<int>(backfiller.backfill);
+  }
+
   /// Returns the named query saved by a loaded bundle under [queryName], or null if there is none.
   Future<Query?> getNamedQuery(String queryName) async {
     _verifyNotShutdown();
@@ -418,7 +456,7 @@ class FirestoreClient implements RemoteStoreCallback {
     }
     if (persistence is SQLitePersistence) {
       final IndexBackfiller indexBackfiller =
-          IndexBackfiller(persistence, localStore);
+          _indexBackfiller = IndexBackfiller(persistence, localStore);
       _indexBackfillScheduler = IndexBackfillerScheduler(
         indexBackfiller,
         scheduler,

@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_context.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
@@ -79,6 +80,10 @@ abstract class RemoteDocumentCache {
   /// [offset] is the read time and document key to start scanning at (exclusive): only documents that were read after
   /// its read time, or at its read time with a key after its key, are returned. [IndexOffset.none] returns all
   /// documents; `IndexOffset.createSuccessor(version, ...)` the documents read after `version`.
+  ///
+  /// [context] is an optional tracker that records the number of documents the scan went through (SQLite only, as
+  /// upstream).
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query, IndexOffset offset);
+      getAllDocumentsMatchingQuery(Query query, IndexOffset offset,
+          [QueryContext? context]);
 }

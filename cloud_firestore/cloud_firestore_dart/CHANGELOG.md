@@ -184,6 +184,15 @@ Listeners, cache and lifecycle:
 - `Firestore.waitForPendingWrites`, `terminate`, `snapshotsInSync`.
 - Cache settings (`PersistentCacheSettings`, `MemoryCacheSettings`), `ListenSource.cache` and
   `SnapshotListenOptions`.
+- Persistent cache indexes (the client-side index engine of the Android and JS SDKs):
+  `Firestore.persistentCacheIndexManager` with `enableIndexAutoCreation()`,
+  `disableIndexAutoCreation()` and `deleteAllIndexes()`, and the deprecated
+  `Firestore.setIndexConfiguration(json)`. Queries against the SQLite cache are served from an
+  index when one matches (all operators, `in` / `not-in`, array membership, OR queries, cursors,
+  limits), merged with the documents that are not indexed yet; indexes are filled in the
+  background. Schema versions 12 and 13 add the tables. Not available with a memory cache.
+  The stored index entries differ from the Android SDK's in two places where its encoding
+  returns wrong results (references of different depths, BSON timestamps past 2^31 seconds).
 - `Firestore.clearPersistence()`: deletes the local SQLite database (and its `-journal`, `-wal`,
   `-shm` files) of a terminated instance. It fails with `failedPrecondition` while the instance,
   or a newer instance of the same app and database, is running, and is a no-op for memory
@@ -304,10 +313,8 @@ Documentation and tests:
 
 ### Not done
 
-- The client-side index engine (`setIndexConfiguration`, persistent-cache auto-indexing): the
-  index value encoding, the `FieldIndex` model, target-to-index matching and the index manager
-  with its tables exist internally, but no query reads the indexes yet, and there is no public
-  API.
+- Persistent cache indexes for queries with inequalities on several fields (they are scanned,
+  as upstream), and indexes with a memory cache.
 - Persistence on the web (the cache is in memory only there), and any browser other than
   Chrome.
 - Pipelines beyond the preview: full-text search, window functions, pipelines in a

@@ -249,6 +249,7 @@ class Firestore
   final databaseId: DatabaseId @internal
   final firebaseApp: FirebaseApp
   get databaseName: String
+  get persistentCacheIndexManager: PersistentCacheIndexManager
   get projectId: String
   get scheduler: TaskScheduler @internal
   get snapshotsInSync: Stream<void>
@@ -259,6 +260,7 @@ class Firestore
   querySnapshotsFromJson(Map<String, Object> json, {SnapshotListenOptions options, FirestoreDataConverter<dynamic> converter}): Stream<QuerySnapshot<dynamic>>
   runBatch((.WriteBatch) -> dart.async.Future batchFunction): Future<void>
   runTransaction((.Transaction) -> dart.async.Future updateFunction, {TransactionOptions options}): Future<dynamic>
+  setIndexConfiguration(String json): Future<void> @deprecated
   shutdown(): Future<void> @deprecated
   static get instance: Firestore
   static getInstance(FirebaseApp app, {String database, (dart.core.String, {onConfigure: dart.core.(.Database) -> dart.async.Future, onCreate: dart.core.(.Database, dart.core.int) -> dart.async.Future, onDowngrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, onOpen: dart.core.(.Database) -> dart.async.Future, onUpgrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, version: dart.core.int}) -> dart.async.Future openDatabase, FirestoreSettings settings}): Future<Firestore> @deprecated
@@ -420,6 +422,11 @@ typedef OnOpen = Future<void> Function(Database db)
 typedef OnProgressListener = void Function(LoadBundleTaskProgress snapshot)
 typedef OnVersionChange = Future<void> Function( Database db, int oldVersion, int newVersion)
 typedef OpenDatabase = Future<Database> Function(String path, {int version, OnConfigure onConfigure, OnCreate onCreate, OnVersionChange onUpgrade, OnVersionChange onDowngrade, OnOpen onOpen})
+class PersistentCacheIndexManager
+  deleteAllIndexes(): Future<void>
+  disableIndexAutoCreation(): Future<void>
+  enableIndexAutoCreation(): Future<void>
+  new PersistentCacheIndexManager(FirestoreClient _client) @internal
 class PersistentCacheSettings extends LocalCacheSettings
   ==(Object other): bool
   final sizeBytes: int

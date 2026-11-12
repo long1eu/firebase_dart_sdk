@@ -28,6 +28,10 @@ abstract class QueryEngine {
       SnapshotVersion lastLimboFreeSnapshotVersion,
       ImmutableSortedSet<DocumentKey> remoteKeys);
 
+  /// Whether the engine creates a field index for a query when it finds that the index would have made the query
+  /// cheaper (see `PersistentCacheIndexManager`). Off by default.
+  abstract bool indexAutoCreationEnabled;
+
   /// Notifies the query engine of a document change in case it would like to
   /// update indexes and the like.
   // TODO(long1eu): We can change this to just accept the changed fields

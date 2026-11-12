@@ -18,6 +18,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart'
         VectorValue;
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
@@ -79,6 +80,8 @@ class LocalStoreTestCase {
   late int _lastTargetId;
   late LocalStore _localStore;
   late CountingQueryEngine _queryEngine;
+  late DefaultQueryEngine _defaultEngine;
+  int? _backfillerMaxDocumentsToProcess;
   QueryResult? _lastQueryResult;
 
   Future<void> setUp() async {
@@ -87,7 +90,9 @@ class LocalStoreTestCase {
     _lastQueryResult = null;
     _lastTargetId = 0;
 
-    _queryEngine = CountingQueryEngine(DefaultQueryEngine());
+    _defaultEngine = DefaultQueryEngine();
+    _backfillerMaxDocumentsToProcess = null;
+    _queryEngine = CountingQueryEngine(_defaultEngine);
     _localStore = LocalStore(_persistence, User.unauthenticated,
         queryEngine: _queryEngine);
     await _localStore.start();
@@ -2125,7 +2130,13 @@ class LocalStoreTestCase {
   }
 
   Future<void> _backfillIndexes() async {
-    await IndexBackfiller(_persistence, _localStore).backfill();
+    final IndexBackfiller backfiller =
+        IndexBackfiller(_persistence, _localStore);
+    final int? maxDocumentsToProcess = _backfillerMaxDocumentsToProcess;
+    if (maxDocumentsToProcess != null) {
+      backfiller.maxDocumentsToProcess = maxDocumentsToProcess;
+    }
+    await backfiller.backfill();
   }
 
   /// Asserts the type of every overlay that the query engine read since the last call to [_resetPersistenceStats].
@@ -3485,5 +3496,796 @@ class LocalStoreTestCase {
     _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
     _expectOverlayTypes(<String, OverlayType>{'coll/a': OverlayType.set});
     _expectQueryReturned(<String>['coll/a']);
+  }
+
+  // Automatic index creation: the cases of SQLiteLocalStoreTest of the Android SDK.
+
+  @testMethod
+  Future<void> testCanAutoCreateIndexes() async {
+    Query qry = query('coll').filter(filter('matches', '==', true));
+    final int targetId = await _allocateQuery(qry);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.indexAutoCreationMinCollectionSize = 0;
+    _defaultEngine.relativeIndexReadCostPerDocument = 2;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['matches', true])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/b', 10, map(<dynamic>['matches', false])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/c', 10, map(<dynamic>['matches', false])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/d', 10, map(<dynamic>['matches', false])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/e', 10, map(<dynamic>['matches', true])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    // First time qry runs without indexes.
+    // Based on current heuristic, collection document counts (5) > 2 * resultSize (2).
+    // Full matched index should be created.
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    await _backfillIndexes();
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/f', 20, map(<dynamic>['matches', true])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 2, byQuery: 1);
+    _expectQueryReturned(<String>['coll/a', 'coll/e', 'coll/f']);
+  }
+
+  @testMethod
+  Future<void> testCanAutoCreateIndexesWorksWithOrQuery() async {
+    Query qry = query('coll').filter(
+      orFilters(<Filter>[filter('a', '==', 3), filter('b', '==', true)]),
+    );
+    final int targetId = await _allocateQuery(qry);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.indexAutoCreationMinCollectionSize = 0;
+    _defaultEngine.relativeIndexReadCostPerDocument = 2;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/a', 10, map(<dynamic>['b', true])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/b', 10, map(<dynamic>['b', false])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/c', 10, map(<dynamic>['a', 5, 'b', false])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/d', 10, map(<dynamic>['a', true])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/e', 10, map(<dynamic>['a', 3, 'b', true])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    // First time qry runs without indexes.
+    // Based on current heuristic, collection document counts (5) > 2 * resultSize (2).
+    // Full matched index should be created.
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    await _backfillIndexes();
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/f', 20, map(<dynamic>['a', 3, 'b', false])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 2, byQuery: 1);
+    _expectQueryReturned(<String>['coll/a', 'coll/e', 'coll/f']);
+  }
+
+  @testMethod
+  Future<void> testDoesNotAutoCreateIndexesForSmallCollections() async {
+    Query qry = query(
+      'coll',
+    ).filter(filter('foo', '==', 9)).filter(filter('count', '>=', 3));
+    final int targetId = await _allocateQuery(qry);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.relativeIndexReadCostPerDocument = 2;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['foo', 9, 'count', 5])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/b', 10, map(<dynamic>['foo', 8, 'count', 6])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/c', 10, map(<dynamic>['foo', 9, 'count', 0])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/d', 10, map(<dynamic>['count', 4])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/e', 10, map(<dynamic>['foo', 9, 'count', 3])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    // SDK will not create indexes since collection size is too small.
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/e', 'coll/a']);
+
+    await _backfillIndexes();
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/f', 20, map(<dynamic>['foo', 9, 'count', 4])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 3);
+    _expectQueryReturned(<String>['coll/e', 'coll/f', 'coll/a']);
+  }
+
+  @testMethod
+  Future<void> testDoesNotAutoCreateIndexesWhenIndexLookUpIsExpensive() async {
+    Query qry = query(
+      'coll',
+    ).filter(filter('array', 'array-contains-any', <Object?>[0, 7]));
+    final int targetId = await _allocateQuery(qry);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.indexAutoCreationMinCollectionSize = 0;
+    _defaultEngine.relativeIndexReadCostPerDocument = 5;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'coll/a',
+          10,
+          map(<dynamic>[
+            'array',
+            <Object?>[2, 7],
+          ]),
+        ),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/b', 10, map(<dynamic>['array', <int>[]])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'coll/c',
+          10,
+          map(<dynamic>[
+            'array',
+            <Object?>[3],
+          ]),
+        ),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'coll/d',
+          10,
+          map(<dynamic>[
+            'array',
+            <Object?>[2, 10, 20],
+          ]),
+        ),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'coll/e',
+          10,
+          map(<dynamic>[
+            'array',
+            <Object?>[2, 0, 8],
+          ]),
+        ),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    // SDK will not create indexes since relative read cost is too large.
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    await _backfillIndexes();
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'coll/f',
+          20,
+          map(<dynamic>[
+            'array',
+            <Object?>[0],
+          ]),
+        ),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 3);
+    _expectQueryReturned(<String>['coll/a', 'coll/e', 'coll/f']);
+  }
+
+  @testMethod
+  Future<void> testIndexAutoCreationWorksWhenBackfillerRunsHalfway() async {
+    Query qry = query(
+      'coll',
+    ).filter(filter('matches', '==', 'foo')).filter(filter('count', '>', 10));
+    final int targetId = await _allocateQuery(qry);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.indexAutoCreationMinCollectionSize = 0;
+    _defaultEngine.relativeIndexReadCostPerDocument = 2;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['matches', 'foo', 'count', 11])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/b', 10, map(<dynamic>['matches', 'foo', 'count', 9])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/c', 10, map(<dynamic>['matches', 'foo'])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/d', 10, map(<dynamic>['matches', 7, 'count', 11])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/e', 10, map(<dynamic>['matches', 'foo', 'count', 21])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    // First time qry is running without indexes.
+    // Based on current heuristic, collection document counts (5) > 2 * resultSize (2).
+    // Full matched index should be created.
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    _backfillerMaxDocumentsToProcess = 2;
+    await _backfillIndexes();
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/f', 20, map(<dynamic>['matches', 'foo', 'count', 15])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 1, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/f', 'coll/e']);
+  }
+
+  @testMethod
+  Future<void>
+  testIndexCreatedByIndexAutoCreationExistsAfterTurnOffAutoCreation() async {
+    Query qry = query('coll').filter(filter('value', 'not-in', <Object?>[3]));
+    final int targetId = await _allocateQuery(qry);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.indexAutoCreationMinCollectionSize = 0;
+    _defaultEngine.relativeIndexReadCostPerDocument = 2;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/a', 10, map(<dynamic>['value', 5])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/b', 10, map(<dynamic>['value', 3])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/c', 10, map(<dynamic>['value', 3])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/d', 10, map(<dynamic>['value', 3])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/e', 10, map(<dynamic>['value', 2])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+
+    // First time qry runs without indexes.
+    // Based on current heuristic, collection document counts (5) > 2 * resultSize (2).
+    // Full matched index should be created.
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/e', 'coll/a']);
+
+    _localStore.indexAutoCreationEnabled = false;
+
+    await _backfillIndexes();
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/f', 20, map(<dynamic>['value', 7])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 2, byQuery: 1);
+    _expectQueryReturned(<String>['coll/e', 'coll/a', 'coll/f']);
+  }
+
+  @testMethod
+  Future<void> testDisableIndexAutoCreationWorks() async {
+    Query query1 = query('coll').filter(filter('value', 'in', <Object?>[0, 1]));
+    int targetId1 = await _allocateQuery(query1);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.indexAutoCreationMinCollectionSize = 0;
+    _defaultEngine.relativeIndexReadCostPerDocument = 2;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/a', 10, map(<dynamic>['value', 1])), <int>[
+        targetId1,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/b', 10, map(<dynamic>['value', 8])), <int>[
+        targetId1,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/c', 10, map(<dynamic>['value', 'string'])),
+        <int>[targetId1],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/d', 10, map(<dynamic>['value', false])), <int>[
+        targetId1,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/e', 10, map(<dynamic>['value', 0])), <int>[
+        targetId1,
+      ], <int>[]),
+    );
+
+    // First time qry is running without indexes.
+    // Based on current heuristic, collection document counts (5) > 2 * resultSize (2).
+    // Full matched index should be created.
+    await _executeQuery(query1);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    _localStore.indexAutoCreationEnabled = false;
+
+    await _backfillIndexes();
+
+    await _executeQuery(query1);
+    _expectRemoteDocumentsReadByEngine(byKey: 2, byQuery: 0);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    Query query2 = query('foo').filter(filter('value', '!=', double.nan));
+    int targetId2 = await _allocateQuery(query2);
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('foo/a', 10, map(<dynamic>['value', 5])), <int>[
+        targetId2,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('foo/b', 10, map(<dynamic>['value', double.nan])),
+        <int>[targetId2],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('foo/c', 10, map(<dynamic>['value', double.nan])),
+        <int>[targetId2],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('foo/d', 10, map(<dynamic>['value', double.nan])),
+        <int>[targetId2],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('foo/e', 10, map(<dynamic>['value', 'string'])),
+        <int>[targetId2],
+        <int>[],
+      ),
+    );
+
+    await _executeQuery(query2);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['foo/a', 'foo/e']);
+
+    await _backfillIndexes();
+
+    // Run the qry in second time, test index won't be created
+    await _executeQuery(query2);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['foo/a', 'foo/e']);
+  }
+
+  @testMethod
+  Future<void> testDeleteAllIndexesWorksWithIndexAutoCreation() async {
+    Query qry = query('coll').filter(filter('value', '==', 'match'));
+    final int targetId = await _allocateQuery(qry);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.indexAutoCreationMinCollectionSize = 0;
+    _defaultEngine.relativeIndexReadCostPerDocument = 2;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['value', 'match'])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/b', 10, map(<dynamic>['value', double.nan])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/c', 10, map(<dynamic>['value', null])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/d', 10, map(<dynamic>['value', 'mismatch'])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/e', 10, map(<dynamic>['value', 'match'])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    // First time qry is running without indexes.
+    // Based on current heuristic, collection document counts (5) > 2 * resultSize (2).
+    // Full matched index should be created.
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    await _backfillIndexes();
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 2, byQuery: 0);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    await _localStore.deleteAllFieldIndexes();
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    // Field index is created again.
+    await _backfillIndexes();
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 2, byQuery: 0);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+  }
+
+  @testMethod
+  Future<void> testDeleteAllIndexesWorksWithManualAddedIndexes() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['matches', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+
+    Query qry = query('coll').filter(filter('matches', '==', true));
+    final int targetId = await _allocateQuery(qry);
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['matches', true])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    await _backfillIndexes();
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 1, byQuery: 0);
+    _expectQueryReturned(<String>['coll/a']);
+
+    await _localStore.deleteAllFieldIndexes();
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 1);
+    _expectQueryReturned(<String>['coll/a']);
+  }
+
+  @testMethod
+  Future<void> testIndexAutoCreationWorksWithMutation() async {
+    Query qry = query(
+      'coll',
+    ).filter(filter('value', 'array-contains-any', <Object?>[8, 1, 'string']));
+    final int targetId = await _allocateQuery(qry);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.indexAutoCreationMinCollectionSize = 0;
+    _defaultEngine.relativeIndexReadCostPerDocument = 2;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'coll/a',
+          10,
+          map(<dynamic>[
+            'value',
+            <Object?>[8, 1, 'string'],
+          ]),
+        ),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/b', 10, map(<dynamic>['value', <int>[]])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'coll/c',
+          10,
+          map(<dynamic>[
+            'value',
+            <Object?>[3],
+          ]),
+        ),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'coll/d',
+          10,
+          map(<dynamic>[
+            'value',
+            <Object?>[0, 5],
+          ]),
+        ),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc(
+          'coll/e',
+          10,
+          map(<dynamic>[
+            'value',
+            <Object?>['string'],
+          ]),
+        ),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    await _writeMutation(deleteMutation('coll/e'));
+
+    await _backfillIndexes();
+
+    await _writeMutation(
+      setMutation(
+        'coll/f',
+        map(<dynamic>[
+          'value',
+          <Object?>[1],
+        ]),
+      ),
+    );
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 1, byQuery: 0);
+    // PORTING NOTE: byKey is 1 upstream (keys looked up: coll/a from the index); the port counts the overlays found,
+    // and coll/a has none.
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 1);
+    _expectQueryReturned(<String>['coll/a', 'coll/f']);
+  }
+
+  @testMethod
+  Future<void> testIndexAutoCreationDoesnotWorkWithMultipleInequality() async {
+    Query qry = query(
+      'coll',
+    ).filter(filter('field1', '<', 5)).filter(filter('field2', '<', 5));
+    final int targetId = await _allocateQuery(qry);
+
+    _localStore.indexAutoCreationEnabled = true;
+    _defaultEngine.indexAutoCreationMinCollectionSize = 0;
+    _defaultEngine.relativeIndexReadCostPerDocument = 2;
+
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/a', 10, map(<dynamic>['field1', 1, 'field2', 2])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/b', 10, map(<dynamic>['field1', 8, 'field2', 2])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/c', 10, map(<dynamic>['field1', 'string', 'field2', 2])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(doc('coll/d', 10, map(<dynamic>['field1', 2])), <int>[
+        targetId,
+      ], <int>[]),
+    );
+    await _applyRemoteEvent(
+      addedRemoteEvent(
+        doc('coll/e', 10, map(<dynamic>['field1', 4, 'field2', 4])),
+        <int>[targetId],
+        <int>[],
+      ),
+    );
+
+    // First time qry is running without indexes.
+    // Based on current heuristic, collection document counts (5) > 2 * resultSize (2).
+    // Full matched index will not be created since FieldIndex does not support multiple inequality.
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
+
+    await _backfillIndexes();
+
+    await _executeQuery(qry);
+    _expectRemoteDocumentsReadByEngine(byKey: 0, byQuery: 2);
+    _expectQueryReturned(<String>['coll/a', 'coll/e']);
   }
 }

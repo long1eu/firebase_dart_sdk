@@ -224,7 +224,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
   @override
   Future<ImmutableSortedMap<DocumentKey, Document>>
-      getAllDocumentsMatchingQuery(Query query, IndexOffset offset) async {
+      getAllDocumentsMatchingQuery(Query query, IndexOffset offset,
+          [QueryContext? context]) async {
     hardAssert(!query.isCollectionGroupQuery,
         'CollectionGroup queries should be handled in LocalDocumentsView');
 
@@ -306,6 +307,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     }
 
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, result.length);
+    context?.incrementDocumentReadCount(result.length);
     return ImmutableSortedMap<DocumentKey, Document>.fromMap(
         results, DocumentKey.comparator);
   }

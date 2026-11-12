@@ -25,6 +25,7 @@ const Set<String> _expected = <String>{
   'bundles.dart',
   'snapshot_json.dart',
   'offline_persistence.dart',
+  'cache_indexes.dart',
   'emulator_mock_user_token.dart',
   'lifecycle.dart',
 };

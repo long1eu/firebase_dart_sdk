@@ -42,6 +42,7 @@ export 'src/firebase/firestore/local_cache_settings.dart';
 export 'src/firebase/firestore/max_key.dart';
 export 'src/firebase/firestore/metadata_change.dart';
 export 'src/firebase/firestore/min_key.dart';
+export 'src/firebase/firestore/persistent_cache_index_manager.dart';
 export 'src/firebase/firestore/query.dart';
 export 'src/firebase/firestore/query_document_snapshot.dart';
 export 'src/firebase/firestore/query_snapshot.dart';
