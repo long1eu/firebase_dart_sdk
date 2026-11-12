@@ -133,13 +133,15 @@ class LocalDocumentsView {
       final MaybeDocument? doc = entry.value;
       final Overlay? overlay = overlays[key];
 
-      // Recalculate an overlay if the document's existence state is changed due to a remote event *and* the overlay is
-      // a PatchMutation. This is because document existence state can change if some patch mutation's preconditions are
-      // met.
-      // NOTE: we recalculate when `overlay` is null as well, because there might be a patch mutation whose precondition
-      // does not match before the change (hence overlay==null), but would now match.
-      if (existenceStateChanged.contains(key) &&
-          (overlay == null || overlay.mutation is PatchMutation)) {
+      // Recalculate an overlay if the document's existence state is changed due to a remote event. This is because
+      // document existence state can change if some patch mutation's preconditions are met (also when there is no
+      // overlay yet: a patch whose precondition did not match before the change may match now).
+      //
+      // DEVIATION FROM UPSTREAM (set overlay of a merge): upstream only recalculates when the overlay is missing or a
+      // patch. A merge or update on top of a document without remote version is stored as a set overlay; when the
+      // document then arrives from the backend, that set would hide the remote fields the pending writes do not
+      // touch, so set and delete overlays are recalculated as well.
+      if (existenceStateChanged.contains(key)) {
         recalculateDocuments[key] = doc;
       } else if (overlay != null) {
         final Mutation mutation = overlay.mutation;
@@ -291,6 +293,9 @@ class LocalDocumentsView {
   /// Recalculates overlays by reading the documents from remote document cache first, and saves them after they are
   /// calculated.
   Future<void> recalculateAndSaveOverlays(Set<DocumentKey> documentKeys) async {
+    if (documentKeys.isEmpty) {
+      return;
+    }
     final Map<DocumentKey, MaybeDocument?> docs =
         await remoteDocumentCache.getAll(documentKeys);
     await _recalculateAndSaveOverlays(docs);
@@ -380,42 +385,38 @@ class LocalDocumentsView {
       }
     }
 
-    final Map<DocumentKey, MaybeDocument?> baseDocuments =
-        <DocumentKey, MaybeDocument?>{
-      for (MapEntry<DocumentKey, Document> entry in remoteDocuments)
-        entry.key: entry.value,
-    };
+    if (overlays.isEmpty) {
+      // The remote document cache already matched the documents against the query.
+      return remoteDocuments;
+    }
 
     // As documents might match the query because of their overlay we need to include documents for all overlays in
     // the initial document set. A patch overlay can make a cached document match the query even if the cached version
     // does not (yet), so those are read from the cache; set and delete overlays do not need a base document.
-    final List<DocumentKey> missingPatchBases = <DocumentKey>[];
-    for (Overlay overlay in overlays.values) {
-      if (!baseDocuments.containsKey(overlay.key)) {
-        if (overlay.mutation is PatchMutation) {
-          missingPatchBases.add(overlay.key);
-        } else {
-          baseDocuments[overlay.key] = null;
-        }
-      }
-    }
-    if (missingPatchBases.isNotEmpty) {
-      baseDocuments.addAll(await remoteDocumentCache.getAll(missingPatchBases));
-    }
+    final List<DocumentKey> missingPatchBases = <DocumentKey>[
+      for (Overlay overlay in overlays.values)
+        if (overlay.mutation is PatchMutation &&
+            !remoteDocuments.containsKey(overlay.key))
+          overlay.key,
+    ];
+    final Map<DocumentKey, MaybeDocument?> patchBases =
+        missingPatchBases.isEmpty
+            ? const <DocumentKey, MaybeDocument?>{}
+            : await remoteDocumentCache.getAll(missingPatchBases);
 
-    // Apply the overlays and match against the query.
+    // Apply the overlays and match against the query. Only the documents with an overlay are touched: the others were
+    // matched by the remote document cache.
     final Timestamp now = Timestamp.now();
-    ImmutableSortedMap<DocumentKey, Document> results =
-        DocumentCollections.emptyDocumentMap();
-    for (MapEntry<DocumentKey, MaybeDocument?> entry in baseDocuments.entries) {
-      MaybeDocument? doc = entry.value;
-      final Overlay? overlay = overlays[entry.key];
-      if (overlay != null) {
-        doc = overlay.mutation.applyToLocalView(doc, doc, now);
-      }
-      // Finally, insert the documents that still match the query
+    ImmutableSortedMap<DocumentKey, Document> results = remoteDocuments;
+    for (Overlay overlay in overlays.values) {
+      final DocumentKey key = overlay.key;
+      final MaybeDocument? base = remoteDocuments[key] ?? patchBases[key];
+      final MaybeDocument? doc =
+          overlay.mutation.applyToLocalView(base, base, now);
       if (doc is Document && query.matches(doc)) {
-        results = results.insert(entry.key, doc);
+        results = results.insert(key, doc);
+      } else {
+        results = results.remove(key);
       }
     }
 

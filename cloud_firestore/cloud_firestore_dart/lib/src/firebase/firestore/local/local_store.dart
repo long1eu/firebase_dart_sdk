@@ -348,10 +348,10 @@ class LocalStore implements BundleCallback {
               .applyToLocalViewWithMask(
                   key, overlayed.document, overlayed.mutatedFields);
           // Set mutatedFields to null if the document is only from local mutations, this creates a Set (or Delete)
-          // mutation, instead of trying to create a patch mutation as the overlay. An empty mask means that no
-          // mutation applied (upstream checks MutableDocument.hasLocalMutations for this).
-          final bool hasLocalMutations =
-              mutatedFields == null || mutatedFields.mask.isNotEmpty;
+          // mutation, instead of trying to create a patch mutation as the overlay (unless no mutation applied).
+          final bool hasLocalMutations = mutatedFields == null ||
+              mutatedFields.mask.isNotEmpty ||
+              (document is Document && document.hasLocalMutations);
           final Mutation? overlay = Mutation.calculateOverlayMutation(
               document,
               hasLocalMutations && docsWithoutRemoteVersion.contains(key)

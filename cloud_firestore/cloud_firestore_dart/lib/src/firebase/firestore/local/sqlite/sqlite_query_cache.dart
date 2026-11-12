@@ -326,8 +326,6 @@ class SQLiteQueryCache implements QueryCache {
   @override
   Future<ImmutableSortedSet<DocumentKey>> getMatchingKeysForTargetId(
       int targetId) async {
-    ImmutableSortedSet<DocumentKey> keys = DocumentKey.emptyKeySet;
-
     final List<Map<String, dynamic>> result = await _db.query(
         // @formatter:off
         '''
@@ -338,14 +336,11 @@ class SQLiteQueryCache implements QueryCache {
         // @formatter:on
         <int>[targetId]);
 
-    for (Map<String, dynamic> row in result) {
-      final String path = row['path'];
-      final DocumentKey key =
-          DocumentKey.fromPath(EncodedPath.decodeResourcePath(path));
-      keys = keys.insert(key);
-    }
-
-    return keys;
+    // Build the set in one go: inserting the keys one by one is several times slower for large targets.
+    return ImmutableSortedSet<DocumentKey>(<DocumentKey>[
+      for (Map<String, dynamic> row in result)
+        DocumentKey.fromPath(EncodedPath.decodeResourcePath(row['path'])),
+    ], DocumentKey.comparator);
   }
 
   @override

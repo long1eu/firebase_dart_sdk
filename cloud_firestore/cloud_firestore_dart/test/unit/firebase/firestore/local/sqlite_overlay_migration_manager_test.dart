@@ -237,9 +237,11 @@ void main() {
     expect(await hasPendingOverlayMigration(), isFalse);
   });
 
-  test('testRebuildsStaleOverlaysAfterDowngrade', () async {
-    // An overlay written before a downgrade whose batch was acknowledged by the older SDK must not survive the
-    // re-upgrade (port addition: the migration rebuilds all overlays).
+  test('testDeviationMigrationRebuildsOverlaysFromScratchAfterDowngrade',
+      () async {
+    // DEVIATION FROM UPSTREAM (rebuild from scratch): an overlay written before a downgrade whose batch was
+    // acknowledged by the older SDK must not survive the re-upgrade. Upstream only writes the overlays of documents
+    // that still have mutations and keeps every other row.
     await writeMutations(<Mutation>[
       setMutation('foo/bar', map(<dynamic>['foo', 'bar']))
     ]);

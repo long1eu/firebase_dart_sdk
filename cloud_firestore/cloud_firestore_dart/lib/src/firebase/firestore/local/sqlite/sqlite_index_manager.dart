@@ -424,7 +424,10 @@ class SqliteIndexManager extends IndexManager {
       DocumentKey documentKey, FieldIndex fieldIndex) async {
     final SplayTreeSet<IndexEntry> results = SplayTreeSet<IndexEntry>();
     final List<Map<String, dynamic>> rows = await db.query(
+        // The index of schema migration 14 is named, because SQLite prefers the (covering) primary key otherwise and
+        // then walks all the entries of the index for every document.
         'SELECT array_value, directional_value FROM index_entries '
+        'INDEXED BY index_entries_document_key '
         'WHERE index_id = ? AND document_key = ? AND uid = ?',
         <Object>[fieldIndex.indexId, documentKey.path.canonicalString, _uid]);
     for (final Map<String, dynamic> row in rows) {

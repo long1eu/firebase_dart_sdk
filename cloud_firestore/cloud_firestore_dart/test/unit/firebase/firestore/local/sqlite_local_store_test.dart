@@ -106,8 +106,10 @@ void main() {
   test('testReadsAllDocumentsForCollectionQueries',
       () => testCase.testReadsAllDocumentsForCollectionQueries());
   test('testWritesOverlaysAndRemovesThemOnAck', () => testCase.testWritesOverlaysAndRemovesThemOnAck());
-  test('testRejectRecalculatesOverlays', () => testCase.testRejectRecalculatesOverlays());
-  test('testRemoteDeleteDropsPatchOverlay', () => testCase.testRemoteDeleteDropsPatchOverlay());
+  test('testDeviationRejectRemovesOverlayThatNoLongerApplies', () => testCase.testDeviationRejectRemovesOverlayThatNoLongerApplies());
+  test('testDeviationRemoteDeleteRemovesPatchOverlay', () => testCase.testDeviationRemoteDeleteRemovesPatchOverlay());
+  test('testDeviationEmptyMergeKeepsItsOverlay', () => testCase.testDeviationEmptyMergeKeepsItsOverlay());
+  test('testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives', () => testCase.testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives());
   test('testReadsAllDocumentsForInitialCollectionQueries', () => testCase.testReadsAllDocumentsForInitialCollectionQueries());
   test('testUsesTargetMappingToExecuteQueries', () => testCase.testUsesTargetMappingToExecuteQueries());
   test('testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing', () => testCase.testLastLimboFreeSnapshotIsAdvancedDuringViewProcessing());

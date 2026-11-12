@@ -1728,8 +1728,10 @@ class LocalStoreTestCase {
     expect(await _overlay('foo/remote'), isNull);
   }
 
+  /// DEVIATION FROM UPSTREAM (removeOverlays): recalculating a document whose pending mutations no longer apply
+  /// removes its overlay. Upstream only saves the overlays that exist after a recalculation and keeps the old one.
   @testMethod
-  Future<void> testRejectRecalculatesOverlays() async {
+  Future<void> testDeviationRejectRemovesOverlayThatNoLongerApplies() async {
     await _writeMutation(setMutation('foo/bar', map(<dynamic>['a', 1])));
     await _writeMutation(patchMutation('foo/bar', map(<dynamic>['b', 2])));
     expect((await _overlay('foo/bar'))!.largestBatchId, 2);
@@ -1742,8 +1744,11 @@ class LocalStoreTestCase {
     await _expectNotContains('foo/bar');
   }
 
+  /// DEVIATION FROM UPSTREAM (removeOverlays), see [testDeviationRejectRemovesOverlayThatNoLongerApplies]: without the
+  /// removal the stale patch overlay (which has no precondition) brings the remotely deleted document back on the
+  /// next read.
   @testMethod
-  Future<void> testRemoteDeleteDropsPatchOverlay() async {
+  Future<void> testDeviationRemoteDeleteRemovesPatchOverlay() async {
     final Query query = Query(ResourcePath.fromString('foo'));
     final int targetId = await _allocateQuery(query);
     await _applyRemoteEvent(_addedRemoteEvents(
@@ -1759,6 +1764,72 @@ class LocalStoreTestCase {
     _expectChanged(<MaybeDocument>[deletedDoc('foo/bar', 2)]);
     expect(await _overlay('foo/bar'), isNull);
     await _expectContains(deletedDoc('foo/bar', 2));
+  }
+
+  /// DEVIATION FROM UPSTREAM (empty patch mask): a merge of no fields keeps an overlay, so the document it creates (or
+  /// the pending write state it sets) survives the next read. Upstream calculates no overlay for an empty mask.
+  @testMethod
+  Future<void> testDeviationEmptyMergeKeepsItsOverlay() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    final int targetId = await _allocateQuery(query);
+    await _applyRemoteEvent(updateRemoteEvent(
+        deletedDoc('foo/deleted', 1), <int>[targetId], <int>[]));
+    await _applyRemoteEvent(_addedRemoteEvents(
+        <MaybeDocument>[doc('foo/existing', 1, map(<dynamic>['x', 1]))],
+        <int>[targetId]));
+
+    // set({}, merge: true) on a document that is cached as deleted and on one that exists.
+    await _writeMutation(patchMutation('foo/deleted', map(), <FieldPath>[]));
+    await _writeMutation(patchMutation('foo/existing', map(), <FieldPath>[]));
+
+    final Mutation existingOverlay = (await _overlay('foo/existing'))!.mutation;
+    expect(existingOverlay, isA<PatchMutation>());
+    expect((existingOverlay as PatchMutation).mask.mask, isEmpty);
+    if (!_garbageCollectorIsEager) {
+      // (The eager collector does not keep the deleted document, and a document without remote version gets a set
+      // overlay.)
+      final Mutation deletedOverlay = (await _overlay('foo/deleted'))!.mutation;
+      expect(deletedOverlay, isA<PatchMutation>());
+      expect((deletedOverlay as PatchMutation).mask.mask, isEmpty);
+    }
+    await _expectContains(
+        doc('foo/deleted', 0, map(), DocumentState.localMutations));
+    await _expectContains(doc('foo/existing', 0, map(<dynamic>['x', 1]),
+        DocumentState.localMutations));
+
+    // The overlay is a patch, so the document picks up the remote fields when it appears on the backend.
+    await _applyRemoteEvent(_addedRemoteEvents(
+        <MaybeDocument>[doc('foo/deleted', 2, map(<dynamic>['y', 2]))],
+        <int>[targetId]));
+    await _expectContains(doc('foo/deleted', 0, map(<dynamic>['y', 2]),
+        DocumentState.localMutations));
+  }
+
+  /// DEVIATION FROM UPSTREAM (set overlay of a merge): a merge on a document without remote version is stored as a set
+  /// overlay. When the document arrives from the backend the overlay is recalculated, so the remote fields the merge
+  /// does not touch show up (as when replaying the mutation queue). Upstream keeps applying the set overlay.
+  @testMethod
+  Future<void>
+      testDeviationSetOverlayOfMergeIsRecalculatedWhenDocumentArrives() async {
+    final Query query = Query(ResourcePath.fromString('foo'));
+    final int targetId = await _allocateQuery(query);
+
+    await _writeMutation(patchMutation(
+        'foo/bar', map(<dynamic>['a', 1]), <FieldPath>[field('a')]));
+    expect((await _overlay('foo/bar'))!.mutation, isA<SetMutation>());
+    await _expectContains(doc(
+        'foo/bar', 0, map(<dynamic>['a', 1]), DocumentState.localMutations));
+
+    await _applyRemoteEvent(_addedRemoteEvents(
+        <MaybeDocument>[doc('foo/bar', 1, map(<dynamic>['x', 1]))],
+        <int>[targetId]));
+    _expectChanged(<Document>[
+      doc('foo/bar', 0, map(<dynamic>['a', 1, 'x', 1]),
+          DocumentState.localMutations)
+    ]);
+    await _expectContains(doc('foo/bar', 0, map(<dynamic>['a', 1, 'x', 1]),
+        DocumentState.localMutations));
+    expect((await _overlay('foo/bar'))!.mutation, isA<PatchMutation>());
   }
 
   Future<Overlay?> _overlay(String path) {

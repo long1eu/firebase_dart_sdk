@@ -16,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 13;
+  static const int version = 14;
 
   /// The batch size for data migrations on a large table. This is chosen to balance the memory usage of the rows read
   /// with the number of round trips.
@@ -77,6 +77,8 @@ class SQLiteSchema {
     // Migration 10 corresponds to migrations 9 and 10 of the Android SDK (read time on remote documents for index-free
     // queries, 47def6d / a744cb7 / d8ff6a5).
     if (fromVersion < 10 && toVersion >= 10) {
+      // PORTING NOTE: unlike on Android, the migrations are not guaranteed to run in one transaction (that is up to the
+      // [OpenDatabase] implementation), so a migration that was interrupted half way must be completed here.
       if (!(await _hasReadTime())) {
         await _addReadTime();
       } else {
@@ -110,6 +112,12 @@ class SQLiteSchema {
     // Migration 13 corresponds to migration 16 of the Android SDK (client-side field indexes).
     if (fromVersion < 13 && toVersion >= 13) {
       await _createFieldIndex();
+    }
+
+    // Migration 14 has no counterpart in the Android SDK: two indexes for lookups that scan a whole table otherwise
+    // (found with tool/bench/local_store_bench.dart).
+    if (fromVersion < 14 && toVersion >= 14) {
+      await _createV14LookupIndexes();
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -531,6 +539,18 @@ class SQLiteSchema {
     });
   }
 
+  /// Indexes for two lookups by document that the primary keys do not cover:
+  ///   * `document_mutations` by path, used by the garbage collector for every document it considers (the primary key
+  ///     starts with the uid);
+  ///   * `index_entries` by document key, used by the index backfill to read the existing entries of every document
+  ///     it indexes (the primary key has the index values before the key, which made a backfill quadratic).
+  Future<void> _createV14LookupIndexes() async {
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS document_mutations_path ON document_mutations (path)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS index_entries_document_key ON index_entries (index_id, uid, document_key)');
+  }
+
   Future<void> _createOverlays() async {
     await _ifTablesDontExist(<String>['document_overlays'], () async {
       await db.execute(
@@ -548,11 +568,12 @@ class SQLiteSchema {
           '''
           // @formatter:on
           );
-      await db.execute(
-          'CREATE INDEX batch_id_overlay ON document_overlays (uid, largest_batch_id)');
-      await db.execute(
-          'CREATE INDEX collection_group_overlay ON document_overlays (uid, collection_group)');
     });
+    // Outside of the guard, so that an interrupted migration (table created, indexes not yet) is completed.
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS batch_id_overlay ON document_overlays (uid, largest_batch_id)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS collection_group_overlay ON document_overlays (uid, collection_group)');
   }
 
   Future<void> _createDataMigrationTable() async {
@@ -676,17 +697,20 @@ class SQLiteSchema {
     final bool hasReadTimeNanos =
         await _tableContainsColumn('remote_documents', 'read_time_nanos');
 
-    hardAssert(hasReadTimeSeconds == hasReadTimeNanos,
-        'Table contained just one of read_time_seconds or read_time_nanos');
-
+    // Only one of the columns exists when the migration that adds them was interrupted: it is not complete then.
     return hasReadTimeSeconds && hasReadTimeNanos;
   }
 
   Future<void> _addReadTime() async {
-    await db.execute(
-        'ALTER TABLE remote_documents ADD COLUMN read_time_seconds INTEGER');
-    await db.execute(
-        'ALTER TABLE remote_documents ADD COLUMN read_time_nanos INTEGER');
+    for (final String column in <String>[
+      'read_time_seconds',
+      'read_time_nanos'
+    ]) {
+      if (!(await _tableContainsColumn('remote_documents', column))) {
+        await db.execute(
+            'ALTER TABLE remote_documents ADD COLUMN $column INTEGER');
+      }
+    }
   }
 
   Future<void> _dropLastLimboFreeSnapshotVersion() async {

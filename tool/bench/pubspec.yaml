@@ -5,6 +5,7 @@ environment:
 dependencies:
   cloud_firestore_dart:
     path: ../../cloud_firestore/cloud_firestore_dart
+  sqlite3: ^2.4.0
 # cloud_firestore_dart depends on the hosted firebase_app_dart; use the sibling
 # checkout instead.
 dependency_overrides:

@@ -116,20 +116,20 @@ abstract class Mutation {
     final Mutation mutation = this;
     if (mutation is PatchMutation) {
       // As upstream, a patch keeps its mask also when it creates the document (a merge on a document that the cache
-      // knows as deleted). The overlay then stays a patch: it is recalculated when the backend creates the document,
-      // and only writes the merged fields. A set overlay would hide the other fields of the backend's document.
+      // knows as deleted) and when the mask is empty. The overlay then stays a patch: it is recalculated when the
+      // backend creates the document, and only writes the merged fields. A set overlay would hide the other fields
+      // of the backend's document. (An empty mask is handled in [calculateOverlayMutation].)
       if (previousMask == null) {
         return (result, null);
       }
-      final FieldMask mask = FieldMask(<FieldPath>{
-        ...previousMask.mask,
-        ...mutation.mask.mask,
-        for (FieldTransform transform in fieldTransforms) transform.fieldPath,
-      });
-      // PORTING NOTE: an empty mask means "not mutated locally", but a patch of no fields (a merge of `{}`) still
-      // marks the document as having pending writes, and creates the document when there is none (upstream loses
-      // it); keep that by treating it as a set of the current document.
-      return (result, mask.mask.isEmpty ? null : mask);
+      return (
+        result,
+        FieldMask(<FieldPath>{
+          ...previousMask.mask,
+          ...mutation.mask.mask,
+          for (FieldTransform transform in fieldTransforms) transform.fieldPath,
+        })
+      );
     } else if (mutation is SetMutation || mutation is DeleteMutation) {
       return (result, null);
     } else {
@@ -143,10 +143,17 @@ abstract class Mutation {
   ///
   /// [mask] is the result of [applyToLocalViewWithMask] for all the pending mutations of the document: null if a set
   /// or delete was applied, which creates a set or delete overlay; otherwise a patch overlay with the values of the
-  /// mutated fields. An empty mask means no mutation was applied.
+  /// mutated fields.
+  ///
+  /// DEVIATION FROM UPSTREAM (empty patch mask): upstream returns no overlay whenever the mask is empty. A patch of no
+  /// fields (`set({}, merge: true)`) still creates the document and marks it as having pending writes, so here an
+  /// empty mask only means "no overlay" when the document has no local mutations; otherwise the overlay is a patch
+  /// with an empty mask.
   static Mutation? calculateOverlayMutation(
       MaybeDocument? maybeDoc, FieldMask? mask) {
-    if (mask != null && mask.mask.isEmpty) {
+    if (mask != null &&
+        mask.mask.isEmpty &&
+        !(maybeDoc is Document && maybeDoc.hasLocalMutations)) {
       return null;
     }
     hardAssert(maybeDoc != null,

@@ -24,6 +24,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/delete_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
@@ -333,6 +334,32 @@ void main() {
     _verifyOverlayRoundTrips(
         doc('collection/key', 1, map(<dynamic>['foo', 'foo-value'])),
         <Mutation>[merge]);
+  });
+
+  test('testDeviationPatchWithEmptyMaskKeepsAnOverlay', () {
+    // DEVIATION FROM UPSTREAM (empty patch mask): Mutation.calculateOverlayMutation returns null upstream whenever the
+    // mask is empty, which loses a document created by `set({}, merge: true)` and the pending write state of an
+    // existing one. The port keeps a patch overlay with an empty mask.
+    final Mutation merge =
+        _merge('collection/key', <String, Object?>{}, <String>[]);
+    for (final MaybeDocument base in <MaybeDocument>[
+      deletedDoc('collection/key', 1),
+      doc('collection/key', 1, map(<dynamic>['foo', 'foo-value'])),
+    ]) {
+      final (MaybeDocument? local, FieldMask? mask) = merge
+          .applyToLocalViewWithMask(base, base, FieldMask.empty, Timestamp.now());
+      expect(mask, FieldMask.empty);
+      final Mutation? overlay = Mutation.calculateOverlayMutation(local, mask);
+      expect(overlay, isA<PatchMutation>());
+      expect((overlay! as PatchMutation).mask.mask, isEmpty);
+      expect(overlay.precondition, Precondition.none);
+    }
+    // No mutation applied: no overlay.
+    expect(
+        Mutation.calculateOverlayMutation(
+            doc('collection/key', 1, map(<dynamic>['foo', 1])), FieldMask.empty),
+        isNull);
+    expect(Mutation.calculateOverlayMutation(null, FieldMask.empty), isNull);
   });
 
   test('testOverlayKeepsPendingServerTimestamps', () {
