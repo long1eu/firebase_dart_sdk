@@ -43,6 +43,12 @@ class FirestoreMultiDbComponent {
     });
   }
 
+  /// Whether an instance for [appName] and [database] exists or is being created.
+  static bool hasInstance(String appName, String database) {
+    final String key = keyFor(appName, database);
+    return instances.containsKey(key) || _pending.containsKey(key);
+  }
+
   /// Forgets [firestore] (called when it is shut down), so the next
   /// `getInstance` builds a fresh one.
   static void deregister(Firestore firestore) {

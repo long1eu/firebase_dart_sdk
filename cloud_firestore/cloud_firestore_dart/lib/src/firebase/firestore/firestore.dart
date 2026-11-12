@@ -357,11 +357,10 @@ class Firestore {
   Future<void> shutdown() async {
     // The client must be initialized to ensure that all subsequent API usage
     // throws an exception.
-    try {
-      await client.shutdown();
-    } finally {
-      FirestoreMultiDbComponent.deregister(this);
-    }
+    // Forget the instance first (as Android and JS do), so that a caller that asks for an instance while this one
+    // shuts down gets a new one rather than this one.
+    FirestoreMultiDbComponent.deregister(this);
+    await client.shutdown();
   }
 
   /// Clears the persistent storage of this instance: the local SQLite database
@@ -380,7 +379,20 @@ class Firestore {
   /// otherwise make cached data unrecoverable. For applications that are
   /// sensitive to the disclosure of cached data in between user sessions, we
   /// strongly recommend not enabling persistence at all.
-  Future<void> clearPersistence() => client.clearPersistence();
+  Future<void> clearPersistence() async {
+    final FirebaseApp? app = firebaseApp;
+    if (client.isTerminated &&
+        app != null &&
+        FirestoreMultiDbComponent.hasInstance(app.name, databaseName)) {
+      // This instance was terminated and a newer one has the same cache open: deleting the files under it would
+      // detach it from its cache without any error.
+      throw FirestoreError(
+        'Persistence cannot be cleared while another firestore instance of the same app and database is running.',
+        FirestoreErrorCode.failedPrecondition,
+      );
+    }
+    await client.clearPersistence();
+  }
 
   /// Re-enables network usage for this instance after a prior call to [disableNetwork].
   ///

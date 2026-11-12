@@ -439,6 +439,7 @@ class DocumentSnapshot<T extends dynamic> {
           _firestore == other._firestore &&
           _key == other._key &&
           metadata == other.metadata &&
+          _converter == other._converter &&
           // Only the data is compared, not the internal state of the document
           // (version, local mutations).
           document?.data == other.document?.data &&

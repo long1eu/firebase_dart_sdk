@@ -100,6 +100,10 @@ only. **Nothing was run against production Firestore.**
 - `Firestore.clearPersistence()`: deletes the local SQLite database (and its `-journal`, `-wal`,
   `-shm` files) of a terminated instance; fails with `failedPrecondition` while the instance runs, a
   no-op for memory persistence.
+  It fails with `failedPrecondition` while a newer instance of the same app and database is running.
+- `Firestore.instanceFor` no longer returns an instance whose `terminate()` is still in progress; a
+  `QueryDocumentSnapshot` returns a null produced by a converter of a nullable type; `DocumentSnapshot`
+  equality takes the converter into account.
 - `Firestore.setLogLevel(LogLevel)` with `debug`, `error` and `silent` (as the JS SDK);
   `setLoggingEnabled` still works.
 - `FirestoreSettings.withEmulator(host, port, mockUserToken: ...)` (and the `mockUserToken`

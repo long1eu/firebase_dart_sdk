@@ -8,7 +8,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_conve
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/server_timestamp_behavior.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:meta/meta.dart';
 
 /// A [QueryDocumentSnapshot] contains data read from a document in your Firestore database as part
@@ -57,10 +56,8 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
   /// Returns the fields of the document as a Map.
   @override
   T get data {
-    final T? result = super.data;
-    hardAssert(
-        result != null, 'Data in a QueryDocumentSnapshot should be non-null');
-    return result!;
+    // The document always exists here; a null can only be what a converter of a nullable [T] returned.
+    return super.data as T;
   }
 
   /// Returns the fields of the document as a Map. Field values will be converted to their native
@@ -72,9 +69,6 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
   /// Returns the fields of the document as a Map or null if the document doesn't exist.
   @override
   T getData(ServerTimestampBehavior serverTimestampBehavior) {
-    final T? result = super.getData(serverTimestampBehavior);
-    hardAssert(
-        result != null, 'Data in a QueryDocumentSnapshot should be non-null');
-    return result!;
+    return super.getData(serverTimestampBehavior) as T;
   }
 }
