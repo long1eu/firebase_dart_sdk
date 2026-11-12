@@ -6,8 +6,8 @@
 class GeoPoint implements Comparable<GeoPoint> {
   /// Construct a new GeoPoint using the provided latitude and longitude values.
   ///
-  /// The [latitude] of this GeoPoint in the range [-90, 90] and the [longitude] of this GeoPoint in
-  /// the range [-180, 180].
+  /// The [latitude] of this GeoPoint in the range -90 to 90 and the [longitude] of this GeoPoint in
+  /// the range -180 to 180.
   // NaN is detected with `x != x`, because `identical(x, double.nan)` never
   // matches a computed NaN (and `isNaN` is not usable in constant expressions).
   const GeoPoint(this.latitude, this.longitude)
@@ -48,7 +48,10 @@ class GeoPoint implements Comparable<GeoPoint> {
   /// The value of the `type` field written by [toJson].
   static const String jsonType = 'firestore/geoPoint/1.0';
 
+  /// The latitude, in degrees, between -90 and 90 inclusive.
   final double latitude;
+
+  /// The longitude, in degrees, between -180 and 180 inclusive.
   final double longitude;
 
   /// A JSON-serializable representation of this GeoPoint, in the same shape as

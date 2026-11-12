@@ -21,6 +21,7 @@ import 'package:meta/meta.dart';
 /// Vector queries are always served by the backend, so a snapshot is never
 /// from the cache and never has pending writes.
 class VectorQuerySnapshot extends Iterable<QueryDocumentSnapshot> {
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   VectorQuerySnapshot(this.query, List<QueryDocumentSnapshot> docs)
       : docs = List<QueryDocumentSnapshot>.unmodifiable(docs);

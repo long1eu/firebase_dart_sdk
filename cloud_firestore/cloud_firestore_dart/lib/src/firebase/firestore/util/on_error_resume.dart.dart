@@ -71,6 +71,8 @@ class OnErrorResumeStreamTransformer<T> extends StreamTransformerBase<T, T> {
             inputSubscription?.resume();
             recoverySubscription?.resume();
           },
+          // The returned future is awaited by `cancel()`.
+          // ignore: void_checks
           onCancel: () {
             return Future.wait<void>(<Future<void>>[
               if (inputSubscription != null) inputSubscription!.cancel(),

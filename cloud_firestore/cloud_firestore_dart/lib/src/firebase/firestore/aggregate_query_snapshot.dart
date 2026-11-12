@@ -20,6 +20,7 @@ import 'package:meta/meta.dart';
 
 /// The results of executing an [AggregateQuery].
 class AggregateQuerySnapshot {
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   AggregateQuerySnapshot(this.query, Map<String, FieldValue> data)
       : _data = Map<String, FieldValue>.unmodifiable(data);

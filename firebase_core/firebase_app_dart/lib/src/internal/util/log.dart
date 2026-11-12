@@ -3,6 +3,7 @@
 // on 16/09/2018
 
 // ignore: avoid_classes_with_only_static_members
+/// Minimal leveled logger that prints to stdout.
 class Log {
   /// Whether [d] currently prints. Use it to avoid building expensive messages.
   static bool get isDebugEnabled => level <= InternalLogLevel.d;
@@ -26,24 +27,28 @@ class Log {
     return '${message.substring(0, maxMessageLength)}... <message truncated>';
   }
 
+  /// Logs [message] at info level.
   static void i(String tag, dynamic message) {
     if (level <= InternalLogLevel.i) {
       print('${_formatTag('I:$tag')}||${truncate('$message')}');
     }
   }
 
+  /// Logs [message] at debug level.
   static void d(String tag, dynamic message) {
     if (level <= InternalLogLevel.d) {
       print('${_formatTag('D:$tag')}||${truncate('$message')}');
     }
   }
 
+  /// Logs [message] at warning level.
   static void w(String tag, dynamic message) {
     if (level <= InternalLogLevel.w) {
       print('${_formatTag('W:$tag')}||${truncate('$message')}');
     }
   }
 
+  /// Logs [message] at error level.
   static void e(String tag, dynamic message) {
     if (level <= InternalLogLevel.e) {
       print('${_formatTag('E:$tag')}||${truncate('$message')}');
@@ -53,14 +58,22 @@ class Log {
   static String _formatTag(String tag) => tag.padRight(30, ' ');
 }
 
+/// The severity of a log message, ordered from [i] (lowest) to [e].
 class InternalLogLevel implements Comparable<InternalLogLevel> {
   const InternalLogLevel._(this._i);
 
   final int _i;
 
+  /// Info.
   static const InternalLogLevel i = InternalLogLevel._(0);
+
+  /// Debug.
   static const InternalLogLevel d = InternalLogLevel._(1);
+
+  /// Warning.
   static const InternalLogLevel w = InternalLogLevel._(2);
+
+  /// Error.
   static const InternalLogLevel e = InternalLogLevel._(3);
 
   /// Above every message level: nothing is printed.
@@ -69,14 +82,18 @@ class InternalLogLevel implements Comparable<InternalLogLevel> {
   @override
   int compareTo(InternalLogLevel other) => _i.compareTo(other._i);
 
+  /// Whether this level is at most as severe as [other].
   bool operator <=(InternalLogLevel other) => _i <= other._i;
 
+  /// Whether this level is at least as severe as [other].
   bool operator >=(InternalLogLevel other) => _i >= other._i;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is InternalLogLevel && runtimeType == other.runtimeType && _i == other._i;
+      other is InternalLogLevel &&
+          runtimeType == other.runtimeType &&
+          _i == other._i;
 
   @override
   int get hashCode => _i.hashCode * 31;

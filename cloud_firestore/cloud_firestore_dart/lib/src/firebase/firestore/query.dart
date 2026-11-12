@@ -46,7 +46,13 @@ import 'package:firebase_app_dart/internal.dart';
 import 'package:meta/meta.dart';
 
 /// An enum for the direction of a sort.
-enum Direction { ascending, descending }
+enum Direction {
+  /// Smallest values first.
+  ascending,
+
+  /// Largest values first.
+  descending,
+}
 
 /// A [Query] which you can read or listen to. You can also construct refined [Query] objects by adding filters and
 /// ordering.
@@ -54,6 +60,8 @@ enum Direction { ascending, descending }
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
 class Query<T extends dynamic> {
+  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.collection] or
+  /// [Firestore.collectionGroup].
   @internal
   const Query(this.query, this.firestore, [this.converter]);
 
@@ -75,8 +83,10 @@ class Query<T extends dynamic> {
     return Query<Map<String, Object?>>(query, firestore);
   }
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final core.Query query;
+  /// The [Firestore] instance this query belongs to.
   final Firestore firestore;
 
   /// Creates and returns a new Query with the additional filter that documents must contain the specified field and the

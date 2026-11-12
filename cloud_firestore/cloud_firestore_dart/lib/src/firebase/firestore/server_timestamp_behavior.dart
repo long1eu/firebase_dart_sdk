@@ -5,16 +5,16 @@
 
 /// Controls the return value for server timestamps that have not yet been set to their final value.
 enum ServerTimestampBehavior {
-  /// Return 'null' for [FieldValue.serverTimestampServerTimestamps] that have not yet been set to
+  /// Return 'null' for [FieldValue.serverTimestamp] values that have not yet been set to
   /// their final value.
   none,
 
-  /// Return local estimates for [FieldValue.serverTimestampServerTimestamps] that have not yet been
+  /// Return local estimates for [FieldValue.serverTimestamp] values that have not yet been
   /// set to their final value. This estimate will likely differ from the final value and may cause
   /// these pending values to change once the server result becomes available.
   estimate,
 
-  /// Return the previous value for [FieldValue.serverTimestampServerTimestamps] that have not yet
+  /// Return the previous value for [FieldValue.serverTimestamp] values that have not yet
   /// been set to their final value.
   previous,
 }

@@ -19,6 +19,7 @@ import 'dart:async';
 /// Like the Android SDK, a failed request still carries a (placeholder) [token]
 /// together with the [error]; the backend rejects the placeholder.
 class AppCheckTokenResult {
+  /// Creates a result with a [token] and, for a failed request, the [error].
   const AppCheckTokenResult(this.token, {this.error});
 
   /// The App Check token. May be empty when [error] is set.

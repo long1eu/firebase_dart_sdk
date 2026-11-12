@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-part of memory_persistence;
+part of 'memory_persistence.dart';
 
 /// In-memory cache of remote documents.
 class MemoryRemoteDocumentCache implements RemoteDocumentCache {

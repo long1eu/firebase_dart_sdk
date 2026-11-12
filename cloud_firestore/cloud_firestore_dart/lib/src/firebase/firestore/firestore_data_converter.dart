@@ -20,6 +20,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 /// example how pending server timestamps are returned. Passed to
 /// [FirestoreDataConverter.fromFirestore].
 class SnapshotOptions {
+  /// Creates the options; by default pending server timestamps are read as `null`.
   const SnapshotOptions({this.serverTimestamps = ServerTimestampBehavior.none});
 
   /// How a server timestamp that has not been resolved yet is returned.
@@ -41,6 +42,7 @@ class SnapshotOptions {
 /// );
 /// ```
 abstract class FirestoreDataConverter<T> {
+  /// Const constructor for subclasses.
   const FirestoreDataConverter();
 
   /// Creates a converter from two functions. The returned converters compare

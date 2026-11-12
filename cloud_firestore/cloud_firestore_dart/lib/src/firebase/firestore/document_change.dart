@@ -14,6 +14,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:meta/meta.dart';
 
+/// The kind of change a [DocumentChange] describes.
 enum DocumentChangeType {
   /// Indicates a new document was added to the set of documents matching the query.
   added,
@@ -33,6 +34,7 @@ enum DocumentChangeType {
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class DocumentChange<T extends dynamic> {
+  /// Implementation detail of the SDK; not part of the supported API.
   @visibleForTesting
   @internal
   DocumentChange(this.document, this.type, this.oldIndex, this.newIndex);

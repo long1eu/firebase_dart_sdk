@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-part of field_value;
+part of 'field_value.dart';
 
 /// A wrapper for float/double values in Firestore.
 class DoubleValue extends NumberValue {

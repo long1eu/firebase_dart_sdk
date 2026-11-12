@@ -10,6 +10,7 @@ import 'package:rxdart/rxdart.dart';
 /// This class should provide services that Firebase depends on and are platform
 /// specific.
 class PlatformDependencies extends LocalStorage {
+  /// Creates the default dependencies: an in-memory [LocalStorage] and no connectivity monitoring.
   PlatformDependencies();
 
   final Map<String, String> _map = <String, String>{};

@@ -9,7 +9,11 @@ import 'dart:typed_data';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:collection/collection.dart';
 
+/// An immutable sequence of bytes, the value of a `bytes` field in a document.
+///
+/// Two blobs are equal when their bytes are equal, and blobs are ordered byte by byte.
 class Blob implements Comparable<Blob> {
+  /// Creates a blob holding a copy of [bytes].
   Blob(Uint8List bytes) : bytes = Uint8List.fromList(bytes);
 
   /// Creates a blob from a base64-encoded string.
@@ -39,6 +43,7 @@ class Blob implements Comparable<Blob> {
   /// The value of the `type` field written by [toJson].
   static const String jsonType = 'firestore/bytes/1.0';
 
+  /// The bytes of this blob.
   final Uint8List bytes;
 
   /// The bytes of this blob, base64-encoded.

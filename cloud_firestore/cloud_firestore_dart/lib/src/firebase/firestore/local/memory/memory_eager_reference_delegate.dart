@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-part of memory_persistence;
+part of 'memory_persistence.dart';
 
 /// Provides eager garbage collection for [MemoryPersistence].
 class MemoryEagerReferenceDelegate implements ReferenceDelegate {

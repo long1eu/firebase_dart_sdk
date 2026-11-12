@@ -11,9 +11,13 @@ import 'package:meta/meta.dart';
 /// (referring to a top level field in the document), or a list of field names (referring to a
 /// nested field in the document).
 class FieldPath {
+  /// Implementation detail of the SDK; not part of the supported API. Use [FieldPath.of] or
+  /// [FieldPath.fromDotSeparatedPath].
   @internal
   const FieldPath(this.internalPath);
 
+  /// Creates a field path from [segments], one field name per nesting level. Unlike [FieldPath.of]
+  /// it does not validate the names.
   factory FieldPath.fromSegments(List<String> segments) {
     return FieldPath(model.FieldPath.fromSegments(segments));
   }
@@ -54,9 +58,11 @@ class FieldPath {
   @internal
   static final RegExp reserved = RegExp('[~*/\\[\\]]');
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final model.FieldPath internalPath;
 
+  /// Implementation detail of the SDK; not part of the supported API. Use [documentIdField].
   @internal
   static final FieldPath documentIdInstance =
       FieldPath(model.FieldPath.keyPath);

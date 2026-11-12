@@ -15,6 +15,10 @@ import 'package:meta/meta.dart';
 ///
 /// see [The reference timestamp definition](https://github.com/google/protobuf/blob/master/src/google/protobuf/timestamp.proto)
 class Timestamp implements Comparable<Timestamp> {
+  /// Creates a timestamp from [seconds] since the Unix epoch (UTC) and a non-negative [nanoseconds]
+  /// fraction below one second.
+  ///
+  /// The value must lie between 0001-01-01T00:00:00Z and 9999-12-31T23:59:59.999999999Z.
   const Timestamp(this.seconds, this.nanoseconds)
       : assert(nanoseconds >= 0,
             'Timestamp nanoseconds out of range: $nanoseconds'),
@@ -84,7 +88,11 @@ class Timestamp implements Comparable<Timestamp> {
     return Timestamp.fromMillis(DateTime.now().millisecondsSinceEpoch);
   }
 
+  /// Seconds of UTC time since the Unix epoch, 1970-01-01T00:00:00Z.
   final int seconds;
+
+  /// The fraction of a second, in nanoseconds, from 0 to 999,999,999. Always counted forward in
+  /// time, also for timestamps before the epoch.
   final int nanoseconds;
 
   /// The value of the `type` field written by [toJson].
@@ -124,6 +132,7 @@ class Timestamp implements Comparable<Timestamp> {
     }
   }
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   static void validateRange(int seconds, int nanoseconds) {
     Preconditions.checkArgument(

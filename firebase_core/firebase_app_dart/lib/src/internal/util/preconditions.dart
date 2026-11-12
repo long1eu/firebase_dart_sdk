@@ -2,13 +2,16 @@
 // Lung Razvan <long1eu>
 // on 16/09/2018
 
+/// Argument and state checks that throw when they fail.
 class Preconditions {
+  /// Throws a [StateError] with [message] unless [condition] holds.
   static void checkState(bool condition, Object? message) {
     if (!condition) {
       throw StateError('$message');
     }
   }
 
+  /// Returns [object], or throws an [ArgumentError] if it is `null`.
   static T checkNotNull<T>(T? object, [String? message]) {
     if (object == null) {
       throw ArgumentError('$message ${T.toString()}');
@@ -17,6 +20,7 @@ class Preconditions {
     }
   }
 
+  /// Returns [value], or throws an [ArgumentError] with [message] if it is `null` or empty.
   static String checkNotEmpty(String? value, String message) {
     if (value == null || value.isEmpty) {
       throw ArgumentError(message);

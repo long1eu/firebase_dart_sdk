@@ -38,6 +38,7 @@ class QueryDocumentSnapshot<T extends dynamic> extends DocumentSnapshot<T> {
           converter: converter,
         );
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   factory QueryDocumentSnapshot.fromDocument(
     Firestore firestore,

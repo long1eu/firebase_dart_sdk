@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-part of sqlite_persistence;
+part of 'sqlite_persistence.dart';
 
 /// A mutation queue for a specific user, backed by SQLite.
 class SQLiteMutationQueue implements MutationQueue {

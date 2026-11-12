@@ -33,6 +33,7 @@ typedef BatchCallback = Future<void> Function(WriteBatch);
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class WriteBatch {
+  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.batch].
   @internal
   WriteBatch(this._firestore);
 

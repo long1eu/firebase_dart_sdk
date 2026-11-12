@@ -10,6 +10,7 @@ import 'util/to_string_helper.dart';
 
 /// Result object that contains a Firebase Auth ID Token.
 class GetTokenResult {
+  /// Creates a result from the JWT [token], reading the claims from its payload.
   factory GetTokenResult(String token) {
     final Map<String, dynamic> claims = _parseJwt(token);
     return GetTokenResult._(token, claims);

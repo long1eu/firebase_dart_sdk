@@ -135,6 +135,11 @@ only. **Nothing was run against production Firestore.**
   emulator integration suite. Protos resynced with current googleapis
   (`tool/gen_protos.sh`).
 
+### Documentation
+
+- Every exported class and member has a doc comment (members marked `@internal` say so), the
+  library has an overview, and `dart doc` runs without warnings.
+
 ### Not done
 
 BSON value types, index-free queries / overlays / index engine, persistence clearing (API to be

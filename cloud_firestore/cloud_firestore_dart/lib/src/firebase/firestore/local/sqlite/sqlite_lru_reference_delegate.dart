@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-part of sqlite_persistence;
+part of 'sqlite_persistence.dart';
 
 class SQLiteLruReferenceDelegate implements ReferenceDelegate, LruDelegate {
   SQLiteLruReferenceDelegate(this.persistence, LruGarbageCollectorParams params)

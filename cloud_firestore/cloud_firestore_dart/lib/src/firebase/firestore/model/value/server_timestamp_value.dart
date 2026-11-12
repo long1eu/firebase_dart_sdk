@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-part of field_value;
+part of 'field_value.dart';
 
 /// Represents a locally-applied Server Timestamp.
 ///

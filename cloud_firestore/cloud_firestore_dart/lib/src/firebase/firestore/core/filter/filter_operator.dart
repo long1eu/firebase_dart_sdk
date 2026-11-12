@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 16/03/2020
 
-part of filter;
+part of 'filter.dart';
 
 class FilterOperator {
   const FilterOperator._(this._value);

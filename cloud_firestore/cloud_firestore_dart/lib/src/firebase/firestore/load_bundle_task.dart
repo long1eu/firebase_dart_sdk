@@ -27,6 +27,7 @@ typedef OnProgressListener = void Function(LoadBundleTaskProgress snapshot);
 /// PORTING NOTE: the Android class extends `Task<LoadBundleTaskProgress>`. Here the task completion is exposed as
 /// [future] and the progress updates as [stream] / [addOnProgressListener].
 class LoadBundleTask {
+  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.loadBundle].
   @internal
   LoadBundleTask() {
     // Failures are reported to every consumer of [future]. Do not turn a failure nobody asked about into an

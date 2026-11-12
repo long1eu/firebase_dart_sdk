@@ -22,6 +22,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart
 /// PORTING NOTE: the Android `executor` and `activity` options have no
 /// equivalent here, a listener is a Dart [Stream].
 class SnapshotListenOptions {
+  /// Creates the options. By default metadata-only changes are excluded and the listener uses both
+  /// the cache and the server.
   const SnapshotListenOptions({
     this.metadataChanges = MetadataChanges.exclude,
     this.source = ListenSource.defaultSource,

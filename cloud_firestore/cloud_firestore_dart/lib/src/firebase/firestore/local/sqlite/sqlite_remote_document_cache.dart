@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-part of sqlite_persistence;
+part of 'sqlite_persistence.dart';
 
 class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   SQLiteRemoteDocumentCache(this.db, this.serializer, this._statsCollector);

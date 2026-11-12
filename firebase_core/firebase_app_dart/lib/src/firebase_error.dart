@@ -2,11 +2,15 @@
 // Lung Razvan <long1eu>
 // on 16/09/2018
 
+/// The base class of the errors thrown by the Firebase SDKs of this repository.
 class FirebaseError implements Error {
+  /// Creates an error with a [message] and, optionally, the stack trace of its origin.
   const FirebaseError(this.message, [this.stackTrace]);
 
+  /// A description of what went wrong.
   final String message;
 
+  /// The stack trace captured where the error originated, if any.
   @override
   final StackTrace? stackTrace;
 
@@ -17,10 +21,13 @@ class FirebaseError implements Error {
 /// Internal use only, indicates that no signed-in user and operations like
 /// [InternalTokenProvider.getAccessToken] will fail.
 class FirebaseNoSignedInUserError extends FirebaseError {
+  /// Creates the error with a [message].
   FirebaseNoSignedInUserError(String message) : super(message);
 }
 
+/// Thrown when a Firebase service or feature that an operation needs is not available.
 class FirebaseApiNotAvailableError extends FirebaseError {
+  /// Creates the error with a [message].
   const FirebaseApiNotAvailableError(String message) : super(message);
 }
 
@@ -28,6 +35,7 @@ class FirebaseApiNotAvailableError extends FirebaseError {
 /// network error. Inspect the device's network connectivity state or retry
 /// later to resolve.
 class FirebaseNetworkError extends FirebaseError {
+  /// Creates the error with a [message].
   const FirebaseNetworkError(String message) : super(message);
 }
 
@@ -35,14 +43,17 @@ class FirebaseNetworkError extends FirebaseError {
 /// to having received too many consecutive requests from the same device. Retry
 /// the request later to resolve.
 class FirebaseTooManyRequestsError extends FirebaseError {
+  /// Creates the error with a [message].
   const FirebaseTooManyRequestsError(String message) : super(message);
 }
 
 /// Represents API errors. This is for internal usage only and we don't expose
 /// externally.
 class FirebaseApiError {
+  /// Creates an error with the given numeric code.
   const FirebaseApiError(this.errorCode);
 
+  /// The numeric code of this error.
   final int errorCode;
 
   /// Firebase auth specific error codes.
@@ -50,6 +61,7 @@ class FirebaseApiError {
   static const FirebaseApiError errorInvalidCustomToken =
       FirebaseApiError(17000);
 
+  /// The custom token belongs to a different project.
   static const FirebaseApiError errorCustomTokenMismatch =
       FirebaseApiError(17002);
 
@@ -57,20 +69,25 @@ class FirebaseApiError {
   static const FirebaseApiError errorInvalidCredential =
       FirebaseApiError(17004);
 
+  /// The user account has been disabled.
   static const FirebaseApiError errorUserDisabled = FirebaseApiError(17005);
 
   /// set account info error codes.
   static const FirebaseApiError errorOperationNotAllowed =
       FirebaseApiError(17006);
 
+  /// The email address is already used by another account.
   static const FirebaseApiError errorEmailAlreadyInUse =
       FirebaseApiError(17007);
 
   /* sign in with password error codes*/
+  /// The email address is malformed.
   static const FirebaseApiError errorInvalidEmail = FirebaseApiError(17008);
 
+  /// The password is wrong.
   static const FirebaseApiError errorWrongPassword = FirebaseApiError(17009);
 
+  /// Too many requests were made; try again later.
   static const FirebaseApiError errorTooManyRequests = FirebaseApiError(17010);
 
   /// send password request email error codes

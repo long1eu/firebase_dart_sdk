@@ -34,6 +34,7 @@ import 'package:meta/meta.dart';
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
 class DocumentSnapshot<T extends dynamic> {
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   DocumentSnapshot(
     this._firestore,
@@ -45,6 +46,7 @@ class DocumentSnapshot<T extends dynamic> {
   })  : _converter = converter,
         metadata = SnapshotMetadata(hasPendingWrites, isFromCache);
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   factory DocumentSnapshot.fromDocument(
     Firestore firestore,
@@ -59,6 +61,7 @@ class DocumentSnapshot<T extends dynamic> {
         converter: converter);
   }
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   factory DocumentSnapshot.fromNoDocument(
     Firestore firestore,
@@ -182,6 +185,7 @@ class DocumentSnapshot<T extends dynamic> {
     return document?.getField(fieldPath.internalPath) != null;
   }
 
+  /// The value of [field], or `null` if the field or the document does not exist. Same as [get].
   Object? operator [](String field) => get(field);
 
   /// Returns the value at the field or null if the field doesn't exist.
@@ -334,23 +338,23 @@ class DocumentSnapshot<T extends dynamic> {
   DocumentReference<T> get ref =>
       DocumentReference<T>(_key, _firestore, _converter);
 
-  T? _getTypedValue<T>(String field) {
+  V? _getTypedValue<V>(String field) {
     checkNotNull(field, 'Provided field must not be null.');
     final Object? value = get(field, ServerTimestampBehavior.none);
-    return _castTypedValue<T>(value, field);
+    return _castTypedValue<V>(value, field);
   }
 
-  T? _castTypedValue<T>(Object? value, String field) {
+  V? _castTypedValue<V>(Object? value, String field) {
     if (value == null) {
       return null;
     }
 
     try {
-      final T result = value as T;
+      final V result = value as V;
       return result;
     } on TypeError catch (_) {
       throw StateError(
-          'Field \'$field\' is not a $T, but it is ${value.runtimeType}');
+          'Field \'$field\' is not a $V, but it is ${value.runtimeType}');
     }
   }
 

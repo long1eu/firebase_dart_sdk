@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 16/03/2020
 
-part of filter;
+part of 'filter.dart';
 
 /// A Filter that implements the array-contains-any operator.
 class ArrayContainsAnyFilter extends FieldFilter {

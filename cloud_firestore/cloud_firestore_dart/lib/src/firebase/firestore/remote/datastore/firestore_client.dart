@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 02/12/2019
 
-part of datastore;
+part of 'datastore.dart';
 
 /// Helper class that wraps the gRPC calls and invalidates the auth token when [StatusCode.unauthenticated] is received
 /// for both the [Future]s and the [Stream]s.

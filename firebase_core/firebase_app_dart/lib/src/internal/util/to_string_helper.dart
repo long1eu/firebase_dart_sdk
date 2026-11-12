@@ -4,14 +4,19 @@
 
 int _indentingBuiltValueToStringHelperIndent = 0;
 
+/// Builds indented `toString` output of the form `Name { field=value, }`.
 class ToStringHelper {
+  /// Starts the description of an instance of [className].
   ToStringHelper(Type className) {
-    _result..write(className.toString())..write(' {\n');
+    _result
+      ..write(className.toString())
+      ..write(' {\n');
     _indentingBuiltValueToStringHelperIndent += 2;
   }
 
   final StringBuffer _result = StringBuffer();
 
+  /// Adds a `field=value` line; `null` values are left out.
   void add(String field, Object? value) {
     if (value != null) {
       _result
@@ -26,7 +31,9 @@ class ToStringHelper {
   @override
   String toString() {
     _indentingBuiltValueToStringHelperIndent -= 2;
-    _result..write(' ' * _indentingBuiltValueToStringHelperIndent)..write('}');
+    _result
+      ..write(' ' * _indentingBuiltValueToStringHelperIndent)
+      ..write('}');
     final String stringResult = _result.toString();
     return stringResult;
   }

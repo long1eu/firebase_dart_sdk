@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-part of sqlite_persistence;
+part of 'sqlite_persistence.dart';
 
 /// Migrates schemas from version 0 (empty) to whatever the current version is.
 ///

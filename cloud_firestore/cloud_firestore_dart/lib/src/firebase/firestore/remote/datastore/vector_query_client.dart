@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-part of datastore;
+part of 'datastore.dart';
 
 /// Runs vector (nearest-neighbour) queries (`RunQuery` with `find_nearest`).
 extension DatastoreVectorQuery on Datastore {

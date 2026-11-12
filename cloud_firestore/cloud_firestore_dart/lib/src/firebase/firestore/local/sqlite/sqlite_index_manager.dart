@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 15/03/2020
 
-part of sqlite_persistence;
+part of 'sqlite_persistence.dart';
 
 /// An in-memory implementation of IndexManager.
 class SqliteIndexManager extends IndexManager {

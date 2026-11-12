@@ -22,13 +22,19 @@ import 'package:meta/meta.dart';
 ///
 /// PORTING NOTE: nested in `LoadBundleTaskProgress` as `TaskState` in the Android SDK.
 enum LoadBundleTaskState {
+  /// Loading failed; see [LoadBundleTaskProgress.exception].
   error,
+
+  /// The bundle is still being loaded.
   running,
+
+  /// The whole bundle was loaded.
   success,
 }
 
 /// Represents a progress update or a final state from loading bundles.
 class LoadBundleTaskProgress {
+  /// Creates a progress value. Instances are normally produced by a [LoadBundleTask].
   const LoadBundleTaskProgress(
     this.documentsLoaded,
     this.totalDocuments,

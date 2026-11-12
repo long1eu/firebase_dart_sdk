@@ -55,7 +55,10 @@ class FirestoreSettings {
                 cacheSizeBytes >= _minimumCacheBytes,
             'Cache size must be set to at least $_minimumCacheBytes bytes');
 
+  /// The host of the production Firestore service.
   static const String defaultHost = 'firestore.googleapis.com';
+
+  /// The port of the production Firestore service.
   static const int defaultPort = 443;
 
   /// Constant to use with [cacheSizeBytes] to disable garbage collection.
@@ -64,6 +67,8 @@ class FirestoreSettings {
   /// The minimum cache size, 1 MB.
   static const int minimumCacheBytes = 1 * 1024 * 1024;
   static const int _minimumCacheBytes = minimumCacheBytes;
+
+  /// The cache size threshold used when none is configured (100 MB).
   static const int defaultCacheSizeBytes = 100 * 1024 * 1024; // 100 MB
 
   /// The host of the Firestore backend.
@@ -199,6 +204,7 @@ class FirestoreSettings {
         mockUserToken: mockUserToken);
   }
 
+  /// A copy of these settings with the given values replaced.
   FirestoreSettings copyWith({
     String? host,
     int? port,

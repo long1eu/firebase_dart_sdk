@@ -23,6 +23,8 @@ import 'package:meta/meta.dart';
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class CollectionReference<T extends dynamic> extends Query<T> {
+  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.collection] or
+  /// [DocumentReference.collection].
   @internal
   CollectionReference(ResourcePath path, Firestore firestore,
       [FirestoreDataConverter<T>? converter])

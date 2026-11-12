@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 01/12/2019
 
-part of datastore;
+part of 'datastore.dart';
 
 abstract class BaseStream<Req extends GeneratedMessage,
     Res extends GeneratedMessage> extends DelegatingStream<StreamEvent> {

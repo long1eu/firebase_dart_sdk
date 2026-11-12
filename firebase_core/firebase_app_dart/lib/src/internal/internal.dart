@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-
 import 'auth.dart';
 import 'util/to_string_helper.dart';
 
@@ -29,8 +28,10 @@ abstract class InternalTokenProvider {
 
 /// Represents an internal token result.
 class InternalTokenResult {
+  /// Creates a result holding [token].
   const InternalTokenResult(this.token);
 
+  /// The raw token.
   final String token;
 
   @override

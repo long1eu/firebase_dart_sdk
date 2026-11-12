@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 02/12/2019
 
-part of datastore;
+part of 'datastore.dart';
 
 class WatchStream
     extends BaseStream<proto.ListenRequest, proto.ListenResponse> {

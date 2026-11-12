@@ -25,6 +25,8 @@ import 'package:meta/meta.dart';
 /// A query that calculates aggregations over the documents of a [Query]
 /// without downloading the documents themselves.
 class AggregateQuery {
+  /// Implementation detail of the SDK; not part of the supported API. Use [Query.count] or
+  /// [Query.aggregate].
   @internal
   AggregateQuery(this.query, List<AggregateField> aggregateFields)
       : aggregateFields = List<AggregateField>.unmodifiable(aggregateFields),

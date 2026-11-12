@@ -11,13 +11,18 @@ import 'package:firebase_app_dart/src/platform_dependencies.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 
+/// The entry point of the Firebase SDKs: a named set of [FirebaseOptions] shared by the Firebase
+/// services of one project.
+///
+/// Create one with [FirebaseApp.withOptions]. The app created without a name is the default app,
+/// returned by [FirebaseApp.instance].
 class FirebaseApp with _PlatformDependenciesMixin {
   FirebaseApp._(this._name, this._options, this._dependencies,
       this._dataCollectionDefaultEnabled);
 
   /// Initializes a [FirebaseApp] instance with [options] and [name].
   ///
-  /// If the name is not provided the [DEFAULT] app will be created. It is an
+  /// If the name is not provided the default app (named `[DEFAULT]`) will be created. It is an
   /// error to initialize an app with an already existing name.
   factory FirebaseApp.withOptions(
     FirebaseOptions options, {
@@ -77,6 +82,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
         'FirebaseApp with name $name doesn\'t exist. $availableAppNamesMessage');
   }
 
+  /// The name of the default app.
   static const String defaultAppName = '[DEFAULT]';
 
   static final Map<String, FirebaseApp> _instances = <String, FirebaseApp>{};
@@ -97,6 +103,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
   bool _deleted = false;
   bool _dataCollectionDefaultEnabled;
 
+  /// Emits the new value every time [setDataCollectionDefaultEnabled] changes it.
   Stream<bool> get onDataCollectionChange => _dataCollectionChangeSink.stream;
 
   /// An event is emitted when [FirebaseApp.delete] is called.
@@ -119,6 +126,8 @@ class FirebaseApp with _PlatformDependenciesMixin {
     return List<FirebaseApp>.from(_instances.values);
   }
 
+  /// Deletes this app: it is removed from [apps], [onDeleteApp] emits its name, and reading its
+  /// [name] or [options] afterwards throws a [StateError]. Deleting twice is a no-op.
   void delete() {
     if (_deleted) {
       return;
@@ -175,6 +184,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
     Preconditions.checkState(!_deleted, 'FirebaseApp was deleted');
   }
 
+  /// Whether this is the default app (its name is [defaultAppName]).
   @visibleForTesting
   bool get isDefaultApp => defaultAppName == name;
 
@@ -183,6 +193,7 @@ class FirebaseApp with _PlatformDependenciesMixin {
     return getPersistenceKeyFor(name, options.applicationId);
   }
 
+  /// Forgets every app without deleting it. For tests only.
   @visibleForTesting
   static void clearInstancesForTest() {
     // TODO(long1eu): also delete, once functionality is implemented.

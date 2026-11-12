@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 16/03/2020
 
-part of filter;
+part of 'filter.dart';
 
 /// Filter that matches on key fields (i.e. '__name__').
 class KeyFieldFilter extends FieldFilter {

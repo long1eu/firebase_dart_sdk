@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-part of memory_persistence;
+part of 'memory_persistence.dart';
 
 /// An implementation of the [QueryCache] protocol that merely keeps queries in memory, suitable for online only clients
 /// with persistence disabled.

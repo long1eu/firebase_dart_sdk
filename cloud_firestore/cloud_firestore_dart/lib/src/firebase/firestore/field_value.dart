@@ -5,7 +5,7 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:meta/meta.dart';
 
-/// Sentinel values that can be used when writing document fields with [set] or [update].
+/// Sentinel values that can be used when writing document fields with `set()` or `update()`.
 abstract class FieldValue {
   const FieldValue._(this.elements);
 
@@ -77,6 +77,7 @@ abstract class FieldValue {
   /// Unlike the other factories this is a plain value, not a sentinel.
   static VectorValue vector(List<double> values) => VectorValue(values);
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final List<Object?> elements;
 
@@ -85,24 +86,31 @@ abstract class FieldValue {
   @internal
   String get methodName;
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   bool get isDelete => this is _DeleteFieldValue;
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   bool get isServerTimestamp => this is _ServerTimestampFieldValue;
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   bool get isArrayUnion => this is _ArrayUnionFieldValue;
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   bool get isArrayRemove => this is _ArrayRemoveFieldValue;
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   bool get isIncrement => this is _NumericIncrementFieldValue;
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   bool get isMinimum => this is _NumericMinimumFieldValue;
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   bool get isMaximum => this is _NumericMaximumFieldValue;
 

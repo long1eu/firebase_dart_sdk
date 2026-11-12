@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-part of field_value;
+part of 'field_value.dart';
 
 /// Base class inherited from by IntegerValue and DoubleValue. It implements proper number
 /// comparisons between the two types.

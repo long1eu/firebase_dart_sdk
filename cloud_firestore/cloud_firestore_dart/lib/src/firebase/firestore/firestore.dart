@@ -49,6 +49,7 @@ import 'package:meta/meta.dart';
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test mocks. Subclassing is
 /// not supported in production code and new SDK releases may break code that does so.
 class Firestore {
+  /// Implementation detail of the SDK; not part of the supported API. Use [instanceFor].
   @visibleForTesting
   @internal
   Firestore(this.databaseId, this.firebaseApp, this.client, this._scheduler)
@@ -56,6 +57,8 @@ class Firestore {
 
   static const String _tag = 'FirebaseFirestore';
 
+  /// Implementation detail of the SDK; not part of the supported API. Use [projectId] and
+  /// [databaseName].
   @internal
   final DatabaseId databaseId;
 
@@ -66,13 +69,19 @@ class Firestore {
   /// one was passed to [instanceFor].
   String get databaseName => databaseId.databaseId;
 
+  /// The [FirebaseApp] this instance belongs to.
   final FirebaseApp? firebaseApp;
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final UserDataConverter dataConverter;
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final FirestoreClient client;
   final TaskScheduler _scheduler;
 
+  /// The instance of the default [FirebaseApp] and the default database.
+  ///
+  /// Throws a [StateError] if that instance has not been created with [instanceFor] yet.
   static Firestore get instance {
     final FirebaseApp app = FirebaseApp.instance;
 
@@ -91,6 +100,7 @@ class Firestore {
     return firestore;
   }
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @visibleForTesting
   @internal
   TaskScheduler get scheduler => _scheduler;
@@ -107,6 +117,7 @@ class Firestore {
         database: database, openDatabase: openDatabase, settings: settings);
   }
 
+  /// Gets the instance for [app] and [database], creating it on the first call.
   @Deprecated('Use instanceFor instead.')
   static Future<Firestore> getInstance(
     FirebaseApp app, {
@@ -125,6 +136,7 @@ class Firestore {
     return firestore;
   }
 
+  /// Implementation detail of the SDK; not part of the supported API. Use [instanceFor].
   @internal
   static Future<Firestore> newInstance(
     FirebaseApp app,

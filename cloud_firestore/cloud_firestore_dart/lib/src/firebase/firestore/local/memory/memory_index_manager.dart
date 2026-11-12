@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 15/03/2020
 
-part of memory_persistence;
+part of 'memory_persistence.dart';
 
 /// An in-memory implementation of IndexManager.
 class MemoryIndexManager extends IndexManager {

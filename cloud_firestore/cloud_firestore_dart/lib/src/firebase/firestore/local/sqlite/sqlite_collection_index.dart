@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 21/09/2018
 
-part of sqlite_persistence;
+part of 'sqlite_persistence.dart';
 
 /// A persisted 'collection index' of all documents in the local cache (with
 /// mutations overlaid on top of remote documents).

@@ -39,9 +39,13 @@ import 'package:meta/meta.dart';
 /// is not supported in production code and new SDK releases may break code that does so.
 class DocumentReference<T extends dynamic> {
   // TODO(long1eu): We should checkNotNull(firestore), but tests are currently cheating and setting it to null.
+  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.doc] or
+  /// [CollectionReference.doc].
   @internal
   DocumentReference(this.key, this.firestore, [this.converter]);
 
+  /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.doc] or
+  /// [CollectionReference.doc].
   @internal
   factory DocumentReference.forPath(ResourcePath path, Firestore firestore,
       [FirestoreDataConverter<T>? converter]) {
@@ -80,6 +84,7 @@ class DocumentReference<T extends dynamic> {
   /// The value of the `type` field written by [toJson].
   static const String jsonType = 'firestore/documentReference/1.0';
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final DocumentKey key;
 
@@ -114,6 +119,7 @@ class DocumentReference<T extends dynamic> {
     return DocumentReference<Map<String, Object?>>(key, firestore);
   }
 
+  /// The id of the document: the last segment of its [path].
   String get id => key.path.last;
 
   /// Gets a [CollectionReference] to the collection that contains this document.
@@ -260,11 +266,16 @@ class DocumentReference<T extends dynamic> {
     }));
   }
 
+  /// A stream of snapshots of this document: the current contents first, then a new snapshot every
+  /// time the contents change. Metadata-only changes are not reported; use [getSnapshots] for
+  /// those.
   Stream<DocumentSnapshot<T>> get snapshots {
     final ListenOptions options = _internalOptions(MetadataChanges.exclude);
     return _getSnapshotsInternal(options);
   }
 
+  /// A stream of snapshots of this document, like [snapshots]. Pass [MetadataChanges.include] as
+  /// [changes] to also get a snapshot when only the [DocumentSnapshot.metadata] changed.
   Stream<DocumentSnapshot<T>> getSnapshots([MetadataChanges? changes]) {
     final ListenOptions options =
         _internalOptions(changes ?? MetadataChanges.exclude);

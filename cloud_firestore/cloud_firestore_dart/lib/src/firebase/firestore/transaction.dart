@@ -30,6 +30,8 @@ typedef TransactionCallback<T> = Future<T> Function(Transaction);
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class Transaction {
+  /// Implementation detail of the SDK; not part of the supported API. Use
+  /// [Firestore.runTransaction].
   @internal
   Transaction(this._transaction, this._firestore);
 

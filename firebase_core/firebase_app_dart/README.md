@@ -100,7 +100,7 @@ Since desktop is not an officially supported platform, we need to create `applic
     - `projectNumber` - is your project number and can be found on the `Google Cloud Platform Dashboard` in the 
     `Project info` card.
     - `os` - `windows`, `macos`, `linux`, `my-custom-os-because-i-can`
-1. Generate the SHA1 hash of this part. You can use this [tool](http://www.sha1-online.com/)
+1. Generate the SHA1 hash of this part. You can use this [tool](https://www.sha1-online.com/)
 1. Add the SHA1 hash to the first part, so you `applicationId` looks like this `<appNumber>:<gcmSenderID>:<os>:sha1(<appNumber>:<gcmSenderID>:<os>)`
 (eg. `<YOUR_APP_ID>`)    
  

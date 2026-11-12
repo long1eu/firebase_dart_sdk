@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 01/12/2019
 
-part of datastore;
+part of 'datastore.dart';
 
 /// Wrapper class for transaction specific gRPC methods
 class TransactionClient {

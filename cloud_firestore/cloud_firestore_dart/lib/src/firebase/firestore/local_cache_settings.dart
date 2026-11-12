@@ -81,6 +81,7 @@ sealed class MemoryGarbageCollectorSettings {
 /// Eager garbage collection: documents that are no longer needed by any
 /// listener or pending write are removed from the memory cache immediately.
 final class MemoryEagerGcSettings extends MemoryGarbageCollectorSettings {
+  /// Creates the settings; eager collection has no options.
   const MemoryEagerGcSettings();
 
   @override

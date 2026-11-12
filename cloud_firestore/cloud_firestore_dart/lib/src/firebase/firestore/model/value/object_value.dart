@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
-part of field_value;
+part of 'field_value.dart';
 
 class ObjectValue extends FieldValue {
   const ObjectValue(this._value);

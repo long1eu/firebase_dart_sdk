@@ -1,3 +1,14 @@
+/// A pure-Dart Cloud Firestore client for the Dart VM and Flutter (no web).
+///
+/// Start from [Firestore.instanceFor] with a `FirebaseApp` created with
+/// `package:firebase_app_dart`, then use [Firestore.collection] and
+/// [Firestore.doc] to get a [CollectionReference] or a [DocumentReference].
+/// Reads return a [DocumentSnapshot] or a [QuerySnapshot]; `snapshots` streams
+/// deliver updates in real time. Writes go through [DocumentReference.set],
+/// [DocumentReference.update], a [WriteBatch] or a [Transaction].
+///
+/// The offline cache is stored in SQLite when an [OpenDatabase] function is
+/// supplied, and in memory otherwise.
 library cloud_firestore_dart;
 
 export 'src/firebase/firestore/aggregate_field.dart';

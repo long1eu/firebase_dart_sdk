@@ -25,6 +25,7 @@ import 'package:meta/meta.dart';
 /// not supported in production code and new SDK releases may break code that does so.
 class QuerySnapshot<T extends dynamic>
     extends Iterable<QueryDocumentSnapshot<T>> {
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   QuerySnapshot(this.query, this.snapshot, this._firestore)
       : metadata =
@@ -45,11 +46,13 @@ class QuerySnapshot<T extends dynamic>
     return snapshot_json.querySnapshotFromJson<T>(firestore, json, converter);
   }
 
+  /// The query whose results this snapshot holds.
   final Query<T> query;
 
   /// Returns the metadata for this document snapshot.
   final SnapshotMetadata metadata;
 
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final ViewSnapshot snapshot;
   final Firestore _firestore;
@@ -74,7 +77,7 @@ class QuerySnapshot<T extends dynamic>
   /// Returns the list of documents that changed since the last snapshot. If it's the first snapshot all documents will
   /// be in the list as added changes.
   ///
-  /// [metadataChanges] Indicates whether metadata-only changes (i.e. only [Query.metadata] changed) should be included.
+  /// [metadataChanges] Indicates whether metadata-only changes (i.e. only [QuerySnapshot.metadata] changed) should be included.
   ///
   /// Returns the list of document changes since the last snapshot.
   List<DocumentChange<T>> getDocumentChanges(MetadataChanges metadataChanges) {

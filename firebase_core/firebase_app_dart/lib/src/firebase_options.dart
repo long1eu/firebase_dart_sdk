@@ -4,7 +4,11 @@
 
 import 'package:firebase_app_dart/internal.dart';
 
+/// The configuration of a [FirebaseApp]: the identifiers and keys of the Firebase project it talks
+/// to.
 class FirebaseOptions {
+  /// Creates the options. [apiKey] and [applicationId] are required; the other values are needed
+  /// only by the services that use them (Firestore needs [projectId]).
   const FirebaseOptions({
     required this.apiKey,
     required this.applicationId,
@@ -78,6 +82,7 @@ class FirebaseOptions {
   /// developer via SDK specific mechanisms.
   final bool dataCollectionEnabled;
 
+  /// A map with these options, in the shape read by [FirebaseOptions.fromJson].
   Map<String, String?> toJson() {
     return <String, String?>{
       _appId: applicationId,

@@ -2,7 +2,7 @@
 // Lung Razvan <long1eu>
 // on 20/09/2018
 
-part of memory_persistence;
+part of 'memory_persistence.dart';
 
 class MemoryMutationQueue implements MutationQueue {
   MemoryMutationQueue(this.persistence, this._statsCollector)

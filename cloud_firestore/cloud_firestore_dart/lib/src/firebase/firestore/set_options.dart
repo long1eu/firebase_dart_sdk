@@ -9,7 +9,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field
 import 'package:meta/meta.dart';
 
 /// An options object that configures the behavior of set() calls. By providing one of the
-/// [SetOptions] objects returned by [merge], [mergeField] and [mergeFieldPaths], the set() calls in
+/// [SetOptions] objects returned by [mergeAllFields], [mergeFields] and [mergeFieldPaths], the set() calls in
 /// [DocumentReference], [WriteBatch] and [Transaction] can be configured to perform granular merges
 /// instead of overwriting the target documents in their entirety.
 class SetOptions {
@@ -25,8 +25,8 @@ class SetOptions {
       : merge = true,
         fieldMask = null;
 
-  /// Changes the behavior of set() calls to only replace the fields under [fieldPaths]. Any field
-  /// that is not specified in [fieldPaths] is ignored and remains untouched.
+  /// Changes the behavior of set() calls to only replace the fields under [fields]. Any field
+  /// that is not specified in [fields] is ignored and remains untouched.
   ///
   /// It is an error to pass a [SetOptions] object to a set() call that is missing a value for any
   /// of the fields specified here.
@@ -41,8 +41,8 @@ class SetOptions {
     return SetOptions._(true, FieldMask(fieldPaths));
   }
 
-  /// Changes the behavior of set() calls to only replace the fields under [fieldPaths]. Any field
-  /// that is not specified in [fieldPaths] is ignored and remains untouched.
+  /// Changes the behavior of set() calls to only replace the fields under [fields]. Any field
+  /// that is not specified in [fields] is ignored and remains untouched.
   ///
   /// It is an error to pass a SetOptions object to a set() call that is missing a value for any of
   /// the fields specified here in its to data argument.
@@ -52,13 +52,17 @@ class SetOptions {
     return SetOptions._(true, FieldMask(fieldPaths));
   }
 
+  /// The default behavior of set() calls: the whole document is replaced by the provided data.
   static const SetOptions overwrite = SetOptions._overwrite();
 
   /// Changes the behavior of set() calls to only replace the values specified in its data argument.
   /// Fields omitted from the set() call will remain untouched.
   static const SetOptions mergeAllFields = SetOptions._mergeAll();
 
+  /// Whether the data is merged into the existing document instead of replacing it.
   final bool merge;
+
+  /// Implementation detail of the SDK; not part of the supported API.
   @internal
   final FieldMask? fieldMask;
 }

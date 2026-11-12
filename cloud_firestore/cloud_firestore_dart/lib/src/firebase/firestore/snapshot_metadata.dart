@@ -11,6 +11,7 @@ import 'package:firebase_app_dart/internal.dart';
 /// mocks. Subclassing is not supported in production code and new SDK releases may break code that
 /// does so.
 class SnapshotMetadata {
+  /// Creates the metadata of a snapshot.
   const SnapshotMetadata(this.hasPendingWrites, this.isFromCache);
 
   /// Returns true if the snapshot contains the result of local writes (e.g. set() or update()
@@ -21,7 +22,7 @@ class SnapshotMetadata {
 
   /// Returns true if the snapshot was created from cached data rather than guaranteed up-to-date
   /// server data. If your listener has opted into metadata updates (via [MetadataChanges.include])
-  /// you will receive another snapshot with [isFomCache] equal to false once the client has
+  /// you will receive another snapshot with [isFromCache] equal to false once the client has
   /// received up-to-date data from the backend.
   final bool isFromCache;
 
