@@ -206,6 +206,7 @@ class Filter
 typedef FirebaseFirestore = Firestore
 class Firestore
   batch(): WriteBatch
+  clearPersistence(): Future<void>
   collection(String collectionPath): CollectionReference<Map<String, Object>>
   collectionGroup(String collectionId): Query<Map<String, Object>>
   disableNetwork(): Future<void>
@@ -231,6 +232,7 @@ class Firestore
   static getInstance(FirebaseApp app, {String database, (dart.core.String, {onConfigure: dart.core.(.Database) -> dart.async.Future, onCreate: dart.core.(.Database, dart.core.int) -> dart.async.Future, onDowngrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, onOpen: dart.core.(.Database) -> dart.async.Future, onUpgrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, version: dart.core.int}) -> dart.async.Future openDatabase, FirestoreSettings settings}): Future<Firestore> @deprecated
   static instanceFor({FirebaseApp app, String database, (dart.core.String, {onConfigure: dart.core.(.Database) -> dart.async.Future, onCreate: dart.core.(.Database, dart.core.int) -> dart.async.Future, onDowngrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, onOpen: dart.core.(.Database) -> dart.async.Future, onUpgrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, version: dart.core.int}) -> dart.async.Future openDatabase, FirestoreSettings settings}): Future<Firestore>
   static newInstance(FirebaseApp app, String database, {InternalTokenProvider authProvider, InternalAppCheckTokenProvider appCheckProvider, (dart.core.String, {onConfigure: dart.core.(.Database) -> dart.async.Future, onCreate: dart.core.(.Database, dart.core.int) -> dart.async.Future, onDowngrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, onOpen: dart.core.(.Database) -> dart.async.Future, onUpgrade: dart.core.(.Database, dart.core.int, dart.core.int) -> dart.async.Future, version: dart.core.int}) -> dart.async.Future openDatabase, FirestoreSettings settings}): Future<Firestore> @internal
+  static setLogLevel(LogLevel level): void
   static setLoggingEnabled({bool loggingEnabled}): void
   terminate(): Future<void>
   validateReference(DocumentReference<Object> docRef): void @internal
@@ -274,18 +276,20 @@ class FirestoreSettings
   final cacheSettings: LocalCacheSettings
   final cacheSizeBytes: int
   final host: String
+  final mockUserToken: Object
   final persistenceEnabled: bool
   final port: int
   final sslEnabled: bool
   get hashCode: int
   new FirestoreSettings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings})
+  new FirestoreSettings._({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool emulator, Object mockUserToken})
   static final cacheSizeUnlimited: int
   static final defaultCacheSizeBytes: int
   static final defaultHost: String
   static final defaultPort: int
   static final minimumCacheBytes: int
   toString(): String
-  withEmulator(String host, int port): FirestoreSettings
+  withEmulator(String host, int port, {Object mockUserToken}): FirestoreSettings
 class GeoPoint
   ==(Object other): bool
   compareTo(GeoPoint other): int
@@ -336,6 +340,12 @@ enum LoadBundleTaskState
   static final values: List<LoadBundleTaskState>
 abstract class LocalCacheSettings
   new LocalCacheSettings()
+enum LogLevel
+  new LogLevel(int #index, String #name)
+  static final debug: LogLevel
+  static final error: LogLevel
+  static final silent: LogLevel
+  static final values: List<LogLevel>
 class MemoryCacheSettings extends LocalCacheSettings
   ==(Object other): bool
   final gcSettings: MemoryGarbageCollectorSettings

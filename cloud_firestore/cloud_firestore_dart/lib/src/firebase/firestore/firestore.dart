@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/app_check_token_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/auth/emulator_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/firebase_auth_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
@@ -17,9 +18,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/transaction.dar
     as core;
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_multi_db_component.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/log_level.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
@@ -28,6 +31,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/transaction_options.
 import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/log_level_util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/write_batch.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
@@ -130,8 +134,15 @@ class Firestore {
     }
     final DatabaseId databaseId = DatabaseId.forDatabase(projectId, database);
 
+    final FirestoreSettings firestoreSettings = settings ?? FirestoreSettings();
+
     final CredentialsProvider provider;
-    if (authProvider != null && authProvider != app) {
+    final Object? mockUserToken = firestoreSettings.mockUserToken;
+    if (mockUserToken != null) {
+      Log.d(_tag, 'Using the mockUserToken of the emulator settings.');
+      provider = EmulatorCredentialsProvider.forMockUserToken(
+          mockUserToken, projectId);
+    } else if (authProvider != null && authProvider != app) {
       provider = FirebaseAuthCredentialsProvider(authProvider);
     } else if (app.authProvider != app) {
       Log.d(
@@ -156,7 +167,6 @@ class Firestore {
     // in the persistence key.
     final String persistenceKey = app.name;
 
-    final FirestoreSettings firestoreSettings = settings ?? FirestoreSettings();
     final DatabaseInfo databaseInfo = DatabaseInfo(
       databaseId,
       persistenceKey,
@@ -348,6 +358,24 @@ class Firestore {
     }
   }
 
+  /// Clears the persistent storage of this instance: the local SQLite database
+  /// with the cached documents and the pending writes. Does nothing when the
+  /// instance uses memory persistence.
+  ///
+  /// Must be called after [terminate] (an instance of this SDK starts as soon
+  /// as it is created). While the instance is running the returned future
+  /// fails with a [FirestoreError] with code
+  /// [FirestoreErrorCode.failedPrecondition]. Create a new instance with the
+  /// same app and database to start again with an empty cache.
+  ///
+  /// Note: [clearPersistence] is primarily intended to help write reliable
+  /// tests that use Cloud Firestore. It uses an efficient mechanism for
+  /// dropping existing data but does not attempt to securely overwrite or
+  /// otherwise make cached data unrecoverable. For applications that are
+  /// sensitive to the disclosure of cached data in between user sessions, we
+  /// strongly recommend not enabling persistence at all.
+  Future<void> clearPersistence() => client.clearPersistence();
+
   /// Re-enables network usage for this instance after a prior call to [disableNetwork].
   ///
   /// Returns a [Future] that will be completed once networking is enabled.
@@ -399,12 +427,22 @@ class Firestore {
   }
 
   /// Globally enables / disables Firestore logging for the SDK.
+  ///
+  /// Enabled logs everything ([LogLevel.debug]); disabled goes back to the
+  /// default, which logs warnings and errors. [setLogLevel] gives finer
+  /// control.
   static void setLoggingEnabled({bool loggingEnabled = false}) {
-    if (loggingEnabled) {
-      Log.level = LogLevel.d;
-    } else {
-      Log.level = LogLevel.w;
-    }
+    applyLoggingEnabled(loggingEnabled);
+  }
+
+  /// Sets the verbosity of the Cloud Firestore logs: [LogLevel.debug] for the
+  /// most verbose logging, [LogLevel.error] to log errors only, or
+  /// [LogLevel.silent] to turn logging off. Like `setLogLevel` of the JS SDK.
+  ///
+  /// The setting is global: it applies to every instance (and to the logs of
+  /// the other Firebase packages of this SDK, which share the logger).
+  static void setLogLevel(LogLevel level) {
+    applyLogLevel(level);
   }
 
   /// Helper to validate a [DocumentReference]. Used by [WriteBatch] and [Transaction].

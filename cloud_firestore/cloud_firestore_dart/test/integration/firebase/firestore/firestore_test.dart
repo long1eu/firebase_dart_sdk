@@ -24,7 +24,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/write_batch.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
-import 'package:firebase_app_dart/internal.dart' show LogLevel;
+import 'package:firebase_app_dart/internal.dart' show InternalLogLevel;
 import 'package:test/test.dart';
 
 import '../../../unit/firebase/firestore/local/mock/database_mock.dart';
@@ -1257,7 +1257,7 @@ void main() {
 
     final Firestore firestore = await IntegrationTestUtil.testFirestoreInstance(
         IntegrationTestUtil.provider.projectId,
-        LogLevel.w,
+        InternalLogLevel.w,
         IntegrationTestUtil.newTestSettings(),
         'integration/firestore',
         fixedDbName: dbName);
@@ -1270,7 +1270,7 @@ void main() {
     final Firestore firestore2 =
         await IntegrationTestUtil.testFirestoreInstance(
             IntegrationTestUtil.provider.projectId,
-            LogLevel.w,
+            InternalLogLevel.w,
             IntegrationTestUtil.newTestSettings(),
             'integration/firestore',
             fixedDbName: dbName);
@@ -1334,13 +1334,13 @@ void main() {
     final String projectId = IntegrationTestUtil.provider.projectId;
     final Firestore db1 = await IntegrationTestUtil.testFirestoreInstance(
         projectId,
-        LogLevel.w,
+        InternalLogLevel.w,
         IntegrationTestUtil.newTestSettings(),
         'integration/firestore',
         databaseName: 'db1');
     final Firestore db2 = await IntegrationTestUtil.testFirestoreInstance(
         projectId,
-        LogLevel.w,
+        InternalLogLevel.w,
         IntegrationTestUtil.newTestSettings(),
         'integration/firestore',
         databaseName: 'db2');

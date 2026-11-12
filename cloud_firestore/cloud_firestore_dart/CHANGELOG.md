@@ -91,6 +91,16 @@ only. **Nothing was run against production Firestore.**
   `dynamic` data.
 - Read-only transactions: `TransactionOptions(readOnly: true)`, verified at commit with a `VerifyMutation`
   (new `verify` field in the vendored `write.proto`). Emulator-verified only.
+- `Firestore.clearPersistence()`: deletes the local SQLite database (and its `-journal`, `-wal`,
+  `-shm` files) of a terminated instance; fails with `failedPrecondition` while the instance runs, a
+  no-op for memory persistence.
+- `Firestore.setLogLevel(LogLevel)` with `debug`, `error` and `silent` (as the JS SDK);
+  `setLoggingEnabled` still works.
+- `FirestoreSettings.withEmulator(host, port, mockUserToken: ...)` (and the `mockUserToken`
+  setting): a token string or a map of claims, encoded as an unsigned JWT like
+  `connectFirestoreEmulator` of the JS SDK, sent as the bearer token to the emulator. It can only be
+  set through `withEmulator`; settings that have a token and are pointed at another host throw an
+  `ArgumentError`, so the unsigned token is never sent to production.
 
 - Queries: `!=` / `not-in`, composite `Filter.or` / `Filter.and` (OR queries), multiple
   inequality filters, `limitToLast`, arrays in `whereIn` values.

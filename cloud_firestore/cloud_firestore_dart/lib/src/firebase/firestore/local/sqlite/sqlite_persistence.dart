@@ -30,6 +30,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/st
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_bundle_cache.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_database_files.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -81,6 +82,10 @@ class SQLitePersistence extends Persistence {
   final Semaphore _semaphore;
 
   late Database _db;
+
+  /// The path of the database file, known once [start] opened it. Kept after
+  /// [shutdown] so that [clearPersistence] can delete it.
+  String? _databasePath;
 
   @override
   bool started = false;
@@ -167,6 +172,7 @@ class SQLitePersistence extends Persistence {
       Log.d(tag, 'Starting SQLite persistance');
       hardAssert(!started, 'SQLitePersistence double-started!');
       _db = await _openDb(databaseName, openDatabase);
+      _databasePath = _db.path;
       await queryCache.start();
       started = true;
       referenceDelegate.start(queryCache.highestListenSequenceNumber);
@@ -191,6 +197,26 @@ class SQLitePersistence extends Persistence {
 
   @visibleForTesting
   Database get database => _db;
+
+  /// Deletes the database file and its journal, WAL and shared memory side
+  /// files. Only valid after [shutdown]; does nothing when the database was
+  /// never opened.
+  ///
+  /// PORTING NOTE: Android derives the path from [databaseName] with
+  /// `Context.getDatabasePath`. Here the file is chosen by the [OpenDatabase]
+  /// callback, so the file of the database that was opened is deleted.
+  Future<void> clearPersistence() async {
+    await _semaphore.acquire();
+    try {
+      hardAssert(!started, 'SQLitePersistence cleared while running!');
+      final String? path = _databasePath;
+      if (path != null) {
+        deleteSqliteDatabaseFiles(path);
+      }
+    } finally {
+      _semaphore.release();
+    }
+  }
 
   @override
   MutationQueue getMutationQueue(User user) {

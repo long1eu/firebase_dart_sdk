@@ -199,6 +199,30 @@ class FirestoreClient implements RemoteStoreCallback {
     await persistence.shutdown();
   }
 
+  /// Whether [shutdown] was called on this client.
+  bool get isTerminated => _isShutdown;
+
+  /// Deletes the local persistence files of this client. Only allowed after
+  /// [shutdown]; a no-op for memory persistence.
+  ///
+  /// Throws a [FirestoreError] with [FirestoreErrorCode.failedPrecondition]
+  /// while the client is running, and one with [FirestoreErrorCode.unknown]
+  /// when a file can't be deleted (like upstream).
+  Future<void> clearPersistence() async {
+    if (!_isShutdown) {
+      throw FirestoreError(
+        'Persistence cannot be cleared while the firestore instance is running.',
+        FirestoreErrorCode.failedPrecondition,
+      );
+    }
+    // The database has to be closed before its files go away.
+    await _shutdownFuture;
+    final Persistence persistence = this.persistence;
+    if (persistence is SQLitePersistence) {
+      await persistence.clearPersistence();
+    }
+  }
+
   /// Starts listening to a query. */
   Future<QueryStream> listen(Query query, ListenOptions options) async {
     _verifyNotShutdown();

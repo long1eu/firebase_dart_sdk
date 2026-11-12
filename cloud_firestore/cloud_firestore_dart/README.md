@@ -92,6 +92,14 @@ final firestore = await Firestore.instanceFor(
 );
 ```
 
+To test security rules as a user, pass `mockUserToken` (a token string, or the claims of a
+Firebase ID token that are encoded as an unsigned JWT, as `connectFirestoreEmulator` does in
+the JS SDK): `FirestoreSettings().withEmulator('127.0.0.1', 8080, mockUserToken: {'sub': 'alice'})`.
+
+`await firestore.terminate(); await firestore.clearPersistence();` deletes the local cache
+(useful between tests). `Firestore.setLogLevel(LogLevel.debug)` turns on debug logging
+(`error` and `silent` are the other levels).
+
 Aggregation, OR queries, vector search, `limitToLast`:
 
 ```dart

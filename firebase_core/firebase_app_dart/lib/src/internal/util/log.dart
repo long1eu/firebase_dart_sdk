@@ -5,12 +5,12 @@
 // ignore: avoid_classes_with_only_static_members
 class Log {
   /// Whether [d] currently prints. Use it to avoid building expensive messages.
-  static bool get isDebugEnabled => level <= LogLevel.d;
+  static bool get isDebugEnabled => level <= InternalLogLevel.d;
 
   /// Messages below this level are dropped. Quiet by default (warnings and
   /// errors only), like the Java SDK; `Firestore.setLoggingEnabled(true)`
   /// turns debug output on.
-  static LogLevel level = LogLevel.w;
+  static InternalLogLevel level = InternalLogLevel.w;
 
   /// Longest message that is printed. Longer messages (for example the
   /// description of a huge document) are cut so that logging can't exhaust
@@ -27,25 +27,25 @@ class Log {
   }
 
   static void i(String tag, dynamic message) {
-    if (level <= LogLevel.i) {
+    if (level <= InternalLogLevel.i) {
       print('${_formatTag('I:$tag')}||${truncate('$message')}');
     }
   }
 
   static void d(String tag, dynamic message) {
-    if (level <= LogLevel.d) {
+    if (level <= InternalLogLevel.d) {
       print('${_formatTag('D:$tag')}||${truncate('$message')}');
     }
   }
 
   static void w(String tag, dynamic message) {
-    if (level <= LogLevel.w) {
+    if (level <= InternalLogLevel.w) {
       print('${_formatTag('W:$tag')}||${truncate('$message')}');
     }
   }
 
   static void e(String tag, dynamic message) {
-    if (level <= LogLevel.e) {
+    if (level <= InternalLogLevel.e) {
       print('${_formatTag('E:$tag')}||${truncate('$message')}');
     }
   }
@@ -53,27 +53,30 @@ class Log {
   static String _formatTag(String tag) => tag.padRight(30, ' ');
 }
 
-class LogLevel implements Comparable<LogLevel> {
-  const LogLevel._(this._i);
+class InternalLogLevel implements Comparable<InternalLogLevel> {
+  const InternalLogLevel._(this._i);
 
   final int _i;
 
-  static const LogLevel i = LogLevel._(0);
-  static const LogLevel d = LogLevel._(1);
-  static const LogLevel w = LogLevel._(2);
-  static const LogLevel e = LogLevel._(3);
+  static const InternalLogLevel i = InternalLogLevel._(0);
+  static const InternalLogLevel d = InternalLogLevel._(1);
+  static const InternalLogLevel w = InternalLogLevel._(2);
+  static const InternalLogLevel e = InternalLogLevel._(3);
+
+  /// Above every message level: nothing is printed.
+  static const InternalLogLevel none = InternalLogLevel._(4);
 
   @override
-  int compareTo(LogLevel other) => _i.compareTo(other._i);
+  int compareTo(InternalLogLevel other) => _i.compareTo(other._i);
 
-  bool operator <=(LogLevel other) => _i <= other._i;
+  bool operator <=(InternalLogLevel other) => _i <= other._i;
 
-  bool operator >=(LogLevel other) => _i >= other._i;
+  bool operator >=(InternalLogLevel other) => _i >= other._i;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is LogLevel && runtimeType == other.runtimeType && _i == other._i;
+      other is InternalLogLevel && runtimeType == other.runtimeType && _i == other._i;
 
   @override
   int get hashCode => _i.hashCode * 31;

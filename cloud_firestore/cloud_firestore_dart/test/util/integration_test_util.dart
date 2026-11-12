@@ -112,7 +112,7 @@ class IntegrationTestUtil {
       [FirestoreSettings? settings, String? dbPath]) async {
     return testFirestoreInstance(
       provider.projectId,
-      LogLevel.w,
+      InternalLogLevel.w,
       settings ?? newTestSettings(),
       dbPath ?? currentDatabasePath,
     );
@@ -122,7 +122,7 @@ class IntegrationTestUtil {
   static Future<Firestore> testAlternateFirestore() async {
     return testFirestoreInstance(
       badProjectId,
-      LogLevel.w,
+      InternalLogLevel.w,
       newTestSettings(),
       'bad/projectId/path.db',
     );
@@ -159,7 +159,7 @@ class IntegrationTestUtil {
   /// With [fixedDbName] the instance uses exactly that database file and does not delete it, so that a later instance
   /// created with the same name sees the persisted data (restart). Use [databaseName] to address a named database.
   static Future<Firestore> testFirestoreInstance(String projectId,
-      LogLevel logLevel, FirestoreSettings settings, String dbPath,
+      InternalLogLevel logLevel, FirestoreSettings settings, String dbPath,
       {String? fixedDbName,
       String databaseName = DatabaseId.defaultDatabaseId}) async {
     // This unfortunately is a global setting that affects existing Firestore clients.

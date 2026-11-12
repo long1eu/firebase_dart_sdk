@@ -22,6 +22,7 @@ export 'src/firebase/firestore/geo_point.dart';
 export 'src/firebase/firestore/listen_source.dart';
 export 'src/firebase/firestore/load_bundle_task.dart';
 export 'src/firebase/firestore/load_bundle_task_progress.dart';
+export 'src/firebase/firestore/log_level.dart' show LogLevel;
 export 'src/firebase/firestore/local_cache_settings.dart';
 export 'src/firebase/firestore/metadata_change.dart';
 export 'src/firebase/firestore/query.dart';

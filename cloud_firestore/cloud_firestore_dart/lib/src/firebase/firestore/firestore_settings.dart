@@ -2,20 +2,48 @@
 // Lung Razvan <long1eu>
 // on 25/09/2018
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/auth/emulator_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
+import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/internal.dart';
 
 /// Settings used to configure a FirebaseFirestore instance.
 class FirestoreSettings {
   /// Constructs a FirebaseFirestoreSettings object
   FirestoreSettings({
-    this.host = defaultHost,
-    this.port = defaultPort,
-    this.sslEnabled = true,
+    String host = defaultHost,
+    int port = defaultPort,
+    bool sslEnabled = true,
     bool persistenceEnabled = true,
     int cacheSizeBytes = defaultCacheSizeBytes,
-    this.cacheSettings,
-  })  : persistenceEnabled = _resolvePersistenceEnabled(
+    LocalCacheSettings? cacheSettings,
+  }) : this._(
+          host: host,
+          port: port,
+          sslEnabled: sslEnabled,
+          persistenceEnabled: persistenceEnabled,
+          cacheSizeBytes: cacheSizeBytes,
+          cacheSettings: cacheSettings,
+          emulator: false,
+          mockUserToken: null,
+        );
+
+  /// [emulator] is true only for settings made by [withEmulator]; a
+  /// [mockUserToken] is rejected without it, so that the unsigned token is
+  /// never sent to a production host.
+  FirestoreSettings._({
+    required this.host,
+    required this.port,
+    required this.sslEnabled,
+    required bool persistenceEnabled,
+    required int cacheSizeBytes,
+    required this.cacheSettings,
+    required bool emulator,
+    required Object? mockUserToken,
+  })  : _emulator = emulator,
+        mockUserToken =
+            _checkMockUserToken(mockUserToken, emulator, host, sslEnabled),
+        persistenceEnabled = _resolvePersistenceEnabled(
             persistenceEnabled, cacheSizeBytes, cacheSettings),
         cacheSizeBytes = _resolveCacheSizeBytes(
             persistenceEnabled, cacheSizeBytes, cacheSettings),
@@ -74,6 +102,49 @@ class FirestoreSettings {
   /// settings.
   final LocalCacheSettings? cacheSettings;
 
+  /// The token sent to the Firestore emulator to authenticate the requests,
+  /// set with [withEmulator] (the only way to set it: it is never sent to a
+  /// host that was not configured as an emulator). Same as the `mockUserToken` option of
+  /// `connectFirestoreEmulator` in the JS SDK; meant for testing security
+  /// rules, it replaces the token of Firebase Auth.
+  ///
+  /// Either a token string, sent as is (the user is `mock-user`), or a
+  /// `Map<String, Object?>` with the claims of a Firebase ID token, which is
+  /// encoded as an unsigned JWT for the project of the app. The claims need a
+  /// `sub` or `user_id`, which becomes the user id; missing claims get
+  /// defaults. For example `{'sub': 'alice', 'email': 'alice@example.com'}`.
+  final Object? mockUserToken;
+
+  /// Whether these settings were made by [withEmulator] (and the host was not
+  /// changed afterwards).
+  final bool _emulator;
+
+  static Object? _checkMockUserToken(
+      Object? mockUserToken, bool emulator, String host, bool sslEnabled) {
+    if (mockUserToken == null) {
+      return null;
+    }
+    if (!emulator || host == defaultHost || sslEnabled) {
+      throw ArgumentError.value(
+          host,
+          'host',
+          'mockUserToken can only be used with the Firestore emulator: set it '
+              'with withEmulator(host, port, mockUserToken: ...) and do not '
+              'change the host, port or SSL setting afterwards');
+    }
+    if (mockUserToken is String) {
+      return mockUserToken;
+    }
+    if (mockUserToken is Map<String, Object?>) {
+      // Rejects a missing "sub" / "user_id" and the old "uid" claim now
+      // rather than when the instance is created.
+      createMockUserToken(mockUserToken);
+      return Map<String, Object?>.unmodifiable(mockUserToken);
+    }
+    throw ArgumentError.value(mockUserToken, 'mockUserToken',
+        'Must be a String or a Map<String, Object?> of token claims');
+  }
+
   static bool _resolvePersistenceEnabled(bool persistenceEnabled,
       int cacheSizeBytes, LocalCacheSettings? cacheSettings) {
     if (cacheSettings == null) {
@@ -106,8 +177,27 @@ class FirestoreSettings {
   /// and [port], without SSL. Equivalent to `useEmulator` of the other
   /// SDKs; it has to be applied to the settings that are passed when the
   /// instance is created. A host that was set before is replaced.
-  FirestoreSettings withEmulator(String host, int port) =>
-      copyWith(host: host, port: port, sslEnabled: false);
+  ///
+  /// [mockUserToken] authenticates the requests to the emulator, see
+  /// [FirestoreSettings.mockUserToken]. Like `connectFirestoreEmulator`, the
+  /// emulator options replace the previous ones: without [mockUserToken] the
+  /// copy has none.
+  ///
+  /// Throws an [ArgumentError] when [host] is the production host
+  /// ([defaultHost]).
+  FirestoreSettings withEmulator(String host, int port,
+      {Object? mockUserToken}) {
+    if (host == defaultHost) {
+      throw ArgumentError.value(
+          host, 'host', 'The production host is not an emulator');
+    }
+    return _copy(
+        host: host,
+        port: port,
+        sslEnabled: false,
+        emulator: true,
+        mockUserToken: mockUserToken);
+  }
 
   FirestoreSettings copyWith({
     String? host,
@@ -117,11 +207,40 @@ class FirestoreSettings {
     int? cacheSizeBytes,
     LocalCacheSettings? cacheSettings,
   }) {
+    // The settings stay emulator settings (and keep their mock user token)
+    // only while they point at the same emulator. Changing the host of
+    // settings that have a token is an error: see [_checkMockUserToken].
+    final bool emulator = _emulator &&
+        (host ?? this.host) == this.host &&
+        (port ?? this.port) == this.port &&
+        !(sslEnabled ?? this.sslEnabled);
+    return _copy(
+      host: host,
+      port: port,
+      sslEnabled: sslEnabled,
+      persistenceEnabled: persistenceEnabled,
+      cacheSizeBytes: cacheSizeBytes,
+      cacheSettings: cacheSettings,
+      emulator: emulator,
+      mockUserToken: mockUserToken,
+    );
+  }
+
+  FirestoreSettings _copy({
+    String? host,
+    int? port,
+    bool? sslEnabled,
+    bool? persistenceEnabled,
+    int? cacheSizeBytes,
+    LocalCacheSettings? cacheSettings,
+    required bool emulator,
+    required Object? mockUserToken,
+  }) {
     // The persistence flags are derived when there are cache settings, so only
     // the explicitly given ones are forwarded (and checked) in that case.
     final LocalCacheSettings? newCacheSettings =
         cacheSettings ?? this.cacheSettings;
-    return FirestoreSettings(
+    return FirestoreSettings._(
       host: host ?? this.host,
       port: port ?? this.port,
       sslEnabled: sslEnabled ?? this.sslEnabled,
@@ -132,6 +251,8 @@ class FirestoreSettings {
               ? this.cacheSizeBytes
               : defaultCacheSizeBytes),
       cacheSettings: newCacheSettings,
+      emulator: emulator,
+      mockUserToken: mockUserToken,
     );
   }
 
@@ -145,7 +266,9 @@ class FirestoreSettings {
           sslEnabled == other.sslEnabled &&
           persistenceEnabled == other.persistenceEnabled &&
           cacheSizeBytes == other.cacheSizeBytes &&
-          cacheSettings == other.cacheSettings;
+          cacheSettings == other.cacheSettings &&
+          const DeepCollectionEquality()
+              .equals(mockUserToken, other.mockUserToken);
 
   @override
   int get hashCode =>
@@ -154,7 +277,8 @@ class FirestoreSettings {
       sslEnabled.hashCode ^
       persistenceEnabled.hashCode ^
       cacheSizeBytes.hashCode ^
-      cacheSettings.hashCode;
+      cacheSettings.hashCode ^
+      const DeepCollectionEquality().hash(mockUserToken);
 
   @override
   String toString() {
@@ -164,7 +288,8 @@ class FirestoreSettings {
           ..add('sslEnabled', sslEnabled)
           ..add('persistenceEnabled', persistenceEnabled)
           ..add('cacheSizeBytes', cacheSizeBytes)
-          ..add('cacheSettings', cacheSettings))
+          ..add('cacheSettings', cacheSettings)
+          ..add('mockUserToken', mockUserToken == null ? null : '<set>'))
         .toString();
   }
 }

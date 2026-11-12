@@ -16,8 +16,8 @@ void main() {
   group('level', levelTests);
 
   group('printing', () {
-    final LogLevel original = Log.level;
-    setUp(() => Log.level = LogLevel.d);
+    final InternalLogLevel original = Log.level;
+    setUp(() => Log.level = InternalLogLevel.d);
     tearDown(() => Log.level = original);
     printingTests();
   });
@@ -44,11 +44,11 @@ void printingTests() {
 }
 
 void levelTests() {
-  final LogLevel saved = Log.level;
+  final InternalLogLevel saved = Log.level;
   tearDown(() => Log.level = saved);
 
   test('default level is quiet (warning)', () {
-    expect(LogLevel.w, saved);
+    expect(InternalLogLevel.w, saved);
     expect(Log.isDebugEnabled, isFalse);
     expect(capture(() => Log.d('tag', 'x')), isEmpty);
     expect(capture(() => Log.i('tag', 'x')), isEmpty);
@@ -57,15 +57,15 @@ void levelTests() {
   });
 
   test('isDebugEnabled matches whether Log.d prints', () {
-    for (final LogLevel level in <LogLevel>[
-      LogLevel.i,
-      LogLevel.d,
-      LogLevel.w,
-      LogLevel.e
+    for (final InternalLogLevel level in <InternalLogLevel>[
+      InternalLogLevel.i,
+      InternalLogLevel.d,
+      InternalLogLevel.w,
+      InternalLogLevel.e
     ]) {
       Log.level = level;
       expect(Log.isDebugEnabled, capture(() => Log.d('t', 'x')).isNotEmpty,
-          reason: 'level ${level.compareTo(LogLevel.i)}');
+          reason: 'level ${level.compareTo(InternalLogLevel.i)}');
     }
   });
 }
