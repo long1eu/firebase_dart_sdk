@@ -129,9 +129,13 @@ class PipelineSnapshot {
   /// report one.
   final Timestamp? executionTime;
 
-  /// What the server reported about how it ran the pipeline; null unless
-  /// `explainOptions` was passed to `Pipeline.execute` and the server
-  /// answered.
+  /// What the server reported about how it ran the pipeline, or null if it
+  /// reported nothing.
+  ///
+  /// The server only explains a pipeline when asked to with an option. This
+  /// SDK has no parameter for that option yet, because its name could not be
+  /// verified (the other client SDKs do not have it and the emulator ignores
+  /// every option); send it with the `rawOptions` of `Pipeline.execute`.
   final PipelineExplainStats? explainStats;
 
   @override

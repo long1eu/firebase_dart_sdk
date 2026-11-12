@@ -12,16 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
+    as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/expression.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/query_to_pipeline.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/stage.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as pb;
 import 'package:meta/meta.dart';
@@ -185,6 +192,72 @@ class PipelineSource {
   Pipeline createFrom(Query<Object?> query) {
     _validateDatabase(query.firestore.databaseId, 'Query');
     return queryToPipeline(_firestore, query.query);
+  }
+
+  /// Creates the pipeline that computes the aggregations of the classic
+  /// [aggregateQuery] (`query.count()`, `query.aggregate(...)`).
+  ///
+  /// The single result has one field per aggregation, named after the alias
+  /// given to `aggregateWithAliases`, or `count`, `sum_<field>` and
+  /// `average_<field>` without aliases.
+  Pipeline createFromAggregateQuery(AggregateQuery aggregateQuery) {
+    final Map<String, AggregateField> fields = aggregateQuery.aliases ??
+        <String, AggregateField>{
+          for (final AggregateField field in aggregateQuery.aggregateFields)
+            field.alias: field,
+        };
+    AggregateFunction convert(AggregateField aggregate) {
+      if (aggregate is CountAggregateField) {
+        return AggregateFunction('count');
+      }
+      final Field field =
+          Field(model.FieldPath.fromServerFormat(aggregate.fieldPath));
+      return aggregate is SumAggregateField ? field.sum() : field.average();
+    }
+
+    return createFrom(aggregateQuery.query).aggregate(<AliasedAggregate>[
+      for (final MapEntry<String, AggregateField> entry in fields.entries)
+        // The server reads an alias as a field path; this keeps a name with
+        // dots or other special characters one field.
+        convert(entry.value)
+            .as(model.FieldPath.fromSingleSegment(entry.key).canonicalString),
+    ]);
+  }
+
+  /// Creates the pipeline that returns the same documents, nearest first, as
+  /// the classic vector query [vectorQuery] (`query.findNearest(...)`).
+  ///
+  /// A `distanceThreshold` becomes a filter that computes the distance again
+  /// with the matching distance function.
+  Pipeline createFromVectorQuery(VectorQuery vectorQuery) {
+    final Field vectorField = Field(vectorQuery.vectorField);
+    Pipeline pipeline = createFrom(vectorQuery.query).findNearest(
+      vectorField,
+      vectorQuery.queryVector,
+      vectorQuery.distanceMeasure,
+      limit: vectorQuery.limit,
+      distanceField: vectorQuery.distanceResultField,
+    );
+    final double? threshold = vectorQuery.distanceThreshold;
+    if (threshold != null) {
+      final VectorValue vector = vectorQuery.queryVector;
+      switch (vectorQuery.distanceMeasure) {
+        case DistanceMeasure.euclidean:
+          pipeline = pipeline.where(
+              vectorField.euclideanDistance(vector).lessThanOrEqual(threshold));
+          break;
+        case DistanceMeasure.cosine:
+          pipeline = pipeline.where(
+              vectorField.cosineDistance(vector).lessThanOrEqual(threshold));
+          break;
+        case DistanceMeasure.dotProduct:
+          // A larger dot product means more similar.
+          pipeline = pipeline.where(
+              vectorField.dotProduct(vector).greaterThanOrEqual(threshold));
+          break;
+      }
+    }
+    return pipeline;
   }
 
   Pipeline _start(Stage stage) => Pipeline(_firestore, <Stage>[stage]);

@@ -35,69 +35,6 @@ enum PipelineIndexMode {
   final String serverName;
 }
 
-/// What the server reports about how it runs a pipeline.
-enum PipelineExplainMode {
-  /// Run the pipeline and report the plan together with execution
-  /// statistics.
-  analyze('analyze'),
-
-  /// Only report the plan.
-  explain('explain');
-
-  const PipelineExplainMode(this.serverName);
-
-  /// The name the server knows this mode by.
-  @internal
-  final String serverName;
-}
-
-/// The format of [PipelineExplainStats].
-enum PipelineExplainOutputFormat {
-  /// Human readable text.
-  text('text'),
-
-  /// A JSON document.
-  json('json');
-
-  const PipelineExplainOutputFormat(this.serverName);
-
-  /// The name the server knows this format by.
-  @internal
-  final String serverName;
-}
-
-/// Asks the server to explain how it runs a pipeline; pass it to
-/// [Pipeline.execute].
-///
-/// **Not verified**: the other client SDKs do not have this option yet and
-/// the emulator ignores it, so the option names sent here (`explain_options`
-/// with `mode` and `output_format`) are taken from the API description and
-/// have not been checked against a real backend.
-class PipelineExplainOptions {
-  /// Explain in [mode], formatting the answer as [outputFormat] (the server
-  /// default when null).
-  const PipelineExplainOptions(
-      {this.mode = PipelineExplainMode.analyze, this.outputFormat});
-
-  /// What to report.
-  final PipelineExplainMode mode;
-
-  /// The format of the report, or null for the server default.
-  final PipelineExplainOutputFormat? outputFormat;
-
-  /// The wire form of these options.
-  @internal
-  pb.Value toProto() {
-    final PipelineExplainOutputFormat? format = outputFormat;
-    return pb.Value()
-      ..mapValue = (pb.MapValue()
-        ..fields['mode'] = stringValue(mode.serverName)
-        ..fields.addAll(<String, pb.Value>{
-          if (format != null) 'output_format': stringValue(format.serverName),
-        }));
-  }
-}
-
 /// A query made of an ordered list of stages, executed by the server.
 ///
 /// Start one with `firestore.pipeline()` and a source such as
@@ -557,12 +494,12 @@ class Pipeline {
   /// committed when it completes, so the writes of a write stage ([delete],
   /// [update], [insert], [upsert]) are applied together or not at all.
   ///
-  /// With [explainOptions] the server is asked to describe how it runs the
-  /// pipeline; the answer is in [PipelineSnapshot.explainStats].
+  /// Options this SDK has no parameter for go into [rawOptions]. If such an
+  /// option makes the server explain how it ran the pipeline, the answer is in
+  /// [PipelineSnapshot.explainStats].
   Future<PipelineSnapshot> execute({
     bool atomic = false,
     PipelineIndexMode? indexMode,
-    PipelineExplainOptions? explainOptions,
     Map<String, Object?>? rawOptions,
   }) async {
     if (stages.isNotEmpty && stages.first.name == 'subcollection') {
@@ -573,10 +510,7 @@ class Pipeline {
     }
     final PipelineEncoder encoder = PipelineEncoder(firestore.databaseId);
     final proto.ExecutePipelineRequest request = toExecuteRequest(encoder,
-        atomic: atomic,
-        indexMode: indexMode,
-        explainOptions: explainOptions,
-        rawOptions: rawOptions);
+        atomic: atomic, indexMode: indexMode, rawOptions: rawOptions);
     final List<proto.ExecutePipelineResponse> responses =
         await firestore.client.executePipeline(request);
     return decodePipelineResponses(
@@ -589,16 +523,12 @@ class Pipeline {
     PipelineEncoder encoder, {
     bool atomic = false,
     PipelineIndexMode? indexMode,
-    PipelineExplainOptions? explainOptions,
     Map<String, Object?>? rawOptions,
   }) {
     final proto.StructuredPipeline structured = proto.StructuredPipeline()
       ..pipeline = toProto(encoder);
     if (indexMode != null) {
       structured.options['index_mode'] = stringValue(indexMode.serverName);
-    }
-    if (explainOptions != null) {
-      structured.options['explain_options'] = explainOptions.toProto();
     }
     structured.options.addAll(encodeOptions(encoder, rawOptions));
     final proto.ExecutePipelineRequest request = proto.ExecutePipelineRequest()

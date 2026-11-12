@@ -92,7 +92,9 @@ only. **Nothing was run against production Firestore.**
   The preview also has the write stages `update`, `delete`, `insert` and `upsert` with
   `execute(atomic: true)`, variables and subqueries (`define`, `variable`, `subcollection`,
   `toArrayExpression`, `toScalarExpression`), lambda functions (`arrayFilter`,
-  `arrayTransform`), `switchOn`, `nor`, and explain options (not verified against a backend).
+  `arrayTransform`), `switchOn`, `nor`, and `PipelineSnapshot.explainStats`.
+  `createFrom(query)`, `createFromAggregateQuery` and `createFromVectorQuery` convert the
+  classic queries; `example/pipelines.dart` shows the API.
 
 - **Experimental web support.** Where `dart:io` is missing (browsers) the client uses a second
   network transport, picked by a conditional import: REST/JSON for `Commit`,

@@ -153,6 +153,50 @@ Future<void> firestoreReadmeLine202() async {
       .execute();
 }
 
+// README.md:228
+Future<void> firestoreReadmeLine228() async {
+  // An existing query as a pipeline: the same documents in the same order.
+  final Query<Map<String, Object?>> italian = users
+      .where('country', isEqualTo: 'IT')
+      .orderBy('age', Direction.descending)
+      .limit(20);
+  final PipelineSnapshot same =
+      await firestore.pipeline().createFrom(italian).execute();
+
+  // A subquery: every author with the number of their books.
+  await firestore
+      .pipeline()
+      .collection('authors')
+      .define([field('name').as('author')])
+      .select([
+        'name',
+        firestore
+            .pipeline()
+            .collection('books')
+            .where(field('author').equal(variable('author')))
+            .aggregate([countAll().as('count')])
+            .toScalarExpression()
+            .as('books'),
+      ])
+      .execute();
+
+  // A lambda over an array.
+  await firestore
+      .pipeline()
+      .collection('books')
+      .select([field('tags').arrayFilter((tag) => tag.startsWith('sci')).as('tags')])
+      .execute();
+
+  // A write stage, applied in one transaction.
+  final PipelineSnapshot written = await firestore
+      .pipeline()
+      .collection('books')
+      .where(field('published').lessThan(1900))
+      .update(transformedFields: [constant(true).as('classic')])
+      .execute(atomic: true);
+  print(written.results.single.get('documents_modified'));
+}
+
 // ../../firebase_core/firebase_app_dart/README.md:38
 Future<void> appReadmeLine38() async {
 }

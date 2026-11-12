@@ -197,7 +197,7 @@ class Pipeline
   define(List<AliasedExpression> variables, {Map<String, Object> rawOptions}): Pipeline
   delete({Map<String, Object> rawOptions}): Pipeline
   distinct(List<Object> groups, {Map<String, Object> rawOptions}): Pipeline
-  execute({bool atomic, PipelineIndexMode indexMode, PipelineExplainOptions explainOptions, Map<String, Object> rawOptions}): Future<PipelineSnapshot>
+  execute({bool atomic, PipelineIndexMode indexMode, Map<String, Object> rawOptions}): Future<PipelineSnapshot>
   final firestore: Firestore
   final stages: List<Stage> @internal
   findNearest(Object field, Object vector, DistanceMeasure distanceMeasure, {int limit, String distanceField, Map<String, Object> rawOptions}): Pipeline
@@ -212,7 +212,7 @@ class Pipeline
   select(List<Object> selections, {Map<String, Object> rawOptions}): Pipeline
   sort(List<Ordering> orderings, {Map<String, Object> rawOptions}): Pipeline
   toArrayExpression(): Expression
-  toExecuteRequest(PipelineEncoder encoder, {bool atomic, PipelineIndexMode indexMode, PipelineExplainOptions explainOptions, Map<String, Object> rawOptions}): ExecutePipelineRequest @internal
+  toExecuteRequest(PipelineEncoder encoder, {bool atomic, PipelineIndexMode indexMode, Map<String, Object> rawOptions}): ExecutePipelineRequest @internal
   toProto(PipelineEncoder encoder): Pipeline @internal
   toScalarExpression(): Expression
   toString(): String
@@ -221,23 +221,6 @@ class Pipeline
   update({List<Selectable> transformedFields, Map<String, Object> rawOptions}): Pipeline
   upsert({List<Selectable> additionalFields, Object collection, Object documentId, Map<String, Object> rawOptions}): Pipeline
   where(BooleanExpression condition, {Map<String, Object> rawOptions}): Pipeline
-enum PipelineExplainMode
-  final serverName: String @internal
-  new PipelineExplainMode(int #index, String #name, String serverName)
-  static final analyze: PipelineExplainMode
-  static final explain: PipelineExplainMode
-  static final values: List<PipelineExplainMode>
-class PipelineExplainOptions
-  final mode: PipelineExplainMode
-  final outputFormat: PipelineExplainOutputFormat
-  new PipelineExplainOptions({PipelineExplainMode mode, PipelineExplainOutputFormat outputFormat})
-  toProto(): Value @internal
-enum PipelineExplainOutputFormat
-  final serverName: String @internal
-  new PipelineExplainOutputFormat(int #index, String #name, String serverName)
-  static final json: PipelineExplainOutputFormat
-  static final text: PipelineExplainOutputFormat
-  static final values: List<PipelineExplainOutputFormat>
 class PipelineExplainStats
   final typeUrl: String
   final value: List<int>
@@ -269,6 +252,8 @@ class PipelineSource
   collection(Object collection, {String forceIndex, Map<String, Object> rawOptions}): Pipeline
   collectionGroup(String collectionId, {String forceIndex, Map<String, Object> rawOptions}): Pipeline
   createFrom(Query<Object> query): Pipeline
+  createFromAggregateQuery(AggregateQuery aggregateQuery): Pipeline
+  createFromVectorQuery(VectorQuery vectorQuery): Pipeline
   database({Map<String, Object> rawOptions}): Pipeline
   documents(List<Object> documents, {Map<String, Object> rawOptions}): Pipeline
   literals(List<Map<String, Object>> documents, {Map<String, Object> rawOptions}): Pipeline

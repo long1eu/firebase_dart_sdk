@@ -43,6 +43,20 @@ List<Constant> _elements(FieldValue value) {
       : const <Constant>[];
 }
 
+/// A classic `!=` or `not-in` filter never matches a null value, but the
+/// pipeline functions do.
+///
+/// PORTING NOTE: the JS and Android SDKs do not add this check.
+BooleanExpression _andNotNull(Field field, BooleanExpression condition) =>
+    condition.and(field.notEqual(null));
+
+/// A classic array filter does not match a value that is not an array, but
+/// the pipeline functions fail the whole pipeline for one.
+///
+/// PORTING NOTE: the JS and Android SDKs do not add this check.
+BooleanExpression _ifArray(Field field, BooleanExpression condition) =>
+    field.isType('array').conditional(condition, false).asBoolean();
+
 /// Converts a filter of a classic query to a pipeline condition.
 ///
 /// A classic filter never matches a document that lacks the field, so most
@@ -64,23 +78,26 @@ BooleanExpression filterToCondition(Filter filter) {
     } else if (op == FilterOperator.equal) {
       return field.exists().and(field.equal(value));
     } else if (op == FilterOperator.notEqual) {
-      return field.notEqual(value);
+      return filter.value is NullValue
+          ? field.notEqual(value)
+          : _andNotNull(field, field.notEqual(value));
     } else if (op == FilterOperator.arrayContains) {
-      return field.exists().and(field.arrayContains(value));
+      return field.exists().and(_ifArray(field, field.arrayContains(value)));
     } else if (op == FilterOperator.IN) {
       final List<Constant> values = _elements(filter.value);
       return field.exists().and(values.length == 1
           ? field.equal(values.first)
           : field.equalAny(values));
     } else if (op == FilterOperator.arrayContainsAny) {
-      return field
-          .exists()
-          .and(field.arrayContainsAny(_elements(filter.value)));
+      return field.exists().and(
+          _ifArray(field, field.arrayContainsAny(_elements(filter.value))));
     } else if (op == FilterOperator.NOT_IN) {
       final List<Constant> values = _elements(filter.value);
-      return values.length == 1
-          ? field.notEqual(values.first)
-          : field.notEqualAny(values);
+      return _andNotNull(
+          field,
+          values.length == 1
+              ? field.notEqual(values.first)
+              : field.notEqualAny(values));
     }
     throw fail('Unexpected filter operator: $op');
   } else if (filter is CompositeFilter) {
@@ -103,6 +120,12 @@ BooleanExpression filterToCondition(Filter filter) {
 /// PORTING NOTE: the JS and Android SDKs always use `greater_than` for start
 /// bounds and `less_than` for end bounds, which is wrong for descending
 /// orderings; here the comparison follows the direction of each ordering.
+///
+/// Known difference from a classic query: the pipeline comparisons only match
+/// values of the type of the cursor value (all numbers are one type), while a
+/// classic cursor is a position in the order of all types. On a field that
+/// holds values of several types the pipeline therefore returns only the
+/// documents of the cursor's type.
 BooleanExpression _cursorCondition(Bound bound, List<Ordering> orderings,
     {required bool after, required bool inclusive}) {
   BooleanExpression compare(int i) {

@@ -335,46 +335,17 @@ void main() {
   });
 
   group('explain', () {
-    test('options are sent as explain_options', () {
+    test('options are sent with rawOptions', () {
       expect(
           base()
-              .toExecuteRequest(encoder(),
-                  explainOptions: const PipelineExplainOptions())
+              .toExecuteRequest(encoder(), rawOptions: <String, Object?>{
+                'explain_options': <String, Object?>{'mode': 'analyze'}
+              })
               .structuredPipeline
               .options,
           <String, pb.Value>{
             'explain_options':
                 mapValue(<String, pb.Value>{'mode': str('analyze')}),
-          });
-      expect(
-          base()
-              .toExecuteRequest(encoder(),
-                  explainOptions: const PipelineExplainOptions(
-                      mode: PipelineExplainMode.explain,
-                      outputFormat: PipelineExplainOutputFormat.json))
-              .structuredPipeline
-              .options,
-          <String, pb.Value>{
-            'explain_options': mapValue(<String, pb.Value>{
-              'mode': str('explain'),
-              'output_format': str('json'),
-            }),
-          });
-    });
-
-    test('raw options can replace them', () {
-      expect(
-          base()
-              .toExecuteRequest(encoder(),
-                  explainOptions: const PipelineExplainOptions(),
-                  rawOptions: <String, Object?>{
-                    'explain_options': <String, Object?>{'mode': 'other'}
-                  })
-              .structuredPipeline
-              .options,
-          <String, pb.Value>{
-            'explain_options':
-                mapValue(<String, pb.Value>{'mode': str('other')}),
           });
     });
 

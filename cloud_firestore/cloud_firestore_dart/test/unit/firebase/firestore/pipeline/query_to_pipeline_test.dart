@@ -77,6 +77,16 @@ void main() {
         stage('documents', <pb.Value>[ref('/coll/doc')]));
   });
 
+  pb.Value notNull(String field) =>
+      cmp('not_equal', field, pb.Value()..nullValue = pb.Value().nullValue);
+
+  pb.Value ifArray(String field, pb.Value condition) =>
+      fn('conditional', <pb.Value>[
+        fn('is_type', <pb.Value>[fieldRef(field), str('array')]),
+        condition,
+        boolean(false)
+      ]);
+
   test('comparison filters also require the field to exist', () {
     const Map<String, String> operators = <String, String>{
       '<': 'less_than',
@@ -84,7 +94,6 @@ void main() {
       '>': 'greater_than',
       '>=': 'greater_than_or_equal',
       '==': 'equal',
-      'array-contains': 'array_contains',
     };
     for (final MapEntry<String, String> entry in operators.entries) {
       final String operator = entry.key;
@@ -100,24 +109,35 @@ void main() {
     }
   });
 
-  test('not-equal filters do not require the field to exist', () {
-    expect(convert(util.query('coll').filter(util.filter('a', '!=', 1)))[1],
-        stage('where', <pb.Value>[cmp('not_equal', 'a', integer(1))]));
+  test('not-equal filters do not match null', () {
+    expect(
+        convert(util.query('coll').filter(util.filter('a', '!=', 1)))[1],
+        stage('where', <pb.Value>[
+          and(<pb.Value>[cmp('not_equal', 'a', integer(1)), notNull('a')])
+        ]));
+    // `!= null` is the "is not null" filter itself.
+    expect(convert(util.query('coll').filter(util.filter('a', '!=', null)))[1],
+        stage('where', <pb.Value>[notNull('a')]));
     expect(
         convert(util
             .query('coll')
             .filter(util.filter('a', 'not-in', <int>[1, 2])))[1],
         stage('where', <pb.Value>[
-          cmp('not_equal_any', 'a',
-              arrayValue(<pb.Value>[integer(1), integer(2)]))
+          and(<pb.Value>[
+            cmp('not_equal_any', 'a',
+                arrayValue(<pb.Value>[integer(1), integer(2)])),
+            notNull('a'),
+          ])
         ]));
     expect(
         convert(
             util.query('coll').filter(util.filter('a', 'not-in', <int>[1])))[1],
-        stage('where', <pb.Value>[cmp('not_equal', 'a', integer(1))]));
+        stage('where', <pb.Value>[
+          and(<pb.Value>[cmp('not_equal', 'a', integer(1)), notNull('a')])
+        ]));
   });
 
-  test('in and array-contains-any filters', () {
+  test('in filters', () {
     expect(
         convert(
             util.query('coll').filter(util.filter('a', 'in', <int>[1, 2])))[1],
@@ -133,6 +153,19 @@ void main() {
         stage('where', <pb.Value>[
           and(<pb.Value>[exists('a'), cmp('equal', 'a', integer(1))])
         ]));
+  });
+
+  test('array filters only look at arrays', () {
+    expect(
+        convert(util
+            .query('coll')
+            .filter(util.filter('a', 'array-contains', 1)))[1],
+        stage('where', <pb.Value>[
+          and(<pb.Value>[
+            exists('a'),
+            ifArray('a', cmp('array_contains', 'a', integer(1))),
+          ])
+        ]));
     expect(
         convert(util
             .query('coll')
@@ -140,8 +173,10 @@ void main() {
         stage('where', <pb.Value>[
           and(<pb.Value>[
             exists('a'),
-            cmp('array_contains_any', 'a',
-                arrayValue(<pb.Value>[integer(1), integer(2)]))
+            ifArray(
+                'a',
+                cmp('array_contains_any', 'a',
+                    arrayValue(<pb.Value>[integer(1), integer(2)]))),
           ])
         ]));
   });
@@ -160,8 +195,8 @@ void main() {
           or(<pb.Value>[
             and(<pb.Value>[exists('a'), cmp('equal', 'a', integer(1))]),
             and(<pb.Value>[
-              cmp('not_equal', 'b', integer(2)),
-              cmp('not_equal', 'c', integer(3)),
+              and(<pb.Value>[cmp('not_equal', 'b', integer(2)), notNull('b')]),
+              and(<pb.Value>[cmp('not_equal', 'c', integer(3)), notNull('c')]),
             ]),
           ])
         ]));

@@ -21,10 +21,12 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/main.dart
 | `sqlite_database.dart` | The complete `OpenDatabase` on top of `package:sqlite3` used by the two examples around it. Copy it into your app. |
 | `emulator_mock_user_token.dart` | `withEmulator` and `mockUserToken` to act as a signed-in user. |
 | `lifecycle.dart` | `setLogLevel`, `waitForPendingWrites`, `snapshotsInSync`, `terminate`, `clearPersistence`. |
+| `pipelines.dart` | Pipelines (preview): stages, expressions, grouped aggregation, lambdas, `createFrom(query)`, subqueries, an atomic `update`. Needs an Enterprise edition emulator (`FIRESTORE_ENTERPRISE_EMULATOR_HOST`); prints a note and exits without one. |
 
 `common.dart` holds the setup the examples share (a `FirebaseApp` for the `demo-example`
 project and emulator settings). Every example ends with `firestore.terminate()`; without it
 the open gRPC channel keeps the process alive.
 
 `test/integration/firebase/firestore/examples_smoke_test.dart` runs all of them against the
-emulator.
+emulator. `test/integration_enterprise/examples_enterprise_smoke_test.dart` runs
+`pipelines.dart` against the Enterprise edition emulator.

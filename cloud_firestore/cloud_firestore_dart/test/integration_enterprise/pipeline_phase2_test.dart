@@ -694,11 +694,13 @@ void main() {
             .execute();
         expect(snapshot.results, hasLength(3));
 
-        snapshot = await source().where(field('n').exists()).execute(
-            explainOptions: const PipelineExplainOptions(
-                mode: PipelineExplainMode.analyze,
-                outputFormat: PipelineExplainOutputFormat.text));
+        snapshot = await source()
+            .where(field('n').exists())
+            .execute(rawOptions: <String, Object?>{
+          'explain_options': <String, Object?>{'mode': 'analyze'}
+        });
         expect(snapshot.results, hasLength(3));
+        expect(snapshot.explainStats, isNull);
       });
     });
   }, skip: skip);

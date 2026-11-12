@@ -225,6 +225,53 @@ await firestore
     .execute();
 ```
 
+```dart
+import 'package:cloud_firestore_dart/pipelines.dart';
+
+// An existing query as a pipeline: the same documents in the same order.
+final Query<Map<String, Object?>> italian = users
+    .where('country', isEqualTo: 'IT')
+    .orderBy('age', Direction.descending)
+    .limit(20);
+final PipelineSnapshot same =
+    await firestore.pipeline().createFrom(italian).execute();
+
+// A subquery: every author with the number of their books.
+await firestore
+    .pipeline()
+    .collection('authors')
+    .define([field('name').as('author')])
+    .select([
+      'name',
+      firestore
+          .pipeline()
+          .collection('books')
+          .where(field('author').equal(variable('author')))
+          .aggregate([countAll().as('count')])
+          .toScalarExpression()
+          .as('books'),
+    ])
+    .execute();
+
+// A lambda over an array.
+await firestore
+    .pipeline()
+    .collection('books')
+    .select([field('tags').arrayFilter((tag) => tag.startsWith('sci')).as('tags')])
+    .execute();
+
+// A write stage, applied in one transaction.
+final PipelineSnapshot written = await firestore
+    .pipeline()
+    .collection('books')
+    .where(field('published').lessThan(1900))
+    .update(transformedFields: [constant(true).as('classic')])
+    .execute(atomic: true);
+print(written.results.single.get('documents_modified'));
+```
+
+`example/pipelines.dart` is a runnable program.
+
 - **Requirements**: a Firestore **Enterprise edition** database. A Standard edition database
   (and the emulator in its default edition) answers `invalid-argument: ExecutePipeline requires
   the Database Edition to be enterprise`. The emulator supports pipelines when it is started
@@ -232,8 +279,17 @@ await firestore
 - **Server only**: a pipeline is sent to the server with the `ExecutePipeline` RPC. It does not
   read or update the local cache, does not see pending writes, fails with `unavailable` while
   offline and cannot be listened to.
-- **Sources**: `collection`, `collectionGroup`, `database`, `documents`, `literals`, and
-  `createFrom(query)`, which converts an existing `Query`.
+- **Sources**: `collection`, `collectionGroup`, `database`, `documents`, `literals`, and the
+  converters of existing queries described below.
+- **Existing queries**: `createFrom(query)` converts a `Query` (filters with named arguments or
+  `Filter.or` / `Filter.and`, orderings, cursors, `limit`, `limitToLast`, collection groups, BSON
+  operands), `createFromAggregateQuery` an `AggregateQuery` and `createFromVectorQuery` a
+  `findNearest` query. The integration tests compare each shape with `query.get(Source.server)`.
+  Known difference: a cursor (`startAt`, `endBefore`, ...) on a field that holds values of
+  several types only returns the documents whose value has the type of the cursor value; a
+  classic cursor is a position in the order of all types. The converter of a query is ignored:
+  pipeline results are maps (as in the JS and Android SDKs, which have no typed pipeline results
+  either).
 - **Stages**: `where`, `select`, `addFields`, `removeFields`, `sort`, `limit`, `offset`,
   `aggregate` (with `groups`), `distinct`, `findNearest`, `sample`, `union`, `unnest`,
   `replaceWith`.
@@ -260,10 +316,10 @@ await firestore
 - **Lambdas**: `arrayFilter((e) => e.greaterThan(1))`, `arrayTransform`,
   `arrayTransformWithIndex`; the callback builds the expression once, from a variable that
   stands for the element (name it with `alias` when lambdas are nested).
-- **Explain**: `execute(explainOptions: PipelineExplainOptions())` and
-  `PipelineSnapshot.explainStats`. Not verified: the JS and Android SDKs have no such option yet
-  and the emulator ignores it (it accepts any option), so the option names have not been checked
-  against a real backend.
+- **Explain**: there is no typed option, because its name could not be verified (the JS and
+  Android SDKs do not have one and the emulator ignores every option). Send it with
+  `execute(rawOptions: {...})`; whatever the server then reports is in
+  `PipelineSnapshot.explainStats`.
 - **Not done yet**: full-text search (the emulator has no `document_matches` function, so the
   `search` stage could not be checked; `rawStage('search', [], options: {...})` can send it),
   window functions, pipelines inside a `Transaction`, and evaluation against the local cache or
@@ -276,7 +332,7 @@ await firestore
 - The helper functions have short names (`field`, `and`, `or`, `not`, ...); import the library
   with a prefix if they clash with yours.
 
-To run `test/integration_enterprise/pipeline_test.dart`, start the Enterprise edition emulator
+To run the pipeline tests in `test/integration_enterprise`, start the Enterprise edition emulator
 (`tool/start_enterprise_emulator.sh`) and set `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (host:port);
 without it the tests are skipped.
 
