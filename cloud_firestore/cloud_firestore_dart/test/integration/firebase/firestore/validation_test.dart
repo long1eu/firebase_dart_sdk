@@ -67,8 +67,12 @@ void main() {
 
   /// Performs a write using each update API and makes sure it fails with the
   /// expected reason.
-  void expectUpdateError(Map<String, Object?> data, String reason) {
-    expectWriteError(data, reason, includeSets: false, includeUpdates: true);
+  ///
+  /// Must be awaited: it runs a transaction, which would otherwise still be in flight when the test ends and fail
+  /// with a connection error once the instance is shut down.
+  Future<void> expectUpdateError(Map<String, Object?> data, String reason) {
+    return expectWriteError(data, reason,
+        includeSets: false, includeUpdates: true);
   }
 
   /// Tests a field path with all of our APIs that accept field paths and
@@ -276,11 +280,11 @@ void main() {
         'Invalid data. Document fields cannot begin and end with "__" '
         '(found in field __baz__)');
 
-    expectUpdateError(
+    await expectUpdateError(
         map<dynamic>(<dynamic>['__baz__', 1]),
         'Invalid data. Document fields cannot begin and end with "__" '
         '(found in field __baz__)');
-    expectUpdateError(
+    await expectUpdateError(
         map<dynamic>(<dynamic>['baz.__foo__', 1]),
         'Invalid data. Document fields cannot begin and end with "__" '
         '(found in field baz.__foo__)');
