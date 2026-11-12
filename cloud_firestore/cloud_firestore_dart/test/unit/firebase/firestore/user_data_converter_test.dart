@@ -63,7 +63,7 @@ void main() {
   });
 
   test('testConvertsDoubleValue', () {
-    const List<double> testCases = <double>[
+    final List<double> testCases = <double>[
       double.infinity,
       -double.maxFinite,
       IntegerValue.min * 1.0,

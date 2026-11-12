@@ -59,6 +59,9 @@ only. **Nothing was run against production Firestore.**
     `LoadBundleTaskProgress.forInitial` / `forSuccess`; `FirestoreErrorCode.fromValue`;
     `Timestamp.validateRange`.
   - Deprecated, still working: `Firestore.shutdown` (use `terminate`).
+- `Database.file` (a `dart:io` `File`) is replaced by `Database.path` (a `String`), so the
+  persistence interface no longer needs `dart:io`. Implementations of `Database` must rename
+  the getter.
 
 ### Added
 

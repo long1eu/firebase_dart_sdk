@@ -11,8 +11,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/sync_engine.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/listen_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
-import 'package:grpc/grpc.dart';
 
 /// EventManager is responsible for mapping queries to query event listeners.
 /// It handles 'fan-out.' (Identical queries will re-use the same watch on the

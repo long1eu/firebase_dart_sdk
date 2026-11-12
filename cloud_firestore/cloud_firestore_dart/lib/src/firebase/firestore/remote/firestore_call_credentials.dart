@@ -5,9 +5,9 @@ import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/app_check_token_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:grpc/grpc.dart';
 
 class FirestoreCallCredentials {
   const FirestoreCallCredentials(this.credentialsProvider,

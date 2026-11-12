@@ -39,12 +39,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/existence_filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto_v1;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:fixnum/fixnum.dart';
-import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 
 /// Serializer that converts to and from Firestore API protos.

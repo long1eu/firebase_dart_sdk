@@ -7,9 +7,9 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:grpc/grpc.dart';
 
 /// Called whenever the online state of the client changes. This is based on the watch stream for
 /// now.

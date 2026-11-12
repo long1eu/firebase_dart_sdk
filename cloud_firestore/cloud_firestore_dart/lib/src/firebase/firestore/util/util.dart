@@ -7,7 +7,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
-import 'package:grpc/grpc.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:protobuf/protobuf.dart' show GeneratedMessage;
 
 const int _autoIdLength = 20;

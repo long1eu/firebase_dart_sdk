@@ -3,7 +3,6 @@
 // on 28/09/2018
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:meta/meta.dart';
 
@@ -51,8 +50,9 @@ typedef OnConfigure = Future<void> Function(Database db);
 /// Statements use `?` positional placeholders; [arguments] may contain `null`,
 /// [int], [double], [String] and `Uint8List` values.
 abstract class Database {
-  /// The file backing this database.
-  File get file;
+  /// The path (or, where there is no file system, the name) this database was
+  /// opened with.
+  String get path;
 
   /// Runs SQLite statement without return values
   Future<void> execute(String statement, [List<Object?>? arguments]);

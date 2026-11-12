@@ -24,6 +24,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_versi
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/aggregation_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_channel.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/vector_query_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
@@ -68,7 +69,7 @@ class Datastore {
     ClientChannelBase? clientChannel,
   }) {
     final ClientChannelBase channel = clientChannel ??
-        ChannelOptionsProvider.createChannel(
+        createGrpcChannel(
           host: databaseInfo.host,
           port: databaseInfo.port,
           sslEnabled: databaseInfo.sslEnabled,

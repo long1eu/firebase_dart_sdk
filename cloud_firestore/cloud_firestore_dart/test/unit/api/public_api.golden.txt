@@ -65,7 +65,7 @@ abstract class Database
   close(): void
   delete(String statement, [List<Object> arguments]): Future<int>
   execute(String statement, [List<Object> arguments]): Future<void>
-  get file: File
+  get path: String
   new Database()
   query(String statement, [List<Object> arguments]): Future<List<Map<String, dynamic>>>
 enum Direction

@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:grpc/grpc.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 
 /// Interface used for incoming/receiving gRPC streams.
 abstract class IncomingStreamObserver<RespT> {

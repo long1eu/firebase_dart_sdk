@@ -8,9 +8,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/existence_filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:grpc/grpc.dart';
 
 /// The kind of change that happened to the watch target.
 enum WatchTargetChangeType { noChange, added, removed, current, reset }

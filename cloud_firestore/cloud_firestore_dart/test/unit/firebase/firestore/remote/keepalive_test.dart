@@ -14,7 +14,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/grpc_channel.dart';
 import 'package:grpc/grpc.dart';
 import 'package:grpc/grpc_connection_interface.dart' show ClientChannelBase;
 import 'package:test/test.dart';
@@ -108,23 +108,23 @@ void main() {
     test('use the same keepalive as the Android SDK', () {
       // Android: ManagedChannelBuilder.keepAliveTime(30, SECONDS), grpc-java
       // defaults for the timeout (20 s) and for permitWithoutCalls (false).
-      expect(ChannelOptionsProvider.defaultKeepAlivePingInterval,
+      expect(defaultKeepAlivePingInterval,
           const Duration(seconds: 30));
-      expect(ChannelOptionsProvider.defaultKeepAliveTimeout,
+      expect(defaultKeepAliveTimeout,
           const Duration(seconds: 20));
     });
 
     test('give up on connection attempts after 15 seconds', () {
-      expect(ChannelOptionsProvider.defaultConnectTimeout,
+      expect(defaultConnectTimeout,
           const Duration(seconds: 15));
     });
 
     test('the channel options carry the connect timeout and the credentials',
         () {
       final ChannelOptions secure =
-          ChannelOptionsProvider.channelOptions(sslEnabled: true);
+          grpcChannelOptions(sslEnabled: true);
       final ChannelOptions insecure =
-          ChannelOptionsProvider.channelOptions(sslEnabled: false);
+          grpcChannelOptions(sslEnabled: false);
 
       expect(secure.connectTimeout, const Duration(seconds: 15));
       expect(secure.credentials.isSecure, isTrue);
@@ -158,7 +158,7 @@ void main() {
     }
 
     ClientChannelBase firestoreChannel(int port) =>
-        ChannelOptionsProvider.createChannel(
+        createGrpcChannel(
           host: '127.0.0.1',
           port: port,
           sslEnabled: false,

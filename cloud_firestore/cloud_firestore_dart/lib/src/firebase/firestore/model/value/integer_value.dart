@@ -10,8 +10,13 @@ class IntegerValue extends NumberValue {
 
   factory IntegerValue.valueOf(int value) => IntegerValue(value);
 
-  static const int max = 9223372036854775807;
-  static const int min = -9223372036854775808;
+  /// The largest and the smallest 64 bit integers.
+  ///
+  /// Parsed rather than written as literals: compiled to JavaScript an `int`
+  /// is a double, which cannot represent these values exactly, and the
+  /// literals would not compile. There they are 2^63 and -2^63.
+  static final int max = int.parse('9223372036854775807');
+  static final int min = int.parse('-9223372036854775808');
 
   final int _value;
 

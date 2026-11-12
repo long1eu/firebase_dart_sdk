@@ -94,8 +94,10 @@ class AggregateQuerySnapshot {
     return value.toInt();
   }
 
-  static const int _maxInt = 9223372036854775807;
-  static const int _minInt = -9223372036854775808;
+  // Not literals: they do not compile to JavaScript, where an `int` cannot
+  // hold them exactly (they are 2^63 and -2^63 there).
+  static final int _maxInt = int.parse('9223372036854775807');
+  static final int _minInt = int.parse('-9223372036854775808');
 
   /// The result of [aggregateField] as a `double`, or null if the result is
   /// null.

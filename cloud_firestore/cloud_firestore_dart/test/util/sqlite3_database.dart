@@ -10,10 +10,10 @@ import 'package:sqlite3/sqlite3.dart' as sql;
 /// [DatabaseMock.create] has the signature of [OpenDatabase], so it can be
 /// passed wherever an [OpenDatabase] is expected.
 class DatabaseMock extends Database {
-  DatabaseMock._(this.database, this.path);
+  DatabaseMock._(this.database, this.file);
 
   final sql.Database database;
-  final File path;
+  final File file;
 
   /// Whether the database file is renamed when [close] is called, so the next
   /// open of the same name starts from a fresh file.
@@ -46,12 +46,12 @@ class DatabaseMock extends Database {
   }) async {
     final int targetVersion = version ?? 1;
 
-    final File path = pathForName(name);
-    final bool callOnCreate = !path.existsSync();
-    path.createSync(recursive: true);
+    final File file = pathForName(name);
+    final bool callOnCreate = !file.existsSync();
+    file.createSync(recursive: true);
 
-    final sql.Database database = sql.sqlite3.open(path.path);
-    final DatabaseMock mock = DatabaseMock._(database, path);
+    final sql.Database database = sql.sqlite3.open(file.path);
+    final DatabaseMock mock = DatabaseMock._(database, file);
 
     await onConfigure?.call(mock);
     if (callOnCreate) {
@@ -97,10 +97,10 @@ class DatabaseMock extends Database {
   void close() {
     database.dispose();
     if (renamePath) {
-      path.renameSync('${path.path}_');
+      file.renameSync('${file.path}_');
     }
   }
 
   @override
-  File get file => path;
+  String get path => file.path;
 }

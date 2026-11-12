@@ -43,10 +43,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/target_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 
 /// [SyncEngine] is the central controller in the client SDK architecture. It is the glue code between the

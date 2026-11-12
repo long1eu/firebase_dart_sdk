@@ -47,10 +47,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/exponential_backoff.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:grpc/grpc.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// [FirestoreClient] is a top-level class that constructs and owns all of the pieces of the client SDK architecture.

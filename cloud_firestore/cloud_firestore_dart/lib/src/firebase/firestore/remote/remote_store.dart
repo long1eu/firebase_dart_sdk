@@ -31,11 +31,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/target_change
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change_aggregator.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:grpc/grpc.dart';
 import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
 

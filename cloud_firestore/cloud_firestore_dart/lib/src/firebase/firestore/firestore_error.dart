@@ -2,8 +2,8 @@
 // Lung Razvan <long1eu>
 // on 17/09/2018
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
-import 'package:grpc/grpc.dart';
 
 class FirestoreErrorCode {
   const FirestoreErrorCode._(this.value);

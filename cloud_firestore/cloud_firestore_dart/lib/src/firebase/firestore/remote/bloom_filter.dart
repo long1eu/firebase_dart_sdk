@@ -16,6 +16,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart' as crypto;
+import 'package:fixnum/fixnum.dart';
 
 /// Thrown by [BloomFilter.create] if the given arguments are not valid.
 class BloomFilterCreateException implements Exception {
@@ -102,8 +103,8 @@ class BloomFilter {
           'Invalid md5 hash array length: ${digest.length} (expected 16)');
     }
 
-    final int hash1 = _getLongLittleEndian(digest, 0);
-    final int hash2 = _getLongLittleEndian(digest, 8);
+    final Int64 hash1 = Int64.fromBytes(digest.sublist(0, 8));
+    final Int64 hash2 = Int64.fromBytes(digest.sublist(8, 16));
 
     for (int i = 0; i < _hashCount; i++) {
       if (!_isBitSet(_getBitIndex(hash1, hash2, i))) {
@@ -113,29 +114,25 @@ class BloomFilter {
     return true;
   }
 
-  /// Interprets 8 bytes as a little endian 64 bit integer.
-  static int _getLongLittleEndian(List<int> bytes, int offset) {
-    int result = 0;
-    for (int i = 0; i < 8; i++) {
-      result |= (bytes[offset + i] & 0xFF) << (i * 8);
-    }
-    return result;
-  }
-
   /// Returns the index of the bit the [hashIndex]-th hash function checks.
-  int _getBitIndex(int hash1, int hash2, int hashIndex) {
+  ///
+  /// PORTING NOTE: the 64 bit arithmetic uses [Int64] instead of `int`, so it
+  /// is also correct when compiled to JavaScript (53 bit integers).
+  int _getBitIndex(Int64 hash1, Int64 hash2, int hashIndex) {
     // h(i) = h1 + i * h2. The hashes are unsigned 64 bit values; addition and
     // multiplication wrap around in the same way for signed and unsigned ints.
-    final int combinedHash = hash1 + hash2 * hashIndex;
+    final Int64 combinedHash = hash1 + hash2 * Int64(hashIndex);
     return _unsignedRemainder(combinedHash, _bitCount);
   }
 
-  /// Computes `dividend mod divisor`, treating both as unsigned 64 bit values.
-  /// [divisor] must be positive.
-  static int _unsignedRemainder(int dividend, int divisor) {
-    final int quotient = ((dividend >>> 1) ~/ divisor) << 1;
-    final int remainder = dividend - quotient * divisor;
-    return remainder - (remainder >= divisor ? divisor : 0);
+  /// Computes `dividend mod divisor`, treating [dividend] as an unsigned 64
+  /// bit value. [divisor] must be positive.
+  static int _unsignedRemainder(Int64 dividend, int divisor) {
+    final Int64 divisor64 = Int64(divisor);
+    final Int64 quotient = (dividend.shiftRightUnsigned(1) ~/ divisor64) << 1;
+    final Int64 remainder = dividend - quotient * divisor64;
+    return (remainder - (remainder >= divisor64 ? divisor64 : Int64.ZERO))
+        .toInt();
   }
 
   bool _isBitSet(int index) {
