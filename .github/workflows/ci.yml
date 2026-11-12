@@ -9,14 +9,18 @@ permissions:
   contents: read
 
 jobs:
+  # The lowest supported SDK (the `sdk: ^3.8.0` floor of cloud_firestore_dart). The formatting
+  # check runs only here, on a pinned SDK, so that a formatter change in a new Dart release
+  # cannot fail CI without a code change. `lib` is formatted identically by 3.8.0 and by the
+  # SDK it was last formatted with (3.12.2); when the pin moves, reformat with the new one.
   unit:
-    name: Unit tests (all packages)
+    name: Unit tests and formatting (Dart 3.8.0)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: dart-lang/setup-dart@v1.7.1
         with:
-          sdk: stable
+          sdk: 3.8.0
       - name: Analyze and run unit tests
         run: ./tool/test_all.sh
       # After test_all.sh, which runs `dart pub get`: the formatter takes the language version
@@ -28,6 +32,18 @@ jobs:
       - name: Check formatting (cloud_firestore_dart)
         working-directory: cloud_firestore/cloud_firestore_dart
         run: dart format --output=none --set-exit-if-changed lib
+
+  # The same on the current stable SDK, without the formatting check.
+  unit-stable:
+    name: Unit tests (Dart stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dart-lang/setup-dart@v1.7.1
+        with:
+          sdk: stable
+      - name: Analyze and run unit tests
+        run: ./tool/test_all.sh
 
   # The emulator suite has 1-2 known flaky tests (event ordering in the emulator, e.g.
   # write_batch_test testWriteTheSameServerTimestampAcrossWrites).

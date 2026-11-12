@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-part of field_value;
+part of 'field_value.dart';
 
 /// The reserved map keys of the BSON types.
 ///
