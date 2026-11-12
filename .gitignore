@@ -22,3 +22,6 @@ build/
 # Local Firestore emulator install and logs (npm install firebase-tools here)
 .emulator/
 .protoc-venv/
+
+# Node harness of the JS interop tests (npm install in tool/interop)
+tool/interop/node_modules/

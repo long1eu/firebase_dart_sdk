@@ -1,0 +1,10 @@
+{
+  "name": "firestore-dart-js-interop",
+  "private": true,
+  "type": "module",
+  "description": "Node harness for the Dart <-> JS SDK interop tests (emulator only, no credentials).",
+  "dependencies": {
+    "firebase": "^13.3.0",
+    "firebase-admin": "^14.5.1"
+  }
+}

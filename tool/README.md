@@ -22,5 +22,6 @@
 
   The real-project mode is described in the Testing section of `cloud_firestore/cloud_firestore_dart/README.md`. It is never used unless you set `FIRESTORE_TEST_PROJECT_ID`.
 - CI (`.github/workflows/ci.yml`) has three jobs: unit tests, the standard-emulator integration suite, and the enterprise-emulator tests. The workflow has not been run yet.
+- `interop/`: Node harness for the interop tests with the JS SDK and firebase-admin (`npm install` there; see its README).
 - `bench/`: micro-benchmarks for hot paths.
 - Regenerating the Firestore protos: `cloud_firestore/cloud_firestore_dart/tool/gen_protos.sh` (needs `protoc_plugin` 21.1.2, matching protobuf 3.x). If `protoc` is unusable, set up `tool/protoc_wrap.sh` (see its header) and pass `PROTOC="$PWD/tool/protoc_wrap.sh"`.

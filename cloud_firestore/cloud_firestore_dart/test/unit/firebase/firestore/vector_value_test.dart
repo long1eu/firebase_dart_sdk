@@ -127,4 +127,56 @@ void main() {
           FieldValue.vector(<double>[0.5, 1.5]));
     });
   });
+
+  group('VectorValue JSON', () {
+    test('toJson has the shape of the JS SDK', () {
+      expect(VectorValue(<double>[1, 2.5, -3]).toJson(), <String, Object>{
+        'type': 'firestore/vectorValue/1.0',
+        'vectorValues': <double>[1, 2.5, -3],
+      });
+      expect(VectorValue.jsonType, 'firestore/vectorValue/1.0');
+    });
+
+    test('fromJson reads toJson and JSON numbers without a fraction', () {
+      final VectorValue vector = VectorValue(<double>[1, 2.5, -3]);
+      expect(VectorValue.fromJson(vector.toJson()), vector);
+      expect(
+          VectorValue.fromJson(<String, Object?>{
+            'type': 'firestore/vectorValue/1.0',
+            'vectorValues': <Object?>[1, 2.5, -3],
+          }),
+          vector);
+      expect(VectorValue.fromJson(VectorValue(<double>[]).toJson()),
+          VectorValue(<double>[]));
+    });
+
+    test('fromJson throws with invalid data', () {
+      for (final Map<String, Object?> json in <Map<String, Object?>>[
+        <String, Object?>{},
+        <String, Object?>{
+          'vectorValues': <Object?>[1]
+        },
+        <String, Object?>{
+          'type': 'firestore/geoPoint/1.0',
+          'vectorValues': <Object?>[1]
+        },
+        <String, Object?>{'type': 'firestore/vectorValue/1.0'},
+        <String, Object?>{
+          'type': 'firestore/vectorValue/1.0',
+          'vectorValues': 'x'
+        },
+        <String, Object?>{
+          'type': 'firestore/vectorValue/1.0',
+          'vectorValues': <Object?>[1, 'x']
+        },
+        <String, Object?>{
+          'type': 'firestore/vectorValue/1.0',
+          'vectorValues': <Object?>[null]
+        },
+      ]) {
+        expect(() => VectorValue.fromJson(json), throwsArgumentError,
+            reason: '$json');
+      }
+    });
+  });
 }

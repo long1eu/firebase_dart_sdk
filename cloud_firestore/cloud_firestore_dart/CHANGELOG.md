@@ -113,7 +113,9 @@ only. **Nothing was run against production Firestore.**
   `onSnapshotResume()`): `DocumentSnapshot.toJson()`, `QuerySnapshot.toJson()`, `DocumentSnapshot.fromJson()`,
   `QuerySnapshot.fromJson()`, `Firestore.documentSnapshotsFromJson()` and `Firestore.querySnapshotsFromJson()`. The
   JSON holds the snapshot as a bundle string; resuming a query listen sends the snapshot's read time to the backend.
-  Also `DocumentReference.toJson()` / `DocumentReference.fromJson()`. Bundles with `OR` composite filters can now be
+  Also `DocumentReference.toJson()` / `DocumentReference.fromJson()` and `VectorValue.toJson()` /
+  `VectorValue.fromJson()`. The JSON and bundle formats are checked against the JS SDK (13.3.0) and firebase-admin
+  by `test/integration/.../js_interop_test.dart` (needs `tool/interop`). Bundles with `OR` composite filters can now be
   loaded. Emulator-verified only.
 - Read-only transactions: `TransactionOptions(readOnly: true)`, verified at commit with a `VerifyMutation`
   (new `verify` field in the vendored `write.proto`). Emulator-verified only.

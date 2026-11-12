@@ -605,7 +605,10 @@ class VectorValue
   get hashCode: int
   get length: int
   new VectorValue(List<double> values)
+  new VectorValue.fromJson(Map<String, Object> json)
+  static final jsonType: String
   toArray(): List<double>
+  toJson(): Map<String, Object>
   toString(): String
 class WriteBatch
   commit(): Future<void>

@@ -18,6 +18,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
+import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
+    as proto_v1;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 
 /// Builds a Firestore data bundle (the length-prefixed proto3 JSON format read by `BundleReader`) from documents and
@@ -103,7 +105,7 @@ class BundleBuilder {
       'name': name,
       'bundledQuery': <String, Object?>{
         'parent': queryTarget.parent,
-        'structuredQuery': queryTarget.structuredQuery.toProto3Json(),
+        'structuredQuery': _encodeStructuredQuery(queryTarget.structuredQuery),
         'limitType': isLimitToLast ? 'LAST' : 'FIRST',
       },
       'readTime': _encodeVersion(readTime),
@@ -150,8 +152,11 @@ class BundleBuilder {
         _serializer.encodeDocument(document.key, document.data);
     final Map<String, Object?> result = <String, Object?>{
       'name': encoded.name,
-      'fields': (encoded.toProto3Json()! as Map<String, Object?>)['fields'] ??
-          <String, Object?>{},
+      'fields': <String, Object?>{
+        for (final MapEntry<String, proto_v1.Value> field
+            in encoded.fields.entries)
+          field.key: _encodeValue(field.value),
+      },
       'updateTime': _encodeVersion(document.version),
     };
     // Documents received from the backend keep their create time in the proto.
@@ -160,6 +165,107 @@ class BundleBuilder {
       result['createTime'] = original.createTime.toProto3Json();
     }
     return result;
+  }
+
+  /// Encodes [query] as proto3 JSON, with its values encoded by [_encodeValue].
+  Map<String, Object?> _encodeStructuredQuery(proto.StructuredQuery query) {
+    final Map<String, Object?> result =
+        query.toProto3Json()! as Map<String, Object?>;
+    if (query.hasWhere()) {
+      _fixFilterValues(query.where, result['where']! as Map<String, Object?>);
+    }
+    if (query.hasStartAt()) {
+      result['startAt'] = _encodeCursor(query.startAt);
+    }
+    if (query.hasEndAt()) {
+      result['endAt'] = _encodeCursor(query.endAt);
+    }
+    return result;
+  }
+
+  void _fixFilterValues(
+      proto.StructuredQuery_Filter filter, Map<String, Object?> json) {
+    if (filter.hasCompositeFilter()) {
+      final List<proto.StructuredQuery_Filter> filters =
+          filter.compositeFilter.filters;
+      final Object? jsonFilters =
+          (json['compositeFilter']! as Map<String, Object?>)['filters'];
+      for (int i = 0; i < filters.length; i++) {
+        _fixFilterValues(filters[i],
+            (jsonFilters! as List<Object?>)[i]! as Map<String, Object?>);
+      }
+    } else if (filter.hasFieldFilter()) {
+      (json['fieldFilter']! as Map<String, Object?>)['value'] =
+          _encodeValue(filter.fieldFilter.value);
+    }
+  }
+
+  Map<String, Object?> _encodeCursor(proto.Cursor cursor) {
+    return <String, Object?>{
+      'values': cursor.values.map(_encodeValue).toList(),
+      'before': cursor.before,
+    };
+  }
+
+  /// Encodes [value] as proto3 JSON, like the serializer of the JS SDK does.
+  ///
+  /// PORTING NOTE: `GeneratedMessage.toProto3Json()` is not used for values. It writes an empty `bytesValue` as an
+  /// empty object (the type is lost, and no SDK reads it back) and -0.0 as `0` (the sign is lost).
+  Object? _encodeValue(proto_v1.Value value) {
+    // The oneof case, not hasXxx(): an empty bytes value 'has' no value.
+    final proto_v1.Value_ValueType type = value.whichValueType();
+    if (type == proto_v1.Value_ValueType.nullValue) {
+      return <String, Object?>{'nullValue': 'NULL_VALUE'};
+    } else if (type == proto_v1.Value_ValueType.booleanValue) {
+      return <String, Object?>{'booleanValue': value.booleanValue};
+    } else if (type == proto_v1.Value_ValueType.integerValue) {
+      return <String, Object?>{'integerValue': value.integerValue.toString()};
+    } else if (type == proto_v1.Value_ValueType.doubleValue) {
+      final double doubleValue = value.doubleValue;
+      Object encoded = doubleValue;
+      if (doubleValue.isNaN) {
+        encoded = 'NaN';
+      } else if (doubleValue.isInfinite) {
+        encoded = doubleValue.isNegative ? '-Infinity' : 'Infinity';
+      } else if (doubleValue == 0 && doubleValue.isNegative) {
+        encoded = '-0';
+      }
+      return <String, Object?>{'doubleValue': encoded};
+    } else if (type == proto_v1.Value_ValueType.timestampValue) {
+      return <String, Object?>{
+        'timestampValue': value.timestampValue.toProto3Json()
+      };
+    } else if (type == proto_v1.Value_ValueType.stringValue) {
+      return <String, Object?>{'stringValue': value.stringValue};
+    } else if (type == proto_v1.Value_ValueType.bytesValue) {
+      return <String, Object?>{'bytesValue': base64Encode(value.bytesValue)};
+    } else if (type == proto_v1.Value_ValueType.referenceValue) {
+      return <String, Object?>{'referenceValue': value.referenceValue};
+    } else if (type == proto_v1.Value_ValueType.geoPointValue) {
+      return <String, Object?>{
+        'geoPointValue': <String, Object?>{
+          'latitude': value.geoPointValue.latitude,
+          'longitude': value.geoPointValue.longitude,
+        },
+      };
+    } else if (type == proto_v1.Value_ValueType.arrayValue) {
+      return <String, Object?>{
+        'arrayValue': <String, Object?>{
+          'values': value.arrayValue.values.map(_encodeValue).toList(),
+        },
+      };
+    } else if (type == proto_v1.Value_ValueType.mapValue) {
+      return <String, Object?>{
+        'mapValue': <String, Object?>{
+          'fields': <String, Object?>{
+            for (final MapEntry<String, proto_v1.Value> field
+                in value.mapValue.fields.entries)
+              field.key: _encodeValue(field.value),
+          },
+        },
+      };
+    }
+    throw ArgumentError('Cannot write the value in a bundle: $value');
   }
 
   Object? _encodeVersion(SnapshotVersion version) =>

@@ -208,6 +208,43 @@ void main() {
       expect(fromJson.reference.path, 'foo/bar');
     });
 
+    // Found by the interop tests with the JS SDK: toProto3Json() of the generated protos loses both.
+    test('keeps an empty blob and the sign of -0.0', () {
+      final DocumentSnapshot<Map<String, Object?>> snapshot =
+          documentSnapshot('coll/doc', <String, Object?>{
+        'emptyBlob': util.blob(),
+        'negativeZero': -0.0,
+        'zero': 0.0,
+        'integral': 3.0,
+        'nested': <Object?>[
+          -0.0,
+          util.blob(),
+          <String, Object?>{'emptyMap': <String, Object?>{}}
+        ],
+      });
+      final Map<String, Object?> json = snapshot.toJson();
+      final String bundle = json['bundle']! as String;
+      expect(bundle, contains('"emptyBlob":{"bytesValue":""}'));
+      expect(bundle, contains('"negativeZero":{"doubleValue":"-0"}'));
+      expect(
+          bundle,
+          contains('{"arrayValue":{"values":[{"doubleValue":"-0"},'
+              '{"bytesValue":""},'
+              '{"mapValue":{"fields":{"emptyMap":{"mapValue":{"fields":{}}}}}}]}}'));
+
+      final Map<String, Object?> data =
+          DocumentSnapshot<Map<String, Object?>>.fromJson(firestore, json)
+              .data!;
+      expect(data['emptyBlob'], util.blob());
+      expect((data['negativeZero']! as double).isNegative, isTrue);
+      expect(data['zero'], isA<double>());
+      expect((data['zero']! as double).isNegative, isFalse);
+      expect(data['integral'], isA<double>());
+      expect(((data['nested']! as List<Object?>)[0]! as double).isNegative,
+          isTrue);
+      expect((data['nested']! as List<Object?>)[1], util.blob());
+    });
+
     test('fromJson round-trips every value type', () {
       final Map<String, Object?> data = <String, Object?>{
         'null': null,
@@ -496,6 +533,36 @@ void main() {
               firestore, fromJson.toJson());
       expect(again.snapshot.readTime, util.version(5000));
       expect(again.query.query, query);
+    });
+
+    test('keeps an empty blob and the sign of -0.0 in the query', () {
+      final core.Query query = util
+          .query('coll')
+          .filter(util.filter('blob', '==', util.blob()))
+          .filter(util.orFilters(<Filter>[
+            util.filter('n', '==', -0.0),
+            util.filter('n', '==', 1),
+          ]))
+          .orderBy(util.orderBy('sort'))
+          .startAt(Bound(position: <FieldValue>[util.wrap(-0.0)], before: true))
+          .endAt(Bound(
+              position: <FieldValue>[util.wrap(util.blob())], before: false));
+      final Map<String, Object?> json =
+          querySnapshot(query, <Document>[]).toJson();
+      final String bundle = json['bundle']! as String;
+      expect(bundle, contains('"value":{"bytesValue":""}'));
+      expect(bundle, contains('"value":{"doubleValue":"-0"}'));
+      expect(
+          bundle,
+          contains(
+              '"startAt":{"values":[{"doubleValue":"-0"}],"before":true}'));
+      expect(bundle,
+          contains('"endAt":{"values":[{"bytesValue":""}],"before":false}'));
+      expect(
+          QuerySnapshot<Map<String, Object?>>.fromJson(firestore, json)
+              .query
+              .query,
+          query);
     });
 
     test('fromJson round-trips queries', () {

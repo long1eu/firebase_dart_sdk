@@ -22,7 +22,37 @@ class VectorValue {
   VectorValue(List<double> values)
       : _values = List<double>.unmodifiable(values);
 
+  /// Builds a vector from a JSON map created by [toJson].
+  ///
+  /// Throws an [ArgumentError] if [json] does not have that shape. This is the JS SDK `VectorValue.fromJSON()`.
+  factory VectorValue.fromJson(Map<String, Object?> json) {
+    final Object? values = json['vectorValues'];
+    if (json['type'] != jsonType ||
+        values is! List<Object?> ||
+        values.any((Object? value) => value is! num)) {
+      throw ArgumentError.value(
+          json, 'json', 'Not a JSON representation of a VectorValue');
+    }
+    return VectorValue(<double>[
+      for (final Object? value in values) (value! as num).toDouble(),
+    ]);
+  }
+
+  /// The value of the `type` field written by [toJson].
+  static const String jsonType = 'firestore/vectorValue/1.0';
+
   final List<double> _values;
+
+  /// A JSON-serializable representation of this vector, in the same shape as the JS SDK's `VectorValue.toJSON()`: its
+  /// `type` ([jsonType]) and `vectorValues`. Read it back with [VectorValue.fromJson].
+  ///
+  /// Like in the JS SDK, a vector with a NaN or infinite component cannot be encoded as JSON.
+  Map<String, Object> toJson() {
+    return <String, Object>{
+      'type': jsonType,
+      'vectorValues': List<double>.of(_values),
+    };
+  }
 
   /// The number of dimensions of the vector.
   int get length => _values.length;
