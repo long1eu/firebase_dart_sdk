@@ -98,7 +98,7 @@ void main() {
     'end at': <dynamic>[
       baseQuery
           .orderBy(orderBy('a'))
-          .endAt(bound(true, <Object>['foo', <int>[1, 2, 3]])),
+          .endAt(bound(false, <Object>['foo', <int>[1, 2, 3]])),
       'collection|f:|ob:aasc__name__asc|ub:b:foo[1, 2, 3]'
     ],
     'limit': <dynamic>[baseQuery.limit(5), 'collection|f:|ob:__name__asc|l:5'],

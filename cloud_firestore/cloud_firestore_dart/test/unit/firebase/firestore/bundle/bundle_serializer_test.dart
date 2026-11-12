@@ -596,7 +596,7 @@ void main() {
           }),
           query('coll').orderBy(orderBy('foo')).startAt(Bound(
               position: <FieldValue>[StringValue.valueOf('bar')],
-              before: false)));
+              inclusive: false)));
     });
 
     test('testDecodesEndBeforeQuery', () {
@@ -612,7 +612,7 @@ void main() {
           }),
           query('coll').orderBy(orderBy('foo')).endAt(Bound(
               position: <FieldValue>[StringValue.valueOf('bar')],
-              before: true)));
+              inclusive: false)));
     });
 
     test('testDoesNotDecodeOffset', () {

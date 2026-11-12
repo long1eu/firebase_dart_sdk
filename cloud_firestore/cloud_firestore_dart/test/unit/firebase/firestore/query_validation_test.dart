@@ -250,14 +250,14 @@ void main() {
       expect(q.query.getStartAt(), isNotNull);
       // `a` plus the implicit document key.
       expect(q.query.getStartAt()!.position.length, 2);
-      expect(q.query.getStartAt()!.before, isTrue);
+      expect(q.query.getStartAt()!.inclusive, isTrue);
       expect(
           collection()
               .orderBy('a')
               .startAfterDocument(snap)
               .query
               .getStartAt()!
-              .before,
+              .inclusive,
           isFalse);
     });
 

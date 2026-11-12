@@ -47,9 +47,10 @@ pb.Value ordering(String field, [String direction = 'ascending']) {
 pb.Value cmp(String name, String field, pb.Value value) =>
     fn(name, <pb.Value>[fieldRef(field), value]);
 
-Bound bound(List<Object?> values, {required bool before}) {
+Bound bound(List<Object?> values, {required bool inclusive}) {
   return Bound(
-      position: values.map<FieldValue>(util.wrap).toList(), before: before);
+      position: values.map<FieldValue>(util.wrap).toList(),
+      inclusive: inclusive);
 }
 
 void main() {
@@ -226,7 +227,7 @@ void main() {
 
     test('startAt is inclusive', () {
       expect(
-          cursorStage(base().startAt(bound(<Object?>[1], before: true))),
+          cursorStage(base().startAt(bound(<Object?>[1], inclusive: true))),
           stage('where', <pb.Value>[
             or(<pb.Value>[
               cmp('greater_than', 'a', integer(1)),
@@ -236,18 +237,18 @@ void main() {
     });
 
     test('startAfter is exclusive', () {
-      expect(cursorStage(base().startAt(bound(<Object?>[1], before: false))),
+      expect(cursorStage(base().startAt(bound(<Object?>[1], inclusive: false))),
           stage('where', <pb.Value>[cmp('greater_than', 'a', integer(1))]));
     });
 
     test('endBefore is exclusive', () {
-      expect(cursorStage(base().endAt(bound(<Object?>[1], before: true))),
+      expect(cursorStage(base().endAt(bound(<Object?>[1], inclusive: false))),
           stage('where', <pb.Value>[cmp('less_than', 'a', integer(1))]));
     });
 
     test('endAt is inclusive', () {
       expect(
-          cursorStage(base().endAt(bound(<Object?>[1], before: false))),
+          cursorStage(base().endAt(bound(<Object?>[1], inclusive: true))),
           stage('where', <pb.Value>[
             or(<pb.Value>[
               cmp('less_than', 'a', integer(1)),
@@ -258,16 +259,19 @@ void main() {
 
     test('descending orderings flip the comparison', () {
       expect(
-          cursorStage(base('desc').startAt(bound(<Object?>[1], before: false))),
+          cursorStage(
+              base('desc').startAt(bound(<Object?>[1], inclusive: false))),
           stage('where', <pb.Value>[cmp('less_than', 'a', integer(1))]));
-      expect(cursorStage(base('desc').endAt(bound(<Object?>[1], before: true))),
+      expect(
+          cursorStage(
+              base('desc').endAt(bound(<Object?>[1], inclusive: false))),
           stage('where', <pb.Value>[cmp('greater_than', 'a', integer(1))]));
     });
 
     test('cursors over several fields compare lexicographically', () {
       final core.Query query = base()
           .orderBy(util.orderBy('b', 'desc'))
-          .startAt(bound(<Object?>[1, 2], before: false));
+          .startAt(bound(<Object?>[1, 2], inclusive: false));
       expect(
           cursorStage(query),
           stage('where', <pb.Value>[
@@ -283,8 +287,8 @@ void main() {
 
     test('cursors come after the sort and before the limit', () {
       final List<pb.Pipeline_Stage> stages = convert(base()
-          .startAt(bound(<Object?>[1], before: true))
-          .endAt(bound(<Object?>[5], before: true))
+          .startAt(bound(<Object?>[1], inclusive: true))
+          .endAt(bound(<Object?>[5], inclusive: false))
           .limitToFirst(3));
       expect(stages.map((pb.Pipeline_Stage s) => s.name), <String>[
         'collection',
@@ -299,7 +303,7 @@ void main() {
     test('limitToLast applies the cursors between the reversed sort and limit',
         () {
       final List<pb.Pipeline_Stage> stages = convert(
-          base().startAt(bound(<Object?>[1], before: true)).limitToLast(3));
+          base().startAt(bound(<Object?>[1], inclusive: true)).limitToLast(3));
       expect(stages.map((pb.Pipeline_Stage s) => s.name),
           <String>['collection', 'where', 'sort', 'where', 'limit', 'sort']);
       expect(

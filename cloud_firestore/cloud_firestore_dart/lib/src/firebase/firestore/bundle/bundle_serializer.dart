@@ -162,8 +162,10 @@ class BundleSerializer {
         _decodeWhere(_optObject(structuredQuery, 'where'));
     final List<OrderBy> orderBys =
         _decodeOrderBy(_optArray(structuredQuery, 'orderBy'));
-    final Bound? startAt = _decodeBound(_optObject(structuredQuery, 'startAt'));
-    final Bound? endAt = _decodeBound(_optObject(structuredQuery, 'endAt'));
+    final Bound? startAt =
+        _decodeBound(_optObject(structuredQuery, 'startAt'), isStart: true);
+    final Bound? endAt =
+        _decodeBound(_optObject(structuredQuery, 'endAt'), isStart: false);
 
     _verifyNoOffset(structuredQuery);
     final int limit = _decodeLimit(structuredQuery);
@@ -194,7 +196,9 @@ class BundleSerializer {
     }
   }
 
-  Bound? _decodeBound(Map<String, dynamic>? bound) {
+  /// A start cursor with `before` includes its position, an end cursor with
+  /// `before` excludes it.
+  Bound? _decodeBound(Map<String, dynamic>? bound, {required bool isStart}) {
     if (bound == null) {
       return null;
     }
@@ -208,7 +212,7 @@ class BundleSerializer {
             .add(remoteSerializer.decodeValue(_decodeValue(_asObject(value))));
       }
     }
-    return Bound(position: cursor, before: before);
+    return Bound(position: cursor, inclusive: isStart ? before : !before);
   }
 
   List<OrderBy> _decodeOrderBy(List<dynamic>? orderBys) {

@@ -4,6 +4,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/blob.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_byte_encoder.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/value_bounds.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:fixnum/fixnum.dart';
 
@@ -25,7 +26,7 @@ import 'package:fixnum/fixnum.dart';
 ///   * The BSON types are their own [FieldValue] classes (upstream detects
 ///     them from the shape of a map), and a blob carries its BSON subtype.
 ///   * The internal max value of upstream (a map with `__type__: __max__`) is
-///     not part of the port's model. [writeMaxValue] writes it.
+///     [InternalMaxValue].
 class FirestoreIndexValueWriter {
   // Note: This file is copied from the backend. Code that is not used by
   // Firestore was removed. Code that has different behavior was modified.
@@ -108,6 +109,8 @@ class FirestoreIndexValueWriter {
       // Double and Decimal128 sort the same
       // Decimal128 is written as double with precision lost
       _writeIndexDouble(double.parse(indexValue.value.stringValue), encoder);
+    } else if (indexValue is InternalMaxValue) {
+      _writeValueTypeLabel(encoder, indexTypeMax);
     } else if (indexValue is MinKeyValue) {
       _writeValueTypeLabel(encoder, indexTypeMinKey);
     } else if (indexValue is MaxKeyValue) {

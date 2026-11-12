@@ -17,11 +17,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 
 import 'test_util.dart';
 
-/// Creates a [Bound] from the given raw values. [before] is true for an
-/// inclusive start bound / exclusive end bound.
-Bound bound(bool before, [List<Object?> values = const <Object?>[]]) {
+/// Creates a [Bound] from the given raw values. [inclusive] is true for
+/// `startAt` / `endAt` and false for `startAfter` / `endBefore`.
+Bound bound(bool inclusive, [List<Object?> values = const <Object?>[]]) {
   return Bound(
     position: values.map<FieldValue>(wrap).toList(),
-    before: before,
+    inclusive: inclusive,
   );
 }

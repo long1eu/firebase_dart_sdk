@@ -300,7 +300,7 @@ class Query {
         !startAt.sortsBeforeDocument(orderByConstraints, doc)) {
       return false;
     }
-    if (endAt != null && endAt.sortsBeforeDocument(orderByConstraints, doc)) {
+    if (endAt != null && !endAt.sortsAfterDocument(orderByConstraints, doc)) {
       return false;
     }
     return true;
@@ -362,10 +362,10 @@ class Query {
       final Bound? endAt = _endAt;
       final Bound? startAt = _startAt;
       final Bound? newStartAt = endAt != null
-          ? Bound(position: endAt.position, before: !endAt.before)
+          ? Bound(position: endAt.position, inclusive: endAt.inclusive)
           : null;
       final Bound? newEndAt = startAt != null
-          ? Bound(position: startAt.position, before: !startAt.before)
+          ? Bound(position: startAt.position, inclusive: startAt.inclusive)
           : null;
 
       return _memoizedTarget = Target(

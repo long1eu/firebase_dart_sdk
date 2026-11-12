@@ -48,9 +48,42 @@ void main() {
   final Query base = query('collection').orderBy(orderBy('a'));
 
   group('Bound', () {
-    test('canonicalString distinguishes before/after', () {
-      expect(bound(true, <Object>[1]).canonicalString(), startsWith('b:'));
-      expect(bound(false, <Object>[1]).canonicalString(), startsWith('a:'));
+    test('the canonical id of a target distinguishes the four cursors', () {
+      // Canonical ids are persisted with the targets: these are the strings
+      // the port wrote when Bound still had a `before` flag ('b:' is "before
+      // the position", 'a:' is "after" it).
+      final Query q = query('coll').orderBy(orderBy('a'));
+      const String prefix = 'coll|f:|ob:aasc__name__asc';
+      // startAt
+      expect(q.startAt(bound(true, <Object>[1, 'x'])).toTarget().canonicalId,
+          '$prefix|lb:b:1x');
+      // startAfter
+      expect(q.startAt(bound(false, <Object>[1, 'x'])).toTarget().canonicalId,
+          '$prefix|lb:a:1x');
+      // endBefore
+      expect(q.endAt(bound(false, <Object>[1, 'x'])).toTarget().canonicalId,
+          '$prefix|ub:b:1x');
+      // endAt
+      expect(q.endAt(bound(true, <Object>[1, 'x'])).toTarget().canonicalId,
+          '$prefix|ub:a:1x');
+      // limitToLast swaps the cursors and keeps what they include.
+      expect(
+          q
+              .startAt(bound(true, <Object>[1]))
+              .endAt(bound(true, <Object>[5]))
+              .limitToLast(2)
+              .toTarget()
+              .canonicalId,
+          'coll|f:|ob:adesc__name__desc|l:2|lb:b:5|ub:a:1');
+      expect(
+          q
+              .startAt(bound(false, <Object>[1]))
+              .endAt(bound(false, <Object>[5]))
+              .limitToLast(2)
+              .toTarget()
+              .canonicalId,
+          'coll|f:|ob:adesc__name__desc|l:2|lb:a:5|ub:b:1');
+      expect(bound(true, <Object>[1, 'x']).positionString(), '1x');
     });
 
     test('equality and hashCode', () {
@@ -62,7 +95,7 @@ void main() {
       expect(bound(true, <Object>[1]), isNot(bound(true, <Object>[1, 2])));
     });
 
-    test('sortsBeforeDocument honours before flag', () {
+    test('sortsBeforeDocument honours the inclusive flag', () {
       final List<OrderBy> order = <OrderBy>[orderBy('a')];
       final Document doc3 = d(3, 3);
       expect(bound(true, <Object>[3]).sortsBeforeDocument(order, doc3), isTrue);
@@ -91,21 +124,34 @@ void main() {
       expect(
           Bound(
                   position: <dynamic>[wrap(ref('collection/3'))].cast(),
-                  before: true)
+                  inclusive: true)
               .sortsBeforeDocument(order, doc3),
           isTrue);
       expect(
           Bound(
                   position: <dynamic>[wrap(ref('collection/3'))].cast(),
-                  before: false)
+                  inclusive: false)
               .sortsBeforeDocument(order, doc3),
           isFalse);
       expect(
           Bound(
                   position: <dynamic>[wrap(ref('collection/4'))].cast(),
-                  before: true)
+                  inclusive: true)
               .sortsBeforeDocument(order, doc3),
           isFalse);
+    });
+
+    test('sortsAfterDocument honours the inclusive flag', () {
+      final List<OrderBy> order = <OrderBy>[orderBy('a')];
+      final Document doc3 = d(3, 3);
+      expect(bound(true, <Object>[3]).sortsAfterDocument(order, doc3), isTrue);
+      expect(
+          bound(false, <Object>[3]).sortsAfterDocument(order, doc3), isFalse);
+      expect(bound(true, <Object>[4]).sortsAfterDocument(order, doc3), isTrue);
+      expect(bound(false, <Object>[4]).sortsAfterDocument(order, doc3), isTrue);
+      expect(bound(true, <Object>[2]).sortsAfterDocument(order, doc3), isFalse);
+      expect(
+          bound(false, <Object>[2]).sortsAfterDocument(order, doc3), isFalse);
     });
 
     test('uses later order-by components to break ties', () {
@@ -133,24 +179,24 @@ void main() {
     });
 
     test('endBefore is exclusive', () {
-      expect(ids(base.endAt(bound(true, <Object>[3]))), <String>['1', '2']);
+      expect(ids(base.endAt(bound(false, <Object>[3]))), <String>['1', '2']);
     });
 
     test('endAt is inclusive', () {
       expect(
-          ids(base.endAt(bound(false, <Object>[3]))), <String>['1', '2', '3']);
+          ids(base.endAt(bound(true, <Object>[3]))), <String>['1', '2', '3']);
     });
 
     test('start and end bounds combine', () {
       expect(
           ids(base
               .startAt(bound(true, <Object>[2]))
-              .endAt(bound(false, <Object>[4]))),
+              .endAt(bound(true, <Object>[4]))),
           <String>['2', '3', '4']);
       expect(
           ids(base
               .startAt(bound(false, <Object>[2]))
-              .endAt(bound(true, <Object>[4]))),
+              .endAt(bound(false, <Object>[4]))),
           <String>['3']);
     });
 
@@ -159,14 +205,14 @@ void main() {
       expect(
           ids(desc.startAt(bound(true, <Object>[3]))), <String>['1', '2', '3']);
       expect(
-          ids(desc.endAt(bound(false, <Object>[3]))), <String>['3', '4', '5']);
+          ids(desc.endAt(bound(true, <Object>[3]))), <String>['3', '4', '5']);
     });
 
     test('bounds are part of equality, hashCode and canonical id', () {
       final Query q1 = base.startAt(bound(true, <Object>[3]));
       final Query q2 = base.startAt(bound(true, <Object>[3]));
       final Query q3 = base.startAt(bound(false, <Object>[3]));
-      final Query q4 = base.endAt(bound(true, <Object>[3]));
+      final Query q4 = base.endAt(bound(false, <Object>[3]));
       expect(q1, q2);
       expect(q1.hashCode, q2.hashCode);
       expect(q1.canonicalId, q2.canonicalId);

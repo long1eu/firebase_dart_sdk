@@ -22,22 +22,22 @@ import 'order_by.dart';
 /// document comes before or after a bound. This is influenced by whether the
 /// position is just before or just after the provided values.
 class Bound {
-  const Bound({required this.position, required this.before});
+  const Bound({required this.position, required this.inclusive});
 
-  /// Whether this bound is just before or just after the provided position
-  final bool before;
+  /// Whether this bound includes the provided position: true for `startAt()`
+  /// and `endAt()`, false for `startAfter()` and `endBefore()`.
+  final bool inclusive;
 
   /// The index position of this bound
   final List<FieldValue> position;
 
-  String canonicalString() {
+  /// The position as it is written into the canonical id of a target.
+  ///
+  /// PORTING NOTE: upstream separates the values with a comma. The port never
+  /// did, and canonical ids are persisted with the targets, so it stays.
+  String positionString() {
     // TODO(long1eu): Make this collision robust.
     final StringBuffer builder = StringBuffer();
-    if (before) {
-      builder.write('b:');
-    } else {
-      builder.write('a:');
-    }
     position.forEach(builder.write);
     return builder.toString();
   }
@@ -45,6 +45,18 @@ class Bound {
   /// Returns true if a document sorts before a bound using the provided sort
   /// order.
   bool sortsBeforeDocument(List<OrderBy> orderBy, Document document) {
+    final int comparison = _compareToDocument(orderBy, document);
+    return inclusive ? comparison <= 0 : comparison < 0;
+  }
+
+  /// Returns true if a document sorts after a bound using the provided sort
+  /// order.
+  bool sortsAfterDocument(List<OrderBy> orderBy, Document document) {
+    final int comparison = _compareToDocument(orderBy, document);
+    return inclusive ? comparison >= 0 : comparison > 0;
+  }
+
+  int _compareToDocument(List<OrderBy> orderBy, Document document) {
     hardAssert(position.length <= orderBy.length,
         'Bound has more components than query\'s orderBy');
     int comparison = 0;
@@ -76,7 +88,7 @@ class Bound {
       }
     }
 
-    return before ? comparison <= 0 : comparison < 0;
+    return comparison;
   }
 
   @override
@@ -84,17 +96,17 @@ class Bound {
       identical(this, other) ||
       other is Bound &&
           runtimeType == other.runtimeType &&
-          before == other.before &&
+          inclusive == other.inclusive &&
           const ListEquality<FieldValue>().equals(position, other.position);
 
   @override
   int get hashCode =>
-      before.hashCode ^ const ListEquality<FieldValue>().hash(position);
+      inclusive.hashCode ^ const ListEquality<FieldValue>().hash(position);
 
   @override
   String toString() {
     return (ToStringHelper(runtimeType) //
-          ..add('before', before)
+          ..add('inclusive', inclusive)
           ..add('position', position))
         .toString();
   }

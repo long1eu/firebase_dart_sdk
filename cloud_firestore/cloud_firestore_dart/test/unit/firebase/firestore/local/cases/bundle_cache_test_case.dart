@@ -113,8 +113,8 @@ void defineBundleCacheTests(Future<Persistence> Function() createPersistence) {
             .filter(filter('a', '==', 'x'))
             .filter(filter('b', '>', 3))
             .orderBy(orderBy('b', 'desc'))
-            .startAt(Bound(position: <FieldValue>[wrap(4)], before: true))
-            .endAt(Bound(position: <FieldValue>[wrap(9)], before: false))
+            .startAt(Bound(position: <FieldValue>[wrap(4)], inclusive: true))
+            .endAt(Bound(position: <FieldValue>[wrap(9)], inclusive: true))
             .limit(10),
         BundledQueryLimitType.first);
   });

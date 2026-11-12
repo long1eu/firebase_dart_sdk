@@ -944,8 +944,8 @@ void main() {
   test('canonicalId contains the limit value', () {
     final Query base = Query(ResourcePath.fromString('a'));
     expect(base.limit(5).toTarget().canonicalId, 'a|f:|ob:__name__asc|l:5');
-    expect(base.limit(5).canonicalId,
-        'a|f:|ob:__name__asc|l:5|lt:LIMIT_TO_FIRST');
+    expect(
+        base.limit(5).canonicalId, 'a|f:|ob:__name__asc|l:5|lt:LIMIT_TO_FIRST');
     expect(base.limit(5).canonicalId, isNot(base.limit(10).canonicalId));
     expect(base.toTarget().canonicalId, 'a|f:|ob:__name__asc');
     expect(base.canonicalId, 'a|f:|ob:__name__asc|lt:LIMIT_TO_FIRST');
@@ -1009,8 +1009,8 @@ void main() {
 
     test('toTarget of a limitToLast query swaps and flips the bounds', () {
       final Bound start =
-          Bound(position: <FieldValue>[wrap(1)], before: true);
-      final Bound end = Bound(position: <FieldValue>[wrap(9)], before: false);
+          Bound(position: <FieldValue>[wrap(1)], inclusive: true);
+      final Bound end = Bound(position: <FieldValue>[wrap(9)], inclusive: true);
       final Target target = base()
           .orderBy(orderBy('foo'))
           .startAt(start)
@@ -1019,9 +1019,9 @@ void main() {
           .toTarget();
 
       expect(target.startAt!.position, end.position);
-      expect(target.startAt!.before, isTrue);
+      expect(target.startAt!.inclusive, isTrue);
       expect(target.endAt!.position, start.position);
-      expect(target.endAt!.before, isFalse);
+      expect(target.endAt!.inclusive, isTrue);
 
       // Without bounds nothing is invented.
       final Target unbounded =
@@ -1033,7 +1033,7 @@ void main() {
       final Target onlyStart =
           base().orderBy(orderBy('foo')).startAt(start).limitToLast(2).toTarget();
       expect(onlyStart.startAt, isNull);
-      expect(onlyStart.endAt!.before, isFalse);
+      expect(onlyStart.endAt!.inclusive, isTrue);
     });
 
     test('mirror queries map to the same target', () {
@@ -1063,8 +1063,8 @@ void main() {
 
     test('target canonicalId matches the Java format', () {
       final Query q = base().orderBy(orderBy('foo', 'desc')).limitToLast(7);
-      expect(q.toTarget().canonicalId,
-          'collection|f:|ob:fooasc__name__asc|l:7');
+      expect(
+          q.toTarget().canonicalId, 'collection|f:|ob:fooasc__name__asc|l:7');
       expect(q.canonicalId,
           'collection|f:|ob:fooasc__name__asc|l:7|lt:LIMIT_TO_LAST');
     });

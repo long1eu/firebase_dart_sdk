@@ -544,9 +544,10 @@ void main() {
             util.filter('n', '==', 1),
           ]))
           .orderBy(util.orderBy('sort'))
-          .startAt(Bound(position: <FieldValue>[util.wrap(-0.0)], before: true))
+          .startAt(
+              Bound(position: <FieldValue>[util.wrap(-0.0)], inclusive: true))
           .endAt(Bound(
-              position: <FieldValue>[util.wrap(util.blob())], before: false));
+              position: <FieldValue>[util.wrap(util.blob())], inclusive: true));
       final Map<String, Object?> json =
           querySnapshot(query, <Document>[]).toJson();
       final String bundle = json['bundle']! as String;
@@ -579,8 +580,10 @@ void main() {
         util
             .query('coll')
             .orderBy(util.orderBy('sort'))
-            .startAt(Bound(position: <FieldValue>[util.wrap(1)], before: true))
-            .endAt(Bound(position: <FieldValue>[util.wrap(3)], before: true)),
+            .startAt(
+                Bound(position: <FieldValue>[util.wrap(1)], inclusive: true))
+            .endAt(
+                Bound(position: <FieldValue>[util.wrap(3)], inclusive: false)),
         util
             .query('rooms/eros/messages')
             .filter(util.filter('foo', 'array-contains-any', <Object?>[1, 2])),

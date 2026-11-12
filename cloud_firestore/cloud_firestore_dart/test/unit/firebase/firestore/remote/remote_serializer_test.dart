@@ -1382,10 +1382,10 @@ void main() {
         .orderBy(orderBy('prop'))
         .startAt(Bound(position: <ReferenceValue>[
           ReferenceValue.valueOf(databaseId, key('foo/bar'))
-        ], before: true))
+        ], inclusive: true))
         .endAt(Bound(position: <ReferenceValue>[
           ReferenceValue.valueOf(databaseId, key('foo/baz'))
-        ], before: false))
+        ], inclusive: true))
         .limitToLast(5);
 
     final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
@@ -1447,10 +1447,10 @@ void main() {
     final Query q = Query(ResourcePath.fromString('docs'))
         .startAt(Bound(position: <ReferenceValue>[
           ReferenceValue.valueOf(databaseId, key('foo/bar'))
-        ], before: true))
+        ], inclusive: true))
         .endAt(Bound(position: <ReferenceValue>[
           ReferenceValue.valueOf(databaseId, key('foo/baz'))
-        ], before: false));
+        ], inclusive: true));
 
     final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
 

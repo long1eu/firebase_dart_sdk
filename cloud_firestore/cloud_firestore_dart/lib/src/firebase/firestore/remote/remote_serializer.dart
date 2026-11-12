@@ -873,12 +873,12 @@ class RemoteSerializer {
 
     final Bound? startAt = target.startAt;
     if (startAt != null) {
-      structuredQueryBuilder.startAt = _encodeBound(startAt);
+      structuredQueryBuilder.startAt = _encodeBound(startAt, isStart: true);
     }
 
     final Bound? endAt = target.endAt;
     if (endAt != null) {
-      structuredQueryBuilder.endAt = _encodeBound(endAt);
+      structuredQueryBuilder.endAt = _encodeBound(endAt, isStart: false);
     }
 
     builder.structuredQuery = structuredQueryBuilder;
@@ -919,12 +919,12 @@ class RemoteSerializer {
 
     Bound? startAt;
     if (query.hasStartAt()) {
-      startAt = _decodeBound(query.startAt);
+      startAt = _decodeBound(query.startAt, isStart: true);
     }
 
     Bound? endAt;
     if (query.hasEndAt()) {
-      endAt = _decodeBound(query.endAt);
+      endAt = _decodeBound(query.endAt, isStart: false);
     }
 
     return Query(
@@ -1192,18 +1192,24 @@ class RemoteSerializer {
 
   // Bounds
 
-  proto.Cursor _encodeBound(Bound bound) {
-    final proto.Cursor builder = proto.Cursor.create()..before = bound.before;
+  // A start cursor that is `before` its position includes it, an end cursor
+  // that is `before` its position excludes it.
+
+  proto.Cursor _encodeBound(Bound bound, {required bool isStart}) {
+    final proto.Cursor builder = proto.Cursor.create()
+      ..before = isStart ? bound.inclusive : !bound.inclusive;
     for (FieldValue component in bound.position) {
       builder.values.add(encodeValue(component));
     }
     return builder..freeze();
   }
 
-  Bound _decodeBound(proto.Cursor value) {
+  Bound _decodeBound(proto.Cursor value, {required bool isStart}) {
     final List<FieldValue> indexComponents =
         value.values.map(decodeValue).toList();
-    return Bound(position: indexComponents, before: value.before);
+    return Bound(
+        position: indexComponents,
+        inclusive: isStart ? value.before : !value.before);
   }
 
   // Watch changes

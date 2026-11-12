@@ -165,12 +165,12 @@ Pipeline queryToPipeline(Firestore firestore, core.Query query) {
     final Bound? startAt = query.getStartAt();
     if (startAt != null) {
       pipeline = pipeline.where(_cursorCondition(startAt, orderings,
-          after: true, inclusive: startAt.before));
+          after: true, inclusive: startAt.inclusive));
     }
     final Bound? endAt = query.getEndAt();
     if (endAt != null) {
       pipeline = pipeline.where(_cursorCondition(endAt, orderings,
-          after: false, inclusive: !endAt.before));
+          after: false, inclusive: endAt.inclusive));
     }
     return pipeline;
   }

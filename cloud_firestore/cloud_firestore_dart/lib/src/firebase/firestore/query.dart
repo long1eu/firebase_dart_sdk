@@ -717,7 +717,7 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   Query<T> startAtDocument(DocumentSnapshot<Object?> snapshot) {
     final Bound bound =
-        _boundFromDocumentSnapshot('startAt', snapshot, /*before:*/ true);
+        _boundFromDocumentSnapshot('startAt', snapshot, /*inclusive:*/ true);
     return Query<T>(query.startAt(bound), firestore, converter);
   }
 
@@ -729,7 +729,7 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   Query<T> startAt(List<Object?> fieldValues) {
     final Bound bound =
-        _boundFromFields('startAt', fieldValues, /*before:*/ true);
+        _boundFromFields('startAt', fieldValues, /*inclusive:*/ true);
     return Query<T>(query.startAt(bound), firestore, converter);
   }
 
@@ -741,8 +741,8 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> startAfterDocument(DocumentSnapshot<Object?> snapshot) {
-    final Bound bound =
-        _boundFromDocumentSnapshot('startAfter', snapshot, /*before:*/ false);
+    final Bound bound = _boundFromDocumentSnapshot(
+        'startAfter', snapshot, /*inclusive:*/ false);
     return Query<T>(query.startAt(bound), firestore, converter);
   }
 
@@ -754,7 +754,7 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   Query<T> startAfter(List<Object?> fieldValues) {
     final Bound bound =
-        _boundFromFields('startAfter', fieldValues, /*before:*/ false);
+        _boundFromFields('startAfter', fieldValues, /*inclusive:*/ false);
     return Query<T>(query.startAt(bound), firestore, converter);
   }
 
@@ -766,7 +766,7 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   Query<T> endBeforeDocument(DocumentSnapshot<Object?> snapshot) {
     final Bound bound =
-        _boundFromDocumentSnapshot('endBefore', snapshot, /*before:*/ true);
+        _boundFromDocumentSnapshot('endBefore', snapshot, /*inclusive:*/ false);
     return Query<T>(query.endAt(bound), firestore, converter);
   }
 
@@ -778,7 +778,7 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   Query<T> endBefore(List<Object?> fieldValues) {
     final Bound bound =
-        _boundFromFields('endBefore', fieldValues, /*before:*/ true);
+        _boundFromFields('endBefore', fieldValues, /*inclusive:*/ false);
     return Query<T>(query.endAt(bound), firestore, converter);
   }
 
@@ -790,7 +790,7 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   Query<T> endAtDocument(DocumentSnapshot<Object?> snapshot) {
     final Bound bound =
-        _boundFromDocumentSnapshot('endAt', snapshot, /*before:*/ false);
+        _boundFromDocumentSnapshot('endAt', snapshot, /*inclusive:*/ true);
     return Query<T>(query.endAt(bound), firestore, converter);
   }
 
@@ -802,7 +802,7 @@ class Query<T extends dynamic> {
   /// Returns the created Query.
   Query<T> endAt(List<Object?> fieldValues) {
     final Bound bound =
-        _boundFromFields('endAt', fieldValues, /*before:*/ false);
+        _boundFromFields('endAt', fieldValues, /*inclusive:*/ true);
     return Query<T>(query.endAt(bound), firestore, converter);
   }
 
@@ -814,7 +814,7 @@ class Query<T extends dynamic> {
   /// Will throw if the document does not contain all fields of the order by of the query or if any of the fields in the
   /// order by are an uncommitted server timestamp.
   Bound _boundFromDocumentSnapshot(
-      String methodName, DocumentSnapshot<Object?> snapshot, bool before) {
+      String methodName, DocumentSnapshot<Object?> snapshot, bool inclusive) {
     checkNotNull<DocumentSnapshot<Object?>>(
         snapshot, 'Provided snapshot must not be null.');
     if (!snapshot.exists) {
@@ -848,11 +848,12 @@ class Query<T extends dynamic> {
         }
       }
     }
-    return Bound(position: components, before: before);
+    return Bound(position: components, inclusive: inclusive);
   }
 
   /// Converts a list of field values to Bound.
-  Bound _boundFromFields(String methodName, List<Object?> values, bool before) {
+  Bound _boundFromFields(
+      String methodName, List<Object?> values, bool inclusive) {
     // Use explicit order by's because it has to match the query the user made
     final List<OrderBy> explicitOrderBy = query.explicitSortOrder;
     if (values.length > explicitOrderBy.length) {
@@ -891,7 +892,7 @@ class Query<T extends dynamic> {
       }
     }
 
-    return Bound(position: components, before: before);
+    return Bound(position: components, inclusive: inclusive);
   }
 
   /// Executes the query and returns the results as a [QuerySnapshot].
