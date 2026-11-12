@@ -24,11 +24,8 @@ import 'package:meta/meta.dart';
 /// Filters can be combined with [Filter.or] and [Filter.and] to build
 /// disjunctions (OR queries) and conjunctions.
 ///
-/// NOTE: the Java-like API of this port expresses the filter with static
-/// factories and `Query.where(Filter)`. A FlutterFire-style `where(field,
-/// isEqualTo: ...)` extension with named parameters can be layered on top of
-/// these (it would only need to build the same filters) and is intentionally
-/// left for a later change.
+/// `Query.where` also accepts a field with FlutterFire-style named arguments
+/// (`where('age', isGreaterThan: 18)`), which builds the same filters.
 ///
 /// **Subclassing Note**: Firestore classes are not meant to be subclassed.
 class Filter {

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'dart:collection';
+
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_source.dart';
@@ -25,13 +27,27 @@ import 'package:meta/meta.dart';
 class AggregateQuery {
   @internal
   AggregateQuery(this.query, List<AggregateField> aggregateFields)
-      : aggregateFields = List<AggregateField>.unmodifiable(aggregateFields);
+      : aggregateFields = List<AggregateField>.unmodifiable(aggregateFields),
+        aliases = null;
+
+  /// Creates an aggregate query whose results are keyed by the user-chosen
+  /// aliases of [aliases] (see `Query.aggregateWithAliases`).
+  @internal
+  AggregateQuery.withAliases(this.query, Map<String, AggregateField> aliases)
+      : aggregateFields = List<AggregateField>.unmodifiable(
+            LinkedHashSet<AggregateField>.of(aliases.values)),
+        aliases = Map<String, AggregateField>.unmodifiable(aliases);
 
   /// The query whose result set is aggregated.
   final Query<Object?> query;
 
   /// The aggregations requested by this query.
   final List<AggregateField> aggregateFields;
+
+  /// The user-chosen aliases of the aggregations, or null when the query was
+  /// created from a list of fields. `AggregateQuerySnapshot.data` is keyed by
+  /// these aliases when they are present.
+  final Map<String, AggregateField>? aliases;
 
   /// Executes the aggregation on the server and returns the results.
   ///
@@ -51,9 +67,13 @@ class AggregateQuery {
       other is AggregateQuery &&
           query == other.query &&
           const ListEquality<AggregateField>()
-              .equals(aggregateFields, other.aggregateFields);
+              .equals(aggregateFields, other.aggregateFields) &&
+          const MapEquality<String, AggregateField>()
+              .equals(aliases, other.aliases);
 
   @override
   int get hashCode => Object.hash(
-      query, const ListEquality<AggregateField>().hash(aggregateFields));
+      query,
+      const ListEquality<AggregateField>().hash(aggregateFields),
+      const MapEquality<String, AggregateField>().hash(aliases));
 }

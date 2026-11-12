@@ -66,6 +66,18 @@ only. **Nothing was run against production Firestore.**
   `toBase64`, `AggregateQuerySnapshot.data()` (results keyed by alias), and `toJson` /
   `fromJson` on `Timestamp`, `GeoPoint` and `Blob` in the JS `toJSON()` shape (so `jsonEncode`
   works on them).
+- `Query.where` also takes a field with FlutterFire-style named arguments:
+  `where('age', isGreaterThanOrEqualTo: 18, isLessThan: 65)`, `where(FieldPath.documentIdField,
+  whereIn: [...])`, `isNull: true/false`. `where(Filter)` keeps working (the parameter is now
+  `Object`: a `Filter`, a `String` field or a `FieldPath`). Unlike FlutterFire, a call with a
+  field and no non-null named argument throws an `ArgumentError` instead of returning the query
+  unchanged.
+- `Query.aggregateWithAliases({'total': AggregateField.sum('price')})`: aggregations with
+  user-chosen aliases, as JS `getAggregateFromServer`; `AggregateQuerySnapshot.data()` is then
+  keyed by those aliases (also exposed as `AggregateQuery.aliases`).
+- `Timestamp.fromDate` / `toDate` are microsecond-accurate (they truncated to milliseconds);
+  results for millisecond inputs are unchanged, and `DateTime` values written to documents keep
+  their microseconds. `Timestamp.now()` still has millisecond precision.
 - Typed data converters: `FirestoreDataConverter<T>` (with `FirestoreDataConverter.from`),
   `SnapshotOptions`, and `withConverter<T>` / `withoutConverter()` on `DocumentReference`,
   `CollectionReference` and `Query`. `DocumentReference`, `CollectionReference`, `Query`,

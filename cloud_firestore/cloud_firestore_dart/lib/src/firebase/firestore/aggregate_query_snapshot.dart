@@ -30,14 +30,22 @@ class AggregateQuerySnapshot {
   /// Results keyed by [AggregateField.alias].
   final Map<String, FieldValue> _data;
 
-  /// All results of this snapshot, keyed by [AggregateField.alias]: each value
-  /// is an `int`, a `double` or null, as returned by [get].
+  /// All results of this snapshot: each value is an `int`, a `double` or
+  /// null, as returned by [get].
   ///
   /// This is the counterpart of the JS SDK's `AggregateQuerySnapshot.data()`.
-  /// The keys are the aliases this SDK derives for each field (for example
-  /// `count`, or `sum_price` for `AggregateField.sum('price')`), not
-  /// user-chosen names.
+  /// For a query created with `Query.aggregateWithAliases` the keys are the
+  /// user-chosen aliases. Otherwise they are the aliases this SDK derives for
+  /// each field ([AggregateField.alias]: for example `count`, or `sum_price`
+  /// for `AggregateField.sum('price')`).
   Map<String, Object?> data() {
+    final Map<String, AggregateField>? aliases = query.aliases;
+    if (aliases != null) {
+      return Map<String, Object?>.unmodifiable(<String, Object?>{
+        for (final MapEntry<String, AggregateField> entry in aliases.entries)
+          entry.key: get(entry.value),
+      });
+    }
     return Map<String, Object?>.unmodifiable(<String, Object?>{
       for (final MapEntry<String, FieldValue> entry in _data.entries)
         entry.key: entry.value.value,

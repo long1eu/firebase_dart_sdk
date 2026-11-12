@@ -78,8 +78,10 @@ void main() {
   test('toMillis truncates sub-millisecond precision toward the past', () {
     expect(const Timestamp(1, 999999).toMillis(), 1000);
     expect(const Timestamp(-1, 999999).toMillis(), -1000);
+    // toDate keeps the microseconds (it used to truncate to milliseconds).
     expect(const Timestamp(-1, 999999).toDate(),
-        DateTime.fromMillisecondsSinceEpoch(-1000));
+        DateTime.fromMicrosecondsSinceEpoch(-999001));
+    expect(const Timestamp(-1, 999999).toDate().millisecondsSinceEpoch, -1000);
   });
 
   test('fromMillis rejects out-of-range values', () {
@@ -130,5 +132,64 @@ void main() {
               'nanoseconds': 1000000000
             }),
         throwsArgumentError);
+  });
+
+  test('fromDate and toDate keep microseconds', () {
+    final DateTime date = DateTime.fromMicrosecondsSinceEpoch(22501123);
+    final Timestamp timestamp = Timestamp.fromDate(date);
+    expect(timestamp, const Timestamp(22, 501123000));
+    expect(timestamp.toDate(), date);
+    expect(timestamp.toDate().microsecondsSinceEpoch, 22501123);
+
+    // Negative values round toward the past and keep nanoseconds in range.
+    expect(Timestamp.fromDate(DateTime.fromMicrosecondsSinceEpoch(-1)),
+        const Timestamp(-1, 999999000));
+    expect(Timestamp.fromDate(DateTime.fromMicrosecondsSinceEpoch(-1250001)),
+        const Timestamp(-2, 749999000));
+    expect(Timestamp.fromDate(DateTime.fromMicrosecondsSinceEpoch(-1000000)),
+        const Timestamp(-1, 0));
+    for (final int micros in <int>[
+      0,
+      1,
+      -1,
+      999999,
+      -999999,
+      -1000000,
+      -1250001,
+      1700000000123456,
+      -62135596800000000, // 0001-01-01T00:00:00Z
+      253402300799999999, // 9999-12-31T23:59:59.999999Z
+    ]) {
+      final Timestamp value =
+          Timestamp.fromDate(DateTime.fromMicrosecondsSinceEpoch(micros));
+      expect(value.nanoseconds, inInclusiveRange(0, 999999999));
+      expect(value.toDate().microsecondsSinceEpoch, micros, reason: '$micros');
+    }
+  });
+
+  test('fromDate and toDate are unchanged for millisecond inputs', () {
+    for (final int millis in <int>[0, 1, -1, 22501, -1250, 1700000000123]) {
+      final DateTime date = DateTime.fromMillisecondsSinceEpoch(millis);
+      expect(Timestamp.fromDate(date), Timestamp.fromMillis(millis));
+      expect(Timestamp.fromMillis(millis).toDate(), date);
+      expect(Timestamp.fromDate(date).toMillis(), millis);
+    }
+  });
+
+  test('toDate truncates sub-microsecond precision toward the past', () {
+    expect(const Timestamp(1, 999).toDate().microsecondsSinceEpoch, 1000000);
+    expect(const Timestamp(-1, 999).toDate().microsecondsSinceEpoch, -1000000);
+    expect(
+        const Timestamp(-1, 999999999).toDate().microsecondsSinceEpoch, -1);
+  });
+
+  test('fromDate accepts UTC and local dates for the same instant', () {
+    final DateTime utc = DateTime.utc(2024, 2, 29, 12, 30, 15, 123, 456);
+    expect(Timestamp.fromDate(utc), Timestamp.fromDate(utc.toLocal()));
+    expect(Timestamp.fromDate(utc).toDate().isAtSameMomentAs(utc), isTrue);
+  });
+
+  test('now has millisecond precision', () {
+    expect(Timestamp.now().nanoseconds % 1000000, 0);
   });
 }

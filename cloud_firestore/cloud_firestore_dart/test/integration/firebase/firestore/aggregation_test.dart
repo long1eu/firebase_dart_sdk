@@ -630,4 +630,62 @@ void main() {
       expect(snapshot.get(AggregateField.average('pages')), isA<double>());
     });
   });
+
+  // Modelled on the JS SDK's aggregation.test.ts alias cases
+  // (getAggregateFromServer with a user-keyed spec).
+  group('aliases', () {
+    test('can alias aggregations', () async {
+      final CollectionReference c = await testCollectionWithDocs(books);
+      final AggregateQuery query =
+          c.aggregateWithAliases(<String, AggregateField>{
+        'foo': AggregateField.count(),
+        'bar': AggregateField.sum('pages'),
+        'baz': AggregateField.average('pages'),
+        'pagesAgain': AggregateField.sum('pages'),
+      });
+      final AggregateQuerySnapshot snapshot =
+          await query.get(AggregateSource.server);
+      expect(snapshot.data(), <String, Object?>{
+        'foo': 2,
+        'bar': 150,
+        'baz': 75.0,
+        'pagesAgain': 150,
+      });
+      expect(snapshot.query, query);
+      expect(snapshot.getCount(), 2);
+      expect(snapshot.get(AggregateField.sum('pages')), 150);
+    });
+
+    test('works with filters and null results', () async {
+      final CollectionReference c = await testCollectionWithDocs(books);
+      final AggregateQuerySnapshot snapshot = await c
+          .where('pages', isGreaterThan: 1000)
+          .aggregateWithAliases(<String, AggregateField>{
+        'n': AggregateField.count(),
+        'avg': AggregateField.average('pages'),
+      }).get(AggregateSource.server);
+      expect(snapshot.data(), <String, Object?>{'n': 0, 'avg': null});
+    });
+
+    test('allows special characters, backticks, backslashes and long aliases',
+        () async {
+      final CollectionReference c = await testCollectionWithDocs(books);
+      final String longAlias = 'a' * 1500;
+      final AggregateQuerySnapshot snapshot =
+          await c.aggregateWithAliases(<String, AggregateField>{
+        'with-un/su+pp[or]ted': AggregateField.count(),
+        'with `backticks`': AggregateField.sum('pages'),
+        r'with\backshash\es': AggregateField.sum('year'),
+        longAlias: AggregateField.average('rating'),
+        '': AggregateField.count(),
+      }).get(AggregateSource.server);
+      expect(snapshot.data(), <String, Object?>{
+        'with-un/su+pp[or]ted': 2,
+        'with `backticks`': 150,
+        r'with\backshash\es': 4000,
+        longAlias: 4.5,
+        '': 2,
+      });
+    });
+  });
 }

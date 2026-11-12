@@ -14,10 +14,12 @@ abstract class AggregateField
 class AggregateQuery
   ==(Object other): bool
   final aggregateFields: List<AggregateField>
+  final aliases: Map<String, AggregateField>
   final query: Query<Object>
   get hashCode: int
   get([AggregateSource source]): Future<AggregateQuerySnapshot>
   new AggregateQuery(Query<Object> query, List<AggregateField> aggregateFields) @internal
+  new AggregateQuery.withAliases(Query<Object> query, Map<String, AggregateField> aliases) @internal
 class AggregateQuerySnapshot
   ==(Object other): bool
   data(): Map<String, Object>
@@ -373,6 +375,7 @@ class PersistentCacheSettings extends LocalCacheSettings
 class Query
   ==(Object other): bool
   aggregate(List<AggregateField> aggregateFields): AggregateQuery
+  aggregateWithAliases(Map<String, AggregateField> aggregates): AggregateQuery
   count(): AggregateQuery
   endAt(List<Object> fieldValues): Query<X0>
   endAtDocument(DocumentSnapshot<Object> snapshot): Query<X0>
@@ -398,7 +401,7 @@ class Query
   startAt(List<Object> fieldValues): Query<X0>
   startAtDocument(DocumentSnapshot<Object> snapshot): Query<X0>
   toString(): String
-  where(Filter filter): Query<X0>
+  where(Object fieldOrFilter, {Object isEqualTo, Object isNotEqualTo, Object isLessThan, Object isLessThanOrEqualTo, Object isGreaterThan, Object isGreaterThanOrEqualTo, Object arrayContains, Iterable<Object> arrayContainsAny, Iterable<Object> whereIn, Iterable<Object> whereNotIn, bool isNull}): Query<X0>
   whereArrayContains(String field, Object value): Query<X0>
   whereArrayContainsAny(String field, List<Object> value): Query<X0>
   whereArrayContainsAnyField(FieldPath fieldPath, List<Object> value): Query<X0>

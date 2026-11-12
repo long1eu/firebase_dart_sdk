@@ -71,4 +71,65 @@ void main() {
     });
     expect(snapshot.data(), <String, Object?>{'average_rating': 4.5});
   });
+
+  test('aggregateWithAliases keys data by the user aliases', () {
+    final Map<String, AggregateField> spec = <String, AggregateField>{
+      'total': AggregateField.sum('pages'),
+      'n': AggregateField.count(),
+      'again `with` \\ odd chars.': AggregateField.sum('pages'),
+      'avg': AggregateField.average('rating'),
+    };
+    final AggregateQuery query =
+        collectionReference('coll').aggregateWithAliases(spec);
+    expect(query.aliases, spec);
+    // The same aggregation under two aliases is sent once.
+    expect(query.aggregateFields, <AggregateField>[
+      AggregateField.sum('pages'),
+      AggregateField.count(),
+      AggregateField.average('rating'),
+    ]);
+
+    final AggregateQuerySnapshot snapshot =
+        AggregateQuerySnapshot(query, <String, FieldValue>{
+      AggregateField.count().alias: IntegerValue.valueOf(3),
+      AggregateField.sum('pages').alias: IntegerValue.valueOf(150),
+      AggregateField.average('rating').alias: NullValue.nullValue(),
+    });
+    final Map<String, Object?> data = snapshot.data();
+    expect(data, <String, Object?>{
+      'total': 150,
+      'n': 3,
+      'again `with` \\ odd chars.': 150,
+      'avg': null,
+    });
+    expect(data.keys.toList(), spec.keys.toList());
+    expect(() => data['n'] = 4, throwsUnsupportedError);
+    // Typed access by field keeps working.
+    expect(snapshot.getCount(), 3);
+    expect(snapshot.get(AggregateField.sum('pages')), 150);
+  });
+
+  test('aggregateWithAliases validation and equality', () {
+    expect(
+        () => collectionReference('coll')
+            .aggregateWithAliases(<String, AggregateField>{}),
+        throwsArgumentError);
+
+    AggregateQuery build(String alias) => collectionReference('coll')
+        .aggregateWithAliases(
+            <String, AggregateField>{alias: AggregateField.count()});
+    expect(build('n'), build('n'));
+    expect(build('n').hashCode, build('n').hashCode);
+    expect(build('n'), isNot(build('m')));
+    expect(build('n'), isNot(collectionReference('coll').count()));
+
+    // The spec is copied.
+    final Map<String, AggregateField> spec = <String, AggregateField>{
+      'n': AggregateField.count()
+    };
+    final AggregateQuery query =
+        collectionReference('coll').aggregateWithAliases(spec);
+    spec['m'] = AggregateField.sum('x');
+    expect(query.aliases!.keys, <String>['n']);
+  });
 }

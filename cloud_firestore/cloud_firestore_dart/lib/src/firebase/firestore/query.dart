@@ -309,17 +309,113 @@ class Query<T extends dynamic> {
     return _whereHelper(fieldPath, FilterOperator.NOT_IN, value);
   }
 
-  /// Creates and returns a new [Query] with the additional [filter].
+  /// Creates and returns a new [Query] with additional filters.
   ///
-  /// The filter can be a single field filter created with the [Filter]
+  /// [fieldOrFilter] is either a [Filter], or a field (a dot-separated
+  /// [String] path or a [FieldPath]) that is constrained with the named
+  /// arguments, in the FlutterFire style:
+  ///
+  /// ```dart
+  /// query.where(Filter.or([Filter.equalTo('a', 1), Filter.equalTo('b', 2)]));
+  /// query.where('age', isGreaterThanOrEqualTo: 18, isLessThan: 65);
+  /// query.where(FieldPath.documentIdField, whereIn: ['a', 'b']);
+  /// ```
+  ///
+  /// A [Filter] can be a single field filter created with the [Filter]
   /// factories, or a conjunction/disjunction created with [Filter.and] and
   /// [Filter.or] (OR queries). A composite filter without any filters returns
-  /// this query unchanged.
+  /// this query unchanged. No named argument may be given with a [Filter].
   ///
-  /// NOTE: a FlutterFire-style `where(field, isEqualTo: ...)` with named
-  /// parameters is intentionally not provided here; it can be added later as
-  /// an extension that builds the same [Filter]s.
-  Query<T> where(Filter filter) {
+  /// With a field, every named argument that is given adds one filter and all
+  /// of them must match. A null argument is the same as an omitted one, so
+  /// use `isNull: true` (equal to null) or `isNull: false` (not equal to null)
+  /// to compare with null. At least one non-null named argument is required:
+  /// unlike FlutterFire, which returns the query unchanged in that case (so
+  /// `where('a', isEqualTo: valueThatIsNull)` silently filters nothing), this
+  /// method throws.
+  ///
+  /// Throws an [ArgumentError] if [fieldOrFilter] has another type, if named
+  /// arguments are given with a [Filter], or if none is given with a field.
+  Query<T> where(
+    Object fieldOrFilter, {
+    Object? isEqualTo,
+    Object? isNotEqualTo,
+    Object? isLessThan,
+    Object? isLessThanOrEqualTo,
+    Object? isGreaterThan,
+    Object? isGreaterThanOrEqualTo,
+    Object? arrayContains,
+    Iterable<Object?>? arrayContainsAny,
+    Iterable<Object?>? whereIn,
+    Iterable<Object?>? whereNotIn,
+    bool? isNull,
+  }) {
+    final List<Filter> filters;
+    if (fieldOrFilter is Filter) {
+      final bool hasConstraint = isEqualTo != null ||
+          isNotEqualTo != null ||
+          isLessThan != null ||
+          isLessThanOrEqualTo != null ||
+          isGreaterThan != null ||
+          isGreaterThanOrEqualTo != null ||
+          arrayContains != null ||
+          arrayContainsAny != null ||
+          whereIn != null ||
+          whereNotIn != null ||
+          isNull != null;
+      if (hasConstraint) {
+        throw ArgumentError(
+            'Invalid query. Named arguments cannot be combined with a Filter '
+            'in where().');
+      }
+      filters = <Filter>[fieldOrFilter];
+    } else {
+      final FieldPath fieldPath;
+      if (fieldOrFilter is FieldPath) {
+        fieldPath = fieldOrFilter;
+      } else if (fieldOrFilter is String) {
+        fieldPath = FieldPath.fromDotSeparatedPath(fieldOrFilter);
+      } else {
+        throw ArgumentError.value(fieldOrFilter, 'fieldOrFilter',
+            'where() expects a Filter, a String field or a FieldPath');
+      }
+      api.UnaryFilter filter(FilterOperator op, Object? value) =>
+          api.UnaryFilter(fieldPath, op, value);
+      filters = <Filter>[
+        if (isEqualTo != null) filter(FilterOperator.equal, isEqualTo),
+        if (isNotEqualTo != null) filter(FilterOperator.notEqual, isNotEqualTo),
+        if (isLessThan != null) filter(FilterOperator.lessThan, isLessThan),
+        if (isLessThanOrEqualTo != null)
+          filter(FilterOperator.lessThanOrEqual, isLessThanOrEqualTo),
+        if (isGreaterThan != null)
+          filter(FilterOperator.graterThan, isGreaterThan),
+        if (isGreaterThanOrEqualTo != null)
+          filter(FilterOperator.graterThanOrEqual, isGreaterThanOrEqualTo),
+        if (arrayContains != null)
+          filter(FilterOperator.arrayContains, arrayContains),
+        if (arrayContainsAny != null)
+          filter(FilterOperator.arrayContainsAny, arrayContainsAny.toList()),
+        if (whereIn != null) filter(FilterOperator.IN, whereIn.toList()),
+        if (whereNotIn != null)
+          filter(FilterOperator.NOT_IN, whereNotIn.toList()),
+        if (isNull != null)
+          filter(isNull ? FilterOperator.equal : FilterOperator.notEqual, null),
+      ];
+      if (filters.isEmpty) {
+        throw ArgumentError(
+            "Invalid query. where('$fieldPath') needs at least one non-null "
+            'named argument. Use isNull to compare with null.');
+      }
+    }
+
+    Query<T> result = this;
+    for (final Filter filter in filters) {
+      result = result._where(filter);
+    }
+    return result;
+  }
+
+  Query<T> _where(Filter filter) {
     final core_filter.Filter parsedFilter = _parseFilter(filter);
     if (parsedFilter.filters.isEmpty) {
       // Return the existing query if not adding any more filters (because the
@@ -334,7 +430,7 @@ class Query<T extends dynamic> {
   /// documents must contain the specified field and the value should satisfy
   /// the relation constraint provided.
   Query<T> _whereHelper(FieldPath fieldPath, FilterOperator op, Object? value) {
-    return where(api.UnaryFilter(fieldPath, op, value));
+    return _where(api.UnaryFilter(fieldPath, op, value));
   }
 
   /// Takes a [api.UnaryFilter], parses the value object and returns a new
@@ -891,6 +987,27 @@ class Query<T extends dynamic> {
       throw ArgumentError('At least one AggregateField is required.');
     }
     return AggregateQuery(this, aggregateFields);
+  }
+
+  /// Returns an [AggregateQuery] that calculates the given aggregations over the
+  /// result set of this query, with results keyed by user-chosen aliases, as
+  /// the JS SDK's `getAggregateFromServer(query, {total: sum('price')})`:
+  ///
+  /// ```dart
+  /// final snapshot = await query.aggregateWithAliases({
+  ///   'total': AggregateField.sum('price'),
+  ///   'n': AggregateField.count(),
+  /// }).get();
+  /// snapshot.data(); // {'total': 42, 'n': 3}
+  /// ```
+  ///
+  /// Any string is a valid alias (aliases are not sent to the server) and the
+  /// same aggregation may appear under several aliases.
+  AggregateQuery aggregateWithAliases(Map<String, AggregateField> aggregates) {
+    if (aggregates.isEmpty) {
+      throw ArgumentError('At least one AggregateField is required.');
+    }
+    return AggregateQuery.withAliases(this, aggregates);
   }
 
   /// Return cached results first and then queries the server with resume token

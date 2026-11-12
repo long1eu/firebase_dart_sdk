@@ -27,9 +27,23 @@ class Timestamp implements Comparable<Timestamp> {
         assert(
             seconds < 253402300800, 'Timestamp seconds out of range: $seconds');
 
-  /// Creates a new timestamp from [date], with millisecond precision.
+  /// Creates a new timestamp from [date], with microsecond precision (the
+  /// precision of [DateTime] on the Dart VM, and of the Firestore backend).
+  ///
+  /// Throws an [ArgumentError] if the result is outside the supported range.
   factory Timestamp.fromDate(DateTime date) {
-    return Timestamp.fromMillis(date.millisecondsSinceEpoch);
+    final int microseconds = date.microsecondsSinceEpoch;
+    // Floor division, so that negative values keep non-negative nanoseconds.
+    int seconds = microseconds ~/ 1000000;
+    int nanoseconds = microseconds.remainder(1000000) * 1000;
+
+    if (nanoseconds < 0) {
+      seconds -= 1;
+      nanoseconds += 1000000000;
+    }
+
+    validateRange(seconds, nanoseconds);
+    return Timestamp(seconds, nanoseconds);
   }
 
   /// Creates a new timestamp from the given number of [milliseconds] since the
@@ -67,7 +81,7 @@ class Timestamp implements Comparable<Timestamp> {
 
   /// Creates a new timestamp with the current date, with millisecond precision.
   factory Timestamp.now() {
-    return Timestamp.fromDate(DateTime.now());
+    return Timestamp.fromMillis(DateTime.now().millisecondsSinceEpoch);
   }
 
   final int seconds;
@@ -76,9 +90,12 @@ class Timestamp implements Comparable<Timestamp> {
   /// The value of the `type` field written by [toJson].
   static const String jsonType = 'firestore/timestamp/1.0';
 
-  /// Converts this timestamp to a [DateTime], with millisecond precision.
+  /// Converts this timestamp to a [DateTime] in the local time zone, with
+  /// microsecond precision. Sub-microsecond precision is truncated toward the
+  /// earlier time.
   DateTime toDate() {
-    return DateTime.fromMillisecondsSinceEpoch(toMillis());
+    return DateTime.fromMicrosecondsSinceEpoch(
+        seconds * 1000000 + nanoseconds ~/ 1000);
   }
 
   /// The number of milliseconds since the Unix epoch 1970-01-01T00:00:00Z.
