@@ -7243,7 +7243,8 @@
     "describeName": "Limbo Documents:",
     "itName": "Limbo documents survive primary state transitions",
     "tags": [
-      "multi-client"
+      "multi-client",
+      "no-pipeline-conversion"
     ],
     "config": {
       "numClients": 2,

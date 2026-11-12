@@ -58,6 +58,10 @@ class MockDatastore extends Datastore {
         _client = client,
         super.test(scheduler, databaseInfo, serializer, client);
 
+  /// When true, a watch removal with a cause may name a target that is not active (the spec config
+  /// `allowUnlistedTargetRemoval`, used by specs where the server removes a target the client already unlistened).
+  bool allowUnlistedTargetRemoval = false;
+
   final FirestoreClient _client;
   final TaskScheduler _scheduler;
   final RemoteSerializer _serializer;
@@ -213,7 +217,8 @@ class _MockWatchStream extends WatchStream {
       final GrpcError? cause = change.cause;
       if (cause != null && cause.code != StatusCode.ok) {
         for (int targetId in change.targetIds) {
-          if (!_activeTargets.containsKey(targetId)) {
+          if (!_activeTargets.containsKey(targetId) &&
+              !_datastore.allowUnlistedTargetRemoval) {
             // Technically removing an unknown target is valid (e.g. it could
             // race with a server-side removal), but we want to pay extra
             // careful attention in tests that we only remove targets we

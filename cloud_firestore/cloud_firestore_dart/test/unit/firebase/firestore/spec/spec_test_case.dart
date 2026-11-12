@@ -128,6 +128,9 @@ class SpecTestCase implements RemoteStoreCallback {
 
   int _maxConcurrentLimboResolutions = 0x7fffffff;
 
+  /// The spec config `allowUnlistedTargetRemoval`: a watch removal with a cause may name a target that is not active.
+  bool _allowUnlistedTargetRemoval = false;
+
   /// Set of expected active targets, keyed by target ID.
   late Map<int, QueryData> _expectedActiveTargets;
   Map<int, QueryPurpose> _expectedPurposes = <int, QueryPurpose>{};
@@ -176,6 +179,7 @@ class SpecTestCase implements RemoteStoreCallback {
     _useEagerGc = config['useEagerGCForMemory'] ?? true;
     _maxConcurrentLimboResolutions =
         config['maxConcurrentLimboResolutions'] ?? 0x7fffffff;
+    _allowUnlistedTargetRemoval = config['allowUnlistedTargetRemoval'] ?? false;
 
     _currentUser = User.unauthenticated;
 
@@ -227,7 +231,8 @@ class SpecTestCase implements RemoteStoreCallback {
     _queue = TaskScheduler('');
 
     // Set up the sync engine and various stores.
-    _datastore = MockDatastore(_queue);
+    _datastore = MockDatastore(_queue)
+      ..allowUnlistedTargetRemoval = _allowUnlistedTargetRemoval;
     // ignore: close_sinks
     final BehaviorSubject<bool> onNetworkConnected =
         BehaviorSubject<bool>.seeded(true);
@@ -932,6 +937,10 @@ class SpecTestCase implements RemoteStoreCallback {
       await _doLoadBundle(step['loadBundle']);
     } else if (step.containsKey('restart')) {
       await _doRestart();
+    } else if (step.containsKey('watchUsesTargetIndex')) {
+      // The JS SDK gives every listen of a target a fresh remote target id, and this step picks which of them the
+      // following watch steps address. The port (like Android) sends the SDK target id to watch and tracks
+      // re-listens with pending-response counts, so every index names the same id and the step is a no-op.
     } else {
       for (String unsupported in unsupportedSteps) {
         if (step.containsKey(unsupported)) {

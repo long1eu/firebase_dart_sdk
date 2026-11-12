@@ -21,7 +21,8 @@ import 'dart:convert';
 /// a skipped `test()` that carries that reason, so nothing disappears silently. When a feature lands, delete (or set to
 /// `null`) its entry and the specs that need it start running.
 ///
-/// Specs that fail because of a real divergence are NOT listed here: they stay failing on purpose.
+/// Specs that fail because of a real divergence are NOT listed here: they stay failing on purpose, unless the
+/// divergence is one upstream Android shares and needs a redesign to remove (then it goes in [knownSpecDivergences]).
 ///
 /// Features are detected from the spec JSON by [detectSpecFeatures]; a spec that needs several features is reported
 /// with the first one in this map's iteration order.
@@ -63,6 +64,17 @@ const Map<String, String> memoryExcludedTags = <String, String>{
 const Map<String, String> sqliteExcludedTags = <String, String>{
   'eager-gc':
       'eager-gc: relies on eager garbage collection, which only exists for memory persistence (as upstream).',
+};
+
+/// Single specs that need a library design the port (like upstream Android) does not have, keyed by
+/// `'<describeName> <itName>'`. Unlike [skippedSpecFeatures] these are not detectable from the spec JSON: the spec
+/// uses only supported steps but expects behaviour that only the JS SDK implements.
+const Map<String, String> knownSpecDivergences = <String, String>{
+  'Remote store: Handles removal of old target (with cause) after re-listen':
+      'JS-only remote target ids: the JS RemoteStore gives every listen a fresh remote target id '
+          '(targetIdMapSdkToRemote), so a removal with a cause for the previous listen of the query is ignored. '
+          'The port, like Android main, sends the SDK target id to watch, so the removal rejects the re-listened '
+          'query with RESOURCE_EXHAUSTED. Needs the JS remote-target-id redesign of RemoteStore/WatchChangeAggregator.',
 };
 
 /// Returns the names (keys of [skippedSpecFeatures]) of all features that [testJson] needs.
@@ -145,6 +157,11 @@ String? skipReasonFor(
   Map<String, dynamic> testJson,
   Map<String, String> excludedTags,
 ) {
+  final String? divergence =
+      knownSpecDivergences['${testJson['describeName']} ${testJson['itName']}'];
+  if (divergence != null) {
+    return '[known-divergence] $divergence';
+  }
   final Set<String> features = detectSpecFeatures(testJson);
   for (final MapEntry<String, String?> entry in skippedSpecFeatures.entries) {
     if (entry.value != null && features.contains(entry.key)) {
