@@ -14,8 +14,10 @@ import 'dart:io';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
+import 'package:firebase_app_dart/platform_dependencies.dart';
 import 'package:firebase_auth_providers_dart/adc.dart'; // needs dart:io
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:test/test.dart';
 
 late FirebaseApp app;
@@ -25,23 +27,6 @@ late Query<Map<String, Object?>> query;
 late List<int> bundleBytes;
 late String password;
 late String keyFilePath;
-
-class City {
-  const City(this.name, this.population);
-  factory City.fromMap(Map<String, Object?> m) =>
-      City(m['name']! as String, m['population']! as int);
-  final String name;
-  final int population;
-  Map<String, Object?> toMap() => {'name': name, 'population': population};
-}
-
-class FileAuthStorage implements AuthStorage {
-  @override
-  Future<String?> read(String key) async { /* ... */ return null; } // null: no value
-
-  @override
-  Future<void> write(String key, String? value) async { /* null removes the key */ }
-}
 
 class MyDatabase implements Database {
   MyDatabase(this.path);
@@ -64,6 +49,30 @@ class MyDatabase implements Database {
   void close() {}
 }
 
+class FileAuthStorage implements AuthStorage {
+  @override
+  Future<String?> read(String key) async { /* ... */ return null; } // null: no value
+
+  @override
+  Future<void> write(String key, String? value) async { /* null removes the key */ }
+}
+
+class AppDependencies extends PlatformDependencies {
+  final BehaviorSubject<bool> connectivity = BehaviorSubject<bool>.seeded(true);
+
+  @override
+  BehaviorSubject<bool> get onNetworkConnected => connectivity;
+}
+
+class City {
+  const City(this.name, this.population);
+  factory City.fromMap(Map<String, Object?> m) =>
+      City(m['name']! as String, m['population']! as int);
+  final String name;
+  final int population;
+  Map<String, Object?> toMap() => {'name': name, 'population': population};
+}
+
 // ../../README.md:11
 Future<void> rootReadmeLine11() async {
   final firestore = Firestore.instanceFor(app: app);
@@ -80,266 +89,40 @@ Future<void> rootReadmeLine11() async {
       .listen((snapshot) => print(snapshot.docs.length));
 }
 
-// README.md:164
-Future<void> firestoreReadmeLine164() async {
-  // `app` is a FirebaseApp created with firebase_app_dart.
-  final firestore = Firestore.instanceFor(app: app);
-  final users = firestore.collection('users');
-  await users.doc('ada').set({'name': 'Ada', 'age': 36});
-  final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
-}
-
-// README.md:182
-Future<void> firestoreReadmeLine182() async {
-  final firestore = Firestore.instanceFor(
-    app: app,
-    settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
-  );
-}
-
-// README.md:199
-Future<void> firestoreReadmeLine199() async {
-  final count = await users.count().get();                 // AggregateQuerySnapshot
-  final agg = await users.aggregate([
-    AggregateField.sum('age'),
-    AggregateField.average('age'),
-  ]).get();
-  final either = await users
-      .where(Filter.or([
-        Filter.equalTo('city', 'Paris'),
-        Filter.equalTo('city', 'Rome'),
-      ]))
-      .get();
-  final last3 = await users.orderBy('age').limitToLast(3).get();
-  final near = await users
-      .findNearest('embedding', FieldValue.vector([0.1, 0.2, 0.3]), 5,
-          DistanceMeasure.cosine)
-      .get();
-}
-
-// README.md:221
-Future<void> firestoreReadmeLine221() async {
-  final converter = FirestoreDataConverter<City>.from(
-    fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
-    toFirestore: (city, options) => city.toMap(),
-  );
-
-  final cities = firestore.collection('cities').withConverter<City>(converter);
-  await cities.doc('sf').set(const City('San Francisco', 870000));   // CollectionReference<City>
-  final City sf = (await cities.doc('sf').get()).data!;               // DocumentSnapshot<City>
-  final big = await cities.whereGreaterThan('population', 500000).get();
-  final names = [for (final c in big.docs) c.data.name];              // QueryDocumentSnapshot<City>
-  final raw = cities.withoutConverter();                              // back to Map<String, Object?>
-}
-
-// README.md:252
-Future<void> firestoreReadmeLine252() async {
-  final settings = FirestoreSettings(
-      cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024));
-  final task = firestore.loadBundle(bundleBytes);          // LoadBundleTask
-  final json = (await query.get()).toJson();               // e.g. sent from a server to a client
-  final snapshot = QuerySnapshot.fromJson(firestore, json);
-  firestore.querySnapshotsFromJson(json).listen((_) {});   // resumes listening from that snapshot
-  await firestore.waitForPendingWrites();
-  firestore.snapshotsInSync.listen((_) {});
-  await firestore.terminate();
-}
-
-// README.md:306
-Future<void> firestoreReadmeLine306() async {
-  // A signed-in Firebase Auth user: the security rules see request.auth.
-  final auth = await FirebaseUserAuth.forApp(app);
-  final firestore = Firestore.instanceFor(app: app);
-  await auth.signInWithEmailAndPassword('ada@example.com', 'the password'); // or signInAnonymously(), ...
-
-  // A server (bypasses security rules; access is decided by IAM):
-  //   app.authProvider = OAuthTokenProvider.serviceAccount(serviceAccountJson);
-  //   app.authProvider = applicationDefaultCredentials();   // package:.../adc.dart
-}
-
-// README.md:332
-Future<void> firestoreReadmeLine332() async {
-  final PipelineSnapshot snapshot = await firestore
-      .pipeline()
-      .collection('books')
-      .where(field('rating').greaterThan(4).and(field('genre').equal('Fantasy')))
-      .addFields([field('title').toUpper().as('upperTitle')])
-      .sort([field('rating').descending()])
-      .limit(10)
-      .execute();
-
-  for (final PipelineResult result in snapshot.results) {
-    print('${result.id}: ${result.data()}');
+// README.md:50
+Future<void> firestoreReadmeLine50() async {
+  Future<void> main() async {
+    final app = FirebaseApp.withOptions(const FirebaseOptions(
+        apiKey: '<API key>', applicationId: '1:1234567890:web:abc', projectId: 'my-project'));
+    final firestore = Firestore.instanceFor(app: app);
+    await firestore.doc('cities/SF').set({'name': 'San Francisco', 'state': 'CA'});
+    final cities = await firestore.collection('cities').where('state', isEqualTo: 'CA').get();
+    print(cities.docs.map((city) => city.data));
+    await firestore.terminate(); // a VM program exits once its instances are terminated
   }
-
-  // One row per genre.
-  await firestore
-      .pipeline()
-      .collection('books')
-      .aggregate([countAll().as('count'), field('rating').average().as('avg')],
-          groups: ['genre'])
-      .execute();
 }
 
-// README.md:358
-Future<void> firestoreReadmeLine358() async {
-  // An existing query as a pipeline: the same documents in the same order.
-  final Query<Map<String, Object?>> italian = users
-      .where('country', isEqualTo: 'IT')
-      .orderBy('age', Direction.descending)
-      .limit(20);
-  final PipelineSnapshot same =
-      await firestore.pipeline().createFrom(italian).execute();
-
-  // A subquery: every author with the number of their books.
-  await firestore
-      .pipeline()
-      .collection('authors')
-      .define([field('name').as('author')])
-      .select([
-        'name',
-        firestore
-            .pipeline()
-            .collection('books')
-            .where(field('author').equal(variable('author')))
-            .aggregate([countAll().as('count')])
-            .toScalarExpression()
-            .as('books'),
-      ])
-      .execute();
-
-  // A lambda over an array.
-  await firestore
-      .pipeline()
-      .collection('books')
-      .select([field('tags').arrayFilter((tag) => tag.startsWith('sci')).as('tags')])
-      .execute();
-
-  // A write stage, applied in one transaction.
-  final PipelineSnapshot written = await firestore
-      .pipeline()
-      .collection('books')
-      .where(field('published').lessThan(1900))
-      .update(transformedFields: [constant(true).as('classic')])
-      .execute(atomic: true);
-  print(written.results.single.get('documents_modified'));
+// ../../firebase_core/firebase_app_dart/README.md:34
+Future<void> appReadmeLine34() async {
+  final FirebaseApp app = FirebaseApp.withOptions(
+    const FirebaseOptions(
+      apiKey: '<YOUR_API_KEY>',
+      applicationId: '1:1234567890:web:0123456789abcdef',
+      projectId: 'my-project',
+    ),
+  );
+  print(identical(FirebaseApp.instance, app)); // the default app
 }
 
-// README.md:596
-Future<void> firestoreReadmeLine596() async {
-  final total = await firestore.runTransaction((transaction) async {
-    final account = await transaction.get(firestore.doc('accounts/a'));
-    final orders = await transaction.getQuery(
-        firestore.collection('orders').where('account', isEqualTo: 'a'));
-    final count = await transaction.getAggregate(firestore.collection('orders').count());
-    return (account.data, orders.docs.length, count.getCount());
-  }, options: TransactionOptions(readOnly: true));
-}
-
-// README.md:715
-Future<void> firestoreReadmeLine715() async {
-  final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
-  await indexes?.enableIndexAutoCreation();
-}
-
-// ../../firebase_core/firebase_app_dart/README.md:41
-Future<void> appReadmeLine41() async {
-}
-
-// ../../firebase_core/firebase_app_dart/README.md:49
-Future<void> appReadmeLine49() async {
-  FirebaseOptions options;
-  if (Platform.isLinux) {
-    options = const FirebaseOptions(
-      apiKey: '<YOUR_API_KEY>',
-      applicationId:
-          '<YOUR_APP_ID>',
-    );
-  } else if (Platform.isMacOS) {
-    options = const FirebaseOptions(
-      apiKey: '<YOUR_API_KEY>',
-      applicationId:
-          '<YOUR_APP_ID>',
-    );
-  } else if (Platform.isWindows) {
-    options = const FirebaseOptions(
-      apiKey: '<YOUR_API_KEY>',
-      applicationId:
-          '<YOUR_APP_ID>',
-    );
-  } else if (Platform.isAndroid) {
-    options = const FirebaseOptions(
-      apiKey: '<YOUR_API_KEY>',
-      applicationId: '<YOUR_APP_ID>',
-    );
-  } else if (Platform.isIOS) {
-    options = const FirebaseOptions(
-      apiKey: '<YOUR_API_KEY>',
-      applicationId: '<YOUR_APP_ID>',
-    );
-  } else if (Platform.isFuchsia) {
-    options = const FirebaseOptions(
-      apiKey: '<YOUR_API_KEY>',
-      applicationId:
-          '<YOUR_APP_ID>',
-    );
-  } else {
-    throw UnsupportedError('No Firebase options for this platform.');
-  }
-
-  FirebaseApp.withOptions(options);
-}
-
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:53
-Future<void> authProvidersReadmeLine53() async {
-  final app = FirebaseApp.withOptions(const FirebaseOptions(
-    apiKey: '<the Web API key of the project>',
-    applicationId: '1:1234567890:dart:example',
-    projectId: 'my-project',
-  ));
-
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:36
+Future<void> authProvidersReadmeLine36() async {
   // Before the Firestore instance is created: it becomes the token provider of the app.
   final auth = await FirebaseUserAuth.forApp(app);
   final firestore = Firestore.instanceFor(app: app);
 
   await auth.signInWithEmailAndPassword('ada@example.com', password);
-  // or: auth.signInAnonymously(), auth.createUserWithEmailAndPassword(...),
-  //     auth.signInWithCustomToken(tokenFromYourServer)
-
   await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
-
   await auth.signOut();
-}
-
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:107
-Future<void> authProvidersReadmeLine107() async {
-  final auth = await FirebaseUserAuth.forApp(app, storage: FileAuthStorage());
-  // auth.currentUser is the user of the last run, if there was one.
-}
-
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:137
-Future<void> authProvidersReadmeLine137() async {
-  final auth = await FirebaseUserAuth.forApp(app,
-      emulatorHost: FirebaseUserAuth.emulatorHostFromEnvironment); // FIREBASE_AUTH_EMULATOR_HOST
-  // or emulatorHost: '127.0.0.1:9099'
-}
-
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:163
-Future<void> authProvidersReadmeLine163() async {
-  final app = FirebaseApp.withOptions(const FirebaseOptions(
-    apiKey: 'unused',            // required by FirebaseOptions, not sent with these credentials
-    applicationId: '1:1234567890:dart:server',
-    projectId: 'my-project',
-  ));
-
-  // Application Default Credentials: GOOGLE_APPLICATION_CREDENTIALS, gcloud, or the metadata server.
-  app.authProvider = applicationDefaultCredentials();
-
-  // Or a service account key (the decoded JSON of the key file, or its content as a string):
-  app.authProvider = OAuthTokenProvider.serviceAccount(
-      jsonDecode(File(keyFilePath).readAsStringSync()));
-
-  final firestore = Firestore.instanceFor(app: app);
 }
 
 // ../../docs/migrating_from_vm_packages.md:60
@@ -432,8 +215,181 @@ Future<void> migrationGuideLine398() async {
     }
 }
 
-// ../../docs/guides/getting_started.md:25
-Future<void> gettingStartedGuideLine25() async {
+// ../../docs/guides/authentication.md:24
+Future<void> authenticationGuideLine24() async {
+  // A signed-in Firebase Auth user: the security rules see request.auth.
+  final auth = await FirebaseUserAuth.forApp(app);
+  final firestore = Firestore.instanceFor(app: app);
+  await auth.signInWithEmailAndPassword('ada@example.com', 'the password'); // or signInAnonymously(), ...
+
+  // A server (bypasses security rules; access is decided by IAM):
+  //   app.authProvider = OAuthTokenProvider.serviceAccount(serviceAccountJson);
+  //   app.authProvider = applicationDefaultCredentials();   // package:.../adc.dart
+}
+
+// ../../docs/guides/authentication.md:46
+Future<void> authenticationGuideLine46() async {
+  final app = FirebaseApp.withOptions(const FirebaseOptions(
+    apiKey: '<the Web API key of the project>',
+    applicationId: '1:1234567890:dart:example',
+    projectId: 'my-project',
+  ));
+
+  // Before the Firestore instance is created: it becomes the token provider of the app.
+  final auth = await FirebaseUserAuth.forApp(app);
+  final firestore = Firestore.instanceFor(app: app);
+
+  await auth.signInWithEmailAndPassword('ada@example.com', password);
+  // or: auth.signInAnonymously(), auth.createUserWithEmailAndPassword(...),
+  //     auth.signInWithCustomToken(tokenFromYourServer)
+
+  await firestore.doc('users/${auth.uid}/notes/first').set({'text': 'hello'});
+
+  await auth.signOut();
+}
+
+// ../../docs/guides/authentication.md:100
+Future<void> authenticationGuideLine100() async {
+  final auth = await FirebaseUserAuth.forApp(app, storage: FileAuthStorage());
+  // auth.currentUser is the user of the last run, if there was one.
+}
+
+// ../../docs/guides/authentication.md:130
+Future<void> authenticationGuideLine130() async {
+  final auth = await FirebaseUserAuth.forApp(app,
+      emulatorHost: FirebaseUserAuth.emulatorHostFromEnvironment); // FIREBASE_AUTH_EMULATOR_HOST
+  // or emulatorHost: '127.0.0.1:9099'
+}
+
+// ../../docs/guides/authentication.md:156
+Future<void> authenticationGuideLine156() async {
+  final app = FirebaseApp.withOptions(const FirebaseOptions(
+    apiKey: 'unused',            // required by FirebaseOptions, not sent with these credentials
+    applicationId: '1:1234567890:dart:server',
+    projectId: 'my-project',
+  ));
+
+  // Application Default Credentials: GOOGLE_APPLICATION_CREDENTIALS, gcloud, or the metadata server.
+  app.authProvider = applicationDefaultCredentials();
+
+  // Or a service account key (the decoded JSON of the key file, or its content as a string):
+  app.authProvider = OAuthTokenProvider.serviceAccount(
+      jsonDecode(File(keyFilePath).readAsStringSync()));
+
+  final firestore = Firestore.instanceFor(app: app);
+}
+
+// ../../docs/guides/emulator_and_testing.md:22
+Future<void> emulatorAndTestingGuideLine22() async {
+  final FirebaseApp app = FirebaseApp.withOptions(
+    const FirebaseOptions(
+      apiKey: 'demo-key', // the emulator accepts any key and application id
+      applicationId: '1:1234567890:dart:demo',
+      projectId: 'demo-my-app',
+    ),
+  );
+  final Firestore firestore = Firestore.instanceFor(
+    app: app,
+    settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+  );
+}
+
+// ../../docs/guides/emulator_and_testing.md:39
+Future<void> emulatorAndTestingGuideLine39() async {
+  final String? emulator = Platform.environment['FIRESTORE_EMULATOR_HOST']; // host:port
+  final FirestoreSettings settings = emulator == null
+      ? FirestoreSettings()
+      : FirestoreSettings().withEmulator(
+          emulator.substring(0, emulator.lastIndexOf(':')),
+          int.parse(emulator.substring(emulator.lastIndexOf(':') + 1)),
+        );
+}
+
+// ../../docs/guides/emulator_and_testing.md:57
+Future<void> emulatorAndTestingGuideLine57() async {
+  final Firestore asAlice = Firestore.instanceFor(
+    app: FirebaseApp.withOptions(app.options, name: 'alice'),
+    settings: FirestoreSettings().withEmulator('127.0.0.1', 8080, mockUserToken: {'sub': 'alice'}),
+  );
+}
+
+// ../../docs/guides/emulator_and_testing.md:70
+Future<void> emulatorAndTestingGuideLine70() async {
+  late Firestore db;
+  int instances = 0;
+
+  setUp(() {
+    // A new app name gives each test its own instance (and its own cache).
+    final FirebaseApp testApp = FirebaseApp.withOptions(
+      const FirebaseOptions(
+        apiKey: 'demo-key',
+        applicationId: '1:1234567890:dart:test',
+        projectId: 'demo-my-app',
+      ),
+      name: 'test-${instances++}',
+    );
+    db = Firestore.instanceFor(
+      app: testApp,
+      settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
+    );
+  });
+
+  tearDown(() async {
+    await db.terminate();
+    await db.clearPersistence();
+  });
+
+  test('writes and reads a document', () async {
+    // A collection name of its own keeps tests independent on a shared emulator.
+    final DocumentReference<Map<String, Object?>> doc =
+        db.collection('test-${DateTime.now().microsecondsSinceEpoch}').doc('a');
+    await doc.set({'n': 1});
+    expect((await doc.get()).data, {'n': 1});
+  });
+}
+
+// ../../docs/guides/firebase_app.md:9
+Future<void> firebaseAppGuideLine9() async {
+  final FirebaseApp defaultApp = FirebaseApp.withOptions(
+    const FirebaseOptions(
+      apiKey: '<YOUR_API_KEY>',
+      applicationId: '1:1234567890:web:0123456789abcdef',
+      projectId: 'my-project',
+    ),
+  );
+
+  // More apps, for other projects or other users, have names of their own.
+  final FirebaseApp secondary = FirebaseApp.withOptions(
+    const FirebaseOptions(
+      apiKey: '<YOUR_API_KEY>',
+      applicationId: '1:1234567890:dart:secondary',
+      projectId: 'other-project',
+    ),
+    name: 'secondary',
+  );
+  print(identical(FirebaseApp.instance, defaultApp)); // true
+  print(identical(FirebaseApp.getInstance('secondary'), secondary)); // true
+}
+
+// ../../docs/guides/firebase_app.md:67
+Future<void> firebaseAppGuideLine67() async {
+  final AppDependencies dependencies = AppDependencies();
+  final FirebaseApp connectedApp = FirebaseApp.withOptions(
+    const FirebaseOptions(
+      apiKey: '<YOUR_API_KEY>',
+      applicationId: '1:1234567890:dart:example',
+      projectId: 'my-project',
+    ),
+    name: 'connected',
+    dependencies: dependencies,
+  );
+
+  // From the plugin's callback:
+  dependencies.connectivity.add(true);
+}
+
+// ../../docs/guides/getting_started.md:24
+Future<void> gettingStartedGuideLine24() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the Web API key of the project>',
@@ -447,8 +403,8 @@ Future<void> gettingStartedGuideLine25() async {
   final Firestore firestore = Firestore.instanceFor(app: app);
 }
 
-// ../../docs/guides/getting_started.md:54
-Future<void> gettingStartedGuideLine54() async {
+// ../../docs/guides/getting_started.md:53
+Future<void> gettingStartedGuideLine53() async {
   final CollectionReference<Map<String, Object?>> cities = firestore.collection('cities');
 
   // Writes complete when the backend has acknowledged them.
@@ -482,24 +438,42 @@ Future<void> gettingStartedGuideLine54() async {
   await added.delete();
 }
 
-// ../../docs/guides/getting_started.md:98
-Future<void> gettingStartedGuideLine98() async {
+// ../../docs/guides/getting_started.md:97
+Future<void> gettingStartedGuideLine97() async {
   // Writes that the backend has not acknowledged yet are kept in a persistent
   // cache and sent by the next instance; with a memory cache they are lost.
   await firestore.waitForPendingWrites();
   await firestore.terminate();
 }
 
-// ../../docs/guides/getting_started.md:141
-Future<void> gettingStartedGuideLine141() async {
+// ../../docs/guides/getting_started.md:140
+Future<void> gettingStartedGuideLine140() async {
   final Firestore firestore = Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings(experimentalForceLongPolling: true),
   );
 }
 
+// ../../docs/guides/multiple_clients.md:67
+Future<void> multipleClientsGuideLine67() async {
+  final Directory directory = Directory('/home/ada/.local/share/my_app');
+
+  // In the background isolate: the same project, another app name, another cache file.
+  final FirebaseApp worker = FirebaseApp.withOptions(app.options, name: 'background-sync');
+  final Firestore workerFirestore = Firestore.instanceFor(
+    app: worker,
+    openDatabase: sqliteOpener(directory),
+  );
+}
+
+// ../../docs/guides/multiple_clients.md:93
+Future<void> multipleClientsGuideLine93() async {
+  await firestore.terminate();
+  await firestore.clearPersistence();
+}
+
 // ../../docs/guides/offline_persistence.md:17
-Future<void> persistenceGuideLine17() async {
+Future<void> offlinePersistenceGuideLine17() async {
   // Persistent (needs an openDatabase): unused documents are removed once the
   // cache grows beyond about 100 MB, the default.
   final FirestoreSettings persistent = FirestoreSettings(
@@ -523,7 +497,7 @@ Future<void> persistenceGuideLine17() async {
 }
 
 // ../../docs/guides/offline_persistence.md:55
-Future<void> persistenceGuideLine55() async {
+Future<void> offlinePersistenceGuideLine55() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app');
   final Firestore firestore = Firestore.instanceFor(
     app: app,
@@ -533,7 +507,7 @@ Future<void> persistenceGuideLine55() async {
 }
 
 // ../../docs/guides/offline_persistence.md:80
-Future<void> persistenceGuideLine80() async {
+Future<void> offlinePersistenceGuideLine80() async {
   // Only the cache, never the network.
   final DocumentSnapshot<Map<String, Object?>> cached =
       await firestore.doc('cities/SF').get(Source.cache);
@@ -556,7 +530,7 @@ Future<void> persistenceGuideLine80() async {
 }
 
 // ../../docs/guides/offline_persistence.md:117
-Future<void> persistenceGuideLine117() async {
+Future<void> offlinePersistenceGuideLine117() async {
   final Directory directory = Directory('/home/ada/.local/share/my_app')
     ..createSync(recursive: true);
   if (!Platform.isWindows) {
@@ -565,42 +539,36 @@ Future<void> persistenceGuideLine117() async {
 }
 
 // ../../docs/guides/offline_persistence.md:138
-Future<void> persistenceGuideLine138() async {
+Future<void> offlinePersistenceGuideLine138() async {
+  // IndexedDB: SQLite runs in the page on a copy of the whole database in memory.
   final Firestore firestore = Firestore.instanceFor(
     app: app,
     openDatabase: sqliteWebOpener(sqlite3Wasm: Uri.parse('sqlite3.wasm')),
   );
 }
 
-// ../../docs/guides/offline_persistence.md:171
-Future<void> persistenceGuideLine171() async {
-  await firestore.terminate();        // the cache must not be in use by this instance
-  await firestore.clearPersistence(); // deletes the files (or the IndexedDB database)
-  final Firestore fresh = Firestore.instanceFor(app: app);
-}
-
-// ../../docs/guides/offline_persistence.md:187
-Future<void> persistenceGuideLine187() async {
-  final PersistentCacheIndexManager? indexes = firestore.persistentCacheIndexManager;
-  await indexes?.enableIndexAutoCreation(); // null with a memory cache
-}
-
-// ../../docs/guides/multiple_clients.md:60
-Future<void> multipleClientsGuideLine60() async {
-  final Directory directory = Directory('/home/ada/.local/share/my_app');
-
-  // In the background isolate: the same project, another app name, another cache file.
-  final FirebaseApp worker = FirebaseApp.withOptions(app.options, name: 'background-sync');
-  final Firestore workerFirestore = Firestore.instanceFor(
-    app: worker,
-    openDatabase: sqliteOpener(directory),
+// ../../docs/guides/offline_persistence.md:156
+Future<void> offlinePersistenceGuideLine156() async {
+  final Firestore firestore = Firestore.instanceFor(
+    app: app,
+    openDatabase: sqliteWebOpener(
+      sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+      opfsWorker: Uri.parse('sqlite_opfs_worker.js'),
+    ),
   );
 }
 
-// ../../docs/guides/multiple_clients.md:82
-Future<void> multipleClientsGuideLine82() async {
-  await firestore.terminate();
-  await firestore.clearPersistence();
+// ../../docs/guides/offline_persistence.md:193
+Future<void> offlinePersistenceGuideLine193() async {
+  await firestore.terminate();        // the cache must not be in use by this instance
+  await firestore.clearPersistence(); // deletes the files (or the browser storage)
+  final Firestore fresh = Firestore.instanceFor(app: app);
+}
+
+// ../../docs/guides/offline_persistence.md:212
+Future<void> offlinePersistenceGuideLine212() async {
+  final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
+  await indexes?.enableIndexAutoCreation();
 }
 
 // ../../docs/guides/pipelines.md:21
@@ -646,8 +614,35 @@ Future<void> pipelinesGuideLine55() async {
       .execute();
 }
 
-// ../../docs/guides/pipelines.md:103
-Future<void> pipelinesGuideLine103() async {
+// ../../docs/guides/pipelines.md:112
+Future<void> pipelinesGuideLine112() async {
+  // A subquery: every author with the number of their books.
+  await firestore
+      .pipeline()
+      .collection('authors')
+      .define([field('name').as('author')])
+      .select([
+        'name',
+        firestore
+            .pipeline()
+            .collection('books')
+            .where(field('author').equal(variable('author')))
+            .aggregate([countAll().as('count')])
+            .toScalarExpression()
+            .as('books'),
+      ])
+      .execute();
+
+  // A lambda over an array.
+  await firestore
+      .pipeline()
+      .collection('books')
+      .select([field('tags').arrayFilter((tag) => tag.startsWith('sci')).as('tags')])
+      .execute();
+}
+
+// ../../docs/guides/pipelines.md:152
+Future<void> pipelinesGuideLine152() async {
   final PipelineSnapshot written = await firestore
       .pipeline()
       .collection('books')
@@ -657,8 +652,8 @@ Future<void> pipelinesGuideLine103() async {
   print(written.results.single.get('documents_modified'));
 }
 
-// ../../docs/guides/pipelines.md:120
-Future<void> pipelinesGuideLine120() async {
+// ../../docs/guides/pipelines.md:173
+Future<void> pipelinesGuideLine173() async {
   final PipelineSnapshot inSnapshot = await firestore.runTransaction(
     (Transaction transaction) => transaction.execute(
       firestore.pipeline().collection('books').where(field('genre').equal('Fantasy')),
@@ -667,8 +662,8 @@ Future<void> pipelinesGuideLine120() async {
   );
 }
 
-// ../../docs/guides/pipelines.md:136
-Future<void> pipelinesGuideLine136() async {
+// ../../docs/guides/pipelines.md:189
+Future<void> pipelinesGuideLine189() async {
   final PipelineSnapshot explained = await firestore
       .pipeline()
       .collection('books')
@@ -677,71 +672,70 @@ Future<void> pipelinesGuideLine136() async {
   print(explained.explainStats);
 }
 
-// ../../docs/guides/emulator_and_testing.md:22
-Future<void> testingGuideLine22() async {
-  final FirebaseApp app = FirebaseApp.withOptions(
-    const FirebaseOptions(
-      apiKey: 'demo-key', // the emulator accepts any key and application id
-      applicationId: '1:1234567890:dart:demo',
-      projectId: 'demo-my-app',
-    ),
-  );
-  final Firestore firestore = Firestore.instanceFor(
-    app: app,
-    settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
-  );
+// ../../docs/guides/queries_and_data.md:10
+Future<void> queriesAndDataGuideLine10() async {
+  // `app` is a FirebaseApp created with firebase_app_dart.
+  final firestore = Firestore.instanceFor(app: app);
+  final users = firestore.collection('users');
+  await users.doc('ada').set({'name': 'Ada', 'age': 36});
+  final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
 }
 
-// ../../docs/guides/emulator_and_testing.md:39
-Future<void> testingGuideLine39() async {
-  final String? emulator = Platform.environment['FIRESTORE_EMULATOR_HOST']; // host:port
-  final FirestoreSettings settings = emulator == null
-      ? FirestoreSettings()
-      : FirestoreSettings().withEmulator(
-          emulator.substring(0, emulator.lastIndexOf(':')),
-          int.parse(emulator.substring(emulator.lastIndexOf(':') + 1)),
-        );
+// ../../docs/guides/queries_and_data.md:30
+Future<void> queriesAndDataGuideLine30() async {
+  final count = await users.count().get();                 // AggregateQuerySnapshot
+  final agg = await users.aggregate([
+    AggregateField.sum('age'),
+    AggregateField.average('age'),
+  ]).get();
+  final either = await users
+      .where(Filter.or([
+        Filter.equalTo('city', 'Paris'),
+        Filter.equalTo('city', 'Rome'),
+      ]))
+      .get();
+  final last3 = await users.orderBy('age').limitToLast(3).get();
+  final near = await users
+      .findNearest('embedding', FieldValue.vector([0.1, 0.2, 0.3]), 5,
+          DistanceMeasure.cosine)
+      .get();
 }
 
-// ../../docs/guides/emulator_and_testing.md:57
-Future<void> testingGuideLine57() async {
-  final Firestore asAlice = Firestore.instanceFor(
-    app: FirebaseApp.withOptions(app.options, name: 'alice'),
-    settings: FirestoreSettings().withEmulator('127.0.0.1', 8080, mockUserToken: {'sub': 'alice'}),
+// ../../docs/guides/queries_and_data.md:53
+Future<void> queriesAndDataGuideLine53() async {
+  final converter = FirestoreDataConverter<City>.from(
+    fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
+    toFirestore: (city, options) => city.toMap(),
   );
+
+  final cities = firestore.collection('cities').withConverter<City>(converter);
+  await cities.doc('sf').set(const City('San Francisco', 870000));   // CollectionReference<City>
+  final City sf = (await cities.doc('sf').get()).data!;               // DocumentSnapshot<City>
+  final big = await cities.whereGreaterThan('population', 500000).get();
+  final names = [for (final c in big.docs) c.data.name];              // QueryDocumentSnapshot<City>
+  final raw = cities.withoutConverter();                              // back to Map<String, Object?>
 }
 
-// ../../docs/guides/emulator_and_testing.md:70
-Future<void> testingGuideLine70() async {
-  late Firestore db;
-  int instances = 0;
+// ../../docs/guides/queries_and_data.md:87
+Future<void> queriesAndDataGuideLine87() async {
+  final settings = FirestoreSettings(
+      cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024));
+  final task = firestore.loadBundle(bundleBytes);          // LoadBundleTask
+  final json = (await query.get()).toJson();               // e.g. sent from a server to a client
+  final snapshot = QuerySnapshot.fromJson(firestore, json);
+  firestore.querySnapshotsFromJson(json).listen((_) {});   // resumes listening from that snapshot
+  await firestore.waitForPendingWrites();
+  firestore.snapshotsInSync.listen((_) {});
+  await firestore.terminate();
+}
 
-  setUp(() {
-    // A new app name gives each test its own instance (and its own cache).
-    final FirebaseApp testApp = FirebaseApp.withOptions(
-      const FirebaseOptions(
-        apiKey: 'demo-key',
-        applicationId: '1:1234567890:dart:test',
-        projectId: 'demo-my-app',
-      ),
-      name: 'test-${instances++}',
-    );
-    db = Firestore.instanceFor(
-      app: testApp,
-      settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
-    );
-  });
-
-  tearDown(() async {
-    await db.terminate();
-    await db.clearPersistence();
-  });
-
-  test('writes and reads a document', () async {
-    // A collection name of its own keeps tests independent on a shared emulator.
-    final DocumentReference<Map<String, Object?>> doc =
-        db.collection('test-${DateTime.now().microsecondsSinceEpoch}').doc('a');
-    await doc.set({'n': 1});
-    expect((await doc.get()).data, {'n': 1});
-  });
+// ../../docs/guides/transactions_and_lifecycle.md:35
+Future<void> transactionsAndLifecycleGuideLine35() async {
+  final total = await firestore.runTransaction((transaction) async {
+    final account = await transaction.get(firestore.doc('accounts/a'));
+    final orders = await transaction.getQuery(
+        firestore.collection('orders').where('account', isEqualTo: 'a'));
+    final count = await transaction.getAggregate(firestore.collection('orders').count());
+    return (account.data, orders.docs.length, count.getCount());
+  }, options: TransactionOptions(readOnly: true));
 }

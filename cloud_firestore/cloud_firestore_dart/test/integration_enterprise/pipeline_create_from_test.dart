@@ -497,7 +497,7 @@ void main() {
 
     // A classic cursor is a position in the order of all types; the pipeline
     // comparison only matches values of the cursor's type. See the note on
-    // createFrom in the README.
+    // createFrom in docs/guides/pipelines.md.
     test('known difference: cursors on a field with values of several types',
         () async {
       final CollectionReference<Map<String, Object?>> mixed =

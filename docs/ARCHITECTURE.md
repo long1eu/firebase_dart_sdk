@@ -180,7 +180,7 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
 - LRU garbage collection removes orphaned documents with one query, where Android batches; on a
   very large cache this loads all orphan paths at once (see `docs/upstream_sync/UPSTREAM_PLAN.md`).
 - The emulator differs between the Standard and the Enterprise edition in a few places; they are
-  listed in the package README and pinned by `test/integration_enterprise/edition_differences_test.dart`.
+  listed in `docs/guides/emulator_and_testing.md` and pinned by `test/integration_enterprise/edition_differences_test.dart`.
 
 ## Where to read more
 

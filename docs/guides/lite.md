@@ -65,9 +65,44 @@ to use both in one file, import one with a prefix. The value types (`Timestamp`,
   options), and `DocumentReference.parent` keeps the converter of the reference.
 - Authentication, App Check and the emulator settings work as in the main library.
 
-What Lite does not have: snapshot streams, persistence and cache settings, bundles, vector
-queries, pipelines, and the `whereEqualTo(...)` family of query methods (use `where`). The
-[Firestore Lite section](../../cloud_firestore/cloud_firestore_dart/README.md#firestore-lite-experimental)
-of the package README has the full list, and
+## What it has and what it does not
+
+- **What it has:** `ref.get()`, `set` / `update` / `updateFromList` / `delete`,
+  `collection.add`, `firestore.batch()`, `runTransaction` (with `TransactionOptions`; read-only
+  transactions with `Transaction.getQuery` and `getAggregate`), queries
+  with `where` (named arguments or `Filter`), `orderBy`, `limit`, `limitToLast`, cursors and
+  collection groups, `count()` / `aggregate` / `aggregateWithAliases`, `withConverter`,
+  `DocumentReference.toJson` / `fromJson`, `terminate()`, the emulator settings with
+  `mockUserToken`, Firebase Auth and App Check tokens of the `FirebaseApp`.
+- **What it does not have:** snapshot streams, `Source`, snapshot metadata
+  (`hasPendingWrites`, `isFromCache`), persistence and cache settings, bundles, offline
+  behaviour of any kind, vector queries (`findNearest`), pipelines, and the
+  `whereEqualTo(...)`-style query methods (use `where`).
+
+Differences from the main library that are not just missing features:
+`Firestore.instanceFor` is synchronous; `FirestoreDataConverter.fromFirestore` takes only the
+snapshot (a `QueryDocumentSnapshot`, there are no snapshot options); `DocumentReference.parent`
+keeps the converter of the reference, as in the JS SDK; `firestore.doc('')` throws; two
+`AggregateQuerySnapshot`s are equal when they hold the same results under the same names, in
+any order.
+
+## Size
+
+A program that only imports `lite.dart` does not contain the sync engine, the local
+store, the SQLite layer or WebChannel. `tool/check_size.sh` (repository root) compiles the same
+small web application (writes, a read, a query, an aggregation, a batch and a transaction) with
+both libraries, `dart compile js -O2`, Dart 3.12.2:
+
+| | JavaScript | gzipped | of it code of this package |
+|---|---|---|---|
+| Firestore Lite | 415,850 | 128,303 | 129,045 |
+| main library, memory cache | 641,418 | 196,065 | 294,546 |
+
+Most of the rest is the Dart runtime and `package:protobuf`. The script fails when the lite
+program grows past 450,000 characters (140,000 bytes gzipped) or when the compiler's
+`--dump-info` output lists code from `src/firebase/firestore/local/`, the sync engine, the
+views, the event manager, the remote store or the WebChannel transport in it. CI runs it as a
+job that is allowed to fail.
+
 [`example/lite.dart`](../../cloud_firestore/cloud_firestore_dart/example/lite.dart) is a runnable
 program.

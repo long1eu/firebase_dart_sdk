@@ -20,7 +20,7 @@ import 'dart:io';
 /// bytes of its gzipped form. Measured with Dart 3.12.2: 415,850 and 128,303.
 /// The numbers move with the Dart SDK (most of the program is the Dart
 /// runtime), so CI runs this check with that SDK. Raise the budget
-/// deliberately, with the new numbers in this comment and in the README.
+/// deliberately, with the new numbers in this comment and in docs/guides/lite.md.
 const int liteBudget = 450000;
 const int liteGzipBudget = 140000;
 

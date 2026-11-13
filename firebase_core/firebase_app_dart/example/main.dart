@@ -6,7 +6,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 
 void main() {
   // On platforms Firebase does not register apps for (desktop, servers), any
-  // unique application id works; see the package README.
+  // unique application id works; see docs/guides/firebase_app.md.
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<YOUR_API_KEY>',

@@ -22,6 +22,13 @@ again when another connection has committed, so target ids and write batch ids s
 a schema migration runs once. A client fails with `failedPrecondition` when a different version
 of the SDK moves the cache to another schema version under it.
 
+The connection never switches to `PRAGMA locking_mode = EXCLUSIVE`, which the Android SDK uses
+(it fails with "Failed to gain exclusive lock" when a second process opens the file): after a
+Flutter hot restart the new isolate must be able to open the file that the old isolate still
+holds. SQLite's normal file locking keeps the file consistent. The repository tests this with two
+clients in one process (`sqlite_shared_clients_test.dart`) and with two processes
+(`sqlite_shared_processes_test.dart`, both in `test/unit/firebase/firestore/local/`).
+
 ## One primary client
 
 The clients of one cache elect a primary client with the lease of the JS SDK:
@@ -78,6 +85,10 @@ final Firestore workerFirestore = Firestore.instanceFor(
 deletes the files. When another live client still uses the cache, it empties the cache in place
 instead of deleting the file under that client; the other client then fails with
 `failedPrecondition` at its next operation and terminates itself, as in the JS SDK.
+
+On Windows, deleting a file that another handle has open is not possible: `clearPersistence()`
+fails with `unknown` while another isolate or process still has the file open, where Linux and
+macOS delete it anyway.
 
 ```dart
 await firestore.terminate();

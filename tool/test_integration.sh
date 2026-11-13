@@ -12,7 +12,7 @@
 #               verification kit, against the emulator).
 #   enterprise  test/integration against the Enterprise edition emulator (tests whose
 #               expectations only hold for the Standard edition are skipped, see the
-#               "Enterprise edition" section of the package README), then
+#               "Enterprise edition differences" in docs/guides/emulator_and_testing.md), then
 #               test/integration_enterprise.
 #   both        standard, then enterprise.
 #

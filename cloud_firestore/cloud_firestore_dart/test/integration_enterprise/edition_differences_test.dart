@@ -1,13 +1,14 @@
 // Pins the behaviour differences between the Standard and the Enterprise
 // edition that the standard integration suite runs into (the tests it skips
 // with `IntegrationTestUtil.skipOnEnterprise`). They are listed in the
-// "Enterprise edition" section of the package README.
+// "Enterprise edition differences" section of
+// docs/guides/emulator_and_testing.md.
 //
 //     FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise
 //
 // These were observed with the Firestore emulator v1.22.0 in Enterprise
 // edition, not with a production Enterprise database. If one of them starts
-// to fail, the emulator changed: update the README and the matching skip.
+// to fail, the emulator changed: update that guide and the matching skip.
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query_snapshot.dart';

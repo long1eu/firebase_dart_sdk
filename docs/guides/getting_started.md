@@ -7,8 +7,7 @@ browser. It assumes you have a Firebase project with a Firestore database, or th
 
 `cloud_firestore_dart` is an unofficial port of the Firebase Android SDK. It has been verified
 against the Firestore emulator only; nothing has been run against production Firestore yet.
-See the [package README](../../cloud_firestore/cloud_firestore_dart/README.md#status) for the
-status.
+See [Features and limits](features.md) for what is done and what is not.
 
 ## Install
 
@@ -47,7 +46,7 @@ final Firestore firestore = Firestore.instanceFor(app: app);
   instance is terminated. Settings and the cache opener are only used by the call that creates
   it. Use `database: 'my-database'` for a named database.
 - Without a token provider the requests are not authenticated, so the security rules see no
-  user. See [Authentication](../../cloud_firestore/cloud_firestore_dart/README.md#authentication).
+  user. See [Authentication](authentication.md).
 
 ## Read and write
 
@@ -103,7 +102,7 @@ await firestore.terminate();
 ```
 
 After `terminate()` the instance cannot be used again; `Firestore.instanceFor` creates a new one.
-See [Lifecycle](../../cloud_firestore/cloud_firestore_dart/README.md#lifecycle-terminate) for what
+See [the lifecycle](transactions_and_lifecycle.md#lifecycle-terminate) for what
 happens to work in progress.
 
 ## Flutter
@@ -121,7 +120,7 @@ Two Flutter specifics:
 - **Connectivity**: on the VM the client notices a new network address by itself while it is
   offline. You can also feed it the connectivity events of a plugin through
   `PlatformDependencies.onNetworkConnected`; see
-  [Persistence and connectivity](../../cloud_firestore/cloud_firestore_dart/README.md#persistence-and-connectivity).
+  [Connectivity](offline_persistence.md#connectivity).
 
 ## The web
 
@@ -133,7 +132,7 @@ for one-shot calls, WebChannel for listeners and writes.
   JavaScript, integers above 2^53 lose precision.
 - Do not compile with `-Dprotobuf.omit_field_names=true` or `-Dprotobuf.omit_enum_names=true`;
   the web transport needs those names and refuses to start without them.
-- The cache is in memory unless you pass the IndexedDB opener; see
+- The cache is in memory unless you pass the web opener (IndexedDB or OPFS); see
   [Offline persistence on the web](offline_persistence.md#on-the-web).
 - If listeners or writes never complete behind a proxy that buffers streamed responses, use
   long polling:
@@ -146,13 +145,19 @@ final Firestore firestore = Firestore.instanceFor(
 ```
 
 For a smaller program that only reads and writes, without cache or listeners, see
-[Firestore Lite](lite.md).
+[Firestore Lite](lite.md). [Platforms](platforms.md) has the details of the web transport, its
+measurements and its limits.
 
 ## Next steps
 
+- [Queries, data and the API](queries_and_data.md)
+- [Transactions and the lifecycle](transactions_and_lifecycle.md)
+- [Authentication and App Check](authentication.md)
 - [Offline persistence and cache settings](offline_persistence.md)
 - [Several clients on one cache](multiple_clients.md)
 - [The emulator and testing](emulator_and_testing.md)
 - [Firestore Lite](lite.md)
 - [Pipelines (preview, Enterprise only)](pipelines.md)
+- [Platforms](platforms.md)
+- [Features and limits](features.md)
 - [Migrating from the `_vm` packages](../migrating_from_vm_packages.md)

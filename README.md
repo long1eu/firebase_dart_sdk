@@ -26,7 +26,7 @@ firestore
 ```
 
 (`app` is a `FirebaseApp` from `firebase_app_dart`; see the
-[package README](cloud_firestore/cloud_firestore_dart/README.md) for current examples and
+[guides](docs/guides/README.md) for more and
 `cloud_firestore/cloud_firestore_dart/example/main.dart` for a runnable program.)
 
 ```shell
@@ -59,9 +59,11 @@ dart pub add cloud_firestore_dart firebase_app_dart   # once 0.1.0 is published;
 
 ## Guides
 
-[docs/guides](docs/guides/README.md): getting started (VM, Flutter, web), offline persistence
-and cache settings, several clients on one cache, Pipelines (preview, Enterprise only),
-Firestore Lite, the emulator and testing, and migrating from the `_vm` packages.
+[docs/guides](docs/guides/README.md): getting started (VM, Flutter, web), queries and data,
+transactions and the lifecycle, offline persistence and cache settings, several clients on one
+cache, authentication and App Check, Pipelines (preview, Enterprise only), Firestore Lite,
+platforms, the emulator and testing, configuring the `FirebaseApp`, features and limits, and
+migrating from the `_vm` packages.
 
 ## Status
 
@@ -89,7 +91,7 @@ null safety, and parts of its public API follow the JS SDK.
   the JS SDK), a full Firebase Auth SDK (no federated sign-in), and Pipelines beyond the preview
   (no real-time pipelines and no offline evaluation; a local evaluator exists but is internal
   and not used yet; search, window functions and explain options are only checked for their
-  encoding, since the emulator rejects them). The package README lists the known gaps.
+  encoding, since the emulator rejects them). [docs/guides/features.md](docs/guides/features.md) lists the known gaps.
 
 This repository ports Firestore and the Firebase Core pieces it needs, plus token providers for
 Firestore in `firebase_auth/firebase_auth_providers_dart`. There is no full Auth SDK, no Storage

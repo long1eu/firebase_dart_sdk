@@ -31,20 +31,42 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 /// README path (relative to this package) to the prefix of its functions.
-const Map<String, String> _readmes = <String, String>{
+const Map<String, String> _fixedReadmes = <String, String>{
   '../../README.md': 'rootReadme',
   'README.md': 'firestoreReadme',
   '../../firebase_core/firebase_app_dart/README.md': 'appReadme',
   '../../firebase_auth/firebase_auth_providers_dart/README.md':
       'authProvidersReadme',
   '../../docs/migrating_from_vm_packages.md': 'migrationGuide',
-  '../../docs/guides/getting_started.md': 'gettingStartedGuide',
-  '../../docs/guides/offline_persistence.md': 'persistenceGuide',
-  '../../docs/guides/multiple_clients.md': 'multipleClientsGuide',
-  '../../docs/guides/pipelines.md': 'pipelinesGuide',
-  '../../docs/guides/lite.md': 'liteGuide',
-  '../../docs/guides/emulator_and_testing.md': 'testingGuide',
 };
+
+/// The guides in docs/guides, found on disk so that a new guide is checked
+/// without a change here: `queries_and_data.md` gets the prefix
+/// `queriesAndDataGuide`.
+const String _guides = '../../docs/guides';
+
+/// [_fixedReadmes] and every guide, in a fixed order.
+final Map<String, String> _readmes = <String, String>{
+  ..._fixedReadmes,
+  if (Directory(_guides).existsSync())
+    for (final String path in (Directory(_guides)
+            .listSync()
+            .whereType<File>()
+            .map((File file) => file.path.replaceAll(r'\', '/'))
+            .where((String path) => path.endsWith('.md'))
+            .toList()
+          ..sort()))
+      path: '${_camelCase(path.split('/').last.replaceAll('.md', ''))}Guide',
+};
+
+String _camelCase(String snake) {
+  final List<String> words = snake.split('_');
+  return <String>[
+    words.first.toLowerCase(),
+    for (final String word in words.skip(1))
+      if (word.isNotEmpty) word[0].toUpperCase() + word.substring(1),
+  ].join();
+}
 
 /// `import 'name.dart';` of a file that the reader copies from example/.
 final RegExp _exampleImport = RegExp(r"^import '(\w+\.dart)';");

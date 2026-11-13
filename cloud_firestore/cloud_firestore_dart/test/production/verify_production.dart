@@ -1260,7 +1260,7 @@ Future<CheckResult> _editionFilters(Kit kit) async {
       'The results match neither the Standard nor the Enterprise behaviour of the emulators.',
       details: <String>[
         ...details,
-        'Update the "Enterprise edition" section of the package README with what the real backend does.',
+        'Update the "Enterprise edition differences" section of docs/guides/emulator_and_testing.md with what the real backend does.',
       ],
       observed: observed);
 }

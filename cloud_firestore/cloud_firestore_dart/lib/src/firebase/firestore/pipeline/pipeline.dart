@@ -588,7 +588,7 @@ class Pipeline {
   /// database directly on the server. They are not queued while offline, do
   /// not go through the local cache and do not raise local events; listeners
   /// see the change when the server reports it (the emulator does not report
-  /// it at all, see the README). Use `execute(atomic: true)` to apply all
+  /// it at all, see docs/guides/pipelines.md). Use `execute(atomic: true)` to apply all
   /// writes of a pipeline in one transaction; the server requires it whenever
   /// it cannot apply the stages to one document at a time, for example for
   /// [insert] and [upsert] of documents read from a collection, or after an

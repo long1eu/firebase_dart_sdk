@@ -95,6 +95,55 @@ final PipelineSnapshot same = await firestore
   `AggregateFunction('server_name', [args])`, `Pipeline.rawStage(name, args)`, and the
   `rawOptions` parameter of every stage.
 
+## From an existing query
+
+`createFrom(query)` converts a `Query` (filters with named arguments or
+`Filter.or` / `Filter.and`, orderings, cursors, `limit`, `limitToLast`, collection groups, BSON
+operands), `createFromAggregateQuery` an `AggregateQuery` and `createFromVectorQuery` a
+`findNearest` query. The integration tests compare each shape with `query.get(Source.server)`.
+Known difference: a cursor (`startAt`, `endBefore`, ...) on a field that holds values of
+several types only returns the documents whose value has the type of the cursor value; a
+classic cursor is a position in the order of all types. The converter of a query is ignored:
+pipeline results are maps (as in the JS and Android SDKs, which have no typed pipeline results
+either).
+
+## Variables, subqueries and lambdas
+
+```dart
+import 'package:cloud_firestore_dart/pipelines.dart';
+
+// A subquery: every author with the number of their books.
+await firestore
+    .pipeline()
+    .collection('authors')
+    .define([field('name').as('author')])
+    .select([
+      'name',
+      firestore
+          .pipeline()
+          .collection('books')
+          .where(field('author').equal(variable('author')))
+          .aggregate([countAll().as('count')])
+          .toScalarExpression()
+          .as('books'),
+    ])
+    .execute();
+
+// A lambda over an array.
+await firestore
+    .pipeline()
+    .collection('books')
+    .select([field('tags').arrayFilter((tag) => tag.startsWith('sci')).as('tags')])
+    .execute();
+```
+
+- **Variables and subqueries**: `define([...])` with `variable(name)`, `currentDocument()`,
+  `getField`, `firestore.pipeline().subcollection(path)`, and `toArrayExpression()` /
+  `toScalarExpression()` to use a pipeline inside a stage of another one.
+- **Lambdas**: `arrayFilter((e) => e.greaterThan(1))`, `arrayTransform`,
+  `arrayTransformWithIndex`; the callback builds the expression once, from a variable that
+  stands for the element (name it with `alias` when lambdas are nested).
+
 ## Write stages
 
 `update`, `delete`, `insert` and `upsert` end a pipeline and change documents on the server.
@@ -112,8 +161,12 @@ final PipelineSnapshot written = await firestore
 print(written.results.single.get('documents_modified'));
 ```
 
-These writes bypass the local cache and the write queue: they fail while offline, and cached
-copies of the changed documents are stale until the backend reports the change to a listener.
+With `execute(atomic: true)` the pipeline runs in a transaction that is committed at the end. The
+server demands that for `insert` and `upsert` of documents read from a collection, and after
+an aggregation, `unnest`, `union` or a subquery. These writes bypass the local cache and the
+write queue: they fail while offline, and cached copies are stale until the server reports the
+change. The emulator (v1.22.0) never reports it: listeners and `get(Source.server)` return the
+old version until a regular write touches the document, while pipelines read the new one.
 
 ## In a transaction
 
@@ -149,11 +202,13 @@ explanation was seen in a test.
 
 ## Beta server features
 
-Full-text `search` and window functions (`addWindowFields`) are encoded as the JS SDK encodes
-them, but the emulator rejects both, so they were only checked for their encoding. The same goes
-for `geoDistance`. The emulator also denies the `literals` source to clients that are subject to
+Full-text search and window functions are beta upstream. They are encoded as the JS SDK encodes
+them, but the emulator rejects both, so they were checked for their encoding only:
+`search(documentMatches('...'), sort: [score().descending()])`, and
+`addWindowFields(WindowSpec(...), [rank().as('rank'), field('n').sum().over(WindowFrame.documents(preceding: 1, following: 1)).as('moving')])`.
+The emulator also rejects `geoDistance`. The emulator also denies the `literals` source to clients that are subject to
 security rules.
 
-More examples: [`example/pipelines.dart`](../../cloud_firestore/cloud_firestore_dart/example/pipelines.dart)
-and the [Pipelines section](../../cloud_firestore/cloud_firestore_dart/README.md#pipelines-preview)
-of the package README.
+More examples: [`example/pipelines.dart`](../../cloud_firestore/cloud_firestore_dart/example/pipelines.dart).
+To run the repository's pipeline tests, see
+[The emulator and testing](emulator_and_testing.md#testing-this-repository).

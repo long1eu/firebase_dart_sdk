@@ -86,8 +86,8 @@ class IntegrationTestUtil {
   /// The reason to skip a test whose expectations only hold for the Standard
   /// edition, or null when the suite runs against a Standard edition
   /// backend: `test('...', skip: skipOnEnterprise('what differs'), ...)`.
-  /// The differences are listed in the "Enterprise edition" section of the
-  /// package README and pinned by
+  /// The differences are listed in the "Enterprise edition differences"
+  /// section of docs/guides/emulator_and_testing.md and pinned by
   /// `test/integration_enterprise/edition_differences_test.dart`.
   static String? skipOnEnterprise(String reason) =>
       TestBackend().skipOnEnterprise(reason);
