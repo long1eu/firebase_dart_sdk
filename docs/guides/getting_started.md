@@ -85,9 +85,9 @@ await added.delete();
 ```
 
 The package [`example/`](../../cloud_firestore/cloud_firestore_dart/example/README.md) folder
-has a runnable program for each topic: queries, aggregations, typed converters, transactions,
-bundles, snapshot JSON, offline persistence, the emulator, the lifecycle, Firestore Lite and
-Pipelines.
+has a runnable program for each topic: a quick start (`main.dart`), a backend process
+(`server.dart`), queries, aggregations, converters, transactions, bundles, snapshot JSON, offline
+persistence, the emulator, the lifecycle, Firestore Lite and Pipelines.
 
 ## End the program
 

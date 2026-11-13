@@ -125,6 +125,6 @@ The exact signatures are pinned in `test/unit/api/public_api.golden.txt` in the 
 
 The public entry point is `package:cloud_firestore_dart/cloud_firestore_dart.dart` (class
 `Firestore`). It needs a `FirebaseApp` from `firebase_app_dart`. Runnable programs, one per topic
-(queries, aggregations, converters, transactions, bundles, snapshot JSON, offline persistence,
-emulator, lifecycle), are in [`example/`](../../cloud_firestore/cloud_firestore_dart/example/README.md). See
+(a quick start, queries, transactions, offline persistence, a backend process, Lite, Pipelines and
+more), are in [`example/`](../../cloud_firestore/cloud_firestore_dart/example/README.md). See
 [The emulator and testing](emulator_and_testing.md) for how to run the tests.
