@@ -918,6 +918,11 @@ class RemoteStore implements TargetMetadataProvider {
         batch = await _localStore.getNextMutationBatch(lastBatchIdRetrieved);
       } catch (error, stackTrace) {
         await _disableNetworkUntilRecovery(error, stackTrace);
+        // The first probe of the recovery runs right away (JS only queues it): when it succeeds, starting the network
+        // again already refilled the pipeline, so continue after what is in it now, not after what this loop read.
+        lastBatchIdRetrieved = _writePipeline.isEmpty
+            ? MutationBatch.unknown
+            : _writePipeline.last.batchId;
         continue;
       }
 
