@@ -13,6 +13,7 @@ import 'package:grpc/grpc_connection_interface.dart' show ClientChannelBase;
 import 'package:test/test.dart';
 
 import '../util/chaos_proxy.dart';
+import '../util/self_signed_certificate.dart';
 import 'verify_production.dart';
 
 /// The name in the certificate. Nothing resolves it: the client only ever dials the proxy on the loopback address.
@@ -96,16 +97,9 @@ Future<void> _eventually(bool Function() condition, String what,
 }
 
 void main() {
-  String? skip;
-  try {
-    if (Process.runSync('openssl', <String>['version']).exitCode != 0) {
-      skip = '`openssl version` failed: the test needs openssl to make a certificate';
-    }
-  } on ProcessException {
-    skip = 'openssl is not installed: the test needs it to make a self-signed certificate';
-  }
+  final String? skip = SelfSignedCertificate.unavailableReason;
 
-  late Directory temp;
+  late SelfSignedCertificate selfSigned;
   late List<int> certificate;
   late Server server;
   late _EchoService service;
@@ -113,18 +107,8 @@ void main() {
   final List<ClientChannelBase> channels = <ClientChannelBase>[];
 
   setUp(() async {
-    temp = Directory.systemTemp.createTempSync('firestore_kit_tls_');
-    final ProcessResult result = Process.runSync('openssl', <String>[
-      'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2',
-      '-keyout', '${temp.path}/key.pem',
-      '-out', '${temp.path}/cert.pem',
-      '-subj', '/CN=$serverName',
-      '-addext', 'subjectAltName=DNS:$serverName',
-      // The platform verifier (macOS) only accepts a server certificate with this extension.
-      '-addext', 'extendedKeyUsage=serverAuth',
-    ]);
-    expect(result.exitCode, 0, reason: '${result.stderr}');
-    certificate = File('${temp.path}/cert.pem').readAsBytesSync();
+    selfSigned = SelfSignedCertificate.create(serverName);
+    certificate = selfSigned.certificate;
 
     service = _EchoService();
     server = Server.create(services: <Service>[service]);
@@ -133,7 +117,7 @@ void main() {
       port: 0,
       security: ServerTlsCredentials(
         certificate: certificate,
-        privateKey: File('${temp.path}/key.pem').readAsBytesSync(),
+        privateKey: selfSigned.privateKey,
       ),
     );
     proxy = await ChaosProxy.start('127.0.0.1', server.port!);
@@ -147,7 +131,7 @@ void main() {
     channels.clear();
     await proxy.close();
     await server.shutdown();
-    temp.deleteSync(recursive: true);
+    selfSigned.delete();
   });
 
   _EchoClient client({String name = serverName, bool trust = true}) {

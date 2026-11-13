@@ -413,6 +413,15 @@ Documentation and tests:
   flight. For a transaction that meant a commit that the backend had applied looked failed and
   was retried (a counter incremented twice).
 - Transactions are no longer retried once the instance is terminated.
+- The client no longer reconnects in a tight loop to a peer that accepts connections and then
+  drops them before a call could start (it closes them at once, also after the TLS handshake or
+  after the HTTP/2 preface, or it sends GOAWAY: a load balancer without a backend, a captive
+  portal, a TLS-terminating middlebox). `package:grpc` kept the waiting calls and connected
+  again immediately, about 43 times per second, without failing a call, so the backoff of the
+  streams never applied. The attempt that follows such a connection now fails, the calls fail
+  with `unavailable`, and the streams retry with their exponential backoff as they do when a
+  connection is refused (about 15 connections in 30 seconds instead of 1300). The web transport
+  was checked and did not have the problem.
 - The SQLite persistence lock is per database instead of process-wide, so a long transaction in
   one `Firestore` instance no longer blocks the others.
 - `Firestore.instanceFor` no longer returns an instance whose `terminate()` is still in

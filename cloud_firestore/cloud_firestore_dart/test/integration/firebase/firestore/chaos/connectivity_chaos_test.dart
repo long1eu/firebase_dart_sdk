@@ -39,7 +39,14 @@ void main() {
   /// returns how long the client then took to deliver a change made on the
   /// backend. With [hint] an address appears on the simulated interfaces at
   /// the moment the network is back.
-  Future<Duration> recoveryTime({required bool hint}) async {
+  ///
+  /// With [acceptAndClose] the proxy does not refuse the connections during the outage: it accepts every one and
+  /// closes it at once. [connectionsDuringOutage] is then how often the client connected.
+  int connectionsDuringOutage = 0;
+  Future<Duration> recoveryTime({
+    required bool hint,
+    bool acceptAndClose = false,
+  }) async {
     final Set<String> addresses = <String>{};
     int signals = 0;
     final ConnectivityChangeDetector detector = ConnectivityChangeDetector(
@@ -87,8 +94,15 @@ void main() {
         reason: 'a healthy client does not poll',
       );
 
-      await env.proxy.unplug();
+      final int connectionsBefore = env.proxy.acceptedConnections;
+      if (acceptAndClose) {
+        env.proxy.disconnect();
+      } else {
+        await env.proxy.unplug();
+      }
       await Future<void>.delayed(outage);
+      connectionsDuringOutage =
+          env.proxy.acceptedConnections - connectionsBefore;
       expect(
         detector.isRunning,
         isTrue,
@@ -100,7 +114,11 @@ void main() {
       await serverDoc.set(<String, Object?>{'n': 1});
 
       final Stopwatch stopwatch = Stopwatch()..start();
-      await env.proxy.plug();
+      if (acceptAndClose) {
+        env.proxy.restore();
+      } else {
+        await env.proxy.plug();
+      }
       if (hint) {
         addresses.add('en0/192.168.1.20');
       }
@@ -139,6 +157,46 @@ void main() {
       // Without a hint the client waits for the rest of a backoff of several
       // seconds; how much is left when the network comes back is random.
       expect(withHint, lessThan(withoutHint));
+    },
+    skip:
+        chaosSkipReason ??
+        webTransportSkipReason(
+          'the backoff of the WebChannel transport is not the one measured here',
+        ),
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
+  test(
+    'a network that accepts and closes connections is backed off from, and '
+    'recovered from like a refused one',
+    () async {
+      // Before the fix of KeepAliveTransportConnector the client connected
+      // about 43 times per second for the whole outage.
+      final Duration withHint = await recoveryTime(
+        hint: true,
+        acceptAndClose: true,
+      );
+      final int connectionsWithHint = connectionsDuringOutage;
+      final Duration withoutHint = await recoveryTime(
+        hint: false,
+        acceptAndClose: true,
+      );
+      final int connectionsWithoutHint = connectionsDuringOutage;
+      // ignore: avoid_print
+      print(
+        'Accept-and-close outage of ${outage.inSeconds}s: '
+        '$connectionsWithHint and $connectionsWithoutHint connections; '
+        'recovery ${withHint.inMilliseconds} ms with a connectivity hint, '
+        '${withoutHint.inMilliseconds} ms without',
+      );
+
+      // One stream is in use (the listen), whose backoff allows about seven
+      // attempts in 16 seconds.
+      expect(connectionsWithHint, lessThanOrEqualTo(12));
+      expect(connectionsWithoutHint, lessThanOrEqualTo(12));
+      expect(withHint, lessThan(const Duration(seconds: 2)));
+      // Without a hint the client is back after the rest of its backoff.
+      expect(withoutHint, lessThan(const Duration(seconds: 20)));
     },
     skip:
         chaosSkipReason ??

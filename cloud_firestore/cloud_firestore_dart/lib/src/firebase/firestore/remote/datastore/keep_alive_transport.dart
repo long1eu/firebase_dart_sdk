@@ -15,6 +15,7 @@ import 'dart:io';
 
 import 'package:grpc/grpc.dart';
 import 'package:http2/transport.dart';
+import 'package:meta/meta.dart';
 
 /// A [ClientTransportConnector] that detects dead connections.
 ///
@@ -26,6 +27,17 @@ import 'package:http2/transport.dart';
 /// flight, and those are exactly the long-lived streams that are hung. This
 /// connector pings the same way (only while there are active calls) and
 /// terminates the connection forcefully when no frame arrives in time.
+///
+/// It also keeps `package:grpc` from reconnecting in a tight loop. When a
+/// connection is established and then lost before a call could use it (the
+/// peer closes it at once, or sends GOAWAY: a load balancer without a backend,
+/// a captive portal, a TLS-terminating middlebox), gRPC keeps the calls that
+/// are waiting and connects again immediately, about 40 times per second,
+/// without ever failing a call, so the backoff of the streams never applies.
+/// This connector fails the connection attempt that follows such a connection
+/// instead of connecting: gRPC then fails the waiting calls with UNAVAILABLE,
+/// and the streams retry with their exponential backoff, like they do when
+/// the connection is refused.
 class KeepAliveTransportConnector implements ClientTransportConnector {
   KeepAliveTransportConnector({
     required this.host,
@@ -34,6 +46,7 @@ class KeepAliveTransportConnector implements ClientTransportConnector {
     required this.pingInterval,
     required this.pingTimeout,
     this.connectTimeout,
+    this.uselessConnectionWindow = const Duration(seconds: 10),
   });
 
   final String host;
@@ -50,11 +63,42 @@ class KeepAliveTransportConnector implements ClientTransportConnector {
   /// The timeout of a single connection attempt.
   final Duration? connectTimeout;
 
+  /// A new connection is asked for this soon after the previous one was
+  /// established, and no call was ever started on the previous one: that
+  /// connection was lost before it was of any use.
+  final Duration uselessConnectionWindow;
+
   Socket? _socket;
+  KeepAliveTransportConnection? _connection;
+  final Stopwatch _sinceConnected = Stopwatch();
+
+  /// The number of connections that were opened, and the number of attempts
+  /// that were failed without connecting because the previous connection was
+  /// useless.
+  @visibleForTesting
+  int connectionsOpened = 0;
+  @visibleForTesting
+  int attemptsFailedFast = 0;
 
   @override
   Future<ClientTransportConnection> connect() async {
+    final KeepAliveTransportConnection? previous = _connection;
+    _connection = null;
+    if (previous != null &&
+        !previous.wasUsed &&
+        !previous.closedByClient &&
+        _sinceConnected.elapsed < uselessConnectionWindow) {
+      // gRPC does not close a connection that it abandons after a GOAWAY.
+      _socket?.destroy();
+      attemptsFailedFast++;
+      throw SocketException(
+        'The previous connection to $host:$port was lost before a call could '
+        'use it; not reconnecting right away',
+      );
+    }
+
     Socket socket = await Socket.connect(host, port, timeout: connectTimeout);
+    connectionsOpened++;
     // Don't wait for io buffers to fill up before sending requests.
     socket.setOption(SocketOption.tcpNoDelay, true);
     final SecurityContext? context = credentials.securityContext;
@@ -70,7 +114,10 @@ class KeepAliveTransportConnector implements ClientTransportConnector {
       );
     }
     _socket = socket;
-    return KeepAliveTransportConnection(
+    _sinceConnected
+      ..reset()
+      ..start();
+    return _connection = KeepAliveTransportConnection(
       ClientTransportConnection.viaSocket(socket),
       pingInterval: pingInterval,
       pingTimeout: pingTimeout,
@@ -81,7 +128,10 @@ class KeepAliveTransportConnector implements ClientTransportConnector {
   Future<void> get done => _socket!.done;
 
   @override
-  void shutdown() => _socket?.destroy();
+  void shutdown() {
+    _connection?.closedByClient = true;
+    _socket?.destroy();
+  }
 
   @override
   String get authority =>
@@ -110,6 +160,14 @@ class KeepAliveTransportConnection implements ClientTransportConnection {
   final Stopwatch _sinceLastFrame = Stopwatch()..start();
   Timer? _pingTimer;
   Timer? _timeoutTimer;
+
+  /// Whether a call was ever started on this connection. gRPC does not start
+  /// one on a connection that is already closed (or that got a GOAWAY) when
+  /// it is ready to.
+  bool wasUsed = false;
+
+  /// Whether the client closed the connection itself.
+  bool closedByClient = false;
 
   void _onActiveStateChanged(bool isActive) {
     _active = isActive;
@@ -182,7 +240,10 @@ class KeepAliveTransportConnection implements ClientTransportConnection {
   ClientTransportStream makeRequest(
     List<Header> headers, {
     bool endStream = false,
-  }) => _inner.makeRequest(headers, endStream: endStream);
+  }) {
+    wasUsed = true;
+    return _inner.makeRequest(headers, endStream: endStream);
+  }
 
   @override
   Future<void> ping() => _inner.ping();
@@ -199,12 +260,14 @@ class KeepAliveTransportConnection implements ClientTransportConnection {
 
   @override
   Future<void> finish() {
+    closedByClient = true;
     _cancelTimers();
     return _inner.finish();
   }
 
   @override
   Future<void> terminate([int? errorCode]) {
+    closedByClient = true;
     _cancelTimers();
     _frames.cancel();
     return _inner.terminate(errorCode);
