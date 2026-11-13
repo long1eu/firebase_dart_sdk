@@ -494,6 +494,11 @@ class RemoteStore implements TargetMetadataProvider {
   /// streams are dropped: their pipeline and aggregator no longer exist.
   int _networkEpoch = 0;
 
+  /// Whether the open event of the current watch stream was handled, which sends every target listened to so far.
+  /// The stream is open before that (the event waits for its turn in the queue): a listen or an unlisten in between
+  /// is left to that handler, otherwise the backend gets the same target twice and fails the stream.
+  bool _watchStreamOpenHandled = false;
+
   /// Whether the pipeline was already sent for the current write stream handshake. Writes that are added before that
   /// are sent together with the pipeline, writes added after are sent right away.
   bool _writeHandshakeHandled = false;
@@ -555,7 +560,7 @@ class RemoteStore implements TargetMetadataProvider {
 
     if (_shouldStartWatchStream) {
       await _startWatchStream();
-    } else if (_watchStream.isOpen) {
+    } else if (_watchStreamOpenHandled && _watchStream.isOpen) {
       _sendWatchRequest(remoteQueryData);
     }
   }
@@ -597,7 +602,7 @@ class RemoteStore implements TargetMetadataProvider {
     _remoteToSdkTargetId.remove(remoteTargetId);
 
     // The watch stream might not be started if we're in a disconnected state
-    if (_watchStream.isOpen) {
+    if (_watchStreamOpenHandled && _watchStream.isOpen) {
       _sendUnwatchRequest(remoteTargetId!);
     }
 
@@ -642,6 +647,7 @@ class RemoteStore implements TargetMetadataProvider {
       'startWatchStream() called when shouldStartWatchStream() is false.',
     );
     _watchChangeAggregator = WatchChangeAggregator(this);
+    _watchStreamOpenHandled = false;
     final int epoch = _networkEpoch;
     await _watchStream.start();
     if (epoch != _networkEpoch) {
@@ -652,9 +658,15 @@ class RemoteStore implements TargetMetadataProvider {
   }
 
   Future<void> _handleWatchStreamOpen() async {
+    if (!_watchStream.isOpen) {
+      // The stream failed while this report waited in the queue; its close comes next (see
+      // [_handleWriteStreamHandshakeComplete]).
+      return;
+    }
     // A close event of the previous stream can be handled after the new stream was started and has dropped the
     // aggregator that the new stream needs; every open stream starts with a fresh one.
     _watchChangeAggregator ??= WatchChangeAggregator(this);
+    _watchStreamOpenHandled = true;
     // Restore any existing watches.
     _listenTargets.values.forEach(_sendWatchRequest);
   }
@@ -722,6 +734,7 @@ class RemoteStore implements TargetMetadataProvider {
     }
 
     _cleanUpWatchStreamState();
+    _watchStreamOpenHandled = false;
 
     // If we still need the watch stream, retry the connection.
     if (_shouldStartWatchStream) {
@@ -995,6 +1008,11 @@ class RemoteStore implements TargetMetadataProvider {
   /// Handles a successful handshake response from the server, which is our cue
   /// to send any pending writes.
   Future<void> _handleWriteStreamHandshakeComplete() async {
+    if (!_writeStream.isOpen) {
+      // The stream failed after its handshake, while this report waited in the queue. Its close comes next and
+      // restarts it. Upstream drops the callbacks of a stream that closed in the meantime (CloseGuardedRunner).
+      return;
+    }
     // Send the write pipeline now that stream is established. From now on new writes are sent right away.
     _writeHandshakeHandled = true;
     _writeStreamFailed = false;

@@ -128,6 +128,7 @@ class KeepAliveTransportConnector implements ClientTransportConnector {
       transport,
       pingInterval: pingInterval,
       pingTimeout: pingTimeout,
+      destroySocket: socket.destroy,
     );
   }
 
@@ -175,6 +176,14 @@ class KeepAliveTransportConnector implements ClientTransportConnector {
       credentials.authority ?? (port == 443 ? host : '$host:$port');
 }
 
+/// How long [KeepAliveTransportConnection.terminate] waits for the HTTP/2
+/// connection to close before it destroys the socket.
+///
+/// The Android SDK gives the channel one second to shut down gracefully and
+/// then shuts it down forcefully (`GrpcCallProvider.shutdown`:
+/// `awaitTermination(1, SECONDS)`, then `shutdownNow()`).
+const Duration gracefulTerminateTimeout = Duration(seconds: 1);
+
 /// Decorates a [ClientTransportConnection] with the keepalive logic of
 /// [KeepAliveTransportConnector].
 class KeepAliveTransportConnection implements ClientTransportConnection {
@@ -182,7 +191,8 @@ class KeepAliveTransportConnection implements ClientTransportConnection {
     this._inner, {
     required this.pingInterval,
     required this.pingTimeout,
-  }) {
+    required void Function() destroySocket,
+  }) : _destroySocket = destroySocket {
     _inner.onActiveStateChanged = _onActiveStateChanged;
     _frames = _inner.onFrameReceived.listen((_) => _onFrameReceived());
   }
@@ -190,6 +200,7 @@ class KeepAliveTransportConnection implements ClientTransportConnection {
   final ClientTransportConnection _inner;
   final Duration pingInterval;
   final Duration pingTimeout;
+  final void Function() _destroySocket;
 
   late final StreamSubscription<void> _frames;
   ActiveStateHandler? _activeStateHandler;
@@ -206,7 +217,16 @@ class KeepAliveTransportConnection implements ClientTransportConnection {
   /// Whether the client closed the connection itself.
   bool closedByClient = false;
 
+  /// Whether the client terminated the connection.
+  bool _terminated = false;
+
   void _onActiveStateChanged(bool isActive) {
+    if (_terminated) {
+      // The calls of a terminated connection end after gRPC shut it down.
+      // Reporting that would make gRPC start its idle timer (five minutes)
+      // on the shut down channel, which keeps the isolate alive.
+      return;
+    }
     _active = isActive;
     if (isActive) {
       // Like gRPC, don't reset the time since the last frame so that a
@@ -254,7 +274,7 @@ class KeepAliveTransportConnection implements ClientTransportConnection {
         _timeoutTimer = null;
         _cancelTimers();
         // The pending calls fail with the connection error.
-        _inner.terminate().catchError((Object _) {});
+        _terminateInner(null).catchError((Object _) {});
       });
     });
   }
@@ -305,8 +325,26 @@ class KeepAliveTransportConnection implements ClientTransportConnection {
   @override
   Future<void> terminate([int? errorCode]) {
     closedByClient = true;
+    _terminated = true;
     _cancelTimers();
     _frames.cancel();
-    return _inner.terminate(errorCode);
+    return _terminateInner(errorCode);
+  }
+
+  /// Terminates the HTTP/2 connection, and destroys the socket when that does
+  /// not complete in [gracefulTerminateTimeout].
+  ///
+  /// `package:http2` closes its side and then waits for the socket to be done.
+  /// When the peer dropped the connection while a request was on its way out,
+  /// and the client did not read that yet, that never happens: the read side
+  /// is cancelled first, so the socket never learns that the peer is gone, and
+  /// it stays open.
+  Future<void> _terminateInner(int? errorCode) {
+    // The future of package:http2 is not a Future<void> at runtime.
+    final Future<void> terminated = _inner.terminate(errorCode).then((_) {});
+    return terminated.timeout(
+      gracefulTerminateTimeout,
+      onTimeout: _destroySocket,
+    );
   }
 }

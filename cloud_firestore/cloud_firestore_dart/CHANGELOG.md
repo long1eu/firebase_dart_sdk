@@ -682,6 +682,14 @@ Documentation and tests:
 - LRU garbage collection of the SQLite cache read every orphaned document in one query, so its memory grew with
   the cache (several hundred MB for a million cached documents). It now works in batches as the Android SDK does.
   Collection queries no longer read the documents of subcollections out of the cache.
+- `terminate()` no longer hangs when the backend dropped the connection while a request was on its way out:
+  `package:http2` waited for the socket to close, which never happened, and the open socket (and then the idle
+  timer of `package:grpc`) kept the isolate or process alive. As in the Android SDK, the connection gets one second
+  to close and the socket is then destroyed.
+- A listen or unlisten made while the watch stream was opening was sent twice; the backend rejects a target that is
+  already active and fails the whole stream, which then had to reconnect.
+- A write stream that failed right after its handshake no longer crashes the client with "Writing mutations
+  requires an opened stream": as in the Android SDK, the late report of a stream that already failed is dropped.
 
 ### Not done
 

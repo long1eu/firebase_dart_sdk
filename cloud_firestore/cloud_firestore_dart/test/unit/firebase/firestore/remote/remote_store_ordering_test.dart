@@ -27,11 +27,14 @@ import 'mock_datastore.dart';
 /// Records when each callback of the remote store starts and ends. Every callback takes a while to complete, like
 /// the real ones that talk to the local store.
 class _SlowCallback implements RemoteStoreCallback {
+  _SlowCallback({this.delay = const Duration(milliseconds: 20)});
+
+  final Duration delay;
   final List<String> events = <String>[];
 
   Future<void> _slow(String name) async {
     events.add('$name:start');
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await Future<void>.delayed(delay);
     events.add('$name:end');
   }
 
@@ -155,6 +158,83 @@ void main() {
 
     await remoteStore.enableNetwork();
     await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(datastore.writesSent, 1);
+  });
+
+  test('a listen while the watch stream opens is sent to the backend once',
+      () async {
+    final TaskScheduler scheduler = TaskScheduler('');
+    final MockDatastore datastore = MockDatastore(scheduler);
+    final BehaviorSubject<bool> connected = BehaviorSubject<bool>.seeded(true);
+    addTearDown(connected.close);
+    final MemoryPersistence persistence =
+        MemoryPersistence.createEagerGcMemoryPersistence();
+    await persistence.start();
+    final LocalStore localStore = LocalStore(persistence, User.unauthenticated);
+    await localStore.start();
+    final RemoteStore remoteStore = RemoteStore(
+        _SlowCallback(), localStore, datastore, connected, scheduler);
+    await remoteStore.start();
+
+    // The first listen starts the watch stream; the second one comes after the stream is open but before the
+    // remote store handled the open event, which sends every target it listens to. The backend fails the stream
+    // when a target is added twice.
+    final Future<void> first = remoteStore
+        .listen(QueryData(query('foo').toTarget(), 2, 1, QueryPurpose.listen));
+    final Future<void> second = remoteStore
+        .listen(QueryData(query('bar').toTarget(), 4, 1, QueryPurpose.listen));
+    await Future.wait(<Future<void>>[first, second]);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(datastore.activeTargets, hasLength(2));
+    expect(datastore.watchStreamRequestCount, 2);
+  });
+
+  test(
+      'a write stream that fails before its handshake is handled gets no '
+      'writes', () async {
+    final TaskScheduler scheduler = TaskScheduler('');
+    final MockDatastore datastore = MockDatastore(scheduler);
+    final BehaviorSubject<bool> connected = BehaviorSubject<bool>.seeded(true);
+    addTearDown(connected.close);
+    final MemoryPersistence persistence =
+        MemoryPersistence.createEagerGcMemoryPersistence();
+    await persistence.start();
+    final LocalStore localStore = LocalStore(persistence, User.unauthenticated);
+    await localStore.start();
+    // Every watch snapshot keeps the queue of the remote store busy for a while.
+    final _SlowCallback callback =
+        _SlowCallback(delay: const Duration(milliseconds: 200));
+    final RemoteStore remoteStore =
+        RemoteStore(callback, localStore, datastore, connected, scheduler);
+    Future<void> watchSnapshot() => datastore.writeWatchChange(
+        WatchChangeWatchTargetChange(WatchTargetChangeType.noChange, <int>[],
+            Uint8List.fromList(<int>[1, 2, 3])),
+        version(10));
+
+    await localStore.writeLocally(<Mutation>[
+      setMutation('foo/bar', map(<String>['a', 'b']))
+    ]);
+    await remoteStore.start();
+    await remoteStore
+        .listen(QueryData(query('foo').toTarget(), 2, 1, QueryPurpose.listen));
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(datastore.writesSent, 1);
+
+    // The write stream fails and is restarted while a snapshot is handled; a second snapshot comes after the open
+    // event of the new stream, so that the report of its handshake waits behind it.
+    await datastore.failWrite(const GrpcError.unavailable());
+    await watchSnapshot();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await watchSnapshot();
+    // The new stream sent its handshake (after the first snapshot), and fails while the second snapshot is handled.
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    final int requestsBeforeFailure = datastore.writeStreamRequestCount;
+    await datastore.failWrite(const GrpcError.unavailable());
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    // Only the stream started after the second failure got requests: its handshake and the write.
+    expect(datastore.writeStreamRequestCount - requestsBeforeFailure, 2);
     expect(datastore.writesSent, 1);
   });
 }
