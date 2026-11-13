@@ -30,6 +30,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/json_decode.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rpc_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_http_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
@@ -100,7 +101,7 @@ class WebChannelChunkParser {
         _needed = end;
         break;
       }
-      chunks.add(jsonDecode(_buffer.substring(newline + 1, end)));
+      chunks.add(decodeBackendJson(_buffer.substring(newline + 1, end)));
       _buffer = _buffer.substring(end);
     }
     return chunks;

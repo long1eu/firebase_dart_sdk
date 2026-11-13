@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/json_decode.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rpc_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_http_client.dart';
@@ -173,7 +174,7 @@ class RestClient {
 
     Object? json;
     try {
-      json = text.isEmpty ? null : jsonDecode(text);
+      json = text.isEmpty ? null : decodeBackendJson(text);
     } on FormatException {
       json = null;
     }

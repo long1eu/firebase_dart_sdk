@@ -1,5 +1,9 @@
 ## Unreleased
 
+- Web transport: the double -0.0 read from production Firestore came back as 0.0. Production writes it as the
+  JSON number `-0`, which `jsonDecode` reads as the int 0; the responses of REST and WebChannel are now decoded
+  keeping the sign, as `JSON.parse` does in the JS SDK. (The emulator writes `-0.0`, so its tests did not show
+  it.) Empty bytes were not affected.
 - The switch of a SQLite cache to write-ahead logging is tried again a few times (within 1.5 s) when
   another connection opening the same file at that moment makes it fail with `database is locked`;
   if it still fails, that is logged at debug level instead of as a warning, and the next open

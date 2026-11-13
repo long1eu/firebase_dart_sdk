@@ -401,6 +401,37 @@ class Kit {
     return db.doc(path);
   }
 
+  /// The value lines (`"doubleValue": ...`, `"bytesValue": ...`) of the raw REST answer for the document at [path]
+  /// (relative to the documents of the database), as the backend sends them, for diagnostics. The request carries the
+  /// kit's credentials; nothing of them is returned or printed.
+  Future<List<String>> rawRestValueLines(String path) async {
+    final HttpClient client = HttpClient();
+    try {
+      final Uri url = Uri(
+        scheme: backend.ssl ? 'https' : 'http',
+        host: backend.host,
+        port: backend.port,
+        path: '/v1/projects/${backend.projectId}/databases/${backend.databaseId}/documents/$path',
+      );
+      final HttpClientRequest request = await client.getUrl(url);
+      if (backend.production) {
+        final String? token = await _tokens.token;
+        request.headers
+          ..set('Authorization', 'Bearer $token')
+          ..set('x-goog-user-project', backend.projectId);
+      }
+      final HttpClientResponse response = await request.close();
+      final String body = await response.transform(utf8.decoder).join();
+      final RegExp value = RegExp(r'"(doubleValue|bytesValue)": *("[^"]*"|[^,}\s]+)');
+      return <String>[
+        'HTTP ${response.statusCode}',
+        for (final RegExpMatch match in value.allMatches(body)) match[0]!,
+      ];
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   /// The path of a document of the run, for a client that is not a [Firestore] of the main library. Like [doc], it
   /// registers the document for the clean-up.
   String documentPath(String collection, String id) {
@@ -1356,6 +1387,17 @@ Future<CheckResult> _negativeZeroAndEmptyBytes(Kit kit) async {
       }
     }
   }
+  // What the backend sends over REST (the web transport reads the same JSON), in document order of its answer.
+  final List<String> raw = <String>[];
+  for (final String writer in <String>['by_grpc', 'by_web']) {
+    try {
+      raw.add('raw REST $writer: '
+          '${(await kit.rawRestValueLines('${kit.collectionPath('vp_values')}/$writer')).join(', ')}');
+    } catch (e) {
+      raw.add('raw REST $writer: not read ($e)');
+    }
+  }
+  kit.log(raw.join('\n'));
   if (problems.isNotEmpty) {
     return CheckResult(Status.fail,
         '-0.0 or empty bytes do not survive a round trip.',
@@ -1366,11 +1408,11 @@ Future<CheckResult> _negativeZeroAndEmptyBytes(Kit kit) async {
             'Known for the emulator: its JSON front end stores -0 as 0 (also for a plain REST request). What counts is '
                 'the result against production.',
         ],
-        observed: <String, Object?>{'problems': problems});
+        observed: <String, Object?>{'problems': problems, 'raw': raw});
   }
   return CheckResult(Status.pass,
       '-0.0, 0.0 and empty bytes round trip over gRPC and over the web transport, in all four combinations.',
-      observed: <String, Object?>{'problems': problems});
+      observed: <String, Object?>{'problems': problems, 'raw': raw});
 }
 
 Future<CheckResult> _tokens(Kit kit) async {
