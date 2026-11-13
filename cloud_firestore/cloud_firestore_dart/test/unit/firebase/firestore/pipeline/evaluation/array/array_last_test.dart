@@ -1,0 +1,115 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Ported from the Android SDK:
+// firebase-firestore/src/test/java/com/google/firebase/firestore/pipeline/evaluation/array/ArrayLastTests.kt
+//
+// The port keeps the names and the structure of the Kotlin tests;
+// evaluation_test_util.dart has the functions they call. Where the expected
+// result differs from Android's, the Enterprise edition emulator was asked
+// and a comment says so.
+
+// ignore_for_file: non_constant_identifier_names, prefer_const_constructors
+// ignore_for_file: prefer_const_declarations, unnecessary_lambdas, directives_ordering
+// ignore_for_file: prefer_interpolation_to_compose_strings, constant_identifier_names
+// ignore_for_file: always_specify_types, prefer_final_locals, unnecessary_brace_in_string_interps
+// ignore_for_file: prefer_const_literals_to_create_immutables, prefer_single_quotes
+// ignore_for_file: unnecessary_string_escapes, unused_local_variable, lines_longer_than_80_chars
+
+import 'package:test/test.dart' show test;
+
+import '../evaluation_test_util.dart';
+
+void main() {
+  test('arrayLast - general cases', () {
+    final testCases = [
+      (array("1", 42, true), EvaluateResultValue(encodeValue(true)), "basic"),
+      (array(), EvaluateResultUnset, "empty array"),
+      (
+        array("first", null),
+        EvaluateResultValue(NULL_VALUE),
+        "null last element",
+      ),
+      (
+        array(array(1, 2)),
+        EvaluateResultValue(encodeValue([encodeValue(1), encodeValue(2)])),
+        "nested arrays",
+      ),
+      (
+        array("single"),
+        EvaluateResultValue(encodeValue("single")),
+        "single element",
+      ),
+      (nullValue(), EvaluateResultValue(NULL_VALUE), "null input"),
+      (
+        field("nonexistent"),
+        EvaluateResultValue(NULL_VALUE),
+        "non-existent input",
+      ),
+    ];
+
+    for (final testCase in testCases) {
+      final expr = arrayLast(testCase.array);
+      final result = evaluate(expr);
+      assertWithMessage(
+        "arrayLast ${testCase.description}",
+      ).that(result).isEqualTo(testCase.expected);
+    }
+  });
+  test('arrayLast - error cases', () {
+    final testCases = [
+      (
+        vector(<double>[1.0, 2.0]),
+        EvaluateResultError,
+        "received unexpected input type vector",
+      ),
+      (
+        constant("notAnArray"),
+        EvaluateResultError,
+        "received unexpected input type string",
+      ),
+      (
+        constant(123),
+        EvaluateResultError,
+        "received unexpected input type long",
+      ),
+      (
+        constant(true),
+        EvaluateResultError,
+        "received unexpected input type boolean",
+      ),
+      (
+        map(<String, Object?>{"a": 1}),
+        EvaluateResultError,
+        "received unexpected input type map",
+      ),
+    ];
+
+    for (final testCase in testCases) {
+      final expr = arrayLast(testCase.array);
+      final result = evaluate(expr);
+      assertWithMessage(
+        "arrayLast ${testCase.description}",
+      ).that(result).isEqualTo(testCase.expected);
+    }
+  });
+}
+
+typedef ArrayLastTestCase = (dynamic, dynamic, dynamic);
+
+extension ArrayLastTestCaseFields on ArrayLastTestCase {
+  dynamic get array => $1;
+  dynamic get expected => $2;
+  dynamic get description => $3;
+}
