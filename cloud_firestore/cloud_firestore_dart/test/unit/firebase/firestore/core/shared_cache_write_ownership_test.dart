@@ -122,13 +122,15 @@ class _Client {
     await _settle();
     await remoteStore.start();
     await _settle();
-    return _Client._(persistence, datastore, remoteStore, syncEngine);
+    return _Client._(persistence, datastore, remoteStore, syncEngine)
+      ..scheduler = scheduler;
   }
 
   final SQLitePersistence persistence;
   final MockDatastore datastore;
   final RemoteStore remoteStore;
   final SyncEngine syncEngine;
+  late final TaskScheduler scheduler;
   bool _shutDown = false;
 
   /// Writes [mutation] and returns the future of the user (completed by the acknowledgement).
@@ -297,6 +299,38 @@ void main() {
       await b.acknowledge(writeC, 1000);
     },
   );
+
+  test('the fill after a refresh does nothing without batches to send', () async {
+    final _Client b = await start('B');
+
+    // An idle client: no write stream is opened, however often the metadata is refreshed.
+    for (int i = 0; i < 3; i++) {
+      await b.refresh();
+      await b.syncEngine.handleClientMetadataRefresh();
+    }
+    await _settle();
+    expect(b.datastore.writeStreamRequestCount, 0);
+    expect(b.scheduler.getTask(TaskId.writeStreamIdle), isNull);
+
+    // After a write the stream is open and idle: the fills do not send anything and do not restart its idle timer
+    // (the stream would never close with a refresh every 4 s).
+    final Mutation writeB = setMutation('col/b', <String, Object?>{'by': 'B'});
+    final Future<void> bWritten = b.write(writeB);
+    await _expectSent(b.datastore, 1);
+    await b.acknowledge(writeB, 1000);
+    await bWritten;
+    final int requests = b.datastore.writeStreamRequestCount;
+    final TimerTask? idleTimer = b.scheduler.getTask(TaskId.writeStreamIdle);
+    expect(idleTimer, isNotNull);
+    for (int i = 0; i < 3; i++) {
+      await b.refresh();
+      await b.syncEngine.handleClientMetadataRefresh();
+    }
+    await _settle();
+    expect(b.datastore.writeStreamRequestCount, requests);
+    expect(b.datastore.writesSent, 0);
+    expect(b.scheduler.getTask(TaskId.writeStreamIdle), same(idleTimer));
+  });
 
   test('a client that refreshed 30 s ago keeps its batch', () async {
     final _Client b = await start('B');
