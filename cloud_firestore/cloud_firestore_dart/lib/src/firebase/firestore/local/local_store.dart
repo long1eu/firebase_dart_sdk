@@ -44,6 +44,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/preco
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/unknown_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.dart';
@@ -864,7 +865,7 @@ class LocalStore implements BundleCallback {
         'docVersions should contain every doc in the write.',
       );
 
-      if (doc == null || doc.version.compareTo(ackVersion!) < 0) {
+      if (doc == null || _shouldApplyAcknowledgedWrite(doc, ackVersion!)) {
         doc = batch.applyToRemoteDocument(docKey, doc, batchResult);
         if (doc == null) {
           hardAssertLazy(
@@ -879,6 +880,31 @@ class LocalStore implements BundleCallback {
     }
 
     await _mutationQueue.removeMutationBatch(batch);
+  }
+
+  /// Whether an acknowledged write still has to be applied to the cached [doc], given the version the backend
+  /// reports for the document after the write.
+  ///
+  /// A cached document that is newer than the acknowledgement already contains the write (the watch stream
+  /// delivered it first), and an older acknowledgement must never overwrite it. That is the upstream rule
+  /// (`doc.version < ackVersion`).
+  ///
+  /// PORTING NOTE: the port also applies the write when the versions are equal and the cached document is itself
+  /// only the result of earlier acknowledgements (it has committed mutations; it did not come from the backend).
+  /// The backend reports an unchanged update time for a write that did not change the document, for example a write
+  /// that is sent again after its acknowledgement was lost. The backend document at that version includes the
+  /// write, but the estimate in the cache may not, and upstream then drops the write from the cache until the
+  /// document is read from the backend again. A document that came from the backend at that version is left alone,
+  /// as upstream does.
+  static bool _shouldApplyAcknowledgedWrite(
+      MaybeDocument doc, SnapshotVersion ackVersion) {
+    final int comparison = doc.version.compareTo(ackVersion);
+    if (comparison != 0) {
+      return comparison < 0;
+    }
+    return doc is UnknownDocument ||
+        (doc is Document && doc.hasCommittedMutations) ||
+        (doc is NoDocument && doc.hasCommittedMutations);
   }
 
   Future<LruGarbageCollectorResults> collectGarbage(

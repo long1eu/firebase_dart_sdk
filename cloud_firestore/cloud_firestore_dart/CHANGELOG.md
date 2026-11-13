@@ -347,6 +347,11 @@ Documentation and tests:
 
 ### Fixed
 
+- Cache after a lost write acknowledgement: a write that is sent again and changes nothing on the backend is
+  acknowledged with the unchanged update time of the document, and was then dropped from the cached document
+  (as in the other SDKs), so `get(Source.cache)` returned the old value without a pending write until the document
+  was read from the backend. It is now applied when the cached document is only the result of earlier
+  acknowledgements. Emulator-verified only.
 - The local evaluation of filters follows the backend in three places where the JS and Android
   SDKs do not: `whereIn`, `whereNotIn`, `arrayContains` and `arrayContainsAny` match numbers by
   value (`1` is `1.0`, `0.0` is `-0.0`); `<`, `<=`, `>` and `>=` do not order `null` and `NaN`

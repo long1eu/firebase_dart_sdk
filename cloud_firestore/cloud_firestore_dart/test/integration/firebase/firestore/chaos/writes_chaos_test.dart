@@ -227,8 +227,8 @@ void main() {
       // reviews/chaos_findings.md (F1).
       final Map<String, Map<String, Object?>> server =
           await env.serverDocs(collection.path);
-      // The cache can be behind for a document whose re-sent writes changed nothing on the backend (F1b), until
-      // the document is read from the backend again; then it agrees.
+      // The cache is an estimate until the documents are read from the backend again; then it agrees. (Before the
+      // F1b fix it was regularly behind here for the re-sent writes that changed nothing on the backend.)
       final Map<String, Map<String, Object?>> staleCache =
           docsById(await collection.get(Source.cache));
       await collection.get(Source.server);
@@ -264,8 +264,8 @@ void main() {
     });
 
     test(
-        'after a lost acknowledgement the cache catches up with a server read '
-        '(F1b)', () async {
+        'after a lost acknowledgement the cache has the re-sent write that '
+        'changed nothing (F1b)', () async {
       final Firestore db = await env.newClient();
       final CollectionReference<Map<String, Object?>> collection =
           db.collection(uniqueName('stale'));
@@ -288,21 +288,19 @@ void main() {
 
       // Both writes were sent again. The increment was applied a second time (F1). The second write changed
       // nothing on the backend this time, so its acknowledgement carries the unchanged update time of the
-      // document, and the client (like the other SDKs) does not apply an acknowledged write to a cached document
-      // that already has that version: the cache keeps the old tag, without a pending write.
+      // document. The other SDKs do not apply an acknowledged write to a cached document that already has that
+      // version, and keep the old tag in the cache (without a pending write) until the document is read from the
+      // backend. The port applies it when the cached document is only the result of earlier acknowledgements
+      // (LocalStore._shouldApplyAcknowledgedWrite), so the cache is right at once.
       final Map<String, Object?> server =
           (await env.serverDocs(collection.path))['a']!;
       expect(server, <String, Object?>{'n': 2, 'tag': 'second'});
-      final DocumentSnapshot<Map<String, Object?>> stale =
+      final DocumentSnapshot<Map<String, Object?>> cached =
           await doc.get(Source.cache);
-      expect(stale.metadata.hasPendingWrites, isFalse);
-      expect(stale.data!['n'], 2);
-      expect(stale.data!['tag'], anyOf('first', 'second'));
-      // ignore: avoid_print
-      print('F1b: cached tag after the lost acknowledgement: '
-          "${stale.data!['tag']} (backend: second)");
+      expect(cached.metadata.hasPendingWrites, isFalse);
+      expect(cached.data, server);
 
-      // Reading the document from the backend (a get or a listener) repairs the cache.
+      // And it stays right after the document is read from the backend.
       expect((await doc.get(Source.server)).data, server);
       expect((await doc.get(Source.cache)).data, server);
     },
