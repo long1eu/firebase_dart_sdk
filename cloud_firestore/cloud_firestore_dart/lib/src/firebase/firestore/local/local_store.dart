@@ -757,6 +757,17 @@ class LocalStore implements BundleCallback {
       targetId = cached.targetId;
     } else {
       await _persistence.runTransaction('Allocate target', () async {
+        // Another client of the same cache may have allocated targets, this one included, since this client last
+        // looked.
+        final QueryData? allocatedMeanwhile = await _queryCache.getQueryData(
+          target,
+        );
+        if (allocatedMeanwhile != null) {
+          cached = allocatedMeanwhile;
+          targetId = cached.targetId;
+          return;
+        }
+        _targetIdGenerator.advancePast(_queryCache.highestTargetId);
         targetId = _targetIdGenerator.nextId;
         cached = QueryData(
           target,

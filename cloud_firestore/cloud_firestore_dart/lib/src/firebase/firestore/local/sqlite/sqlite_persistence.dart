@@ -110,6 +110,24 @@ class SQLitePersistence extends Persistence {
   /// itself (see [ClearableDatabase]).
   Future<void> Function()? _clearStorage;
 
+  /// How long a statement waits for the lock of another connection (another isolate or process that has the same
+  /// database file open) before it fails with `SQLITE_BUSY`.
+  static const Duration busyTimeout = Duration(seconds: 10);
+
+  /// `PRAGMA data_version` as it was when the state this client keeps in memory was last read. SQLite changes the
+  /// value when another connection commits, and never for a commit of this connection.
+  int? _dataVersion;
+
+  /// The mutation queues and index managers that were handed out and keep state of the database in memory.
+  final List<WeakReference<SQLiteMutationQueue>> _mutationQueues =
+      <WeakReference<SQLiteMutationQueue>>[];
+  final List<WeakReference<SqliteIndexManager>> _indexManagers =
+      <WeakReference<SqliteIndexManager>>[];
+
+  /// The number of times the in-memory state was read again because another connection had changed the database.
+  @visibleForTesting
+  int foreignCommitsSeen = 0;
+
   @override
   bool started = false;
 
@@ -205,6 +223,8 @@ class SQLitePersistence extends Persistence {
       _databasePath = _db.path;
       final Database db = _db;
       _clearStorage = db is ClearableDatabase ? db.clearStorage : null;
+      // Read before the state: a commit of another connection in between is then seen by the next transaction.
+      _dataVersion = await _readDataVersion();
       await queryCache.start();
       started = true;
       referenceDelegate.start(queryCache.highestListenSequenceNumber);
@@ -232,7 +252,63 @@ class SQLitePersistence extends Persistence {
 
   @override
   IndexManager getIndexManager(User user) {
-    return SqliteIndexManager(this, serializer, user);
+    final SqliteIndexManager manager = SqliteIndexManager(
+      this,
+      serializer,
+      user,
+    );
+    _track(_indexManagers, manager);
+    return manager;
+  }
+
+  void _track<T extends Object>(List<WeakReference<T>> list, T value) {
+    list
+      ..removeWhere((WeakReference<T> reference) => reference.target == null)
+      ..add(WeakReference<T>(value));
+  }
+
+  Future<int> _readDataVersion() async {
+    return (await _db.query('PRAGMA data_version')).first.values.first as int;
+  }
+
+  /// Reads the state that this client keeps in memory again when another connection changed the database since it
+  /// was read. Called at the start of every transaction, when this connection already holds the write lock: what is
+  /// read here stays true until the transaction ends.
+  ///
+  /// PORTING NOTE: the Android SDK opens the database in exclusive locking mode and can cache this state for as long
+  /// as it runs. The port cannot (see [_openDb]), and two clients on one file happen: the isolate before a hot
+  /// restart, a background isolate, a second process. Without this they hand out the same target and batch ids and
+  /// overwrite each other's metadata rows with what they remembered.
+  Future<void> _refreshAfterForeignCommit() async {
+    final int dataVersion = await _readDataVersion();
+    if (dataVersion == _dataVersion) {
+      return;
+    }
+
+    final int schemaVersion =
+        (await _db.query('PRAGMA user_version')).first.values.first as int;
+    if (schemaVersion != SQLiteSchema.version) {
+      throw FirestoreError(
+        'The persistent cache was opened by a different version of the SDK while this client was using it '
+        '(its schema version is now $schemaVersion, this client uses ${SQLiteSchema.version}). Terminate this '
+        'instance; a new instance migrates the cache when it starts.',
+        FirestoreErrorCode.failedPrecondition,
+      );
+    }
+
+    await queryCache.start();
+    referenceDelegate.listenSequence.advanceTo(
+      queryCache.highestListenSequenceNumber,
+    );
+    for (final WeakReference<SQLiteMutationQueue> reference
+        in _mutationQueues) {
+      await reference.target?._refresh();
+    }
+    for (final WeakReference<SqliteIndexManager> reference in _indexManagers) {
+      await reference.target?._refresh();
+    }
+    _dataVersion = dataVersion;
+    foreignCommitsSeen++;
   }
 
   /// Deletes the database file and its journal, WAL and shared memory side
@@ -271,7 +347,14 @@ class SQLitePersistence extends Persistence {
 
   @override
   MutationQueue getMutationQueue(User user) {
-    return SQLiteMutationQueue(this, serializer, _statsCollector, user);
+    final SQLiteMutationQueue queue = SQLiteMutationQueue(
+      this,
+      serializer,
+      _statsCollector,
+      user,
+    );
+    _track(_mutationQueues, queue);
+    return queue;
   }
 
   @override
@@ -301,9 +384,12 @@ class SQLitePersistence extends Persistence {
 
     bool began = false;
     try {
-      referenceDelegate.onTransactionStarted();
-      await _db.execute('BEGIN;');
+      // IMMEDIATE takes the write lock now. A deferred transaction takes it at its first write, and that fails at
+      // once, whatever the busy timeout, when another connection wrote since this transaction first read.
+      await _db.execute('BEGIN IMMEDIATE;');
       began = true;
+      await _refreshAfterForeignCommit();
+      referenceDelegate.onTransactionStarted();
       final T result = await operation();
       await _db.execute('COMMIT;');
       began = false;
@@ -362,6 +448,53 @@ class SQLitePersistence extends Persistence {
       if (!configured) {
         configured = true;
         // Intentionally no `PRAGMA locking_mode = EXCLUSIVE`: it breaks flutter hot restart.
+        //
+        // Wait for the lock of another connection instead of failing at once. The pragma returns a row, so it is
+        // sent as a query: some bindings refuse rows from `execute`.
+        try {
+          await db.query('PRAGMA busy_timeout = ${busyTimeout.inMilliseconds}');
+        } catch (e) {
+          Log.w(tag, 'Could not set the busy timeout of the database: $e');
+        }
+      }
+    }
+
+    /// Brings the schema to [SQLiteSchema.version] while no other connection can read or write.
+    ///
+    /// Two clients that open an old (or new) file at the same moment are both told to migrate it by their openers.
+    /// The second one waits here, finds the version the first one stored and does nothing. The version is read and
+    /// stored inside the transaction for that reason; the opener stores it again afterwards.
+    Future<void> migrate(Database db) async {
+      await ensureConfigured(db);
+      bool began = false;
+      try {
+        await db.execute('BEGIN EXCLUSIVE;');
+        began = true;
+      } catch (e) {
+        // An opener may run the callbacks inside a transaction of its own (example/sqlite_database_web.dart does).
+        if (!'$e'.contains('within a transaction')) {
+          rethrow;
+        }
+      }
+      try {
+        final int stored =
+            (await db.query('PRAGMA user_version')).first.values.first as int;
+        if (stored < SQLiteSchema.version) {
+          await SQLiteSchema(db).runMigrations(stored);
+          await db.execute('PRAGMA user_version = ${SQLiteSchema.version}');
+        }
+        if (began) {
+          await db.execute('COMMIT;');
+        }
+      } catch (_) {
+        if (began) {
+          try {
+            await db.execute('ROLLBACK;');
+          } catch (e) {
+            Log.w(tag, 'Rollback of the schema migration failed: $e');
+          }
+        }
+        rethrow;
       }
     }
 
@@ -369,18 +502,15 @@ class SQLitePersistence extends Persistence {
       databaseName,
       version: SQLiteSchema.version,
       onConfigure: ensureConfigured,
-      onCreate: (Database db, int version) async {
-        await ensureConfigured(db);
-        await SQLiteSchema(db).runMigrations(0);
-      },
-      onUpgrade: (Database db, int fromVersion, int toVersion) async {
-        await ensureConfigured(db);
-        await SQLiteSchema(db).runMigrations(fromVersion);
-      },
+      onCreate: (Database db, int version) => migrate(db),
+      onUpgrade: (Database db, int fromVersion, int toVersion) => migrate(db),
       onDowngrade: (Database db, int fromVersion, int toVersion) async {
         await ensureConfigured(db);
 
         // For now, we can safely do nothing.
+        //
+        // PORTING NOTE: a client of a newer SDK that still has this file open notices the lowered version at its next
+        // transaction and fails (see [_refreshAfterForeignCommit]); this client goes on.
         //
         // The only case that's possible at this point would be to downgrade from version 1 (present
         // in our first released version) to 0 (uninstalled). Nobody would want us to just wipe the

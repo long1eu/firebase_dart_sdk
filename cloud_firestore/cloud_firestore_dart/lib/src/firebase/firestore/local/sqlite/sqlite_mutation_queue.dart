@@ -20,8 +20,8 @@ class SQLiteMutationQueue implements MutationQueue {
 
   /// Next value to use when assigning sequential IDs to each mutation batch.
   ///
-  /// NOTE: There can only be one [SQLiteMutationQueue] for a given db at a time, hence it is safe to track
-  /// [_nextBatchId] as an instance-level property. Should we ever relax this constraint we'll need to revisit this.
+  /// NOTE: Another connection may add batches as well, so this is only valid inside a transaction: the persistence
+  /// calls [_refresh] at the start of a transaction when another connection has committed since.
   late int _nextBatchId;
 
   /// A stream token that was previously sent by the server.
@@ -33,8 +33,18 @@ class SQLiteMutationQueue implements MutationQueue {
 
   // MutationQueue implementation
 
+  bool _started = false;
+
+  /// Reads the next batch id and the stream token again, after another connection changed the database.
+  Future<void> _refresh() async {
+    if (_started) {
+      await start();
+    }
+  }
+
   @override
   Future<void> start() async {
+    _started = true;
     await _loadNextBatchIdAcrossAllUsers();
     final List<Map<String, dynamic>> result = await db.query(
       // @formatter:off

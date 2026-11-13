@@ -21,6 +21,12 @@ import 'package:meta/meta.dart';
 /// finally call [onOpen]. The callbacks run Firestore's own schema migrations,
 /// so they must be awaited before the returned future completes.
 ///
+/// The callbacks may be called inside a transaction of the opener. Outside of
+/// one, Firestore runs the migration in a transaction of its own
+/// (`BEGIN EXCLUSIVE`), reads `PRAGMA user_version` in it and migrates from the
+/// version it finds there: another client may have migrated the same file
+/// since the opener looked.
+///
 /// See `example/sqlite_database.dart` in this package for a complete
 /// implementation on top of `package:sqlite3`.
 typedef OpenDatabase =

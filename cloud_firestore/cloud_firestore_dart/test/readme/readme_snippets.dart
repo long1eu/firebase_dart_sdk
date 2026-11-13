@@ -208,8 +208,8 @@ Future<void> firestoreReadmeLine526() async {
   }, options: TransactionOptions(readOnly: true));
 }
 
-// README.md:619
-Future<void> firestoreReadmeLine619() async {
+// README.md:627
+Future<void> firestoreReadmeLine627() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }

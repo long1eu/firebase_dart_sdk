@@ -109,4 +109,57 @@ void main() {
     release.complete();
     await held;
   });
+
+  // Runs in a browser as well (tool/test_unit_browser.sh): what the persistence relies on to notice the commits of
+  // another connection has to hold on the WebAssembly build of SQLite too.
+  test('a commit of another connection is noticed, an own commit is not',
+      () async {
+    final String name = 'foreign-${const Uuid().v4()}';
+    final String dbName = SQLitePersistence.sDatabaseName(
+        name, DatabaseId.forProject('projectId'));
+    addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
+
+    final SQLitePersistence first = await open(name);
+    await first.start();
+    final SQLitePersistence second = await open(name);
+    await second.start();
+    addTearDown(() async {
+      await first.shutdown();
+      await second.shutdown();
+    });
+
+    expect(
+        (await first.query('PRAGMA busy_timeout')).single.values.single,
+        SQLitePersistence.busyTimeout.inMilliseconds);
+
+    await first.execute('CREATE TABLE IF NOT EXISTS probe (v INTEGER)');
+    final int seenByFirst = first.foreignCommitsSeen;
+    for (int i = 0; i < 3; i++) {
+      await first.runTransaction('write', () async {
+        await first.execute('INSERT INTO probe (v) VALUES (?)', <Object?>[i]);
+      });
+      await first.runTransaction('read', () async {
+        await first.query('SELECT v FROM probe');
+      });
+    }
+    expect(first.foreignCommitsSeen, seenByFirst);
+
+    // Transactions that write nothing are not commits.
+    final int seenBySecond = second.foreignCommitsSeen;
+    await second.runTransaction('read', () async {
+      expect(await second.query('SELECT v FROM probe'), hasLength(3));
+    });
+    expect(second.foreignCommitsSeen, seenBySecond + 1);
+    await first.runTransaction('read', () async {});
+    expect(first.foreignCommitsSeen, seenByFirst);
+
+    await second.runTransaction('write', () async {
+      await second.execute('INSERT INTO probe (v) VALUES (?)', <Object?>[9]);
+    });
+    await first.runTransaction('read', () async {});
+    await first.runTransaction('read', () async {});
+    expect(first.foreignCommitsSeen, seenByFirst + 1);
+    await second.runTransaction('read', () async {});
+    expect(second.foreignCommitsSeen, seenBySecond + 1);
+  });
 }

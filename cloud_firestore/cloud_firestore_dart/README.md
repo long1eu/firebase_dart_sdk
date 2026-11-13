@@ -585,9 +585,17 @@ then fails whichever test is running.
   after a Flutter hot restart the old isolate's handle is still open and the new isolate must be
   able to open the same file (issue #1). SQLite's normal file locking keeps the file consistent
   and is covered by `test/unit/firebase/firestore/local/sqlite_shared_file_test.dart`.
-  Two live clients on the same file do not share their in-memory state (target ids, mutation
-  batch ids), so do not run two active clients on one persistence key; use different app names
-  or databases. Handles inside one process are serialized per database name.
+  Two live clients on the same file (the isolate before a hot restart, a background isolate, a
+  second process) do not damage the cache: every transaction takes SQLite's write lock at its
+  start (`BEGIN IMMEDIATE`, waiting up to 10 seconds for another connection), a client reads
+  the state it keeps in memory again when another connection has committed, so target ids and
+  mutation batch ids stay unique, and a schema migration runs once. A client fails with
+  `failedPrecondition` when another version of the SDK changes the schema version under it.
+  They are still not coordinated: each one talks to the backend and does not see the listeners
+  or the pending writes of the other until it reads the cache again, so do not run two active
+  clients on one persistence key on purpose; use different app names or databases. Handles
+  inside one process are serialized per database name
+  (`test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`).
 - Instances are independent: each `Firestore` has its own scheduler and work queue, and the
   persistence lock is per database, so an instance never waits for another one (issue #2).
 - Connectivity: a failed stream is the only thing that makes the client consider itself

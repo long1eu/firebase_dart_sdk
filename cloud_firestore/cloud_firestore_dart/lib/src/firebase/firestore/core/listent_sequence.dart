@@ -11,4 +11,11 @@ class ListenSequence {
   int _previousSequenceNumber;
 
   int get next => ++_previousSequenceNumber;
+
+  /// Makes the sequence continue after [sequenceNumber] if it is not past it already.
+  void advanceTo(int sequenceNumber) {
+    if (sequenceNumber > _previousSequenceNumber) {
+      _previousSequenceNumber = sequenceNumber;
+    }
+  }
 }

@@ -407,6 +407,14 @@ Documentation and tests:
 
 ### Fixed
 
+- Two clients with the same SQLite cache open (the isolate before a Flutter hot restart, a background isolate, a
+  second process) could give two listens the same target id or two writes the same batch id, and overwrite the
+  cache metadata with what each had read at its start; a transaction could also fail with "database is locked"
+  the moment the other client wrote. Transactions now take the write lock when they start and wait for it,
+  the state kept in memory is read again after a commit of another connection, and two clients that open an old
+  cache at the same time migrate it once. A client whose cache is moved to another schema version by a different
+  version of the SDK while it runs fails with `failedPrecondition` instead of working on a schema it does not
+  know. The clients are still not coordinated (there is no multi-tab support).
 - Argument checks that were only `assert`s, and so did nothing in release builds, now throw an `ArgumentError`
   in every build: a collection path with an even number of segments (`firestore.collection('coll/doc')`,
   `doc.collection('')`), a `cacheSizeBytes` below the minimum of 1 MB with persistence enabled, and a `GeoPoint`

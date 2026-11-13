@@ -51,6 +51,15 @@ class TargetIdGenerator {
   int _nextId;
 
   /// Returns the next id in the sequence
+  /// Makes the generator continue after [id] if it is not past it already. [id] may be an id of any generator.
+  void advancePast(int id) {
+    if (id >= _nextId) {
+      _nextId =
+          (((id >> _reservedBits) + 1) << _reservedBits) |
+          (_nextId & _reservedBits);
+    }
+  }
+
   int get nextId {
     final int _nextId = this._nextId;
     this._nextId += 1 << _reservedBits;

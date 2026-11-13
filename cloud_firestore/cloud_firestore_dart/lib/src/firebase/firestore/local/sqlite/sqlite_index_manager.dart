@@ -49,6 +49,16 @@ class SqliteIndexManager extends IndexManager {
   int _memoizedMaxIndexId = -1;
   int _memoizedMaxSequenceNumber = -1;
 
+  /// Reads the indexes and their states again, after another connection changed the database.
+  Future<void> _refresh() async {
+    if (_started) {
+      _memoizedIndexes.clear();
+      _nextIndexToUpdate.clear();
+      _memoizedMaxIndexId = -1;
+      await start();
+    }
+  }
+
   @override
   Future<void> start() async {
     final Map<int, IndexState> indexStates = <int, IndexState>{};
