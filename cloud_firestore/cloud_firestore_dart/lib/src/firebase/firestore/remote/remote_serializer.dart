@@ -221,7 +221,12 @@ class RemoteSerializer {
         ..nullValue = proto.NullValue.NULL_VALUE;
     }
 
-    hardAssert(value.value != null, 'Encoded field value should not be null.');
+    // A map or an array is never null, and its value getter converts the whole subtree: checking it at every level
+    // made encoding quadratic in the depth.
+    hardAssert(
+      value is ObjectValue || value is ArrayValue || value.value != null,
+      'Encoded field value should not be null.',
+    );
 
     if (value is BoolValue) {
       builder.booleanValue = value.value;
