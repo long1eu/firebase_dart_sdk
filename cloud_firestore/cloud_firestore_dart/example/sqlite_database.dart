@@ -18,7 +18,14 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 ///
 /// In a Flutter app use a directory from `path_provider`, for example
 /// `getApplicationSupportDirectory()`.
-OpenDatabase sqliteOpener(Directory directory) {
+///
+/// [pageCacheMb] sets SQLite's page cache of the connection
+/// (`PRAGMA cache_size`); SQLite's default is 2 MB. The cache is filled as
+/// pages are read, up to that size, once per open cache. It mostly matters
+/// when the operating system can't keep the database file in its own file
+/// cache (a large cache on a device short of memory); see "SQLite page cache"
+/// in docs/guides/offline_persistence.md for measurements.
+OpenDatabase sqliteOpener(Directory directory, {int? pageCacheMb}) {
   // Before the first use of `sqlite3` in this isolate.
   open.overrideFor(OperatingSystem.linux, openLinuxSqlite);
   return (
@@ -41,6 +48,10 @@ OpenDatabase sqliteOpener(Directory directory) {
       file.path,
     );
     try {
+      if (pageCacheMb != null) {
+        // A negative value is a size in KiB, a positive one a number of pages.
+        db._database.execute('PRAGMA cache_size = -${pageCacheMb * 1024}');
+      }
       // The callbacks run Firestore's schema setup and migrations. They must
       // be called in this order and awaited before the database is returned.
       await onConfigure?.call(db);

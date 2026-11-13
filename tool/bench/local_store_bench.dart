@@ -2,7 +2,8 @@
 // queries (previous results vs full scan), document reads, writes, restart (with and without the overlay data
 // migration), acknowledgements and garbage collection.
 //
-//   dart run local_store_bench.dart <documents> [<directory for the database file>] [--profile]
+//   dart run local_store_bench.dart <documents> [<directory for the database file>] [--profile] [--fsync]
+//     [--cache-mb=<SQLite page cache in MB>] [--mmap-mb=<SQLite memory-mapped I/O in MB>] [--journal=<mode>]
 //
 // --profile prints, after every measurement, the SQL statements that took the most time in it. --fsync keeps SQLite's
 // default `synchronous` setting (commits wait for the disk); by default it is OFF so that runs are comparable.
@@ -81,8 +82,16 @@ class BenchDatabase extends Database {
         database.execute('PRAGMA synchronous = OFF');
       }
       if (cacheSizeKb != null) {
-        // SQLite's default page cache is 2 MB.
+        // SQLite's default page cache is 2 MB (2000 pages, 8 MB, in the library of macOS).
         database.execute('PRAGMA cache_size = -$cacheSizeKb');
+      }
+      if (journalMode != null) {
+        // A rollback journal mode other than `delete` is kept by the persistence (which switches `delete` to WAL).
+        database.select('PRAGMA journal_mode = $journalMode');
+      }
+      if (mmapSizeBytes != null) {
+        // Memory-mapped reads (off by default): pages come from the OS file cache instead of the page cache.
+        database.select('PRAGMA mmap_size = $mmapSizeBytes');
       }
       final BenchDatabase db = BenchDatabase._(database, file);
       await onConfigure?.call(db);
@@ -104,8 +113,14 @@ class BenchDatabase extends Database {
   /// Whether commits wait for the disk (`--fsync`); off by default.
   static bool fsync = false;
 
-  /// The SQLite page cache in KiB (`--cache-mb=<n>` of index_bench.dart); SQLite's default (2 MB) when null.
+  /// The SQLite page cache in KiB (`--cache-mb=<n>` of index_bench.dart); the library's default (2 MB, or 8 MB on macOS) when null.
   static int? cacheSizeKb;
+
+  /// `PRAGMA mmap_size` in bytes (`--mmap-mb=`); off by default.
+  static int? mmapSizeBytes;
+
+  /// `PRAGMA journal_mode` set by the opener (`--journal=`), for example `truncate` to compare with WAL.
+  static String? journalMode;
 
   static void resetProfile() => profile.clear();
 
@@ -251,6 +266,15 @@ ImmutableSortedSet<DocumentKey> keys(Iterable<DocumentKey> keys) {
 Future<void> main(List<String> args) async {
   BenchDatabase.profiling = args.contains('--profile');
   BenchDatabase.fsync = args.contains('--fsync');
+  for (final String arg in args.where((String a) => a.startsWith('--cache-mb='))) {
+    BenchDatabase.cacheSizeKb = int.parse(arg.substring(11)) * 1024;
+  }
+  for (final String arg in args.where((String a) => a.startsWith('--mmap-mb='))) {
+    BenchDatabase.mmapSizeBytes = int.parse(arg.substring(10)) * 1024 * 1024;
+  }
+  for (final String arg in args.where((String a) => a.startsWith('--journal='))) {
+    BenchDatabase.journalMode = arg.substring(10);
+  }
   args = args.where((String arg) => !arg.startsWith('--')).toList();
   final int n = int.parse(args.isEmpty ? '10000' : args[0]);
   final String dir = args.length > 1 ? args[1] : Directory.systemTemp.path;

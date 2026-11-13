@@ -261,6 +261,9 @@ Deprecated, still working:
 
 ### Added
 
+- `example/sqlite_database.dart`: `sqliteOpener(directory, pageCacheMb: ...)` sets SQLite's page cache size
+  (`PRAGMA cache_size`). The client keeps SQLite's default, as the Android SDK does; the offline persistence guide
+  has measurements and a recommendation.
 - Recovery from a cache that is not available for a while, as in the JS SDK: a `Database` can throw the new
   `TransientDatabaseException` (the example openers do for SQLite's busy, locked, I/O and full-disk errors, and on the
   web when IndexedDB fails to store a transaction). A listen or write that can not be stored then fails with

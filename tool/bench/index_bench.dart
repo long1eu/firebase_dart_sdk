@@ -2,7 +2,8 @@
 // full scan, from field indexes, and with automatic index creation; plus backfill time and memory.
 //
 //   dart run index_bench.dart <documents> [<directory for the database file>] [--profile] [--reps=<n>]
-//     [--no-scan] [--no-auto] [--cache-mb=<SQLite page cache>]
+//     [--no-scan] [--no-auto] [--cache-mb=<SQLite page cache>] [--mmap-mb=<SQLite memory-mapped I/O>]
+//     [--journal=<journal mode set by the opener>]
 //
 // Results: notes/perf/local_store_bench.md ("client-side index engine").
 
@@ -101,6 +102,12 @@ Future<void> main(List<String> args) async {
   for (final String arg
       in args.where((String a) => a.startsWith('--cache-mb='))) {
     BenchDatabase.cacheSizeKb = int.parse(arg.substring(11)) * 1024;
+  }
+  for (final String arg in args.where((String a) => a.startsWith('--mmap-mb='))) {
+    BenchDatabase.mmapSizeBytes = int.parse(arg.substring(10)) * 1024 * 1024;
+  }
+  for (final String arg in args.where((String a) => a.startsWith('--journal='))) {
+    BenchDatabase.journalMode = arg.substring(10);
   }
   final bool scans = !args.contains('--no-scan');
   final int reps = int.parse(args

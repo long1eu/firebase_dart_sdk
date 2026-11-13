@@ -118,4 +118,15 @@ void main() {
       throwsA(isA<sqlite.SqliteException>()),
     );
   });
+
+  test('the page cache size is applied, the default is left alone', () async {
+    // The default of the library: -2000 (2 MB) in SQLite's own build, 2000 pages (8 MB) in the one of macOS.
+    expect((await database.query('PRAGMA cache_size')).single.values.single,
+        anyOf(-2000, 2000));
+    final Database sized =
+        await sqliteOpener(directory, pageCacheMb: 16)('sized', version: 1);
+    addTearDown(sized.close);
+    expect((await sized.query('PRAGMA cache_size')).single.values.single,
+        -16 * 1024);
+  });
 }

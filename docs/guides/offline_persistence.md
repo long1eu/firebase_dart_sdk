@@ -75,6 +75,30 @@ then `onOpen`. The doc comment of `OpenDatabase` has the details.
 `example/offline_persistence.dart` is a runnable program: it writes online, restarts on the same
 file, reads offline and writes offline.
 
+### SQLite page cache
+
+The client sets no page cache size, like the Android SDK (which sets none either; IndexedDB in
+the JS SDK has nothing to set): the connection keeps SQLite's default, 2 MB in SQLite's own build
+(`sqlite3_flutter_libs`) and 2000 pages (8 MB) in the library of macOS. The example opener takes
+`pageCacheMb` to change it:
+
+```dart
+final Directory directory = Directory('/home/ada/.local/share/my_app');
+final OpenDatabase opener = sqliteOpener(directory, pageCacheMb: 32);
+```
+
+Measured on a Mac with plenty of memory (`tool/bench/index_bench.dart` and
+`local_store_bench.dart`, interleaved runs): between 2 and 256 MB nothing changed by more than the
+run-to-run noise, at 100,000 documents (index backfill 72 to 75 us per document, every
+`local_store_bench` line within about 10 %) and at 1,000,000 documents (backfill 197 to 240 us per
+document; 2 MB 197, 256 MB 209 to 213). There the operating system keeps the whole database file
+in its own file cache, so a page that SQLite's cache misses costs a system call, not a disk read.
+A larger page cache helps when that is not the case (a 1 GB cache on a device short of memory),
+and then it competes for the same memory. Recommendation: keep the default; if you profile a
+large cache on such a device and see it reading from disk, try 16 to 32 MB. The cache fills as
+pages are read, up to the size you set, once per open cache (one connection per `Firestore`
+instance with a persistent cache).
+
 ### Reading and writing offline
 
 ```dart
