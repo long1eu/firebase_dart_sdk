@@ -15,8 +15,10 @@
 # Environment:
 #   EMULATOR_DIR            directory for the pid files, logs and the generated firebase.json
 #                           (default: <repo>/.emulator)
-#   FIREBASE_CLI            the firebase command (default: $EMULATOR_DIR/node_modules/.bin/firebase,
-#                           else `firebase` on the PATH)
+#   FIREBASE_CLI            the firebase command (default: the first of
+#                           $EMULATOR_DIR/node_modules/.bin/firebase,
+#                           <repo>/.emulator/node_modules/.bin/firebase (in a git worktree also the
+#                           one of the main checkout), and `firebase` on the PATH)
 #   FIRESTORE_EMULATOR_JAR  emulator JAR (default: the newest cloud-firestore-emulator-v*.jar in
 #                           ~/.cache/firebase/emulators)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -50,15 +52,32 @@ else
   fi
   CLI="${FIREBASE_CLI:-}"
   if [ -z "$CLI" ]; then
-    if [ -x "$EMU/node_modules/.bin/firebase" ]; then
-      CLI="$EMU/node_modules/.bin/firebase"
-    else
-      CLI="$(command -v firebase || true)"
-    fi
+    # The local installs come before the PATH, which may hold a firebase binary for another
+    # architecture. In a git worktree <repo> is the worktree; the main checkout is tried too.
+    MAIN_ROOT="$(cd "$ROOT" && git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+    MAIN_ROOT="${MAIN_ROOT%/.git}"
+    for C in "$EMU/node_modules/.bin/firebase" "$ROOT/.emulator/node_modules/.bin/firebase" \
+        ${MAIN_ROOT:+"$MAIN_ROOT/.emulator/node_modules/.bin/firebase"}; do
+      if [ -x "$C" ]; then CLI="$C"; break; fi
+    done
+    [ -n "$CLI" ] || CLI="$(command -v firebase || true)"
   fi
   if [ -z "$CLI" ]; then
     echo "The firebase CLI was not found. Install it (mkdir -p .emulator && cd .emulator &&"
     echo "npm init -y && npm install firebase-tools) or set FIREBASE_CLI."
+    exit 1
+  fi
+  # Fail now, with the reason, when the binary can't run (for example "Bad CPU type in
+  # executable": a firebase binary built for another architecture).
+  if ! CLI_CHECK="$("$CLI" --version 2>&1)"; then
+    echo "The firebase CLI $CLI cannot run:"
+    echo "  $CLI_CHECK"
+    case "$CLI_CHECK" in
+      *"Bad CPU type"*|*"cannot execute binary"*|*"Exec format error"*)
+        echo "It was built for another CPU architecture.";;
+    esac
+    echo "Install firebase-tools locally (mkdir -p .emulator && cd .emulator && npm init -y &&"
+    echo "npm install firebase-tools) or set FIREBASE_CLI to a firebase command that runs here."
     exit 1
   fi
   # A configuration of its own: only the Auth emulator, with its hub and logging ports next to
