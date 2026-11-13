@@ -48,10 +48,14 @@ class FirebaseUserAuth implements InternalTokenProvider {
   ///   never an emulator. An emulator that is not on the loopback interface gets a warning in the log, like the
   ///   JS SDK warns for every emulator: passwords and tokens travel unencrypted to it. See
   ///   [emulatorHostFromEnvironment].
+  /// * [appId] (the `applicationId` of the app's options) is sent as `X-Firebase-gmpid`, and the token of [appCheck]
+  ///   as `X-Firebase-AppCheck`, with every request, like the JS SDK does. [forApp] takes both from the app.
   /// * [httpClient] is used for all requests and is not closed by [dispose]; without it one is created and closed.
   /// * [clock] and [createTimer] are for tests.
   FirebaseUserAuth({
     required this.apiKey,
+    this.appId,
+    InternalAppCheckTokenProvider? appCheck,
     AuthStorage? storage,
     String? storageKey,
     this.emulatorHost,
@@ -61,6 +65,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
   }) : _emulatorOrigin = emulatorHost == null
            ? null
            : _emulatorOriginOf(emulatorHost),
+       _appCheck = appCheck,
        _storage = storage ?? InMemoryAuthStorage(),
        _storageKey = storageKey ?? 'firebase_auth_providers_dart:$apiKey',
        _http = httpClient ?? http.Client(),
@@ -75,8 +80,9 @@ class FirebaseUserAuth implements InternalTokenProvider {
     );
   }
 
-  /// Creates the instance for [app] (with the API key of its options), restores a stored session and makes it the
-  /// token provider of the app. Call it before the Firestore instance of the app is created.
+  /// Creates the instance for [app] (with the API key and the application id of its options, and its App Check
+  /// provider), restores a stored session and makes it the token provider of the app. Call it before the Firestore
+  /// instance of the app is created, and after the App Check provider is set on the app.
   static Future<FirebaseUserAuth> forApp(
     FirebaseApp app, {
     AuthStorage? storage,
@@ -85,6 +91,8 @@ class FirebaseUserAuth implements InternalTokenProvider {
   }) async {
     final FirebaseUserAuth auth = FirebaseUserAuth(
       apiKey: app.options.apiKey,
+      appId: app.options.applicationId,
+      appCheck: app.appCheckProvider,
       storage: storage,
       storageKey:
           'firebase_auth_providers_dart:${app.options.apiKey}:${app.name}',
@@ -109,6 +117,15 @@ class FirebaseUserAuth implements InternalTokenProvider {
 
   /// The `host:port` of the Auth emulator, or null for the real service.
   final String? emulatorHost;
+
+  /// The id of the Firebase app, sent as `X-Firebase-gmpid`; null sends none.
+  final String? appId;
+
+  final InternalAppCheckTokenProvider? _appCheck;
+
+  /// The value of `X-Client-Version`, in the format of the JS SDK (`Chrome/JsCore/<version>/FirebaseCore-web`):
+  /// platform, implementation, version of the package, framework.
+  static const String clientVersion = 'Dart/DartCore/0.1.0/FirebaseCore-dart';
 
   /// `http://host:port` (or `https://...`) of the Auth emulator, checked; null for the real service.
   final String? _emulatorOrigin;
@@ -394,23 +411,65 @@ class FirebaseUserAuth implements InternalTokenProvider {
           );
   }
 
+  /// The headers the JS SDK sends with every request (`_getAdditionalHeaders`): the client version, the app id and
+  /// the App Check token. A failed App Check request is logged and the request goes out anyway, with the
+  /// placeholder token the provider returned (without the header when it threw), like in the JS SDK.
+  Future<Map<String, String>> _additionalHeaders() async {
+    final Map<String, String> headers = <String, String>{
+      'X-Client-Version': clientVersion,
+    };
+    final String? id = appId;
+    if (id != null && id.isNotEmpty) {
+      headers['X-Firebase-gmpid'] = id;
+    }
+    final InternalAppCheckTokenProvider? appCheck = _appCheck;
+    if (appCheck != null) {
+      try {
+        final AppCheckTokenResult result = await appCheck.getToken(
+          forceRefresh: false,
+        );
+        if (result.error != null) {
+          Log.w(
+            'FirebaseUserAuth',
+            'Error while retrieving App Check token: ${result.error}',
+          );
+        }
+        if (result.token.isNotEmpty) {
+          headers['X-Firebase-AppCheck'] = result.token;
+        }
+      } on Object catch (e) {
+        Log.w('FirebaseUserAuth', 'Error while retrieving App Check token: $e');
+      }
+    }
+    return headers;
+  }
+
   /// Sends a request and returns the decoded JSON object of the answer, or throws.
   Future<Map<String, Object?>> _send(
     Uri url, {
     Map<String, Object?>? json,
     Map<String, String>? form,
   }) async {
+    final Map<String, String> headers = await _additionalHeaders();
     final http.Response response;
     try {
       response = json != null
           ? await _http.post(
               url,
-              headers: const <String, String>{
+              headers: <String, String>{
+                ...headers,
                 'Content-Type': 'application/json',
               },
               body: jsonEncode(json),
             )
-          : await _http.post(url, body: form);
+          : await _http.post(
+              url,
+              headers: <String, String>{
+                ...headers,
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: form,
+            );
     } on Object catch (_) {
       // The error of the HTTP client may quote the URL, which holds the API key.
       throw const FirebaseAuthProviderException(

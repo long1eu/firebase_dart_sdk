@@ -85,6 +85,11 @@ await auth.signOut();
   write issued right after them belongs to the new user.
 - **A session that ended on the backend** (account deleted or disabled, refresh token revoked)
   signs the user out at the next refresh; `userChanges` emits null.
+- **Request headers** are those of the JS SDK: `X-Client-Version`
+  (`Dart/DartCore/<version>/FirebaseCore-dart`), `X-Firebase-gmpid` (the application id of the
+  app) and `X-Firebase-AppCheck` (the token of the app's App Check provider; a failed App Check
+  request is logged and the request goes out anyway). Not sent: `X-Firebase-Client` (there is no
+  heartbeat service) and `X-Firebase-Locale` (there is no language setting).
 - **Errors** are `FirebaseAuthProviderException`s with the codes of the Firebase SDKs:
   `wrong-password`, `user-not-found`, `invalid-credential`, `email-already-in-use`,
   `weak-password`, `invalid-email`, `user-disabled`, `too-many-requests`,
@@ -198,6 +203,7 @@ final firestore = Firestore.instanceFor(app: app);
 
     dart test                                   # unit tests; the service account tests need openssl
     dart test -p chrome test/browser            # needs the Auth emulator below; skips without it
+    dart test -p chrome -c dart2wasm test/browser
 
     # from the repository root: the Auth emulator and a Firestore emulator whose rules need auth
     tool/start_auth_emulators.sh                # needs the firebase CLI and java; prints two exports
@@ -207,4 +213,6 @@ final firestore = Firestore.instanceFor(app: app);
     (cd cloud_firestore/cloud_firestore_dart && dart test test/integration_auth)   # end to end
     tool/stop_auth_emulators.sh
 
-The emulator tests are skipped (with the reason) while the variables are not set.
+The emulator tests are skipped (with the reason) while the variables are not set. The browser
+tests read `FIREBASE_AUTH_EMULATOR_HOST` from the environment of `dart test` too (through a hybrid
+isolate on the VM) and fall back to `127.0.0.1:9197`.

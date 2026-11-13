@@ -1,3 +1,9 @@
+## Unreleased
+
+- `FirebaseUserAuth` sends the headers of the JS SDK with every request: `X-Client-Version`,
+  `X-Firebase-gmpid` (new `appId` parameter) and `X-Firebase-AppCheck` (new `appCheck`
+  parameter). `forApp` takes both from the app. New constant `FirebaseUserAuth.clientVersion`.
+
 ## 0.1.0
 
 First version. Not published yet.

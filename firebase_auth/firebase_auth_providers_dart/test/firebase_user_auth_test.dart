@@ -836,6 +836,125 @@ void main() {
         await second.dispose();
       },
     );
+
+    test('sends the app id and the App Check token of the app', () async {
+      final FirebaseApp app = FirebaseApp.withOptions(
+        const FirebaseOptions(
+          apiKey: apiKey,
+          applicationId: '1:1:web:1',
+          projectId: 'demo',
+        ),
+        name: 'forApp-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      addTearDown(app.delete);
+      app.appCheckProvider = _AppCheck(
+        () async => const AppCheckTokenResult('app-check-token'),
+      );
+      final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(
+        app,
+        storage: storage,
+        httpClient: MockClient((http.Request request) {
+          requests.add(request);
+          return backend(request);
+        }),
+      );
+      addTearDown(auth.dispose);
+      await auth.signInAnonymously();
+      await auth.getAccessToken(forceRefresh: true);
+      expect(requests, hasLength(2));
+      for (final http.Request request in requests) {
+        expect(request.headers['X-Firebase-gmpid'], '1:1:web:1');
+        expect(request.headers['X-Firebase-AppCheck'], 'app-check-token');
+        expect(
+          request.headers['X-Client-Version'],
+          FirebaseUserAuth.clientVersion,
+        );
+      }
+    });
+  });
+
+  group('the headers of the JS SDK', () {
+    FirebaseUserAuth withAppCheck(InternalAppCheckTokenProvider? appCheck) {
+      final FirebaseUserAuth created = FirebaseUserAuth(
+        apiKey: apiKey,
+        appId: '1:2:web:3',
+        appCheck: appCheck,
+        storage: storage,
+        httpClient: MockClient((http.Request request) {
+          requests.add(request);
+          return backend(request);
+        }),
+        clock: clock.call,
+        createTimer: timers.create,
+      );
+      addTearDown(created.dispose);
+      return created;
+    }
+
+    test('every request: client version and app id; content types', () async {
+      final FirebaseUserAuth auth = withAppCheck(null);
+      await auth.signInAnonymously();
+      await auth.getAccessToken(forceRefresh: true);
+      expect(requests, hasLength(2));
+      for (final http.Request request in requests) {
+        expect(
+          request.headers['X-Client-Version'],
+          'Dart/DartCore/0.1.0/FirebaseCore-dart',
+        );
+        expect(request.headers['X-Firebase-gmpid'], '1:2:web:3');
+        expect(request.headers.containsKey('X-Firebase-AppCheck'), isFalse);
+      }
+      expect(
+        requests[0].headers['content-type'],
+        startsWith('application/json'),
+      );
+      expect(
+        requests[1].headers['content-type'],
+        startsWith('application/x-www-form-urlencoded'),
+      );
+    });
+
+    test('no app id: no X-Firebase-gmpid', () async {
+      await auth.signInAnonymously();
+      expect(requests.single.headers.containsKey('X-Firebase-gmpid'), isFalse);
+      expect(
+        requests.single.headers['X-Client-Version'],
+        FirebaseUserAuth.clientVersion,
+      );
+    });
+
+    test(
+      'a failed App Check request: the placeholder is sent and logged',
+      () async {
+        final List<String> printed = <String>[];
+        await runZoned(
+          () async {
+            await withAppCheck(
+              _AppCheck(
+                () async => AppCheckTokenResult(
+                  'placeholder',
+                  error: StateError('attestation failed'),
+                ),
+              ),
+            ).signInAnonymously();
+            await withAppCheck(
+              _AppCheck(() async => throw StateError('no provider')),
+            ).signInAnonymously();
+          },
+          zoneSpecification: ZoneSpecification(
+            print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
+                printed.add(line),
+          ),
+        );
+        expect(requests, hasLength(2));
+        expect(requests[0].headers['X-Firebase-AppCheck'], 'placeholder');
+        expect(requests[1].headers.containsKey('X-Firebase-AppCheck'), isFalse);
+        expect(printed, <Matcher>[
+          contains('attestation failed'),
+          contains('no provider'),
+        ]);
+      },
+    );
   });
 
   test('nothing prints a token', () async {
@@ -868,4 +987,18 @@ class _AsyncStorage implements AuthStorage {
       values[key] = value;
     }
   }
+}
+
+class _AppCheck implements InternalAppCheckTokenProvider {
+  _AppCheck(this._getToken);
+
+  final Future<AppCheckTokenResult> Function() _getToken;
+
+  @override
+  Future<AppCheckTokenResult> getToken({required bool forceRefresh}) =>
+      _getToken();
+
+  @override
+  Stream<AppCheckTokenResult> get onTokenChanged =>
+      const Stream<AppCheckTokenResult>.empty();
 }
