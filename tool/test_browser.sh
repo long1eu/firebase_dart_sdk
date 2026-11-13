@@ -88,6 +88,9 @@ else
   fi
 fi
 
+# The compiled assets of the tests (the worker of the crash test).
+"$ROOT/tool/build_web_test_assets.sh" || exit 1
+
 STARTED=0
 if ! curl -s -o /dev/null "http://127.0.0.1:$PORT"; then
   "$ROOT/tool/start_private_emulator.sh" "$PORT" || exit 1

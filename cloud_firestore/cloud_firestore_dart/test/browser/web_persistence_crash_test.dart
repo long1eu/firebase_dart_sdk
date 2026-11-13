@@ -4,8 +4,8 @@
 // database is read back from IndexedDB and checked.
 //
 // Needs test/browser/sqlite3.wasm (see web_persistence_test.dart) and the
-// compiled worker (see crash/crash_worker.dart); skips itself with a reason
-// without them. `CRASH_ITERATIONS` is fixed below.
+// compiled worker (tool/build_web_test_assets.sh, which tool/test_browser.sh
+// runs); skips itself with a reason without them.
 
 @TestOn('browser')
 @Timeout(Duration(minutes: 30))
@@ -51,10 +51,11 @@ class Observed {
 void main() {
   test('the cache survives a tab that dies at any moment', () async {
     if (const bool.fromEnvironment('dart.tool.dart2wasm')) {
-      // Measured with sqlite3 2.9.4: reading the 3 MB database back and
-      // checking it takes 2 ms compiled with dart2js and a minute compiled
-      // with dart2wasm, where SQLite's page reads and writes cross from its
-      // WebAssembly memory to Dart's one byte at a time.
+      // The checks after each kill read the database with the file system of
+      // sqlite3 2.9.4 directly, without the read fix of the opener
+      // (`_ReadCopyFileSystem` in example/sqlite_database_web.dart): compiled
+      // with dart2wasm every read then costs a copy of the whole file, and
+      // checking the 3 MB database takes a minute instead of 2 ms.
       markTestSkipped('Run with -c dart2js: under dart2wasm the checks after '
           'each kill take about a minute instead of milliseconds');
       return;

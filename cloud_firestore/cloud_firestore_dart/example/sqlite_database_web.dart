@@ -37,19 +37,16 @@
 //    its last transactions.
 //  * Memory and speed. The whole database is read into memory when it is
 //    opened and stays there. Measured in Chrome with documents of about
-//    1 KB, compiled with dart2js: 10,000 cached documents are a 17 MB
-//    database that opens in 0.1 s; 100,000 are 166 MB, open in 0.6 s, take
-//    about 0.5 GB of JavaScript heap once open and 2.5 s to scan. Compiled
-//    with dart2wasm, sqlite3 2.9.4 moves every page between SQLite and Dart
-//    one byte at a time: a cache of 1,000 documents (2 MB) already takes
-//    0.7 s to open and 2.4 s to scan instead of 0.03 s, and it gets worse
-//    with the size. Until that changes, use this opener in applications
-//    compiled with dart2js, or for small caches only.
+//    1 KB: 10,000 cached documents are a 17 MB database that opens in 0.1 s
+//    and is scanned in 0.4 s; 100,000 are 160 MB, open in 1.2 s compiled
+//    with dart2wasm (0.6 s with dart2js), take about 0.5 GB of JavaScript
+//    heap once open and 4 s to scan (2.5 s with dart2js).
 //  * `Firestore.clearPersistence()` deletes the IndexedDB database.
 
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
@@ -102,6 +99,7 @@ OpenDatabase sqliteWebOpener({
     }
 
     sqlite.IndexedDbFileSystem? fileSystem;
+    sqlite.VirtualFileSystem? registered;
     sqlite.WasmSqlite3? sqlite3;
     SqliteWebDatabase? db;
     try {
@@ -118,13 +116,15 @@ OpenDatabase sqliteWebOpener({
         dbName: storageName,
         vfsName: 'indexeddb-${_fileSystems++}',
       );
-      sqlite3.registerVirtualFileSystem(fileSystem);
+      registered = _ReadCopyFileSystem(fileSystem);
+      sqlite3.registerVirtualFileSystem(registered);
 
       const String file = '/database';
       db = SqliteWebDatabase._(
-        sqlite3.open(file, vfs: fileSystem.name),
+        sqlite3.open(file, vfs: registered.name),
         sqlite3,
         fileSystem,
+        registered,
         storageName,
         releaseLock,
       );
@@ -177,10 +177,10 @@ OpenDatabase sqliteWebOpener({
       if (db != null) {
         db.close();
       } else {
-        if (fileSystem != null) {
-          sqlite3?.unregisterVirtualFileSystem(fileSystem);
-          await fileSystem.close();
+        if (registered != null) {
+          sqlite3?.unregisterVirtualFileSystem(registered);
         }
+        await fileSystem?.close();
         await releaseLock();
       }
       rethrow;
@@ -215,6 +215,85 @@ Future<Firestore> openWithMemoryFallback({
 }
 
 int _fileSystems = 0;
+
+/// Makes the reads of [_inner] cost what they read.
+///
+/// SQLite hands a read a view of its WebAssembly memory to fill. The file
+/// systems of sqlite3 2.9.4 fill it with `setRange` from a view of the whole
+/// file, and compiled with dart2wasm that converts the whole file to a
+/// JavaScript array first, on every read: 26 ms per read of 16 bytes from a
+/// 1.2 MB database, and SQLite reads 16 bytes of the file header for every
+/// statement. Reading into a list of Dart's own first, and copying only that,
+/// took 1000 statements from 26 s to 10 ms. Compiled with dart2js the extra
+/// copy is not measurable.
+final class _ReadCopyFileSystem extends sqlite.BaseVirtualFileSystem {
+  _ReadCopyFileSystem(this._inner) : super(name: '${_inner.name}-read-copy');
+
+  final sqlite.VirtualFileSystem _inner;
+
+  @override
+  int xAccess(String path, int flags) => _inner.xAccess(path, flags);
+
+  @override
+  void xDelete(String path, int syncDir) => _inner.xDelete(path, syncDir);
+
+  @override
+  String xFullPathName(String path) => _inner.xFullPathName(path);
+
+  @override
+  sqlite.XOpenResult xOpen(sqlite.Sqlite3Filename path, int flags) {
+    final sqlite.XOpenResult opened = _inner.xOpen(path, flags);
+    return (outFlags: opened.outFlags, file: _ReadCopyFile(opened.file));
+  }
+
+  @override
+  void xSleep(Duration duration) => _inner.xSleep(duration);
+}
+
+class _ReadCopyFile implements sqlite.VirtualFileSystemFile {
+  _ReadCopyFile(this._inner);
+
+  final sqlite.VirtualFileSystemFile _inner;
+
+  @override
+  void xRead(Uint8List target, int fileOffset) {
+    final Uint8List copy = Uint8List(target.length);
+    try {
+      _inner.xRead(copy, fileOffset);
+    } finally {
+      // Also after a short read, which zero-fills the rest and then throws.
+      target.setRange(0, target.length, copy);
+    }
+  }
+
+  @override
+  void xWrite(Uint8List buffer, int fileOffset) =>
+      _inner.xWrite(buffer, fileOffset);
+
+  @override
+  int xCheckReservedLock() => _inner.xCheckReservedLock();
+
+  @override
+  void xClose() => _inner.xClose();
+
+  @override
+  int get xDeviceCharacteristics => _inner.xDeviceCharacteristics;
+
+  @override
+  int xFileSize() => _inner.xFileSize();
+
+  @override
+  void xLock(int mode) => _inner.xLock(mode);
+
+  @override
+  void xSync(int flags) => _inner.xSync(flags);
+
+  @override
+  void xTruncate(int size) => _inner.xTruncate(size);
+
+  @override
+  void xUnlock(int mode) => _inner.xUnlock(mode);
+}
 
 /// The databases of this page that are being closed, by storage name.
 final Map<String, Future<void>> _closing = <String, Future<void>>{};
@@ -296,6 +375,7 @@ class SqliteWebDatabase implements ClearableDatabase {
     this._database,
     this._sqlite3,
     this._fileSystem,
+    this._registeredFileSystem,
     this.path,
     this._releaseLock,
   );
@@ -303,6 +383,7 @@ class SqliteWebDatabase implements ClearableDatabase {
   final sqlite.CommonDatabase _database;
   final sqlite.WasmSqlite3 _sqlite3;
   final sqlite.IndexedDbFileSystem _fileSystem;
+  final sqlite.VirtualFileSystem _registeredFileSystem;
   final Future<void> Function() _releaseLock;
 
   /// The name of the IndexedDB database.
@@ -355,7 +436,7 @@ class SqliteWebDatabase implements ClearableDatabase {
     final Future<void> closed = () async {
       try {
         _database.dispose();
-        _sqlite3.unregisterVirtualFileSystem(_fileSystem);
+        _sqlite3.unregisterVirtualFileSystem(_registeredFileSystem);
         // Finishes the copies to IndexedDB that are still queued.
         await _fileSystem.close();
       } finally {

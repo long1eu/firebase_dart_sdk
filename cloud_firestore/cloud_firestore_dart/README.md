@@ -62,15 +62,27 @@ listen and write streams, over `fetch`. What to know:
     of a transaction loses only that transaction (SQLite's rollback journal is stored too and
     is applied on the next open). Tested by killing a worker at random moments, 2700 times.
     A crash of the browser itself or a power cut is not covered.
-  - Memory: the whole database is read into memory when it is opened. With documents of about
-    1 KB, compiled with dart2js: 10,000 cached documents are 17 MB and open in 0.1 s; 100,000
-    are 166 MB, open in 0.6 s, need about 0.5 GB of JavaScript heap and 2.5 s for a full scan.
-    Treat some tens of thousands of documents as the practical limit.
-  - **Compile with dart2js when you use the persistent cache.** With dart2wasm, `sqlite3`
-    2.9.4 copies every database page between SQLite and Dart one byte at a time: a cache of
-    1,000 documents takes 0.7 s to open and 2.4 s to scan (0.03 s with dart2js), a single
-    write 0.7 s, and it gets worse with the size. With dart2js, integers above 2^53 lose
-    precision (see below).
+  - Memory and speed: the whole database is read into memory when it is opened. Measured in
+    Chrome with documents of about 1 KB (database size; time to open; full scan from the
+    cache; one write):
+
+    | Cached documents | Database | dart2wasm | dart2js |
+    |---|---|---|---|
+    | 1,000 | 2 MB | 19 ms; 39 ms; 17 ms | 13 ms; 24 ms; 13 ms |
+    | 10,000 | 17 MB | 0.13 s; 0.39 s; 21 ms | 0.08 s; 0.27 s; 17 ms |
+    | 100,000 | 160 MB | 1.2 s; 4.1 s; 18 ms | 0.6 s; 2.5 s; 12 ms |
+
+    With 100,000 documents the JavaScript heap was about 0.5 GB once open (dart2js). Treat
+    some tens of thousands of documents as the practical limit; the default cache size limit
+    of 100 MB starts evicting unused documents before that.
+  - The opener works around a slowness of `sqlite3` 2.9.4 compiled with dart2wasm, where
+    every read of the database cost a copy of the whole file (0.7 s to open and 2.4 s to scan
+    the 1,000 documents above, and worse with the size). Use the opener as it is in
+    `example/`; an older copy without `_ReadCopyFileSystem` is that slow.
+- Against the emulator, a query that returns more than about 10,000 documents fails on the
+  web with `unavailable` (the emulator's WebChannel endpoint drops the stream; over gRPC the
+  same query works). Read such collections in pages there. Whether the production backend
+  has such a limit was not checked.
 - It was verified against the emulator only: 19 tests in Chrome
   (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 18 pass and 1 is skipped),
   and the whole standard integration suite on the VM over the web transport
