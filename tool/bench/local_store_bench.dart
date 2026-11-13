@@ -80,6 +80,10 @@ class BenchDatabase extends Database {
         // Commits dominate (and randomize) the write measurements otherwise; the engine work is what is compared.
         database.execute('PRAGMA synchronous = OFF');
       }
+      if (cacheSizeKb != null) {
+        // SQLite's default page cache is 2 MB.
+        database.execute('PRAGMA cache_size = -$cacheSizeKb');
+      }
       final BenchDatabase db = BenchDatabase._(database, file);
       await onConfigure?.call(db);
       if (create) {
@@ -99,6 +103,9 @@ class BenchDatabase extends Database {
 
   /// Whether commits wait for the disk (`--fsync`); off by default.
   static bool fsync = false;
+
+  /// The SQLite page cache in KiB (`--cache-mb=<n>` of index_bench.dart); SQLite's default (2 MB) when null.
+  static int? cacheSizeKb;
 
   static void resetProfile() => profile.clear();
 
