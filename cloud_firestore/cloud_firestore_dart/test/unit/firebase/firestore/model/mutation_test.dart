@@ -2,8 +2,10 @@
 // Lung Razvan <long1eu>
 // on 28/09/2018
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart'
     as firestore;
+import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
@@ -20,6 +22,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/patch
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/precondition.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/server_timestamp_operation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/set_mutation.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/transform_operation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/unknown_document.dart';
@@ -56,6 +59,37 @@ void main() {
   ) {
     _verifyTransformAsList(
         baseData, <Map<String, Object>>[transformData], expectedData);
+  }
+
+  void _verifyDocTransform(
+    Object? baseVal,
+    firestore.FieldValue transformOp,
+    Object expectedVal,
+  ) {
+    if (baseVal == null) {
+      _verifyTransform(
+        map(),
+        map(<dynamic>['val', transformOp]),
+        map(<dynamic>['val', expectedVal]),
+      );
+    } else {
+      _verifyTransform(
+        map(<dynamic>['val', baseVal]),
+        map(<dynamic>['val', transformOp]),
+        map(<dynamic>['val', expectedVal]),
+      );
+    }
+  }
+
+  void _verifyModelTransform(
+    TransformOperation op,
+    Object? baseVal,
+    Object expectedVal,
+  ) {
+    final FieldValue? baseProto = baseVal != null ? wrap(baseVal) : null;
+    final FieldValue expectedProto = wrap(expectedVal);
+    final FieldValue result = op.applyToLocalView(baseProto, Timestamp.now());
+    expect(result, expectedProto);
   }
 
   test('testLocalMutationsCarryNoServerVersion', () {
@@ -1263,6 +1297,483 @@ void main() {
 
   test('testNumericMaximumBaseValue', () {
     _expectNoBaseValue(firestore.FieldValue.maximum(1));
+  });
+
+  // Model-level increment evaluation
+
+  test('testModelIncrementInt32AndInt32', () {
+    _verifyModelTransform(
+      NumericIncrementTransformOperation(wrap(Int32Value(5)) as NumberValue),
+      Int32Value(10),
+      Int32Value(15),
+    );
+  });
+
+  test('testModelIncrementIntAndInt32', () {
+    _verifyModelTransform(
+      NumericIncrementTransformOperation(wrap(Int32Value(5)) as NumberValue),
+      10,
+      15,
+    );
+  });
+
+  test('testModelIncrementDecimal128AndInt', () {
+    _verifyModelTransform(
+      NumericIncrementTransformOperation(wrap(5) as NumberValue),
+      Decimal128Value('10'),
+      Decimal128Value('15'),
+    );
+  });
+
+  test('testModelIncrementIntAndDecimal128', () {
+    _verifyModelTransform(
+      NumericIncrementTransformOperation(
+        wrap(Decimal128Value('5')) as NumberValue,
+      ),
+      10,
+      Decimal128Value('15'),
+    );
+  });
+
+  test('testModelIncrementInt32AndDecimal128', () {
+    _verifyModelTransform(
+      NumericIncrementTransformOperation(
+        wrap(Decimal128Value('5')) as NumberValue,
+      ),
+      Int32Value(10),
+      Decimal128Value('15'),
+    );
+  });
+
+  test('testModelIncrementDoubleAndInt32', () {
+    _verifyModelTransform(
+      NumericIncrementTransformOperation(wrap(Int32Value(5)) as NumberValue),
+      10.5,
+      15.5,
+    );
+  });
+
+  test('testModelIncrementDecimal128AndDecimal128', () {
+    _verifyModelTransform(
+      NumericIncrementTransformOperation(
+        wrap(Decimal128Value('5')) as NumberValue,
+      ),
+      Decimal128Value('10'),
+      Decimal128Value('15'),
+    );
+  });
+
+  test('testModelIncrementDoubleAndDecimal128', () {
+    _verifyModelTransform(
+      NumericIncrementTransformOperation(
+        wrap(Decimal128Value('5')) as NumberValue,
+      ),
+      10.5,
+      Decimal128Value('15.5'),
+    );
+  });
+
+  // Standalone document-level increment tests
+  test('testAppliesIncrementWithIntegerToInt32Base', () {
+    _verifyTransform(
+      map(<dynamic>['val', Int32Value(10)]),
+      map(<dynamic>['val', firestore.FieldValue.increment(5)]),
+      map(<dynamic>['val', 15]),
+    );
+  });
+
+  test('testAppliesIncrementWithDoubleToInt32Base', () {
+    _verifyTransform(
+      map(<dynamic>['val', Int32Value(10)]),
+      map(<dynamic>['val', firestore.FieldValue.increment(1.5)]),
+      map(<dynamic>['val', 11.5]),
+    );
+  });
+
+  test('testAppliesIncrementWithIntegerToDecimal128Base', () {
+    _verifyTransform(
+      map(<dynamic>['val', Decimal128Value('10.5')]),
+      map(<dynamic>['val', firestore.FieldValue.increment(5)]),
+      map(<dynamic>['val', Decimal128Value('15.5')]),
+    );
+  });
+
+  // Model-level minimum and maximum evaluation
+
+  test('testModelMinimumInt32AndInt32_Smaller', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(wrap(Int32Value(5)) as NumberValue),
+      Int32Value(10),
+      Int32Value(5),
+    );
+  });
+
+  test('testModelMinimumInt32AndInt32_Larger', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(wrap(Int32Value(15)) as NumberValue),
+      Int32Value(10),
+      Int32Value(10),
+    );
+  });
+
+  test('testModelMinimumIntAndInt32', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(wrap(Int32Value(5)) as NumberValue),
+      10,
+      Int32Value(5),
+    );
+  });
+
+  test('testModelMinimumInt32AndInt', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(wrap(5) as NumberValue),
+      Int32Value(10),
+      5,
+    );
+  });
+
+  test('testModelMinimumDecimal128AndInt', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(wrap(5) as NumberValue),
+      Decimal128Value('10'),
+      5,
+    );
+  });
+
+  test('testModelMinimumIntAndDecimal128', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(
+        wrap(Decimal128Value('5')) as NumberValue,
+      ),
+      10,
+      Decimal128Value('5'),
+    );
+  });
+
+  test('testModelMinimumInt32AndDecimal128', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(
+        wrap(Decimal128Value('5')) as NumberValue,
+      ),
+      Int32Value(10),
+      Decimal128Value('5'),
+    );
+  });
+
+  test('testModelMinimumDoubleAndInt32', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(wrap(Int32Value(5)) as NumberValue),
+      10.5,
+      Int32Value(5),
+    );
+  });
+
+  test('testModelMinimumDecimal128AndDecimal128', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(
+        wrap(Decimal128Value('5')) as NumberValue,
+      ),
+      Decimal128Value('10'),
+      Decimal128Value('5'),
+    );
+  });
+
+  test('testModelMinimumDoubleAndDecimal128', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(
+        wrap(Decimal128Value('5')) as NumberValue,
+      ),
+      10.5,
+      Decimal128Value('5'),
+    );
+  });
+
+  test('testModelMinimumNonNumericBaseSelectsOperand', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(wrap(Int32Value(5)) as NumberValue),
+      'hello',
+      Int32Value(5),
+    );
+  });
+
+  test('testModelMinimumNullBaseSelectsOperand', () {
+    _verifyModelTransform(
+      NumericMinimumTransformOperation(wrap(Int32Value(5)) as NumberValue),
+      null,
+      Int32Value(5),
+    );
+  });
+
+  test('testModelMaximumInt32AndInt32_Smaller', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(wrap(Int32Value(5)) as NumberValue),
+      Int32Value(10),
+      Int32Value(10),
+    );
+  });
+
+  test('testModelMaximumInt32AndInt32_Larger', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(wrap(Int32Value(15)) as NumberValue),
+      Int32Value(10),
+      Int32Value(15),
+    );
+  });
+
+  test('testModelMaximumIntAndInt32', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(wrap(Int32Value(15)) as NumberValue),
+      10,
+      Int32Value(15),
+    );
+  });
+
+  test('testModelMaximumInt32AndInt', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(wrap(15) as NumberValue),
+      Int32Value(10),
+      15,
+    );
+  });
+
+  test('testModelMaximumDecimal128AndInt', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(wrap(15) as NumberValue),
+      Decimal128Value('10'),
+      15,
+    );
+  });
+
+  test('testModelMaximumIntAndDecimal128', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(
+        wrap(Decimal128Value('15')) as NumberValue,
+      ),
+      10,
+      Decimal128Value('15'),
+    );
+  });
+
+  test('testModelMaximumInt32AndDecimal128', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(
+        wrap(Decimal128Value('15')) as NumberValue,
+      ),
+      Int32Value(10),
+      Decimal128Value('15'),
+    );
+  });
+
+  test('testModelMaximumDoubleAndInt32', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(wrap(Int32Value(15)) as NumberValue),
+      10.5,
+      Int32Value(15),
+    );
+  });
+
+  test('testModelMaximumDecimal128AndDecimal128', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(
+        wrap(Decimal128Value('15')) as NumberValue,
+      ),
+      Decimal128Value('10'),
+      Decimal128Value('15'),
+    );
+  });
+
+  test('testModelMaximumDoubleAndDecimal128', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(
+        wrap(Decimal128Value('15')) as NumberValue,
+      ),
+      10.5,
+      Decimal128Value('15'),
+    );
+  });
+
+  test('testModelMaximumNonNumericBaseSelectsOperand', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(
+        wrap(Decimal128Value('10.5')) as NumberValue,
+      ),
+      'hello',
+      Decimal128Value('10.5'),
+    );
+  });
+
+  test('testModelMaximumNullBaseSelectsOperand', () {
+    _verifyModelTransform(
+      NumericMaximumTransformOperation(
+        wrap(Decimal128Value('10.5')) as NumberValue,
+      ),
+      null,
+      Decimal128Value('10.5'),
+    );
+  });
+
+  // Ported from the JS SDK's mutation.test.ts: the high-precision cases.
+  test(
+    'minimum with high-precision Decimal128Value selects smaller operand (operand smaller)',
+    () {
+      _verifyModelTransform(
+        NumericMinimumTransformOperation(
+          wrap(Decimal128Value('1.000000000000000000000000000000001'))
+              as NumberValue,
+        ),
+        Decimal128Value('1.000000000000000000000000000000002'),
+        Decimal128Value('1.000000000000000000000000000000001'),
+      );
+    },
+  );
+
+  test(
+    'minimum with high-precision Decimal128Value retains base when base is smaller',
+    () {
+      _verifyModelTransform(
+        NumericMinimumTransformOperation(
+          wrap(Decimal128Value('1.000000000000000000000000000000002'))
+              as NumberValue,
+        ),
+        Decimal128Value('1.000000000000000000000000000000001'),
+        Decimal128Value('1.000000000000000000000000000000001'),
+      );
+    },
+  );
+
+  test(
+    'maximum with high-precision Decimal128Value selects larger operand (operand larger)',
+    () {
+      _verifyModelTransform(
+        NumericMaximumTransformOperation(
+          wrap(Decimal128Value('1.000000000000000000000000000000002'))
+              as NumberValue,
+        ),
+        Decimal128Value('1.000000000000000000000000000000001'),
+        Decimal128Value('1.000000000000000000000000000000002'),
+      );
+    },
+  );
+
+  test(
+    'maximum with high-precision Decimal128Value retains base when base is larger',
+    () {
+      _verifyModelTransform(
+        NumericMaximumTransformOperation(
+          wrap(Decimal128Value('1.000000000000000000000000000000001'))
+              as NumberValue,
+        ),
+        Decimal128Value('1.000000000000000000000000000000002'),
+        Decimal128Value('1.000000000000000000000000000000002'),
+      );
+    },
+  );
+
+  // Document-level numeric transform evaluation
+  test('testAppliesNumericTransformsToInt32Fields', () {
+    final Int32Value base = Int32Value(10);
+    _verifyDocTransform(base, firestore.FieldValue.increment(5), 15);
+    _verifyDocTransform(base, firestore.FieldValue.increment(1.5), 11.5);
+    _verifyDocTransform(base, firestore.FieldValue.minimum(5), 5);
+    _verifyDocTransform(base, firestore.FieldValue.minimum(15), Int32Value(10));
+    _verifyDocTransform(base, firestore.FieldValue.minimum(5.5), 5.5);
+    _verifyDocTransform(base, firestore.FieldValue.minimum(-5), -5);
+    _verifyDocTransform(base, firestore.FieldValue.maximum(5), Int32Value(10));
+    _verifyDocTransform(base, firestore.FieldValue.maximum(15), 15);
+    _verifyDocTransform(
+      base,
+      firestore.FieldValue.maximum(5.5),
+      Int32Value(10),
+    );
+    _verifyDocTransform(base, firestore.FieldValue.maximum(-5), Int32Value(10));
+  });
+
+  test('testAppliesNumericTransformsToDecimal128Fields', () {
+    final Decimal128Value base = Decimal128Value('10.5');
+    _verifyDocTransform(
+      base,
+      firestore.FieldValue.increment(5),
+      Decimal128Value('15.5'),
+    );
+    _verifyDocTransform(base, firestore.FieldValue.minimum(5), 5);
+    _verifyDocTransform(
+      base,
+      firestore.FieldValue.minimum(15),
+      Decimal128Value('10.5'),
+    );
+    _verifyDocTransform(base, firestore.FieldValue.minimum(5.5), 5.5);
+    _verifyDocTransform(base, firestore.FieldValue.minimum(-5), -5);
+    _verifyDocTransform(
+      base,
+      firestore.FieldValue.maximum(5),
+      Decimal128Value('10.5'),
+    );
+    _verifyDocTransform(base, firestore.FieldValue.maximum(15), 15);
+    _verifyDocTransform(
+      base,
+      firestore.FieldValue.maximum(5.5),
+      Decimal128Value('10.5'),
+    );
+    _verifyDocTransform(
+      base,
+      firestore.FieldValue.maximum(-5),
+      Decimal128Value('10.5'),
+    );
+  });
+
+  test('testAppliesNumericTransformsToStandardIntegerAndDoubleFields', () {
+    const int intBase = 10;
+    _verifyDocTransform(intBase, firestore.FieldValue.minimum(5), 5);
+    _verifyDocTransform(intBase, firestore.FieldValue.minimum(5.5), 5.5);
+    _verifyDocTransform(intBase, firestore.FieldValue.maximum(15), 15);
+    _verifyDocTransform(intBase, firestore.FieldValue.maximum(15.5), 15.5);
+
+    // PORTING NOTE: Android expects 5.0 and 15.0 here, which only pass there
+    // because its document equality treats 5L and 5.0 as equal. The result is
+    // the integer operand in both SDKs; the expectations follow the JS SDK.
+    const double doubleBase = 10.5;
+    _verifyDocTransform(doubleBase, firestore.FieldValue.minimum(5), 5);
+    _verifyDocTransform(doubleBase, firestore.FieldValue.minimum(5.5), 5.5);
+    _verifyDocTransform(doubleBase, firestore.FieldValue.maximum(15), 15);
+    _verifyDocTransform(doubleBase, firestore.FieldValue.maximum(15.5), 15.5);
+  });
+
+  test('testAppliesNumericTransformsToMissingAndNonNumericFields', () {
+    _verifyDocTransform(null, firestore.FieldValue.increment(1), 1);
+    _verifyDocTransform(null, firestore.FieldValue.minimum(10), 10);
+    _verifyDocTransform(null, firestore.FieldValue.maximum(10.5), 10.5);
+
+    const String stringBase = 'hello';
+    _verifyDocTransform(stringBase, firestore.FieldValue.minimum(5), 5);
+    _verifyDocTransform(stringBase, firestore.FieldValue.maximum(15), 15);
+  });
+
+  test('testAppliesConsecutiveNumericTransformsOnDocument', () {
+    final Map<String, Object> baseDoc = map(<dynamic>['val', Int32Value(10)]);
+    final Map<String, Object> t1 = map(<dynamic>[
+      'val',
+      firestore.FieldValue.minimum(15),
+    ]);
+    final Map<String, Object> t2 = map(<dynamic>[
+      'val',
+      firestore.FieldValue.minimum(5),
+    ]);
+    final Map<String, Object> t3 = map(<dynamic>[
+      'val',
+      firestore.FieldValue.maximum(20),
+    ]);
+    _verifyTransformAsList(baseDoc, <Map<String, Object>>[
+      t1,
+      t2,
+      t3,
+    ], map(<dynamic>['val', 20]));
+
+    final Map<String, Object> numDoc = map(<dynamic>['numberVal', 1]);
+    _verifyTransformAsList(numDoc, <Map<String, Object>>[
+      map(<dynamic>['numberVal', firestore.FieldValue.increment(2)]),
+      map(<dynamic>['numberVal', firestore.FieldValue.increment(3)]),
+      map(<dynamic>['numberVal', firestore.FieldValue.increment(4)]),
+    ], map(<dynamic>['numberVal', 10]));
   });
 
   test('testNumericTransformOperationEquality', () {
