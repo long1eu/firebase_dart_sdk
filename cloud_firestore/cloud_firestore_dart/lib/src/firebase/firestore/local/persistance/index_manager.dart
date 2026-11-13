@@ -2,6 +2,8 @@
 // Lung Razvan <long1eu>
 // on 15/03/2020
 
+import 'dart:collection';
+
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
@@ -110,10 +112,14 @@ abstract class IndexManager {
 /// Internal implementation of the collection-parent index. Also used for
 /// in-memory caching by SQLiteIndexManager and initial index population in
 /// SQLiteSchema.
+///
+/// The parents of a collection id are kept sorted (a `SortedSet` upstream in
+/// JS), so [getEntries] returns them in path order.
 class MemoryCollectionParentIndex {
-  MemoryCollectionParentIndex() : _index = <String, Set<ResourcePath>>{};
+  MemoryCollectionParentIndex()
+    : _index = <String, SplayTreeSet<ResourcePath>>{};
 
-  final Map<String, Set<ResourcePath>> _index;
+  final Map<String, SplayTreeSet<ResourcePath>> _index;
 
   /// Whether [collectionPath] was already added.
   bool contains(ResourcePath collectionPath) {
@@ -129,7 +135,9 @@ class MemoryCollectionParentIndex {
     final String collectionId = collectionPath.getLastSegment();
     final ResourcePath parentPath = collectionPath.popLast();
 
-    return (_index[collectionId] ??= <ResourcePath>{}).add(parentPath);
+    return (_index[collectionId] ??= SplayTreeSet<ResourcePath>()).add(
+      parentPath,
+    );
   }
 
   List<ResourcePath> getEntries(String collectionId) {
