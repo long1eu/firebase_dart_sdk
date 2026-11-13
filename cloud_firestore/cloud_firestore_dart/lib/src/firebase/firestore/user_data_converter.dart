@@ -19,6 +19,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/max_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/min_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/array_transform_operation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
@@ -38,9 +39,21 @@ class UserDataConverter {
   final DatabaseId databaseId;
 
   /// Parse document data from a non-merge set() call.
-  UserDataParsedSetData parseSetData(Map<String, Object?> input) {
+  ///
+  /// [methodName], [targetDoc] and [hasConverter] describe the call in the
+  /// error messages, see [createUserDataError]; the same goes for the other
+  /// parse methods.
+  UserDataParsedSetData parseSetData(
+    Map<String, Object?> input, {
+    String? methodName,
+    DocumentKey? targetDoc,
+    bool hasConverter = false,
+  }) {
     final UserDataParseAccumulator accumulator = UserDataParseAccumulator(
       UserDataSource.set,
+      methodName: methodName,
+      targetDoc: targetDoc,
+      hasConverter: hasConverter,
     );
     final ObjectValue updateData =
         _parseData(input, accumulator.rootContext)! as ObjectValue;
@@ -50,10 +63,16 @@ class UserDataConverter {
   /// Parse document data from a set() call with SetOptions.merge() set.
   UserDataParsedSetData parseMergeData(
     Map<String, Object?> input,
-    FieldMask? fieldMask,
-  ) {
+    FieldMask? fieldMask, {
+    String? methodName,
+    DocumentKey? targetDoc,
+    bool hasConverter = false,
+  }) {
     final UserDataParseAccumulator accumulator = UserDataParseAccumulator(
       UserDataSource.mergeSet,
+      methodName: methodName,
+      targetDoc: targetDoc,
+      hasConverter: hasConverter,
     );
     final ObjectValue updateData =
         _parseData(input, accumulator.rootContext)! as ObjectValue;
@@ -63,7 +82,8 @@ class UserDataConverter {
       for (FieldPath field in fieldMask.mask) {
         if (!accumulator.contains(field)) {
           throw ArgumentError(
-            'Field \'$field\' is specified in your field mask but not in your input data.',
+            "Field '$field' is specified in your field mask but missing from "
+            'your input data.',
           );
         }
       }
@@ -75,18 +95,26 @@ class UserDataConverter {
   }
 
   /// Parse update data from an update() call.
-  UserDataParsedUpdateData parseUpdateData(Map<String, Object?> data) {
+  UserDataParsedUpdateData parseUpdateData(
+    Map<String, Object?> data, {
+    String? methodName,
+    DocumentKey? targetDoc,
+  }) {
     checkNotNull(data, 'Provided update data must not be null.');
     final UserDataParseAccumulator accumulator = UserDataParseAccumulator(
       UserDataSource.update,
+      methodName: methodName,
+      targetDoc: targetDoc,
     );
     final UserDataParseContext context = accumulator.rootContext;
 
     ObjectValue updateData = ObjectValue.empty;
     for (MapEntry<String, Object?> entry in data.entries) {
-      final FieldPath fieldPath = firestore.FieldPath.fromDotSeparatedPath(
+      final FieldPath fieldPath = _updateFieldPath(
         entry.key,
-      ).internalPath;
+        methodName,
+        targetDoc,
+      );
       final Object? fieldValue = entry.value;
 
       if (fieldValue is firestore.FieldValue && fieldValue.isDelete) {
@@ -110,8 +138,10 @@ class UserDataConverter {
   /// Parses the update data from the update(field, value, field, value...) varargs call, accepting both strings and
   /// FieldPaths.
   UserDataParsedUpdateData parseUpdateDataFromList(
-    List<Object?> fieldsAndValues,
-  ) {
+    List<Object?> fieldsAndValues, {
+    String? methodName,
+    DocumentKey? targetDoc,
+  }) {
     // fieldsAndValues.length and alternating types should already be validated by collectUpdateArguments().
     final int length = fieldsAndValues.length;
     hardAssert(
@@ -121,6 +151,8 @@ class UserDataConverter {
 
     final UserDataParseAccumulator accumulator = UserDataParseAccumulator(
       UserDataSource.update,
+      methodName: methodName,
+      targetDoc: targetDoc,
     );
     final UserDataParseContext context = accumulator.rootContext;
     ObjectValue updateData = ObjectValue.empty;
@@ -138,9 +170,7 @@ class UserDataConverter {
       final FieldPath parsedField;
 
       if (fieldPath is String) {
-        parsedField = firestore.FieldPath.fromDotSeparatedPath(
-          fieldPath,
-        ).internalPath;
+        parsedField = _updateFieldPath(fieldPath, methodName, targetDoc);
       } else {
         final firestore.FieldPath path = fieldPath as firestore.FieldPath;
         parsedField = path.internalPath;
@@ -168,9 +198,14 @@ class UserDataConverter {
   ///
   /// [allowArrays] is whether the query value is an array that may directly contain additional arrays (e.g. the operand
   /// of a `whereIn` or `whereNotIn` query).
-  FieldValue parseQueryValue(Object? input, {bool allowArrays = false}) {
+  FieldValue parseQueryValue(
+    Object? input, {
+    bool allowArrays = false,
+    String? methodName,
+  }) {
     final UserDataParseAccumulator accumulator = UserDataParseAccumulator(
       allowArrays ? UserDataSource.arrayArgument : UserDataSource.argument,
+      methodName: methodName,
     );
     final FieldValue? parsed = _parseData(input, accumulator.rootContext);
 
@@ -183,6 +218,23 @@ class UserDataConverter {
     // key such as `{'__int__': 5}`. The backend reads it as the BSON value, so
     // the local evaluation of the query has to as well.
     return resolveBsonShapes(parsed!);
+  }
+
+  /// Parses a field of update data; with a [methodName] an invalid path names
+  /// the method and the document, like the JS SDK.
+  FieldPath _updateFieldPath(
+    String path,
+    String? methodName,
+    DocumentKey? targetDoc,
+  ) {
+    if (methodName == null) {
+      return firestore.FieldPath.fromDotSeparatedPath(path).internalPath;
+    }
+    return firestore.FieldPathInternal.fromArgument(
+      methodName,
+      path,
+      documentPath: targetDoc?.path.canonicalString,
+    ).internalPath;
   }
 
   /// Internal helper for parsing user data.
@@ -309,7 +361,8 @@ class UserDataConverter {
       context.addToFieldTransforms(path, ServerTimestampOperation());
     } else if (value.isArrayUnion) {
       final List<FieldValue> parsedElements = _parseArrayTransformElements(
-        value.elements,
+        value,
+        context,
       );
       final ArrayTransformOperation arrayUnion = ArrayTransformOperationUnion(
         parsedElements,
@@ -317,7 +370,8 @@ class UserDataConverter {
       context.addToFieldTransforms(path, arrayUnion);
     } else if (value.isArrayRemove) {
       final List<FieldValue> parsedElements = _parseArrayTransformElements(
-        value.elements,
+        value,
+        context,
       );
       final ArrayTransformOperation arrayRemove = ArrayTransformOperationRemove(
         parsedElements,
@@ -422,13 +476,32 @@ class UserDataConverter {
       }
       return ReferenceValue.valueOf(databaseId, input.key);
     } else {
-      throw context.createError('Unsupported type: ${input.runtimeType}');
+      throw context.createError(
+        'Unsupported field value: ${_valueDescription(input)}',
+      );
     }
   }
 
-  List<FieldValue> _parseArrayTransformElements(List<Object?> elements) {
+  /// Describes an unsupported [input] like the JS SDK's `valueDescription`.
+  static String _valueDescription(Object input) {
+    if (input is Function) {
+      return 'a function';
+    }
+    return 'a custom ${input.runtimeType} object';
+  }
+
+  /// Parses the elements of the array transform [value] found in [context].
+  /// Like the JS SDK, errors name the transform (`FieldValue.arrayUnion`) as
+  /// the method and keep the document of the write.
+  List<FieldValue> _parseArrayTransformElements(
+    firestore.FieldValue value,
+    UserDataParseContext context,
+  ) {
+    final List<Object?> elements = value.elements;
     final UserDataParseAccumulator accumulator = UserDataParseAccumulator(
       UserDataSource.argument,
+      methodName: context.methodName == null ? null : value.methodName,
+      targetDoc: context.targetDoc,
     );
     final List<FieldValue> result = <FieldValue>[];
     for (int i = 0; i < elements.length; i++) {

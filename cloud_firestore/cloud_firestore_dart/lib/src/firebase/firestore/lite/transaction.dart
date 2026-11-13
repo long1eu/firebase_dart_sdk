@@ -128,8 +128,19 @@ class Transaction {
       options,
     );
     final UserDataParsedSetData parsed = setOptions.merge
-        ? _firestore.dataConverter.parseMergeData(rawData, setOptions.fieldMask)
-        : _firestore.dataConverter.parseSetData(rawData);
+        ? _firestore.dataConverter.parseMergeData(
+            rawData,
+            setOptions.fieldMask,
+            methodName: 'Transaction.set',
+            targetDoc: documentRef.key,
+            hasConverter: documentRef.converter != null,
+          )
+        : _firestore.dataConverter.parseSetData(
+            rawData,
+            methodName: 'Transaction.set',
+            targetDoc: documentRef.key,
+            hasConverter: documentRef.converter != null,
+          );
     _transaction.set(documentRef.key, parsed);
     return this;
   }
@@ -144,7 +155,11 @@ class Transaction {
     _firestore.validateReference(documentRef);
     _transaction.update(
       documentRef.key,
-      _firestore.dataConverter.parseUpdateData(data),
+      _firestore.dataConverter.parseUpdateData(
+        data,
+        methodName: 'Transaction.update',
+        targetDoc: documentRef.key,
+      ),
     );
     return this;
   }
@@ -159,7 +174,13 @@ class Transaction {
     _transaction.update(
       documentRef.key,
       _firestore.dataConverter.parseUpdateDataFromList(
-        collectUpdateArguments(1, data),
+        collectUpdateArguments(
+          1,
+          data,
+          methodName: 'Transaction.updateFromList',
+        ),
+        methodName: 'Transaction.updateFromList',
+        targetDoc: documentRef.key,
       ),
     );
     return this;

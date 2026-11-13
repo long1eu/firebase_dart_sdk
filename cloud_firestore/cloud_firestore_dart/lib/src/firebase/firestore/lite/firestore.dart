@@ -44,6 +44,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/exponential_backoff.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/log_level_util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart'
+    show checkNonEmptyPath;
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:meta/meta.dart';
@@ -172,6 +174,7 @@ class Firestore {
   /// Gets a [CollectionReference] that refers to the collection at
   /// [collectionPath].
   CollectionReference<Map<String, Object?>> collection(String collectionPath) {
+    checkNonEmptyPath('Firestore.collection', collectionPath);
     return CollectionReference<Map<String, Object?>>.forPath(
       ResourcePath.fromString(collectionPath),
       this,
@@ -181,6 +184,7 @@ class Firestore {
   /// Gets a [DocumentReference] that refers to the document at
   /// [documentPath].
   DocumentReference<Map<String, Object?>> doc(String documentPath) {
+    checkNonEmptyPath('Firestore.doc', documentPath);
     return DocumentReference<Map<String, Object?>>.forPath(
       ResourcePath.fromString(documentPath),
       this,
@@ -192,12 +196,14 @@ class Firestore {
   Query<Map<String, Object?>> collectionGroup(String collectionId) {
     if (collectionId.isEmpty) {
       throw ArgumentError(
-        'Invalid collectionId. Collection IDs must not be empty.',
+        'Function Firestore.collectionGroup() cannot be called with an empty '
+        'collectionId.',
       );
     }
     if (collectionId.contains('/')) {
       throw ArgumentError(
-        'Invalid collectionId \'$collectionId\'. Collection IDs must not contain \'/\'.',
+        "Invalid collection ID '$collectionId' passed to function "
+        "Firestore.collectionGroup(). Collection IDs must not contain '/'.",
       );
     }
     return Query<Map<String, Object?>>(

@@ -64,8 +64,19 @@ class WriteBatch {
       userOptions,
     );
     final UserDataParsedSetData parsed = options.merge
-        ? _firestore.dataConverter.parseMergeData(rawData, options.fieldMask)
-        : _firestore.dataConverter.parseSetData(rawData);
+        ? _firestore.dataConverter.parseMergeData(
+            rawData,
+            options.fieldMask,
+            methodName: 'WriteBatch.set',
+            targetDoc: documentRef.key,
+            hasConverter: documentRef.converter != null,
+          )
+        : _firestore.dataConverter.parseSetData(
+            rawData,
+            methodName: 'WriteBatch.set',
+            targetDoc: documentRef.key,
+            hasConverter: documentRef.converter != null,
+          );
     _mutations.add(parsed.toMutation(documentRef.key, Precondition.none));
     return this;
   }
@@ -83,8 +94,13 @@ class WriteBatch {
     DocumentReference<Object?> documentRef,
     List<Object?> data,
   ) {
+    const String methodName = 'WriteBatch.updateFromList';
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
-        .parseUpdateDataFromList(collectUpdateArguments(1, data));
+        .parseUpdateDataFromList(
+          collectUpdateArguments(1, data, methodName: methodName),
+          methodName: methodName,
+          targetDoc: documentRef.key,
+        );
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();
@@ -107,7 +123,11 @@ class WriteBatch {
     Map<String, Object?> data,
   ) {
     final UserDataParsedUpdateData parsedData = _firestore.dataConverter
-        .parseUpdateData(data);
+        .parseUpdateData(
+          data,
+          methodName: 'WriteBatch.update',
+          targetDoc: documentRef.key,
+        );
 
     _firestore.validateReference(documentRef);
     _verifyNotCommitted();

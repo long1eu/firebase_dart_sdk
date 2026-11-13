@@ -89,6 +89,13 @@ class UserDataParseContext {
   /// parsing and providing better error messages.
   UserDataSource get dataSource => _accumulator.dataSource;
 
+  /// The public API method the data is parsed for, see
+  /// [UserDataParseAccumulator.methodName].
+  String? get methodName => _accumulator.methodName;
+
+  /// The document the data is written to, if any.
+  DocumentKey? get targetDoc => _accumulator.targetDoc;
+
   /// Returns true for the non-query parse contexts (Set, MergeSet and Update).
   bool get isWrite {
     switch (_accumulator.dataSource) {
@@ -151,13 +158,16 @@ class UserDataParseContext {
     _accumulator.addToFieldTransforms(fieldPath, transformOperation);
   }
 
-  /// Creates an error including the given reason and the current field path.
+  /// Creates an error including the given reason, the API method, the current
+  /// field path and the target document.
   Error createError(String reason) {
-    final FieldPath? path = this.path;
-    final String fieldDescription = (path == null || path.isEmpty)
-        ? ''
-        : ' (found in field $path)';
-    return ArgumentError('Invalid data. $reason$fieldDescription');
+    return createUserDataError(
+      reason,
+      methodName: _accumulator.methodName,
+      hasConverter: _accumulator.hasConverter,
+      path: path,
+      targetDoc: _accumulator.targetDoc,
+    );
   }
 
   void _validatePath() {
@@ -230,13 +240,29 @@ class UserDataParsedUpdateData {
 /// protocol these are encoded separately from the Value.
 class UserDataParseAccumulator {
   /// [dataSource] indicates what kind of API method this data came from.
-  UserDataParseAccumulator(this.dataSource)
-    : _fieldMask = <FieldPath>{},
-      fieldTransforms = <FieldTransform>[];
+  /// [methodName], [targetDoc] and [hasConverter] describe the call in the
+  /// error messages, see [createUserDataError].
+  UserDataParseAccumulator(
+    this.dataSource, {
+    this.methodName,
+    this.targetDoc,
+    this.hasConverter = false,
+  }) : _fieldMask = <FieldPath>{},
+       fieldTransforms = <FieldTransform>[];
 
   /// What type of API method provided the data being parsed; useful for determining which error conditions apply during
   /// parsing and providing better error messages.
   final UserDataSource dataSource;
+
+  /// The public API method that received the data, for example
+  /// `DocumentReference.set`, or null when the data is not parsed for one.
+  final String? methodName;
+
+  /// The document the data is written to, if any.
+  final DocumentKey? targetDoc;
+
+  /// Whether the data was produced by the `toFirestore()` of a converter.
+  final bool hasConverter;
 
   /// Accumulates a list of the field paths found while parsing the data.
   final Set<FieldPath> _fieldMask;
@@ -343,4 +369,40 @@ class UserDataParseAccumulator {
       fieldTransforms.toList(growable: false),
     );
   }
+}
+
+/// Creates the error for invalid user data, worded like the JS SDK:
+/// "Function DocumentReference.set() called with invalid data. REASON (found
+/// in field a in document c/d)", with " (via `toFirestore()`)" after "invalid
+/// data" when [hasConverter] is set. Without a [methodName] the message starts
+/// with "Invalid data." instead.
+Error createUserDataError(
+  String reason, {
+  String? methodName,
+  bool hasConverter = false,
+  FieldPath? path,
+  DocumentKey? targetDoc,
+}) {
+  final StringBuffer message = StringBuffer();
+  if (methodName == null) {
+    message.write('Invalid data');
+  } else {
+    message.write('Function $methodName() called with invalid data');
+  }
+  if (hasConverter) {
+    message.write(' (via `toFirestore()`)');
+  }
+  message.write('. $reason');
+  final bool hasPath = path != null && path.isNotEmpty;
+  if (hasPath || targetDoc != null) {
+    message.write(' (found');
+    if (hasPath) {
+      message.write(' in field $path');
+    }
+    if (targetDoc != null) {
+      message.write(' in document ${targetDoc.path}');
+    }
+    message.write(')');
+  }
+  return ArgumentError(message.toString());
 }

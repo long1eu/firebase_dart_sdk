@@ -240,7 +240,10 @@ void genericMutationTests(MutationTester op) {
             isA<ArgumentError>().having(
               (ArgumentError e) => '${e.message}',
               'message',
-              contains('Unsupported type: Object (found in field val)'),
+              contains(
+                'Unsupported field value: a custom Object object '
+                '(found in field val in document ${ref.path})',
+              ),
             ),
           ),
         );
@@ -308,7 +311,10 @@ void genericMutationTests(MutationTester op) {
             isA<ArgumentError>().having(
               (ArgumentError e) => '${e.message}',
               'message',
-              contains('Unsupported type: Object (found in field val)'),
+              contains(
+                'Unsupported field value: a custom Object object '
+                '(found in field val in document ${ref.path})',
+              ),
             ),
           ),
         );
@@ -559,7 +565,7 @@ void main() {
           isA<ArgumentError>().having(
             (ArgumentError e) => '${e.message}',
             'message',
-            'Invalid document reference. A document path must not be empty.',
+            'Function Firestore.doc() cannot be called with an empty path.',
           ),
         ),
       );
@@ -1478,7 +1484,8 @@ void main() {
           isA<ArgumentError>().having(
             (ArgumentError e) => '${e.message}',
             'message',
-            "Invalid collectionId '/'. Collection IDs must not contain '/'.",
+            "Invalid collection ID '/' passed to function "
+                "Firestore.collectionGroup(). Collection IDs must not contain '/'.",
           ),
         ),
       );

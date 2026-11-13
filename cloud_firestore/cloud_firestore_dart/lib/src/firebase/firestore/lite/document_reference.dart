@@ -160,6 +160,7 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
   /// Gets a [CollectionReference] to the subcollection at [collectionPath],
   /// relative to this document.
   CollectionReference<Map<String, Object?>> collection(String collectionPath) {
+    checkNonEmptyPath('DocumentReference.collection', collectionPath);
     return CollectionReference<Map<String, Object?>>.forPath(
       key.path.appendField(ResourcePath.fromString(collectionPath)),
       firestore,
@@ -190,13 +191,28 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
   /// document.
   ///
   /// The future completes when the backend has applied the write.
-  Future<void> set(T data, [SetOptions? options]) async {
+  Future<void> set(T data, [SetOptions? options]) =>
+      _set(data, options, 'DocumentReference.set');
+
+  /// [set] for the public method [methodName], which the errors name.
+  Future<void> _set(T data, SetOptions? options, String methodName) async {
     final SetOptions setOptions = options ?? SetOptions.overwrite;
     checkNotNull<Object>(data, 'Provided data must not be null.');
     final Map<String, Object?> rawData = toRawData<T>(data, converter, options);
     final UserDataParsedSetData parsed = setOptions.merge
-        ? firestore.dataConverter.parseMergeData(rawData, setOptions.fieldMask)
-        : firestore.dataConverter.parseSetData(rawData);
+        ? firestore.dataConverter.parseMergeData(
+            rawData,
+            setOptions.fieldMask,
+            methodName: methodName,
+            targetDoc: key,
+            hasConverter: converter != null,
+          )
+        : firestore.dataConverter.parseSetData(
+            rawData,
+            methodName: methodName,
+            targetDoc: key,
+            hasConverter: converter != null,
+          );
     return _commit(parsed.toMutation(key, Precondition.none));
   }
 
@@ -205,7 +221,11 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
   /// does not exist.
   Future<void> update(Map<String, Object?> data) async {
     final UserDataParsedUpdateData parsed = firestore.dataConverter
-        .parseUpdateData(data);
+        .parseUpdateData(
+          data,
+          methodName: 'DocumentReference.update',
+          targetDoc: key,
+        );
     return _commit(parsed.toMutation(key, Precondition(exists: true)));
   }
 
@@ -213,8 +233,13 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
   /// or a `FieldPath`) and values. Fails with [FirestoreErrorCode.notFound]
   /// if the document does not exist.
   Future<void> updateFromList(List<Object?> data) async {
+    const String methodName = 'DocumentReference.updateFromList';
     final UserDataParsedUpdateData parsed = firestore.dataConverter
-        .parseUpdateDataFromList(collectUpdateArguments(1, data));
+        .parseUpdateDataFromList(
+          collectUpdateArguments(1, data, methodName: methodName),
+          methodName: methodName,
+          targetDoc: key,
+        );
     return _commit(parsed.toMutation(key, Precondition(exists: true)));
   }
 
@@ -242,4 +267,13 @@ class DocumentReference<T extends dynamic> implements KeyedDocumentReference {
 
   @override
   String toString() => 'DocumentReference{path: $path}';
+}
+
+/// Members of the Firestore Lite [DocumentReference] for the SDK itself. Not
+/// exported by the public libraries.
+extension LiteDocumentReferenceInternal<T> on DocumentReference<T> {
+  /// [DocumentReference.set] for the public method [methodName] (for example
+  /// `CollectionReference.add`), which the errors name.
+  Future<void> setFor(String methodName, T data) =>
+      _set(data, null, methodName);
 }

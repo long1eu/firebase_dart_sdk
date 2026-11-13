@@ -41,7 +41,8 @@ export 'src/firebase/firestore/geo_point.dart';
 export 'src/firebase/firestore/int32_value.dart';
 export 'src/firebase/firestore/lite/aggregate.dart';
 export 'src/firebase/firestore/lite/data_converter.dart' hide toRawData;
-export 'src/firebase/firestore/lite/document_reference.dart';
+export 'src/firebase/firestore/lite/document_reference.dart'
+    hide LiteDocumentReferenceInternal;
 export 'src/firebase/firestore/lite/firestore.dart' hide liteTransportOverride;
 export 'src/firebase/firestore/lite/query.dart';
 export 'src/firebase/firestore/lite/settings.dart';

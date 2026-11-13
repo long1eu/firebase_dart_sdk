@@ -195,7 +195,9 @@ class DocumentSnapshot<T extends dynamic> {
   ///
   /// Returns true if the field exists.
   bool contains(String field) {
-    return containsPath(FieldPath.fromDotSeparatedPath(field));
+    return containsPath(
+      FieldPathInternal.fromArgument('DocumentSnapshot.contains', field),
+    );
   }
 
   /// Returns whether or not the field exists in the document. Returns false if the document does  not exist.
@@ -223,7 +225,7 @@ class DocumentSnapshot<T extends dynamic> {
     ServerTimestampBehavior? serverTimestampBehavior,
   ]) {
     return getField(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('DocumentSnapshot.get', field),
       serverTimestampBehavior ?? ServerTimestampBehavior.none,
     );
   }
@@ -299,7 +301,10 @@ class DocumentSnapshot<T extends dynamic> {
   ]) {
     checkNotNull(field, 'Provided field path must not be null.');
     final Object? maybeDate = _getInternal(
-      FieldPath.fromDotSeparatedPath(field).internalPath,
+      FieldPathInternal.fromArgument(
+        'DocumentSnapshot.getDate',
+        field,
+      ).internalPath,
       _FieldValueOptions(
         serverTimestampBehavior:
             serverTimestampBehavior ?? ServerTimestampBehavior.none,
@@ -323,7 +328,10 @@ class DocumentSnapshot<T extends dynamic> {
   ]) {
     checkNotNull(field, 'Provided field path must not be null.');
     final Object? maybeTimestamp = _getInternal(
-      FieldPath.fromDotSeparatedPath(field).internalPath,
+      FieldPathInternal.fromArgument(
+        'DocumentSnapshot.getTimestamp',
+        field,
+      ).internalPath,
       _FieldValueOptions(
         serverTimestampBehavior:
             serverTimestampBehavior ?? ServerTimestampBehavior.none,

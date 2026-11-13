@@ -36,8 +36,25 @@ void main() {
 
   // Helpers
 
+  /// The message of an invalid data error of [methodName], as in the JS SDK:
+  /// [documentPath] is added to the "(found in field ...)" part of [reason],
+  /// or as "(found in document ...)" when [reason] has none.
+  String invalidData(String methodName, String reason, {String? documentPath}) {
+    String message = reason;
+    if (documentPath != null) {
+      message = reason.contains('(found in field ')
+          ? '${reason.substring(0, reason.length - 1)} in document '
+                '$documentPath)'
+          : '$reason (found in document $documentPath)';
+    }
+    return 'Function $methodName() called with invalid data. $message';
+  }
+
   /// Performs a write using each set and/or update API and makes sure it fails
-  /// with the expected reason.
+  /// with the expected reason. Like the JS SDK's `expectWriteToFail`, the
+  /// message names the method and the document:
+  /// `Function WriteBatch.set() called with invalid data. <reason>
+  /// (found in field f in document c/d)`.
   Future<void> expectWriteError(
     Map<String, Object?> data,
     String reason, {
@@ -45,24 +62,41 @@ void main() {
     bool includeUpdates = true,
   }) async {
     final DocumentReference ref = await testDocument();
+    String error(String methodName) =>
+        invalidData(methodName, reason, documentPath: ref.path);
 
     if (includeSets) {
-      await expectError(() => ref.set(data), reason);
-      await expectError(() => ref.firestore.batch().set(ref, data), reason);
+      await expectError(() => ref.set(data), error('DocumentReference.set'));
+      await expectError(
+        () => ref.firestore.batch().set(ref, data),
+        error('WriteBatch.set'),
+      );
     }
 
     if (includeUpdates) {
-      await expectError(() => ref.update(data), reason);
-      await expectError(() => ref.firestore.batch().update(ref, data), reason);
+      await expectError(
+        () => ref.update(data),
+        error('DocumentReference.update'),
+      );
+      await expectError(
+        () => ref.firestore.batch().update(ref, data),
+        error('WriteBatch.update'),
+      );
     }
 
     await ref.firestore.runTransaction<void>((Transaction transaction) async {
       if (includeSets) {
-        await expectError(() => transaction.set(ref, data), reason);
+        await expectError(
+          () => transaction.set(ref, data),
+          error('Transaction.set'),
+        );
       }
 
       if (includeUpdates) {
-        await expectError(() => transaction.update(ref, data), reason);
+        await expectError(
+          () => transaction.update(ref, data),
+          error('Transaction.update'),
+        );
       }
 
       return;
@@ -92,17 +126,38 @@ void main() {
     final DocumentSnapshot snapshot = await docRef.get();
 
     // snapshot paths
-    await expectError(() => snapshot.get(path), reason);
+    await expectError(
+      () => snapshot.get(path),
+      invalidData('DocumentSnapshot.get', reason),
+    );
 
     // Query filter / order fields
     final CollectionReference coll = await testCollection();
     // whereLessThan(), etc. omitted for brevity since the code path is
     // trivially shared.
-    await expectError(() => coll.whereEqualTo(path, 1), reason);
-    await expectError(() => coll.orderBy(path), reason);
+    await expectError(
+      () => coll.whereEqualTo(path, 1),
+      invalidData('where', reason),
+    );
+    await expectError(() => coll.orderBy(path), invalidData('orderBy', reason));
 
     // update() paths.
-    await expectError(() => docRef.updateFromList(<dynamic>[path, 1]), reason);
+    await expectError(
+      () => docRef.updateFromList(<dynamic>[path, 1]),
+      invalidData(
+        'DocumentReference.updateFromList',
+        reason,
+        documentPath: docRef.path,
+      ),
+    );
+    await expectError(
+      () => docRef.update(<String, Object?>{path: 1}),
+      invalidData(
+        'DocumentReference.update',
+        reason,
+        documentPath: docRef.path,
+      ),
+    );
   }
 
   test('firestoreSettingsNullHostFails', () async {
@@ -234,7 +289,7 @@ void main() {
           <int>[2],
         ],
       ]),
-      'Invalid data. Nested arrays are not supported',
+      'Nested arrays are not supported',
     );
   });
 
@@ -276,7 +331,7 @@ void main() {
 
     await expectWriteError(
       data,
-      'Invalid data. Document reference is for database '
+      'Document reference is for database '
       '${IntegrationTestUtil.badProjectId}/(default) but should be for '
       'database ${IntegrationTestUtil.provider.projectId}/(default) '
       '(found in field foo)',
@@ -286,7 +341,7 @@ void main() {
   test('writesMustNotContainReservedFieldNames', () async {
     await expectWriteError(
       map<dynamic>(<dynamic>['__baz__', 1]),
-      'Invalid data. Document fields cannot begin and end with "__" '
+      'Document fields cannot begin and end with "__" '
       '(found in field __baz__)',
     );
     await expectWriteError(
@@ -294,7 +349,7 @@ void main() {
         'foo',
         map<dynamic>(<dynamic>['__baz__', 1]),
       ]),
-      'Invalid data. Document fields cannot begin and end with "__" '
+      'Document fields cannot begin and end with "__" '
       '(found in field foo.__baz__)',
     );
     await expectWriteError(
@@ -302,18 +357,18 @@ void main() {
         '__baz__',
         map<dynamic>(<dynamic>['foo', 1]),
       ]),
-      'Invalid data. Document fields cannot begin and end with "__" '
+      'Document fields cannot begin and end with "__" '
       '(found in field __baz__)',
     );
 
     await expectUpdateError(
       map<dynamic>(<dynamic>['__baz__', 1]),
-      'Invalid data. Document fields cannot begin and end with "__" '
+      'Document fields cannot begin and end with "__" '
       '(found in field __baz__)',
     );
     await expectUpdateError(
       map<dynamic>(<dynamic>['baz.__foo__', 1]),
-      'Invalid data. Document fields cannot begin and end with "__" '
+      'Document fields cannot begin and end with "__" '
       '(found in field baz.__foo__)',
     );
   });
@@ -321,7 +376,7 @@ void main() {
   test('writesMustNotContainEmptyFieldNames', () async {
     await expectWriteError(
       map<dynamic>(<dynamic>['', 'foo']),
-      'Invalid data. Document fields must not be empty (found in field ``)',
+      'Document fields must not be empty (found in field ``)',
       includeUpdates: false,
     );
   });
@@ -339,8 +394,12 @@ void main() {
     final DocumentReference ref = await testDocument();
     await expectError(
       () => ref.set(map(<dynamic>['foo', FieldValue.delete()])),
-      'Invalid data. FieldValue.delete() can only be used with update() and'
-      ' set() with SetOptions.merge() (found in field foo)',
+      invalidData(
+        'DocumentReference.set',
+        'FieldValue.delete() can only be used with update() and set() with '
+            'SetOptions.merge() (found in field foo)',
+        documentPath: ref.path,
+      ),
     );
   });
 
@@ -353,8 +412,12 @@ void main() {
           map<dynamic>(<dynamic>['bar', FieldValue.delete()]),
         ]),
       ),
-      'Invalid data. FieldValue.delete() can only appear at the top level of'
-      ' your update data (found in field foo.bar)',
+      invalidData(
+        'DocumentReference.update',
+        'FieldValue.delete() can only appear at the top level of your update '
+            'data (found in field foo.bar)',
+        documentPath: ref.path,
+      ),
     );
   });
 
@@ -419,8 +482,10 @@ void main() {
       'foo[1]',
     ];
     for (String fieldPath in badFieldPaths) {
-      const String reason =
-          "Use FieldPath.of() for field names containing '~*/[]'.";
+      final String reason =
+          'Invalid field path ($fieldPath). Paths must not contain '
+          "'~', '*', '/', '[', or ']'. Use FieldPath.of() for field names "
+          'that contain them.';
       await verifyFieldPathThrows(fieldPath, reason);
     }
   });
@@ -455,9 +520,11 @@ void main() {
 
   test('arrayTransformsFailInQueries', () async {
     final CollectionReference collection = await testCollection();
-    String reason =
-        'Invalid data. FieldValue.arrayUnion() can only be used with set() and '
-        'update() (found in field test)';
+    String reason = invalidData(
+      'where',
+      'FieldValue.arrayUnion() can only be used with set() and update() '
+          '(found in field test)',
+    );
     await expectError(
       () => collection.whereEqualTo(
         'test',
@@ -469,9 +536,11 @@ void main() {
       reason,
     );
 
-    reason =
-        'Invalid data. FieldValue.arrayRemove() can only be used with set() '
-        'and update() (found in field test)';
+    reason = invalidData(
+      'where',
+      'FieldValue.arrayRemove() can only be used with set() and update() '
+          '(found in field test)',
+    );
     await expectError(
       () => collection.whereEqualTo(
         'test',
@@ -486,7 +555,11 @@ void main() {
 
   test('arrayTransformsRejectInvalidElements', () async {
     final DocumentReference doc = await testDocument();
-    const String reason = 'Invalid data. Unsupported type: _ValidationTest';
+    String reason(String transform) => invalidData(
+      transform,
+      'Unsupported field value: a custom _ValidationTest object',
+      documentPath: doc.path,
+    );
 
     await expectError(
       () => doc.set(
@@ -495,7 +568,7 @@ void main() {
           FieldValue.arrayUnion(<dynamic>[1, const _ValidationTest()]),
         ]),
       ),
-      reason,
+      reason('FieldValue.arrayUnion'),
     );
     await expectError(
       () => doc.set(
@@ -504,14 +577,18 @@ void main() {
           FieldValue.arrayRemove(<dynamic>[1, const _ValidationTest()]),
         ]),
       ),
-      reason,
+      reason('FieldValue.arrayRemove'),
     );
   });
 
   test('arrayTransformsRejectArrays', () async {
     final DocumentReference doc = await testDocument();
     // This would result in a directly nested array which is not supported.
-    const String reason = 'Invalid data. Nested arrays are not supported';
+    String reason(String transform) => invalidData(
+      transform,
+      'Nested arrays are not supported',
+      documentPath: doc.path,
+    );
     await expectError(
       () => doc.set(
         map(<dynamic>[
@@ -522,7 +599,7 @@ void main() {
           ]),
         ]),
       ),
-      reason,
+      reason('FieldValue.arrayUnion'),
     );
     await expectError(
       () => doc.set(
@@ -534,7 +611,7 @@ void main() {
           ]),
         ]),
       ),
-      reason,
+      reason('FieldValue.arrayRemove'),
     );
   });
 
@@ -1152,43 +1229,51 @@ void main() {
 
     test('collection paths must be non-empty strings', () async {
       final Firestore db = await testFirestore();
-      expect(() => db.collection(''), throwsArgumentError);
+      expect(
+        () => db.collection(''),
+        throwsWith(
+          'Function Firestore.collection() cannot be called with an empty '
+          'path.',
+        ),
+      );
     });
 
     test('document paths must be non-empty strings', () async {
       final Firestore db = await testFirestore();
-      expect(() => db.document(''), throwsArgumentError);
+      expect(
+        () => db.doc(''),
+        throwsWith(
+          'Function Firestore.doc() cannot be called with an empty path.',
+        ),
+      );
     });
 
     test('writes must not contain custom objects or functions', () async {
-      final List<Map<String, Object?>> badData = <Map<String, Object?>>[
-        <String, Object?>{'foo': _TestClass('foo')},
-        <String, Object?>{
-          'foo': <Object?>[_TestClass('foo')],
-        },
-        <String, Object?>{
-          'foo': <String, Object?>{'bar': _TestClass('foo')},
-        },
-        <String, Object?>{'foo': () {}},
-        <String, Object?>{
-          'foo': <Object?>[() {}],
-        },
-        <String, Object?>{
-          'foo': <String, Object?>{'bar': () {}},
-        },
-      ];
-      final DocumentReference ref = await testDocument();
-      for (final Map<String, Object?> data in badData) {
-        await expectLater(
-          () => ref.set(data),
-          throwsWith('Invalid data. Unsupported type: '),
-          reason: '$data',
-        );
-        await expectLater(
-          () => ref.update(data),
-          throwsWith('Invalid data. Unsupported type: '),
-          reason: '$data',
-        );
+      // The JS SDK's reasons; `_TestClass` is its `TestClass`.
+      final Map<Map<String, Object?>, String> badData =
+          <Map<String, Object?>, String>{
+            <String, Object?>{'foo': _TestClass('foo')}:
+                'Unsupported field value: a custom _TestClass object '
+                '(found in field foo)',
+            <String, Object?>{
+              'foo': <Object?>[_TestClass('foo')],
+            }: 'Unsupported field value: a custom _TestClass object',
+            <String, Object?>{
+              'foo': <String, Object?>{'bar': _TestClass('foo')},
+            }: 'Unsupported field value: a custom _TestClass object '
+                '(found in field foo.bar)',
+            <String, Object?>{'foo': () {}}:
+                'Unsupported field value: a function (found in field foo)',
+            <String, Object?>{
+              'foo': <Object?>[() {}],
+            }: 'Unsupported field value: a function',
+            <String, Object?>{
+              'foo': <String, Object?>{'bar': () {}},
+            }: 'Unsupported field value: a function (found in field foo.bar)',
+          };
+      for (final MapEntry<Map<String, Object?>, String> entry
+          in badData.entries) {
+        await expectWriteError(entry.key, entry.value);
       }
     });
 
@@ -1209,6 +1294,7 @@ void main() {
           'test': FieldValue.increment(1),
         }),
         throwsWith(
+          'Function where() called with invalid data. '
           'FieldValue.increment() can only be used with set() and '
           'update() (found in field test)',
         ),

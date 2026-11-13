@@ -91,7 +91,7 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereEqualTo(String field, Object? value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.equal,
       value,
     );
@@ -120,7 +120,7 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereNotEqualTo(String field, Object? value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.notEqual,
       value,
     );
@@ -149,7 +149,7 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereLessThan(String field, Object? value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.lessThan,
       value,
     );
@@ -175,7 +175,7 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereLessThanOrEqualTo(String field, Object? value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.lessThanOrEqual,
       value,
     );
@@ -201,7 +201,7 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereGreaterThan(String field, Object? value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.graterThan,
       value,
     );
@@ -227,7 +227,7 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereGreaterThanOrEqualTo(String field, Object? value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.graterThanOrEqual,
       value,
     );
@@ -255,7 +255,7 @@ class Query<T extends dynamic> {
   /// Returns the created [Query].
   Query<T> whereArrayContains(String field, Object? value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.arrayContains,
       value,
     );
@@ -281,7 +281,7 @@ class Query<T extends dynamic> {
   /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
   Query<T> whereArrayContainsAny(String field, List<Object?> value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.arrayContainsAny,
       value,
     );
@@ -306,7 +306,7 @@ class Query<T extends dynamic> {
   /// It cannot be combined with [whereNotIn]; the backend validates other combinations.
   Query<T> whereIn(String field, List<Object?> value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.IN,
       value,
     );
@@ -329,7 +329,7 @@ class Query<T extends dynamic> {
   /// with [whereArrayContainsAny], [whereIn] or [whereNotEqualTo].
   Query<T> whereNotIn(String field, List<Object?> value) {
     return _whereHelper(
-      FieldPath.fromDotSeparatedPath(field),
+      FieldPathInternal.fromArgument('where', field),
       FilterOperator.NOT_IN,
       value,
     );
@@ -422,7 +422,10 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> orderBy(String field, [Direction direction = Direction.ascending]) {
-    return orderByField(FieldPath.fromDotSeparatedPath(field), direction);
+    return orderByField(
+      FieldPathInternal.fromArgument('orderBy', field),
+      direction,
+    );
   }
 
   /// Creates and returns a new [Query] that's additionally sorted by the specified field, optionally in descending
@@ -920,6 +923,9 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// this collection. Same as [doc].
   @Deprecated('Use doc instead.')
   DocumentReference<T> document([String? documentPath]) {
+    if (documentPath != null) {
+      checkNonEmptyPath('CollectionReference.doc', documentPath);
+    }
     final String path = documentPath ?? autoId();
     return DocumentReferenceInternal.forPath<T>(
       query.path.appendField(ResourcePath.fromString(path)),
@@ -938,7 +944,7 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   Future<DocumentReference<T>> add(T data) async {
     checkNotNull<Object>(data, 'Provided data must not be null.');
     final DocumentReference<T> ref = document();
-    await ref.set(data);
+    await ref.setFor('CollectionReference.add', data);
     return ref;
   }
 

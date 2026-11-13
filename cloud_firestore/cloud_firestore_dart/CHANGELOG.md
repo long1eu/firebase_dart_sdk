@@ -21,6 +21,13 @@
 - The local view of a document is now right when its pending writes delete a nested field and later its
   parent (for example `a.b.c` set, then `a.b.c` and `a.b` deleted): the overlay kept for it handles the fields
   in order, as the JS and iOS SDKs do, and no longer drops the parent `a` left as an empty map.
+- Argument validation errors are worded like the JS SDK's (the error types do not change).
+  Invalid document data names the method, the field and the document, for example "Function
+  WriteBatch.set() called with invalid data. Unsupported field value: a custom Foo object (found in
+  field a in document c/d)", with "(via `toFirestore()`)" when a converter produced the data; this
+  applies to where() and cursor values and to field path arguments too. An empty path passed to
+  collection() or doc() fails with "Function Firestore.collection() cannot be called with an empty
+  path." instead of a segment count. The messages of the pipelines are unchanged.
 - A listen or write stream that the backend closes with UNAUTHENTICATED invalidates the token
   only if it has been open for less than 10 seconds, as in the Android and JS SDKs; a stream that
   was healthy keeps it. Before, every UNAUTHENTICATED of a stream invalidated the token (unary

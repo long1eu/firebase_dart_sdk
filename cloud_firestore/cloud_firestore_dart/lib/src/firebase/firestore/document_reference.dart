@@ -159,6 +159,7 @@ class DocumentReference<T extends dynamic> {
   /// Returns the [CollectionReference] instance.
   CollectionReference<Map<String, Object?>> collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
+    checkNonEmptyPath('DocumentReference.collection', collectionPath);
     return CollectionReferenceInternal.create<Map<String, Object?>>(
       key.path.appendField(ResourcePath.fromString(collectionPath)),
       firestore,
@@ -172,13 +173,28 @@ class DocumentReference<T extends dynamic> {
   /// [options] an object to configure the set behavior.
   ///
   /// Returns a Future that will be resolved when the write finishes.
-  Future<void> set(T data, [SetOptions? options]) async {
+  Future<void> set(T data, [SetOptions? options]) =>
+      _set(data, options, 'DocumentReference.set');
+
+  /// [set] for the public method [methodName], which the errors name.
+  Future<void> _set(T data, SetOptions? options, String methodName) async {
     final SetOptions setOptions = options ?? SetOptions.overwrite;
     checkNotNull<Object>(data, 'Provided data must not be null.');
     final Map<String, Object?> rawData = toRawData<T>(data, converter, options);
     final UserDataParsedSetData parsed = setOptions.merge
-        ? firestore.dataConverter.parseMergeData(rawData, setOptions.fieldMask)
-        : firestore.dataConverter.parseSetData(rawData);
+        ? firestore.dataConverter.parseMergeData(
+            rawData,
+            setOptions.fieldMask,
+            methodName: methodName,
+            targetDoc: key,
+            hasConverter: converter != null,
+          )
+        : firestore.dataConverter.parseSetData(
+            rawData,
+            methodName: methodName,
+            targetDoc: key,
+            hasConverter: converter != null,
+          );
 
     await voidErrorTransformer(
       () => firestore.client.write(<Mutation>[
@@ -197,8 +213,13 @@ class DocumentReference<T extends dynamic> {
   ///
   /// Returns a Future that will be resolved when the write finishes.
   Future<void> updateFromList(List<Object?> data) async {
+    const String methodName = 'DocumentReference.updateFromList';
     final UserDataParsedUpdateData parsedData = firestore.dataConverter
-        .parseUpdateDataFromList(collectUpdateArguments(1, data));
+        .parseUpdateDataFromList(
+          collectUpdateArguments(1, data, methodName: methodName),
+          methodName: methodName,
+          targetDoc: key,
+        );
     await voidErrorTransformer(
       () => firestore.client.write(<Mutation>[
         parsedData.toMutation(key, Precondition(exists: true)),
@@ -215,7 +236,11 @@ class DocumentReference<T extends dynamic> {
   /// Returns a Future that will be resolved when the write finishes.
   Future<void> update(Map<String, Object?> data) async {
     final UserDataParsedUpdateData parsedData = firestore.dataConverter
-        .parseUpdateData(data);
+        .parseUpdateData(
+          data,
+          methodName: 'DocumentReference.update',
+          targetDoc: key,
+        );
     await voidErrorTransformer(
       () => firestore.client.write(<Mutation>[
         parsedData.toMutation(key, Precondition(exists: true)),
@@ -402,6 +427,11 @@ Future<T> _firstAndCancel<T>(Stream<T> stream) async {
 extension DocumentReferenceInternal<T> on DocumentReference<T> {
   /// The key of the document this reference points to.
   DocumentKey get key => _key;
+
+  /// [DocumentReference.set] for the public method [methodName] (for example
+  /// `CollectionReference.add`), which the errors name.
+  Future<void> setFor(String methodName, T data) =>
+      _set(data, null, methodName);
 
   /// A reference to the document with [key] in [firestore].
   static DocumentReference<T> create<T extends dynamic>(

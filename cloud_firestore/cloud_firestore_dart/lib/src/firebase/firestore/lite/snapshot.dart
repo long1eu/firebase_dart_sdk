@@ -80,7 +80,9 @@ class DocumentSnapshot<T extends dynamic> {
 
   /// Whether the document has the field at the dot-separated path [field].
   bool contains(String field) {
-    return containsPath(FieldPath.fromDotSeparatedPath(field));
+    return containsPath(
+      FieldPathInternal.fromArgument('DocumentSnapshot.contains', field),
+    );
   }
 
   /// Whether the document has the field at [fieldPath].
@@ -95,7 +97,9 @@ class DocumentSnapshot<T extends dynamic> {
   /// The value of the field at the dot-separated path [field], or null if
   /// there is no such field or document. Never converted.
   Object? get(String field) {
-    return getField(FieldPath.fromDotSeparatedPath(field));
+    return getField(
+      FieldPathInternal.fromArgument('DocumentSnapshot.get', field),
+    );
   }
 
   /// The value of the field at [fieldPath], or null if there is no such field

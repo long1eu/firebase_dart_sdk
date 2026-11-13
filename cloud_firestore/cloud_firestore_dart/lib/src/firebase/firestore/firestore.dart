@@ -42,6 +42,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/log_level_util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart'
+    show checkNonEmptyPath;
 import 'package:cloud_firestore_dart/src/firebase/firestore/write_batch.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
@@ -252,6 +254,7 @@ class Firestore {
   /// [collectionPath] is a slash-separated path to a collection.
   CollectionReference<Map<String, Object?>> collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
+    checkNonEmptyPath('Firestore.collection', collectionPath);
     final ResourcePath resourcePath = ResourcePath.fromString(collectionPath);
     return CollectionReferenceInternal.create<Map<String, Object?>>(
       resourcePath,
@@ -269,6 +272,7 @@ class Firestore {
   @Deprecated('Use doc instead.')
   DocumentReference<Map<String, Object?>> document(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
+    checkNonEmptyPath('Firestore.doc', documentPath);
     return DocumentReferenceInternal.forPath(
       ResourcePath.fromString(documentPath),
       this,
@@ -285,12 +289,14 @@ class Firestore {
     checkNotNull(collectionId, 'Provided collection ID must not be null.');
     if (collectionId.isEmpty) {
       throw ArgumentError(
-        'Invalid collectionId. Collection IDs must not be empty.',
+        'Function Firestore.collectionGroup() cannot be called with an empty '
+        'collectionId.',
       );
     }
     if (collectionId.contains('/')) {
       throw ArgumentError(
-        'Invalid collectionId \'$collectionId\'. Collection IDs must not contain \'/\'.',
+        "Invalid collection ID '$collectionId' passed to function "
+        "Firestore.collectionGroup(). Collection IDs must not contain '/'.",
       );
     }
 

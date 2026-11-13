@@ -140,7 +140,10 @@ class Query<T extends dynamic> {
   ///
   /// Returns the created Query.
   Query<T> orderBy(String field, [Direction direction = Direction.ascending]) {
-    return orderByField(FieldPath.fromDotSeparatedPath(field), direction);
+    return orderByField(
+      FieldPathInternal.fromArgument('orderBy', field),
+      direction,
+    );
   }
 
   /// Creates and returns a new [Query] that's additionally sorted by the specified field, optionally in descending
@@ -466,6 +469,9 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// this collection, or to a new document with an auto-generated ID when no
   /// path is given.
   DocumentReference<T> doc([String? documentPath]) {
+    if (documentPath != null) {
+      checkNonEmptyPath('CollectionReference.doc', documentPath);
+    }
     return DocumentReference<T>.forPath(
       query.path.appendField(ResourcePath.fromString(documentPath ?? autoId())),
       firestore,
@@ -478,7 +484,7 @@ class CollectionReference<T extends dynamic> extends Query<T> {
   /// written it.
   Future<DocumentReference<T>> add(T data) async {
     final DocumentReference<T> ref = doc();
-    await ref.set(data);
+    await ref.setFor('CollectionReference.add', data);
     return ref;
   }
 

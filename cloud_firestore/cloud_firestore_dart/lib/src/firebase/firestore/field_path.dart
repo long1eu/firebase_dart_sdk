@@ -47,7 +47,8 @@ class FieldPath {
     checkNotNull(path, 'Provided field path must not be null.');
     checkArgument(
       !_reserved.hasMatch(path),
-      "Use FieldPath.of() for field names containing '~*/[]'.",
+      "Invalid field path ($path). Paths must not contain '~', '*', '/', '[', "
+      "or ']'. Use FieldPath.of() for field names that contain them.",
     );
     try {
       return FieldPath.of(path.split('.'));
@@ -109,4 +110,25 @@ extension FieldPathInternal on FieldPath {
 
   /// The path of the document id, as [FieldPath.documentIdField].
   static FieldPath get documentIdInstance => FieldPath._documentIdInstance;
+
+  /// [FieldPath.fromDotSeparatedPath] for the [path] argument of the public
+  /// method [methodName]: an invalid path fails with an [ArgumentError] that
+  /// names the method, like the JS SDK (`Function where() called with invalid
+  /// data. Invalid field path (a..b). ...`), and [documentPath] when given.
+  static FieldPath fromArgument(
+    String methodName,
+    String path, {
+    String? documentPath,
+  }) {
+    try {
+      return FieldPath.fromDotSeparatedPath(path);
+    } on ArgumentError catch (e) {
+      final String found = documentPath == null
+          ? ''
+          : ' (found in document $documentPath)';
+      throw ArgumentError(
+        'Function $methodName() called with invalid data. ${e.message}$found',
+      );
+    }
+  }
 }

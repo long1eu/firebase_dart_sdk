@@ -99,7 +99,7 @@ class QueryBuilder {
       if (fieldOrFilter is FieldPath) {
         fieldPath = fieldOrFilter;
       } else if (fieldOrFilter is String) {
-        fieldPath = FieldPath.fromDotSeparatedPath(fieldOrFilter);
+        fieldPath = FieldPathInternal.fromArgument('where', fieldOrFilter);
       } else {
         throw ArgumentError.value(
           fieldOrFilter,
@@ -193,6 +193,7 @@ class QueryBuilder {
       fieldValue = dataConverter.parseQueryValue(
         value,
         allowArrays: op == FilterOperator.IN || op == FilterOperator.NOT_IN,
+        methodName: 'where',
       );
     }
     return FieldFilter(internalPath, op, fieldValue);
@@ -469,7 +470,10 @@ class QueryBuilder {
         final DocumentKey key = DocumentKey.fromPath(path);
         components.add(ReferenceValue.valueOf(databaseId, key));
       } else {
-        final FieldValue wrapped = dataConverter.parseQueryValue(rawValue);
+        final FieldValue wrapped = dataConverter.parseQueryValue(
+          rawValue,
+          methodName: methodName,
+        );
         components.add(wrapped);
       }
     }

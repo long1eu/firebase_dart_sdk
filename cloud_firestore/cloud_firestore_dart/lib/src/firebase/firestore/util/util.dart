@@ -183,19 +183,34 @@ Future<void> voidErrorTransformer(Future<void> Function() operation) async {
   }
 }
 
+/// Throws the JS SDK's error for an empty [path] passed to the public method
+/// [methodName] (for example `Firestore.collection`). As in the JS SDK only
+/// the empty string is checked here; a path such as `/` fails the segment
+/// checks of the reference.
+void checkNonEmptyPath(String methodName, String path) {
+  if (path.isEmpty) {
+    throw ArgumentError(
+      'Function $methodName() cannot be called with an empty path.',
+    );
+  }
+}
+
 /// Converts varargs from an update call to a list of objects, ensuring that the arguments alternate
 /// between String/FieldPath and Objects.
 ///
 /// [fieldPathOffset] is the offset of the first field path in the original update API (used as the
 /// index in error messages)
+///
+/// [methodName] names the public method in the error messages.
 List<Object?> collectUpdateArguments(
   int fieldPathOffset,
-  List<Object?> fieldsAndValues,
-) {
+  List<Object?> fieldsAndValues, {
+  String methodName = 'update',
+}) {
   if (fieldsAndValues.length % 2 == 1) {
     throw ArgumentError(
-      'Missing value in call to update().  There must be an even number of '
-      'arguments that alternate between field names and values',
+      'Function $methodName() needs to be called with an even number of '
+      'arguments that alternate between field names and values.',
     );
   }
   final List<Object?> argumentList = fieldsAndValues.toList(growable: false);
@@ -203,9 +218,10 @@ List<Object?> collectUpdateArguments(
     final Object? fieldPath = argumentList[i];
     if (fieldPath is! String && fieldPath is! FieldPath) {
       throw ArgumentError(
-        'Excepted field name at argument position ${i + fieldPathOffset + 1} but '
-        'got $fieldPath in call to update. The arguments to update should alternate between '
-        'field names and values',
+        'Function $methodName() called with invalid data. Expected a field '
+        'name (a String or a FieldPath) at argument position '
+        '${i + fieldPathOffset + 1}, but got $fieldPath. The arguments should '
+        'alternate between field names and values.',
       );
     }
   }
