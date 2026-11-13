@@ -21,14 +21,22 @@
 #                           one of the main checkout), and `firebase` on the PATH)
 #   FIRESTORE_EMULATOR_JAR  emulator JAR (default: the newest cloud-firestore-emulator-v*.jar in
 #                           ~/.cache/firebase/emulators)
+#   AUTH_HUB_PORT           port of the emulator hub that the firebase CLI starts with the Auth
+#                           emulator (default: auth port + 1; the CLI's own default is 4400)
+#   AUTH_LOGGING_PORT       port of its logging server (default: auth port + 2; CLI default 4500)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 EMU="${EMULATOR_DIR:-$ROOT/.emulator}"
 AUTH_PORT="${1:-9197}"
 FS_PORT="${2:-8197}"
-for P in "$AUTH_PORT" "$FS_PORT"; do
+case "$AUTH_PORT" in
+  ''|*[!0-9]*) echo "Usage: $0 [auth port] [firestore port]"; exit 2;;
+esac
+HUB_PORT="${AUTH_HUB_PORT:-$((AUTH_PORT + 1))}"
+LOGGING_PORT="${AUTH_LOGGING_PORT:-$((AUTH_PORT + 2))}"
+for P in "$AUTH_PORT" "$FS_PORT" "$HUB_PORT" "$LOGGING_PORT"; do
   case "$P" in
-    ''|*[!0-9]*) echo "Usage: $0 [auth port] [firestore port]"; exit 2;;
-    8080|8181|9099) echo "$P is a shared or default emulator port; pick another one."; exit 2;;
+    ''|*[!0-9]*) echo "Usage: $0 [auth port] [firestore port] (ports are numbers: $P)"; exit 2;;
+    8080|8181|9099|4400|4500) echo "$P is a shared or default emulator port; pick another one."; exit 2;;
   esac
 done
 RULES="$ROOT/tool/auth_emulators/firestore.rules"
@@ -46,10 +54,12 @@ running() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 if running "$AUTH_PID"; then
   echo "Auth emulator already running on port $AUTH_PORT (pid $(cat "$AUTH_PID"))"
 else
-  if curl -s -o /dev/null "http://127.0.0.1:$AUTH_PORT"; then
-    echo "Port $AUTH_PORT is already in use by a process this script did not start; not starting."
-    exit 1
-  fi
+  for P in "$AUTH_PORT" "$HUB_PORT" "$LOGGING_PORT"; do
+    if curl -s -o /dev/null "http://127.0.0.1:$P"; then
+      echo "Port $P is already in use by a process this script did not start; not starting."
+      exit 1
+    fi
+  done
   CLI="${FIREBASE_CLI:-}"
   if [ -z "$CLI" ]; then
     # The local installs come before the PATH, which may hold a firebase binary for another
@@ -80,14 +90,14 @@ else
     echo "npm install firebase-tools) or set FIREBASE_CLI to a firebase command that runs here."
     exit 1
   fi
-  # A configuration of its own: only the Auth emulator, with its hub and logging ports next to
-  # its own port so that it does not collide with another emulator suite.
+  # A configuration of its own: only the Auth emulator, with its hub and logging ports moved off
+  # the CLI defaults (4400, 4500) so that it does not collide with another emulator suite.
   cat >"$AUTH_CFG/firebase.json" <<JSON
 {
   "emulators": {
     "auth": {"host": "127.0.0.1", "port": $AUTH_PORT},
-    "hub": {"host": "127.0.0.1", "port": $((AUTH_PORT + 1))},
-    "logging": {"host": "127.0.0.1", "port": $((AUTH_PORT + 2))},
+    "hub": {"host": "127.0.0.1", "port": $HUB_PORT},
+    "logging": {"host": "127.0.0.1", "port": $LOGGING_PORT},
     "ui": {"enabled": false}
   }
 }
@@ -104,7 +114,7 @@ JSON
   done
   curl -s -o /dev/null "http://127.0.0.1:$AUTH_PORT" || {
     echo "Timed out waiting for the Auth emulator, see $AUTH_LOG"; exit 1; }
-  echo "Auth emulator up on 127.0.0.1:$AUTH_PORT (pid $(cat "$AUTH_PID"), log $AUTH_LOG)"
+  echo "Auth emulator up on 127.0.0.1:$AUTH_PORT, hub $HUB_PORT, logging $LOGGING_PORT (pid $(cat "$AUTH_PID"), log $AUTH_LOG)"
 fi
 
 # ---- the Firestore emulator with rules that require auth ----
