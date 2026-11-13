@@ -182,9 +182,15 @@ void main() {
 
   /// A Firestore instance of the full SDK for [app], over gRPC or over the web transport, with a memory cache.
   Future<Firestore> newFirestore(FirebaseApp app, {required bool web}) async {
+    // The transport is created with the client, on its first operation: the override stays in place until the
+    // tear-down (resetting it right after instanceFor ran the "web transport" tests over gRPC).
     Datastore.transportOverride = web
-        ? (DatabaseInfo databaseInfo, ChannelOptionsProvider options) =>
-            WebChannelTransport(IoWebHttpClient(), databaseInfo, options)
+        ? (DatabaseInfo databaseInfo, ChannelOptionsProvider options) {
+            final IoWebHttpClient http = IoWebHttpClient();
+            cleanups.add(() async => expect(http.log, isNotEmpty,
+                reason: 'the web transport was used'));
+            return WebChannelTransport(http, databaseInfo, options);
+          }
         : null;
     final Firestore firestore = Firestore.instanceFor(
       app: app,
@@ -195,7 +201,6 @@ void main() {
         cacheSettings: const MemoryCacheSettings(),
       ),
     );
-    Datastore.transportOverride = null;
     cleanups.add(firestore.terminate);
     return firestore;
   }

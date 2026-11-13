@@ -35,7 +35,11 @@ class AppCheckTokenResult {
 abstract class InternalAppCheckTokenProvider {
   /// Fetches a token. [forceRefresh] must only be set when the cached token was
   /// invalidated out of band (for example the backend answered UNAUTHENTICATED).
-  /// Throws if the request itself fails.
+  ///
+  /// Report a failure in [AppCheckTokenResult.error] (with a placeholder or
+  /// empty token), like the App Check SDKs do. Firestore sends its requests
+  /// anyway: with the placeholder, or without the header when the token is
+  /// empty or when this method throws, and logs a warning.
   Future<AppCheckTokenResult> getToken({required bool forceRefresh});
 
   /// Emits whenever the token changes.

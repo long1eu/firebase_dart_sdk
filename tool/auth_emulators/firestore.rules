@@ -9,5 +9,14 @@ service cloud.firestore {
     match /signed_in/{document=**} {
       allow read, write: if request.auth != null;
     }
+    // The claims of the ID token: a custom claim of a custom token, and the sign-in provider.
+    match /testers/{document=**} {
+      allow read, write: if request.auth != null && request.auth.token.role == 'tester';
+    }
+    match /password_users/{document=**} {
+      allow read, write: if request.auth != null
+          && request.auth.token.firebase.sign_in_provider == 'password'
+          && request.auth.token.email != null;
+    }
   }
 }

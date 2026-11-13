@@ -48,9 +48,19 @@ class FirestoreCallCredentials {
       }
     } on FirebaseApiNotAvailableError catch (_) {
       Log.d(tag, 'Firebase AppCheck API not available.');
-    } catch (e, stackTrace) {
-      Log.w(tag, 'Failed to get AppCheck token: $e. $stackTrace');
-      throw GrpcError.unauthenticated(e.toString());
+    } catch (e) {
+      // The App Check SDKs never fail a token request: they report the
+      // failure in the result together with a placeholder token, and Firestore
+      // sends the request anyway (the backend decides, depending on whether
+      // App Check is enforced). A provider that throws is treated the same
+      // way: the request goes out without the header, and the failure is
+      // logged. Failing the request instead would block every write and
+      // listener on a project that does not enforce App Check.
+      Log.w(
+        tag,
+        'Failed to get AppCheck token; sending the request without it. '
+        'Error: $e',
+      );
     }
   }
 

@@ -4,7 +4,9 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/app_check_token_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/channel_options_provider.dart';
 import 'package:firebase_app_dart/internal.dart';
@@ -29,6 +31,17 @@ class FakeAppCheck implements InternalAppCheckTokenProvider {
 
   @override
   Stream<AppCheckTokenResult> get onTokenChanged => changes.stream;
+}
+
+class _FailingCredentials implements CredentialsProvider {
+  @override
+  Future<String?> get token => Future<String?>.error(StateError('no token'));
+
+  @override
+  void invalidateToken() {}
+
+  @override
+  Stream<User> get onChange => Stream<User>.value(User.unauthenticated);
 }
 
 Future<Map<String, String>> _metadata(ChannelOptionsProvider provider) async {
@@ -85,10 +98,35 @@ void main() {
     expect(m['x-firebase-appcheck'], 'placeholder');
   });
 
-  test('a failing provider fails the RPC with UNAUTHENTICATED', () async {
+  test(
+      'a failing provider: the request goes out without the header and the '
+      'failure is logged (like the App Check SDKs, which never fail)',
+      () async {
     final FakeAppCheck fake = FakeAppCheck()..throwError = StateError('boom');
+    final List<String> printed = <String>[];
+    final Map<String, String> m = await runZoned(
+      () => _metadata(_options(AppCheckTokenProvider(fake))),
+      zoneSpecification: ZoneSpecification(
+          print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
+              printed.add(line)),
+    );
+    expect(m.containsKey('x-firebase-appcheck'), isFalse);
+    expect(m['x-goog-request-params'], 'projects/p/databases/d');
+    expect(
+        printed,
+        contains(allOf(
+            contains('Failed to get AppCheck token'), contains('boom'))));
+  });
+
+  test('a failing auth provider still fails the RPC with UNAUTHENTICATED',
+      () async {
+    final ChannelOptionsProvider options = ChannelOptionsProvider(
+      databaseId: DatabaseId.forDatabase('p', 'd'),
+      credentialsProvider: _FailingCredentials(),
+      appCheckProvider: AppCheckTokenProvider(FakeAppCheck()),
+    );
     await expectLater(
-      _metadata(_options(AppCheckTokenProvider(fake))),
+      _metadata(options),
       throwsA(isA<GrpcError>()
           .having((GrpcError e) => e.code, 'code', StatusCode.unauthenticated)),
     );

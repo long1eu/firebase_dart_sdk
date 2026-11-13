@@ -7,6 +7,14 @@
   transactions; typed `PipelineExplainOptions` for `Pipeline.execute`; `Expression.arraySum`,
   `Expression.log10`, more key/value pairs for `Expression.mapSet`, and `pipelineResultEqual`.
   The surface now has every symbol of the JS `firestore-pipelines` API, in Dart shape.
+- App Check: when the App Check provider throws, requests are now sent without the
+  `x-firebase-appcheck` header and a warning is logged, like the JS and Android SDKs behave (their
+  App Check SDKs report failures with a placeholder token instead of failing). Before, the
+  request failed with UNAUTHENTICATED and streams retried without end.
+- Tested on the wire over gRPC, WebChannel and REST (full SDK and Lite): the App Check and ID
+  tokens on every request, their refresh after UNAUTHENTICATED, a new App Check token used from
+  the next request on, and a failing App Check provider. Enforcement by the backend is not
+  testable on the emulator and remains untested.
 
 ## 0.1.0
 
