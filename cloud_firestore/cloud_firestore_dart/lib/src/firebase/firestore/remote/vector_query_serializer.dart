@@ -27,21 +27,16 @@ import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 /// Encoding of vector (nearest-neighbour) queries and decoding of their results.
 extension VectorQuerySerializer on RemoteSerializer {
   /// Encodes [vectorQuery] on top of the base [query] as a structured query
-  /// with a `find_nearest` stage. As for aggregations, only the explicit sort
-  /// orders are sent (the ordering of `find_nearest` supersedes them).
+  /// with a `find_nearest` stage. As for aggregations, the base query is
+  /// encoded from [Query.toAggregateTarget], so only the explicit sort orders
+  /// are sent (the ordering of `find_nearest` supersedes the implicit ones).
   proto.Target_QueryTarget encodeVectorQueryTarget(
     Query query,
     VectorQuery vectorQuery,
   ) {
     final proto.Target_QueryTarget target = encodeQueryTarget(
-      query.toTarget(),
+      query.toAggregateTarget(),
     ).clone();
-    final List<proto.StructuredQuery_Order> orders =
-        target.structuredQuery.orderBy;
-    final int explicitCount = query.explicitSortOrder.length;
-    if (orders.length > explicitCount) {
-      orders.removeRange(explicitCount, orders.length);
-    }
 
     final proto.StructuredQuery_FindNearest findNearest =
         proto.StructuredQuery_FindNearest()

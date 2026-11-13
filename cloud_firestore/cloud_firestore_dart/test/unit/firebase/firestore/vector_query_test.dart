@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart'
+    as core;
 import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
@@ -24,6 +26,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:test/test.dart';
 
+import '../../../util/core_helpers.dart';
 import '../../../util/test_util.dart' as util;
 import 'test_util.dart';
 
@@ -133,6 +136,58 @@ void main() {
       // Implicit orderings (here b, __name__) are not sent.
       expect(target.structuredQuery.orderBy, isEmpty);
       expect(target.structuredQuery.hasFindNearest(), isTrue);
+    });
+
+    test('sends the explicit orderings and drops the implicit ones', () {
+      final VectorQuery vq = QueryInternal.create(
+        util
+            .query('coll')
+            .filter(util.filter('b', '>', 1))
+            .orderBy(util.orderBy('a', 'desc')),
+        firestore,
+      ).findNearest('v', <double>[1.0], 3, DistanceMeasure.euclidean);
+      final proto.StructuredQuery sq = serializer
+          .encodeVectorQueryTarget(vq.query.query, vq)
+          .structuredQuery;
+      // The listen target would also order by b and __name__ (descending).
+      expect(sq.orderBy, hasLength(1));
+      expect(sq.orderBy.single.field_1.fieldPath, 'a');
+      expect(
+        sq.orderBy.single.direction,
+        proto.StructuredQuery_Direction.DESCENDING,
+      );
+    });
+
+    test('encodes the base query as its aggregate target', () {
+      final core.Query base = util
+          .query('coll')
+          .filter(util.filter('b', '>', 1))
+          .orderBy(util.orderBy('a'))
+          .limitToLast(4)
+          .startAt(bound(true, <Object>[1]))
+          .endAt(bound(false, <Object>[9]));
+      final VectorQuery vq = QueryInternal.create(
+        base,
+        firestore,
+      ).findNearest('v', <double>[1.0], 3, DistanceMeasure.euclidean);
+      final proto.StructuredQuery sq =
+          serializer
+              .encodeVectorQueryTarget(vq.query.query, vq)
+              .structuredQuery
+              .deepCopy()
+            ..clearFindNearest();
+      expect(
+        sq,
+        serializer.encodeQueryTarget(base.toAggregateTarget()).structuredQuery,
+      );
+      // limitToLast flips the explicit ordering and swaps the cursors, as for
+      // aggregations.
+      expect(
+        sq.orderBy.single.direction,
+        proto.StructuredQuery_Direction.DESCENDING,
+      );
+      expect(sq.startAt.values.single.integerValue.toInt(), 9);
+      expect(sq.endAt.values.single.integerValue.toInt(), 1);
     });
 
     test('omits optional fields and implicit orderings', () {
