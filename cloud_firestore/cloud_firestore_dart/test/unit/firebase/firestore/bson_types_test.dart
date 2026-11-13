@@ -213,6 +213,51 @@ void main() {
     expect(Blob(_bytes(<int>[1, 2, 3])).toString(), 'Blob { bytes= 010203 }');
   });
 
+  test('a Decimal128Value is a value decimal128 holds exactly', () {
+    // What the Enterprise emulator accepts and rejects (probed with writes).
+    final String nines = '9' * 34;
+    for (final String accepted in <String>[
+      '1.${'0' * 32}1', // 34 significant digits
+      '1.${'0' * 40}', // trailing zeros that carry no digit
+      '1.${'0' * 32}10',
+      '0.000${'1' * 34}', // leading zeros do not count
+      '${'0' * 40}1',
+      '${nines}e6111', '1e6144', '1.0e6144', '0.1e6145', '1e6111',
+      '1${'0' * 34}e6110', '1234567890123456789012345678901234e6111',
+      '12345678901234567890123456789012340e6110',
+      '1e-6176', '-1e-6176', '100e-6178', '1e-6175', '1e-6143',
+      '0e7000', '0e-7000', '-0e6200', '-0', '0.${'0' * 40}',
+      '+1.5', '.5', '5.', '1E5', 'NaN', 'Infinity', '+Infinity', '-Infinity',
+    ]) {
+      expect(
+        () => Decimal128Value(accepted),
+        returnsNormally,
+        reason: accepted,
+      );
+    }
+    for (final String rejected in <String>[
+      '1.${'0' * 33}1', // 35 significant digits
+      '1e6145', '10e6144', '${nines}e6112',
+      '1234567890123456789012345678901234e6112',
+      '1e-6177', '15e-6177', '12e-6177', '120e-6178', '1234e-6178',
+      '1.234e-6174', '1.2345e-6174', '1e7000',
+    ]) {
+      expect(
+        () => Decimal128Value(rejected),
+        throwsFormatException,
+        reason: rejected,
+      );
+    }
+    // Not decimals at all.
+    for (final String invalid in <String>['-NaN', 'inf', '1e', '']) {
+      expect(
+        () => Decimal128Value(invalid),
+        throwsFormatException,
+        reason: invalid,
+      );
+    }
+  });
+
   group('ExactNumber', () {
     int compare(ExactNumber a, ExactNumber b) => a.compareTo(b).sign;
     ExactNumber dec(String s) => ExactNumber.parse(s);

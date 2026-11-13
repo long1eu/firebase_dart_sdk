@@ -239,7 +239,9 @@ class SumAccumulator implements Accumulator {
     final Decimal? total = decimal;
     if (total != null) {
       return EvaluateValue(
-        Decimal128FieldValue.valueOf(Decimal128Value(total.toString())),
+        Decimal128FieldValue.valueOf(
+          Decimal128ValueInternal.unchecked(total.toString()),
+        ),
       );
     } else if (_hasDouble) {
       return EvaluateValue(DoubleValue.valueOf(asDouble));
@@ -265,7 +267,9 @@ class _Average implements Accumulator {
     if (total != null) {
       return EvaluateValue(
         Decimal128FieldValue.valueOf(
-          Decimal128Value((total / Decimal.fromInt(_sum.count)).toString()),
+          Decimal128ValueInternal.unchecked(
+            (total / Decimal.fromInt(_sum.count)).toString(),
+          ),
         ),
       );
     }

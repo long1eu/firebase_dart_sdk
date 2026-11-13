@@ -11,9 +11,9 @@ library;
 
 import 'dart:math' as math;
 
-import 'package:cloud_firestore_dart/cloud_firestore_dart.dart'
-    show Decimal128Value;
 import 'package:cloud_firestore_dart/pipelines.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart'
+    show Decimal128ValueInternal;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart'
     as model;
@@ -228,9 +228,15 @@ void main() {
         );
         expect(Decimal.parse('1e-100000000').isInteger, isFalse);
         expect(Decimal.parse('0e-100000000').isInteger, isTrue);
+        // A stored value out of the decimal128 range (Decimal128Value refuses
+        // to create one).
         expect(
-          valueOf(constant(Decimal128Value('1e1000000')).add(constant(1))),
-          Decimal128Value('1E+1000000'),
+          valueOf(
+            constant(
+              Decimal128ValueInternal.unchecked('1e1000000'),
+            ).add(constant(1)),
+          ),
+          Decimal128ValueInternal.unchecked('1E+1000000'),
         );
       });
     });

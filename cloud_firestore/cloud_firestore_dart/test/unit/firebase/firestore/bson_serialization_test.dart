@@ -101,6 +101,23 @@ void main() {
       }
     });
 
+    test('reads a stored decimal that decimal128 can not hold exactly', () {
+      // Decimal128Value refuses such a string, as the backend does; one that
+      // reaches the client anyway (an old cache, a hand-made bundle) is still
+      // read as a decimal and compared exactly, not failed or turned into a map.
+      final String long = '1.${'0' * 33}1';
+      expect(() => Decimal128Value(long), throwsFormatException);
+      final FieldValue decoded = serializer.decodeValue(
+          _map(<String, proto.Value>{'__decimal128__': _string(long)}));
+      expect(decoded, isA<Decimal128FieldValue>());
+      expect((decoded.value! as Decimal128Value).stringValue, long);
+      expect(decoded.compareTo(wrap(Decimal128Value('1'))), greaterThan(0));
+      expect(
+          serializer.decodeValue(
+              _map(<String, proto.Value>{'__decimal128__': _string('1e7000')})),
+          isA<Decimal128FieldValue>());
+    });
+
     test('testEncodesBsonObjectIds', () {
       assertRoundTrip(
           BsonObjectId('507f191e810c19729de860ea'),

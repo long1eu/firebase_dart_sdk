@@ -32,7 +32,8 @@ export 'src/firebase/firestore/aggregate_field.dart'
 export 'src/firebase/firestore/blob.dart';
 export 'src/firebase/firestore/bson_object_id.dart';
 export 'src/firebase/firestore/bson_timestamp.dart';
-export 'src/firebase/firestore/decimal128_value.dart';
+export 'src/firebase/firestore/decimal128_value.dart'
+    hide Decimal128ValueInternal;
 export 'src/firebase/firestore/field_path.dart' hide FieldPathInternal;
 export 'src/firebase/firestore/field_value.dart' hide FieldValueInternal;
 export 'src/firebase/firestore/filter.dart' show Filter;

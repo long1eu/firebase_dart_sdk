@@ -10,6 +10,8 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart'
+    show Decimal128ValueInternal;
 import 'package:test/test.dart';
 
 import '../util/integration_test_util.dart';
@@ -408,6 +410,68 @@ void main() {
         <String>['f', 'b', 'a', 'e', 'd'],
       );
     });
+
+    test(
+      'decimals at the edges of decimal128 round-trip and order as on the backend',
+      () async {
+        // The backend rejects a decimal that decimal128 does not hold exactly
+        // (probed: 35 significant digits, 1e6145, 1e-6177, 15e-6177), and so
+        // does Decimal128Value, before anything is sent.
+        for (final String inexact in <String>[
+          '1.${'0' * 33}1',
+          '1e6145',
+          '1e-6177',
+          '15e-6177',
+        ]) {
+          expect(
+            () => Decimal128Value(inexact),
+            throwsFormatException,
+            reason: inexact,
+          );
+        }
+
+        final _Docs docs = <String, Map<String, Object?>>{
+          // More than 34 digits, but the extra ones are trailing zeros.
+          'a': <String, Object?>{'key': Decimal128Value('1.${'0' * 40}')},
+          'b': <String, Object?>{'key': Decimal128Value('1.${'0' * 32}1')},
+          'c': <String, Object?>{'key': Decimal128Value('${'9' * 34}e6111')},
+          'd': <String, Object?>{'key': Decimal128Value('1e-6176')},
+          'e': <String, Object?>{'key': Decimal128Value('100e-6178')},
+          'f': <String, Object?>{'key': Decimal128Value('0e7000')},
+        };
+        final CollectionReference collection = await testCollectionWithDocs(
+          docs,
+        );
+        for (final String id in docs.keys) {
+          final DocumentSnapshot snapshot = await collection
+              .document(id)
+              .get(Source.server);
+          expect(
+            snapshot.data!['key'],
+            docs[id]!['key'],
+            reason: 'round trip of $id',
+          );
+        }
+        await expectConsistent(
+          collection,
+          collection.whereEqualTo('key', Decimal128Value('1')),
+          docs,
+          <String>['a'],
+        );
+        await expectConsistent(
+          collection,
+          collection.whereEqualTo('key', Decimal128Value('1e-6176')),
+          docs,
+          <String>['d', 'e'],
+        );
+        await expectConsistent(
+          collection,
+          collection.orderBy('key'),
+          docs,
+          <String>['f', 'd', 'e', 'a', 'b', 'c'],
+        );
+      },
+    );
 
     test('filterAndOrderMinKey', () async {
       final _Docs docs = <String, Map<String, Object?>>{
@@ -907,10 +971,20 @@ void main() {
     });
 
     test('invalidDecimal128ValueGetsRejected', () async {
-      // More significant digits than a decimal128 can hold.
+      // More significant digits than a decimal128 can hold. The port rejects
+      // the value when it is constructed, as it does for the other invalid
+      // BSON values below.
+      expect(
+        () => Decimal128Value('1.0000000000000000000000000000000001'),
+        throwsFormatException,
+      );
+      // The backend rejects it too (Android's assertion), when it gets there
+      // without the client-side check.
       await expectLater(
         testCollection().document().set(<String, Object?>{
-          'key': Decimal128Value('1.0000000000000000000000000000000001'),
+          'key': Decimal128ValueInternal.unchecked(
+            '1.0000000000000000000000000000000001',
+          ),
         }),
         throwsInvalidArgument('Invalid decimal128 string'),
       );

@@ -24,12 +24,18 @@ enum _Kind { nan, negativeInfinity, finite, positiveInfinity }
 /// 32-bit integers and 128-bit decimals). A decimal such as `0.1` has no exact
 /// double representation, so the comparison can not go through `double`.
 ///
-/// PORTING NOTE: the Android and JS SDKs convert every operand to a `Quadruple`
-/// (a binary float with a 128-bit mantissa) for this. This class keeps the
-/// exact value instead, which orders every valid 34-digit decimal128 the same
-/// way and needs no rounding: a parsed decimal as its significant digits and a
+/// It keeps the exact value: a parsed decimal as its significant digits and a
 /// power of ten, an integer or a double as `mantissa * 2^exp2` (turned into
 /// decimal digits when two numbers of about the same magnitude are compared).
+///
+/// PORTING NOTE: the Android, iOS and JS SDKs convert decimal128 strings to a
+/// `Quadruple` (a binary float with a 128-bit mantissa, rounded from at most
+/// 59 significant digits, with an exponent range of about ±6.5e8 in base ten)
+/// and accept any such string. The port accepts, in `Decimal128Value`, only
+/// the strings that decimal128 holds exactly ([isDecimal128]), as the backend
+/// does (it rejects the others with `invalid-argument`, verified on the
+/// Enterprise emulator), and compares them exactly; for those values the
+/// order is the same as upstream's.
 ///
 /// The digits of a decimal are kept as a string: parsing, comparing and
 /// hashing are linear in the length of the input. A [BigInt] of the digits
@@ -333,6 +339,39 @@ class ExactNumber implements Comparable<ExactNumber> {
         final (String digits, int exp10) = _decimalForm;
         return double.parse('${_negative ? '-' : ''}${digits}e$exp10');
     }
+  }
+
+  /// The number of significant digits of decimal128.
+  static const int decimal128Digits = 34;
+
+  /// The smallest exponent of the last digit of a decimal128: the quantum of
+  /// its smallest subnormal, `1e-6176`.
+  static const int decimal128MinExponent = -6176;
+
+  /// The largest exponent of the last digit of a decimal128: its largest
+  /// finite value is `9.99...9e6144` (34 nines times `10^6111`).
+  static const int decimal128MaxExponent = 6111;
+
+  /// Whether IEEE 754 decimal128 holds this number exactly: NaN, an infinity,
+  /// a zero (of any exponent), or a finite number of at most
+  /// [decimal128Digits] significant digits (leading and trailing zeros do not
+  /// count) whose last digit is not below `10^decimal128MinExponent` and that
+  /// is not above `9.99...9e6144`.
+  ///
+  /// Matches what the backend accepts: `1.` with 40 zeros, `100e-6178`,
+  /// `0.1e6145` and `0e7000` are exact, `1.` with 33 zeros and a `1`,
+  /// `10e6144`, `1e-6177` and `1.234e-6174` are not.
+  bool get isDecimal128 {
+    if (_kind != _Kind.finite) {
+      return true;
+    }
+    final (String digits, int exp10) = _decimalForm;
+    if (digits.isEmpty) {
+      return true;
+    }
+    return digits.length <= decimal128Digits &&
+        exp10 >= decimal128MinExponent &&
+        digits.length + exp10 <= decimal128Digits + decimal128MaxExponent;
   }
 
   /// A hash that is the same for all the numbers [ExactNumber.parse] returns

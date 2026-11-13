@@ -45,7 +45,9 @@ double _toDouble(FieldValue value) {
 }
 
 EvaluateResult _decimalResult(Decimal value) => EvaluateValue(
-  Decimal128FieldValue.valueOf(Decimal128Value(value.toString())),
+  Decimal128FieldValue.valueOf(
+    Decimal128ValueInternal.unchecked(value.toString()),
+  ),
 );
 
 EvaluateResult _int32(int value) =>

@@ -467,7 +467,9 @@ class RemoteSerializer {
         }
         try {
           return Decimal128FieldValue.valueOf(
-            Decimal128Value(field.stringValue),
+            // From the backend, a bundle or the cache: always valid there; one
+            // that is not is still compared exactly instead of failing the read.
+            Decimal128ValueInternal.unchecked(field.stringValue),
           );
         } on FormatException {
           return null;

@@ -51,7 +51,8 @@ export 'src/firebase/firestore/aliases.dart';
 export 'src/firebase/firestore/blob.dart';
 export 'src/firebase/firestore/bson_object_id.dart';
 export 'src/firebase/firestore/bson_timestamp.dart';
-export 'src/firebase/firestore/decimal128_value.dart';
+export 'src/firebase/firestore/decimal128_value.dart'
+    hide Decimal128ValueInternal;
 export 'src/firebase/firestore/distance_measure.dart';
 export 'src/firebase/firestore/document_change.dart'
     hide DocumentChangeInternal;

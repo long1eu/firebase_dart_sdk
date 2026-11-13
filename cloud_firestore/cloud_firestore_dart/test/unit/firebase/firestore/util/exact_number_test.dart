@@ -40,8 +40,12 @@ void main() {
     final String digits = '1' * 1000000;
     final String digits2 = '${'1' * 999999}2';
 
-    final Decimal128Value a = Decimal128Value(zeros);
-    final Decimal128Value b = Decimal128Value('1e1000000');
+    // Decimal128Value refuses such values (decimal128 can not hold them), and
+    // tells so in linear time; a stored one is read without the check.
+    expect(() => Decimal128Value(zeros), throwsFormatException);
+    expect(() => Decimal128Value(digits), throwsFormatException);
+    final Decimal128Value a = Decimal128ValueInternal.unchecked(zeros);
+    final Decimal128Value b = Decimal128ValueInternal.unchecked('1e1000000');
     expect(a, b);
     expect(a.hashCode, b.hashCode);
 

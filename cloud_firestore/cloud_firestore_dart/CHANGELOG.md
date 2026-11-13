@@ -328,6 +328,12 @@ Data types:
   a plain map with a reserved key used as a query value or as an `arrayUnion` / `arrayRemove`
   element (for example `{'__int__': 5}`) is read as the BSON value, so that the local cache
   evaluates the query like the backend. Verified on the Enterprise edition emulator only.
+  `Decimal128Value` throws a `FormatException` for a string that decimal128 can not hold
+  exactly, as the backend rejects such a value: more than 34 significant digits (leading zeros
+  and trailing zeros that carry no digit do not count), anything above `9.99...9e6144`, or a
+  last digit below `1e-6176` (`1e6145`, `1e-6177` and `15e-6177` are rejected; `1e6144`,
+  `1e-6176` and `1.` with 40 zeros are fine). A stored value is read as it is. The other SDKs
+  accept any decimal string and round it to a 128-bit binary float.
 - Value helpers from the JS SDK: `Timestamp.fromMillis` / `toMillis`, `Blob.fromBase64String` /
   `toBase64`, and `toJson` / `fromJson` on `Timestamp`, `GeoPoint`, `Blob` and `VectorValue` in
   the JS `toJSON()` shape (so `jsonEncode` works on them).
