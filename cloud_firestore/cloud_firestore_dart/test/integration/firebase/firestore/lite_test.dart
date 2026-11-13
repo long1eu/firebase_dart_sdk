@@ -1,8 +1,15 @@
 // Firestore Lite against the emulator: a port of the integration tests of
 // the JS SDK's lite library (packages/firestore/test/lite/integration.test.ts).
 // The groups and test names are those of the JS file. Not ported: the tests
-// of TypeScript's static types (`types test`), `ignoreUndefinedProperties`
-// (Dart has no `undefined`) and the tests JS skips on the emulator.
+// of TypeScript's static types (`types test`, `is properly typed`, `requires
+// the correct converter for Partial usage`), `ignoreUndefinedProperties`
+// (Dart has no `undefined`), the variadic path forms of `doc()` and
+// `collection()` (Dart takes one path), and the tests JS skips on the
+// emulator (the console link of a missing index, `BSON types`, which JS runs
+// only against an Enterprise backend). The two `FieldValue` tests that need
+// no backend (`isEqual()` and `instanceof`) are in
+// test/unit/firebase/firestore/lite/lite_api_test.dart. The JS tests of
+// aggregations with one filter, order or cursor each are one test here.
 //
 // Runs over gRPC by default and over REST (the transport of the web) with
 // FIRESTORE_TEST_TRANSPORT=rest.
@@ -363,6 +370,32 @@ void main() {
       );
       expect(fs1, same(fs2));
       expect(fs1, same(fs3));
+    });
+
+    test('returns same default instance from default app', () {
+      final FirebaseApp app = FirebaseApp.withOptions(
+        const FirebaseOptions(
+          apiKey: 'fake-api-key',
+          applicationId: 'appId',
+          projectId: 'test-project',
+        ),
+        dependencies: null,
+      );
+      addTearDown(app.delete);
+      final Firestore fs1 = Firestore.instanceFor(
+        app: app,
+        settings: FirestoreSettings(host: 'localhost', sslEnabled: false),
+      );
+      addTearDown(fs1.terminate);
+      // getFirestore(), getFirestore(app), getFirestore('(default)') and
+      // getFirestore(app, '(default)') of the JS test.
+      expect(Firestore.instance, same(fs1));
+      expect(Firestore.instanceFor(app: app), same(fs1));
+      expect(
+        Firestore.instanceFor(app: FirebaseApp.instance, database: '(default)'),
+        same(fs1),
+      );
+      expect(Firestore.instanceFor(app: app, database: '(default)'), same(fs1));
     });
 
     test('returns different instance from named app', () {
@@ -911,6 +944,53 @@ void main() {
         expect((await coll.count().get()).getCount(), 4);
       },
     );
+
+    test(
+      'a read after a write fails the transaction, even when caught',
+      () async {
+        final DocumentReference<Map<String, Object?>> doc =
+            await newLiteTestDoc(<String, Object?>{'counter': 1});
+        await expectLater(
+          doc.firestore.runTransaction<void>((Transaction transaction) async {
+            transaction.set(doc, <String, Object?>{'counter': 2});
+            try {
+              await transaction.get(doc);
+            } on FirestoreError catch (_) {
+              // The commit fails all the same.
+            }
+          }),
+          throwsA(
+            isA<FirestoreError>().having(
+              (FirestoreError e) => e.code,
+              'code',
+              FirestoreErrorCode.invalidArgument,
+            ),
+          ),
+        );
+        expect((await doc.get()).get('counter'), 1);
+      },
+    );
+
+    test('terminate() inside a transaction fails its commit', () async {
+      final DocumentReference<Map<String, Object?>> doc = await newLiteTestDoc(
+        <String, Object?>{'counter': 1},
+      );
+      final Firestore db = doc.firestore;
+      int attempts = 0;
+      await expectLater(
+        db.runTransaction<void>((Transaction transaction) async {
+          attempts++;
+          await transaction.get(doc);
+          transaction.set(doc, <String, Object?>{'counter': 2});
+          // Does not wait for the transaction.
+          await db.terminate();
+        }),
+        throwsTerminated,
+      );
+      expect(attempts, 1);
+      final Firestore other = newLiteTestFirestore();
+      expect((await other.doc(doc.path).get()).get('counter'), 1);
+    });
 
     test('queries need a read-only transaction', () async {
       final CollectionReference<Map<String, Object?>> coll =
@@ -2005,6 +2085,27 @@ void main() {
       );
     });
 
+    test("aggregate query doesn't use converter", () async {
+      final CollectionReference<Map<String, Object?>> coll =
+          await newLiteTestCollectionWith(threeBooks);
+      final FirestoreDataConverter<Object> throwingConverter =
+          FirestoreDataConverter<Object>.from(
+            fromFirestore:
+                (QueryDocumentSnapshot<Map<String, Object?>> snapshot) =>
+                    throw StateError('should never be called'),
+            toFirestore: (Object value, SetOptions? options) =>
+                throw StateError('should never be called'),
+          );
+      final AggregateQuerySnapshot snapshot = await coll
+          .where('author', isEqualTo: 'authorA')
+          .withConverter(throwingConverter)
+          .aggregateWithAliases(<String, AggregateField>{
+            'myCount': AggregateField.count(),
+          })
+          .get();
+      expect(snapshot.data(), <String, Object?>{'myCount': 2});
+    });
+
     test('aggregate query supports collection groups', () async {
       final Firestore db = newLiteTestFirestore();
       final String group = db.collection('aggregateTest').doc().id;
@@ -2027,6 +2128,64 @@ void main() {
           })
           .get();
       expect(snapshot.data(), <String, Object?>{'myCount': 2, 'total': 4});
+    });
+
+    test('aggregateQuerySnapshotEqual on same queries be truthy', () async {
+      final CollectionReference<Map<String, Object?>> coll =
+          await newLiteTestCollectionWith(threeBooks);
+      AggregateQuery myCount(Query<Object?> query) =>
+          query.aggregateWithAliases(<String, AggregateField>{
+            'myCount': AggregateField.count(),
+          });
+      final Query<Map<String, Object?>> query1 = coll.where(
+        'author',
+        isEqualTo: 'authorA',
+      );
+      final Query<Map<String, Object?>> query2 = coll.where(
+        'author',
+        isEqualTo: 'authorA',
+      );
+      final AggregateQuerySnapshot snapshot1A = await myCount(query1).get();
+      expect(snapshot1A, await myCount(query1).get());
+      expect(snapshot1A, await myCount(query2).get());
+    });
+
+    test('aggregateQuerySnapshotEqual on same queries with different documents '
+        'size be falsy', () async {
+      final CollectionReference<Map<String, Object?>> coll =
+          await newLiteTestCollectionWith(threeBooks);
+      AggregateQuery myCount(Query<Object?> query) =>
+          query.aggregateWithAliases(<String, AggregateField>{
+            'myCount': AggregateField.count(),
+          });
+      final Query<Map<String, Object?>> query1 = coll.where(
+        'author',
+        isEqualTo: 'authorA',
+      );
+      final AggregateQuerySnapshot snapshot1A = await myCount(query1).get();
+      await coll.add(<String, Object?>{'author': 'authorA', 'title': 'titleD'});
+      final Query<Map<String, Object?>> query2 = coll.where(
+        'author',
+        isEqualTo: 'authorA',
+      );
+      expect(snapshot1A, isNot(await myCount(query1).get()));
+      expect(snapshot1A, isNot(await myCount(query2).get()));
+    });
+
+    test('aggregateQuerySnapshotEqual on different queries be falsy', () async {
+      final CollectionReference<Map<String, Object?>> coll =
+          await newLiteTestCollectionWith(<Map<String, Object?>>[
+            ...threeBooks,
+            <String, Object?>{'author': 'authorB', 'title': 'titleD'},
+          ]);
+      AggregateQuery myCount(Query<Object?> query) =>
+          query.aggregateWithAliases(<String, AggregateField>{
+            'myCount': AggregateField.count(),
+          });
+      expect(
+        await myCount(coll.where('author', isEqualTo: 'authorA')).get(),
+        isNot(await myCount(coll.where('author', isEqualTo: 'authorB')).get()),
+      );
     });
 
     test('aggregate query fails on a terminated Firestore', () async {
@@ -2171,51 +2330,55 @@ void main() {
       );
     });
 
-    test('performs aggregations on documents with all aggregated fields using '
-        'getAggregationFromServer', skip: TestBackend().skipOnEnterprise(
-          'an aggregation counts every document, not only those that have '
-          'all the aggregated fields',
-        ), () async {
-      final CollectionReference<Map<String, Object?>> coll =
-          await newLiteTestCollectionWith(<Map<String, Object?>>[
-            <String, Object?>{
-              'author': 'authorA',
-              'title': 'titleA',
-              'pages': 100,
-              'year': 1980,
-            },
-            <String, Object?>{
-              'author': 'authorB',
-              'title': 'titleB',
-              'pages': 50,
-              'year': 2020,
-            },
-            <String, Object?>{
-              'author': 'authorC',
-              'title': 'titleC',
-              'pages': 150,
-              'year': 2021,
-            },
-            <String, Object?>{
-              'author': 'authorD',
-              'title': 'titleD',
-              'pages': 50,
-            },
-          ]);
-      final AggregateQuerySnapshot snapshot =
-          await coll.aggregateWithAliases(<String, AggregateField>{
-            'totalPages': AggregateField.sum('pages'),
-            'averagePages': AggregateField.average('pages'),
-            'averageYear': AggregateField.average('year'),
-            'count': AggregateField.count(),
-          }).get();
-      expect(snapshot.data(), <String, Object?>{
-        'totalPages': 300,
-        'averagePages': 100,
-        'averageYear': 2007,
-        'count': 3,
-      });
-    });
+    test(
+      'performs aggregations on documents with all aggregated fields using '
+      'getAggregationFromServer',
+      skip: TestBackend().skipOnEnterprise(
+        'an aggregation counts every document, not only those that have '
+        'all the aggregated fields',
+      ),
+      () async {
+        final CollectionReference<Map<String, Object?>> coll =
+            await newLiteTestCollectionWith(<Map<String, Object?>>[
+              <String, Object?>{
+                'author': 'authorA',
+                'title': 'titleA',
+                'pages': 100,
+                'year': 1980,
+              },
+              <String, Object?>{
+                'author': 'authorB',
+                'title': 'titleB',
+                'pages': 50,
+                'year': 2020,
+              },
+              <String, Object?>{
+                'author': 'authorC',
+                'title': 'titleC',
+                'pages': 150,
+                'year': 2021,
+              },
+              <String, Object?>{
+                'author': 'authorD',
+                'title': 'titleD',
+                'pages': 50,
+              },
+            ]);
+        final AggregateQuerySnapshot snapshot =
+            await coll.aggregateWithAliases(<String, AggregateField>{
+              'totalPages': AggregateField.sum('pages'),
+              'averagePages': AggregateField.average('pages'),
+              'averageYear': AggregateField.average('year'),
+              'count': AggregateField.count(),
+            }).get();
+        expect(snapshot.data(), <String, Object?>{
+          'totalPages': 300,
+          'averagePages': 100,
+          'averageYear': 2007,
+          'count': 3,
+        });
+      },
+    );
   }, skip: skip);
 
   group('Vectors', () {

@@ -542,6 +542,16 @@ Documentation and tests:
   the whole `Platform.version` string, with spaces, a date and a quoted platform name.
 - `FirestoreSettings.copyWith(cacheSettings: ...)` on settings that set `persistenceEnabled` or
   `cacheSizeBytes` throws instead of dropping them.
+- Firestore Lite: a transaction no longer holds off `terminate()` (awaiting `terminate()` inside
+  a transaction used to hang). As in the JS SDK, once the instance is terminated the next read
+  or the commit of a running transaction fails with `failedPrecondition`, and the transaction is
+  not retried.
+- Transactions (main library and Firestore Lite): a read after a write fails with the message of
+  the JS and Android SDKs ("Firestore transactions require all reads to be executed before all
+  writes.") and, as in the JS SDK, the transaction then fails to commit even if the update
+  function caught the error.
+- `FieldValue.arrayUnion` and `FieldValue.arrayRemove` are equal (`==`) when their elements are
+  equal in the same order, as `isEqual` of the JS SDK.
 
 ### Not done
 

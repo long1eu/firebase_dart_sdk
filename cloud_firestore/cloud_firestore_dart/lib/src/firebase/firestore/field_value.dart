@@ -3,6 +3,7 @@
 // on 20/09/2018
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
+import 'package:collection/collection.dart';
 
 /// Sentinel values that can be used when writing document fields with `set()` or `update()`.
 abstract class FieldValue {
@@ -108,6 +109,18 @@ class _ArrayUnionFieldValue extends FieldValue {
 
   @override
   String get _methodName => 'FieldValue.arrayUnion';
+
+  /// Equal when the elements are equal, in the same order (as `isEqual` of
+  /// the JS SDK).
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _ArrayUnionFieldValue &&
+          _elementEquality.equals(_elements, other._elements);
+
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, _elementEquality.hash(_elements));
 }
 
 /// FieldValue class for arrayRemove() transforms.
@@ -116,6 +129,18 @@ class _ArrayRemoveFieldValue extends FieldValue {
 
   @override
   String get _methodName => 'FieldValue.arrayRemove';
+
+  /// Equal when the elements are equal, in the same order (as `isEqual` of
+  /// the JS SDK).
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _ArrayRemoveFieldValue &&
+          _elementEquality.equals(_elements, other._elements);
+
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, _elementEquality.hash(_elements));
 }
 
 /* FieldValue class for increment() transforms. */
@@ -143,6 +168,9 @@ class _NumericIncrementFieldValue extends FieldValue {
 /// The operand of a numeric transform for hashing. All NaNs are equal there, so
 /// they must hash alike, while the hash of a double follows its bits and NaNs
 /// differ in theirs (`0.0 / 0.0` has the sign bit set on x64, not on arm64).
+/// Compares the elements of array transforms, deeply.
+const DeepCollectionEquality _elementEquality = DeepCollectionEquality();
+
 num _hashableOperand(num operand) => operand.isNaN ? double.nan : operand;
 
 /// FieldValue class for minimum() transforms.

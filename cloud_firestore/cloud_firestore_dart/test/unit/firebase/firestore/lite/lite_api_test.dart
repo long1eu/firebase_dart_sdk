@@ -1100,7 +1100,13 @@ void main() {
             ),
           ),
         );
-        expect(transport().requests<proto.CommitRequest>('Commit'), isEmpty);
+        // No transport may have been opened: look at all of them.
+        expect(
+          transports.expand(
+            (FakeLiteTransport t) => t.requests<proto.CommitRequest>('Commit'),
+          ),
+          isEmpty,
+        );
       },
     );
 
@@ -1238,6 +1244,240 @@ void main() {
         }),
         throwsArgumentError,
       );
+    });
+
+    test('a read after a write fails the transaction, even when caught '
+        '(as in the JS SDK)', () async {
+      final Firestore firestore = newFirestore();
+      int attempts = 0;
+      Object? readError;
+      await expectLater(
+        firestore.runTransaction<void>((Transaction transaction) async {
+          attempts++;
+          transaction.set(firestore.doc('coll/a'), <String, Object?>{'a': 1});
+          try {
+            await transaction.get(firestore.doc('coll/b'));
+          } on FirestoreError catch (e) {
+            readError = e;
+          }
+        }),
+        throwsA(
+          isA<FirestoreError>()
+              .having(
+                (FirestoreError e) => e.code,
+                'code',
+                FirestoreErrorCode.invalidArgument,
+              )
+              .having(
+                (FirestoreError e) => e.message,
+                'message',
+                'Firestore transactions require all reads to be executed '
+                    'before all writes.',
+              ),
+        ),
+      );
+      expect(readError, isA<FirestoreError>());
+      expect(attempts, 1);
+      // No transport may have been opened: look at all of them.
+      expect(
+        transports.expand(
+          (FakeLiteTransport t) => t.requests<proto.CommitRequest>('Commit'),
+        ),
+        isEmpty,
+      );
+    });
+
+    group('and terminate()', () {
+      final Matcher throwsTerminated = throwsA(
+        isA<FirestoreError>()
+            .having(
+              (FirestoreError e) => e.code,
+              'code',
+              FirestoreErrorCode.failedPrecondition,
+            )
+            .having(
+              (FirestoreError e) => e.message,
+              'message',
+              'The client has already been terminated.',
+            ),
+      );
+
+      test('a transaction on a terminated instance fails at once', () async {
+        final Firestore firestore = newFirestore();
+        await firestore.terminate();
+        int attempts = 0;
+        await expectLater(
+          firestore.runTransaction<void>((Transaction transaction) async {
+            attempts++;
+          }),
+          throwsTerminated,
+        );
+        expect(attempts, 0);
+      });
+
+      test('terminate() inside a transaction does not wait for it, and its '
+          'next read fails without a retry', () async {
+        final Firestore firestore = newFirestore();
+        int attempts = 0;
+        await expectLater(
+          firestore.runTransaction<void>((Transaction transaction) async {
+            attempts++;
+            await transaction.get(firestore.doc('coll/a'));
+            // Completes: the transaction does not hold off terminate().
+            await firestore.terminate();
+            await transaction.get(firestore.doc('coll/b'));
+          }),
+          throwsTerminated,
+        );
+        expect(attempts, 1);
+        expect(transport().isShutDown, isTrue);
+        expect(
+          transport().requests<proto.BatchGetDocumentsRequest>(
+            'BatchGetDocuments',
+          ),
+          hasLength(1),
+        );
+      });
+
+      test('the writes of a transaction are not committed after '
+          'terminate()', () async {
+        final Firestore firestore = newFirestore();
+        int attempts = 0;
+        await expectLater(
+          firestore.runTransaction<void>((Transaction transaction) async {
+            attempts++;
+            await transaction.get(firestore.doc('coll/a'));
+            transaction.set(firestore.doc('coll/a'), <String, Object?>{'a': 1});
+            await firestore.terminate();
+          }),
+          throwsTerminated,
+        );
+        expect(attempts, 1);
+        expect(transport().requests<proto.CommitRequest>('Commit'), isEmpty);
+      });
+
+      test('terminate() waits for the request of a transaction on the '
+          'wire', () async {
+        final Firestore firestore = newFirestore();
+        await firestore.doc('coll/warmup').get();
+        final Completer<void> release = Completer<void>();
+        final Completer<void> lookupStarted = Completer<void>();
+        transport().handlers['BatchGetDocuments'] =
+            (GeneratedMessage request) async {
+              lookupStarted.complete();
+              await release.future;
+              return <GeneratedMessage>[
+                proto.BatchGetDocumentsResponse()
+                  ..found = document('coll/a', <String, int>{'a': 1}),
+              ];
+            };
+        final Future<int> result = firestore.runTransaction<int>((
+          Transaction transaction,
+        ) async {
+          final DocumentSnapshot<Map<String, Object?>> snapshot =
+              await transaction.get(firestore.doc('coll/a'));
+          return snapshot.data!['a']! as int;
+        });
+        await lookupStarted.future;
+        bool terminated = false;
+        final Future<void> termination = firestore.terminate().then(
+          (_) => terminated = true,
+        );
+        await pumpEventQueue();
+        expect(terminated, isFalse);
+
+        // The read comes back, but the commit (which verifies it) is a request
+        // after terminate().
+        final Future<void> failure = expectLater(result, throwsTerminated);
+        release.complete();
+        await termination;
+        await failure;
+      });
+    });
+  });
+
+  group('field values', () {
+    // The tests of `FieldValue` of the JS file of integration tests that need
+    // no backend.
+    test('support equality checking with isEqual()', () {
+      expect(FieldValue.delete(), FieldValue.delete());
+      expect(FieldValue.serverTimestamp(), FieldValue.serverTimestamp());
+      expect(FieldValue.delete(), isNot(FieldValue.serverTimestamp()));
+      expect(
+        FieldValue.arrayUnion(<Object?>[]),
+        FieldValue.arrayUnion(<Object?>[]),
+      );
+      expect(
+        FieldValue.arrayUnion(<Object?>['a']),
+        FieldValue.arrayUnion(<Object?>['a']),
+      );
+      expect(
+        FieldValue.arrayUnion(<Object?>['a']),
+        isNot(FieldValue.arrayUnion(<Object?>['b'])),
+      );
+      expect(
+        FieldValue.arrayUnion(<Object?>['a', 'b']),
+        isNot(FieldValue.arrayUnion(<Object?>['b', 'a'])),
+      );
+      expect(
+        FieldValue.arrayRemove(<Object?>[]),
+        FieldValue.arrayRemove(<Object?>[]),
+      );
+      expect(
+        FieldValue.arrayRemove(<Object?>['a']),
+        FieldValue.arrayRemove(<Object?>['a']),
+      );
+      expect(
+        FieldValue.arrayRemove(<Object?>['a']),
+        isNot(FieldValue.arrayRemove(<Object?>['b'])),
+      );
+      expect(
+        FieldValue.arrayRemove(<Object?>['a', 'b']),
+        isNot(FieldValue.arrayRemove(<Object?>['b', 'a'])),
+      );
+      expect(FieldValue.increment(1), FieldValue.increment(1));
+      expect(FieldValue.increment(1), isNot(FieldValue.increment(2)));
+
+      expect(FieldValue.minimum(1), FieldValue.minimum(1));
+      expect(FieldValue.minimum(1), isNot(FieldValue.minimum(2)));
+      expect(FieldValue.maximum(1), FieldValue.maximum(1));
+      expect(FieldValue.maximum(1), isNot(FieldValue.maximum(2)));
+
+      expect(FieldValue.minimum(double.nan), FieldValue.minimum(double.nan));
+      expect(FieldValue.maximum(double.nan), FieldValue.maximum(double.nan));
+
+      // Beyond the JS test: union and remove are not equal to each other,
+      // nested elements are compared deeply, and equal values hash alike.
+      expect(
+        FieldValue.arrayUnion(<Object?>['a']),
+        isNot(FieldValue.arrayRemove(<Object?>['a'])),
+      );
+      expect(
+        FieldValue.arrayUnion(<Object?>[
+          <String, Object?>{
+            'x': <Object?>[1, 2],
+          },
+        ]),
+        FieldValue.arrayUnion(<Object?>[
+          <String, Object?>{
+            'x': <Object?>[1, 2],
+          },
+        ]),
+      );
+      expect(
+        FieldValue.arrayUnion(<Object?>['a', 1]).hashCode,
+        FieldValue.arrayUnion(<Object?>['a', 1]).hashCode,
+      );
+    });
+
+    test('support instanceof checks', () {
+      expect(FieldValue.delete(), isA<FieldValue>());
+      expect(FieldValue.serverTimestamp(), isA<FieldValue>());
+      expect(FieldValue.increment(1), isA<FieldValue>());
+      expect(FieldValue.arrayUnion(<Object?>['a']), isA<FieldValue>());
+      expect(FieldValue.arrayRemove(<Object?>['a']), isA<FieldValue>());
+      expect(FieldValue.minimum(1), isA<FieldValue>());
+      expect(FieldValue.maximum(1), isA<FieldValue>());
     });
   });
 }

@@ -26,6 +26,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/transaction.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/transaction_runner.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/lite/document_reference.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/lite/lite_transaction_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/lite/lite_transport.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/lite/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/lite/settings.dart';
@@ -220,39 +221,45 @@ class Firestore {
   /// of the backend: all its reads, also of queries ([Transaction.getQuery])
   /// and aggregations ([Transaction.getAggregate]), see the database at one
   /// point in time.
+  ///
+  /// If this instance is [terminate]d while the transaction runs, its next
+  /// read or its commit fails with [FirestoreErrorCode.failedPrecondition]
+  /// and it is not retried.
   Future<T> runTransaction<T>(
     Future<T> Function(Transaction transaction) updateFunction, {
     TransactionOptions options = TransactionOptions.defaultOptions,
-  }) {
-    return run<T>(
-      (Datastore datastore) => TransactionRunner<T>(
-        createTransaction: () => core.Transaction(
-          datastore.transactionClient,
-          readOnly: options.readOnly,
-          readTime: options.readTime == null
-              ? null
-              : SnapshotVersion(options.readTime!),
-        ),
-        maxAttempts: options.maxAttempts,
-        // A scheduler of its own: a [TaskScheduler] holds only one pending
-        // task per [TaskId], and transactions run concurrently.
-        backoff: ExponentialBackoff(
-          TaskScheduler('transaction'),
-          TaskId.retryTransaction,
-        ),
-        updateFunction: (core.Transaction transaction) =>
-            updateFunction(Transaction(transaction, this)),
-        isTerminated: () => _terminated,
-      ).run(),
-    );
+  }) async {
+    _checkNotTerminated();
+    // Every request of the transaction is a call of its own (as in the JS
+    // SDK): a transaction does not hold off terminate().
+    final LiteTransactionClient client = LiteTransactionClient(this);
+    return TransactionRunner<T>(
+      createTransaction: () => core.Transaction(
+        client,
+        readOnly: options.readOnly,
+        readTime: options.readTime == null
+            ? null
+            : SnapshotVersion(options.readTime!),
+      ),
+      maxAttempts: options.maxAttempts,
+      // A scheduler of its own: a [TaskScheduler] holds only one pending
+      // task per [TaskId], and transactions run concurrently.
+      backoff: ExponentialBackoff(
+        TaskScheduler('transaction'),
+        TaskId.retryTransaction,
+      ),
+      updateFunction: (core.Transaction transaction) =>
+          updateFunction(Transaction(transaction, this)),
+      isTerminated: () => _terminated,
+    ).run();
   }
 
   /// Terminates this instance: every later call on it, and on the references
   /// and queries made from it, fails with
-  /// [FirestoreErrorCode.failedPrecondition]. The calls in flight are not
+  /// [FirestoreErrorCode.failedPrecondition]. The requests on the wire are not
   /// interrupted: the returned future completes when they are done and the
-  /// connection is closed (so do not await it inside a transaction of this
-  /// instance).
+  /// connection is closed. A transaction in progress is not waited for: its
+  /// next read or its commit fails (see [runTransaction]).
   ///
   /// [instanceFor] returns a new instance afterwards. Calling this again does
   /// nothing.
@@ -291,12 +298,7 @@ class Firestore {
   /// Runs [operation] against the backend, unless this instance is terminated.
   @internal
   Future<R> run<R>(Future<R> Function(Datastore datastore) operation) async {
-    if (_terminated) {
-      throw FirestoreError(
-        _terminatedMessage,
-        FirestoreErrorCode.failedPrecondition,
-      );
-    }
+    _checkNotTerminated();
     final Datastore datastore = _datastore ??= _createDatastore();
     _inFlight++;
     try {
@@ -307,6 +309,15 @@ class Firestore {
         _idle?.complete();
         _idle = null;
       }
+    }
+  }
+
+  void _checkNotTerminated() {
+    if (_terminated) {
+      throw FirestoreError(
+        _terminatedMessage,
+        FirestoreErrorCode.failedPrecondition,
+      );
     }
   }
 

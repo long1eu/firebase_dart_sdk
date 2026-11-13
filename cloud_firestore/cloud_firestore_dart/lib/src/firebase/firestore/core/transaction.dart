@@ -148,12 +148,16 @@ class Transaction {
     }
 
     if (mutations.isNotEmpty) {
-      return Future<List<MaybeDocument>>.error(
-        FirestoreError(
-          'Transactions lookups are invalid after writes.',
-          FirestoreErrorCode.invalidArgument,
-        ),
+      // As in the JS SDK, the error also fails the commit: a transaction that
+      // tried to read after writing does not commit, even if the update
+      // function caught the error.
+      final FirestoreError error = FirestoreError(
+        'Firestore transactions require all reads to be executed before all '
+        'writes.',
+        FirestoreErrorCode.invalidArgument,
       );
+      _lastWriteError = error;
+      return Future<List<MaybeDocument>>.error(error);
     }
 
     final List<MaybeDocument> result = await _transactionClient.lookup(keys);
