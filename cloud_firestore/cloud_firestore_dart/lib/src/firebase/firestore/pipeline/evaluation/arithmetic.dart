@@ -37,6 +37,9 @@ double _toDouble(FieldValue value) {
   return switch (value) {
     DoubleValue() => value.value,
     Decimal128FieldValue() => value.doubleValue,
+    // Also exact in JavaScript: an integer there already is the double
+    // nearest to the 64-bit integer, which is what the conversion gives.
+    IntegerValue() => value.value.toDouble(),
     _ => _integer(value).toDouble(),
   };
 }
@@ -306,8 +309,33 @@ double _log10(double value) {
   } else if (value <= 0) {
     throw const _EvaluationError();
   }
-  return math.log(value) / math.ln10;
+  if (value.isNaN || value.isInfinite) {
+    return value;
+  }
+  // fdlibm's log10, as Java has it: the power of two apart, so that a power
+  // of ten (and log10(2)) comes out exact. log(x) / ln(10) is off by a bit
+  // for many values.
+  final ByteData bits = ByteData(8)..setFloat64(0, value);
+  int high = bits.getUint32(0);
+  int k = 0;
+  if (high < 0x00100000) {
+    // Subnormal: scale up by 2^54.
+    bits.setFloat64(0, value * 18014398509481984.0);
+    high = bits.getUint32(0);
+    k = -54;
+  }
+  k += (high >> 20) - 1023;
+  final int i = k < 0 ? 1 : 0;
+  bits.setUint32(0, (high & 0x000fffff) | ((0x3ff - i) << 20));
+  final double y = (k + i).toDouble();
+  final double z =
+      y * _log10Of2Low + _inverseLn10 * math.log(bits.getFloat64(0));
+  return z + y * _log10Of2High;
 }
+
+const double _inverseLn10 = 4.34294481903251816668e-01;
+const double _log10Of2High = 3.01029995663611771306e-01;
+const double _log10Of2Low = 3.69423907715893078616e-13;
 
 final Map<String, _Function> _arithmeticFunctions = <String, _Function>{
   'add': _binaryArithmetic(

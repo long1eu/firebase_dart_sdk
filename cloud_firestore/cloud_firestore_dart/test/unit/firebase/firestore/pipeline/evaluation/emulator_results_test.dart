@@ -8,6 +8,14 @@
 //     test/integration_enterprise/pipeline_evaluation_property_test.dart \
 //     --name "recorded emulator results"
 
+// The cases of this file use doubles with integral values (1.0, -0.0,
+// Double.MAX_VALUE) or 64-bit integers. Compiled to JavaScript (dart2js) an
+// integral double is an int and an int beyond 2^53 is not exact, so they run
+// on the VM only. web_numbers_test.dart covers evaluation compiled to
+// JavaScript.
+@TestOn('vm')
+library;
+
 import 'dart:convert';
 import 'dart:io';
 

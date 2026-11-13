@@ -44,7 +44,9 @@ void main() {
     );
     assertEvaluatesTo(
       evaluate(expr),
-      encodeValue("a,b,c".toByteArray()),
+      // Android expects bytes here; the Enterprise edition emulator returns a
+      // string (the bytes read as UTF-8).
+      encodeValue("a,b,c"),
       "join_bytes",
     );
   });
@@ -63,7 +65,9 @@ void main() {
     );
     assertEvaluatesTo(
       evaluate(expr),
-      encodeValue("a,c".toByteArray()),
+      // Android expects bytes here; the Enterprise edition emulator returns a
+      // string (the bytes read as UTF-8).
+      encodeValue("a,c"),
       "joinWithNulls_bytes",
     );
   });
@@ -81,7 +85,9 @@ void main() {
     );
     assertEvaluatesTo(
       evaluate(expr),
-      encodeValue("".toByteArray()),
+      // Android expects bytes here; the Enterprise edition emulator returns a
+      // string (the bytes read as UTF-8).
+      encodeValue(""),
       "joinEmptyArray_bytes",
     );
   });
@@ -107,7 +113,9 @@ void main() {
     );
     assertEvaluatesTo(
       evaluate(expr),
-      encodeValue("a,c".toByteArray()),
+      // Android expects bytes here; the Enterprise edition emulator returns a
+      // string (the bytes read as UTF-8).
+      encodeValue("a,c"),
       "joinWithLeadingNull_bytes",
     );
   });
@@ -122,7 +130,9 @@ void main() {
     );
     assertEvaluatesTo(
       evaluate(expr),
-      encodeValue("a".toByteArray()),
+      // Android expects bytes here; the Enterprise edition emulator returns a
+      // string (the bytes read as UTF-8).
+      encodeValue("a"),
       "joinSingleElement_bytes",
     );
   });
@@ -141,7 +151,9 @@ void main() {
     );
     assertEvaluatesTo(
       evaluate(expr),
-      encodeValue("abc".toByteArray()),
+      // Android expects bytes here; the Enterprise edition emulator returns a
+      // string (the bytes read as UTF-8).
+      encodeValue("abc"),
       "joinWithEmptyDelimiter_bytes",
     );
   });
@@ -156,7 +168,9 @@ void main() {
     );
     assertEvaluatesTo(
       evaluate(expr),
-      encodeValue("".toByteArray()),
+      // Android expects bytes here; the Enterprise edition emulator returns a
+      // string (the bytes read as UTF-8).
+      encodeValue(""),
       "joinAllNulls_bytes",
     );
   });
@@ -171,7 +185,9 @@ void main() {
     );
     assertEvaluatesTo(
       evaluate(expr),
-      encodeValue("".toByteArray()),
+      // Android expects bytes here; the Enterprise edition emulator returns a
+      // string (the bytes read as UTF-8).
+      encodeValue(""),
       "joinSingleNull_bytes",
     );
   });

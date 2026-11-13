@@ -400,9 +400,66 @@ EvaluateResult _regexFindAll(_Call call) => _strict(
   call,
   <bool Function(FieldValue)?>[_isString, _isString],
   (List<FieldValue> v) => _list(
-    _regExp(_text(v[1])).allMatches(_text(v[0])).map(_matchValue).toList(),
+    _allMatches(_regExp(_text(v[1])), _text(v[0])).map(_matchValue).toList(),
   ),
 );
+
+bool _isHighSurrogate(int unit) => unit >= 0xd800 && unit <= 0xdbff;
+
+bool _isLowSurrogate(int unit) => unit >= 0xdc00 && unit <= 0xdfff;
+
+/// The matches of [regExp] in [input] as the backend finds them.
+///
+/// The backend (Java) steps over the input in UTF-16 code units: after an
+/// empty match right before a character outside the BMP it tries again
+/// between the two halves of that character, where an empty match counts
+/// once more (`regex_find_all('😀', '')` has three matches). A Dart regular
+/// expression in Unicode mode never starts there, so that position is tried
+/// on a copy of the input whose two halves are replaced by two characters of
+/// the same kind (neither letters, digits, spaces nor line breaks).
+List<RegExpMatch> _allMatches(RegExp regExp, String input) {
+  final List<RegExpMatch> matches = <RegExpMatch>[];
+  int position = 0;
+  while (position <= input.length) {
+    if (position > 0 &&
+        position < input.length &&
+        _isHighSurrogate(input.codeUnitAt(position - 1)) &&
+        _isLowSurrogate(input.codeUnitAt(position))) {
+      final String halves = input.replaceRange(
+        position - 1,
+        position + 1,
+        '\u{e000}\u{e001}',
+      );
+      final RegExpMatch? match =
+          regExp.matchAsPrefix(halves, position) as RegExpMatch?;
+      if (match != null) {
+        if (match.end != match.start) {
+          throw UnsupportedExpression(
+            'A match of half a character outside the BMP',
+          );
+        }
+        matches.add(match);
+      }
+      position++;
+      continue;
+    }
+    final RegExpMatch? match = regExp.allMatches(input, position).firstOrNull;
+    if (match == null) {
+      break;
+    }
+    matches.add(match);
+    position = match.end == match.start ? match.end + 1 : match.end;
+  }
+  return matches;
+}
+
+/// Whether [regExp] (compiled anchored) matches all of [input].
+bool _matchesAll(RegExp regExp, String input) {
+  // The anchors are lookarounds, which a Dart regular expression in Unicode
+  // mode also finds satisfied between the two halves of a character.
+  final RegExpMatch? match = regExp.firstMatch(input);
+  return match != null && match.start == 0 && match.end == input.length;
+}
 
 /// The index of the first occurrence of [search] in [units] at or after
 /// [from], or -1.
@@ -501,6 +558,14 @@ EvaluateResult _join(_Call call) => _strict(
       result.addAll(_units(element).$1);
       first = false;
     }
+    if (v[1] is BlobValue) {
+      // Bytes joined are a string: the bytes read as UTF-8, a malformed
+      // sequence as U+FFFD (what the backend returns, unlike the Android SDK,
+      // which returns bytes).
+      return EvaluateValue(
+        StringValue.valueOf(utf8.decode(result, allowMalformed: true)),
+      );
+    }
     return EvaluateValue(make(result));
   },
 );
@@ -597,7 +662,7 @@ final Map<String, _Function> _stringFunctions = <String, _Function>{
   ),
   'regex_match': _stringPredicate(
     (String value, String pattern) =>
-        _regExp(pattern, anchored: true).hasMatch(value),
+        _matchesAll(_regExp(pattern, anchored: true), value),
   ),
   'regex_find': _regexFind,
   'regex_find_all': _regexFindAll,

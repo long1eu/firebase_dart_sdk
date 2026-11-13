@@ -27,8 +27,16 @@
 // ignore_for_file: prefer_const_literals_to_create_immutables, prefer_single_quotes
 // ignore_for_file: unnecessary_string_escapes, unused_local_variable, lines_longer_than_80_chars
 
+// The cases of this file use doubles with integral values (1.0, -0.0,
+// Double.MAX_VALUE) or 64-bit integers. Compiled to JavaScript (dart2js) an
+// integral double is an int and an int beyond 2^53 is not exact, so they run
+// on the VM only. web_numbers_test.dart covers evaluation compiled to
+// JavaScript.
+@TestOn('vm')
+library;
+
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart' show Timestamp;
-import 'package:test/test.dart' show test;
+import 'package:test/test.dart' show TestOn, test;
 
 import '../evaluation_test_util.dart';
 import '../mirroring_test_cases.dart';

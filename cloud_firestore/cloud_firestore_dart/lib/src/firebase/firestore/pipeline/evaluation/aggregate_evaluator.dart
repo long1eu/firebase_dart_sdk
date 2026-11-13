@@ -92,7 +92,7 @@ class AggregateEvaluator {
 bool _isNullOrUnset(EvaluateResult result) => result.isNullOrUnset;
 
 EvaluateResult _integer(int value) =>
-    EvaluateValue(IntegerValue.valueOf(value));
+    EvaluateValue(IntegerValue.valueOf(exactInteger(value)));
 
 bool _equal(FieldValue a, FieldValue b) =>
     a.typeOrder == b.typeOrder && a.compareTo(b) == 0;
@@ -188,7 +188,7 @@ class _Sum implements Accumulator {
       _integers += BigInt.from(
         value is Int32FieldValue
             ? value.intValue
-            : (value as IntegerValue).value,
+            : exactInteger((value as IntegerValue).value),
       );
       if (_integers < _min || _integers > _max) {
         _overflow = true;

@@ -149,6 +149,20 @@ RegExp compileRe2(String pattern, {bool anchored = false}) {
         throw UnsupportedPattern(r'\C (a single byte)');
       } else if (next == 'a') {
         out.write(r'\x07');
+      } else if (next == 'x' && i < runes.length && runes[i] == 0x7b) {
+        // \x{1F600}: any code point.
+        final int end = runes.indexOf(0x7d, i);
+        final String hex = end < 0
+            ? ''
+            : String.fromCharCodes(runes.sublist(i + 1, end));
+        final int? code = RegExp(r'^[0-9A-Fa-f]{1,8}$').hasMatch(hex)
+            ? int.parse(hex, radix: 16)
+            : null;
+        if (code == null || code > 0x10ffff) {
+          throw const InvalidPattern();
+        }
+        out.write(_literal(code, inClass: inClass));
+        i = end + 1;
       } else if ('dDwWsSbBnrtfvx0'.contains(next)) {
         out.write('\\$next');
       } else if (_letter.hasMatch(next)) {

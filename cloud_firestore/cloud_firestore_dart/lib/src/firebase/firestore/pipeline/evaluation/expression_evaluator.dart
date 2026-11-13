@@ -82,6 +82,28 @@ class UnsupportedExpression implements Exception {
   String toString() => 'UnsupportedExpression: $message';
 }
 
+/// Whether integers are JavaScript numbers (code compiled with dart2js), which
+/// hold integers exactly only up to 2^53.
+const bool jsIntegers = identical(1, 1.0);
+
+const int _maxSafeInteger = 9007199254740991; // 2^53 - 1
+
+/// [value], when it is exact.
+///
+/// Compiled to JavaScript an `int` beyond ±(2^53 - 1) is a double that
+/// stands for several 64-bit integers, so neither an operand nor a result
+/// there can be computed as the backend would: such an expression is not
+/// evaluated locally ([UnsupportedExpression]) rather than evaluated wrong.
+int exactInteger(int value) {
+  if (jsIntegers && (value > _maxSafeInteger || value < -_maxSafeInteger)) {
+    throw UnsupportedExpression(
+      'The integer $value is beyond the integers JavaScript numbers hold '
+      'exactly (±2^53 - 1)',
+    );
+  }
+  return value;
+}
+
 typedef _Function = EvaluateResult Function(_Call call);
 
 /// Evaluates pipeline expressions for the database [databaseId].
@@ -239,7 +261,8 @@ final EvaluateResult _null = EvaluateResult.nullValue;
 EvaluateResult _bool(bool value) =>
     value ? EvaluateResult.trueValue : EvaluateResult.falseValue;
 
-EvaluateResult _int(int value) => EvaluateValue(IntegerValue.valueOf(value));
+EvaluateResult _int(int value) =>
+    EvaluateValue(IntegerValue.valueOf(exactInteger(value)));
 
 EvaluateResult _double(double value) =>
     EvaluateValue(DoubleValue.valueOf(value));
@@ -321,7 +344,7 @@ bool _isBoolean(FieldValue v) => v is BoolValue;
 bool _isReference(FieldValue v) => v is ReferenceValue;
 
 int _integer(FieldValue v) =>
-    v is Int32FieldValue ? v.intValue : (v as IntegerValue).value;
+    v is Int32FieldValue ? v.intValue : exactInteger((v as IntegerValue).value);
 
 String _text(FieldValue v) => (v as StringValue).value;
 

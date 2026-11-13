@@ -3,6 +3,14 @@
 // variables, the clock, aggregates, decimal arithmetic and the translation
 // of RE2 patterns.
 
+// The cases of this file use doubles with integral values (1.0, -0.0,
+// Double.MAX_VALUE) or 64-bit integers. Compiled to JavaScript (dart2js) an
+// integral double is an int and an int beyond 2^53 is not exact, so they run
+// on the VM only. web_numbers_test.dart covers evaluation compiled to
+// JavaScript.
+@TestOn('vm')
+library;
+
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart'
@@ -489,6 +497,78 @@ void main() {
       expect(d('1E+3').toDouble(), 1000.0);
       expect(d('1.0').isInteger, isTrue);
       expect(d('1.5').isInteger, isFalse);
+    });
+  });
+
+  group('as the backend, which runs on Java', () {
+    // The results of the Enterprise edition emulator.
+    Object? result(Expression expression) {
+      final EvaluateResult r = evaluate(expression);
+      return r.isError ? #error : valueOf(r);
+    }
+
+    test('an empty match steps over a UTF-16 code unit', () {
+      expect(result(constant('😀').regexFindAll('')), <Object?>['', '', '']);
+      expect(result(constant('😀a').regexFindAll('a*')), <Object?>[
+        '',
+        '',
+        'a',
+        '',
+      ]);
+      expect(result(constant('😀').regexFindAll('.?')), <Object?>['😀', '']);
+      expect(result(constant('😀a').regexFindAll(r'\b')), <Object?>['', '']);
+      expect(result(constant('a😀b').regexFindAll('.')), <Object?>[
+        'a',
+        '😀',
+        'b',
+      ]);
+    });
+
+    test('a whole match does not end between the halves of a character', () {
+      expect(result(constant('😀').regexMatch('')), false);
+      expect(result(constant('😀a').regexMatch('a*')), false);
+      expect(result(constant('😀').regexMatch('^.\$')), true);
+      expect(result(constant('😀').regexMatch('..')), false);
+    });
+
+    test(r'\x{...} is any code point', () {
+      expect(result(constant('😀').regexMatch(r'\x{1F600}')), true);
+      expect(result(constant('😀').regexMatch(r'[\x{1F000}-\x{1FFFF}]')), true);
+      expect(result(constant('a').regexMatch(r'\x{61}')), true);
+      expect(result(constant('a').regexMatch(r'\x{110000}')), #error);
+    });
+
+    test('bytes joined are a string', () {
+      Blob b(List<int> bytes) => Blob(Uint8List.fromList(bytes));
+      final Object? joined = result(
+        FunctionExpression('join', <Object?>[
+          array(<Object?>[
+            b(<int>[0x61]),
+            null,
+            b(<int>[0xff]),
+          ]),
+          b(<int>[0xc3, 0xa9]),
+        ]),
+      );
+      expect(joined, 'aé\u{fffd}');
+      expect(
+        result(
+          FunctionExpression('join', <Object?>[
+            array(<Object?>[]),
+            b(<int>[0x2c]),
+          ]),
+        ),
+        '',
+      );
+      expect(
+        result(
+          FunctionExpression('join', <Object?>[
+            array(<Object?>['a']),
+            b(<int>[0x2c]),
+          ]),
+        ),
+        #error,
+      );
     });
   });
 
