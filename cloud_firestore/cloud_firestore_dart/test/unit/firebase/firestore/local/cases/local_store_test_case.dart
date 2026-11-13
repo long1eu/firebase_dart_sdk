@@ -908,6 +908,35 @@ class LocalStoreTestCase {
     await _expectNotContains('foo/bar');
   }
 
+  /// Port of the JS SDK's `handles SetMutation -> Ack -> PatchMutation -> Reject` (local_store.test.ts), which only
+  /// runs with eager garbage collection.
+  @testMethod
+  Future<void>
+  testHandlesSetMutationThenAckThenPatchMutationThenReject() async {
+    await _writeMutation(setMutation('foo/bar', map(<dynamic>['foo', 'old'])));
+    await _expectContains(
+      doc(
+        'foo/bar',
+        0,
+        map(<dynamic>['foo', 'old']),
+        DocumentState.localMutations,
+      ),
+    );
+
+    await _acknowledgeMutation(1);
+    // After having been ack'd, there is nothing pinning the document
+    await _expectNotContains('foo/bar');
+
+    await _writeMutation(
+      patchMutation('foo/bar', map(<dynamic>['foo', 'bar'])),
+    );
+    // A blind patch is not visible in the cache
+    await _expectNotContains('foo/bar');
+
+    await _rejectMutation();
+    await _expectNotContains('foo/bar');
+  }
+
   @testMethod
   Future<void>
   testHandlesSetMutationsAndPatchMutationOfJustOneTogether() async {

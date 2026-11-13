@@ -298,4 +298,9 @@ void main() {
     'testDeeplyNestedServerTimestamps',
     () => testCase.testDeeplyNestedServerTimestamps(),
   );
+  // JS runs it with eager garbage collection only (it.skip otherwise), so there is no SQLite registration.
+  test(
+    'testHandlesSetMutationThenAckThenPatchMutationThenReject',
+    () => testCase.testHandlesSetMutationThenAckThenPatchMutationThenReject(),
+  );
 }
