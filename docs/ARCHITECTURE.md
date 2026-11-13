@@ -183,6 +183,23 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
   very large cache this loads all orphan paths at once (see `docs/upstream_sync/UPSTREAM_PLAN.md`).
 - The emulator differs between the Standard and the Enterprise edition in a few places; they are
   listed in `docs/guides/emulator_and_testing.md` and pinned by `test/integration_enterprise/edition_differences_test.dart`.
+- **Writes are delivered at least once, as upstream.** Writes go over the streaming `Write` RPC.
+  A batch stays in the write pipeline (`RemoteStore._writePipeline`) and in the mutation queue
+  until its `WriteResponse` is processed. When the stream ends before that (a cut connection,
+  `disableNetwork()`, `terminate()`, a lost primary lease), the next stream sends every batch of
+  the pipeline again after the handshake (`_handleWriteStreamHandshakeComplete`). The protocol has
+  no write id, and the handshake does not resume the stream: like Android (`WriteStream.java`) and
+  JS (`persistent_stream.ts`, "TODO: Support stream resumption"), the client deliberately sends no
+  stream token in the handshake. So a batch that the backend applied but whose acknowledgement
+  never reached the client is applied again. Idempotent writes (set, update of fixed values,
+  delete, `arrayUnion`, `arrayRemove`, batches, which are atomic) end in the same state;
+  `FieldValue.increment` is counted again. The emulator does not deduplicate; whether production
+  Firestore does is not verified. A write that was acknowledged to the caller is never sent again,
+  and a request lost before it reached the backend (the acknowledgement was never sent) is applied
+  exactly once. Tests: `test/integration/firebase/firestore/chaos/writes_chaos_test.dart` asserts
+  exactly once when only requests are lost (and checks, through the proxy, that no answer was
+  lost), and at least once, with the excess bounded by the writes in flight per cut, when
+  acknowledgements are lost.
 
 ## Where to read more
 

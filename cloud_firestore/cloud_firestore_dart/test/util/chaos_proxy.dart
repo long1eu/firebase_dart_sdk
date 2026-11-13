@@ -110,6 +110,17 @@ class ChaosProxy {
   int bytesUp = 0;
   int bytesDown = 0;
 
+  /// The bytes that the backend sent and that a cut dropped before they were handed to the client: answers (write
+  /// acknowledgements, among others) that the client never received. Zero means that no cut so far lost an answer.
+  int answerBytesLostByCuts = 0;
+
+  /// Whether nothing waits in the delay queue of any connection: every request that was forwarded reached the
+  /// backend, and every answer that was received was handed to the client. Stalled bytes do not count.
+  bool get delayQueuesEmpty => _connections.every(
+      (_Connection connection) =>
+          connection._queued[ChaosDirection.up] == 0 &&
+          connection._queued[ChaosDirection.down] == 0);
+
   ChaosMode _mode = ChaosMode.forward;
 
   ChaosMode get mode => _mode;
@@ -187,17 +198,22 @@ class ChaosProxy {
     return done.future;
   }
 
-  /// Completes once nothing came from the backend for [quiet] (or after [timeout]): the backend has answered what it
-  /// received.
+  /// Completes once the delay queues are empty and nothing came from the backend for [quiet] (or after [timeout]):
+  /// the backend received every request that was forwarded, and has answered it.
+  ///
+  /// The queues matter with a [delay]: requests forwarded before a stall are still on their way to the backend (and
+  /// are answered later), and answers received just before are still on their way to the client. Without waiting for
+  /// them, a [cut] in [ChaosMode.stallUp] lost answers too (see [answerBytesLostByCuts]).
   Future<void> backendQuiet(
       {Duration quiet = const Duration(milliseconds: 400),
       Duration timeout = const Duration(seconds: 5)}) async {
     final Stopwatch total = Stopwatch()..start();
     final Stopwatch silence = Stopwatch()..start();
     int seen = bytesDown;
-    while (silence.elapsed < quiet && total.elapsed < timeout) {
+    while ((silence.elapsed < quiet || !delayQueuesEmpty) &&
+        total.elapsed < timeout) {
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      if (bytesDown != seen) {
+      if (bytesDown != seen || !delayQueuesEmpty) {
         seen = bytesDown;
         silence.reset();
       }
@@ -255,6 +271,10 @@ class _Connection {
   final Set<ChaosDirection> _ended = <ChaosDirection>{};
   bool _destroyed = false;
 
+  /// The bytes received from the backend, and those handed to the client socket.
+  int _downReceived = 0;
+  int _downDelivered = 0;
+
   /// Whether bytes of this connection were dropped by a black hole.
   bool lostBytes = false;
 
@@ -287,6 +307,7 @@ class _Connection {
         _proxy.bytesUp += data.length;
       } else {
         _proxy.bytesDown += data.length;
+        _downReceived += data.length;
       }
       final bool Function(ChaosDirection, Uint8List)? cutWhen = _proxy.cutWhen;
       if (cutWhen != null && cutWhen(direction, data)) {
@@ -342,6 +363,9 @@ class _Connection {
       }
       return;
     }
+    if (direction == ChaosDirection.down) {
+      _downDelivered += data.length;
+    }
     try {
       _target(direction).add(data);
     } catch (_) {
@@ -366,6 +390,7 @@ class _Connection {
     _destroyed = true;
     if (countAsCut) {
       _proxy.cuts++;
+      _proxy.answerBytesLostByCuts += _downReceived - _downDelivered;
     }
     _proxy._connections.remove(this);
     _client.destroy();

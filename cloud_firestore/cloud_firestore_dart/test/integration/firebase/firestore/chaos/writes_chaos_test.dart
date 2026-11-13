@@ -184,6 +184,11 @@ void main() {
 
       await Future.wait(writes).timeout(const Duration(seconds: 25));
       expect(cuts, greaterThanOrEqualTo(1));
+      // The premise of this test: every answer of the backend reached the client before the cuts. A write whose
+      // acknowledgement is lost is sent again and applied twice (F1, the test below), so exactly-once is only
+      // expected without lost answers.
+      expect(env.proxy.answerBytesLostByCuts, 0,
+          reason: 'a cut lost answers of the backend');
       await expectLanded(db, collection);
     });
 
