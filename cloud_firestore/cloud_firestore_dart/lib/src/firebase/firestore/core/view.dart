@@ -362,7 +362,7 @@ class View {
     mutatedKeys = docChanges.mutatedKeys;
     _awaitingSync = docChanges.awaitingSync;
     _removedByWatch.removeWhere(
-      (DocumentKey key) => !documentSet.contains(key),
+      (DocumentKey key) => documentSet.getDocument(key) == null,
     );
     // A rejected document that is back in the view (it has a local mutation) is a regular document again.
     _backendRejected.removeWhere(documentSet.contains);
@@ -501,7 +501,7 @@ class View {
       }
       for (DocumentKey documentKey in targetChange.removedDocuments) {
         _syncedDocuments = _syncedDocuments.remove(documentKey);
-        if (documentSet.contains(documentKey)) {
+        if (documentSet.getDocument(documentKey) != null) {
           _removedByWatch.add(documentKey);
         }
       }
