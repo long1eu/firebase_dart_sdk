@@ -409,8 +409,8 @@ void main() {
       hadError = true;
       expect(
         e.message,
-        'Field \'owner\' is specified in your field mask but not '
-        'in your input data.',
+        'Field \'owner\' is specified in your field mask but missing '
+        'from your input data.',
       );
     } catch (e) {
       assert(false, 'This should not happen.');
