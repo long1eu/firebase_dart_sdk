@@ -288,6 +288,16 @@ List<Expression> curatedCases() {
       ('٣', r'\d'), ('a b', r'a\sb'), ('a-b', r'a\-b'), ('a_b', r'a\_b'),
       ('a]b', '[]]'), ('a^b', r'[\^]'), ('ab', 'a|b'), ('ab', '[^a]'),
       ('A', '(?i)a'), ('tab\there', r'\t'), ('x', r'\x78'), ('ab', r'\bab\b'),
+      // The choices of the linear-time matcher (re2.dart).
+      ('a]b', ']'), ('aaa', 'a{1001}'), ('aaa', 'a{1000}'),
+      ('a\vb', r'a\sb'), ('a\u00a0b', r'a\sb'), ('a\u2028b', r'a\sb'),
+      ('a\rb', '(?m)^b'), ('a\u2028b', '(?m)^b'), ('a\rb', r'(?m)a$'),
+      ('\u212a', '(?i)k'), ('K', '(?i)\u212a'), ('ſ', '(?i)s'),
+      ('abab', '(a|b)+'), ('b', '(a*)*'), ('aaaa', 'a{2,3}?'),
+      ('ab', 'a|ab'), ('aab', 'a*?b'), ('ÀBc', '(?i)[a-z]+'),
+      ('a😀😀', '😀+'), ('a😃', r'[\x{1F600}-\x{1F64F}]'),
+      ('aÉé', r'\p{Lu}\p{Ll}'), ('aaa', '(a+)+'), ('a{b', 'a{b'),
+      ('ab', '^*a'), ('a\u0085b', 'a.b'),
     ]) ...<Expression>[
       constant(value).regexContains(pattern),
       constant(value).regexMatch(pattern),

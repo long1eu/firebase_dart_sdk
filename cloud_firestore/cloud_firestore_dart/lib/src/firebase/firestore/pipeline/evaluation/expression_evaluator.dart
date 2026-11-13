@@ -105,6 +105,31 @@ int exactInteger(int value) {
   return value;
 }
 
+/// The largest value a function builds locally, in elements of an array,
+/// entries of a map, UTF-16 code units of a string or bytes.
+///
+/// The backend (the Enterprise emulator v1.22.0, probed) has no such limit
+/// for `concat`, `string_concat`, `array_concat`, `map_merge`, `join`, the
+/// replacements or `array_agg`: it builds values of hundreds of megabytes
+/// until it runs out of memory. A larger result is therefore not an error
+/// here but an [UnsupportedExpression]: the expression goes to the backend.
+/// Nested calls double a value per level (`string_concat(x, x)` of
+/// `string_concat(x, x)` ...), so without a bound a short expression over a
+/// small document could exhaust the memory of the client.
+/// (`string_repeat` has the backend's own limit of 1 MiB, an error.)
+const int maxLocalValueSize = 1 << 22;
+
+/// Fails with an [UnsupportedExpression] when [function] would build a value
+/// of [size] (see [maxLocalValueSize]).
+void checkLocalValueSize(int size, String function) {
+  if (size > maxLocalValueSize) {
+    throw UnsupportedExpression(
+      '$function() would build a value of $size elements or characters; '
+      'values larger than $maxLocalValueSize are not built locally',
+    );
+  }
+}
+
 typedef _Function = EvaluateResult Function(_Call call);
 
 /// Evaluates pipeline expressions for the database [databaseId].

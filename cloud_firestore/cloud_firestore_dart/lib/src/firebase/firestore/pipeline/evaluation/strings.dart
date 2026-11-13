@@ -312,6 +312,10 @@ EvaluateResult _concat(_Call call) {
     return _error;
   }
   return _mismatchedTypesAreErrors(call, (List<FieldValue> v) {
+    checkLocalValueSize(
+      v.fold(0, (int size, FieldValue e) => size + _sizeOf(e)),
+      'concat',
+    );
     if (v[0] is StringValue) {
       return _string(v.map(_text).join());
     } else if (v[0] is BlobValue) {
@@ -325,8 +329,22 @@ EvaluateResult _stringConcat(_Call call) => _strict(
   call,
   <bool Function(FieldValue)?>[_isString],
   min: 1,
-  (List<FieldValue> v) => _string(v.map(_text).join()),
+  (List<FieldValue> v) {
+    checkLocalValueSize(
+      v.fold(0, (int size, FieldValue e) => size + _text(e).length),
+      'string_concat',
+    );
+    return _string(v.map(_text).join());
+  },
 );
+
+/// The size of a string, bytes or array value for [checkLocalValueSize].
+int _sizeOf(FieldValue value) => switch (value) {
+  StringValue() => value.value.length,
+  BlobValue() => value.value.bytes.length,
+  ArrayValue() => value.internalValue.length,
+  _ => 1,
+};
 
 /// A predicate of two strings.
 _Function _stringPredicate(bool Function(String value, String other) test) {
@@ -336,34 +354,105 @@ _Function _stringPredicate(bool Function(String value, String other) test) {
   ], (List<FieldValue> v) => _bool(test(_text(v[0]), _text(v[1]))));
 }
 
-/// The regular expression of a `like` pattern: `%` is any text, `_` any
-/// character, a backslash makes the next character literal.
-RegExp _likeToRegExp(String like) {
-  final StringBuffer pattern = StringBuffer('^');
+/// Whether [value] matches the `like` [pattern]: `%` is any text, `_` any
+/// character, a backslash makes the next character literal. Neither `%` nor
+/// `_` matches a line feed (what the backend does). Characters are code
+/// points.
+///
+/// A direct matcher, not a regular expression: every line feed of the value
+/// has to be matched by a literal line feed of the pattern, so both are split
+/// at them; inside a line, the pieces between `%` are found left to right,
+/// each at its first occurrence. That takes O(n·m) time at worst (n and m the
+/// lengths), O(n) for a pattern without `_` in its pieces.
+bool _like(String value, String pattern) {
+  // The tokens of the pattern: a code point, or -1 for `_`, -2 for `%`.
+  final List<int> tokens = <int>[];
   bool escape = false;
-  for (final int rune in like.runes) {
-    final String character = String.fromCharCode(rune);
+  for (final int rune in pattern.runes) {
     if (escape) {
       escape = false;
-      pattern.write(RegExp.escape(character));
-    } else if (character == r'\') {
+      tokens.add(rune);
+    } else if (rune == 0x5c /* \ */ ) {
       escape = true;
-    } else if (character == '_') {
-      pattern.write(r'[^\n]');
-    } else if (character == '%') {
-      pattern.write(r'[^\n]*');
+    } else if (rune == 0x5f /* _ */ ) {
+      tokens.add(_likeAny);
+    } else if (rune == 0x25 /* % */ ) {
+      tokens.add(_likeText);
     } else {
-      pattern.write(RegExp.escape(character));
+      tokens.add(rune);
     }
   }
   if (escape) {
     throw const _EvaluationError();
   }
-  pattern.write(r'$');
-  return RegExp(pattern.toString(), unicode: true);
+  final List<int> text = value.runes.toList();
+  final List<List<int>> patternLines = _splitAt(tokens, 0x0a);
+  final List<List<int>> textLines = _splitAt(text, 0x0a);
+  if (patternLines.length != textLines.length) {
+    return false;
+  }
+  for (int i = 0; i < textLines.length; i++) {
+    if (!_likeLine(textLines[i], patternLines[i])) {
+      return false;
+    }
+  }
+  return true;
 }
 
-RegExp _regExp(String pattern, {bool anchored = false}) {
+const int _likeAny = -1;
+const int _likeText = -2;
+
+List<List<int>> _splitAt(List<int> values, int separator) {
+  final List<List<int>> parts = <List<int>>[<int>[]];
+  for (final int value in values) {
+    if (value == separator) {
+      parts.add(<int>[]);
+    } else {
+      parts.last.add(value);
+    }
+  }
+  return parts;
+}
+
+/// [text] (without line feeds) against [tokens] (without line feeds).
+bool _likeLine(List<int> text, List<int> tokens) {
+  final List<List<int>> pieces = _splitAt(tokens, _likeText);
+  bool matchesAt(List<int> piece, int at) {
+    for (int k = 0; k < piece.length; k++) {
+      if (piece[k] != _likeAny && piece[k] != text[at + k]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  if (pieces.length == 1) {
+    return text.length == pieces.single.length && matchesAt(pieces.single, 0);
+  }
+  final List<int> first = pieces.first;
+  final List<int> last = pieces.last;
+  if (first.length + last.length > text.length ||
+      !matchesAt(first, 0) ||
+      !matchesAt(last, text.length - last.length)) {
+    return false;
+  }
+  int position = first.length;
+  final int end = text.length - last.length;
+  for (int p = 1; p < pieces.length - 1; p++) {
+    final List<int> piece = pieces[p];
+    int at = position;
+    while (at + piece.length <= end && !matchesAt(piece, at)) {
+      at++;
+    }
+    if (at + piece.length > end) {
+      return false;
+    }
+    position = at + piece.length;
+  }
+  return true;
+}
+
+Re2 _regExp(String pattern, {bool anchored = false}) {
   try {
     return compileRe2(pattern, anchored: anchored);
   } on InvalidPattern {
@@ -375,9 +464,21 @@ RegExp _regExp(String pattern, {bool anchored = false}) {
   }
 }
 
+/// Runs [match], turning a match too costly for the local matcher into an
+/// [UnsupportedExpression].
+T _matching<T>(T Function() match) {
+  try {
+    return match();
+  } on UnsupportedPattern catch (e) {
+    throw UnsupportedExpression(
+      'The regular expression can not be evaluated locally: ${e.message}',
+    );
+  }
+}
+
 /// What a match stands for: the whole match, or the capturing group of a
 /// pattern that has exactly one. More groups are an error.
-FieldValue _matchValue(RegExpMatch match) {
+FieldValue _matchValue(Re2Match match) {
   if (match.groupCount == 0) {
     return StringValue.valueOf(match.group(0)!);
   } else if (match.groupCount == 1) {
@@ -391,7 +492,8 @@ EvaluateResult _regexFind(_Call call) => _strict(
   call,
   <bool Function(FieldValue)?>[_isString, _isString],
   (List<FieldValue> v) {
-    final RegExpMatch? match = _regExp(_text(v[1])).firstMatch(_text(v[0]));
+    final Re2 re2 = _regExp(_text(v[1]));
+    final Re2Match? match = _matching(() => re2.firstMatch(_text(v[0])));
     return match == null ? _null : EvaluateValue(_matchValue(match));
   },
 );
@@ -400,7 +502,9 @@ EvaluateResult _regexFindAll(_Call call) => _strict(
   call,
   <bool Function(FieldValue)?>[_isString, _isString],
   (List<FieldValue> v) => _list(
-    _allMatches(_regExp(_text(v[1])), _text(v[0])).map(_matchValue).toList(),
+    _matching(
+      () => _allMatches(_regExp(_text(v[1])), _text(v[0])),
+    ).map(_matchValue).toList(),
   ),
 );
 
@@ -417,8 +521,8 @@ bool _isLowSurrogate(int unit) => unit >= 0xdc00 && unit <= 0xdfff;
 /// expression in Unicode mode never starts there, so that position is tried
 /// on a copy of the input whose two halves are replaced by two characters of
 /// the same kind (neither letters, digits, spaces nor line breaks).
-List<RegExpMatch> _allMatches(RegExp regExp, String input) {
-  final List<RegExpMatch> matches = <RegExpMatch>[];
+List<Re2Match> _allMatches(Re2 regExp, String input) {
+  final List<Re2Match> matches = <Re2Match>[];
   int position = 0;
   while (position <= input.length) {
     if (position > 0 &&
@@ -430,8 +534,7 @@ List<RegExpMatch> _allMatches(RegExp regExp, String input) {
         position + 1,
         '\u{e000}\u{e001}',
       );
-      final RegExpMatch? match =
-          regExp.matchAsPrefix(halves, position) as RegExpMatch?;
+      final Re2Match? match = regExp.matchAsPrefix(halves, position);
       if (match != null) {
         if (match.end != match.start) {
           throw UnsupportedExpression(
@@ -443,7 +546,7 @@ List<RegExpMatch> _allMatches(RegExp regExp, String input) {
       position++;
       continue;
     }
-    final RegExpMatch? match = regExp.allMatches(input, position).firstOrNull;
+    final Re2Match? match = regExp.firstMatch(input, position);
     if (match == null) {
       break;
     }
@@ -454,12 +557,8 @@ List<RegExpMatch> _allMatches(RegExp regExp, String input) {
 }
 
 /// Whether [regExp] (compiled anchored) matches all of [input].
-bool _matchesAll(RegExp regExp, String input) {
-  // The anchors are lookarounds, which a Dart regular expression in Unicode
-  // mode also finds satisfied between the two halves of a character.
-  final RegExpMatch? match = regExp.firstMatch(input);
-  return match != null && match.start == 0 && match.end == input.length;
-}
+bool _matchesAll(Re2 regExp, String input) =>
+    _matching(() => regExp.matchAsPrefix(input) != null);
 
 /// The index of the first occurrence of [search] in [units] at or after
 /// [from], or -1.
@@ -556,6 +655,7 @@ EvaluateResult _join(_Call call) => _strict(
         result.addAll(delimiter);
       }
       result.addAll(_units(element).$1);
+      checkLocalValueSize(result.length, 'join');
       first = false;
     }
     if (v[1] is BlobValue) {
@@ -588,6 +688,7 @@ _Function _replace({required bool all}) {
       result
         ..addAll(units.sublist(start, index))
         ..addAll(replacement);
+      checkLocalValueSize(result.length, call.name);
       start = index + find.length;
       if (!all) {
         break;
@@ -655,11 +756,12 @@ final Map<String, _Function> _stringFunctions = <String, _Function>{
     (String value, String substring) => value.contains(substring),
   ),
   'like': _stringPredicate(
-    (String value, String pattern) => _likeToRegExp(pattern).hasMatch(value),
+    (String value, String pattern) => _like(value, pattern),
   ),
-  'regex_contains': _stringPredicate(
-    (String value, String pattern) => _regExp(pattern).hasMatch(value),
-  ),
+  'regex_contains': _stringPredicate((String value, String pattern) {
+    final Re2 re2 = _regExp(pattern);
+    return _matching(() => re2.hasMatch(value));
+  }),
   'regex_match': _stringPredicate(
     (String value, String pattern) =>
         _matchesAll(_regExp(pattern, anchored: true), value),

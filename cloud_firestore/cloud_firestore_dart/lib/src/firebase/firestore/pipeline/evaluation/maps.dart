@@ -64,11 +64,21 @@ EvaluateResult _mapMerge(_Call call) => _strict(
   call,
   <bool Function(FieldValue)?>[_isMap],
   min: 2,
-  (List<FieldValue> v) => EvaluateValue(
-    ObjectValue.fromMap(<String, FieldValue>{
-      for (final FieldValue map in v) ..._entries(map),
-    }),
-  ),
+  (List<FieldValue> v) {
+    checkLocalValueSize(
+      v.fold(
+        0,
+        (int size, FieldValue map) =>
+            size + (map as ObjectValue).internalValue.length,
+      ),
+      'map_merge',
+    );
+    return EvaluateValue(
+      ObjectValue.fromMap(<String, FieldValue>{
+        for (final FieldValue map in v) ..._entries(map),
+      }),
+    );
+  },
 );
 
 EvaluateResult _mapRemove(_Call call) => _strict(

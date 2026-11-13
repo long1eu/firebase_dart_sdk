@@ -1,6 +1,8 @@
 // Local evaluation of the aggregate functions of pipelines: a pure library,
 // like expression_evaluator.dart.
 
+import 'dart:collection';
+
 import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/decimal.dart';
@@ -94,9 +96,6 @@ bool _isNullOrUnset(EvaluateResult result) => result.isNullOrUnset;
 EvaluateResult _integer(int value) =>
     EvaluateValue(IntegerValue.valueOf(exactInteger(value)));
 
-bool _equal(FieldValue a, FieldValue b) =>
-    a.typeOrder == b.typeOrder && a.compareTo(b) == 0;
-
 /// `count()` counts the inputs, `count(expression)` those for which the
 /// expression has a value that is not null.
 class _Count implements Accumulator {
@@ -133,9 +132,20 @@ class _CountIf implements Accumulator {
 class _Distinct {
   final List<FieldValue> values = <FieldValue>[];
 
+  /// The index in [values] of each distinct value, ordered so that values
+  /// that are equal (same type order, comparing equal) meet: O(log n) per input instead of a linear search.
+  final SplayTreeMap<FieldValue, int> _index = SplayTreeMap<FieldValue, int>((
+    FieldValue a,
+    FieldValue b,
+  ) {
+    final int byType = a.typeOrder.compareTo(b.typeOrder);
+    return byType != 0 ? byType : a.compareTo(b);
+  });
+
   void add(FieldValue value) {
-    final int index = values.indexWhere((FieldValue v) => _equal(v, value));
-    if (index < 0) {
+    final int? index = _index[value];
+    if (index == null) {
+      _index[value] = values.length;
       values.add(value);
     } else {
       values[index] = value;
@@ -323,6 +333,7 @@ class _ArrayAgg implements Accumulator {
     final FieldValue? value = result.value;
     if (value != null) {
       _values.add(value);
+      checkLocalValueSize(_values.length, 'array_agg');
     }
   }
 
@@ -340,6 +351,7 @@ class _ArrayAggDistinct implements Accumulator {
     final FieldValue? value = result.value;
     if (value != null) {
       _distinct.add(value);
+      checkLocalValueSize(_distinct.values.length, 'array_agg_distinct');
     }
   }
 

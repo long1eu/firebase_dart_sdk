@@ -1073,6 +1073,106 @@
 {"expression":"regex_match(Constant(ab), Constant(\\bab\\b))","result":"CAE="}
 {"expression":"regex_find(Constant(ab), Constant(\\bab\\b))","result":"igECYWI="}
 {"expression":"regex_find_all(Constant(ab), Constant(\\bab\\b))","result":"SgcKBYoBAmFi"}
+{"expression":"regex_contains(Constant(a]b), Constant(]))","result":"CAE="}
+{"expression":"regex_match(Constant(a]b), Constant(]))","result":"CAA="}
+{"expression":"regex_find(Constant(a]b), Constant(]))","result":"igEBXQ=="}
+{"expression":"regex_find_all(Constant(a]b), Constant(]))","result":"SgYKBIoBAV0="}
+{"expression":"regex_contains(Constant(aaa), Constant(a{1001}))","result":"ERROR"}
+{"expression":"regex_match(Constant(aaa), Constant(a{1001}))","result":"ERROR"}
+{"expression":"regex_find(Constant(aaa), Constant(a{1001}))","result":"ERROR"}
+{"expression":"regex_find_all(Constant(aaa), Constant(a{1001}))","result":"ERROR"}
+{"expression":"regex_contains(Constant(aaa), Constant(a{1000}))","result":"CAA="}
+{"expression":"regex_match(Constant(aaa), Constant(a{1000}))","result":"CAA="}
+{"expression":"regex_find(Constant(aaa), Constant(a{1000}))","result":"WAA="}
+{"expression":"regex_find_all(Constant(aaa), Constant(a{1000}))","result":"SgA="}
+{"expression":"regex_contains(Constant(a\u000bb), Constant(a\\sb))","result":"CAA="}
+{"expression":"regex_match(Constant(a\u000bb), Constant(a\\sb))","result":"CAA="}
+{"expression":"regex_find(Constant(a\u000bb), Constant(a\\sb))","result":"WAA="}
+{"expression":"regex_find_all(Constant(a\u000bb), Constant(a\\sb))","result":"SgA="}
+{"expression":"regex_contains(Constant(a b), Constant(a\\sb))","result":"CAA="}
+{"expression":"regex_match(Constant(a b), Constant(a\\sb))","result":"CAA="}
+{"expression":"regex_find(Constant(a b), Constant(a\\sb))","result":"WAA="}
+{"expression":"regex_find_all(Constant(a b), Constant(a\\sb))","result":"SgA="}
+{"expression":"regex_contains(Constant(a b), Constant(a\\sb))","result":"CAA="}
+{"expression":"regex_match(Constant(a b), Constant(a\\sb))","result":"CAA="}
+{"expression":"regex_find(Constant(a b), Constant(a\\sb))","result":"WAA="}
+{"expression":"regex_find_all(Constant(a b), Constant(a\\sb))","result":"SgA="}
+{"expression":"regex_contains(Constant(a\rb), Constant((?m)^b))","result":"CAA="}
+{"expression":"regex_match(Constant(a\rb), Constant((?m)^b))","result":"CAA="}
+{"expression":"regex_find(Constant(a\rb), Constant((?m)^b))","result":"WAA="}
+{"expression":"regex_find_all(Constant(a\rb), Constant((?m)^b))","result":"SgA="}
+{"expression":"regex_contains(Constant(a b), Constant((?m)^b))","result":"CAA="}
+{"expression":"regex_match(Constant(a b), Constant((?m)^b))","result":"CAA="}
+{"expression":"regex_find(Constant(a b), Constant((?m)^b))","result":"WAA="}
+{"expression":"regex_find_all(Constant(a b), Constant((?m)^b))","result":"SgA="}
+{"expression":"regex_contains(Constant(a\rb), Constant((?m)a$))","result":"CAA="}
+{"expression":"regex_match(Constant(a\rb), Constant((?m)a$))","result":"CAA="}
+{"expression":"regex_find(Constant(a\rb), Constant((?m)a$))","result":"WAA="}
+{"expression":"regex_find_all(Constant(a\rb), Constant((?m)a$))","result":"SgA="}
+{"expression":"regex_contains(Constant(K), Constant((?i)k))","result":"CAE="}
+{"expression":"regex_match(Constant(K), Constant((?i)k))","result":"CAE="}
+{"expression":"regex_find(Constant(K), Constant((?i)k))","result":"igED4oSq"}
+{"expression":"regex_find_all(Constant(K), Constant((?i)k))","result":"SggKBooBA+KEqg=="}
+{"expression":"regex_contains(Constant(K), Constant((?i)K))","result":"CAE="}
+{"expression":"regex_match(Constant(K), Constant((?i)K))","result":"CAE="}
+{"expression":"regex_find(Constant(K), Constant((?i)K))","result":"igEBSw=="}
+{"expression":"regex_find_all(Constant(K), Constant((?i)K))","result":"SgYKBIoBAUs="}
+{"expression":"regex_contains(Constant(ſ), Constant((?i)s))","result":"CAE="}
+{"expression":"regex_match(Constant(ſ), Constant((?i)s))","result":"CAE="}
+{"expression":"regex_find(Constant(ſ), Constant((?i)s))","result":"igECxb8="}
+{"expression":"regex_find_all(Constant(ſ), Constant((?i)s))","result":"SgcKBYoBAsW/"}
+{"expression":"regex_contains(Constant(abab), Constant((a|b)+))","result":"CAE="}
+{"expression":"regex_match(Constant(abab), Constant((a|b)+))","result":"CAE="}
+{"expression":"regex_find(Constant(abab), Constant((a|b)+))","result":"igEBYg=="}
+{"expression":"regex_find_all(Constant(abab), Constant((a|b)+))","result":"SgYKBIoBAWI="}
+{"expression":"regex_contains(Constant(b), Constant((a*)*))","result":"CAE="}
+{"expression":"regex_match(Constant(b), Constant((a*)*))","result":"CAA="}
+{"expression":"regex_find(Constant(b), Constant((a*)*))","result":"igEA"}
+{"expression":"regex_find_all(Constant(b), Constant((a*)*))","result":"SgoKA4oBAAoDigEA"}
+{"expression":"regex_contains(Constant(aaaa), Constant(a{2,3}?))","result":"CAE="}
+{"expression":"regex_match(Constant(aaaa), Constant(a{2,3}?))","result":"CAA="}
+{"expression":"regex_find(Constant(aaaa), Constant(a{2,3}?))","result":"igECYWE="}
+{"expression":"regex_find_all(Constant(aaaa), Constant(a{2,3}?))","result":"Sg4KBYoBAmFhCgWKAQJhYQ=="}
+{"expression":"regex_contains(Constant(ab), Constant(a|ab))","result":"CAE="}
+{"expression":"regex_match(Constant(ab), Constant(a|ab))","result":"CAE="}
+{"expression":"regex_find(Constant(ab), Constant(a|ab))","result":"igEBYQ=="}
+{"expression":"regex_find_all(Constant(ab), Constant(a|ab))","result":"SgYKBIoBAWE="}
+{"expression":"regex_contains(Constant(aab), Constant(a*?b))","result":"CAE="}
+{"expression":"regex_match(Constant(aab), Constant(a*?b))","result":"CAE="}
+{"expression":"regex_find(Constant(aab), Constant(a*?b))","result":"igEDYWFi"}
+{"expression":"regex_find_all(Constant(aab), Constant(a*?b))","result":"SggKBooBA2FhYg=="}
+{"expression":"regex_contains(Constant(ÀBc), Constant((?i)[a-z]+))","result":"CAE="}
+{"expression":"regex_match(Constant(ÀBc), Constant((?i)[a-z]+))","result":"CAA="}
+{"expression":"regex_find(Constant(ÀBc), Constant((?i)[a-z]+))","result":"igECQmM="}
+{"expression":"regex_find_all(Constant(ÀBc), Constant((?i)[a-z]+))","result":"SgcKBYoBAkJj"}
+{"expression":"regex_contains(Constant(a😀😀), Constant(😀+))","result":"CAE="}
+{"expression":"regex_match(Constant(a😀😀), Constant(😀+))","result":"CAA="}
+{"expression":"regex_find(Constant(a😀😀), Constant(😀+))","result":"igEI8J+YgPCfmIA="}
+{"expression":"regex_find_all(Constant(a😀😀), Constant(😀+))","result":"Sg0KC4oBCPCfmIDwn5iA"}
+{"expression":"regex_contains(Constant(a😃), Constant([\\x{1F600}-\\x{1F64F}]))","result":"CAE="}
+{"expression":"regex_match(Constant(a😃), Constant([\\x{1F600}-\\x{1F64F}]))","result":"CAA="}
+{"expression":"regex_find(Constant(a😃), Constant([\\x{1F600}-\\x{1F64F}]))","result":"igEE8J+Ygw=="}
+{"expression":"regex_find_all(Constant(a😃), Constant([\\x{1F600}-\\x{1F64F}]))","result":"SgkKB4oBBPCfmIM="}
+{"expression":"regex_contains(Constant(aÉé), Constant(\\p{Lu}\\p{Ll}))","result":"CAE="}
+{"expression":"regex_match(Constant(aÉé), Constant(\\p{Lu}\\p{Ll}))","result":"CAA="}
+{"expression":"regex_find(Constant(aÉé), Constant(\\p{Lu}\\p{Ll}))","result":"igEEw4nDqQ=="}
+{"expression":"regex_find_all(Constant(aÉé), Constant(\\p{Lu}\\p{Ll}))","result":"SgkKB4oBBMOJw6k="}
+{"expression":"regex_contains(Constant(aaa), Constant((a+)+))","result":"CAE="}
+{"expression":"regex_match(Constant(aaa), Constant((a+)+))","result":"CAE="}
+{"expression":"regex_find(Constant(aaa), Constant((a+)+))","result":"igEDYWFh"}
+{"expression":"regex_find_all(Constant(aaa), Constant((a+)+))","result":"SggKBooBA2FhYQ=="}
+{"expression":"regex_contains(Constant(a{b), Constant(a{b))","result":"CAE="}
+{"expression":"regex_match(Constant(a{b), Constant(a{b))","result":"CAE="}
+{"expression":"regex_find(Constant(a{b), Constant(a{b))","result":"igEDYXti"}
+{"expression":"regex_find_all(Constant(a{b), Constant(a{b))","result":"SggKBooBA2F7Yg=="}
+{"expression":"regex_contains(Constant(ab), Constant(^*a))","result":"CAE="}
+{"expression":"regex_match(Constant(ab), Constant(^*a))","result":"CAA="}
+{"expression":"regex_find(Constant(ab), Constant(^*a))","result":"igEBYQ=="}
+{"expression":"regex_find_all(Constant(ab), Constant(^*a))","result":"SgYKBIoBAWE="}
+{"expression":"regex_contains(Constant(ab), Constant(a.b))","result":"CAE="}
+{"expression":"regex_match(Constant(ab), Constant(a.b))","result":"CAE="}
+{"expression":"regex_find(Constant(ab), Constant(a.b))","result":"igEEYcKFYg=="}
+{"expression":"regex_find_all(Constant(ab), Constant(a.b))","result":"SgkKB4oBBGHChWI="}
 {"expression":"split(Constant(a,b,,c), Constant(,))","result":"ShcKBIoBAWEKBIoBAWIKA4oBAAoEigEBYw=="}
 {"expression":"split(Constant(abc), Constant())","result":"ShIKBIoBAWEKBIoBAWIKBIoBAWM="}
 {"expression":"split(Constant(abc), Constant(x))","result":"SggKBooBA2FiYw=="}

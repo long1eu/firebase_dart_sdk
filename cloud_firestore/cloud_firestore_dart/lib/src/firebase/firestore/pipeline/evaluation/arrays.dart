@@ -213,8 +213,13 @@ EvaluateResult _arrayConcat(_Call call) => _strict(
   call,
   <bool Function(FieldValue)?>[_isArray],
   min: 1,
-  (List<FieldValue> v) =>
-      _list(<FieldValue>[for (final FieldValue e in v) ..._elements(e)]),
+  (List<FieldValue> v) {
+    checkLocalValueSize(
+      v.fold(0, (int size, FieldValue e) => size + _elements(e).length),
+      'array_concat',
+    );
+    return _list(<FieldValue>[for (final FieldValue e in v) ..._elements(e)]);
+  },
 );
 
 /// `array_filter(array, alias, condition)`: the elements for which the

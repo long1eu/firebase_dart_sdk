@@ -1,6 +1,7 @@
 // Decimal arithmetic for the 128-bit decimal values of Enterprise edition
 // databases, as far as local pipeline evaluation needs it.
 
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 /// A decimal floating point number with the precision of IEEE 754
@@ -10,6 +11,13 @@ import 'dart:typed_data';
 /// a complete decimal128 implementation: exponents are not clamped to the
 /// range of the format (results far outside of it can not be told apart from
 /// what the backend would return as infinity or zero).
+///
+/// Exponents may still be huge (a parsed value may carry a nine-digit one),
+/// so no operation scales a coefficient by more than [_maxShift] digits:
+/// when the exponents of two operands differ by more, the smaller operand
+/// only matters for rounding, comparison or a remainder, and is handled
+/// without aligning the two (see [operator +], [compareTo], [remainder]).
+/// Below that difference results are computed exactly as before.
 class Decimal {
   Decimal._(this._kind, this.negative, this.coefficient, this.exponent);
 
@@ -147,8 +155,25 @@ class Decimal {
     )._rounded();
   }
 
-  /// Both coefficients (signed) at the smaller of the two exponents.
+  /// The most digits a coefficient is scaled by to align two operands: two
+  /// full coefficients and the guard digits of rounding. Beyond it the
+  /// operations take the shortcuts of [_farApart].
+  static const int _maxShift = 2 * precision + 4;
+
+  /// The number of digits of the coefficient.
+  int get _digits => coefficient.toString().length;
+
+  /// The exponent of the leading digit.
+  int get _adjusted => exponent + _digits - 1;
+
+  /// Whether aligning [a] and [b] would scale by more than [_maxShift] digits.
+  static bool _farApart(Decimal a, Decimal b) =>
+      (a.exponent - b.exponent).abs() > _maxShift;
+
+  /// Both coefficients (signed) at the smaller of the two exponents. Only for
+  /// operands that are not [_farApart].
   static (BigInt, BigInt, int) _aligned(Decimal a, Decimal b) {
+    assert(!_farApart(a, b));
     final int exponent = a.exponent < b.exponent ? a.exponent : b.exponent;
     return (
       a._signed * _ten.pow(a.exponent - exponent),
@@ -171,6 +196,9 @@ class Decimal {
     } else if (other.isInfinite) {
       return other;
     }
+    if (_farApart(this, other)) {
+      return _sumFarApart(this, other);
+    }
     final (BigInt a, BigInt b, int exponent) = _aligned(this, other);
     final BigInt sum = a + b;
     if (sum == BigInt.zero) {
@@ -182,6 +210,42 @@ class Decimal {
       );
     }
     return Decimal.finite(sum, exponent);
+  }
+
+  /// The sum of finite [a] and [b] whose exponents are [_farApart], as the
+  /// exact sum rounded to [precision] digits would be.
+  static Decimal _sumFarApart(Decimal a, Decimal b) {
+    final Decimal high = a.exponent > b.exponent ? a : b;
+    final Decimal low = identical(high, a) ? b : a;
+    if (high.isZero && low.isZero) {
+      return Decimal._(
+        _DecimalKind.finite,
+        a.negative && b.negative,
+        BigInt.zero,
+        low.exponent,
+      );
+    } else if (high.isZero) {
+      // The zero only lowers the ideal exponent, which [low] already has.
+      return low;
+    } else if (low.isZero) {
+      // [high] scaled down to the smaller exponent as far as the precision
+      // allows: the exact sum has more than [precision] digits.
+      final int shift = precision - high._digits;
+      return Decimal._(
+        _DecimalKind.finite,
+        high.negative,
+        high.coefficient * _ten.pow(shift),
+        high.exponent - shift,
+      );
+    }
+    // |low| is below one unit in the last of [precision] + 2 guard digits
+    // under [high]: it only decides the rounding, as a sticky digit does.
+    const int guard = precision + 2;
+    final BigInt sticky = low.negative ? -BigInt.one : BigInt.one;
+    return Decimal.finite(
+      high._signed * _ten.pow(guard) + sticky,
+      high.exponent - guard,
+    );
   }
 
   Decimal operator -(Decimal other) => this + (-other);
@@ -261,6 +325,35 @@ class Decimal {
       return nan;
     } else if (other.isInfinite) {
       return this;
+    }
+    if (_farApart(this, other)) {
+      if (isZero) {
+        // A zero remainder has the smaller exponent.
+        return Decimal._(
+          _DecimalKind.finite,
+          negative,
+          BigInt.zero,
+          math.min(this.exponent, other.exponent),
+        );
+      } else if (this.exponent < other.exponent) {
+        // |this| < |other|: the remainder is this number.
+        return this;
+      }
+      // (c * 10^d) mod m without building 10^d.
+      final BigInt m = other.coefficient;
+      final BigInt rem =
+          (coefficient *
+              _ten.modPow(BigInt.from(this.exponent - other.exponent), m)) %
+          m;
+      if (rem == BigInt.zero) {
+        return Decimal._(
+          _DecimalKind.finite,
+          negative,
+          BigInt.zero,
+          other.exponent,
+        );
+      }
+      return Decimal.finite(rem, other.exponent, negative: negative);
     }
     final (BigInt a, BigInt b, int exponent) = _aligned(this, other);
     final BigInt rem = a.remainder(b);
@@ -375,6 +468,15 @@ class Decimal {
       final int b = other.isInfinite ? (other.negative ? -1 : 1) : 0;
       return a.compareTo(b);
     }
+    if (_farApart(this, other)) {
+      final int signA = isZero ? 0 : (negative ? -1 : 1);
+      final int signB = other.isZero ? 0 : (other.negative ? -1 : 1);
+      if (signA != signB || signA == 0) {
+        return signA.compareTo(signB);
+      }
+      // Far apart and both not zero: the leading digits differ in place.
+      return signA * _adjusted.compareTo(other._adjusted);
+    }
     final (BigInt a, BigInt b, _) = _aligned(this, other);
     return a.compareTo(b);
   }
@@ -384,7 +486,13 @@ class Decimal {
     if (!isFinite) {
       return false;
     }
-    return exponent >= 0 || coefficient % _ten.pow(-exponent) == BigInt.zero;
+    if (exponent >= 0 || coefficient == BigInt.zero) {
+      return true;
+    } else if (-exponent > _digits) {
+      // The coefficient has fewer digits than the fraction.
+      return false;
+    }
+    return coefficient % _ten.pow(-exponent) == BigInt.zero;
   }
 
   double toDouble() {
