@@ -139,6 +139,11 @@ class SQLiteClientMetadata {
     if (rows.isEmpty) {
       return null;
     }
+    if (rows.length > 1) {
+      // Only a table created without its constraints holds the row more than once.
+      _warnRateLimited('lease', 'Ignoring ${rows.length} primary leases');
+      return null;
+    }
     final Map<String, dynamic> row = rows.single;
     final Object? ownerId = row['owner_id'];
     final Object? allowSynchronization = row['allow_synchronization'];
@@ -158,9 +163,15 @@ class SQLiteClientMetadata {
   bool _isValid(_PrimaryLease? lease) =>
       lease != null && _isWithinAge(lease.timestamp, maxPrimaryEligibleAgeMs);
 
+  // The writes delete and insert rather than INSERT OR REPLACE: a table created without its constraints (by something
+  // else than this SDK) would otherwise gain a row at every refresh.
+
   Future<void> _writeOwnMetadata() async {
+    await _db.execute('DELETE FROM clients WHERE client_id = ?', <Object?>[
+      clientId,
+    ]);
     await _db.execute(
-      'INSERT OR REPLACE INTO clients (client_id, update_time_ms, network_enabled, in_foreground) '
+      'INSERT INTO clients (client_id, update_time_ms, network_enabled, in_foreground) '
       'VALUES (?, ?, ?, ?)',
       <Object?>[
         clientId,
@@ -172,8 +183,9 @@ class SQLiteClientMetadata {
   }
 
   Future<void> _acquireOrExtendLease() async {
+    await _db.execute('DELETE FROM primary_client WHERE id = 0');
     await _db.execute(
-      'INSERT OR REPLACE INTO primary_client (id, owner_id, allow_synchronization, lease_timestamp_ms) '
+      'INSERT INTO primary_client (id, owner_id, allow_synchronization, lease_timestamp_ms) '
       'VALUES (0, ?, ?, ?)',
       <Object?>[clientId, _allowSynchronization ? 1 : 0, _clock()],
     );

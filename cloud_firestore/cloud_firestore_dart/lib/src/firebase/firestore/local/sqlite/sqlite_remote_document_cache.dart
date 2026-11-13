@@ -472,13 +472,12 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   }
 
   MaybeDocument decodeMaybeDocument(Uint8List bytes) {
-    try {
-      return serializer.decodeMaybeDocument(
-        proto.MaybeDocument.fromBuffer(bytes),
-      );
-    } on InvalidProtocolBufferException catch (e) {
-      throw fail('MaybeDocument failed to parse: $e');
-    }
+    return serializer.decodeMaybeDocument(
+      parseStoredProto(
+        'MaybeDocument',
+        () => proto.MaybeDocument.fromBuffer(bytes),
+      ),
+    );
   }
 }
 

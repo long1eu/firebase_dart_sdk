@@ -539,10 +539,11 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   MutationBatch decodeMutationBatch(List<int> bytes) {
-    try {
-      return serializer.decodeMutationBatch(proto.WriteBatch.fromBuffer(bytes));
-    } on InvalidProtocolBufferException catch (e) {
-      throw fail('MutationBatch failed to parse: $e');
-    }
+    return serializer.decodeMutationBatch(
+      parseStoredProto(
+        'MutationBatch',
+        () => proto.WriteBatch.fromBuffer(bytes),
+      ),
+    );
   }
 }

@@ -714,11 +714,12 @@ class StorageSharedClientState extends SharedClientState {
         await _handleClientStateEvent(clientId, null);
       }
     } else if (_mutationBatchKeyRe.hasMatch(key)) {
-      if (newValue != null) {
-        final RegExpMatch match = _mutationBatchKeyRe.firstMatch(key)!;
+      final RegExpMatch match = _mutationBatchKeyRe.firstMatch(key)!;
+      final int? batchId = _idFromKey(key, match.group(1)!);
+      if (newValue != null && batchId != null) {
         final MutationMetadata? metadata = MutationMetadata.fromStorageEntry(
           User(match.group(2)),
-          int.parse(match.group(1)!),
+          batchId,
           newValue,
         );
         if (metadata != null) {
@@ -726,12 +727,13 @@ class StorageSharedClientState extends SharedClientState {
         }
       }
     } else if (_queryTargetKeyRe.hasMatch(key)) {
-      if (newValue != null) {
+      final int? targetId = _idFromKey(
+        key,
+        _queryTargetKeyRe.firstMatch(key)!.group(1)!,
+      );
+      if (newValue != null && targetId != null) {
         final QueryTargetMetadata? metadata =
-            QueryTargetMetadata.fromStorageEntry(
-              int.parse(_queryTargetKeyRe.firstMatch(key)!.group(1)!),
-              newValue,
-            );
+            QueryTargetMetadata.fromStorageEntry(targetId, newValue);
         if (metadata != null) {
           await syncEngine!.applyTargetState(
             metadata.targetId,
@@ -755,13 +757,19 @@ class StorageSharedClientState extends SharedClientState {
       }
     } else if (key == _bundleLoadedKey && newValue != null) {
       final Object? collectionGroups = _tryDecode(newValue);
-      if (collectionGroups is List) {
+      if (collectionGroups is List &&
+          collectionGroups.every((Object? group) => group is String)) {
         await Future.wait(<Future<void>>[
-          for (final dynamic collectionGroup in collectionGroups)
+          for (final Object? collectionGroup in collectionGroups)
             syncEngine!.synchronizeWithChangedDocuments(
-              collectionGroup as String,
+              collectionGroup! as String,
             ),
         ]);
+      } else {
+        Log.e(
+          SharedClientState._tag,
+          'Failed to parse the collection groups of a loaded bundle: $newValue',
+        );
       }
     }
   }
@@ -837,6 +845,19 @@ class StorageSharedClientState extends SharedClientState {
         .map((ClientState state) => state.activeTargetIds)
         .forEach(activeTargets.addAll);
     return activeTargets;
+  }
+
+  /// The batch or target id in [key], or null (logged) when its digits do not fit an integer: no client wrote it.
+  /// The JS SDK reads such an id as an imprecise number.
+  static int? _idFromKey(String key, String digits) {
+    final int? id = int.tryParse(digits);
+    if (id == null) {
+      Log.e(
+        SharedClientState._tag,
+        'Ignoring an entry with an invalid id: $key',
+      );
+    }
+    return id;
   }
 
   static int _sequenceNumberFromStorage(String? value) {

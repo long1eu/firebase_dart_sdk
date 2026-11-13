@@ -212,6 +212,10 @@ class WebChannelStream {
   int _lastArrayId = 0;
   Duration _backChannelTimeout = const Duration(seconds: 45);
 
+  /// The longest back channel timeout the server may ask for: an hour, far
+  /// above the 30 s it sends.
+  static const int _maxBackChannelTimeoutHintMs = 60 * 60 * 1000;
+
   WebHttpRequest? _forwardRequest;
   WebHttpRequest? _backRequest;
   Timer? _backChannelTimer;
@@ -503,10 +507,17 @@ class WebChannelStream {
             (array[1] as List<Object?>).length >= 2 &&
             (array[1] as List<Object?>)[0] == 'c') {
           final List<Object?> open = array[1] as List<Object?>;
-          _sessionId = open[1] as String?;
-          if (open.length > 5 && open[5] is int && (open[5] as int) > 0) {
+          final Object? sessionId = open[1];
+          // Not a string: no session id, which fails the handshake below.
+          _sessionId = sessionId is String ? sessionId : null;
+          final Object? timeoutHint = open.length > 5 ? open[5] : null;
+          // A hint out of range is ignored: a huge one overflowed the
+          // Duration, which aborted every back channel request at once.
+          if (timeoutHint is int &&
+              timeoutHint > 0 &&
+              timeoutHint <= _maxBackChannelTimeoutHintMs) {
             _backChannelTimeout = Duration(
-              milliseconds: ((open[5] as int) * 1.5).round(),
+              milliseconds: (timeoutHint * 1.5).round(),
             );
           }
         } else {

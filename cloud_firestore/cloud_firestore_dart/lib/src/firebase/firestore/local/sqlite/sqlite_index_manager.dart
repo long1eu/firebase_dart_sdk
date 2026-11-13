@@ -91,30 +91,28 @@ class SqliteIndexManager extends IndexManager {
       'SELECT index_id, collection_group, index_proto FROM index_configuration',
     );
     for (final Map<String, dynamic> row in configRows) {
-      try {
-        final int indexId = row['index_id'];
-        final String collectionGroup = row['collection_group'];
-        final List<IndexSegment> segments = _serializer
-            .decodeFieldIndexSegments(
-              admin.Index.fromBuffer(row['index_proto']),
-            );
+      final int indexId = row['index_id'];
+      final String collectionGroup = row['collection_group'];
+      final List<IndexSegment> segments = _serializer.decodeFieldIndexSegments(
+        parseStoredProto(
+          'Index',
+          () => admin.Index.fromBuffer(row['index_proto']),
+        ),
+      );
 
-        // If we fetched an index state for the user above, combine it with this index. We use the default state if we
-        // don't have an index state (for example, if the index was created while a different user as logged in).
-        final IndexState indexState =
-            indexStates[indexId] ?? FieldIndex.initialState;
-        final FieldIndex fieldIndex = FieldIndex(
-          indexId,
-          collectionGroup,
-          segments,
-          indexState,
-        );
+      // If we fetched an index state for the user above, combine it with this index. We use the default state if we
+      // don't have an index state (for example, if the index was created while a different user as logged in).
+      final IndexState indexState =
+          indexStates[indexId] ?? FieldIndex.initialState;
+      final FieldIndex fieldIndex = FieldIndex(
+        indexId,
+        collectionGroup,
+        segments,
+        indexState,
+      );
 
-        // Store the index and update `_memoizedMaxIndexId` and `_memoizedMaxSequenceNumber`.
-        _memoizeIndex(fieldIndex);
-      } on InvalidProtocolBufferException catch (e) {
-        throw fail('Failed to decode index: $e');
-      }
+      // Store the index and update `_memoizedMaxIndexId` and `_memoizedMaxSequenceNumber`.
+      _memoizeIndex(fieldIndex);
     }
 
     _started = true;

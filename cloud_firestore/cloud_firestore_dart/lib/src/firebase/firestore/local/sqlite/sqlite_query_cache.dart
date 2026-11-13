@@ -260,7 +260,9 @@ class SQLiteQueryCache implements QueryCache {
   }
 
   QueryData _decodeQueryData(List<int> bytes) {
-    return _localSerializer.decodeQueryData(proto.Target.fromBuffer(bytes));
+    return _localSerializer.decodeQueryData(
+      parseStoredProto('TargetData', () => proto.Target.fromBuffer(bytes)),
+    );
   }
 
   // Matching key tracking

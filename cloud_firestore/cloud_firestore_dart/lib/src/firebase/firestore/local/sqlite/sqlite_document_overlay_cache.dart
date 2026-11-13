@@ -20,13 +20,12 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/encoded_path.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/stored_proto.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/overlay.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
-import 'package:protobuf/protobuf.dart';
 
 /// SQLite-backed [DocumentOverlayCache] of one user (table `document_overlays`, schema migration 11).
 class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
@@ -232,13 +231,9 @@ class SQLiteDocumentOverlayCache implements DocumentOverlayCache {
   Overlay _decodeOverlay(Map<String, dynamic> row) {
     final Uint8List rawMutation = row['overlay_mutation'];
     final int largestBatchId = row['largest_batch_id'];
-    try {
-      final Mutation mutation = _serializer.decodeOverlayMutation(
-        proto.Write.fromBuffer(rawMutation),
-      );
-      return Overlay(largestBatchId, mutation);
-    } on InvalidProtocolBufferException catch (e) {
-      throw fail('Overlay failed to parse: $e');
-    }
+    final Mutation mutation = _serializer.decodeOverlayMutation(
+      parseStoredProto('Overlay', () => proto.Write.fromBuffer(rawMutation)),
+    );
+    return Overlay(largestBatchId, mutation);
   }
 }

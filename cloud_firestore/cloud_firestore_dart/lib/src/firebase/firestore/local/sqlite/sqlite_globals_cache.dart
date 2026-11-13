@@ -44,16 +44,19 @@ class SQLiteGlobalsCache implements GlobalsCache {
     return _set(_sessionToken, value);
   }
 
+  /// The value as a blob. The column is typed by affinity only, and another process may have written a value of
+  /// another type: SQLite converts it like the `Cursor.getBlob` of Android does for text (its UTF-8 bytes), and a
+  /// number to the bytes of its text.
   Future<Uint8List?> _get(String name) async {
     final List<Map<String, dynamic>> rows = await _db.query(
-      'SELECT value FROM globals WHERE name = ?',
+      'SELECT CAST(value AS BLOB) AS value FROM globals WHERE name = ?',
       <Object?>[name],
     );
     if (rows.isEmpty) {
       return null;
     }
     final Object? value = rows.first['value'];
-    return value == null ? null : Uint8List.fromList(value as List<int>);
+    return value is List<int> ? Uint8List.fromList(value) : null;
   }
 
   Future<void> _set(String name, Uint8List value) {

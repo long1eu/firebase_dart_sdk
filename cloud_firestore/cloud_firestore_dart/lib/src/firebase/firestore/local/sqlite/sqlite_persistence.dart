@@ -44,6 +44,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_database_files.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_document_overlay_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_overlay_migration_manager.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/stored_proto.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -363,14 +364,14 @@ class SQLitePersistence extends Persistence {
     await _metadataTransaction(() => clientMetadata._update(atStart: true));
   }
 
-  /// The epoch of the cache, or null when its row is missing or does not hold an integer (a damaged file, or a row
-  /// written by something else than this SDK). A running client treats null as a changed epoch: it terminates as
-  /// after a clear by another client.
+  /// The epoch of the cache, or null when its row is missing, repeated or does not hold an integer (a damaged file, or
+  /// rows written by something else than this SDK, which may also have created the table without its constraints). A
+  /// running client treats null as a changed epoch: it terminates as after a clear by another client.
   Future<int?> _readEpoch() async {
     final List<Map<String, dynamic>> rows = await _db.query(
       'SELECT epoch FROM persistence_epoch WHERE id = 0',
     );
-    final Object? epoch = rows.isEmpty ? null : rows.single['epoch'];
+    final Object? epoch = rows.length == 1 ? rows.single['epoch'] : null;
     return epoch is int ? epoch : null;
   }
 
@@ -385,7 +386,11 @@ class SQLitePersistence extends Persistence {
       return epoch;
     }
     Log.w(tag, 'Replacing the malformed epoch of the cache "$databaseName".');
-    await _db.execute('UPDATE persistence_epoch SET epoch = 0 WHERE id = 0');
+    // Delete and insert: a table without its constraints may hold the row more than once.
+    await _db.execute('DELETE FROM persistence_epoch WHERE id = 0');
+    await _db.execute(
+      'INSERT INTO persistence_epoch (id, epoch) VALUES (0, 0)',
+    );
     return 0;
   }
 

@@ -21,8 +21,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/named_query.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/stored_proto.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 
@@ -109,14 +109,14 @@ class SQLiteBundleCache implements BundleCache {
     }
 
     final Map<String, dynamic> row = rows.first;
-    final BundledQuery bundledQuery;
-    try {
-      bundledQuery = _serializer.decodeBundledQuery(
-        proto.BundledQuery.fromBuffer(row['bundled_query_proto'] as Uint8List),
-      );
-    } on Exception catch (e) {
-      throw fail('NamedQuery failed to parse: $e');
-    }
+    final BundledQuery bundledQuery = _serializer.decodeBundledQuery(
+      parseStoredProto(
+        'NamedQuery',
+        () => proto.BundledQuery.fromBuffer(
+          row['bundled_query_proto'] as Uint8List,
+        ),
+      ),
+    );
     return NamedQuery(
       queryName,
       bundledQuery,
