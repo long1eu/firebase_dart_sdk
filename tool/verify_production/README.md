@@ -38,7 +38,7 @@ bypass security rules.
 | document deletes | one per document of the run, about 21 (the clean-up; not counted against the cap) |
 | document reads | normally under 200; a few hundred more when a check has to wait and poll |
 | listen streams | about 15 short-lived listeners |
-| duration | about 20 s on the emulator; allow a few minutes |
+| duration | about 5 s on the emulator; allow a few minutes |
 
 This is far below the daily free quota (20,000 writes, 50,000 reads). On a billed database it
 costs a fraction of a cent. Check 1c may need one composite index (see below); an index is free
@@ -92,7 +92,7 @@ does not handle. `INCONCLUSIVE` means the check could not reach a result and say
 | 3 | Lost commit answer (F2) | The same for a transaction commit. `APPLIED ONCE` or `APPLIED TWICE` (the retry ran the body on top of its own first commit; emulator and the other SDKs do this). `FAIL`: the transaction was lost. |
 | 4 | Resume from snapshot JSON | `querySnapshotsFromJson` with the read time of the snapshot unchanged, 2 hours old and 8 days old. `PASS`: the listener gets in sync each time. `FAIL` with the error of the backend: it rejects an old read time and the SDK needs a fallback to a full listen; the detail lines say for which age. |
 | 5 | Target ids from 1000 up | A raw Listen with the target ids the SDK uses (1002, 1003) and the largest 32-bit ones. `FAIL`: the backend rejects them. |
-| 6 | Null and NaN in filters | `array-contains`, `array-contains-any` and `in` with `null` and `NaN`. `STANDARD`: they never match. `ENTERPRISE`: they match. `INCONCLUSIVE`: neither profile of the emulators; update the "Enterprise edition" section of the package README. `FAIL`: with the documents in the cache, a server read does not complete or returns something else than the backend alone does (see "Known results" below). |
+| 6 | Null and NaN in filters | `array-contains`, `array-contains-any` and `in` with `null` and `NaN`. `STANDARD`: they never match. `ENTERPRISE`: they match. `INCONCLUSIVE`: neither profile of the emulators; update the "Enterprise edition" section of the package README. `FAIL`: with the documents in the cache, a server read does not complete or returns something else than the backend alone does (see "Known results" below). The detail lines also list where a query answered from the cache alone differs from the backend. |
 | 7 | BSON numeric increment | Only on a database that behaves like Enterprise in check 6. `increment` on a `Decimal128Value` and an `Int32Value` must add. |
 | 8 | -0.0 and empty bytes | Written over gRPC and over the web transport, read back over both. `FAIL` lists the combination that lost the sign or the type. |
 | 9 | Half-close timing after unlisten | How long the backend takes to end a Listen stream after the client unlistened and half-closed (three samples, in ms). The SDK waits 10 s before it resets the call; `FAIL` when the backend takes longer or ends the stream with an error. |
@@ -111,28 +111,36 @@ and 11, which nobody has seen for production yet.
 | 2 | PASS, `APPLIED TWICE` | PASS, `APPLIED TWICE` |
 | 3 | PASS, `APPLIED TWICE`, 2 attempts | PASS, `APPLIED TWICE` |
 | 4 | PASS (the emulator accepts any read time) | PASS |
-| 6 | **FAIL**, `standard` semantics | PASS, `ENTERPRISE` |
+| 6 | PASS, `STANDARD` | PASS, `ENTERPRISE` |
 | 7 | SKIPPED | **FAIL**: the emulator (v1.22.0) replaces the field with the operand |
 | 8 | **FAIL**: -0.0 written over the web transport comes back as 0.0 | **FAIL**, the same |
 | 10 | SKIPPED | SKIPPED |
 
-The three failures are real and not about the kit:
+The failures are real and not about the kit:
 
-- **6 on Standard:** the SDK itself matches `null` and `NaN` in `in`, `array-contains` and
-  `array-contains-any` (the Enterprise behaviour), the Standard backend does not. With the
-  documents in the cache, `get(Source.cache)` returns them and `get(Source.server)` of such a
-  query does not complete (the document stays in limbo). Open defect of the SDK, found by this
-  kit. Expect the same `FAIL` on a production Standard database.
 - **8:** the emulator's JSON front end stores `-0` as `0` (also for a plain REST request with
   `"doubleValue": "-0"`). Whether production does the same is what the check is for.
 - **7 on Enterprise:** emulator behaviour; the check is for a production Enterprise database.
 
+Check 6 on Standard used to fail: the SDK itself matches `null` and `NaN` in `in`,
+`array-contains` and `array-contains-any` (the Enterprise behaviour), the Standard backend does
+not, and with the documents in the cache a server read of such a query did not complete. The
+sync engine now drops a limbo document that the backend confirms but does not match (4c72e9ea),
+so the server read returns what the backend returns and the check passes. Its detail lines still
+list the difference that remains: a query answered from the cache alone (`get(Source.cache)`)
+returns those documents on a Standard database. If check 6 fails on a production Standard
+database, that fix does not hold there.
+
 ## Not verified
 
-- **TLS through the proxy (checks 2 and 3).** The proxy pipes bytes, and the client connects to
-  it while keeping `firestore.googleapis.com` as the TLS server name and call authority. This
-  was only run without TLS (emulator). If it does not work, the checks report `INCONCLUSIVE`
-  ("could not write through the TCP proxy") and nothing else is affected.
+- **TLS through the proxy (checks 2 and 3)** was verified locally, not against production:
+  `test/production/proxy_tls_test.dart` puts the proxy in front of a `package:grpc` server with
+  a self-signed certificate and uses the channel of the kit (`proxiedGrpcChannel`). The client
+  dials the proxy with the name of the server for SNI, certificate verification and the call
+  authority; a wrong name or an untrusted certificate is rejected; holding back answers or
+  requests and cutting ends the call exactly as on plain TCP, and the next call reconnects.
+  What remains unverified is only Google's front end itself. If it does not work there, the
+  checks report `INCONCLUSIVE` ("could not write through the TCP proxy").
 - **Application Default Credentials end to end.** The token plumbing is unit-tested with a fake
   authenticator; no real token was ever fetched by this code.
 - **The web transport against production** (check 11) and with an OAuth token.

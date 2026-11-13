@@ -1,8 +1,8 @@
 // Verifies the production verification kit itself (verify_production.dart) against the emulator, where the
 // expected results are known. Skipped unless FIRESTORE_EMULATOR_HOST is set; never runs against a real project.
 //
-// The expectations are the ones of the Standard edition emulator. Two checks are expected to FAIL there, for known
-// reasons that are not about the kit (see the comments below).
+// The expectations are the ones of the Standard edition emulator, pinned per check. One check (8) is expected to
+// FAIL there, for a known reason that is not about the kit (see the comment below).
 
 import 'package:test/test.dart';
 
@@ -124,25 +124,25 @@ void main() {
 
     expect(status('5'), Status.pass, reason: why('5'));
 
-    // Standard edition: null and NaN never match on the backend. The check FAILS on the Standard emulator because
-    // of an open defect of the SDK that it found: the SDK itself matches null and NaN in `in`, `array-contains`
-    // and `array-contains-any`, so with the documents cached a server read stays in limbo and does not complete.
+    // Standard edition: null and NaN never match on the backend. The SDK itself matches them, so with the
+    // documents cached they are in limbo; the sync engine drops a limbo document that the backend confirms but
+    // does not match (4c72e9ea), and the server read gives the result of the backend. Before that fix this check
+    // failed here: the server reads did not complete.
+    expect(status('6'), Status.pass, reason: why('6'));
     expect(observed('6')['edition'], 'standard', reason: why('6'));
     expect((observed('6')['server']! as Map<String, String>).values,
         everyElement(isEmpty),
         reason: why('6'));
-    expect(status('6'), anyOf(Status.fail, Status.pass), reason: why('6'));
-    if (status('6') == Status.fail) {
-      expect(observed('6')['stuck'], isNotEmpty);
-    }
+    expect(observed('6')['stuck'], isEmpty, reason: why('6'));
+    expect(observed('6')['localDifferences'], hasLength(6), reason: why('6'));
 
     expect(status('7'), Status.skipped, reason: why('7'));
 
     // FAILS on the emulator: its JSON front end stores -0 as 0, so -0.0 written over the web transport (and only
     // that) loses its sign. Empty bytes are fine everywhere.
     final List<Object?> problems = observed('8')['problems']! as List<Object?>;
-    expect(status('8'), problems.isEmpty ? Status.pass : Status.fail,
-        reason: why('8'));
+    expect(status('8'), Status.fail, reason: why('8'));
+    expect(problems, isNotEmpty);
     for (final Object? problem in problems) {
       expect(problem, contains('written by_web'), reason: why('8'));
       expect(problem, isNot(contains('empty bytes')), reason: why('8'));
@@ -168,7 +168,19 @@ void main() {
     expect(run.deletes, greaterThan(10));
     expect(report, contains('Clean-up: ${run.deletes} documents deleted'));
     expect(report, isNot(contains('Clean-up FAILED')));
-    expect(run.exitCode, anyOf(0, 1));
+    // Check 8 is the only FAIL (the emulator stores -0 as 0), so the exit code is 1.
+    expect(
+        run.results.entries
+            .where((MapEntry<String, CheckResult> e) =>
+                e.value.status == Status.fail)
+            .map((MapEntry<String, CheckResult> e) => e.key),
+        <String>['8'],
+        reason: report);
+    expect(run.exitCode, 1);
+    // Every check printed its verdict.
+    for (final Check check in checks) {
+      expect(report, contains('[${check.id}] ${run.results[check.id]!.status.label}: '));
+    }
   }, skip: skip, timeout: const Timeout(Duration(minutes: 4)));
 
   test('the write cap stops the run before it is exceeded', () async {

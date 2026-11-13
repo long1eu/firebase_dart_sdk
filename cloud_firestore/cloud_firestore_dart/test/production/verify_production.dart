@@ -35,6 +35,7 @@ import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:grpc/grpc.dart'
     show ChannelCredentials, ChannelOptions, ClientTransportConnectorChannel;
+import 'package:grpc/grpc_connection_interface.dart' show ClientChannelBase;
 
 import '../unit/firebase/firestore/local/mock/database_mock.dart';
 import '../util/chaos_proxy.dart';
@@ -141,6 +142,37 @@ class RecordingWebHttpClient implements WebHttpClient {
   void close() => _delegate.close();
 }
 
+/// A gRPC channel that connects to a TCP proxy in front of the backend [serverName].
+///
+/// The channel dials the proxy, but keeps the name of the backend for TLS (SNI and the verification of the
+/// certificate) and as the authority of the calls. The proxy only pipes bytes, so TLS is end to end between the
+/// client and the backend. [trustedCertificates] (PEM) replaces the trusted roots; it is only for tests with a
+/// self-signed server (test/production/proxy_tls_test.dart).
+ClientChannelBase proxiedGrpcChannel({
+  required String proxyHost,
+  required int proxyPort,
+  required String serverName,
+  required bool ssl,
+  List<int>? trustedCertificates,
+}) {
+  final ChannelCredentials credentials = ssl
+      ? ChannelCredentials.secure(
+          authority: serverName, certificates: trustedCertificates)
+      : const ChannelCredentials.insecure();
+  return ClientTransportConnectorChannel(
+    KeepAliveTransportConnector(
+      host: proxyHost,
+      port: proxyPort,
+      credentials: credentials,
+      pingInterval: defaultKeepAlivePingInterval,
+      pingTimeout: defaultKeepAliveTimeout,
+      connectTimeout: defaultConnectTimeout,
+    ),
+    options: ChannelOptions(
+        credentials: credentials, connectTimeout: defaultConnectTimeout),
+  );
+}
+
 /// Thrown before a write that would exceed the cap of the run.
 class WriteCapExceeded implements Exception {
   WriteCapExceeded(this.message);
@@ -200,24 +232,12 @@ class Kit {
     if (via == null) {
       return createTransport(_databaseInfo, options);
     }
-    // Through the proxy: connect to the proxy, but keep the name of the backend for TLS (SNI and certificate) and
-    // for the authority of the calls. The proxy only pipes bytes, so TLS passes through it untouched.
-    final ChannelCredentials credentials = backend.ssl
-        ? ChannelCredentials.secure(authority: backend.host)
-        : const ChannelCredentials.insecure();
-    final ChannelOptions channelOptions = ChannelOptions(
-        credentials: credentials, connectTimeout: defaultConnectTimeout);
     return GrpcTransport(
-      ClientTransportConnectorChannel(
-        KeepAliveTransportConnector(
-          host: via.host,
-          port: via.port,
-          credentials: credentials,
-          pingInterval: defaultKeepAlivePingInterval,
-          pingTimeout: defaultKeepAliveTimeout,
-          connectTimeout: defaultConnectTimeout,
-        ),
-        options: channelOptions,
+      proxiedGrpcChannel(
+        proxyHost: via.host,
+        proxyPort: via.port,
+        serverName: backend.host,
+        ssl: backend.ssl,
       ),
       options,
     );
