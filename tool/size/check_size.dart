@@ -9,6 +9,7 @@
 //   - that no code of the local store, the sync engine, the remote store or
 //     the WebChannel transport is in the program, and
 //   - that the program is within the budget below.
+// The full application is checked against a budget of its own.
 //
 // Exits with 1 when a check fails.
 
@@ -22,6 +23,16 @@ import 'dart:io';
 /// deliberately, with the new numbers in this comment and in the README.
 const int liteBudget = 450000;
 const int liteGzipBudget = 140000;
+
+/// The budget of the full application (the main library), in the same units.
+/// Measured with Dart 3.12.2 on main 1645e672: 651,311 and 199,005; the
+/// budget is those numbers plus about 10%, rounded up to a thousand, so that
+/// the normal growth of the library passes and an accidental large
+/// dependency (a second copy of the protos, a JS interop layer pulled in by
+/// mistake) does not. Same rules as the lite budget: raise it deliberately,
+/// with the new numbers in this comment.
+const int fullBudget = 717000;
+const int fullGzipBudget = 219000;
 
 /// Libraries of the main library that a lite program must not contain code
 /// of, as parts of their URI.
@@ -166,10 +177,26 @@ Future<void> main(List<String> arguments) async {
       'over the budget of ${thousands(liteGzipBudget)}.',
     );
   }
+  if (full.size > fullBudget) {
+    failures.add(
+      'The full application is ${thousands(full.size)} characters of '
+      'JavaScript, over the budget of ${thousands(fullBudget)}.',
+    );
+  }
+  if (full.gzipSize > fullGzipBudget) {
+    failures.add(
+      'The full application is ${thousands(full.gzipSize)} bytes gzipped, '
+      'over the budget of ${thousands(fullGzipBudget)}.',
+    );
+  }
   if (failures.isEmpty) {
     print(
       'lite: within the budget of ${thousands(liteBudget)} '
       '(${thousands(liteGzipBudget)} gzipped)',
+    );
+    print(
+      'full: within the budget of ${thousands(fullBudget)} '
+      '(${thousands(fullGzipBudget)} gzipped)',
     );
     return;
   }

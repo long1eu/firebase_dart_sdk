@@ -292,13 +292,23 @@ jobs:
           dart test --reporter expanded 2>&1 | tee "$EMULATOR_DIR/auth_providers.log"
           exit "${PIPESTATUS[0]}"
       - name: Run the browser test of firebase_auth_providers_dart (dart2js and dart2wasm)
-        # Chrome is preinstalled on the runner image; the test talks to the Auth emulator on 9197.
+        # Chrome is preinstalled on the runner image. The test reads FIREBASE_AUTH_EMULATOR_HOST
+        # in a hybrid isolate on the VM (a browser has no environment) and skips itself when the
+        # emulator does not answer, so a skip here means the wiring broke: the step fails then.
         if: ${{ !cancelled() }}
         working-directory: firebase_auth/firebase_auth_providers_dart
+        env:
+          FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9197
         run: |
           set -o pipefail
-          dart test --reporter expanded -p chrome test/browser 2>&1 | tee "$EMULATOR_DIR/auth_providers_dart2js.log"
-          dart test --reporter expanded -p chrome -c dart2wasm test/browser 2>&1 | tee "$EMULATOR_DIR/auth_providers_dart2wasm.log"
+          for compiler in dart2js dart2wasm; do
+            log="$EMULATOR_DIR/auth_providers_$compiler.log"
+            dart test --reporter expanded -p chrome -c "$compiler" test/browser 2>&1 | tee "$log"
+            if grep -Eq ' ~[0-9]+' "$log"; then
+              echo "::error::The auth browser test skipped under $compiler: the Auth emulator on $FIREBASE_AUTH_EMULATOR_HOST did not answer."
+              exit 1
+            fi
+          done
       - name: Run the end-to-end tests of cloud_firestore_dart (test/integration_auth)
         if: ${{ !cancelled() }}
         working-directory: cloud_firestore/cloud_firestore_dart
@@ -425,12 +435,12 @@ jobs:
           path: ${{ runner.temp }}/emulator/*.log
 
   # The size of a program that uses Firestore Lite, and that it does not contain the sync
-  # engine, the local store or WebChannel (tool/check_size.sh, budget in
-  # tool/size/check_size.dart). Pinned to the SDK the budget was measured with: most of the
+  # engine, the local store or WebChannel, and the size of the same program on the main library
+  # (tool/check_size.sh, budgets in tool/size/check_size.dart). Pinned to the SDK the budget was measured with: most of the
   # compiled program is the Dart runtime, so the numbers move with the SDK. When the pin moves,
   # measure again and update the budget and the README. Allowed to fail.
   size:
-    name: Firestore Lite size check (Dart 3.12.2, allowed to fail)
+    name: Web size check, lite and full (Dart 3.12.2, allowed to fail)
     runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
@@ -438,7 +448,7 @@ jobs:
       - uses: dart-lang/setup-dart@v1.8.2
         with:
           sdk: 3.12.2
-      - name: Compile the sample applications and check the lite one
+      - name: Compile the sample applications and check them against their budgets
         env:
           SIZE_OUT_DIR: ${{ runner.temp }}/size
         run: ./tool/check_size.sh
