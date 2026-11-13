@@ -200,4 +200,28 @@ void main() {
           ? false
           : 'Needs a repository checkout: $missing is not part of the '
               'published package.');
+
+  // test/readme/migration_example.dart (analyzed with the snippets above) has
+  // the before/after code of every numbered section of the migration guide
+  // that changes code; the last section (the example app) has none.
+  test('the migration example covers every section of the migration guide',
+      () {
+    final List<String> sections = RegExp(r'^## (\d+)\. ', multiLine: true)
+        .allMatches(
+            File('../../docs/migrating_from_vm_packages.md').readAsStringSync())
+        .map((Match m) => m.group(1)!)
+        .toList();
+    expect(sections, hasLength(greaterThanOrEqualTo(9)));
+    final String example =
+        File('test/readme/migration_example.dart').readAsStringSync();
+    for (final String section in sections.take(sections.length - 1)) {
+      expect(example, contains('// Section $section. '),
+          reason: 'Section $section of the migration guide has no '
+              'before/after code in test/readme/migration_example.dart');
+    }
+  },
+      skip: missing == null
+          ? false
+          : 'Needs a repository checkout: $missing is not part of the '
+              'published package.');
 }

@@ -19,7 +19,8 @@ production Firebase.
 
 ### Breaking changes
 
-- Dart 3 (`sdk: ^3.0.0`) with sound null safety. `FirebaseOptions.projectId`, `databaseUrl`,
+- Dart 3.8 (`sdk: ^3.8.0`, the floor of `cloud_firestore_dart` and the lowest SDK the CI runs)
+  with sound null safety. `FirebaseOptions.projectId`, `databaseUrl`,
   `storageBucket`, `gcmSenderId` and `gaTrackingId` are nullable; `apiKey` and `applicationId`
   are required.
 - `FirebaseApp.setDataCollectionDefaultEnabled` takes a required named `enabled`.

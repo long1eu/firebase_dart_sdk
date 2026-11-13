@@ -60,7 +60,7 @@ dart pub add cloud_firestore_dart firebase_app_dart   # once 0.1.0 is published;
 ## Status
 
 Revival of the original port, which stopped at the 2019 Android SDK; it now follows the Android
-SDK's behaviour up to late 2026 on Dart 3 (`cloud_firestore_dart` needs Dart 3.8) with sound
+SDK's behaviour up to late 2026 on Dart 3.8 or later with sound
 null safety, and parts of its public API follow the JS SDK.
 
 - **Tested against the Firestore emulator only. Nothing has been run against production Firestore.**

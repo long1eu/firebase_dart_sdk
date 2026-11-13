@@ -17,8 +17,12 @@ import 'package:rxdart/rxdart.dart';
 /// Create one with [FirebaseApp.withOptions]. The app created without a name is the default app,
 /// returned by [FirebaseApp.instance].
 class FirebaseApp with _PlatformDependenciesMixin {
-  FirebaseApp._(this._name, this._options, this._dependencies,
-      this._dataCollectionDefaultEnabled);
+  FirebaseApp._(
+    this._name,
+    this._options,
+    this._dependencies,
+    this._dataCollectionDefaultEnabled,
+  );
 
   /// Initializes a [FirebaseApp] instance with [options] and [name].
   ///
@@ -34,11 +38,16 @@ class FirebaseApp with _PlatformDependenciesMixin {
     // The const constructor of [FirebaseOptions] only checks this with an
     // assert, which a release build skips.
     if (options.applicationId.isEmpty) {
-      throw ArgumentError.value(options.applicationId, 'options.applicationId',
-          'ApplicationId must be set.');
+      throw ArgumentError.value(
+        options.applicationId,
+        'options.applicationId',
+        'ApplicationId must be set.',
+      );
     }
-    Preconditions.checkState(!_instances.containsKey(normalizedName),
-        'FirebaseApp name $normalizedName already exists!');
+    Preconditions.checkState(
+      !_instances.containsKey(normalizedName),
+      'FirebaseApp name $normalizedName already exists!',
+    );
 
     final LocalStorage? storage = dependencies?.storage;
     final String _dataCollectionDefaultEnabled =
@@ -59,7 +68,8 @@ class FirebaseApp with _PlatformDependenciesMixin {
     final FirebaseApp? defaultApp = _instances[defaultAppName];
     if (defaultApp == null) {
       throw StateError(
-          'Default FirebaseApp is not initialized. Make sure to call [FirebaseApp()] or [FirebaseApp.withOptions()] first.');
+        'Default FirebaseApp is not initialized. Make sure to call [FirebaseApp()] or [FirebaseApp.withOptions()] first.',
+      );
     }
 
     return defaultApp;
@@ -81,7 +91,8 @@ class FirebaseApp with _PlatformDependenciesMixin {
         : '';
 
     throw StateError(
-        'FirebaseApp with name $name doesn\'t exist. $availableAppNamesMessage');
+      'FirebaseApp with name $name doesn\'t exist. $availableAppNamesMessage',
+    );
   }
 
   /// The name of the default app.
@@ -205,10 +216,12 @@ class FirebaseApp with _PlatformDependenciesMixin {
   /// Returns persistence key. Exists to support getting [FirebaseApp]
   /// persistence key after the app has been deleted.
   static String getPersistenceKeyFor(String name, String applicationId) {
-    final String encodedName =
-        base64Url.encode(utf8.encode(name)).replaceAll('=', '');
-    final String encodedApplicationId =
-        base64Url.encode(utf8.encode(applicationId)).replaceAll('=', '');
+    final String encodedName = base64Url
+        .encode(utf8.encode(name))
+        .replaceAll('=', '');
+    final String encodedApplicationId = base64Url
+        .encode(utf8.encode(applicationId))
+        .replaceAll('=', '');
 
     return '$encodedName+$encodedApplicationId';
   }
@@ -264,7 +277,8 @@ mixin _PlatformDependenciesMixin
   void _initPlatformDependencies() {
     // Without platform dependencies the defaults are created once, so that
     // everything that listens (or adds) works on the same subject.
-    _onBackgroundChanged = _dependencies?.onBackgroundChanged ??
+    _onBackgroundChanged =
+        _dependencies?.onBackgroundChanged ??
         BehaviorSubject<bool>.seeded(false);
     _onNetworkConnected =
         _dependencies?.onNetworkConnected ?? BehaviorSubject<bool>.seeded(true);

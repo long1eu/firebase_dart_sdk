@@ -5,10 +5,13 @@ import 'package:test/test.dart';
 
 List<String> capture(void Function() body) {
   final List<String> lines = <String>[];
-  runZoned(body,
-      zoneSpecification: ZoneSpecification(
-          print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
-              lines.add(line)));
+  runZoned(
+    body,
+    zoneSpecification: ZoneSpecification(
+      print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
+          lines.add(line),
+    ),
+  );
   return lines;
 }
 
@@ -61,11 +64,14 @@ void levelTests() {
       InternalLogLevel.i,
       InternalLogLevel.d,
       InternalLogLevel.w,
-      InternalLogLevel.e
+      InternalLogLevel.e,
     ]) {
       Log.level = level;
-      expect(Log.isDebugEnabled, capture(() => Log.d('t', 'x')).isNotEmpty,
-          reason: 'level ${level.compareTo(InternalLogLevel.i)}');
+      expect(
+        Log.isDebugEnabled,
+        capture(() => Log.d('t', 'x')).isNotEmpty,
+        reason: 'level ${level.compareTo(InternalLogLevel.i)}',
+      );
     }
   });
 }

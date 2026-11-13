@@ -1,8 +1,10 @@
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
-const FirebaseOptions _options =
-    FirebaseOptions(apiKey: 'key', applicationId: 'app-id');
+const FirebaseOptions _options = FirebaseOptions(
+  apiKey: 'key',
+  applicationId: 'app-id',
+);
 
 void main() {
   tearDown(FirebaseApp.clearInstancesForTest);
@@ -20,8 +22,10 @@ void main() {
 
   test('creating the same name twice throws', () {
     FirebaseApp.withOptions(_options, name: 'x');
-    expect(() => FirebaseApp.withOptions(_options, name: 'x'),
-        throwsA(isA<StateError>()));
+    expect(
+      () => FirebaseApp.withOptions(_options, name: 'x'),
+      throwsA(isA<StateError>()),
+    );
   });
 
   test('delete removes the app from the registry', () {
@@ -51,31 +55,52 @@ void main() {
     expect(() => first.name, throwsA(isA<StateError>()));
   });
 
-  test('missing and deleted apps report "doesn\'t exist", not "was deleted"',
-      () {
-    final FirebaseApp a = FirebaseApp.withOptions(_options, name: 'a');
-    FirebaseApp.withOptions(_options, name: 'b').delete();
+  test(
+    'missing and deleted apps report "doesn\'t exist", not "was deleted"',
+    () {
+      final FirebaseApp a = FirebaseApp.withOptions(_options, name: 'a');
+      FirebaseApp.withOptions(_options, name: 'b').delete();
 
-    expect(
+      expect(
         () => FirebaseApp.getInstance('nope'),
-        throwsA(isA<StateError>().having(
+        throwsA(
+          isA<StateError>().having(
             (StateError e) => e.message,
             'message',
-            allOf(contains('exist'), contains('Available app names: a'),
-                isNot(contains('was deleted'))))));
-    expect(
+            allOf(
+              contains('exist'),
+              contains('Available app names: a'),
+              isNot(contains('was deleted')),
+            ),
+          ),
+        ),
+      );
+      expect(
         () => FirebaseApp.getInstance('b'),
-        throwsA(isA<StateError>().having(
-            (StateError e) => e.message, 'message', contains('exist'))));
-    expect(a.name, 'a');
-  });
+        throwsA(
+          isA<StateError>().having(
+            (StateError e) => e.message,
+            'message',
+            contains('exist'),
+          ),
+        ),
+      );
+      expect(a.name, 'a');
+    },
+  );
 
   test('using a deleted app says it was deleted', () {
     final FirebaseApp app = FirebaseApp.withOptions(_options, name: 'x');
     app.delete();
     expect(
-        () => app.options,
-        throwsA(isA<StateError>().having(
-            (StateError e) => e.message, 'message', contains('was deleted'))));
+      () => app.options,
+      throwsA(
+        isA<StateError>().having(
+          (StateError e) => e.message,
+          'message',
+          contains('was deleted'),
+        ),
+      ),
+    );
   });
 }

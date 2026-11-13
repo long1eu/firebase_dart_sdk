@@ -12,7 +12,7 @@ class names did not change.
 
 *Status*: version 0.1.0, prepared for pub.dev but not published yet. Part of the unofficial
 Firestore revival (see the [repository README](https://github.com/long1eu/firebase_dart_sdk)).
-It builds on Dart 3 with null safety and has unit tests; beyond those it is exercised only by
+It needs Dart 3.8 or later and has unit tests; beyond those it is exercised only by
 `cloud_firestore_dart`'s integration suite, which runs against the local Firestore emulator.
 **Nothing has been run against production Firebase.** The only Firebase service in this
 repository that uses it is Firestore: the parts of `PlatformDependencies` that exist for other

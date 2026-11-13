@@ -26,5 +26,6 @@ void main() {
   );
   print('named app: ${secondary.name}');
   print(
-      'lookup: ${identical(FirebaseApp.getInstance('secondary'), secondary)}');
+    'lookup: ${identical(FirebaseApp.getInstance('secondary'), secondary)}',
+  );
 }

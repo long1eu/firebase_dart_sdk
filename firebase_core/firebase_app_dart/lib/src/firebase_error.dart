@@ -58,27 +58,32 @@ class FirebaseApiError {
 
   /// Firebase auth specific error codes.
   /// bring your own auth error codes.
-  static const FirebaseApiError errorInvalidCustomToken =
-      FirebaseApiError(17000);
+  static const FirebaseApiError errorInvalidCustomToken = FirebaseApiError(
+    17000,
+  );
 
   /// The custom token belongs to a different project.
-  static const FirebaseApiError errorCustomTokenMismatch =
-      FirebaseApiError(17002);
+  static const FirebaseApiError errorCustomTokenMismatch = FirebaseApiError(
+    17002,
+  );
 
   /// sign in with credential error codes.
-  static const FirebaseApiError errorInvalidCredential =
-      FirebaseApiError(17004);
+  static const FirebaseApiError errorInvalidCredential = FirebaseApiError(
+    17004,
+  );
 
   /// The user account has been disabled.
   static const FirebaseApiError errorUserDisabled = FirebaseApiError(17005);
 
   /// set account info error codes.
-  static const FirebaseApiError errorOperationNotAllowed =
-      FirebaseApiError(17006);
+  static const FirebaseApiError errorOperationNotAllowed = FirebaseApiError(
+    17006,
+  );
 
   /// The email address is already used by another account.
-  static const FirebaseApiError errorEmailAlreadyInUse =
-      FirebaseApiError(17007);
+  static const FirebaseApiError errorEmailAlreadyInUse = FirebaseApiError(
+    17007,
+  );
 
   /* sign in with password error codes*/
   /// The email address is malformed.
@@ -98,12 +103,14 @@ class FirebaseApiError {
       FirebaseApiError(17012);
 
   /// set account info error codes.
-  static const FirebaseApiError errorRequiresRecentLogin =
-      FirebaseApiError(17014);
+  static const FirebaseApiError errorRequiresRecentLogin = FirebaseApiError(
+    17014,
+  );
 
   /// link credential error codes
-  static const FirebaseApiError errorProviderAlreadyLinked =
-      FirebaseApiError(17015);
+  static const FirebaseApiError errorProviderAlreadyLinked = FirebaseApiError(
+    17015,
+  );
 
   /// unlink credential
   static const FirebaseApiError errorNoSuchProvider = FirebaseApiError(17016);
@@ -112,8 +119,9 @@ class FirebaseApiError {
   static const FirebaseApiError errorInvalidUserToken = FirebaseApiError(17017);
 
   /// network request failed
-  static const FirebaseApiError errorNetworkRequestFailed =
-      FirebaseApiError(17020);
+  static const FirebaseApiError errorNetworkRequestFailed = FirebaseApiError(
+    17020,
+  );
 
   /// STS code
   static const FirebaseApiError errorUserTokenExpired = FirebaseApiError(17021);
@@ -126,8 +134,9 @@ class FirebaseApiError {
   static const FirebaseApiError errorUserMismatch = FirebaseApiError(17024);
 
   /// setAccountInfo(...) error codes.
-  static const FirebaseApiError errorCredentialAlreadyInUse =
-      FirebaseApiError(17025);
+  static const FirebaseApiError errorCredentialAlreadyInUse = FirebaseApiError(
+    17025,
+  );
 
   /// weak passwords
   static const FirebaseApiError errorWeakPassword = FirebaseApiError(17026);

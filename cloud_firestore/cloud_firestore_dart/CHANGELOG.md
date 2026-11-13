@@ -1,21 +1,3 @@
-## Unreleased
-
-- Pipelines (preview): `Pipeline.search` with `documentMatches` and `score`; window functions
-  with `Pipeline.addWindowFields`, `WindowSpec`, `WindowFrame`, `WindowFunction`, `rank()` and
-  `AggregateFunction.over` (beta upstream; the emulator rejects search and window functions, so
-  both are checked for their encoding only); `Transaction.execute(pipeline)` in read-only
-  transactions; typed `PipelineExplainOptions` for `Pipeline.execute`; `Expression.arraySum`,
-  `Expression.log10`, more key/value pairs for `Expression.mapSet`, and `pipelineResultEqual`.
-  The surface now has every symbol of the JS `firestore-pipelines` API, in Dart shape.
-- App Check: when the App Check provider throws, requests are now sent without the
-  `x-firebase-appcheck` header and a warning is logged, like the JS and Android SDKs behave (their
-  App Check SDKs report failures with a placeholder token instead of failing). Before, the
-  request failed with UNAUTHENTICATED and streams retried without end.
-- Tested on the wire over gRPC, WebChannel and REST (full SDK and Lite): the App Check and ID
-  tokens on every request, their refresh after UNAUTHENTICATED, a new App Check token used from
-  the next request on, and a failing App Check provider. Enforcement by the backend is not
-  testable on the emulator and remains untested.
-
 ## 0.1.0
 
 First release under the new name. This package was published as `cloud_firestore_vm` (last
@@ -332,6 +314,13 @@ Pipelines (preview):
   Pipeline results return BSON values as their value classes.
 - `literals` rejects, as the JS and Android SDKs do, an empty field name at any depth of a
   document, and names the field of a `FieldValue` sentinel in its error.
+- Also in the preview: `Pipeline.search` with `documentMatches` and `score`; window functions
+  with `Pipeline.addWindowFields`, `WindowSpec`, `WindowFrame`, `WindowFunction`, `rank()` and
+  `AggregateFunction.over` (beta upstream; the emulator rejects search and window functions, so
+  both are checked for their encoding only); `Transaction.execute(pipeline)` in read-only
+  transactions; typed `PipelineExplainOptions` for `Pipeline.execute`; `Expression.arraySum`,
+  `Expression.log10`, more key/value pairs for `Expression.mapSet`, and `pipelineResultEqual`.
+  The surface has every symbol of the JS `firestore-pipelines` API, in Dart shape.
 
 Firestore Lite (experimental):
 
@@ -356,7 +345,13 @@ Networking:
   only speeds up recovery: it never declares the client offline, and it has no timer while the
   streams work. An app that feeds `PlatformDependencies.onNetworkConnected` itself replaces it.
   Tested on macOS only.
-- App Check token plumbing (`x-firebase-appcheck` header); the enforcement side was not tested.
+- App Check: the token of the app's App Check provider is sent in the `x-firebase-appcheck`
+  header. When the provider throws, requests are sent without the header and a warning is
+  logged, as the JS and Android SDKs behave (their App Check SDKs report failures with a
+  placeholder token instead of failing). Tested on the wire over gRPC, WebChannel and REST (full
+  SDK and Lite): the App Check and ID tokens on every request, their refresh after
+  `UNAUTHENTICATED`, a new App Check token used from the next request on, and a failing
+  provider. Enforcement by the backend is not testable on the emulator and remains untested.
 - Bloom-filter existence-filter handling, gRPC keepalive and connect timeout, backoff reset on
   connectivity change, instance cache per app and database, serial queue for remote store work.
 - **Experimental web support.** The RPCs are behind a transport interface and the
@@ -570,8 +565,9 @@ Documentation and tests:
   uses the network (see Fixed), but they do not share listens or writes; in the browser the cache
   is refused to a second tab.
 - On the web: OPFS storage, and any browser other than Chrome.
-- Pipelines beyond the preview: full-text search, window functions, pipelines in a
-  `Transaction`, evaluation against the local cache and real-time pipelines.
+- Pipelines beyond the preview: pipelines in a read-write `Transaction`, evaluation against the
+  local cache (an internal evaluator exists but is not wired into the client) and real-time
+  pipelines. Search and window functions are only checked for their encoding.
 - A port of the Firebase Auth SDK. The app supplies tokens through `PlatformDependencies`, for
   example with the providers of `firebase_auth_providers_dart` (email/password, anonymous and
   custom-token sign-in, service accounts); there are no federated or phone sign-in providers.

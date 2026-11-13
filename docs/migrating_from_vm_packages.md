@@ -11,7 +11,10 @@ Firestore emulator only; nothing was run against production Firestore.
 
 The code blocks marked "after" are compiled by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`. They assume an
-`app` (`FirebaseApp`), a `firestore` (`Firestore`) and a `users` collection in scope.
+`app` (`FirebaseApp`), a `firestore` (`Firestore`) and a `users` collection in scope. All the
+changes of this guide are also in one compiled file, section by section, with the 0.0.7 code as
+comments:
+[`test/readme/migration_example.dart`](../cloud_firestore/cloud_firestore_dart/test/readme/migration_example.dart).
 
 Runnable programs for everything mentioned here are in
 [`cloud_firestore/cloud_firestore_dart/example/`](../cloud_firestore/cloud_firestore_dart/example/README.md).
@@ -65,7 +68,7 @@ moved with the package name; most of what was reachable that way is now internal
 
 ## 2. Dart 3 and null safety
 
-`cloud_firestore_dart` needs Dart `^3.8.0` (the minimum of `grpc` 5), `firebase_app_dart` Dart `^3.0.0`; both are null safe. Values that could always be missing are now
+`cloud_firestore_dart` and `firebase_app_dart` need Dart `^3.8.0` (the minimum of `grpc` 5, and the lowest SDK the CI runs); both are null safe. Values that could always be missing are now
 typed as nullable:
 
 - `DocumentSnapshot.data` is `null` for a document that does not exist, and field values are
@@ -356,6 +359,10 @@ print('${firestore.projectId} / ${firestore.databaseId}');
   });
   ```
 
+- **A read after a write in a transaction** fails with `invalidArgument` and the message of the
+  other SDKs ("Firestore transactions require all reads to be executed before all writes."; it
+  was "Transactions lookups are invalid after writes."). As in the JS SDK the transaction then
+  fails to commit even if the update function caught the error, so do every read first.
 - **Transaction attempts.** The default went from 6 to 5
   (`TransactionOptions.defaultMaxAttempts`). To keep 6:
 
@@ -413,6 +420,9 @@ print('${firestore.projectId} / ${firestore.databaseId}');
   by value against the local cache, as the backend does: `whereIn('n', [1])` matches a
   document with `1.0`, and `arrayUnion([1])` adds nothing to an array that holds `1.0`.
   0.0.7 compared them by type as well.
+- **A write that is sent again** (after its acknowledgement was lost) and changes nothing on the
+  backend is applied to the cached document, so the cache no longer keeps the old value without
+  a pending write.
 - **Range filters do not match `null` and `NaN`** in the local cache (`a < 1` does not match a
   `NaN` value), as on the backend.
 - **A cached document that only the client matches for a query** is removed from that query's

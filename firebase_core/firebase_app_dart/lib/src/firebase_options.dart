@@ -28,7 +28,8 @@ class FirebaseOptions {
     final String? apiKey = json[_apiKey] as String?;
     if (apiKey == null || applicationId == null) {
       throw ArgumentError(
-          'The json must contain the keys $_apiKey and $_appId.');
+        'The json must contain the keys $_apiKey and $_appId.',
+      );
     }
     return FirebaseOptions(
       applicationId: applicationId,
