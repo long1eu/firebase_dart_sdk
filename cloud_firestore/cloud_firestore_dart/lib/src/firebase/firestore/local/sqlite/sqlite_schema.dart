@@ -16,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 16;
+  static const int version = 17;
 
   /// The batch size for data migrations on a large table. This is chosen to balance the memory usage of the rows read
   /// with the number of round trips.
@@ -132,6 +132,13 @@ class SQLiteSchema {
     // the globals cache, which holds the session token.
     if (fromVersion < 16 && toVersion >= 16) {
       await _createV16GlobalsTable();
+    }
+
+    // Migration 17 corresponds to migration 18 of the Android SDK (`addDocumentType`): the type of each remote
+    // document, so that queries skip deleted documents in SQL. Existing rows keep a null type until a read backfills
+    // it (see `_DocumentTypeBackfiller`).
+    if (fromVersion < 17 && toVersion >= 17) {
+      await _addDocumentType();
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -659,6 +666,19 @@ class SQLiteSchema {
       'INSERT OR IGNORE INTO data_migrations (migration_name) VALUES (?)',
       <Object>[migration],
     );
+  }
+
+  Future<void> _addDocumentType() async {
+    // The new "document_type" column is a copy of the document type encoded in the "contents" blob. Its range of
+    // values are defined in the `_DocumentType` enum of the remote document cache. The "document_type" value for a
+    // given row must be equal to the document type encoded in the "contents" column for that row. The purpose of the
+    // "document_type" column is to enable efficient filtering on document type. But when using it as a filter, a null
+    // value must also be considered as their document type must be determined by parsing the "contents" column.
+    if (!(await _tableContainsColumn('remote_documents', 'document_type'))) {
+      await db.execute(
+        'ALTER TABLE remote_documents ADD COLUMN document_type INTEGER',
+      );
+    }
   }
 
   Future<void> _addPathLength() async {

@@ -162,6 +162,7 @@ const Map<int, List<String>> _additions = <int, List<String>>{
     'column:persistence_epoch.epoch',
   ],
   16: <String>['table:globals', 'column:globals.name', 'column:globals.value'],
+  17: <String>['column:remote_documents.document_type'],
 };
 
 Set<String> _expectedSchema(int version) => <String>{

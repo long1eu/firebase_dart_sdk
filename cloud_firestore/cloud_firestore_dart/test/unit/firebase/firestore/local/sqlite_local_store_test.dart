@@ -398,4 +398,32 @@ void main() {
     'testDeeplyNestedServerTimestamps',
     () => testCase.testDeeplyNestedServerTimestamps(),
   );
+
+  // The "document_type" cases of SQLiteLocalStoreTest of the Android SDK (#7295).
+  test(
+    'testDocumentTypeIsSetToFoundWhenFoundDocumentAdded',
+    () => testCase.testDocumentTypeIsSetToFoundWhenFoundDocumentAdded(),
+  );
+  test(
+    'testDocumentTypeIsSetToNoDocumentWhenUnknownDocumentDeleted',
+    () => testCase.testDocumentTypeIsSetToNoDocumentWhenUnknownDocumentDeleted(),
+  );
+  test(
+    'testDocumentTypeIsUpdatedToNoDocumentWhenFoundDocumentDeleted',
+    () =>
+        testCase.testDocumentTypeIsUpdatedToNoDocumentWhenFoundDocumentDeleted(),
+  );
+  test(
+    'testDocumentTypeIsSetToUnknownWhenApplyingPatchMutationWithNoBaseDocument',
+    () => testCase
+        .testDocumentTypeIsSetToUnknownWhenApplyingPatchMutationWithNoBaseDocument(),
+  );
+  test(
+    'testQueryBackfillsRowsWithNullDocumentType',
+    () => testCase.testQueryBackfillsRowsWithNullDocumentType(),
+  );
+  test(
+    'testQueryResultsIncludeRowsWithNullDocumentType',
+    () => testCase.testQueryResultsIncludeRowsWithNullDocumentType(),
+  );
 }

@@ -24,6 +24,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
   /// The index manager of the current user, once the local store set it.
   IndexManager? _indexManager;
 
+  final _DocumentTypeBackfiller _documentTypeBackfiller =
+      _DocumentTypeBackfiller();
+
   @override
   set indexManager(IndexManager indexManager) => _indexManager = indexManager;
 
@@ -48,8 +51,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       // @formatter:off
       '''
           INSERT
-          OR REPLACE INTO remote_documents (path, path_length, read_time_seconds, read_time_nanos, contents)
-          VALUES (?, ?, ?, ?, ?);
+          OR REPLACE INTO remote_documents (path, path_length, read_time_seconds, read_time_nanos, document_type, contents)
+          VALUES (?, ?, ?, ?, ?, ?);
         ''',
       // @formatter:on
       <dynamic>[
@@ -57,6 +60,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
         maybeDocument.key.path.length,
         timestamp.seconds,
         timestamp.nanoseconds,
+        _DocumentType.forMaybeDocument(maybeDocument).dbValue,
         message.writeToBuffer(),
       ],
     );
@@ -128,7 +132,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final List<Map<String, dynamic>> result = await db.query(
       // @formatter:off
       '''
-          SELECT contents
+          SELECT contents, read_time_seconds, read_time_nanos, document_type, path
           FROM remote_documents
           WHERE path = ?;
         ''',
@@ -139,9 +143,11 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     if (result.isEmpty) {
       return null;
     }
-    final Map<String, dynamic> row = result.first;
-    final Uint8List contents = row['contents'];
-    return decodeMaybeDocument(contents);
+    final MaybeDocument document = _processRow(result.first);
+
+    // Backfill the "document_type" column if _processRow() found it null.
+    await _documentTypeBackfiller.backfill(db);
+    return document;
   }
 
   @override
@@ -162,7 +168,8 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     final LongQuery longQuery = LongQuery(
       db,
-      'SELECT contents FROM remote_documents WHERE path IN (',
+      'SELECT contents, read_time_seconds, read_time_nanos, document_type, path '
+          'FROM remote_documents WHERE path IN (',
       null,
       args,
       ') ORDER BY path',
@@ -173,11 +180,14 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       final List<Map<String, dynamic>> rows = await longQuery
           .performNextSubquery();
       for (Map<String, dynamic> row in rows) {
-        final MaybeDocument decoded = decodeMaybeDocument(row['contents']);
+        final MaybeDocument decoded = _processRow(row);
         results[decoded.key] = decoded;
       }
       rowsProcessed += rows.length;
     }
+
+    // Backfill any rows with null "document_type" discovered by _processRow().
+    await _documentTypeBackfiller.backfill(db);
 
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rowsProcessed);
     return results;
@@ -245,7 +255,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     final String sql =
         '${List<String>.filled(collections.length, '''
-          SELECT contents, read_time_seconds, read_time_nanos, path
+          SELECT contents, read_time_seconds, read_time_nanos, document_type, path
           FROM remote_documents
           WHERE path >= ? AND path < ? AND path_length = ?
             AND (read_time_seconds > ?
@@ -275,7 +285,7 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     final Map<DocumentKey, ReadDocument> results =
         <DocumentKey, ReadDocument>{};
     for (final Map<String, dynamic> row in rows) {
-      final MaybeDocument document = decodeMaybeDocument(row['contents']);
+      final MaybeDocument document = _processRow(row);
       results[document.key] = (
         document: document,
         readTime: SnapshotVersion(
@@ -285,6 +295,9 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     }
 
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rows.length);
+
+    // Backfill any null "document_type" columns discovered by _processRow().
+    await _documentTypeBackfiller.backfill(db);
     return results;
   }
 
@@ -332,14 +345,23 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       for (Map<String, dynamic> row in rows) {
         // `path_length` keeps the documents of subcollections out (as upstream does), so that they are neither copied
         // out of the database nor their paths decoded.
-        final Uint8List contents = row['contents'];
-        final MaybeDocument maybeDoc = decodeMaybeDocument(contents);
+        final MaybeDocument maybeDoc = _processRow(row);
         if (maybeDoc is Document &&
             (mutatedKeys.contains(maybeDoc.key) || query.matches(maybeDoc))) {
           results[maybeDoc.key] = maybeDoc;
         }
       }
     }
+
+    // Only found documents are read: query.matches() is false for every other document type anyway. Rows written
+    // before the "document_type" column existed have it null and are read too (see
+    // https://github.com/firebase/firebase-android-sdk/issues/7295).
+    const String documentTypeCondition =
+        'AND (document_type IS NULL OR document_type = ?)';
+    final int foundDocument = _DocumentType.foundDocument.dbValue;
+
+    const String rowColumns =
+        'contents, read_time_seconds, read_time_nanos, document_type, path';
 
     const String readTimeCondition = '''
         AND (read_time_seconds > ?
@@ -363,21 +385,26 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
       if ((newer.single['count'] as int) < _readTimeIndexMaxRows) {
         addRows(
           await db.query(
-            'SELECT contents FROM remote_documents INDEXED BY read_time '
+            'SELECT $rowColumns FROM remote_documents INDEXED BY read_time '
             'WHERE (read_time_seconds, read_time_nanos) >= (?, ?) '
-            'AND path >= ? AND path < ? AND path_length = ? $readTimeCondition',
+            'AND path >= ? AND path < ? AND path_length = ? '
+            '$documentTypeCondition $readTimeCondition',
             <Object>[
               readTime.seconds,
               readTime.nanoseconds,
               prefixPath,
               prefixSuccessorPath,
               immediateChildrenPathLength,
+              foundDocument,
               ...readTimeBindings,
             ],
           ),
         );
         _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rowsRead);
         context?.incrementDocumentReadCount(rowsRead);
+
+        // Backfill any null "document_type" columns discovered by _processRow().
+        await _documentTypeBackfiller.backfill(db);
         return ImmutableSortedMap<DocumentKey, Document>.fromMap(
           results,
           DocumentKey.comparator,
@@ -393,14 +420,15 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     bool firstPage = true;
     while (true) {
       final List<Map<String, dynamic>> page = await db.query(
-        'SELECT path, contents FROM remote_documents '
+        'SELECT $rowColumns FROM remote_documents '
         'WHERE path ${firstPage ? '>=' : '>'} ? AND path < ? AND path_length = ? '
-        '${sinceOffset ? readTimeCondition : ''} '
+        '$documentTypeCondition ${sinceOffset ? readTimeCondition : ''} '
         'ORDER BY path LIMIT $_scanPageSize',
         <Object>[
           lastPath,
           prefixSuccessorPath,
           immediateChildrenPathLength,
+          foundDocument,
           ...readTimeBindings,
         ],
       );
@@ -414,10 +442,29 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
 
     _statsCollector.recordRowsRead(RemoteDocumentCache.statsTag, rowsRead);
     context?.incrementDocumentReadCount(rowsRead);
+
+    // Backfill any null "document_type" columns discovered by _processRow().
+    await _documentTypeBackfiller.backfill(db);
     return ImmutableSortedMap<DocumentKey, Document>.fromMap(
       results,
       DocumentKey.comparator,
     );
+  }
+
+  /// Decodes the document of a row selecting `contents, read_time_seconds, read_time_nanos, document_type, path`,
+  /// and queues the backfill of its "document_type" column if that is null.
+  MaybeDocument _processRow(Map<String, dynamic> row) {
+    final MaybeDocument document = decodeMaybeDocument(row['contents']);
+    if (row['document_type'] == null) {
+      _documentTypeBackfiller.enqueue(
+        row['path'],
+        // A null read time reads as 0, as `Cursor.getInt()` does upstream.
+        row['read_time_seconds'] ?? 0,
+        row['read_time_nanos'] ?? 0,
+        document,
+      );
+    }
+    return document;
   }
 
   String _pathForKey(DocumentKey key) {
@@ -432,5 +479,125 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
     } on InvalidProtocolBufferException catch (e) {
       throw fail('MaybeDocument failed to parse: $e');
     }
+  }
+}
+
+/// The values of the "document_type" column of the `remote_documents` table.
+///
+/// PORTING NOTE: Android also has `INVALID_DOCUMENT(4)`, for a `MutableDocument` that is not valid. The port never
+/// writes such a document to the cache (a missing document is `null`), so the value is not needed.
+enum _DocumentType {
+  noDocument(1),
+  foundDocument(2),
+  unknownDocument(3);
+
+  const _DocumentType(this.dbValue);
+
+  final int dbValue;
+
+  static _DocumentType forMaybeDocument(MaybeDocument document) {
+    if (document is NoDocument) {
+      return noDocument;
+    } else if (document is Document) {
+      return foundDocument;
+    } else if (document is UnknownDocument) {
+      return unknownDocument;
+    }
+    throw fail('MaybeDocument has an unknown type: ${document.runtimeType}');
+  }
+}
+
+/// The row of `remote_documents` whose "document_type" column is to be backfilled. The read time is part of it so
+/// that a row rewritten in the meantime (which sets the column itself) is not touched.
+typedef _BackfillKey = ({String path, int readTimeSeconds, int readTimeNanos});
+
+/// Backfills the "document_type" column of the `remote_documents` table.
+///
+/// The column was added as an optimization to skip deleted document tombstones when running queries. Any row added
+/// to the table has it set to the value that matches its "contents"; rows written before the column existed have it
+/// null, and this backfiller replaces those null values to improve the performance of future queries.
+///
+/// When traversing the table call [enqueue] upon finding a row whose "document_type" is null, then call [backfill]
+/// to update the queued rows in batches.
+///
+/// See https://github.com/firebase/firebase-android-sdk/issues/7295.
+class _DocumentTypeBackfiller {
+  final Map<_BackfillKey, _DocumentType> _documentTypeByBackfillKey =
+      <_BackfillKey, _DocumentType>{};
+
+  void enqueue(
+    String path,
+    int readTimeSeconds,
+    int readTimeNanos,
+    MaybeDocument document,
+  ) {
+    _documentTypeByBackfillKey.putIfAbsent((
+      path: path,
+      readTimeSeconds: readTimeSeconds,
+      readTimeNanos: readTimeNanos,
+    ), () => _DocumentType.forMaybeDocument(document));
+  }
+
+  Future<void> backfill(SQLitePersistence db) async {
+    while (true) {
+      final (String, List<Object>)? backfillSql = _calculateBackfillSql();
+      if (backfillSql == null) {
+        break;
+      }
+      await db.execute(backfillSql.$1, backfillSql.$2);
+    }
+  }
+
+  /// Builds one UPDATE statement for at most [LongQuery._limit] bind arguments worth of queued rows, and removes
+  /// those rows from the queue. Returns null if nothing is queued.
+  (String, List<Object>)? _calculateBackfillSql() {
+    if (_documentTypeByBackfillKey.isEmpty) {
+      return null;
+    }
+
+    final List<Object> bindings = <Object>[];
+    final StringBuffer caseClauses = StringBuffer();
+    final StringBuffer whereClauses = StringBuffer();
+
+    final List<_BackfillKey> backfillKeys = _documentTypeByBackfillKey.keys
+        .toList();
+    for (final _BackfillKey backfillKey in backfillKeys) {
+      if (bindings.length >= LongQuery._limit) {
+        break;
+      }
+      final _DocumentType documentType = _documentTypeByBackfillKey.remove(
+        backfillKey,
+      )!;
+
+      bindings.add(backfillKey.path);
+      final int pathBindingNumber = bindings.length;
+      bindings.add(backfillKey.readTimeSeconds);
+      final int readTimeSecondsBindingNumber = bindings.length;
+      bindings.add(backfillKey.readTimeNanos);
+      final int readTimeNanosBindingNumber = bindings.length;
+      bindings.add(documentType.dbValue);
+      final int dbValueBindingNumber = bindings.length;
+
+      caseClauses.write(
+        ' WHEN path=?$pathBindingNumber'
+        ' AND read_time_seconds=?$readTimeSecondsBindingNumber'
+        ' AND read_time_nanos=?$readTimeNanosBindingNumber'
+        ' THEN ?$dbValueBindingNumber',
+      );
+
+      if (whereClauses.isNotEmpty) {
+        whereClauses.write(' OR');
+      }
+      whereClauses.write(
+        ' (path=?$pathBindingNumber'
+        ' AND read_time_seconds=?$readTimeSecondsBindingNumber'
+        ' AND read_time_nanos=?$readTimeNanosBindingNumber)',
+      );
+    }
+
+    return (
+      'UPDATE remote_documents SET document_type = CASE$caseClauses ELSE NULL END WHERE$whereClauses',
+      bindings,
+    );
   }
 }

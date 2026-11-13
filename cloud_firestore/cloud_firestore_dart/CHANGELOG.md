@@ -191,10 +191,12 @@ Behaviour changes without a compile error:
   (`update_transforms`). Stored legacy transform writes are squashed on load by the local
   serializer.
 - Locally mutated documents carry `SnapshotVersion.none`, as upstream.
-- The SQLite schema goes from version 8 to 16 (bundle tables, read times on remote documents,
+- The SQLite schema goes from version 8 to 17 (bundle tables, read times on remote documents,
   document overlays, the tables of the persistent cache indexes, two lookup indexes, and the
-  client lease tables of version 15, and the globals table of version 16, ported from the JS and
-  Android SDKs, which keep a session token there; nothing uses it yet, as upstream; see index-free queries, document overlays and persistent
+  client lease tables of version 15, the globals table of version 16, ported from the JS and
+  Android SDKs, which keep a session token there; nothing uses it yet, as upstream; and the
+  `document_type` column of version 17 (Android 26.0.1), with which queries skip deleted
+  documents; rows from older versions get it the first time they are read; see index-free queries, document overlays and persistent
   cache indexes under Added, and the primary client under Fixed). The migration
   runs through the opener's `onUpgrade` callback on the first open; pending writes are
   converted to overlays the first time the client starts. A cache written by

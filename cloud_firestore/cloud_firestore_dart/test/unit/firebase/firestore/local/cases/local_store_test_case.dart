@@ -23,6 +23,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/default_query_engine.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/encoded_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/index_backfiller.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_view_changes.dart';
@@ -33,6 +34,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/re
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -6417,5 +6419,143 @@ class LocalStoreTestCase {
       (value! as model.ServerTimestampValue).previousFieldValue,
       model.IntegerValue.valueOf(42),
     );
+  }
+
+  // The "document_type" cases of SQLiteLocalStoreTest of the Android SDK (#7295). SQLite only.
+
+  @testMethod
+  Future<void> testDocumentTypeIsSetToFoundWhenFoundDocumentAdded() async {
+    final Mutation mutation = setMutation(
+      'coll/a',
+      map(<String>['foo', 'bar']),
+    );
+    await _writeMutation(mutation);
+    await _acknowledgeMutation(1);
+
+    final Map<ResourcePath, int?> expected = <ResourcePath, int?>{
+      mutation.key.path: 2, // 2 is a "found" document
+    };
+    expect(await _getDocumentTypeByPathFromRemoteDocumentsTable(), expected);
+  }
+
+  @testMethod
+  Future<void>
+  testDocumentTypeIsSetToNoDocumentWhenUnknownDocumentDeleted() async {
+    final Mutation mutation = deleteMutation('coll/a');
+    await _writeMutation(mutation);
+    await _acknowledgeMutation(1);
+
+    final Map<ResourcePath, int?> expected = <ResourcePath, int?>{
+      mutation.key.path: 1, // 1 is a "no" document
+    };
+    expect(await _getDocumentTypeByPathFromRemoteDocumentsTable(), expected);
+  }
+
+  @testMethod
+  Future<void>
+  testDocumentTypeIsUpdatedToNoDocumentWhenFoundDocumentDeleted() async {
+    final Mutation mutation = setMutation(
+      'coll/a',
+      map(<String>['foo', 'bar']),
+    );
+    await _writeMutation(mutation);
+    await _acknowledgeMutation(1);
+    await _writeMutation(deleteMutation('coll/a'));
+    await _acknowledgeMutation(2);
+
+    final Map<ResourcePath, int?> expected = <ResourcePath, int?>{
+      mutation.key.path: 1, // 1 is a "no" document
+    };
+    expect(await _getDocumentTypeByPathFromRemoteDocumentsTable(), expected);
+  }
+
+  @testMethod
+  Future<void>
+  testDocumentTypeIsSetToUnknownWhenApplyingPatchMutationWithNoBaseDocument() async {
+    final Mutation mutation = patchMutation(
+      'coll/a',
+      map(<String>['foo', 'bar']),
+    );
+    await _writeMutation(mutation);
+    await _acknowledgeMutation(1);
+
+    final Map<ResourcePath, int?> expected = <ResourcePath, int?>{
+      mutation.key.path: 3, // 3 is a "unknown" document
+    };
+    expect(await _getDocumentTypeByPathFromRemoteDocumentsTable(), expected);
+  }
+
+  @testMethod
+  Future<void> testQueryBackfillsRowsWithNullDocumentType() async {
+    final Mutation foundDocMutation = setMutation(
+      'coll/a',
+      map(<String>['foo', 'bar']),
+    );
+    await _writeMutation(foundDocMutation);
+    await _acknowledgeMutation(1);
+    final Mutation noDocMutation = deleteMutation('coll/b');
+    await _writeMutation(noDocMutation);
+    await _acknowledgeMutation(1);
+    final Mutation unknownDocMutation = patchMutation(
+      'coll/c',
+      map(<String>['foo', 'bar']),
+    );
+    await _writeMutation(unknownDocMutation);
+    await _acknowledgeMutation(1);
+    await (_persistence as SQLitePersistence).execute(
+      'UPDATE remote_documents SET document_type = NULL',
+    );
+    expect(
+      (await _getDocumentTypeByPathFromRemoteDocumentsTable()).values,
+      <int?>[null, null, null],
+      reason: 'precondition check: all rows have null document type',
+    );
+
+    await _executeQuery(query('coll'));
+
+    final Map<ResourcePath, int?> expected = <ResourcePath, int?>{
+      foundDocMutation.key.path: 2,
+      noDocMutation.key.path: 1,
+      unknownDocMutation.key.path: 3,
+    };
+    expect(await _getDocumentTypeByPathFromRemoteDocumentsTable(), expected);
+  }
+
+  @testMethod
+  Future<void> testQueryResultsIncludeRowsWithNullDocumentType() async {
+    await _writeMutation(setMutation('coll/a', map(<String>['foo', 'bar'])));
+    await _acknowledgeMutation(1);
+    await _writeMutation(deleteMutation('coll/b'));
+    await _acknowledgeMutation(1);
+    await _writeMutation(patchMutation('coll/c', map(<String>['foo', 'bar'])));
+    await _acknowledgeMutation(1);
+    await (_persistence as SQLitePersistence).execute(
+      'UPDATE remote_documents SET document_type = NULL',
+    );
+    expect(
+      (await _getDocumentTypeByPathFromRemoteDocumentsTable()).values,
+      <int?>[null, null, null],
+      reason: 'precondition check: all rows have null document type',
+    );
+
+    await _executeQuery(query('coll'));
+
+    _expectQueryReturned(<String>['coll/a']);
+  }
+
+  /// Scans the entire "remote documents" sqlite table and returns the value of the "document type" column for each
+  /// row, keyed by the value of the "path" column of the corresponding row. Note that the values of the returned map
+  /// may be `null`, if the column value for that row is null.
+  Future<Map<ResourcePath, int?>>
+  _getDocumentTypeByPathFromRemoteDocumentsTable() async {
+    final List<Map<String, dynamic>> rows =
+        await (_persistence as SQLitePersistence).query(
+          'SELECT path, document_type FROM remote_documents',
+        );
+    return <ResourcePath, int?>{
+      for (final Map<String, dynamic> row in rows)
+        EncodedPath.decodeResourcePath(row['path'] as String):
+            row['document_type'] as int?,
+    };
   }
 }

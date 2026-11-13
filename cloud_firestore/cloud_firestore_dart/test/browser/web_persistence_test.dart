@@ -362,7 +362,7 @@ void main() {
       'create 1',
       for (int v = 1; v < SQLiteSchema.version; v++) '$v->${v + 1}',
     ]);
-    expect(SQLiteSchema.version, 16,
+    expect(SQLiteSchema.version, 17,
         reason: 'a new migration: check that it runs in the browser too');
 
     // All at once, as for a new cache.
