@@ -1,9 +1,3 @@
-## Unreleased
-
-- `FirebaseUserAuth` sends the headers of the JS SDK with every request: `X-Client-Version`,
-  `X-Firebase-gmpid` (new `appId` parameter) and `X-Firebase-AppCheck` (new `appCheck`
-  parameter). `forApp` takes both from the app. New constant `FirebaseUserAuth.clientVersion`.
-
 ## 0.1.0
 
 First version. Not published yet.
@@ -12,7 +6,10 @@ First version. Not published yet.
   APIs (anonymous, email and password, custom token), ID token refresh on demand and ahead of
   expiry, sign-out, `AuthStorage` for the session (in memory by default), Auth emulator support.
   It implements the token provider interface of `firebase_app_dart`, so `cloud_firestore_dart`
-  sends the ID token and follows user switches.
+  sends the ID token and follows user switches. Every request carries the headers of the JS SDK:
+  `X-Client-Version` (`FirebaseUserAuth.clientVersion`), `X-Firebase-gmpid` (the `appId`
+  parameter) and `X-Firebase-AppCheck` (the `appCheck` parameter); `forApp` takes both from the
+  app.
 - The Auth emulator host is checked like the Firestore host: user info, a path, a query, a bad
   port and Google hosts throw an `ArgumentError`; `http://` and `https://` URLs are accepted as
   `connectAuthEmulator` takes them, and an emulator off the loopback interface logs a warning.

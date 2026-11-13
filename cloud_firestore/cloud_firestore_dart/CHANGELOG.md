@@ -1,8 +1,3 @@
-## Unreleased
-
-- `Firestore.instance` before the default instance exists: the `StateError` now says to call
-  `Firestore.instanceFor(app: FirebaseApp.instance)` (it named the deprecated `Firestore.getInstance`).
-
 ## 0.1.0
 
 First release under the new name. This package was published as `cloud_firestore_vm` (last
@@ -167,9 +162,10 @@ Behaviour changes without a compile error:
   (`update_transforms`). Stored legacy transform writes are squashed on load by the local
   serializer.
 - Locally mutated documents carry `SnapshotVersion.none`, as upstream.
-- The SQLite schema goes from version 8 to 15 (bundle tables, read times on remote documents,
+- The SQLite schema goes from version 8 to 16 (bundle tables, read times on remote documents,
   document overlays, the tables of the persistent cache indexes, two lookup indexes, and the
-  client lease tables of version 15; see index-free queries, document overlays and persistent
+  client lease tables of version 15, and the globals table of version 16, ported from the JS and
+  Android SDKs, which keep a session token there; nothing uses it yet, as upstream; see index-free queries, document overlays and persistent
   cache indexes under Added, and the primary client under Fixed). The migration
   runs through the opener's `onUpgrade` callback on the first open; pending writes are
   converted to overlays the first time the client starts. A cache written by
@@ -485,8 +481,8 @@ Documentation and tests:
   re-synced with JS SDK `main`, seeded property tests, an emulator integration suite (also run
   over the web transport and against the Enterprise edition emulator), chaos tests behind a
   TCP proxy that cuts and stalls connections, Enterprise-only tests in
-  `test/integration_enterprise`, browser tests in Chrome, interop tests with the JS SDK, and a
-  size check of Firestore Lite. Protos regenerated from current googleapis
+  `test/integration_enterprise`, browser tests in Chrome, interop tests with the JS SDK, and size
+  budgets for a small web app with Firestore Lite and with the main library (`tool/check_size.sh`). Protos regenerated from current googleapis
   (`tool/gen_protos.sh`).
 - A production verification kit (`tool/verify_production`): 14 named checks that run against
   the emulator and, only with your own credentials and an explicit `--yes`, against a real
@@ -494,6 +490,8 @@ Documentation and tests:
 
 ### Fixed
 
+- `Firestore.instance` before the default instance exists throws a `StateError` that says to call
+  `Firestore.instanceFor(app: FirebaseApp.instance)` (0.0.7 named `Firestore.getInstance`).
 - Two clients with the same SQLite cache open (the isolate before a Flutter hot restart, a background isolate, a
   second process) could give two listens the same target id or two writes the same batch id, and overwrite the
   cache metadata with what each had read at its start; a transaction could also fail with "database is locked"

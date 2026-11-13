@@ -380,8 +380,8 @@ Future<void> migrationGuideLine153() async {
 Future<void> migrationGuideLine182() async {
 }
 
-// ../../docs/migrating_from_vm_packages.md:265
-Future<void> migrationGuideLine265() async {
+// ../../docs/migrating_from_vm_packages.md:270
+Future<void> migrationGuideLine270() async {
   final QuerySnapshot<Map<String, Object?>> result = await firestore
       .collection('users')
       .where(FieldPath.documentIdField, isEqualTo: 'ada')
@@ -392,20 +392,20 @@ Future<void> migrationGuideLine265() async {
   await firestore.terminate();
 }
 
-// ../../docs/migrating_from_vm_packages.md:296
-Future<void> migrationGuideLine296() async {
+// ../../docs/migrating_from_vm_packages.md:301
+Future<void> migrationGuideLine301() async {
   final DocumentReference<Map<String, Object?>> ref =
       firestore.collection('users').doc('ada');
   final DocumentSnapshot<Map<String, Object?>> snapshot = await ref.get();
 }
 
-// ../../docs/migrating_from_vm_packages.md:331
-Future<void> migrationGuideLine331() async {
+// ../../docs/migrating_from_vm_packages.md:336
+Future<void> migrationGuideLine336() async {
   print('${firestore.projectId} / ${firestore.databaseId}');
 }
 
-// ../../docs/migrating_from_vm_packages.md:354
-Future<void> migrationGuideLine354() async {
+// ../../docs/migrating_from_vm_packages.md:359
+Future<void> migrationGuideLine359() async {
     final configRef = firestore.doc('config/plans');
     final userRef = users.doc('ada');
     await firestore.runTransaction<void>((Transaction tx) async {
@@ -414,16 +414,16 @@ Future<void> migrationGuideLine354() async {
     });
 }
 
-// ../../docs/migrating_from_vm_packages.md:370
-Future<void> migrationGuideLine370() async {
+// ../../docs/migrating_from_vm_packages.md:375
+Future<void> migrationGuideLine375() async {
     await firestore.runTransaction<void>(
       (Transaction tx) async {},
       options: TransactionOptions(maxAttempts: 6),
     );
 }
 
-// ../../docs/migrating_from_vm_packages.md:393
-Future<void> migrationGuideLine393() async {
+// ../../docs/migrating_from_vm_packages.md:398
+Future<void> migrationGuideLine398() async {
     await firestore.terminate();
     try {
       await users.doc('ada').get();

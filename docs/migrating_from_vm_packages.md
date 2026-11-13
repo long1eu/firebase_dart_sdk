@@ -205,13 +205,18 @@ class MyDatabase implements Database {
 A complete implementation on top of `package:sqlite3` that you can copy is
 [`example/sqlite_database.dart`](../cloud_firestore/cloud_firestore_dart/example/sqlite_database.dart).
 
+New and optional: your `Database` may throw `TransientDatabaseException` for an error after
+which the statement stored nothing and a retry can work (SQLite's busy, locked, I/O or full-disk
+errors). Firestore then keeps the client running, offline if needed, and retries with a backoff
+instead of failing. Throw it only when nothing was stored. The example opener shows the mapping.
+
 ### An existing cache file is kept
 
 The database name passed to the opener is built the same way as in 0.0.7
 (`firestore.<app name>.<project id>.<database>`), so an opener that maps names to files the same
-way finds the existing cache. 0.0.7 wrote schema version 8 and this version is at 15 (bundle
+way finds the existing cache. 0.0.7 wrote schema version 8 and this version is at 16 (bundle
 tables, read times on cached documents, document overlays, persistent cache indexes, the
-client lease); the first open with the new package
+client lease, the globals table); the first open with the new package
 runs the newer migrations through your opener's `onUpgrade` callback (it must call it when the
 stored `user_version` is lower than the requested one, see the contract on `OpenDatabase`), and
 pending writes are converted to overlays the first time the client starts.
