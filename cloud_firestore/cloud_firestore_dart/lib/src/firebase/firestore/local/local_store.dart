@@ -897,7 +897,9 @@ class LocalStore implements BundleCallback {
   /// document is read from the backend again. A document that came from the backend at that version is left alone,
   /// as upstream does.
   static bool _shouldApplyAcknowledgedWrite(
-      MaybeDocument doc, SnapshotVersion ackVersion) {
+    MaybeDocument doc,
+    SnapshotVersion ackVersion,
+  ) {
     final int comparison = doc.version.compareTo(ackVersion);
     if (comparison != 0) {
       return comparison < 0;
