@@ -301,6 +301,8 @@ Pipelines (preview):
   the pipeline. Known difference: a cursor on a field that holds values of several types only
   returns the documents whose value has the type of the cursor value.
   Pipeline results return BSON values as their value classes.
+- `literals` rejects, as the JS and Android SDKs do, an empty field name at any depth of a
+  document, and names the field of a `FieldValue` sentinel in its error.
 
 Firestore Lite (experimental):
 

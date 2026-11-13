@@ -15,8 +15,12 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/collection_reference.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/user_data.dart'
+    show UserDataParseAccumulator, UserDataParseContext, UserDataSource;
 import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart'
+    show FieldValue, FieldValueInternal;
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
@@ -169,6 +173,12 @@ class PipelineSource {
     List<Map<String, Object?>> documents, {
     Map<String, Object?>? rawOptions,
   }) {
+    for (final Map<String, Object?> document in documents) {
+      _validateLiteral(
+        document,
+        UserDataParseAccumulator(UserDataSource.argument).rootContext,
+      );
+    }
     final List<Map<String, Expression>> encoded = documents
         .map(
           (Map<String, Object?> document) => <String, Expression>{
@@ -187,6 +197,29 @@ class PipelineSource {
         rawOptions: rawOptions,
       ),
     );
+  }
+
+  /// Rejects, with the path of the field, what Android's `LiteralsSource`
+  /// and JS's `encodeLiteralDocument` reject in a literal document: an empty
+  /// field name at any depth, and a `FieldValue` sentinel.
+  static void _validateLiteral(Object? value, UserDataParseContext context) {
+    if (value is Map) {
+      for (final MapEntry<Object?, Object?> entry in value.entries) {
+        final Object? key = entry.key;
+        // toExpression rejects keys that are not strings.
+        if (key is String) {
+          _validateLiteral(entry.value, context.childContextForSegment(key));
+        }
+      }
+    } else if (value is List) {
+      for (int i = 0; i < value.length; i++) {
+        _validateLiteral(value[i], context.childContextForArrayIndex(i));
+      }
+    } else if (value is FieldValue) {
+      throw context.createError(
+        '${value.methodName}() can only be used with set() and update()',
+      );
+    }
   }
 
   /// Reads the documents of the subcollection [path] of the document that an
