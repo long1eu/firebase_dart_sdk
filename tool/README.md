@@ -29,7 +29,7 @@
   | `GOOGLE_APPLICATION_CREDENTIALS` | Standard Application Default Credentials variable: path of a service-account key file used for the real project. Without it the gcloud application-default credentials are used. |
 
   The real-project mode is described in the Testing section of `cloud_firestore/cloud_firestore_dart/README.md`. It is never used unless you set `FIRESTORE_TEST_PROJECT_ID`.
-- The standard suite on the Enterprise edition emulator (v1.22.0): everything passes except eleven tests, which `tool/test_integration.sh enterprise` skips with a reason. Nine are behaviour differences of the edition and two are an emulator bug:
+- The standard suite on the Enterprise edition emulator (v1.22.0): everything passes except the tests listed below, which `tool/test_integration.sh enterprise` skips with a reason (behaviour differences of the edition, or emulator bugs):
 
   | Difference on Enterprise | Tests skipped |
   | --- | --- |
@@ -37,7 +37,7 @@
   | `sum` over no documents is `null`, not `0`. | `aggregation_test`: `testPerformsSumAndAverageOverZeroDocuments`; `composite_index_query_test`: `testPerformsAggregationWhenUsingArrayContainsAnyOperator` |
   | An aggregation covers every document of the query; Standard only aggregates over the documents that have all the aggregated fields. | `lite_test`: `performs aggregations on documents with all aggregated fields using getAggregationFromServer` |
   | No limit of 5 aggregations per query. | `aggregation_test`: `testCannotPerformMoreThanMaxAggregations` |
-  | An integer `sum` that overflows 64 bits (also only while accumulating) fails with `INVALID_ARGUMENT: Long overflow`; Standard returns a double. | `aggregation_test`: `testPerformsSumThatOverflowsMaxLong`, `testPerformsSumThatIsNegative` |
+  | An integer `sum` that overflows 64 bits (also only while accumulating) fails with `INVALID_ARGUMENT: Long overflow`; Standard returns a double. | `aggregation_test`: `testPerformsSumThatOverflowsMaxLong`, `testPerformsSumThatIsNegative`, `testPerformsSumThatCanOverflowIntegerValuesDuringAccumulation` |
   | Emulator bug: a Listen with `!=` or `not-in` on the document id fails with `__key__ filter value must be a Key`, although the client sends a reference value and the identical query succeeds with RunQuery on the same emulator (and with Listen on the Standard one). | `query_test`: `testQueriesCanUseNotEqualFiltersWithDocIds`, `testQueriesCanUseNotInFiltersWithDocIds` |
 
   The first four rows are pinned by `test/integration_enterprise/edition_differences_test.dart`. All of this was observed with the emulator only, not with a production Enterprise database. The JS SDK skips its counterparts of rows 1 to 3 on Enterprise (`it.skipEnterprise`); it has no counterpart of row 4 with real 64-bit integers.

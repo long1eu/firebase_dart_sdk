@@ -391,6 +391,9 @@ void main() {
 
     test(
       'testPerformsSumThatCanOverflowIntegerValuesDuringAccumulation',
+      skip: IntegrationTestUtil.skipOnEnterprise(
+        'the emulator fails an integer sum that overflows during accumulation with "Long overflow"',
+      ),
       () async {
         final CollectionReference c = await testCollectionWithDocs(
           ratings(<Object?>[maxLong, 1, -101]),
