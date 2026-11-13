@@ -60,6 +60,71 @@ class View {
   /// Documents that have local changes
   ImmutableSortedSet<DocumentKey> mutatedKeys;
 
+  /// Documents that are left out of this view although they are in the cache and match [query] locally, because the
+  /// backend has shown that it does not consider them results of the query (see [backendMismatches]).
+  ///
+  /// PORTING NOTE: this does not exist upstream, where such a document stays in limbo forever.
+  final Set<DocumentKey> _backendRejected = <DocumentKey>{};
+
+  /// The documents of this view that the backend demonstrably does not consider results of the query.
+  ///
+  /// The local evaluation of a query can disagree with the backend (the filter semantics differ in a few places, and
+  /// between editions of the backend). A cached document that only the client matches is in limbo: it is in the view
+  /// but not in the target although the target is CURRENT. A limbo resolution normally ends that state, because the
+  /// document turns out to be deleted, or changed so that it no longer matches. If it [confirmedToExist] instead (its
+  /// limbo resolution is CURRENT and has the document, unchanged or still matching), nothing ever would: the view would
+  /// stay `fromCache` forever. The backend is the authority on the result of a query, so the document is then taken
+  /// out of this view (only; other queries are not affected).
+  ///
+  /// [targetChange] is the change of this view's target in the remote event that is about to be applied. The caller
+  /// must only pass [confirmedToExist] when no local write can explain the difference (see
+  /// `SyncEngine.handleRemoteEvent`).
+  ///
+  /// The returned documents are recorded as rejected and must be passed through [computeDocChanges] (as changed
+  /// documents) so that they are removed. A rejected document is admitted again when the backend adds it to the target
+  /// or when it gets a local mutation.
+  List<Document> backendMismatches(
+    Set<DocumentKey> confirmedToExist,
+    TargetChange? targetChange,
+    ImmutableSortedMap<DocumentKey, MaybeDocument> changes,
+  ) {
+    if (targetChange != null) {
+      // The backend now says that the document is a result.
+      targetChange.addedDocuments.forEach(_backendRejected.remove);
+    }
+    final bool current = targetChange?.current ?? _current;
+    if (!current || confirmedToExist.isEmpty) {
+      return const <Document>[];
+    }
+
+    final List<Document> result = <Document>[];
+    for (final DocumentKey key in confirmedToExist) {
+      if (documentSet.getDocument(key) == null) {
+        continue;
+      }
+      final bool synced = targetChange == null
+          ? _syncedDocuments.contains(key)
+          : targetChange.addedDocuments.contains(key) ||
+                (_syncedDocuments.contains(key) &&
+                    !targetChange.removedDocuments.contains(key));
+      if (synced) {
+        continue;
+      }
+      // The version that is about to be applied, if the document changes in this event.
+      final MaybeDocument? changed = changes[key];
+      final MaybeDocument document = changed ?? documentSet.getDocument(key)!;
+      if (document is! Document ||
+          document.hasPendingWrites ||
+          !query.matches(document)) {
+        // A local write explains the difference, or the change resolves it.
+        continue;
+      }
+      _backendRejected.add(key);
+      result.add(document);
+    }
+    return result;
+  }
+
   /// Iterates over a set of doc changes, applies the query limit, and computes what the new results should be, what the
   /// changes were, and whether we may need to go back to the local cache for more results. Does not make any changes to
   /// the view.
@@ -123,6 +188,10 @@ class View {
           () => 'Mismatching key in doc change $key != $newDocKey',
         );
         if (!query.matches(newDoc)) {
+          newDoc = null;
+        } else if (_backendRejected.contains(key) &&
+            !newDoc.hasLocalMutations) {
+          // The backend does not consider the document a result, see [backendMismatches].
           newDoc = null;
         }
       }
@@ -259,6 +328,8 @@ class View {
     final DocumentSet oldDocumentSet = documentSet;
     documentSet = docChanges.documentSet;
     mutatedKeys = docChanges.mutatedKeys;
+    // A rejected document that is back in the view (it has a local mutation) is a regular document again.
+    _backendRejected.removeWhere(documentSet.contains);
 
     // Sort changes based on type and query comparator.
     final Comparator<Document> queryComparator = query.comparator;

@@ -26,10 +26,12 @@ void configureGeneratorsForBackend() {
 }
 
 /// Writes [documents] (id to data) to [collection] in batches.
-Future<void> writeAll(CollectionReference<Map<String, Object?>> collection,
-    Map<String, Map<String, Object?>> documents) async {
-  final List<MapEntry<String, Map<String, Object?>>> entries =
-      documents.entries.toList();
+Future<void> writeAll(
+  CollectionReference<Map<String, Object?>> collection,
+  Map<String, Map<String, Object?>> documents,
+) async {
+  final List<MapEntry<String, Map<String, Object?>>> entries = documents.entries
+      .toList();
   for (int start = 0; start < entries.length; start += 100) {
     final WriteBatch batch = collection.firestore.batch();
     for (final MapEntry<String, Map<String, Object?>> entry
@@ -53,30 +55,35 @@ Future<void> checkValueOrderAgainstBackend(
   required bool bson,
 }) async {
   final Gen gen = Gen(seed);
-  final CollectionReference<Map<String, Object?>> collection =
-      firestore.collection('property_order_${autoId()}');
+  final CollectionReference<Map<String, Object?>> collection = firestore
+      .collection('property_order_${autoId()}');
   final Map<String, Object?> values = <String, Object?>{
     for (int i = 0; i < count; i++)
       'd${i.toString().padLeft(4, '0')}': gen.value(
-          bson: bson,
-          reference: (String path) =>
-              firestore.doc(path.replaceFirst('c/', '${collection.id}/')))
+        bson: bson,
+        reference: (String path) =>
+            firestore.doc(path.replaceFirst('c/', '${collection.id}/')),
+      ),
   };
   await writeAll(collection, <String, Map<String, Object?>>{
     for (final MapEntry<String, Object?> entry in values.entries)
-      entry.key: <String, Object?>{'v': entry.value}
+      entry.key: <String, Object?>{'v': entry.value},
   });
 
   for (final Direction direction in Direction.values) {
-    final QuerySnapshot<Map<String, Object?>> snapshot =
-        await collection.orderBy('v', direction).get(Source.server);
-    expect(snapshot.docs, hasLength(count),
-        reason: 'seed $seed: the backend did not return every document');
+    final QuerySnapshot<Map<String, Object?>> snapshot = await collection
+        .orderBy('v', direction)
+        .get(Source.server);
+    expect(
+      snapshot.docs,
+      hasLength(count),
+      reason: 'seed $seed: the backend did not return every document',
+    );
 
     final List<Document> server = <Document>[
       for (final QueryDocumentSnapshot<Map<String, Object?>> doc
           in snapshot.docs)
-        doc.document!
+        doc.document!,
     ];
     model.FieldValue valueOf(Document doc) =>
         doc.getField(FieldPath.fromDotSeparatedPath('v').internalPath)!;
@@ -92,13 +99,15 @@ Future<void> checkValueOrderAgainstBackend(
       if (compare(server[i], server[i + 1]) > 0) {
         final String a = server[i].key.path.last;
         final String b = server[i + 1].key.path.last;
-        fail('Property "backend value order" failed.\n'
-            '  seed: $seed, count: $count, bson: $bson, '
-            'direction: ${direction.name} '
-            '(rerun with PROPERTY_SEED=$seed)\n'
-            '  the backend returns $a before $b, the SDK sorts $b first:\n'
-            '    $a = ${describe(values[a])}\n'
-            '    $b = ${describe(values[b])}');
+        fail(
+          'Property "backend value order" failed.\n'
+          '  seed: $seed, count: $count, bson: $bson, '
+          'direction: ${direction.name} '
+          '(rerun with PROPERTY_SEED=$seed)\n'
+          '  the backend returns $a before $b, the SDK sorts $b first:\n'
+          '    $a = ${describe(values[a])}\n'
+          '    $b = ${describe(values[b])}',
+        );
       }
     }
   }
@@ -111,18 +120,19 @@ Future<void> checkValueOrderAgainstBackend(
 /// has the values with special rules: null, NaN, the zeros, an integer and
 /// the equal double, values of several types in one field, arrays and maps.
 List<Object?> queryValuePool(
-        Gen gen, DocumentReference<Object?> Function(String id) doc) =>
-    <Object?>[
-      null, double.nan, false, true, 0, Gen.signedZero, 1, 1.0, 2, 2.5, -1, 3, //
-      9007199254740993, 9007199254740992.0, '', 'a', 'b', 'aa', 'é', 'A',
-      const <Object?>[], const <Object?>[1], const <Object?>[1, 2],
-      const <Object?>['a', null], const <Object?>[double.nan],
-      const <Object?>[2, 1], const <String, Object?>{},
-      const <String, Object?>{'x': 1}, const <String, Object?>{'x': null},
-      const Timestamp(1, 0), const Timestamp(2, 500000000),
-      const GeoPoint(1, 2), Blob.fromBase64String('AQI='), doc('d00'),
-      doc('d05'), VectorValue(const <double>[1, 2]),
-    ];
+  Gen gen,
+  DocumentReference<Object?> Function(String id) doc,
+) => <Object?>[
+  null, double.nan, false, true, 0, Gen.signedZero, 1, 1.0, 2, 2.5, -1, 3, //
+  9007199254740993, 9007199254740992.0, '', 'a', 'b', 'aa', 'é', 'A',
+  const <Object?>[], const <Object?>[1], const <Object?>[1, 2],
+  const <Object?>['a', null], const <Object?>[double.nan],
+  const <Object?>[2, 1], const <String, Object?>{},
+  const <String, Object?>{'x': 1}, const <String, Object?>{'x': null},
+  const Timestamp(1, 0), const Timestamp(2, 500000000),
+  const GeoPoint(1, 2), Blob.fromBase64String('AQI='), doc('d00'),
+  doc('d05'), VectorValue(const <double>[1, 2]),
+];
 
 /// A document for the query property: the fields `a` to `d` hold pool values
 /// (or are missing) and `m.x` is a nested field.
@@ -148,9 +158,13 @@ class GeneratedQuery {
 
 /// Builds a random query on [collection]. Returns null when the SDK rejects
 /// the combination of constraints (the caller counts it as discarded).
-GeneratedQuery? generateQuery(Gen gen,
-    CollectionReference<Map<String, Object?>> collection, List<Object?> pool,
-    {bool nullAndNaNOperands = false, bool limits = true}) {
+GeneratedQuery? generateQuery(
+  Gen gen,
+  CollectionReference<Map<String, Object?>> collection,
+  List<Object?> pool, {
+  bool nullAndNaNOperands = false,
+  bool limits = true,
+}) {
   final StringBuffer text = StringBuffer('collection');
   const List<String> fields = <String>['a', 'b', 'c', 'd', 'm.x'];
   Object? scalar() => gen.pick(pool);
@@ -164,8 +178,9 @@ GeneratedQuery? generateQuery(Gen gen,
   final List<Object?> members = pool
       .where((Object? v) => v is! List && (nullAndNaNOperands || !special(v)))
       .toList();
-  List<Object?> operands() =>
-      <Object?>[for (int i = gen.between(1, 3); i > 0; i--) gen.pick(members)];
+  List<Object?> operands() => <Object?>[
+    for (int i = gen.between(1, 3); i > 0; i--) gen.pick(members),
+  ];
 
   (Filter, String) fieldFilter() {
     final String field = gen.pick(fields);
@@ -186,19 +201,19 @@ GeneratedQuery? generateQuery(Gen gen,
         final Object? v = bound();
         return (
           Filter.greaterThanOrEqualTo(field, v),
-          '$field >= ${describe(v)}'
+          '$field >= ${describe(v)}',
         );
       case 5:
         final Object? v = gen.pick(members);
         return (
           Filter.arrayContains(field, v),
-          '$field array-contains ${describe(v)}'
+          '$field array-contains ${describe(v)}',
         );
       case 6:
         final List<Object?> v = operands();
         return (
           Filter.arrayContainsAny(field, v),
-          '$field array-contains-any ${describe(v)}'
+          '$field array-contains-any ${describe(v)}',
         );
       case 7:
         final List<Object?> v = operands();
@@ -217,17 +232,14 @@ GeneratedQuery? generateQuery(Gen gen,
       return fieldFilter();
     }
     final List<(Filter, String)> parts = <(Filter, String)>[
-      for (int i = gen.between(2, 3); i > 0; i--) filter(depth - 1)
+      for (int i = gen.between(2, 3); i > 0; i--) filter(depth - 1),
     ];
     final bool or = gen.chance(60);
     return (
       or
           ? Filter.or(parts.map(((Filter, String) p) => p.$1).toList())
           : Filter.and(parts.map(((Filter, String) p) => p.$1).toList()),
-      '${or ? 'or' : 'and'}(${parts.map(((
-            Filter,
-            String
-          ) p) => p.$2).join(', ')})'
+      '${or ? 'or' : 'and'}(${parts.map(((Filter, String) p) => p.$2).join(', ')})',
     );
   }
 
@@ -246,15 +258,16 @@ GeneratedQuery? generateQuery(Gen gen,
         continue;
       }
       ordered.add(field);
-      final Direction direction =
-          gen.chance(50) ? Direction.ascending : Direction.descending;
+      final Direction direction = gen.chance(50)
+          ? Direction.ascending
+          : Direction.descending;
       query = query.orderBy(field, direction);
       text.write('\n      .orderBy($field, ${direction.name})');
     }
 
     List<Object?> cursor() => <Object?>[
-          for (int i = gen.between(1, ordered.length); i > 0; i--) scalar()
-        ];
+      for (int i = gen.between(1, ordered.length); i > 0; i--) scalar(),
+    ];
     if (ordered.isNotEmpty && gen.chance(35)) {
       final List<Object?> values = cursor();
       if (gen.chance(50)) {
@@ -296,7 +309,9 @@ GeneratedQuery? generateQuery(Gen gen,
 /// The ids of the documents of [all] that [query] returns according to the
 /// SDK's own evaluation (`matches`, the query comparator and the limit).
 List<String> evaluateLocally(
-    Query<Map<String, Object?>> query, List<Document> all) {
+  Query<Map<String, Object?>> query,
+  List<Document> all,
+) {
   final List<Document> matching = all.where(query.query.matches).toList()
     ..sort(query.query.comparator);
   List<Document> limited = matching;
@@ -324,7 +339,8 @@ class QueryPropertyStats {
   static const int maxFailures = 8;
 
   @override
-  String toString() => 'compared $compared queries; the SDK rejected '
+  String toString() =>
+      'compared $compared queries; the SDK rejected '
       '$rejectedBySdk, the backend ${rejectedByBackend.values.fold<int>(0, (int a, int b) => a + b)} '
       '$rejectedByBackend';
 }
@@ -337,6 +353,14 @@ class QueryPropertyStats {
 /// [queryCount] queries run against it. A failure shows the seed, the query
 /// (regenerated with the smallest size that still fails) and the documents
 /// on which the two sides disagree.
+///
+/// With [compareWithUncachedClient] the result is not compared with the SDK's
+/// own evaluation but with what a second client gets that has none of the
+/// documents in its cache. That is the property for queries on which the
+/// SDK's evaluation and the backend are known to differ (see
+/// [nullAndNaNOperands]): the client that has the documents cached must still
+/// converge to the answer of the backend, instead of keeping a document in
+/// limbo forever.
 ///
 /// Two options account for the editions of the backend:
 ///  * [nullAndNaNOperands] generates null and NaN as operands of `in`,
@@ -357,28 +381,35 @@ Future<void> checkQueriesAgainstBackend(
   required QueryPropertyStats stats,
   bool limits = true,
   bool nullAndNaNOperands = false,
+  bool compareWithUncachedClient = false,
 }) async {
   final Gen gen = Gen(seed);
-  CollectionReference<Map<String, Object?>> collection =
-      (await newFirestore()).collection('property_query_${autoId()}');
+  CollectionReference<Map<String, Object?>> collection = (await newFirestore())
+      .collection('property_query_${autoId()}');
   String id(int i) => 'd${i.toString().padLeft(2, '0')}';
   final List<Object?> pool = queryValuePool(gen, collection.doc);
   final Map<String, Map<String, Object?>> data = <String, Map<String, Object?>>{
-    for (int i = 0; i < documentCount; i++) id(i): queryDocument(gen, pool)
+    for (int i = 0; i < documentCount; i++) id(i): queryDocument(gen, pool),
   };
   await writeAll(collection, data);
   final List<Document> all = <Document>[
     for (final QueryDocumentSnapshot<Map<String, Object?>> doc
         in (await collection.get(Source.server)).docs)
-      doc.document!
+      doc.document!,
   ];
   expect(all, hasLength(documentCount));
+
+  CollectionReference<Map<String, Object?>>? reference;
 
   /// Null when the two sides agree or the query is rejected.
   Future<String?> mismatch(int querySeed, int size) async {
     final GeneratedQuery? generated = generateQuery(
-        Gen(querySeed, size: size), collection, pool,
-        limits: limits, nullAndNaNOperands: nullAndNaNOperands);
+      Gen(querySeed, size: size),
+      collection,
+      pool,
+      limits: limits,
+      nullAndNaNOperands: nullAndNaNOperands,
+    );
     if (generated == null) {
       if (size == defaultSize) {
         stats.rejectedBySdk++;
@@ -397,27 +428,31 @@ Future<void> checkQueriesAgainstBackend(
                     .get(Source.server)
                     .timeout(const Duration(seconds: 10)))
                 .docs)
-          doc.id
+          doc.id,
       ];
     } on TimeoutException {
       // The view of the query never gets in sync, because the SDK keeps a
       // cached document in it that the backend does not return. Ask a new
       // instance, which has nothing cached, for the answer of the backend,
       // and go on with it (the old one still has the stuck listener).
-      note = '  get(Source.server) did not complete within 10 seconds while '
+      note =
+          '  get(Source.server) did not complete within 10 seconds while '
           'the documents were cached.\n';
       final Firestore fresh = await newFirestore();
       collection = fresh.collection(collection.path);
       actual = <String>[
         for (final QueryDocumentSnapshot<Map<String, Object?>> doc
             in (await generateQuery(
-                        Gen(querySeed, size: size), collection, pool,
-                        limits: limits, nullAndNaNOperands: nullAndNaNOperands)!
-                    .query
+                      Gen(querySeed, size: size),
+                      collection,
+                      pool,
+                      limits: limits,
+                      nullAndNaNOperands: nullAndNaNOperands,
+                    )!.query
                     .get(Source.server)
                     .timeout(const Duration(seconds: 20)))
                 .docs)
-          doc.id
+          doc.id,
       ];
       await collection.get(Source.server);
     } on FirestoreError catch (e) {
@@ -427,8 +462,9 @@ Future<void> checkQueriesAgainstBackend(
         if (size == defaultSize) {
           final String reason = e.message.split('\n').first;
           stats.rejectedByBackend[reason.length > 70
-              ? '${reason.substring(0, 70)}...'
-              : reason] = (stats.rejectedByBackend[reason.length > 70
+                  ? '${reason.substring(0, 70)}...'
+                  : reason] =
+              (stats.rejectedByBackend[reason.length > 70
                       ? '${reason.substring(0, 70)}...'
                       : reason] ??
                   0) +
@@ -438,7 +474,28 @@ Future<void> checkQueriesAgainstBackend(
       }
       rethrow;
     }
-    final List<String> expected = evaluateLocally(generated.query, all);
+    final List<String> expected;
+    if (compareWithUncachedClient) {
+      // What a client without the documents in its cache gets: the answer of
+      // the backend (minus what the client's own filter drops from it).
+      reference ??= (await newFirestore()).collection(collection.path);
+      expected = <String>[
+        for (final QueryDocumentSnapshot<Map<String, Object?>> doc
+            in (await generateQuery(
+                      Gen(querySeed, size: size),
+                      reference!,
+                      pool,
+                      limits: limits,
+                      nullAndNaNOperands: nullAndNaNOperands,
+                    )!.query
+                    .get(Source.server)
+                    .timeout(const Duration(seconds: 20)))
+                .docs)
+          doc.id,
+      ];
+    } else {
+      expected = evaluateLocally(generated.query, all);
+    }
     if (size == defaultSize) {
       stats.compared++;
     }
@@ -450,14 +507,16 @@ Future<void> checkQueriesAgainstBackend(
       ...actual.where((String d) => !expected.contains(d)),
     };
     return '  query (size $size):\n    $generated\n$note'
-        '  the SDK evaluates to: $expected\n'
+        '  ${compareWithUncachedClient ? 'a client without a cache gets' : 'the SDK evaluates to'}: $expected\n'
         '  the backend returns:  $actual\n'
         '${differing.isEmpty ? '  (same documents, different order)\n' : '  documents only one side returns:\n${differing.map((String d) => '    $d = ${describe(data[d])}\n').join()}'}';
   }
 
-  for (int q = 0;
-      q < queryCount && stats.failures.length < QueryPropertyStats.maxFailures;
-      q++) {
+  for (
+    int q = 0;
+    q < queryCount && stats.failures.length < QueryPropertyStats.maxFailures;
+    q++
+  ) {
     final int querySeed = (seed + (q + 1) * 104729) & 0x7fffffff;
     final String? failure = await mismatch(querySeed, defaultSize);
     if (failure == null) {
@@ -465,17 +524,20 @@ Future<void> checkQueriesAgainstBackend(
     }
     String smallest = failure;
     // A query that hangs takes 10 seconds per attempt: only try size 2.
-    for (final int size in failure.contains('did not complete')
-        ? const <int>[2, 4]
-        : const <int>[0, 1, 2, 3, 4, 5]) {
+    for (final int size
+        in failure.contains('did not complete')
+            ? const <int>[2, 4]
+            : const <int>[0, 1, 2, 3, 4, 5]) {
       final String? smaller = await mismatch(querySeed, size);
       if (smaller != null) {
         smallest = smaller;
         break;
       }
     }
-    stats.failures.add('Property "query results match the backend" failed.\n'
-        '  seed: $seed, query #$q of $queryCount, $documentCount documents '
-        '(rerun with PROPERTY_SEED=$seed)\n$smallest');
+    stats.failures.add(
+      'Property "query results match the backend" failed.\n'
+      '  seed: $seed, query #$q of $queryCount, $documentCount documents '
+      '(rerun with PROPERTY_SEED=$seed)\n$smallest',
+    );
   }
 }

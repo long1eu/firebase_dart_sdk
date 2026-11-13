@@ -524,10 +524,15 @@ Enterprise database.
   filter value is `null` or `NaN`. On Standard they never match.
   The client evaluates these filters like Enterprise (as the JS and Android SDKs do: null is
   null, NaN is NaN; the same holds for `<=` and `>=` with a `null` or `NaN` operand). On
-  Standard this means that a cached `null` or `NaN` document stays in the local result of such
-  a query although the backend does not return it: it stays in limbo, the listener keeps
-  reporting `isFromCache` and `get(Source.server)` does not complete.
-  `test/integration/firebase/firestore/property_query_test.dart` pins both sides.
+  Standard this means that a cached `null` or `NaN` document is first part of the local result
+  of such a query, although the backend does not return it. Once the backend has confirmed
+  that the document exists and that it is not a result, the client takes it out of the result
+  of that query: a listener reports it with `isFromCache: true` and then its removal with
+  `isFromCache: false`, and `get(Source.server)` returns what the backend returns. (The JS and
+  Android SDKs keep such a document in limbo: the listener never leaves `isFromCache` and a get
+  from the server does not complete.) The same mechanism covers any other query on which the
+  client and the backend disagree about a cached document.
+  `test/integration/firebase/firestore/property_query_test.dart` checks this.
 - **`!=` and `not-in`** also return documents in which the field is `null` or missing on
   Enterprise (seen with RunQuery). The client drops them, as on Standard, but a `limit` counts
   them on the backend, so a page can come back with fewer documents than the limit although

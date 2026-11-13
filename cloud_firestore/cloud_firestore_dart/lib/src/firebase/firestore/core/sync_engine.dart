@@ -111,6 +111,10 @@ class SyncEngine implements RemoteStoreCallback {
   /// Used to track any documents that are currently in limbo.
   final ReferenceSet _limboDocumentRefs;
 
+  /// The commit version of the newest write that the backend has acknowledged in this session. A remote event that
+  /// is older does not reflect that write yet (see [_limboDocumentsConfirmedToExist]).
+  SnapshotVersion _lastAcknowledgedCommitVersion = SnapshotVersion.none;
+
   /// Stores user completion blocks, indexed by user and batch id.
   final Map<User, Map<int, Completer<void>>> _mutationUserCallbacks;
 
@@ -368,6 +372,7 @@ class SyncEngine implements RemoteStoreCallback {
               1,
           'Limbo resolution for single document contains multiple changes.',
         );
+        limboResolution.current = targetChange.current;
         if (targetChange.addedDocuments.isNotEmpty) {
           limboResolution.receivedDocument = true;
         } else if (targetChange.modifiedDocuments.isNotEmpty) {
@@ -389,7 +394,47 @@ class SyncEngine implements RemoteStoreCallback {
 
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
         await _localStore.applyRemoteEvent(event);
-    await _emitNewSnapsAndNotifyLocalStore(changes, event);
+    await _emitNewSnapsAndNotifyLocalStore(
+      changes,
+      event,
+      await _limboDocumentsConfirmedToExist(event),
+    );
+  }
+
+  /// The limbo documents that the backend has confirmed to exist as of [event]: their limbo resolution is CURRENT and
+  /// has received the document.
+  ///
+  /// Such a document is in the view of a query but not in the query's target. If that target is CURRENT too, the
+  /// backend does not consider the document a result of the query, and the view drops it (see
+  /// [View.backendMismatches]) instead of waiting forever for a resolution that will not come.
+  ///
+  /// That conclusion is only sound when nothing local can explain why the client has a result that the backend does
+  /// not have (yet). So the set is empty while
+  ///  * there are pending writes (a write to any document can pull another one into a query, for example into a
+  ///    limit), or
+  ///  * the event is older than the last acknowledged write (Watch has not caught up with it).
+  ///
+  /// PORTING NOTE: not in the other SDKs, which leave such a document in limbo.
+  Future<Set<DocumentKey>> _limboDocumentsConfirmedToExist(
+    RemoteEvent event,
+  ) async {
+    final Set<DocumentKey> confirmed = <DocumentKey>{
+      for (final _LimboResolution resolution
+          in _activeLimboResolutionsByTarget.values)
+        if (resolution.current && resolution.receivedDocument) resolution.key,
+    };
+    if (confirmed.isEmpty) {
+      return confirmed;
+    }
+    if (event.snapshotVersion.compareTo(_lastAcknowledgedCommitVersion) < 0) {
+      return <DocumentKey>{};
+    }
+    final int pendingBatchId = await _localStore
+        .getHighestUnacknowledgedBatchId();
+    if (pendingBatchId != MutationBatch.unknown) {
+      return <DocumentKey>{};
+    }
+    return confirmed;
   }
 
   /// Applies an [OnlineState] change to the sync engine and notifies any views
@@ -497,6 +542,13 @@ class SyncEngine implements RemoteStoreCallback {
     _notifyUser(mutationBatchResult.batch.batchId, /*status:*/ null);
 
     _resolvePendingWriteTasks(mutationBatchResult.batch.batchId);
+
+    if (mutationBatchResult.commitVersion.compareTo(
+          _lastAcknowledgedCommitVersion,
+        ) >
+        0) {
+      _lastAcknowledgedCommitVersion = mutationBatchResult.commitVersion;
+    }
 
     final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
         await _localStore.acknowledgeBatch(mutationBatchResult);
@@ -638,8 +690,9 @@ class SyncEngine implements RemoteStoreCallback {
   /// Computes a new snapshot from the changes and calls the registered callback with the new snapshot.
   Future<void> _emitNewSnapsAndNotifyLocalStore(
     ImmutableSortedMap<DocumentKey, MaybeDocument> changes,
-    RemoteEvent? remoteEvent,
-  ) async {
+    RemoteEvent? remoteEvent, [
+    Set<DocumentKey> limboDocumentsConfirmedToExist = const <DocumentKey>{},
+  ]) async {
     final List<ViewSnapshot> newSnapshots = <ViewSnapshot>[];
     final List<LocalViewChanges> documentChangesInAllViews =
         <LocalViewChanges>[];
@@ -651,7 +704,31 @@ class SyncEngine implements RemoteStoreCallback {
         continue;
       }
       final View view = queryView.view;
-      ViewDocumentChanges viewDocChanges = view.computeDocChanges(changes);
+      final TargetChange? targetChange = remoteEvent == null
+          ? null
+          : remoteEvent.targetChanges[queryView.targetId];
+      final bool targetIsPendingReset =
+          remoteEvent != null &&
+          remoteEvent.targetMismatches.containsKey(queryView.targetId);
+
+      // Documents that the backend does not consider results of this query are taken out of its view. They go through
+      // computeDocChanges like changed documents, which removes them (and refills a limit query).
+      ImmutableSortedMap<DocumentKey, MaybeDocument> viewChanges = changes;
+      if (remoteEvent != null && !targetIsPendingReset) {
+        for (final Document document in view.backendMismatches(
+          limboDocumentsConfirmedToExist,
+          targetChange,
+          changes,
+        )) {
+          Log.d(
+            _tag,
+            'Document ${document.key} exists but the backend does not return it for target ${queryView.targetId}: '
+            'removing it from the view',
+          );
+          viewChanges = viewChanges.insert(document.key, document);
+        }
+      }
+      ViewDocumentChanges viewDocChanges = view.computeDocChanges(viewChanges);
       if (viewDocChanges.needsRefill) {
         // The query has a limit and some docs were removed/updated, so we need to re-run the query against the local
         // store to make sure we didn't lose any good docs that had been past the limit.
@@ -665,12 +742,6 @@ class SyncEngine implements RemoteStoreCallback {
           continue;
         }
       }
-      final TargetChange? targetChange = remoteEvent == null
-          ? null
-          : remoteEvent.targetChanges[queryView.targetId];
-      final bool targetIsPendingReset =
-          remoteEvent != null &&
-          remoteEvent.targetMismatches.containsKey(queryView.targetId);
       final ViewChange viewChange = queryView.view.applyChanges(
         viewDocChanges,
         targetChange,
@@ -888,6 +959,10 @@ class _LimboResolution {
   /// used by [WatchChangeAggregator] to decide whether it needs to manufacture a delete event for the target once the
   /// target is CURRENT.
   bool receivedDocument = false;
+
+  /// Whether the limbo target is CURRENT. Together with [receivedDocument] this means that the backend has confirmed
+  /// that the document exists.
+  bool current = false;
 }
 
 /// Interface implemented by EventManager to handle notifications from SyncEngine.

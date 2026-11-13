@@ -40,8 +40,9 @@ bool _isNaN(FieldValue? value) =>
 ///
 /// Null and NaN are the same as themselves here, as in the other SDKs. That
 /// is what an Enterprise edition database does; a Standard edition database
-/// never matches them in these filters (`in [null]` matches nothing), so
-/// there the limbo problem remains for a cached null or NaN document.
+/// never matches them in these filters (`in [null]` matches nothing). There
+/// a cached null or NaN document is a result for the client only, until the
+/// view drops it (see `View.backendMismatches`).
 bool _sameForBackend(FieldValue a, FieldValue b) => a.compareTo(b) == 0;
 
 bool _containsForBackend(List<FieldValue> values, FieldValue value) =>

@@ -348,6 +348,13 @@ Documentation and tests:
   matched stayed in limbo (the listener never left `isFromCache`, `get(Source.server)` did not
   complete), and after an array transform the cached document differed from the stored one.
   Found by the seeded property tests (`test/util/property.dart`).
+- A cached document that the client matches for a query but the backend does not return no
+  longer stays in limbo when the backend confirms that it exists (the JS and Android SDKs keep
+  it there: the listener never leaves `isFromCache` and `get(Source.server)` does not
+  complete). The view of that query drops the document once no pending write can explain the
+  difference; it comes back when the backend returns it or when it is written locally. This
+  covers the remaining known difference (`null` / `NaN` operands of `whereIn`, the array
+  filters, `<=` and `>=` on a Standard edition database) and any other disagreement.
 - A double and an integer beyond 2^53 are compared by their exact values (the order used to
   depend on the side of the operands).
 - Fixes from the upstream sync (UTF-8 string ordering, limbo handling, limbo-resolution
