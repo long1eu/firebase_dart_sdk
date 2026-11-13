@@ -170,8 +170,14 @@ class _NumericIncrementFieldValue extends FieldValue {
       (other.operand == operand || (other.operand.isNaN && operand.isNaN));
 
   @override
-  int get hashCode => Object.hash(runtimeType, operand.runtimeType, operand);
+  int get hashCode =>
+      Object.hash(runtimeType, operand.runtimeType, _hashableOperand(operand));
 }
+
+/// The operand of a numeric transform for hashing. All NaNs are equal there, so
+/// they must hash alike, while the hash of a double follows its bits and NaNs
+/// differ in theirs (`0.0 / 0.0` has the sign bit set on x64, not on arm64).
+num _hashableOperand(num operand) => operand.isNaN ? double.nan : operand;
 
 /// FieldValue class for minimum() transforms.
 class _NumericMinimumFieldValue extends FieldValue {
@@ -191,7 +197,8 @@ class _NumericMinimumFieldValue extends FieldValue {
       (other.operand == operand || (other.operand.isNaN && operand.isNaN));
 
   @override
-  int get hashCode => Object.hash(runtimeType, operand.runtimeType, operand);
+  int get hashCode =>
+      Object.hash(runtimeType, operand.runtimeType, _hashableOperand(operand));
 }
 
 /// FieldValue class for maximum() transforms.
@@ -212,5 +219,6 @@ class _NumericMaximumFieldValue extends FieldValue {
       (other.operand == operand || (other.operand.isNaN && operand.isNaN));
 
   @override
-  int get hashCode => Object.hash(runtimeType, operand.runtimeType, operand);
+  int get hashCode =>
+      Object.hash(runtimeType, operand.runtimeType, _hashableOperand(operand));
 }

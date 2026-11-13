@@ -44,8 +44,11 @@ class DoubleValue extends NumberValue {
     }
   }
 
+  /// All NaNs are equal (see [operator ==]), so they must share one hash: the
+  /// hash of a double follows its bits, and NaNs differ in theirs (`0.0 / 0.0`
+  /// has the sign bit set on x64 and not on arm64).
   @override
-  int get hashCode => _value.hashCode;
+  int get hashCode => _value.isNaN ? double.nan.hashCode : _value.hashCode;
 
   /// Comparing NaN's should return 0, if [this] is NaN it should return -1 and if [other] is NaN it
   /// should return 1

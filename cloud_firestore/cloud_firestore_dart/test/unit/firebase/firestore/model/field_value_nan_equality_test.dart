@@ -27,11 +27,21 @@ void main() {
   test('testValueEquality (NaN group)', () {
     final ByteData bits = ByteData(8)..setUint64(0, 0x7ff8000000000000);
     final double canonicalNan = bits.getFloat64(0);
+    // NaNs with other bits: the one `0.0 / 0.0` is on x64 (sign bit set) and
+    // one with a payload. On arm64 `0.0 / 0.0` is the canonical NaN, so
+    // without these the test only fails on x64.
+    final double negativeNan =
+        (ByteData(8)..setUint64(0, 0xfff8000000000000)).getFloat64(0);
+    final double payloadNan =
+        (ByteData(8)..setUint64(0, 0x7ff8000000000123)).getFloat64(0);
+    expect(negativeNan.isNaN && payloadNan.isNaN, isTrue);
 
     EqualsTester()
         .addEqualityGroup(<FieldValue>[
           wrap(0.0 / 0.0),
           wrap(canonicalNan),
+          wrap(negativeNan),
+          wrap(payloadNan),
           DoubleValue.nan,
         ])
         // -0.0 and 0.0 compareTo the same but are not equal.
