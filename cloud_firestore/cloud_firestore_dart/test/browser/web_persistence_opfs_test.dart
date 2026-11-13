@@ -14,6 +14,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:typed_data';
@@ -26,6 +27,7 @@ import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
 
 import '../../example/sqlite_database_web.dart';
+import '../../example/sqlite_opfs_worker.dart' show isTransientError;
 import 'browser_test_util.dart';
 
 typedef Json = Map<String, Object?>;
@@ -33,6 +35,36 @@ typedef Json = Map<String, Object?>;
 final Uri sqlite3Wasm = Uri.base.resolve('sqlite3.wasm');
 final Uri opfsWorker = Uri.base.resolve('opfs/sqlite_opfs_worker.js');
 final Uri noOpfsWorker = Uri.base.resolve('opfs/no_opfs_worker.js');
+final Uri faultyOpfsWorker = Uri.base.resolve('opfs/faulty_opfs_worker.js');
+
+/// Arms a fault in the worker of faulty_opfs_worker.dart that is running
+/// (see that file), or disarms it with a null [point].
+Future<void> armFault(
+  String? point,
+  int code, {
+  bool afterEffect = false,
+}) async {
+  final web.BroadcastChannel channel = web.BroadcastChannel('opfs-faults');
+  try {
+    final Completer<void> armed = Completer<void>();
+    channel.onmessage = (web.MessageEvent event) {
+      if (!armed.isCompleted) {
+        armed.complete();
+      }
+    }.toJS;
+    channel.postMessage(
+      jsonEncode(<String, Object?>{
+        'point': point,
+        'code': code,
+        'afterEffect': afterEffect,
+      }).toJS,
+    );
+    await armed.future.timeout(const Duration(seconds: 5));
+  } finally {
+    channel.close();
+  }
+}
+
 const String storagePrefix = 'cloud_firestore_dart';
 
 OpenDatabase opener() =>
@@ -446,6 +478,215 @@ void main() {
       );
     },
   );
+
+  test('which SQLite errors the worker reports as transient', () {
+    bool transient(
+      int code,
+      String sql, {
+      bool query = false,
+      bool was = false,
+      bool still = false,
+      bool? changed,
+    }) => isTransientError(
+      resultCode: code,
+      sql: sql,
+      isQuery: query,
+      wasInTransaction: was,
+      isInTransaction: still,
+      fileChanged: changed,
+    );
+    const int ioerr = sqlite.SqlError.SQLITE_IOERR;
+    // Inside a transaction: Firestore rolls back, nothing is stored.
+    expect(
+      transient(ioerr, 'INSERT INTO t VALUES (1)', was: true, still: true),
+      isTrue,
+    );
+    expect(transient(ioerr, 'INSERT INTO t VALUES (1)', was: true), isTrue);
+    expect(
+      transient(
+        sqlite.SqlError.SQLITE_FULL,
+        'UPDATE t SET a = 1',
+        was: true,
+        still: true,
+      ),
+      isTrue,
+    );
+    // A COMMIT that ended the transaction may have stored it: unless the
+    // database file is as before, or that was not checked.
+    expect(transient(ioerr, 'COMMIT', was: true, changed: true), isFalse);
+    expect(transient(ioerr, ' commit;', was: true, changed: true), isFalse);
+    expect(transient(ioerr, 'END TRANSACTION', was: true), isFalse);
+    expect(transient(ioerr, 'COMMIT', was: true, changed: false), isTrue);
+    // A COMMIT that left it open did not.
+    expect(
+      transient(sqlite.SqlError.SQLITE_BUSY, 'COMMIT', was: true, still: true),
+      isTrue,
+    );
+    // Outside a transaction: reads and BEGIN store nothing; a write commits
+    // itself.
+    expect(transient(ioerr, 'SELECT * FROM t', query: true), isTrue);
+    expect(transient(ioerr, 'PRAGMA data_version', query: true), isTrue);
+    expect(transient(ioerr, 'BEGIN IMMEDIATE'), isTrue);
+    expect(transient(ioerr, 'INSERT INTO t VALUES (1)'), isFalse);
+    expect(
+      transient(ioerr, 'INSERT INTO t VALUES (1)', changed: true),
+      isFalse,
+    );
+    expect(
+      transient(ioerr, 'INSERT INTO t VALUES (1)', changed: false),
+      isTrue,
+    );
+    // Not a passing condition.
+    expect(
+      transient(sqlite.SqlError.SQLITE_CORRUPT, 'SELECT 1', query: true),
+      isFalse,
+    );
+    expect(
+      transient(
+        sqlite.SqlError.SQLITE_CONSTRAINT,
+        'INSERT INTO t VALUES (1)',
+        was: true,
+        still: true,
+      ),
+      isFalse,
+    );
+  });
+
+  opfsTest('an I/O error is transient only when nothing was stored', () async {
+    if (!await exists(faultyOpfsWorker)) {
+      markTestSkipped(
+        'test/browser/opfs/faulty_opfs_worker.js is missing: '
+        'run tool/build_web_test_assets.sh',
+      );
+      return;
+    }
+    final String app = newAppName();
+    OpenDatabase faulty() =>
+        sqliteWebOpener(sqlite3Wasm: sqlite3Wasm, opfsWorker: faultyOpfsWorker);
+    Future<void> create(Database db, int version) =>
+        db.execute('CREATE TABLE t (a INTEGER)');
+
+    final List<(String, int, bool)> faults = <(String, int, bool)>[
+      (
+        'write:/database-journal',
+        sqlite.SqlExtendedError.SQLITE_IOERR_WRITE,
+        false,
+      ),
+      (
+        'sync:/database-journal',
+        sqlite.SqlExtendedError.SQLITE_IOERR_FSYNC,
+        false,
+      ),
+      ('write:/database', sqlite.SqlExtendedError.SQLITE_IOERR_WRITE, false),
+      ('write:/database', sqlite.SqlError.SQLITE_FULL, false),
+      ('sync:/database', sqlite.SqlExtendedError.SQLITE_IOERR_FSYNC, false),
+      (
+        'delete:/database-journal',
+        sqlite.SqlExtendedError.SQLITE_IOERR_DELETE,
+        false,
+      ),
+      // After the journal is gone: the transaction is stored.
+      (
+        'delete:/database-journal',
+        sqlite.SqlExtendedError.SQLITE_IOERR_DELETE,
+        true,
+      ),
+    ];
+    final List<String> outcomes = <String>[];
+    int transientErrors = 0;
+    for (int i = 0; i < faults.length; i++) {
+      final (String point, int code, bool afterEffect) = faults[i];
+      final String name = 'fault-$i-$app';
+      final Database db = await faulty()(name, version: 1, onCreate: create);
+      await armFault(point, code, afterEffect: afterEffect);
+      Object? error;
+      String? failedAt;
+      for (final String statement in <String>[
+        'BEGIN IMMEDIATE',
+        'INSERT INTO t VALUES (1)',
+        'COMMIT',
+      ]) {
+        try {
+          await db.execute(statement);
+        } catch (e) {
+          error = e;
+          failedAt = statement;
+          // What Firestore does after a failed statement of a transaction.
+          try {
+            await db.execute('ROLLBACK');
+          } catch (_) {
+            // No transaction left.
+          }
+          break;
+        }
+      }
+      await armFault(null, 0);
+      db.close();
+      await (db as SqliteOpfsDatabase).whenClosed;
+
+      // Read back by a new worker, as after a page load.
+      final Database check = await opener()(name, version: 1);
+      final int rows =
+          (await check.query('SELECT count(*) AS c FROM t')).single['c'] as int;
+      expect(
+        (await check.query('PRAGMA integrity_check')).single.values.first,
+        'ok',
+        reason: point,
+      );
+      await (check as ClearableDatabase).clearStorage();
+
+      final String kind = error == null
+          ? 'no error'
+          : error is TransientDatabaseException
+          ? 'transient'
+          : 'fatal (${error.runtimeType})';
+      outcomes.add(
+        '$point${afterEffect ? ' (after)' : ''}: $kind at '
+        '$failedAt, rows $rows',
+      );
+      if (error is TransientDatabaseException) {
+        transientErrors++;
+        expect(
+          rows,
+          0,
+          reason: '$point: a transient error must leave nothing stored',
+        );
+        expect(error.cause, isA<SqliteOpfsException>());
+        expect(error.toString(), isNot(contains('INSERT')));
+      }
+      if (afterEffect) {
+        expect(rows, 1, reason: 'the fault came after the commit point');
+        expect(
+          error,
+          isNot(isA<TransientDatabaseException>()),
+          reason: 'a transaction that was stored must not be retried',
+        );
+      }
+    }
+    // ignore: avoid_print
+    print('I/O faults: ${outcomes.join('; ')}');
+    // A fault before the database file is written leaves it as it was and is
+    // worth a retry. Once the file holds the new pages (a failed delete of
+    // the journal, the commit point) the worker cannot tell a stored
+    // transaction from one that the next open rolls back, and reports the
+    // error as fatal: the last two faults.
+    expect(transientErrors, faults.length - 2, reason: outcomes.join('; '));
+
+    // A read that fails is transient: it stored nothing.
+    final String name = 'fault-read-$app';
+    Database db = await faulty()(name, version: 1, onCreate: create);
+    db.close();
+    await (db as SqliteOpfsDatabase).whenClosed;
+    db = await faulty()(name, version: 1);
+    await armFault('read:/database', sqlite.SqlExtendedError.SQLITE_IOERR_READ);
+    await expectLater(
+      db.query('SELECT * FROM t'),
+      throwsA(isA<TransientDatabaseException>()),
+    );
+    await armFault(null, 0);
+    expect(await db.query('SELECT * FROM t'), isEmpty);
+    await (db as ClearableDatabase).clearStorage();
+  });
 
   // These two do not need OPFS.
   test('without synchronous OPFS access the cache is in IndexedDB', () async {

@@ -26,7 +26,7 @@
 //
 // The page talks to it with messages, one request at a time in the order
 // they were sent. Requests are objects `{id, op, ...}`; every request gets
-// one reply `{id, result}` or `{id, error}`. The operations:
+// one reply `{id, result}` or `{id, error, code, transient}`. The operations:
 //
 //   load {wasm, path, waitMs}  loads SQLite from `wasm` and opens the files
 //                              in the OPFS directory `path`. Replies
@@ -42,6 +42,31 @@
 //   delete {sql, args}         the number of changed rows.
 //   rollback                   rolls back the open transaction, if any.
 //   close                      closes the database and its file handles.
+//
+// Errors. `error` is the message of SQLite (never the statement or its
+// arguments, which hold user data) and `code` its primary result code.
+// `transient` says that the error may go away on its own (BUSY, LOCKED,
+// IOERR, FULL) and that nothing of the failed statement, nor of its
+// transaction, can have been stored: the page then reports it as a
+// `TransientDatabaseException` and Firestore goes offline and retries. That
+// is decided here, where the state of the connection is known:
+//
+//  * a statement inside a transaction, other than its COMMIT: SQLite rolled
+//    back the statement (or the whole transaction), and Firestore rolls the
+//    transaction back;
+//  * a COMMIT after which the transaction is still open: it did not commit;
+//  * a COMMIT that ended the transaction, or a write outside a transaction
+//    (its own implicit commit), when the file change counter in the header
+//    of the database file is what it was before the statement: every write
+//    transaction changes it before its commit point and a rollback restores
+//    it, so the transaction was rolled back;
+//  * BEGIN, ROLLBACK and reads outside a transaction: they store nothing.
+//
+// Not transient, whatever the code: a COMMIT (or a write outside a
+// transaction) after which the change counter differs. With a rollback
+// journal the transaction is durable once the journal is deleted, and an I/O
+// error after that point leaves it stored: running it again would apply it
+// twice.
 //
 // Values travel as JavaScript values: null, numbers for integers within
 // 2^53, strings, Uint8Arrays for blobs; other integers as `{i: '<decimal>'}`
@@ -62,16 +87,30 @@ import 'package:web/web.dart' as web;
 @JS('self')
 external web.DedicatedWorkerGlobalScope get _self;
 
-void main() {
-  final _Host host = _Host();
+void main() => runOpfsWorker();
+
+/// Serves the messages of the page. [wrapFileSystem] wraps the OPFS file
+/// system before SQLite uses it (the tests inject I/O errors with it).
+void runOpfsWorker({
+  sqlite.VirtualFileSystem Function(sqlite.VirtualFileSystem opfs)?
+  wrapFileSystem,
+}) {
+  final _Host host = _Host(wrapFileSystem);
   _self.onmessage = (web.MessageEvent event) {
     host.receive(event.data! as JSObject);
   }.toJS;
 }
 
 class _Host {
+  _Host(this._wrapFileSystem);
+
+  final sqlite.VirtualFileSystem Function(sqlite.VirtualFileSystem opfs)?
+  _wrapFileSystem;
   sqlite.WasmSqlite3? _sqlite3;
   sqlite.SimpleOpfsFileSystem? _fileSystem;
+
+  /// What SQLite uses: [_fileSystem], wrapped or not.
+  sqlite.VirtualFileSystem? _registered;
   sqlite.CommonDatabase? _database;
 
   /// Requests run one after the other; `load` waits for the network and the
@@ -90,6 +129,11 @@ class _Host {
         (request['op']! as JSString).toDart,
         request,
       );
+    } on _StatementError catch (error) {
+      reply
+        ..['error'] = error.message.toJS
+        ..['code'] = error.code.toJS
+        ..['transient'] = error.transient.toJS;
     } catch (error) {
       reply['error'] = '$error'.toJS;
     }
@@ -116,16 +160,24 @@ class _Host {
         );
         return null;
       case 'open':
-        _database = _sqlite3!.open('/database', vfs: _fileSystem!.name);
+        _database = _sqlite3!.open('/database', vfs: _registered!.name);
         return null;
       case 'execute':
-        _db.execute(_sql(request), _args(request));
+        _statement(op, request, (String sql, List<Object?> args) {
+          _db.execute(sql, args);
+        });
         return null;
       case 'delete':
-        _db.execute(_sql(request), _args(request));
+        _statement(op, request, (String sql, List<Object?> args) {
+          _db.execute(sql, args);
+        });
         return _db.updatedRows.toJS;
       case 'query':
-        final sqlite.ResultSet rows = _db.select(_sql(request), _args(request));
+        final sqlite.ResultSet rows = _statement(
+          op,
+          request,
+          (String sql, List<Object?> args) => _db.select(sql, args),
+        );
         return JSObject()
           ..['columns'] = <JSString>[
             for (final String column in rows.columnNames) column.toJS,
@@ -143,13 +195,73 @@ class _Host {
         _database?.dispose();
         _database = null;
         if (_fileSystem != null) {
-          _sqlite3!.unregisterVirtualFileSystem(_fileSystem!);
+          _sqlite3!.unregisterVirtualFileSystem(_registered!);
           _fileSystem!.close();
           _fileSystem = null;
+          _registered = null;
         }
         return null;
     }
     throw ArgumentError.value(op, 'op', 'Unknown operation');
+  }
+
+  /// Runs [run] on the statement of [request] and classifies a SQLite error
+  /// (see the header of this file).
+  T _statement<T>(
+    String op,
+    JSObject request,
+    T Function(String sql, List<Object?> args) run,
+  ) {
+    final String sql = _sql(request);
+    final bool wasInTransaction = !_db.autocommit;
+    // A statement that may commit: whether the database file changed tells,
+    // after a failure, whether anything of it can have been stored.
+    final bool mayCommit =
+        op != 'query' && (!wasInTransaction || _commits(_verb(sql)));
+    final int? before = mayCommit ? _changeCounter() : null;
+    try {
+      return run(sql, _args(request));
+    } on sqlite.SqliteException catch (e) {
+      throw _StatementError(
+        '${e.message} (code ${e.extendedResultCode})',
+        e.resultCode,
+        transient: isTransientError(
+          resultCode: e.resultCode,
+          sql: sql,
+          isQuery: op == 'query',
+          wasInTransaction: wasInTransaction,
+          isInTransaction: _database != null && !_database!.autocommit,
+          fileChanged: mayCommit ? _changeCounter() != before : null,
+        ),
+      );
+    }
+  }
+
+  /// The file change counter of the database (bytes 24 to 27 of its header),
+  /// read past SQLite. Every write transaction changes it before its commit
+  /// point, and a rollback restores it: the same value after a failed COMMIT
+  /// means that the transaction is not stored. Null without a database file.
+  int? _changeCounter() {
+    final sqlite.SimpleOpfsFileSystem? fileSystem = _fileSystem;
+    if (fileSystem == null || fileSystem.xAccess('/database', 0) == 0) {
+      return null;
+    }
+    final sqlite.VirtualFileSystemFile file = fileSystem
+        .xOpen(
+          sqlite.Sqlite3Filename('/database'),
+          sqlite.SqlFlag.SQLITE_OPEN_READWRITE,
+        )
+        .file;
+    try {
+      if (file.xFileSize() < 28) {
+        return null;
+      }
+      final Uint8List bytes = Uint8List(4);
+      file.xRead(bytes, 24);
+      return ByteData.sublistView(bytes).getUint32(0);
+    } finally {
+      file.xClose();
+    }
   }
 
   Future<JSObject> _load({
@@ -165,7 +277,8 @@ class _Host {
     final sqlite.SimpleOpfsFileSystem fileSystem = await sqlite
         .SimpleOpfsFileSystem.loadFromStorage(path, vfsName: 'opfs-$path');
     _fileSystem = fileSystem;
-    _sqlite3!.registerVirtualFileSystem(fileSystem);
+    _registered = _wrapFileSystem?.call(fileSystem) ?? fileSystem;
+    _sqlite3!.registerVirtualFileSystem(_registered!);
     return JSObject()
       ..['supported'] = true.toJS
       ..['exists'] = _exists('/database').toJS;
@@ -323,4 +436,57 @@ List<Object?> _args(JSObject request) {
     return const <Object?>[];
   }
   return <Object?>[for (final JSAny? value in args.toDart) _decode(value)];
+}
+
+/// A SQLite error of a statement, as the page gets it.
+class _StatementError implements Exception {
+  _StatementError(this.message, this.code, {required this.transient});
+
+  final String message;
+  final int code;
+  final bool transient;
+}
+
+String _verb(String sql) =>
+    RegExp(r'^\s*([A-Za-z]+)').firstMatch(sql)?.group(1)?.toUpperCase() ?? '';
+
+bool _commits(String verb) =>
+    verb == 'COMMIT' || verb == 'END' || verb == 'RELEASE';
+
+/// Whether a statement that failed with [resultCode] may be run again: the
+/// error may go away on its own and nothing of the statement can have been
+/// stored. See the header of this file. [fileChanged] is whether the file
+/// change counter of the database differs from before the statement, for a
+/// statement that may commit (null when it was not checked).
+bool isTransientError({
+  required int resultCode,
+  required String sql,
+  required bool isQuery,
+  required bool wasInTransaction,
+  required bool isInTransaction,
+  bool? fileChanged,
+}) {
+  switch (resultCode) {
+    case sqlite.SqlError.SQLITE_BUSY:
+    case sqlite.SqlError.SQLITE_LOCKED:
+    case sqlite.SqlError.SQLITE_IOERR:
+    case sqlite.SqlError.SQLITE_FULL:
+      break;
+    default:
+      return false;
+  }
+  final String verb = _verb(sql);
+  if (_commits(verb)) {
+    // Not committed when the transaction is still open, or when it ended
+    // and the database file is as it was before (rolled back).
+    return isInTransaction || fileChanged == false;
+  }
+  if (wasInTransaction) {
+    return true;
+  }
+  return isQuery ||
+      verb == 'BEGIN' ||
+      verb == 'ROLLBACK' ||
+      verb == 'SELECT' ||
+      fileChanged == false;
 }

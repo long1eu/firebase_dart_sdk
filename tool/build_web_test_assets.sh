@@ -17,6 +17,8 @@
 #   test/browser/opfs/sqlite_opfs_worker.js
 #                                       example/sqlite_opfs_worker.dart compiled, for the
 #                                       OPFS storage tests
+#   test/browser/opfs/faulty_opfs_worker.js
+#                                       the same worker with I/O errors on command
 #
 # Environment:
 #   SQLITE3_WASM  a sqlite3.wasm to use instead of downloading one
@@ -109,6 +111,24 @@ else
     example/sqlite_opfs_worker.dart) >"$COMPILE_LOG" 2>&1; then
     cat "$COMPILE_LOG"; rm -f "$OPFS_WORKER" "$COMPILE_LOG"
     echo "Could not compile sqlite_opfs_worker.js"
+    exit 1
+  fi
+  rm -f "$COMPILE_LOG"
+fi
+
+# --- faulty_opfs_worker.js ----------------------------------------------------------------
+# The OPFS worker with a file system that fails on command (web_persistence_opfs_test.dart).
+FAULTY_WORKER="$PKG/test/browser/opfs/faulty_opfs_worker.js"
+if up_to_date "$FAULTY_WORKER" "$PKG/test/browser/opfs/faulty_opfs_worker.dart" \
+  "$PKG/example/sqlite_opfs_worker.dart" "$PKG/pubspec.lock"; then
+  :
+else
+  echo "Compiling test/browser/opfs/faulty_opfs_worker.js"
+  COMPILE_LOG="$(mktemp)"
+  if ! (cd "$PKG" && dart compile js -O1 -o test/browser/opfs/faulty_opfs_worker.js \
+    test/browser/opfs/faulty_opfs_worker.dart) >"$COMPILE_LOG" 2>&1; then
+    cat "$COMPILE_LOG"; rm -f "$FAULTY_WORKER" "$COMPILE_LOG"
+    echo "Could not compile faulty_opfs_worker.js"
     exit 1
   fi
   rm -f "$COMPILE_LOG"

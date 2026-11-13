@@ -68,6 +68,15 @@
 //    `SqliteWebDatabase._stored`). With sqlite3 2.9.4 only a closed IndexedDB
 //    file system makes the wait fail: the file system does not report a copy
 //    that failed.
+//  * When OPFS fails (OPFS storage). SQLite reports the I/O error of the
+//    statement that ran into it. The worker reports BUSY, LOCKED, IOERR and
+//    FULL as a [TransientDatabaseException] (the client goes offline and
+//    retries) when nothing can have been stored: a statement inside a
+//    transaction other than its COMMIT, a COMMIT that left the transaction
+//    open, a read. An error at a COMMIT that ended the transaction may come
+//    after the commit point, so it is fatal for the operation instead of
+//    being retried and applied twice. As on the VM, a permanent I/O error
+//    (a broken file) keeps the client offline.
 //  * Memory and speed, measured in Chrome with documents of about 1 KB
 //    (tool/web_storage_benchmark): with IndexedDB the whole database is read
 //    into memory when it is opened and stays there, 133 to 138 MB for
@@ -801,10 +810,22 @@ Future<SqliteOpfsDatabase?> inspectOpfsDatabase({
 const Duration _opfsHandleTimeout = Duration(seconds: 10);
 
 /// An error that SQLite (or the file system) reported in the OPFS worker.
+///
+/// The errors that may go away on their own, and after which nothing of the
+/// failed statement or its transaction can have been stored, come as a
+/// [TransientDatabaseException] with this as its cause instead (the worker
+/// decides, see sqlite_opfs_worker.dart): Firestore then goes offline and
+/// retries. An I/O error at a COMMIT that may have stored the transaction
+/// stays a [SqliteOpfsException], fatal for the operation, because running it
+/// again would apply it twice.
 class SqliteOpfsException implements Exception {
-  SqliteOpfsException(this.message);
+  SqliteOpfsException(this.message, [this.resultCode]);
 
+  /// The message of SQLite, without the statement or its arguments.
   final String message;
+
+  /// The primary SQLite result code, when SQLite reported the error.
+  final int? resultCode;
 
   @override
   String toString() => 'SqliteOpfsException: $message';
@@ -863,8 +884,17 @@ class _OpfsWorker {
       return;
     }
     if (reply.has('error')) {
+      final SqliteOpfsException error = SqliteOpfsException(
+        (reply['error']! as JSString).toDart,
+        (reply['code'] as JSNumber?)?.toDartInt,
+      );
       completer.completeError(
-        SqliteOpfsException((reply['error']! as JSString).toDart),
+        (reply['transient'] as JSBoolean?)?.toDart ?? false
+            ? TransientDatabaseException(
+                'SQLite in the OPFS worker failed (code ${error.resultCode})',
+                error,
+              )
+            : error,
       );
     } else {
       completer.complete(reply['result']);

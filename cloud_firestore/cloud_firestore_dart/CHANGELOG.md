@@ -455,8 +455,13 @@ Networking:
   3 to 7 MB once open instead of 133 to 138 MB, opens in 45 to 170 ms instead of 0.55 to
   1.2 s; reads by id and scans cost about the same (a scan of 100,000 documents needs about
   0.45 GB for its snapshot with either storage). A worker killed at random moments 1500 times
-  always left an intact database with every acknowledged transaction. Not verified: browsers
-  other than Chrome.
+  always left an intact database with every acknowledged transaction. I/O errors in the worker
+  (BUSY, LOCKED, IOERR, FULL) are reported as `TransientDatabaseException` (offline, then a
+  retry) only when nothing can have been stored: inside a transaction, at a COMMIT that left
+  the transaction open or after which the database file is unchanged (its change counter), and
+  for reads; an error at a COMMIT that may have stored the transaction stays fatal, so that it is
+  not applied twice (tested with a worker that fails reads, writes, syncs and the journal delete
+  on command). Not verified: browsers other than Chrome.
 - Web transport robustness (web only, the gRPC transport is unchanged):
   - `FirestoreSettings.experimentalForceLongPolling` and
     `experimentalAutoDetectLongPolling` (on by default), for networks where a proxy buffers
