@@ -38,12 +38,22 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dar
 class WebChannelChunkParser {
   String _buffer = '';
 
+  /// Pieces that arrived after [_buffer] and are not joined to it yet, and
+  /// their length. A chunk of megabytes arrives in thousands of pieces:
+  /// appending each one to [_buffer] would copy the chunk once per piece.
+  final List<String> _pieces = <String>[];
+  int _piecesLength = 0;
+
+  /// The length the buffered text must reach before the chunk that is being
+  /// received is complete, or 0 when its length is not known yet.
+  int _needed = 0;
+
   /// The longest chunk that is accepted, in UTF-16 code units. The framing
   /// comes from the network: a larger (or negative) length is not buffered
-  /// for but reported as a malformed body. Far above what the backend sends
-  /// (a chunk holds a few messages; a message is a document of at most 1 MiB
-  /// as JSON).
-  static const int maxChunkLength = 64 * 1024 * 1024;
+  /// for but reported as a malformed body. Far above what the backend sends:
+  /// a chunk holds a few messages, a message holds a document of at most
+  /// 16 MiB, which is longer as JSON (escapes, base64 for bytes).
+  static const int maxChunkLength = 256 * 1024 * 1024;
 
   static final RegExp _decimal = RegExp(r'^[0-9]+$');
 
@@ -51,7 +61,23 @@ class WebChannelChunkParser {
   ///
   /// Throws a [FormatException] if the body is not chunked as expected.
   List<Object?> add(String text) {
-    _buffer += text;
+    if (_needed > 0 && _buffer.length + _piecesLength + text.length < _needed) {
+      _pieces.add(text);
+      _piecesLength += text.length;
+      return const <Object?>[];
+    }
+    if (_pieces.isEmpty) {
+      _buffer += text;
+    } else {
+      _buffer =
+          (StringBuffer(_buffer)
+                ..writeAll(_pieces)
+                ..write(text))
+              .toString();
+      _pieces.clear();
+      _piecesLength = 0;
+    }
+    _needed = 0;
     final List<Object?> chunks = <Object?>[];
     while (true) {
       final int newline = _buffer.indexOf('\n');
@@ -70,6 +96,7 @@ class WebChannelChunkParser {
       }
       final int end = newline + 1 + length;
       if (_buffer.length < end) {
+        _needed = end;
         break;
       }
       chunks.add(jsonDecode(_buffer.substring(newline + 1, end)));
@@ -79,7 +106,7 @@ class WebChannelChunkParser {
   }
 
   /// Whether there is text that is not a complete chunk yet.
-  bool get hasPartialChunk => _buffer.trim().isNotEmpty;
+  bool get hasPartialChunk => _piecesLength > 0 || _buffer.trim().isNotEmpty;
 }
 
 /// One WebChannel session: a bidirectional stream of JSON messages.

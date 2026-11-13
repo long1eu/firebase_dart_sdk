@@ -25,12 +25,14 @@ class FirestoreSettings {
     String host = defaultHost,
     int port = defaultPort,
     bool sslEnabled = true,
+    int grpcFlowControlWindow = defaultGrpcFlowControlWindow,
   }) : this._(
          full.FirestoreSettings(
            host: host,
            port: port,
            sslEnabled: sslEnabled,
            persistenceEnabled: false,
+           grpcFlowControlWindow: grpcFlowControlWindow,
          ),
        );
 
@@ -41,6 +43,10 @@ class FirestoreSettings {
 
   /// The port of the production service.
   static const int defaultPort = full.FirestoreSettings.defaultPort;
+
+  /// The default of [grpcFlowControlWindow], 256 KiB.
+  static const int defaultGrpcFlowControlWindow =
+      full.FirestoreSettings.defaultGrpcFlowControlWindow;
 
   // The settings of the main library check the host, the SSL flag and the
   // mock user token: the rules are the same.
@@ -54,6 +60,11 @@ class FirestoreSettings {
 
   /// Whether the connection uses TLS.
   bool get sslEnabled => _checked.sslEnabled;
+
+  /// The HTTP/2 flow-control window of the gRPC transport, in bytes. An
+  /// advanced setting, see the `grpcFlowControlWindow` of the settings of the
+  /// main library. Ignored by the web transport.
+  int get grpcFlowControlWindow => _checked.grpcFlowControlWindow;
 
   /// The token sent as the credentials of every request to the emulator: a
   /// token string, or the claims of a Firebase ID token as a map. Null unless
@@ -87,5 +98,6 @@ class FirestoreSettings {
 
   @override
   String toString() =>
-      'FirestoreSettings{host: $host, port: $port, sslEnabled: $sslEnabled}';
+      'FirestoreSettings{host: $host, port: $port, sslEnabled: $sslEnabled, '
+      'grpcFlowControlWindow: $grpcFlowControlWindow}';
 }

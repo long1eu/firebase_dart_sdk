@@ -1,6 +1,7 @@
 // The native gRPC channel of the Firestore client. Needs `dart:io`: only the
 // io side of the transport may import this file.
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_settings.dart';
 import 'package:grpc/grpc.dart';
 import 'package:grpc/grpc_connection_interface.dart' show ClientChannelBase;
 
@@ -37,7 +38,13 @@ ChannelOptions grpcChannelOptions({required bool sslEnabled}) {
 }
 
 /// Creates the gRPC channel that talks to the backend, with keepalive pings
-/// (see [KeepAliveTransportConnector]).
+/// (see [KeepAliveTransportConnector]) and an HTTP/2 flow-control window of
+/// [flowControlWindow] bytes for the connection and for each call (see
+/// `FlowControlWindow`).
+///
+/// There is no limit on the size of a response message: package:grpc has
+/// none. The Android and JS SDKs raise the 4 MiB default limit of their gRPC
+/// libraries to 17 MiB, for documents of up to 16 MiB.
 ///
 /// [keepAlivePingInterval] and [keepAliveTimeout] can be overridden for tests.
 ClientChannelBase createGrpcChannel({
@@ -46,6 +53,7 @@ ClientChannelBase createGrpcChannel({
   required bool sslEnabled,
   Duration keepAlivePingInterval = defaultKeepAlivePingInterval,
   Duration keepAliveTimeout = defaultKeepAliveTimeout,
+  int flowControlWindow = FirestoreSettings.defaultGrpcFlowControlWindow,
 }) {
   final ChannelOptions options = grpcChannelOptions(sslEnabled: sslEnabled);
   return ClientTransportConnectorChannel(
@@ -56,6 +64,7 @@ ClientChannelBase createGrpcChannel({
       pingInterval: keepAlivePingInterval,
       pingTimeout: keepAliveTimeout,
       connectTimeout: options.connectTimeout,
+      flowControlWindow: flowControlWindow,
     ),
     options: options,
   );

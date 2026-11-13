@@ -213,12 +213,14 @@ class FirestoreErrorCode
   toString(): String
 class FirestoreSettings
   ==(Object other): bool
+  get grpcFlowControlWindow: int
   get hashCode: int
   get host: String
   get mockUserToken: Object
   get port: int
   get sslEnabled: bool
-  new FirestoreSettings({String host, int port, bool sslEnabled})
+  new FirestoreSettings({String host, int port, bool sslEnabled, int grpcFlowControlWindow})
+  static final defaultGrpcFlowControlWindow: int
   static final defaultHost: String
   static final defaultPort: int
   toString(): String

@@ -19,9 +19,11 @@ class FirestoreSettings {
     LocalCacheSettings? cacheSettings,
     bool experimentalForceLongPolling = false,
     bool? experimentalAutoDetectLongPolling,
+    int grpcFlowControlWindow = defaultGrpcFlowControlWindow,
   }) : this._(
          experimentalForceLongPolling: experimentalForceLongPolling,
          experimentalAutoDetectLongPolling: experimentalAutoDetectLongPolling,
+         grpcFlowControlWindow: grpcFlowControlWindow,
          host: host,
          port: port,
          sslEnabled: sslEnabled,
@@ -46,7 +48,11 @@ class FirestoreSettings {
     required Object? mockUserToken,
     required this.experimentalForceLongPolling,
     required bool? experimentalAutoDetectLongPolling,
+    required int grpcFlowControlWindow,
   }) : _emulator = emulator,
+       grpcFlowControlWindow = _checkGrpcFlowControlWindow(
+         grpcFlowControlWindow,
+       ),
        host = _checkHost(host),
        sslEnabled = _checkSslEnabled(sslEnabled, host),
        experimentalAutoDetectLongPolling = _resolveAutoDetectLongPolling(
@@ -85,6 +91,10 @@ class FirestoreSettings {
 
   /// The cache size threshold used when none is configured (100 MB).
   static const int defaultCacheSizeBytes = 100 * 1024 * 1024; // 100 MB
+
+  /// The default of [grpcFlowControlWindow]: 256 KiB, as in the Android and
+  /// JS SDKs.
+  static const int defaultGrpcFlowControlWindow = 256 * 1024;
 
   /// The host of the Firestore backend.
   final String host;
@@ -149,6 +159,36 @@ class FirestoreSettings {
   /// [experimentalForceLongPolling] is set. The option of the same name of the
   /// JS SDK has the same purpose but detects differently.
   final bool experimentalAutoDetectLongPolling;
+
+  /// The HTTP/2 flow-control window of the gRPC transport, in bytes: how much
+  /// the backend may send on the connection, and on each request, before the
+  /// client acknowledges it. Defaults to [defaultGrpcFlowControlWindow]
+  /// (256 KiB); the HTTP/2 default is 64 KiB, which limits large reads on a
+  /// connection with a long round trip time. Same as `grpcFlowControlWindow`
+  /// of the Android and JS SDKs (in JS, Node only). Ignored by the web
+  /// transport.
+  ///
+  /// **Advanced setting.** A larger window makes reads of large documents
+  /// faster, but on a poor connection a large response can hold back the
+  /// others (head-of-line blocking). Use 65535 for the HTTP/2 default. Must be
+  /// a positive number of bytes, at most 2147483647; below 65535 only the
+  /// window of each request is smaller (HTTP/2 does not let the window of the
+  /// connection shrink below its default).
+  ///
+  /// With another value than 65535 a new connection waits for the backend to
+  /// acknowledge the window before its first request, about one round trip.
+  final int grpcFlowControlWindow;
+
+  static int _checkGrpcFlowControlWindow(int window) {
+    if (window <= 0 || window > 2147483647) {
+      throw ArgumentError.value(
+        window,
+        'grpcFlowControlWindow',
+        'Must be a positive integer and cannot exceed 2147483647',
+      );
+    }
+    return window;
+  }
 
   static bool _resolveAutoDetectLongPolling(bool force, bool? autoDetect) {
     if (force && autoDetect == true) {
@@ -327,6 +367,7 @@ class FirestoreSettings {
     LocalCacheSettings? cacheSettings,
     bool? experimentalForceLongPolling,
     bool? experimentalAutoDetectLongPolling,
+    int? grpcFlowControlWindow,
   }) {
     // The settings stay emulator settings (and keep their mock user token)
     // only while they point at the same emulator. Changing the host of
@@ -345,6 +386,7 @@ class FirestoreSettings {
       cacheSettings: cacheSettings,
       experimentalForceLongPolling: experimentalForceLongPolling,
       experimentalAutoDetectLongPolling: experimentalAutoDetectLongPolling,
+      grpcFlowControlWindow: grpcFlowControlWindow,
       emulator: emulator,
       mockUserToken: mockUserToken,
     );
@@ -359,6 +401,7 @@ class FirestoreSettings {
     LocalCacheSettings? cacheSettings,
     bool? experimentalForceLongPolling,
     bool? experimentalAutoDetectLongPolling,
+    int? grpcFlowControlWindow,
     required bool emulator,
     required Object? mockUserToken,
   }) {
@@ -390,6 +433,8 @@ class FirestoreSettings {
           (experimentalForceLongPolling == null
               ? this.experimentalAutoDetectLongPolling
               : null),
+      grpcFlowControlWindow:
+          grpcFlowControlWindow ?? this.grpcFlowControlWindow,
       emulator: emulator,
       mockUserToken: mockUserToken,
     );
@@ -409,6 +454,7 @@ class FirestoreSettings {
           experimentalForceLongPolling == other.experimentalForceLongPolling &&
           experimentalAutoDetectLongPolling ==
               other.experimentalAutoDetectLongPolling &&
+          grpcFlowControlWindow == other.grpcFlowControlWindow &&
           const DeepCollectionEquality().equals(
             mockUserToken,
             other.mockUserToken,
@@ -424,6 +470,7 @@ class FirestoreSettings {
       cacheSettings.hashCode ^
       experimentalForceLongPolling.hashCode ^
       experimentalAutoDetectLongPolling.hashCode ^
+      grpcFlowControlWindow.hashCode ^
       const DeepCollectionEquality().hash(mockUserToken);
 
   @override
@@ -440,6 +487,7 @@ class FirestoreSettings {
             'experimentalAutoDetectLongPolling',
             experimentalAutoDetectLongPolling,
           )
+          ..add('grpcFlowControlWindow', grpcFlowControlWindow)
           ..add('mockUserToken', mockUserToken == null ? null : '<set>'))
         .toString();
   }

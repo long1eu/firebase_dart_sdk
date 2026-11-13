@@ -218,6 +218,7 @@ class Firestore {
       forceLongPolling: firestoreSettings.experimentalForceLongPolling,
       autoDetectLongPolling:
           firestoreSettings.experimentalAutoDetectLongPolling,
+      grpcFlowControlWindow: firestoreSettings.grpcFlowControlWindow,
     );
 
     final TaskScheduler scheduler = TaskScheduler(app.name);

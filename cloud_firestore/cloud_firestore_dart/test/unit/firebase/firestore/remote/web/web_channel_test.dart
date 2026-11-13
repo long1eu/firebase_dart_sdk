@@ -73,6 +73,52 @@ void main() {
       expect(chunks.first, jsonDecode(json));
     });
 
+    test('parses a chunk of megabytes that arrives in small pieces without '
+        'copying it for every piece', () {
+      // 12 documents of 1 MiB in one chunk, delivered in pieces of 4 KiB as
+      // the emulator's responses arrive. Appending every piece to the text
+      // received so far took about 2.4 s here; the pieces are now joined once.
+      final String json = jsonEncode(<Object?>[
+        for (int i = 0; i < 12; i++)
+          <Object?>[
+            i,
+            <Object?>[
+              <String, Object?>{
+                'chunk': String.fromCharCode(0x61 + i) * (1024 * 1024),
+              },
+            ],
+          ],
+      ]);
+      final String body = '${chunk(json)}${chunk('[[12,["noop"]]]')}';
+      final WebChannelChunkParser parser = WebChannelChunkParser();
+      final List<Object?> chunks = <Object?>[];
+      final Stopwatch stopwatch = Stopwatch()..start();
+      for (int i = 0; i < body.length; i += 4096) {
+        chunks.addAll(
+          parser.add(body.substring(i, min(i + 4096, body.length))),
+        );
+        if (i + 4096 < json.length) {
+          expect(chunks, isEmpty);
+          expect(parser.hasPartialChunk, isTrue);
+        }
+      }
+      stopwatch.stop();
+      expect(chunks, hasLength(2));
+      final List<Object?> arrays = chunks.first! as List<Object?>;
+      expect(arrays, hasLength(12));
+      for (int i = 0; i < 12; i++) {
+        final Map<String, Object?> doc =
+            ((arrays[i]! as List<Object?>)[1]! as List<Object?>)[0]!
+                as Map<String, Object?>;
+        expect(
+          doc['chunk'] == String.fromCharCode(0x61 + i) * (1024 * 1024),
+          isTrue,
+        );
+      }
+      expect(parser.hasPartialChunk, isFalse);
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 1)));
+    });
+
     test('rejects a body that is not chunked', () {
       expect(() => WebChannelChunkParser().add('<html>Not Found</html>......'),
           throwsFormatException);

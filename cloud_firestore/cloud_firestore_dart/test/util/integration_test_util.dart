@@ -240,7 +240,9 @@ class IntegrationTestUtil {
       {ConnectivityChangeDetector? connectivityDetector}) async {
     final DatabaseInfo databaseInfo = DatabaseInfo(
         databaseId, persistenceKey, settings.host,
-        port: settings.port, sslEnabled: settings.sslEnabled);
+        port: settings.port,
+        sslEnabled: settings.sslEnabled,
+        grpcFlowControlWindow: settings.grpcFlowControlWindow);
 
     final BehaviorSubject<bool> onNetworkConnected =
         BehaviorSubject<bool>.seeded(true);

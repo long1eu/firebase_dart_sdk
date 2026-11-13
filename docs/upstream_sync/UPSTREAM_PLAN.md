@@ -13,7 +13,7 @@ rewritten; the table here is the current state.
 |---|---|
 | Wave 0: proto resync | done |
 | Wave 1: correctness fixes (applyRemoteEvent, transaction precondition, empty-cache initial snapshot, UTF-8 ordering, pending server timestamp type order, limbo dequeue/throttle, existence-filter mismatch, late credential change, small fixes, listen order, local mutation version NONE) | done as merged waves (core-fixes, remote-fixes, model-fixes, local-mutation-version, chunks123-small); not every sub-row re-verified individually |
-| Wave 2: keepalive, idle timeout, App Check header, `x-goog-request-params` | done (keepalive, 1 minute idle, App Check plumbing; App Check enforcement untestable on the emulator). BatchGetDocuments logical termination and the >4MB read test: not confirmed |
+| Wave 2: keepalive, idle timeout, App Check header, `x-goog-request-params` | done (keepalive, 1 minute idle, App Check plumbing; App Check enforcement untestable on the emulator). BatchGetDocuments logical termination: done (`TransactionClient.lookup` completes once every key is answered, unit tested). Reads of more than 4 MB in one response: integration test `transport_limits_test.dart` (12 documents near 1 MiB, every transport); single documents above 1 MiB need production (`large_document_test.dart`) |
 | Wave 3: `!=` / `not-in`, update_transforms (TransformMutation removed), count/sum/avg, waitForPendingWrites, terminate, snapshotsInSync, transaction backoff and `TransactionOptions`, limitToLast, min/max transforms | done |
 | Wave 4: bundles and named queries, OR queries / multiple inequality filters / Query-Target split, bloom filters, vector values | done |
 | Wave 4: index-free queries (read time on remote documents, upstream 21.3.0) | done (SQLite schema 10; `2f53c69`) |
@@ -44,7 +44,7 @@ A production verification kit exists (`tool/verify_production`, `36f35e3`) and p
 not been run against a real project.
 
 Still open from the original "Open / unverified" list: `0eaca5e` (`useEmulator`) is covered by
-`FirestoreSettings.withEmulator` but not compared line by line; the `grpc` inbound message size question is unanswered.
+`FirestoreSettings.withEmulator` but not compared line by line; the inbound message size question is answered: package:grpc (5.2.0) has no limit on a response message (`GrpcHttpDecoder` allocates what the length prefix says), so the 17 MiB of Android and JS is not needed; it is not enforced either.
 
 ---
 
@@ -139,7 +139,6 @@ Pipelines (about 35 commits), Kotlin/ktx, Android connectivity/SSL/Robolectric, 
 ## Open / unverified
 
 - 6d360f0 (arrays in IN values), 0eaca5e (`useEmulator`), 751684d (inhibitBackoff on connectivity change), 1e44257 and 3d88f62: not checked end to end.
-- Whether `grpc` 4.1.0 really has no inbound message size limit (grep only).
 - Exact release versions for some features (changelog layout ambiguous).
 - Any row an agent marked (unverified) in its analysis file.
 - A few "UNKNOWN" rows in chunk 1 are now resolved: the protos lack NOT_EQUAL/NOT_IN and update_transforms.

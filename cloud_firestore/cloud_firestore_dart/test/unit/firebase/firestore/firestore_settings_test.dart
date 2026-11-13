@@ -239,4 +239,67 @@ void main() {
           isNot(FirestoreSettings()));
     });
   });
+
+  group('grpcFlowControlWindow', () {
+    // Upstream: FirebaseFirestoreSettingsTest (Android) and the settings
+    // validation of the JS SDK.
+    test('defaults to 256 KiB', () {
+      expect(FirestoreSettings.defaultGrpcFlowControlWindow, 262144);
+      expect(FirestoreSettings().grpcFlowControlWindow, 262144);
+    });
+
+    test('can be set, and copies keep it', () {
+      final FirestoreSettings settings = FirestoreSettings(
+        grpcFlowControlWindow: 65535,
+      );
+      expect(settings.grpcFlowControlWindow, 65535);
+      expect(settings.copyWith(host: 'a.b.c').grpcFlowControlWindow, 65535);
+      expect(
+        settings.withEmulator('localhost', 8080).grpcFlowControlWindow,
+        65535,
+      );
+      expect(
+        settings
+            .copyWith(grpcFlowControlWindow: 1024 * 1024)
+            .grpcFlowControlWindow,
+        1024 * 1024,
+      );
+    });
+
+    test('must be a positive integer of at most 2147483647', () {
+      for (final int window in <int>[0, -1, 2147483648]) {
+        expect(
+          () => FirestoreSettings(grpcFlowControlWindow: window),
+          throwsArgumentError,
+          reason: '$window',
+        );
+        expect(
+          () => FirestoreSettings().copyWith(grpcFlowControlWindow: window),
+          throwsArgumentError,
+          reason: '$window',
+        );
+      }
+      expect(
+        FirestoreSettings(grpcFlowControlWindow: 1).grpcFlowControlWindow,
+        1,
+      );
+      expect(
+        FirestoreSettings(
+          grpcFlowControlWindow: 2147483647,
+        ).grpcFlowControlWindow,
+        2147483647,
+      );
+    });
+
+    test('is part of equality', () {
+      expect(
+        FirestoreSettings(grpcFlowControlWindow: 65535),
+        FirestoreSettings(grpcFlowControlWindow: 65535),
+      );
+      expect(
+        FirestoreSettings(grpcFlowControlWindow: 65535),
+        isNot(FirestoreSettings()),
+      );
+    });
+  });
 }

@@ -17,6 +17,8 @@ import 'package:grpc/grpc.dart';
 import 'package:http2/transport.dart';
 import 'package:meta/meta.dart';
 
+import 'flow_control_window.dart';
+
 /// A [ClientTransportConnector] that detects dead connections.
 ///
 /// The Android SDK relies on gRPC's keepalive to tear down a connection that
@@ -47,6 +49,7 @@ class KeepAliveTransportConnector implements ClientTransportConnector {
     required this.pingTimeout,
     this.connectTimeout,
     this.uselessConnectionWindow = const Duration(seconds: 10),
+    this.flowControlWindow = http2DefaultWindowSize,
   });
 
   final String host;
@@ -67,6 +70,9 @@ class KeepAliveTransportConnector implements ClientTransportConnector {
   /// established, and no call was ever started on the previous one: that
   /// connection was lost before it was of any use.
   final Duration uselessConnectionWindow;
+
+  /// The HTTP/2 receive window of the connection and of each stream, in bytes; see [FlowControlWindow].
+  final int flowControlWindow;
 
   Socket? _socket;
   KeepAliveTransportConnection? _connection;
@@ -114,14 +120,45 @@ class KeepAliveTransportConnector implements ClientTransportConnector {
       );
     }
     _socket = socket;
+    final ClientTransportConnection transport = await _openTransport(socket);
     _sinceConnected
       ..reset()
       ..start();
     return _connection = KeepAliveTransportConnection(
-      ClientTransportConnection.viaSocket(socket),
+      transport,
       pingInterval: pingInterval,
       pingTimeout: pingTimeout,
     );
+  }
+
+  /// Starts HTTP/2 on [socket] with the [flowControlWindow]. Another window than the default of HTTP/2 is only
+  /// returned once the server acknowledged it (see [FlowControlWindow]).
+  Future<ClientTransportConnection> _openTransport(Socket socket) async {
+    if (flowControlWindow == http2DefaultWindowSize) {
+      return ClientTransportConnection.viaSocket(socket);
+    }
+    final ClientSettings settings = ClientSettings(
+      streamWindowSize: flowControlWindow,
+    );
+    final FlowControlWindow window = FlowControlWindow(flowControlWindow);
+    final ClientTransportConnection transport =
+        ClientTransportConnection.viaStreams(
+          window.bindIncoming(socket),
+          window.bindOutgoing(socket),
+          settings: settings,
+        );
+    try {
+      await window.settingsAcknowledged.timeout(
+        connectTimeout ?? const Duration(seconds: 20),
+      );
+    } catch (e) {
+      unawaited(transport.terminate().catchError((Object _) {}));
+      socket.destroy();
+      throw SocketException(
+        'The HTTP/2 settings were not acknowledged by $host:$port ($e)',
+      );
+    }
+    return transport;
   }
 
   @override

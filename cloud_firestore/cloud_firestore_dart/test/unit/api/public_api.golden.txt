@@ -275,20 +275,22 @@ class FirestoreErrorCode
   toString(): String
 class FirestoreSettings
   ==(Object other): bool
-  copyWith({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling}): FirestoreSettings
+  copyWith({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling, int grpcFlowControlWindow}): FirestoreSettings
   final cacheSettings: LocalCacheSettings
   final cacheSizeBytes: int
   final experimentalAutoDetectLongPolling: bool
   final experimentalForceLongPolling: bool
+  final grpcFlowControlWindow: int
   final host: String
   final mockUserToken: Object
   final persistenceEnabled: bool
   final port: int
   final sslEnabled: bool
   get hashCode: int
-  new FirestoreSettings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling})
+  new FirestoreSettings({String host, int port, bool sslEnabled, bool persistenceEnabled, int cacheSizeBytes, LocalCacheSettings cacheSettings, bool experimentalForceLongPolling, bool experimentalAutoDetectLongPolling, int grpcFlowControlWindow})
   static final cacheSizeUnlimited: int
   static final defaultCacheSizeBytes: int
+  static final defaultGrpcFlowControlWindow: int
   static final defaultHost: String
   static final defaultPort: int
   static final minimumCacheBytes: int

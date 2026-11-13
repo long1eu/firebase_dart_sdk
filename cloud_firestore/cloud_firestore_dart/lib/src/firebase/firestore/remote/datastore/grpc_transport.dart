@@ -23,6 +23,7 @@ FirestoreTransport createTransport(
       host: databaseInfo.host,
       port: databaseInfo.port,
       sslEnabled: databaseInfo.sslEnabled,
+      flowControlWindow: databaseInfo.grpcFlowControlWindow,
     ),
     optionsProvider,
   );

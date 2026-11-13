@@ -119,6 +119,25 @@ void main() {
       expect(transport().databaseInfo.sslEnabled, isTrue);
     });
 
+    test('passes the flow-control window of the settings', () async {
+      final Firestore firestore = newFirestore(
+        settings: FirestoreSettings(grpcFlowControlWindow: 1024 * 1024),
+      );
+      expect(firestore.settings.grpcFlowControlWindow, 1024 * 1024);
+      await firestore.doc('coll/doc').get();
+      expect(transport().databaseInfo.grpcFlowControlWindow, 1024 * 1024);
+    });
+
+    test('uses a flow-control window of 256 KiB by default', () async {
+      final Firestore firestore = newFirestore();
+      await firestore.doc('coll/doc').get();
+      expect(transport().databaseInfo.grpcFlowControlWindow, 256 * 1024);
+      expect(
+        () => FirestoreSettings(grpcFlowControlWindow: 0),
+        throwsArgumentError,
+      );
+    });
+
     test('addresses a named database', () async {
       final Firestore firestore = newFirestore(databaseName: 'other');
       await firestore.doc('coll/doc').get();

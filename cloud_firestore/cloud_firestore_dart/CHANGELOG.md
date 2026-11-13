@@ -1,3 +1,20 @@
+## Unreleased
+
+- `FirestoreSettings.grpcFlowControlWindow` (also in the settings of Firestore Lite): the
+  HTTP/2 flow-control window of the gRPC transport, 256 KiB by default
+  (`FirestoreSettings.defaultGrpcFlowControlWindow`) as in the Android and JS SDKs. It applies to
+  the connection as a whole and to each request; before, the window was the HTTP/2 default of
+  64 KiB, which limited a large read to 64 KiB per round trip. package:http2 can only set the
+  window of the streams, so the client grows the window of the connection itself and holds back
+  data that package:http2 would refuse while a response is not read. With another window than
+  65535 bytes a new connection waits for the backend to acknowledge it before its first request,
+  and a server that answers with GOAWAY instead fails the connection attempt. Ignored by the web
+  transport.
+- Web transport: a WebChannel response of many megabytes (for example a query or a listener
+  with many large documents) is no longer copied once per network chunk; reading 12 documents
+  of 1 MiB from the emulator went from about 4 s to 0.2 s. The longest accepted chunk is now
+  256 Mi characters (was 64 Mi), enough for a 16 MiB document as JSON.
+
 ## 0.1.0
 
 First release under the new name. This package was published as `cloud_firestore_vm` (last
