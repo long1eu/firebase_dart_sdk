@@ -294,6 +294,35 @@ void main() {
       await pump();
       expect(errors, isEmpty);
     });
+
+    test('shutdown fails the calls in flight with UNAVAILABLE', () async {
+      // As over gRPC. A call whose stream just ended looked like a complete
+      // answer: a lookup with missing documents, a commit with no response.
+      final Future<List<proto.BatchGetDocumentsResponse>> lookup = transport
+          .startCall(
+              FirestoreRpc.batchGetDocuments,
+              Stream<proto.BatchGetDocumentsRequest>.value(
+                  proto.BatchGetDocumentsRequest()
+                    ..database = database
+                    ..documents.add('$database/documents/coll/doc')))
+          .toList();
+      final Future<List<proto.CommitResponse>> commit = transport
+          .startCall(
+              FirestoreRpc.commit,
+              Stream<proto.CommitRequest>.value(
+                  proto.CommitRequest()..database = database))
+          .toList();
+      await http.next();
+      await http.next();
+      final Matcher unavailable = throwsA(isA<GrpcError>()
+          .having((GrpcError e) => e.code, 'code', StatusCode.unavailable));
+      final Future<void> lookupFails = expectLater(lookup, unavailable);
+      final Future<void> commitFails = expectLater(commit, unavailable);
+      await transport.shutdown();
+
+      await lookupFails;
+      await commitFails;
+    });
   });
 
   group('streams', () {

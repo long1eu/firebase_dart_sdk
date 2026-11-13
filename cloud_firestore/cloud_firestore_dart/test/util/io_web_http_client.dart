@@ -12,6 +12,12 @@ class IoWebHttpClient implements WebHttpClient {
   /// Every request that was sent, as `METHOD path`.
   final List<String> log = <String>[];
 
+  /// The WebChannel sessions of this isolate: how many were opened (handshake requests), and how the requests that
+  /// terminate them ended.
+  static int sessionsOpened = 0;
+  static int terminatesAnswered = 0;
+  static int terminatesFailed = 0;
+
   @override
   WebHttpRequest send(String method, Uri url,
       {Map<String, String> headers = const <String, String>{},
@@ -19,7 +25,20 @@ class IoWebHttpClient implements WebHttpClient {
       // Cookies are a browser concept; dart:io sends none either way.
       bool includeCredentials = false}) {
     log.add('$method ${url.path}');
-    return _IoRequest(_client, method, url, headers, body);
+    final _IoRequest request = _IoRequest(_client, method, url, headers, body);
+    if (url.path.endsWith('/channel')) {
+      final Map<String, String> query = url.queryParameters;
+      if (query['TYPE'] == 'terminate') {
+        unawaited(request.response.then(
+            (WebHttpResponse response) => response.statusCode == 200
+                ? terminatesAnswered++
+                : terminatesFailed++,
+            onError: (Object _) => terminatesFailed++));
+      } else if (!query.containsKey('SID')) {
+        sessionsOpened++;
+      }
+    }
+    return request;
   }
 
   @override

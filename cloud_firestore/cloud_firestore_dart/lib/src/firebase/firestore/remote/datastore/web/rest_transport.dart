@@ -160,6 +160,14 @@ class RestTransport implements FirestoreTransport {
     } finally {
       call.finish();
       if (!responses.isClosed) {
+        if (call.shutDown) {
+          // As over gRPC: the end of the stream alone would read as a
+          // complete answer (a lookup without its documents, a commit
+          // without a result).
+          responses.addError(
+            const GrpcError.unavailable('The transport is shut down'),
+          );
+        }
         unawaited(responses.close());
       }
     }
@@ -183,6 +191,7 @@ class RestTransport implements FirestoreTransport {
   Future<void> shutdown() async {
     _shutdown = true;
     for (final _RestCall call in _calls.toList()) {
+      call.shutDown = true;
       await call.cancel();
     }
     _http.close();
@@ -195,6 +204,10 @@ class _RestCall implements Response {
   final Completer<void> _done = Completer<void>();
 
   bool isCancelled = false;
+
+  /// Whether the call was cancelled because the transport shut down, not by
+  /// its caller.
+  bool shutDown = false;
   void Function()? onCancel;
 
   Future<void> get done => _done.future;

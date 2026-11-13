@@ -186,6 +186,14 @@ class WebChannelTransport implements FirestoreTransport {
     } finally {
       call.finish();
       if (!responses.isClosed) {
+        if (call.shutDown) {
+          // As over gRPC: the end of the stream alone would read as a
+          // complete answer (a lookup without its documents, a commit
+          // without a result).
+          responses.addError(
+            const GrpcError.unavailable('The transport is shut down'),
+          );
+        }
         unawaited(responses.close());
       }
     }
@@ -353,6 +361,7 @@ class WebChannelTransport implements FirestoreTransport {
   Future<void> shutdown() async {
     _shutdown = true;
     for (final _WebCall call in _calls.toList()) {
+      call.shutDown = true;
       await call.cancel();
     }
     // The sessions are terminated on the server before the HTTP client goes
@@ -371,6 +380,10 @@ class _WebCall implements Response {
   final Completer<void> _done = Completer<void>();
 
   bool isCancelled = false;
+
+  /// Whether the call was cancelled because the transport shut down, not by
+  /// its caller.
+  bool shutDown = false;
   void Function()? onCancel;
 
   Future<void> get done => _done.future;

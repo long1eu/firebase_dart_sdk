@@ -15,6 +15,19 @@
 //   SCALE_SOAK_LISTENERS  the number of listeners of each client, at least 1 (default 4)
 //   SCALE_SOAK_DOCS       the number of documents the clients share (default 12)
 //   SCALE_SOAK_SEED       the seed of the operations (default: taken from the clock and printed)
+//   SCALE_SOAK_CHAOS      0 to keep the connections intact (no cuts, stalls or black holes; default 1)
+//   SCALE_SOAK_STEP_MS    the longest pause of a client between two operations (default 60, 2000 on the web transports)
+//
+// With FIRESTORE_TEST_TRANSPORT=webchannel (or webchannel-longpolling) the clients use the web transport. Two limits
+// of the emulator (v1.22.0) make the web transports run the same mix of operations at a slower pace:
+//  * it keeps a thread for every WebChannel session it ever had, also after the client terminated it; every stream
+//    start opens one, and 20 clients at the pace of the gRPC runs reach the thread limit of the user (shared with
+//    every other process of the user) within minutes;
+//  * a Listen session that ends while it has targets (a network toggle, a cut, a failed stream; the SDK does not
+//    remove the targets first, as the JS SDK) keeps them on the emulator: every later change is queued for it, and
+//    from 10000 queued messages on each one is logged. Commits slow down with their number until they time out on
+//    their locks. Run the emulator with the WebChannel loggers at SEVERE
+//    (-Djava.util.logging.config.file with `com.google.net.webchannel.level=SEVERE`) to keep the log small.
 //
 // The seed fixes the sequence of operations of each client, not their timing.
 
@@ -33,6 +46,7 @@ import 'package:test/test.dart';
 import '../../../../unit/firebase/firestore/local/mock/database_mock.dart';
 import '../../../../util/chaos_proxy.dart';
 import '../../../../util/integration_test_util.dart';
+import '../../../../util/io_web_http_client.dart';
 import '../../../../util/test_backend.dart';
 import 'chaos_util.dart';
 
@@ -47,6 +61,8 @@ void main() {
     clients: _env('SCALE_SOAK_CLIENTS') ?? 4,
     listeners: max(1, _env('SCALE_SOAK_LISTENERS') ?? 4),
     docs: _env('SCALE_SOAK_DOCS') ?? 12,
+    chaos: _env('SCALE_SOAK_CHAOS') != 0,
+    stepMs: _env('SCALE_SOAK_STEP_MS') ?? (usesWebTransport ? 2000 : 60),
     seed:
         _env('SCALE_SOAK_SEED') ??
         DateTime.now().millisecondsSinceEpoch % 1000000,
@@ -149,6 +165,8 @@ class _SoakConfig {
     required this.clients,
     required this.listeners,
     required this.docs,
+    required this.chaos,
+    required this.stepMs,
     required this.seed,
     required this.collection,
   });
@@ -160,6 +178,8 @@ class _SoakConfig {
         clients: map['clients']! as int,
         listeners: map['listeners']! as int,
         docs: map['docs']! as int,
+        chaos: map['chaos']! as bool,
+        stepMs: map['stepMs']! as int,
         seed: map['seed']! as int,
         collection: map['collection']! as String,
       );
@@ -169,6 +189,12 @@ class _SoakConfig {
   final int clients;
   final int listeners;
   final int docs;
+
+  /// Whether the connections of the clients are cut, stalled and black-holed.
+  final bool chaos;
+
+  /// The longest pause of a client between two operations, in milliseconds.
+  final int stepMs;
   final int seed;
   final String collection;
 
@@ -178,6 +204,8 @@ class _SoakConfig {
     'clients': clients,
     'listeners': listeners,
     'docs': docs,
+    'chaos': chaos,
+    'stepMs': stepMs,
     'seed': seed,
     'collection': collection,
   };
@@ -185,7 +213,9 @@ class _SoakConfig {
   String describeEnv() =>
       'SCALE_SOAK_SECONDS=$seconds '
       'SCALE_SOAK_ISOLATES=$isolates SCALE_SOAK_CLIENTS=$clients '
-      'SCALE_SOAK_LISTENERS=$listeners SCALE_SOAK_DOCS=$docs';
+      'SCALE_SOAK_LISTENERS=$listeners SCALE_SOAK_DOCS=$docs '
+      'SCALE_SOAK_CHAOS=${chaos ? 1 : 0} SCALE_SOAK_STEP_MS=$stepMs '
+      'FIRESTORE_TEST_TRANSPORT=${Platform.environment['FIRESTORE_TEST_TRANSPORT'] ?? ''}';
 
   @override
   String toString() => 'seed=$seed ${describeEnv()}';
@@ -393,7 +423,11 @@ Future<void> _work(
   }
   out.send(<String, Object?>{
     'problems': problems,
-    'stats': 'worker $workerId: ${stats.join('; ')}',
+    'stats':
+        'worker $workerId: ${stats.join('; ')}'
+        '${usesWebTransport ? '; WebChannel sessions opened=${IoWebHttpClient.sessionsOpened} '
+                  'terminated=${IoWebHttpClient.terminatesAnswered} '
+                  'terminate failed=${IoWebHttpClient.terminatesFailed}' : ''}',
     'log': problems.isEmpty
         ? ''
         : log.skip(max(0, log.length - 400)).join('\n'),
@@ -577,7 +611,9 @@ class _Client {
   Future<void> run(DateTime end) async {
     while (DateTime.now().isBefore(end)) {
       await _step();
-      await Future<void>.delayed(Duration(milliseconds: random.nextInt(60)));
+      await Future<void>.delayed(
+        Duration(milliseconds: random.nextInt(config.stepMs)),
+      );
     }
   }
 
@@ -656,7 +692,10 @@ class _Client {
     } else if (roll < 90) {
       await _restart();
     } else {
-      _chaos(random.nextInt(6));
+      final int kind = random.nextInt(6);
+      if (config.chaos) {
+        _chaos(kind);
+      }
     }
   }
 

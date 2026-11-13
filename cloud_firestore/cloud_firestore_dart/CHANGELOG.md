@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Web transport (and Firestore Lite on the web): the calls in flight when the instance is terminated fail with
+  `unavailable`, as over gRPC. Their responses used to just end, so a transaction read failed with "Mismatch in
+  docs returned from document lookup" and a commit with `unimplemented` ("No responses received").
 - Web transport: a WebChannel stream (Listen, Write) sends the headers of the JS SDK's
   WebChannelConnection: the client, `Content-Type: text/plain`, the app id, the credentials and
   the API key. It no longer sends `google-cloud-resource-prefix` or `x-goog-request-params`, which
