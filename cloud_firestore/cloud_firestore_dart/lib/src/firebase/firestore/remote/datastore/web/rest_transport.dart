@@ -34,6 +34,7 @@ class RestTransport implements FirestoreTransport {
       _baseUrl,
       timeout: timeout,
       apiKey: _options.apiKey,
+      forwardCloudWorkstationCredentials: true,
     );
   }
 

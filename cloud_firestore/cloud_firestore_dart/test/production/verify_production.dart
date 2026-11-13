@@ -138,13 +138,16 @@ class RecordingWebHttpClient implements WebHttpClient {
 
   @override
   WebHttpRequest send(String method, Uri url,
-      {Map<String, String> headers = const <String, String>{}, String? body}) {
+      {Map<String, String> headers = const <String, String>{},
+      String? body,
+      bool includeCredentials = false}) {
     final String last = url.pathSegments.isEmpty ? '' : url.pathSegments.last;
     endpoints.add(last);
     if (last == 'channel') {
       channelParameters.addAll(url.queryParameters.keys);
     }
-    return _delegate.send(method, url, headers: headers, body: body);
+    return _delegate.send(method, url,
+        headers: headers, body: body, includeCredentials: includeCredentials);
   }
 
   @override

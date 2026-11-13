@@ -80,6 +80,7 @@ class Datastore {
       credentialsProvider: credentialsProvider,
       appCheckProvider: appCheckProvider,
       apiKey: databaseInfo.apiKey,
+      appId: databaseInfo.appId,
     );
     final FirestoreTransport transport = transportFactory != null
         ? transportFactory(optionsProvider)

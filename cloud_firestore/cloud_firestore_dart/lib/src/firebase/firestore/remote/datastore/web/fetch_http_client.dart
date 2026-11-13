@@ -22,8 +22,15 @@ class FetchHttpClient implements WebHttpClient {
     Uri url, {
     Map<String, String> headers = const <String, String>{},
     String? body,
+    bool includeCredentials = false,
   }) {
-    final _FetchRequest request = _FetchRequest(method, url, headers, body);
+    final _FetchRequest request = _FetchRequest(
+      method,
+      url,
+      headers,
+      body,
+      includeCredentials,
+    );
     _requests.add(request);
     request._done.future.whenComplete(() => _requests.remove(request));
     return request;
@@ -43,8 +50,9 @@ class _FetchRequest implements WebHttpRequest {
     Uri url,
     Map<String, String> headers,
     String? body,
+    bool includeCredentials,
   ) {
-    response = _send(method, url, headers, body);
+    response = _send(method, url, headers, body, includeCredentials);
     // The caller may have stopped listening after an abort.
     response.ignore();
   }
@@ -60,6 +68,7 @@ class _FetchRequest implements WebHttpRequest {
     Uri url,
     Map<String, String> headers,
     String? body,
+    bool includeCredentials,
   ) async {
     final web.Headers requestHeaders = web.Headers();
     headers.forEach((String name, String value) {
@@ -69,8 +78,9 @@ class _FetchRequest implements WebHttpRequest {
       method: method,
       headers: requestHeaders,
       signal: _abort.signal,
-      // No cookies: the session is carried in the URL.
-      credentials: 'omit',
+      // No cookies: the session is carried in the URL. A Cloud Workstations
+      // host needs them, see RestClient.forwardCloudWorkstationCredentials.
+      credentials: includeCredentials ? 'include' : 'omit',
       // A redirect would send the request, with its credentials, to wherever
       // the response says. Firestore never redirects.
       redirect: 'error',

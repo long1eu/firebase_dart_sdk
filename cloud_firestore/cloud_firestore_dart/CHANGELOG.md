@@ -1,5 +1,13 @@
 ## Unreleased
 
+- The app id of the app (`FirebaseOptions.applicationId`) is sent with every request in the
+  `x-firebase-gmpid` header, as the Android SDK (`x-firebase-gmpid`) and the JS SDK
+  (`X-Firebase-GMPID`) do.
+- Web transport: a REST call sends `x-goog-request-params` as the JS SDK's RestConnection does,
+  `project_id=<project>` (with `&database_id=<database>` for a named database), instead of the
+  database name the gRPC transport sends.
+- Firestore Lite on the web sends the browser's cookies with its REST calls to a Cloud Workstations
+  host (`*.cloudworkstations.dev`), as the JS SDK's FetchConnection does; other hosts get none.
 - A listen or write stream that the backend closes with UNAUTHENTICATED invalidates the token
   only if it has been open for less than 10 seconds, as in the Android and JS SDKs; a stream that
   was healthy keeps it. Before, every UNAUTHENTICATED of a stream invalidated the token (unary

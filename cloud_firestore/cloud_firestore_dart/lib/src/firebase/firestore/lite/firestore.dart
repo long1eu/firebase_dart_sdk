@@ -362,6 +362,7 @@ class Firestore {
         sslEnabled: settings.sslEnabled,
         grpcFlowControlWindow: settings.grpcFlowControlWindow,
         apiKey: app.options.apiKey,
+        appId: app.options.applicationId,
       ),
       credentials,
       liteTransportOverride ?? createLiteTransport,

@@ -18,6 +18,7 @@ class DatabaseInfo {
     this.autoDetectLongPolling = true,
     this.grpcFlowControlWindow = FirestoreSettings.defaultGrpcFlowControlWindow,
     this.apiKey,
+    this.appId,
   });
 
   final DatabaseId databaseId;
@@ -40,6 +41,12 @@ class DatabaseInfo {
   /// request as the JS SDK does: in the `x-goog-api-key` header, and as the
   /// `key` query parameter of a REST call. Null (or empty) sends none.
   final String? apiKey;
+
+  /// The app id of the app (`FirebaseOptions.applicationId`), sent with every
+  /// request in the `x-firebase-gmpid` header, as the Android SDK
+  /// (FirebaseClientGrpcMetadataProvider) and the JS SDK (`X-Firebase-GMPID`)
+  /// do. Null (or empty) sends none.
+  final String? appId;
 
   @override
   String toString() {

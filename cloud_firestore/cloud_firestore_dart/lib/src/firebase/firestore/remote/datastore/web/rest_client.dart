@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/rpc_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/web/web_http_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
@@ -16,7 +17,32 @@ class RestClient {
     this._baseUrl, {
     this.timeout = defaultTimeout,
     this.apiKey,
+    this.forwardCloudWorkstationCredentials = false,
   });
+
+  /// Whether a call to a Cloud Workstations host (`*.cloudworkstations.dev`)
+  /// sends the cookies of the browser, which such a host needs to let the
+  /// request through. The JS SDK does this for the REST calls of Firestore
+  /// Lite (`FetchConnection`), not for the full SDK.
+  final bool forwardCloudWorkstationCredentials;
+
+  /// Whether [host] is a Cloud Workstations host, the `isCloudWorkstation()`
+  /// of the JS SDK.
+  static bool isCloudWorkstation(String host) =>
+      host.endsWith('.cloudworkstations.dev');
+
+  /// The value of the `x-goog-request-params` header of a call to [database]
+  /// (`projects/<project>/databases/<database>`), as the JS SDK's
+  /// RestConnection sends it: `project_id=<project>`, followed by
+  /// `&database_id=<database>` for a database other than `(default)`.
+  static String requestParams(String database) {
+    final List<String> segments = database.split('/');
+    final String projectId = Uri.encodeComponent(segments[1]);
+    final String databaseId = segments[3];
+    return databaseId == DatabaseId.defaultDatabaseId
+        ? 'project_id=$projectId'
+        : 'project_id=$projectId&database_id=${Uri.encodeComponent(databaseId)}';
+  }
 
   /// Sent as the `key` query parameter of every call, as the JS SDK does.
   final String? apiKey;
@@ -101,17 +127,21 @@ class RestClient {
     final Uri url = urlFor(rpcName, request);
     final Map<String, Object?> body = Map<String, Object?>.of(request)
       ..remove(_pathFields[rpcName]);
+    final String resource = request[_pathFields[rpcName]]! as String;
 
     final WebHttpRequest call = _http.send(
       'POST',
       url,
       headers: <String, String>{
         ...headers,
+        'x-goog-request-params': requestParams(resource),
         // Not application/json: text/plain keeps the request "simple" for
         // CORS when there are no other custom headers, like the JS SDK does.
         'Content-Type': 'text/plain',
       },
       body: jsonEncode(body),
+      includeCredentials:
+          forwardCloudWorkstationCredentials && isCloudWorkstation(url.host),
     );
     onRequest?.call(call);
 

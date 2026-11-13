@@ -8,12 +8,15 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dar
 
 /// Sends HTTP requests and streams the response bodies.
 abstract class WebHttpClient {
-  /// Starts a request. [body] is sent as UTF-8 text.
+  /// Starts a request. [body] is sent as UTF-8 text. With
+  /// [includeCredentials] the browser sends its cookies for [url] (the fetch
+  /// `credentials: 'include'`), otherwise none.
   WebHttpRequest send(
     String method,
     Uri url, {
     Map<String, String> headers = const <String, String>{},
     String? body,
+    bool includeCredentials = false,
   });
 
   /// Releases the resources of the client.

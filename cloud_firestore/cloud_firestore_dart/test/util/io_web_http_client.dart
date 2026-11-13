@@ -14,7 +14,10 @@ class IoWebHttpClient implements WebHttpClient {
 
   @override
   WebHttpRequest send(String method, Uri url,
-      {Map<String, String> headers = const <String, String>{}, String? body}) {
+      {Map<String, String> headers = const <String, String>{},
+      String? body,
+      // Cookies are a browser concept; dart:io sends none either way.
+      bool includeCredentials = false}) {
     log.add('$method ${url.path}');
     return _IoRequest(_client, method, url, headers, body);
   }

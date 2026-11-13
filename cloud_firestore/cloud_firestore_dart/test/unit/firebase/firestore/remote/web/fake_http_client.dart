@@ -30,8 +30,11 @@ class FakeHttpClient implements WebHttpClient {
 
   @override
   WebHttpRequest send(String method, Uri url,
-      {Map<String, String> headers = const <String, String>{}, String? body}) {
-    final FakeRequest request = FakeRequest(method, url, headers, body);
+      {Map<String, String> headers = const <String, String>{},
+      String? body,
+      bool includeCredentials = false}) {
+    final FakeRequest request = FakeRequest(method, url, headers, body,
+        includeCredentials: includeCredentials);
     requests.add(request);
     if (_waiting.isNotEmpty) {
       _waiting.removeFirst().complete(request);
@@ -46,12 +49,16 @@ class FakeHttpClient implements WebHttpClient {
 }
 
 class FakeRequest implements WebHttpRequest {
-  FakeRequest(this.method, this.url, this.headers, this.body);
+  FakeRequest(this.method, this.url, this.headers, this.body,
+      {this.includeCredentials = false});
 
   final String method;
   final Uri url;
   final Map<String, String> headers;
   final String? body;
+
+  /// Whether the request asked the browser to send its cookies.
+  final bool includeCredentials;
 
   final Completer<WebHttpResponse> _response = Completer<WebHttpResponse>();
   final StreamController<String> _body = StreamController<String>();

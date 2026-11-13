@@ -65,7 +65,9 @@ void main() {
       'https://example.test:8443/v1/projects/p/databases/(default)'
       '/documents:commit',
     );
-    expect(sent.headers['x-goog-request-params'], database);
+    // As the JS SDK's RestConnection; gRPC sends the database name.
+    expect(sent.headers['x-goog-request-params'], 'project_id=p');
+    expect(sent.headers['google-cloud-resource-prefix'], database);
     expect(sent.headers['Content-Type'], 'text/plain');
     final Map<String, Object?> body =
         jsonDecode(sent.body!) as Map<String, Object?>;

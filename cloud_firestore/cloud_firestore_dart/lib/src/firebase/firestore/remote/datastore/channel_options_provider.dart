@@ -19,18 +19,24 @@ class ChannelOptionsProvider {
     required CredentialsProvider credentialsProvider,
     AppCheckTokenProvider? appCheckProvider,
     String? apiKey,
+    String? appId,
   }) : _databaseId = databaseId,
        _credentialsProvider = credentialsProvider,
        _appCheckProvider = appCheckProvider,
-       _apiKey = apiKey;
+       _apiKey = apiKey,
+       _appId = appId;
 
   /// The header of the API key of the app, see [DatabaseInfo.apiKey].
   static const String apiKeyHeader = 'x-goog-api-key';
+
+  /// The header of the app id of the app, see [DatabaseInfo.appId].
+  static const String appIdHeader = 'x-firebase-gmpid';
 
   final DatabaseId _databaseId;
   final CredentialsProvider _credentialsProvider;
   final AppCheckTokenProvider? _appCheckProvider;
   final String? _apiKey;
+  final String? _appId;
 
   /// The API key sent with the requests, or null.
   String? get apiKey {
@@ -54,6 +60,10 @@ class ChannelOptionsProvider {
           final String? key = apiKey;
           if (key != null) {
             map[apiKeyHeader] = key;
+          }
+          final String? appId = _appId;
+          if (appId != null && appId.isNotEmpty) {
+            map[appIdHeader] = appId;
           }
         },
       ],
