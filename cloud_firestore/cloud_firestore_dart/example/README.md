@@ -19,6 +19,8 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart run example/main.dart
 | `bundles.dart` | `loadBundle`, progress, reading bundled documents from the cache, `getNamedQuery`. |
 | `snapshot_json.dart` | `toJson` / `fromJson` on snapshots and references, `querySnapshotsFromJson` to resume a listener. |
 | `offline_persistence.dart` | A SQLite cache on disk: reading and writing offline, syncing when back online. |
+| `two_clients_one_cache.dart` | Two clients on one SQLite cache: a background isolate opens the cache of the main isolate and takes the lease; the main isolate turns secondary (answers from the cache, keeps its write pending) and becomes primary again when the background isolate terminates. See `docs/guides/multiple_clients.md`. |
+| `database_recovery.dart` | Recovery from a cache that is busy for a moment: a `Database` wrapper throws `TransientDatabaseException`; a write fails with `unavailable` and can be tried again, a change from the backend is stored once the cache works again. |
 | `cache_indexes.dart` | Persistent cache indexes: `persistentCacheIndexManager`, automatic index creation, `deleteAllIndexes`. |
 | `sqlite_database_web.dart` | The `OpenDatabase` for browsers: SQLite as WebAssembly with the database in IndexedDB, one tab at a time. Copy it into your app. Not a command-line program. |
 | `sqlite_opfs_worker.dart` | The worker of the OPFS storage of `sqlite_database_web.dart` (experimental). Copy it next to that file and compile it to JavaScript. Not a command-line program. |
@@ -34,6 +36,7 @@ the open gRPC channel keeps the process alive.
 
 In the [repository](https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_firestore/cloud_firestore_dart),
 `test/integration/firebase/firestore/examples_smoke_test.dart` runs all of them against the
-emulator, and checks what `main.dart`, `server.dart`, `offline_persistence.dart` and `lite.dart`
-print. `test/integration_enterprise/examples_enterprise_smoke_test.dart` runs
-`pipelines.dart` against the Enterprise edition emulator.
+emulator, and checks what `main.dart`, `server.dart`, `offline_persistence.dart`,
+`two_clients_one_cache.dart`, `database_recovery.dart` and `lite.dart` print.
+`test/integration_enterprise/examples_enterprise_smoke_test.dart` runs `pipelines.dart` against
+the Enterprise edition emulator.

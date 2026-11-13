@@ -112,3 +112,10 @@ The JS SDK goes further: secondary tabs share the listeners and the writes of th
 through the cache, so every tab is online through one connection. Here the clients share only
 the file and the lease. Until that exists, do not run two active clients on one cache on
 purpose.
+
+## Example
+
+`example/two_clients_one_cache.dart` in the package runs the takeover above: a background
+isolate opens the cache of the main isolate and takes the lease, the main isolate answers from
+the cache and keeps its write pending, and it sends the write once the background isolate
+terminates.

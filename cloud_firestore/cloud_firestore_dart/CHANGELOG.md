@@ -26,6 +26,9 @@
   RESOURCE_EXHAUSTED and the request is aborted. An error body of the back channel is read up to 1 MiB.
 - Web transport: an HTTP 400 without a status in its body maps to FAILED_PRECONDITION as in the JS SDK
   (was INVALID_ARGUMENT).
+- A write whose mutation can not be stored because the cache is busy for a moment (a
+  `TransientDatabaseException`) fails only its future with `unavailable`, as in the JS SDK. Before,
+  the error was also raised as an uncaught error of the zone, which ends a command-line program.
 
 ## 0.1.0
 

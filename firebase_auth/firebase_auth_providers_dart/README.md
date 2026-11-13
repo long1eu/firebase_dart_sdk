@@ -101,7 +101,7 @@ A server uses `app.authProvider = OAuthTokenProvider.serviceAccount(keyJson)` or
   session safely), the Auth emulator, server credentials, and how the providers were tested.
   [All guides](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/README.md).
 - **API reference**: [pub.dev/documentation/firebase_auth_providers_dart](https://pub.dev/documentation/firebase_auth_providers_dart/latest/).
-- **Example**: [`example/main.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/main.dart).
+- **Examples**: [`example/main.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/main.dart) (anonymous sign-in), [`example/account_flows.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_auth/firebase_auth_providers_dart/example/account_flows.dart) (email verification, password reset, account deletion; Auth emulator).
 
 ## Not done
 

@@ -256,3 +256,12 @@ it retry at once instead of waiting for the backoff:
 
 Instances are independent: each `Firestore` has its own scheduler and work queue, and the
 persistence lock is per database, so an instance never waits for another one.
+
+## A cache that is busy for a moment
+
+A `Database` reports an error that may go away on its own (SQLite busy or locked, an I/O error,
+a full disk) as a `TransientDatabaseException`; the example openers do. A write or a listen that
+could not be stored then fails with `unavailable` and can be tried again; a change from the
+backend that could not be stored takes the client offline until the cache works again, with a
+backoff. `example/database_recovery.dart` shows both with a `Database` wrapper that fails a few
+times.

@@ -517,9 +517,20 @@ class FirestoreClient implements RemoteStoreCallback {
   Future<void> write(final List<Mutation> mutations) async {
     _verifyNotShutdown();
 
+    // As firestoreClientWrite in the JS SDK: the caller listens to the future of the write from the start. The sync
+    // engine can fail it while the queued task is still running (a mutation that could not be stored), and awaiting
+    // the task first would leave that error without a listener.
     final Completer<void> source = Completer<void>();
-    await _enqueue<void>(() => syncEngine.writeMutations(mutations, source));
-    await source.future;
+    unawaited(
+      _enqueue<void>(
+        () => syncEngine.writeMutations(mutations, source),
+      ).catchError((Object error, StackTrace stackTrace) {
+        if (!source.isCompleted) {
+          source.completeError(error, stackTrace);
+        }
+      }),
+    );
+    return source.future;
   }
 
   /// Runs an aggregation over [query] on the server. Fails with an

@@ -38,6 +38,8 @@ const Set<String> _expected = <String>{
   'lifecycle.dart',
   'lite.dart',
   'server.dart',
+  'two_clients_one_cache.dart',
+  'database_recovery.dart',
 };
 
 /// Lines an example must print, for the examples the README points new users
@@ -60,6 +62,21 @@ const Map<String, List<String>> _expectedOutput = <String, List<String>>{
     'GET /tasks?done=false -> 200 [{"title":"Ship it","done":false}]',
     'GET /stats -> 200 {"done":1,"open":1}',
     'GET /tasks/missing -> 404 {"error":"no task missing"}',
+  ],
+  'two_clients_one_cache.dart': <String>[
+    'main isolate: wrote online',
+    'background isolate: took the lease and wrote online',
+    'main isolate: secondary, answers from the cache',
+    'main isolate: reads {from: background isolate} from the cache',
+    'main isolate: write acknowledged while secondary: false',
+    'background isolate: terminated',
+    'main isolate: primary again, write acknowledged: true',
+  ],
+  'database_recovery.dart': <String>[
+    'write failed with unavailable, nothing was stored',
+    'write tried again: {step: 2}',
+    'listener: {step: 2}',
+    'listener after 3 failed attempts to store the change: {step: 3}',
   ],
   'offline_persistence.dart': <String>[
     'offline read: {text: written online} (from cache: true)',
