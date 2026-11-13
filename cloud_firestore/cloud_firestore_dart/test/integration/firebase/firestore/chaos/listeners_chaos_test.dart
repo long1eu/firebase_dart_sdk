@@ -64,7 +64,18 @@ void main() {
         }
       }
 
+      // How many rounds disturb an open connection is up to timing: after a cut the client reconnects after its
+      // backoff, which grows while the connection keeps being cut (seconds by round 5 or 6, more on a loaded
+      // machine), and a round that starts during the backoff cuts nothing. So each round waits a little (up to 1 s)
+      // for the client to be connected, but not longer, and only the first round is required to hit a connection
+      // (the listeners are in sync then, so their stream is open). What the test checks is the end state: the
+      // listeners converge on the backend however many rounds hit.
+      final List<int> hits = <int>[];
       for (int round = 0; round < 8; round++) {
+        for (int i = 0; i < 40 && env.proxy.openConnections == 0; i++) {
+          await pause(25);
+        }
+        final int cutsBefore = env.proxy.cuts;
         switch (round % 4) {
           case 0:
             env.proxy.cut();
@@ -83,6 +94,9 @@ void main() {
         await pause(250);
         if (round % 4 == 3) {
           env.proxy.cut();
+        }
+        if (env.proxy.cuts > cutsBefore) {
+          hits.add(round);
         }
         env.proxy.restore();
         await churn(round + 100);
@@ -105,7 +119,10 @@ void main() {
 
       await all.settlesOn(expectedAll, server);
       await even.settlesOn(expectedEven, server);
-      expect(env.proxy.cuts, greaterThanOrEqualTo(2));
+      expect(hits, contains(0),
+          reason: 'the first round cuts the stream of the synced listeners');
+      // ignore: avoid_print
+      print('repeated cuts: the rounds $hits cut an open connection');
       await all.cancel();
       await even.cancel();
     });
