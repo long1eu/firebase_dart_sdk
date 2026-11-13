@@ -201,6 +201,12 @@ Deprecated, still working:
   is retried with a backoff until the cache works again. Before, such an error failed the operation that ran into it
   and could leave the client stuck. Verified with the shared recovery spec tests (simulated failures); not run against
   a real failing disk.
+  An operation that is retried and itself runs into the failing cache again (an acknowledgement that is stored, after
+  which reading the next write fails) no longer runs twice or drops the operation it queued, and the retries back off
+  instead of looping without delay.
+  `TransientDatabaseException.toString()` names the type of its `cause` instead of repeating it: the string of a
+  `SqliteException` holds the statement and its arguments (document contents, paths, user ids), and Firestore puts
+  this exception into the `unavailable` error the app gets and into a warning in its log.
 - Authentication with ready-made token providers from the new `firebase_auth_providers_dart`
   package of this repository (Firebase Auth user sign-in over REST, service accounts, Application
   Default Credentials); see the README section "Authentication". `test/integration_auth` shows a

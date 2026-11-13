@@ -108,12 +108,16 @@ class TransientDatabaseException implements Exception {
   /// What failed.
   final String message;
 
-  /// The original error, if any.
+  /// The original error, if any. Not part of [toString]: Firestore puts this
+  /// exception into the message of the error the app gets and into its log,
+  /// and the string of a binding's error may repeat the statement and its
+  /// arguments (document contents, paths, user ids).
   final Object? cause;
 
   @override
   String toString() =>
-      'TransientDatabaseException: $message${cause == null ? '' : ' ($cause)'}';
+      'TransientDatabaseException: $message'
+      '${cause == null ? '' : ' (${cause.runtimeType})'}';
 }
 
 /// A [Database] that deletes its own storage for `Firestore.clearPersistence`.

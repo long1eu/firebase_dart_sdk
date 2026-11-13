@@ -30,16 +30,26 @@ class RetryableOperationQueue {
 
   bool _stopped = false;
 
+  /// Whether the operation at the head is running. An operation that enqueues another one (directly or through what
+  /// it calls) must not start the head again: it would run twice, and the one it enqueued would be removed in its
+  /// place.
+  bool _running = false;
+
   /// Whether an operation is waiting to be retried.
   bool get hasPendingOperations => _operations.isNotEmpty;
 
   /// Adds [operation] to the queue and tries the operation at its head right away (which is [operation] when nothing
   /// is pending). Completes after that attempt, also when it failed with a recoverable error (the operation is then
   /// retried later).
+  ///
+  /// Called while the operation at the head runs (by that operation), it only adds [operation], which runs after it.
   Future<void> enqueue(Future<void> Function() operation) {
-    return _queue.run<void>(() {
+    return _queue.run<void>(() async {
       _operations.add(operation);
-      return _retryNext();
+      if (_running) {
+        return;
+      }
+      await _retryNext();
     });
   }
 
@@ -51,26 +61,44 @@ class RetryableOperationQueue {
   }
 
   Future<void> _retryNext() async {
-    if (_operations.isEmpty || _stopped) {
+    if (_operations.isEmpty || _stopped || _running) {
       return;
     }
 
+    final Future<void> Function() operation = _operations.first;
+    final int pending = _operations.length;
+    _running = true;
     try {
-      await _operations.first();
-      _operations.removeAt(0);
-      _backoff.reset();
+      await operation();
+      _remove(operation);
+      // An operation that enqueued another one ran into the persistence again (RemoteStore probes the persistence
+      // with a read, restarts the network, and the next write fails): the backoff keeps growing, otherwise a
+      // persistence that reads but does not write would be retried in a loop without delay.
+      if (_operations.length < pending) {
+        _backoff.reset();
+      }
     } catch (error) {
       if (isRecoverablePersistenceError(error)) {
         Log.d(_tag, 'Operation failed with a retryable error: $error');
       } else {
         // Not a reason to wait: the operations behind it run without delay.
-        _operations.removeAt(0);
+        _remove(operation);
         _backoff.reset();
+        _running = false;
         _scheduleRetry();
         rethrow;
       }
+    } finally {
+      _running = false;
     }
     _scheduleRetry();
+  }
+
+  /// Removes [operation] from the head; [stop] may have emptied the list meanwhile.
+  void _remove(Future<void> Function() operation) {
+    if (_operations.isNotEmpty && identical(_operations.first, operation)) {
+      _operations.removeAt(0);
+    }
   }
 
   /// Schedules the next attempt while operations are pending. `backoffAndRun` cancels a retry that is already

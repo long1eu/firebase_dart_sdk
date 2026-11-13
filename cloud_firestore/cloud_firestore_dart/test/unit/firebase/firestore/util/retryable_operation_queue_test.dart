@@ -95,6 +95,61 @@ void main() {
     },
   );
 
+  test(
+    'an operation enqueued by the running operation runs once, after it',
+    () async {
+      // RemoteStore does this: a retried acknowledgement restarts the network, the write pipeline fails to read the
+      // next batch and enqueues a probe of the persistence.
+      final List<String> log = <String>[];
+      await queue.enqueue(() async {
+        log.add('a');
+        await queue.enqueue(() async => log.add('b'));
+        log.add('a done');
+      });
+      await runRetry();
+      expect(log, <String>['a', 'a done', 'b']);
+      expect(queue.hasPendingOperations, isFalse);
+    },
+  );
+
+  test('an operation enqueued by a retried operation is not lost', () async {
+    final List<String> log = <String>[];
+    bool failing = true;
+    await queue.enqueue(() async {
+      log.add('a');
+      if (failing) {
+        throw TransientDatabaseException('busy');
+      }
+      await queue.enqueue(() async => log.add('b'));
+    });
+    await pumpEventQueue();
+    failing = false;
+    await runRetry();
+    // 'b' follows after the reset backoff, which may still be a scheduled task.
+    if (scheduler.getTask(TaskId.asyncQueueRetry) != null) {
+      await runRetry();
+    }
+    expect(log.where((String e) => e == 'b'), hasLength(1));
+    expect(log.last, 'b');
+    expect(queue.hasPendingOperations, isFalse);
+  });
+
+  test('a recovery that leads straight into a new failure backs off', () async {
+    // A persistence that reads but does not write: each probe succeeds, restarts the network, and the next
+    // operation fails and enqueues a new probe. Without a growing backoff this loops without delay.
+    int runs = 0;
+    Future<void> probe() async {
+      runs++;
+      await queue.enqueue(probe);
+    }
+
+    await queue.enqueue(probe);
+    // Real timers: a retry without delay would run again and again while the event queue is pumped.
+    await pumpEventQueue(times: 200);
+    expect(runs, lessThan(5));
+    queue.stop();
+  });
+
   test('throws an error that is not recoverable to the caller', () async {
     await expectLater(
       queue.enqueue(() async => throw StateError('fatal')),

@@ -46,6 +46,29 @@ void main() {
     expect(await database.query('SELECT a FROM t'), hasLength(1));
   });
 
+  test(
+    'the string of a transient error does not repeat the statement or its arguments',
+    () async {
+      // Firestore puts the error into the message of the `unavailable` error the app sees and logs it as a warning;
+      // the arguments hold document contents, paths and user ids.
+      other.execute('BEGIN IMMEDIATE');
+      other.execute('INSERT INTO t VALUES (1)');
+      try {
+        await database.execute('INSERT INTO t VALUES (?)', <Object?>[
+          'private user data',
+        ]);
+        fail('expected a TransientDatabaseException');
+      } on TransientDatabaseException catch (e) {
+        expect(e.cause, isA<sqlite.SqliteException>());
+        expect('$e', isNot(contains('private user data')));
+        expect('$e', isNot(contains('INSERT INTO')));
+        expect('$e', contains('database is locked'));
+      } finally {
+        other.execute('ROLLBACK');
+      }
+    },
+  );
+
   test('other errors are thrown as they are', () async {
     await expectLater(
       database.query('SELECT * FROM missing_table'),
