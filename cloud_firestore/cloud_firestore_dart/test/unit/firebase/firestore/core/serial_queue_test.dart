@@ -106,9 +106,13 @@ void main() {
     },
   );
 
-  // JS SDK test/unit/util/async_queue.test.ts cases whose JS AsyncQueue
-  // semantics differ from SerialQueue. The delayed operation cases are ported
-  // against TaskScheduler in util/task_scheduler_test.dart.
+  // PORTING NOTE: JS SDK test/unit/util/async_queue.test.ts cases whose JS
+  // AsyncQueue semantics differ from SerialQueue. SerialQueue keeps its
+  // inline run of a nested run() call (pending a decision on aligning it with
+  // upstream), so these two stay skipped. The delayed operation cases are
+  // ported against TaskScheduler in util/task_scheduler_test.dart, the
+  // retryable ones against RetryableOperationQueue in
+  // util/retryable_operation_queue_test.dart.
   test(
     'schedules ops in right order',
     skip:
