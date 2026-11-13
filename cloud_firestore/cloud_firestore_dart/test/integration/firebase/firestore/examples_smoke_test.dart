@@ -33,6 +33,7 @@ const Set<String> _expected = <String>{
   'cache_indexes.dart',
   'emulator_mock_user_token.dart',
   'lifecycle.dart',
+  'lite.dart',
 };
 
 void main() {

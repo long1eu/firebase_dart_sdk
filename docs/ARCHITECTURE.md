@@ -37,6 +37,11 @@ Also in the tree:
   as Android `local/DocumentOverlayCache.java` and `local/SQLiteOverlayMigrationManager.java`.
 - **Pipelines** (preview, separate library `lib/pipelines.dart`): `lib/pipeline/`. Server-executed
   only. JS `lite-api/pipeline.ts`, `api/pipeline_impl.ts`, `core/pipeline-util.ts`.
+- **Firestore Lite** (experimental, separate library `lib/lite.dart`): `lib/lite/`. No cache, no
+  listeners: the API classes call `Datastore` directly (`remote/datastore/unary_client.dart`,
+  `TransactionClient`), over gRPC or, on the web, over `remote/datastore/web/rest_transport.dart`
+  (REST without WebChannel). The query builder is a copy of the one in `query.dart`: keep them
+  in step. JS `lite-api/`.
 - **Index engine building blocks**: `lib/index/` (Android `index/FirestoreIndexValueWriter.java`),
   `lib/model/target_index_matcher.dart` (Android `model/TargetIndexMatcher.java`) and the index
   manager `lib/local/sqlite/sqlite_index_manager.dart` (Android `local/IndexManager.java`). The
@@ -60,7 +65,7 @@ the `RemoteStore`, and a task that is already on the queue runs nested calls inl
 |---|---|---|---|
 | Unit | `test/unit` | nothing | `dart test test/unit` (or `./tool/test_all.sh` from the repository root: pub get, analyze, unit tests of both packages) |
 | Spec tests | `test/res/json/*.json`, run by `test/unit/firebase/firestore/spec/` on memory and SQLite persistence | nothing; part of the unit run | `dart test test/unit/firebase/firestore/spec` |
-| API goldens | `test/unit/api/` (`public_api.golden.txt`, `pipelines_api.golden.txt`, README snippets) | nothing | `dart test test/unit/api`; regenerate with `UPDATE_GOLDEN=1` |
+| API goldens | `test/unit/api/` (`public_api.golden.txt`, `pipelines_api.golden.txt`, `lite_api.golden.txt`, README snippets) | nothing | `dart test test/unit/api`; regenerate with `UPDATE_GOLDEN=1` |
 | Integration, standard | `test/integration` | emulator on 127.0.0.1:8080 (`tool/start_emulator.sh`) | `tool/test_integration.sh standard` (repository root), or `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration` |
 | Integration over the web transport | `test/integration`, on the VM | same emulator | `tool/test_integration.sh standard --transport=webchannel` |
 | Enterprise | `test/integration_enterprise` (BSON types, Pipelines, edition differences) | Enterprise edition emulator on 127.0.0.1:8181 (`tool/start_enterprise_emulator.sh`) | `tool/test_integration.sh enterprise`, or `FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181 dart test test/integration_enterprise` |

@@ -52,6 +52,7 @@ part 'base_stream.dart';
 part 'firestore_client.dart';
 part 'pipeline_client.dart';
 part 'transaction_client.dart';
+part 'unary_client.dart';
 part 'vector_query_client.dart';
 part 'watch_stream.dart';
 part 'write_stream.dart';

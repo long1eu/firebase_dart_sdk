@@ -262,6 +262,21 @@ Pipelines (preview):
   returns the documents whose value has the type of the cursor value.
   Pipeline results return BSON values as their value classes.
 
+Firestore Lite (experimental):
+
+- A second entry point, `package:cloud_firestore_dart/lite.dart`: the counterpart of
+  `firebase/firestore/lite` of the JS SDK. A client without local cache, listeners and sync
+  engine, where every call is one request and one response: `ref.get()`, `set` / `update` /
+  `delete`, `collection.add`, write batches, `runTransaction` (also read-only, with queries),
+  queries (`where`, `orderBy`, `limit`, `limitToLast`, cursors, collection groups), `count` /
+  `sum` / `average` aggregations with aliases, converters and `terminate()`. Its classes have the names and the shape of the
+  main library's (`Firestore`, `DocumentReference`, `Query`, ...), without streams, snapshot
+  metadata, `Source` and cache settings; the value types are shared. It uses gRPC on native
+  platforms and REST without WebChannel on the web, with the Auth and App Check tokens of the
+  app and the emulator settings (`withEmulator`, `mockUserToken`). A program that only imports
+  it does not contain the sync engine, the local store or the SQLite layer. The API is
+  experimental and may change. See the README section and `example/lite.dart`.
+
 Networking:
 
 - A built-in connectivity detector on the VM. While a stream is failing, the client watches the

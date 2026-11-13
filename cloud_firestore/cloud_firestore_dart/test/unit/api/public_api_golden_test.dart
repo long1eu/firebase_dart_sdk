@@ -14,6 +14,9 @@ import 'dart:io';
 import 'dart:mirrors';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+// Loaded so that the lite library can be found by the mirror system.
+// ignore: unused_import
+import 'package:cloud_firestore_dart/lite.dart' as lite;
 // Loaded so that the pipelines library can be found by the mirror system.
 // ignore: unused_import
 import 'package:cloud_firestore_dart/pipelines.dart';
@@ -226,5 +229,20 @@ void main() {
         reason: 'The pipelines API changed. If intended, regenerate with '
             'UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart '
             'and review the diff of test/unit/api/pipelines_api.golden.txt.');
+  });
+
+  test('exported Firestore Lite API matches the golden listing', () {
+    final File golden = File('test/unit/api/lite_api.golden.txt');
+    final String actual = describePublicApi(#cloud_firestore_dart.lite);
+    if (Platform.environment['UPDATE_GOLDEN'] == '1') {
+      golden.writeAsStringSync(actual);
+      return;
+    }
+    expect(golden.existsSync(), isTrue,
+        reason: 'Missing golden file. Run with UPDATE_GOLDEN=1.');
+    expect(actual, golden.readAsStringSync(),
+        reason: 'The Firestore Lite API changed. If intended, regenerate with '
+            'UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart '
+            'and review the diff of test/unit/api/lite_api.golden.txt.');
   });
 }

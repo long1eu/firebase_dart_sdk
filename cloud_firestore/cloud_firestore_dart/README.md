@@ -89,6 +89,8 @@ listen and write streams, over `fetch`. What to know:
   `Decimal128Value`, `BsonObjectId`, `BsonTimestamp`, `RegexValue` and `Blob.bsonBinary`.
 - Pipelines (**preview**, Enterprise edition databases, server only): see
   [Pipelines](#pipelines-preview).
+- Firestore Lite (**experimental**): a second entry point without cache, listeners and sync
+  engine, where every call is one request. See [Firestore Lite](#firestore-lite-experimental).
 - Transactions with `TransactionOptions(maxAttempts)` and retry with exponential backoff,
   read-only transactions (`TransactionOptions(readOnly: true)`); write batches.
 - Field transforms: server timestamp, increment, `FieldValue.maximum` / `minimum`, array union
@@ -372,6 +374,94 @@ print(written.results.single.get('documents_modified'));
 To run the pipeline tests in `test/integration_enterprise`, start the Enterprise edition emulator
 (`tool/start_enterprise_emulator.sh`) and set `FIRESTORE_ENTERPRISE_EMULATOR_HOST` (host:port);
 without it the tests are skipped.
+
+## Firestore Lite (experimental)
+
+`package:cloud_firestore_dart/lite.dart` is a second entry point: a client without a local cache,
+without listeners and without the sync engine, the counterpart of `firebase/firestore/lite` of
+the JS SDK. Every call is one request to the backend and one response. The API is
+**experimental** and may change in any release.
+
+```dart lite
+import 'package:cloud_firestore_dart/lite.dart';
+
+// Synchronous: there is no cache to open. Nothing is sent until the first call.
+final Firestore firestore = Firestore.instanceFor(app: app);
+
+final CollectionReference<Map<String, Object?>> cities = firestore.collection('cities');
+await cities.doc('SF').set({'name': 'San Francisco', 'population': 808000});
+await cities.doc('SF').update({'visits': FieldValue.increment(1)});
+
+final DocumentSnapshot<Map<String, Object?>> sf = await cities.doc('SF').get();
+print(sf.data);
+
+final QuerySnapshot<Map<String, Object?>> largest = await cities
+    .where('population', isGreaterThan: 100000)
+    .orderBy('population')
+    .limitToLast(2)
+    .get();
+print(largest.docs.map((doc) => doc.id).toList());
+
+final AggregateQuerySnapshot totals = await cities.aggregateWithAliases({
+  'cities': AggregateField.count(),
+  'people': AggregateField.sum('population'),
+}).get();
+print(totals.data());
+
+await firestore.runTransaction<void>((Transaction transaction) async {
+  final DocumentSnapshot<Map<String, Object?>> city = await transaction.get(cities.doc('SF'));
+  transaction.update(cities.doc('SF'), {'population': (city.get('population')! as int) + 1});
+});
+
+await firestore.terminate();
+```
+
+Import it *instead of* `cloud_firestore_dart.dart`. Both libraries declare `Firestore`,
+`DocumentReference`, `CollectionReference`, `Query`, the snapshot classes, `WriteBatch`,
+`Transaction`, `FirestoreDataConverter` and `FirestoreSettings` (use an import prefix to have
+both in one file); the lite classes have the same members with the same names, minus everything
+that needs a cache. The value types (`Timestamp`, `GeoPoint`, `Blob`, `VectorValue`, the BSON
+classes, `FieldValue`, `FieldPath`, `Filter`, `SetOptions`, `AggregateField`,
+`TransactionOptions`, `FirestoreError`) are the same classes in both. `example/lite.dart` is a
+runnable program.
+
+- **What it has:** `ref.get()`, `set` / `update` / `updateFromList` / `delete`,
+  `collection.add`, `firestore.batch()`, `runTransaction` (with `TransactionOptions`; read-only
+  transactions with `Transaction.getQuery` and `getAggregate`), queries
+  with `where` (named arguments or `Filter`), `orderBy`, `limit`, `limitToLast`, cursors and
+  collection groups, `count()` / `aggregate` / `aggregateWithAliases`, `withConverter`,
+  `DocumentReference.toJson` / `fromJson`, `terminate()`, the emulator settings with
+  `mockUserToken`, Firebase Auth and App Check tokens of the `FirebaseApp`.
+- **What it does not have:** snapshot streams, `Source`, snapshot metadata
+  (`hasPendingWrites`, `isFromCache`), persistence and cache settings, bundles, offline
+  behaviour of any kind, vector queries (`findNearest`), pipelines, and the
+  `whereEqualTo(...)`-style query methods (use `where`).
+- **Writes are not queued or retried:** a write completes when the backend has applied it and
+  fails with the error of the backend (for example `unavailable` without a connection). Only
+  transactions are retried, as in the main library.
+- **`limitToLast`** sends the query with its orderings flipped and reverses the result, as the
+  JS SDK does.
+- **Transport:** gRPC on native platforms, and REST over `fetch` on the web (no WebChannel).
+- **`terminate()`** lets the calls in flight finish, then closes the connection; later calls
+  fail with `failedPrecondition`. On native platforms a program has to terminate its instances
+  to exit, like with the main library.
+
+Differences from the main library that are not just missing features:
+`Firestore.instanceFor` is synchronous; `FirestoreDataConverter.fromFirestore` takes only the
+snapshot (a `QueryDocumentSnapshot`, there are no snapshot options); `DocumentReference.parent`
+keeps the converter of the reference, as in the JS SDK; `firestore.doc('')` throws; two
+`AggregateQuerySnapshot`s are equal when they hold the same results under the same names, in
+any order.
+
+**Size.** A program that only imports `lite.dart` does not contain the sync engine, the local
+store, the SQLite layer or WebChannel. A small web application (writes, a read, a query, an
+aggregation, a batch and a transaction) compiled with `dart compile js -O2` came to 415 kB of
+JavaScript (127 kB gzipped) with the lite library and to 640 kB (194 kB gzipped) with the main
+library and a memory cache (Dart 3.12, measured once, not tracked by a test). The code of this
+package in it is 128 kB and 294 kB; most of the rest is the Dart runtime and `package:protobuf`.
+The compiler's `--dump-info` output for the lite build lists no code from
+`src/firebase/firestore/local/`, the sync engine, the views, the event manager, the remote
+store or the WebChannel transport.
 
 ## Transactions
 

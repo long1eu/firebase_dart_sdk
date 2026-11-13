@@ -14,6 +14,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_value.dart'
     as firestore;
 import 'package:cloud_firestore_dart/src/firebase/firestore/geo_point.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/keyed_document_reference.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/max_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/min_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
@@ -399,6 +400,15 @@ class UserDataConverter {
         );
       }
       return ReferenceValue.valueOf(databaseId, ref.key);
+    } else if (input is KeyedDocumentReference) {
+      final DatabaseId otherDb = input.databaseId;
+      if (otherDb != databaseId) {
+        throw context.createError(
+          'Document reference is for database ${otherDb.projectId}/${otherDb.databaseId} but '
+          'should be for database ${databaseId.projectId}/${databaseId.databaseId}',
+        );
+      }
+      return ReferenceValue.valueOf(databaseId, input.key);
     } else {
       throw context.createError('Unsupported type: ${input.runtimeType}');
     }
