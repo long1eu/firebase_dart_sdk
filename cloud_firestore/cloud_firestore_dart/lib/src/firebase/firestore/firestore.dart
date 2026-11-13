@@ -304,10 +304,10 @@ class Firestore {
   /// transaction has changed, the [updateFunction] will be retried. If it fails
   /// to commit after 5 attempts, the transaction will fail.
   ///
-  /// The maximum number of writes allowed in a single transaction is 500, but
-  /// note that each usage of [FieldValue.serverTimestamp],
-  /// [FieldValue.arrayUnion], [FieldValue.arrayRemove], or
-  /// [FieldValue.increment] inside a transaction counts as an additional write.
+  /// There is no limit on the number of writes in a transaction, but its
+  /// commit request must not exceed the maximum API request size of 10 MiB,
+  /// and a single document takes at most 500 field transforms (such as
+  /// [FieldValue.serverTimestamp] or [FieldValue.increment]).
   ///
   /// [updateFunction] the function to execute within the transaction context.
   /// [options] customizes the execution, for example the maximum number of
@@ -340,10 +340,10 @@ class Firestore {
   /// Creates a write batch, used for performing multiple writes as a single
   /// atomic operation.
   ///
-  /// The maximum number of writes allowed in a single batch is 500, but note
-  /// that each usage of [FieldValue.serverTimestamp], [FieldValue.arrayUnion],
-  /// [FieldValue.arrayRemove], or [FieldValue.increment] inside a transaction
-  /// counts as an additional write.
+  /// There is no limit on the number of writes in a batch, but its commit
+  /// request must not exceed the maximum API request size of 10 MiB, and a
+  /// single document takes at most 500 field transforms (such as
+  /// [FieldValue.serverTimestamp] or [FieldValue.increment]).
   ///
   /// Returns the created [WriteBatch] object.
   WriteBatch batch() {

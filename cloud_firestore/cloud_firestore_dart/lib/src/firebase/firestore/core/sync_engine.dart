@@ -780,10 +780,6 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
       }
       await _pumpEnqueuedLimboResolutions();
     } else {
-      hardAssertLazy(
-        _queriesByTarget.containsKey(targetId),
-        () => 'Unknown target: $targetId',
-      );
       await _localStore.releaseTarget(
         targetId,
         keepPersistedTargetData: !_isPrimary,
