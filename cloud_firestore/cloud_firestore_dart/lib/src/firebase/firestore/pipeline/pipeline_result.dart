@@ -25,6 +25,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serial
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:meta/meta.dart';
+import 'package:protobuf/protobuf.dart' show InvalidProtocolBufferException;
 
 /// One row produced by a pipeline.
 ///
@@ -196,7 +197,15 @@ class PipelineExplainStats {
     if (!typeUrl.endsWith('/google.protobuf.StringValue')) {
       return null;
     }
-    return proto.StringValue.fromBuffer(value).value;
+    try {
+      return proto.StringValue.fromBuffer(value).value;
+    } on InvalidProtocolBufferException {
+      return null;
+    } on ArgumentError {
+      // protobuf 6.1.0 reports some malformed lengths with a RangeError or an
+      // ArgumentError instead (see parseStoredProto).
+      return null;
+    }
   }
 
   @override

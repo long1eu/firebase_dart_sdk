@@ -209,7 +209,11 @@ class _Scope {
             '${_unsupportedReasons[function.name] ?? ''}',
           );
         }
-        return implementation(_Call(this, function));
+        try {
+          return implementation(_Call(this, function));
+        } on _MissingArgument {
+          return EvaluateResult.error;
+        }
       case pb.Value_ValueType.variableReferenceValue:
         final EvaluateResult? variable =
             variables[expression.variableReferenceValue];
@@ -266,6 +270,13 @@ class _Scope {
   }
 }
 
+/// Thrown by [_Call.arg] for an argument that the call does not have: the
+/// call evaluates to an error. An error value for the argument alone would be
+/// wrong, since `is_error()` or `if_error(x)` would turn it into a result.
+class _MissingArgument implements Exception {
+  const _MissingArgument();
+}
+
 /// One call of a function: its arguments, not evaluated yet.
 class _Call {
   _Call(this.scope, this._function);
@@ -279,8 +290,15 @@ class _Call {
 
   int get length => _function.args.length;
 
-  /// Evaluates the argument at [index].
-  EvaluateResult arg(int index) => scope.eval(_function.args[index]);
+  /// Evaluates the argument at [index]. A call without that argument is an
+  /// error as a whole (see [_MissingArgument]), as a call with a wrong number
+  /// of arguments is everywhere else.
+  EvaluateResult arg(int index) {
+    if (index >= length) {
+      throw const _MissingArgument();
+    }
+    return scope.eval(_function.args[index]);
+  }
 
   /// Evaluates all the arguments, in order.
   List<EvaluateResult> evalAll() => <EvaluateResult>[
@@ -290,6 +308,9 @@ class _Call {
   /// The argument at [index] when it is a string literal, as the names of
   /// units and types have to be.
   String? literal(int index) {
+    if (index >= length) {
+      return null;
+    }
     final pb.Value arg = args[index];
     return arg.whichValueType() == pb.Value_ValueType.stringValue
         ? arg.stringValue
