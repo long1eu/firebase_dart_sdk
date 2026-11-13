@@ -34,8 +34,8 @@ class FirebaseApp with _PlatformDependenciesMixin {
     // The const constructor of [FirebaseOptions] only checks this with an
     // assert, which a release build skips.
     if (options.applicationId.isEmpty) {
-      throw ArgumentError.value(options.applicationId,
-          'options.applicationId', 'ApplicationId must be set.');
+      throw ArgumentError.value(options.applicationId, 'options.applicationId',
+          'ApplicationId must be set.');
     }
     Preconditions.checkState(!_instances.containsKey(normalizedName),
         'FirebaseApp name $normalizedName already exists!');
