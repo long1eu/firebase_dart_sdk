@@ -35,7 +35,7 @@ const Map<String, String?> skippedSpecFeatures = <String, String?>{
       'Needs the primary lease (multi-client stage 1) and SharedClientState with SyncEngine.applyPrimaryState (stage 2).',
   // Upstream Android skips the tag; the port runs these specs. The single-client ones pass (the bloom filter one and
   // the three "Fix #8474" limbo ones, after porting the JS fix to WatchChangeAggregator), except those caught by a
-  // more precise entry below: 'fail-database' (the recovery specs) and 'watch-stream-no-backoff'.
+  // more precise entry below: 'fail-database' (the recovery specs).
   'no-android': null,
   // Upstream runs them only with RUN_BENCHMARK_TESTS; they pass here and take about 3 s for both persistences.
   'benchmark': null,
@@ -57,10 +57,6 @@ const Map<String, String?> skippedSpecFeatures = <String, String?>{
       'Persistence failure recovery (the JS IndexedDbTransactionError handling) is not ported, like Android; see '
       'docs/ARCHITECTURE.md, "Deliberate deviations from upstream" > Persistence. The runner would also need a '
       'failDatabase step over a fault-injecting persistence.',
-  'watch-stream-no-backoff':
-      'watchStreamClose with runBackoffTimer: false. Runner limitation, not a library one: the mock watch stream '
-      '(mock_datastore.dart) restarts synchronously without the backoff timer, as on Android, so a stream left '
-      'closed in backoff can not be expressed. See docs/ARCHITECTURE.md, "Tests".',
   'clear-persistence':
       'clearPersistence step shuts down other clients of a shared persistence; the only spec is multi-client.',
   'write-ack-transform-results': null,
@@ -207,11 +203,6 @@ Set<String> detectSpecFeatures(Map<String, dynamic> testJson) {
     }
     if (step.containsKey('clearPersistence')) {
       features.add('clear-persistence');
-    }
-    if ((step['watchStreamClose']
-            as Map<String, dynamic>?)?['runBackoffTimer'] ==
-        false) {
-      features.add('watch-stream-no-backoff');
     }
     if ((step['writeAck'] as Map<String, dynamic>?)?.containsKey(
           'transformResults',

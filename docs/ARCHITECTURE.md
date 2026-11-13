@@ -93,11 +93,12 @@ the `RemoteStore`, and a task that is already on the queue runs nested calls inl
 The spec tests are the shared, data-driven tests of the official SDKs: the JSON is generated
 from the JS SDK sources (`test/unit/specs/*.test.ts`) and describes sequences of user actions,
 watch events and expected snapshots. `spec/spec_skip_list.dart` names every spec that does not
-run and why (for example multi-client specs). Two kinds of skips there are limits of the test
-harness, not of the library: the mock watch stream restarts at once after an error, without the
-backoff timer (as Android's), so a spec that leaves the stream closed in backoff
-(`watchStreamClose` with `runBackoffTimer: false`) can not run; and there is no `failDatabase`
-step (see the persistence recovery row below).
+run and why (for example multi-client specs). One kind of skip there is a limit of the test
+harness, not of the library: there is no `failDatabase` step (see the persistence recovery row
+below). The mock watch stream (`test/unit/firebase/firestore/remote/mock_datastore.dart`) goes
+through a backoff timer (`TaskId.listenStreamConnectionBackoff`) after an error, as the JS mock
+connection does; the runner fires it on `watchStreamClose` with `runBackoffTimer: true` and
+before a listen, and otherwise leaves it pending.
 
 Rules that the suite relies on: do not weaken or remove assertions; a skip needs a reason
 string; tests that need a backend are skipped with a reason when its environment variable is

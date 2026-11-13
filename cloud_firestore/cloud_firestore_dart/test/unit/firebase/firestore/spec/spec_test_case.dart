@@ -616,6 +616,12 @@ class SpecClient implements RemoteStoreCallback {
           .add(remoteTargetId);
     }
 
+    // Skip the backoff that a previous `watchStreamClose` may have left
+    // pending (JS doListen).
+    if (_datastore.isWatchStreamInBackoff) {
+      _datastore.runWatchStreamBackoff();
+    }
+
     await Future<void>.delayed(_delayDuration);
   }
 
@@ -871,16 +877,19 @@ class SpecClient implements RemoteStoreCallback {
   Future<void> _doWatchStreamClose(Map<String, dynamic> spec) async {
     final Map<String, dynamic> error = spec['error'];
 
-    final bool runBackoffTimer = spec['runBackoffTimer'];
-    expect(runBackoffTimer, isTrue);
+    final bool runBackoffTimer = spec['runBackoffTimer'] ?? false;
 
     final GrpcError status = GrpcError.custom(error['code'], error['message']);
     _datastore.failWatchStream(status);
     // Let the stream close event be delivered to the remote store.
     await Future<void>.delayed(_delayDuration);
-    // Unlike web, stream should re-open synchronously (if we have active
-    // listeners).
-    if (_queryListeners.isNotEmpty) {
+    // The watch stream re-opens through its backoff timer if there are active
+    // listeners (JS doWatchStreamClose); without runBackoffTimer it stays in
+    // backoff. Only the backoff timer runs: with JS's real backoff delays it is
+    // the first timer due, the mock's never elapses on its own.
+    if (runBackoffTimer && _queryListeners.isNotEmpty) {
+      _datastore.runWatchStreamBackoff();
+      await Future<void>.delayed(_delayDuration);
       assert(_datastore.isWatchStreamOpen, 'Watch stream is open');
     }
   }

@@ -130,6 +130,14 @@ class MockDatastore extends Datastore {
 
   /// Helper method to expose stream state to verify in tests.
   bool get isWatchStreamOpen => _watchStream.isOpen;
+
+  /// Whether the watch stream waits for its backoff timer
+  /// ([TaskId.listenStreamConnectionBackoff]) before it opens again.
+  bool get isWatchStreamInBackoff => _watchStream._backoffTask != null;
+
+  /// Runs the pending backoff timer of the watch stream, and only that one
+  /// (other timers, such as the online state timeout, stay pending).
+  void runWatchStreamBackoff() => _watchStream._runBackoff();
 }
 
 class _MockWatchStream extends WatchStream {
@@ -148,34 +156,76 @@ class _MockWatchStream extends WatchStream {
 
   bool _open = false;
 
+  /// Set by [failStream]: like a real stream in its error state, the next
+  /// [start] goes through the backoff instead of opening at once.
+  bool _failed = false;
+
+  /// The pending backoff timer of a [start] after a failure. It is scheduled
+  /// on the [TaskScheduler] under [TaskId.listenStreamConnectionBackoff] and
+  /// only runs when the test runs it ([MockDatastore.runWatchStreamBackoff], or
+  /// `runUntil`), as the JS spec runner does with
+  /// `runAllDelayedOperationsUntil`; so a spec can leave the stream
+  /// closed in backoff (`watchStreamClose` with `runBackoffTimer: false`).
+  TimerTask? _backoffTask;
+
+  /// Long enough never to elapse during a test: only the runner fires it.
+  static const Duration _backoffDelay = Duration(days: 1);
+
   /// Tracks the currently active watch targets as sent over the watch stream.
   final Map<int, QueryData> _activeTargets = <int, QueryData>{};
-
-  @override
-  void inhibitBackoff() {
-    _datastore.watchStreamInhibitBackoffCount++;
-    super.inhibitBackoff();
-  }
 
   @override
   // ignore: must_call_super
   Future<void> start() async {
     hardAssert(!_open, 'Trying to start already started watch stream');
+    hardAssert(_backoffTask == null, 'Watch stream is already in backoff');
+    if (_failed) {
+      _failed = false;
+      _backoffTask = _datastore._scheduler.add(
+        TaskId.listenStreamConnectionBackoff,
+        _backoffDelay,
+        _openAfterBackoff,
+      );
+      return;
+    }
     _open = true;
 
     addEvent(const OpenEvent());
   }
 
+  void _openAfterBackoff() {
+    _backoffTask = null;
+    _open = true;
+    addEvent(const OpenEvent());
+  }
+
+  void _runBackoff() {
+    final TimerTask? task = _backoffTask;
+    hardAssert(task != null, 'The watch stream is not in backoff');
+    task!.cancel();
+    _openAfterBackoff();
+  }
+
   @override
   Future<void> stop() async {
     await super.stop();
+    _backoffTask?.cancel();
+    _backoffTask = null;
     _activeTargets.clear();
     _open = false;
   }
 
   @override
+  void inhibitBackoff() {
+    _datastore.watchStreamInhibitBackoffCount++;
+    _failed = false;
+    super.inhibitBackoff();
+  }
+
+  @override
   bool get isStarted {
-    return _open;
+    // A stream waiting for its backoff counts as started, as in [BaseStream].
+    return _open || _backoffTask != null;
   }
 
   @override
@@ -205,9 +255,13 @@ class _MockWatchStream extends WatchStream {
     _activeTargets.remove(targetId);
   }
 
-  /// Injects a stream failure as though it had come from the backend.
+  /// Injects a stream failure as though it had come from the backend. As the
+  /// JS mock connection, the targets of the closed stream are forgotten: the
+  /// remote store sends them again when the stream opens again.
   void failStream(GrpcError status) {
     _open = false;
+    _failed = true;
+    _activeTargets.clear();
     addEvent(CloseEvent(status));
   }
 
