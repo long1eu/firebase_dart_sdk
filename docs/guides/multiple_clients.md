@@ -59,10 +59,18 @@ runs garbage collection and the index backfill. A client that is not primary (a 
 
 - reports itself offline: snapshots have `metadata.isFromCache == true`;
 - answers its listeners and its `get()` calls from the cache, as it does while offline;
-- keeps its own writes pending: they are in the cache, and their futures do not complete while
-  it is secondary;
+- keeps its own writes pending: they are in the cache, the primary does not send them (it could
+  not tell the secondary their result), and their futures do not complete while it is secondary;
 - becomes primary again, and goes online, when the client that took the lease terminates or
-  disables its network.
+  disables its network; it then sends its pending writes, and their futures complete.
+
+The primary does send the writes of a client that is gone: one that terminated, or that has not
+refreshed its metadata (a live client does so every 4 seconds) for 60 seconds because it crashed,
+its app was killed or it was hot restarted, and writes stored by a version before this one. So a
+write is never stranded for long: after a crash, the relaunched app sends it within about a
+minute. The other side of this: a client that stalls for more than 60 seconds (a paused isolate,
+an app in the background) can have a write sent by the primary, and that client is then not
+told the result, so its future for that write does not complete.
 
 Clients do not see each other's listeners. The listeners of a secondary are not updated with the
 changes the primary receives from the backend; a later read of the secondary sees what the

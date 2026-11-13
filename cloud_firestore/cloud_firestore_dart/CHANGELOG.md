@@ -4,6 +4,14 @@
   JSON number `-0`, which `jsonDecode` reads as the int 0; the responses of REST and WebChannel are now decoded
   keeping the sign, as `JSON.parse` does in the JS SDK. (The emulator writes `-0.0`, so its tests did not show
   it.) Empty bytes were not affected.
+- Two clients on one SQLite cache: the primary client no longer sends the pending writes of the other client. It
+  sent them, but the other client was never told the result, so its `set()` and `waitForPendingWrites()` futures
+  never completed. Each write now records the client that made it (SQLite schema version 18), and the primary sends
+  only its own writes, the writes of a client that is gone (it terminated, or did not refresh its metadata, which a
+  live client does every 4 s, for 60 s: it crashed or its app was killed) and the writes stored before this version.
+  The other client sends its writes, and its futures complete, once it is primary itself. A client that stalls for
+  more than 60 s (a paused isolate, an app in the background) can still have a write sent by the primary without
+  being told the result.
 - The switch of a SQLite cache to write-ahead logging is tried again a few times (within 1.5 s) when
   another connection opening the same file at that moment makes it fail with `database is locked`;
   if it still fails, that is logged at debug level instead of as a warning, and the next open
@@ -624,7 +632,9 @@ Documentation and tests:
   the network, applies remote events and acknowledgements, collects garbage and backfills indexes. A client that
   opens a cache another live client holds takes the lease and logs a warning (as after a hot restart); the other
   client then reports offline, serves its listeners and gets from the cache and keeps its writes pending, until it
-  becomes primary again (when the new client terminates or disables its network). A lone client is always primary.
+  becomes primary again (when the new client terminates or disables its network). (In this version the primary
+  sent the pending writes of the other client, whose futures then never completed; fixed in the next version, see
+  Unreleased.) A lone client is always primary.
 - `clearPersistence()` with another live client on the cache empties the cache in place instead of deleting the
   file under that client; the other client fails with `failedPrecondition` at its next use and terminates.
 - `clearPersistence()` deletes the `-journal`, `-wal` and `-shm` files before the database file, tries all of them,

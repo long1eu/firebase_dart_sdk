@@ -64,7 +64,9 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<int> getHighestUnacknowledgedBatchId() async {
+  Future<int> getHighestUnacknowledgedBatchId({
+    bool skipOtherClients = false,
+  }) async {
     return _queue.isEmpty ? MutationBatch.unknown : _nextBatchId - 1;
   }
 
@@ -153,7 +155,10 @@ class MemoryMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<MutationBatch?> getNextMutationBatchAfterBatchId(int batchId) async {
+  Future<MutationBatch?> getNextMutationBatchAfterBatchId(
+    int batchId, {
+    bool skipOtherClients = false,
+  }) async {
     final int nextBatchId = batchId + 1;
 
     // The requested batchId may still be out of range so normalize it to the start of the queue.

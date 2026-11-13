@@ -55,7 +55,19 @@ class SQLiteClientMetadata {
   static const int maxPrimaryEligibleAgeMs = 5000;
 
   /// How often a client writes its metadata and refreshes or tries to take the lease.
-  static const Duration refreshInterval = Duration(milliseconds: 4000);
+  static const Duration refreshInterval = Duration(
+    milliseconds: _refreshIntervalMs,
+  );
+
+  static const int _refreshIntervalMs = 4000;
+
+  /// How long a client may go without refreshing its metadata before the primary client sends the mutation batches it
+  /// wrote: 15 refresh intervals (60 s). Until the clients share the state of their batches, a client that is alive
+  /// sends its own batches (see `SQLiteMutationQueue`); one that crashed, or whose app was killed, must not keep them
+  /// waiting for long (it may never come back, or come back only as a new client after a restart). A client stalled
+  /// for longer (a paused isolate, an app in the background) can have its batch sent by the primary without learning
+  /// the result. Separate from [maxClientAgeMs], after which the row of a client is removed.
+  static const int maxBatchOwnerAgeMs = 15 * _refreshIntervalMs;
 
   static const String _tag = 'PrimaryLease';
 

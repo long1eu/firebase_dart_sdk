@@ -87,7 +87,11 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
        _limboDocumentRefs = ReferenceSet(),
        _mutationUserCallbacks = <User, Map<int, Completer<void>>>{},
        _pendingWritesCallbacks = <int, List<Completer<void>>>{},
-       _targetIdGenerator = TargetIdGenerator.forSyncEngine();
+       _targetIdGenerator = TargetIdGenerator.forSyncEngine() {
+    // A client whose state is not shared with the other clients of its cache does not send their batches: they would
+    // never learn the result (see LocalStore.sendsOtherClientsBatches).
+    _localStore.sendsOtherClientsBatches = _sharedClientState.sharesState;
+  }
 
   static const String _tag = 'SyncEngine';
 
@@ -880,8 +884,8 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
 
     final int largestPendingBatchId;
     try {
-      largestPendingBatchId = await _localStore
-          .getHighestUnacknowledgedBatchId();
+      // The batches that this client sends: it is told when they are acknowledged.
+      largestPendingBatchId = await _localStore.getHighestBatchIdToSend();
     } catch (e) {
       if (!isRecoverablePersistenceError(e)) {
         rethrow;

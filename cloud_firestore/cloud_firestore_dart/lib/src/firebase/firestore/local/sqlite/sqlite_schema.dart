@@ -16,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 17;
+  static const int version = 18;
 
   /// The batch size for data migrations on a large table. This is chosen to balance the memory usage of the rows read
   /// with the number of round trips.
@@ -139,6 +139,13 @@ class SQLiteSchema {
     // it (see `_DocumentTypeBackfiller`).
     if (fromVersion < 17 && toVersion >= 17) {
       await _addDocumentType();
+    }
+
+    // Migration 18 has no counterpart in the other SDKs: the id of the client that wrote each mutation batch. Until the
+    // clients of a cache share the state of their batches, the primary client only sends its own batches and those of
+    // clients that are gone (see SQLiteMutationQueue). Existing rows keep a null client id: anyone sends them.
+    if (fromVersion < 18 && toVersion >= 18) {
+      await _addMutationClientId();
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -678,6 +685,12 @@ class SQLiteSchema {
       await db.execute(
         'ALTER TABLE remote_documents ADD COLUMN document_type INTEGER',
       );
+    }
+  }
+
+  Future<void> _addMutationClientId() async {
+    if (!(await _tableContainsColumn('mutations', 'client_id'))) {
+      await db.execute('ALTER TABLE mutations ADD COLUMN client_id TEXT');
     }
   }
 

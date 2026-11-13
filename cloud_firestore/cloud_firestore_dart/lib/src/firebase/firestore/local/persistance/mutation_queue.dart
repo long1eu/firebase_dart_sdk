@@ -25,7 +25,10 @@ abstract class MutationQueue {
 
   /// Returns the highest batch id in the queue, i.e. of the newest batch that is not yet acknowledged or rejected, or
   /// [MutationBatch.unknown] if the queue is empty.
-  Future<int> getHighestUnacknowledgedBatchId();
+  ///
+  /// With [skipOtherClients] the batches that another client of a shared cache wrote and still owns are left out (see
+  /// [getNextMutationBatchAfterBatchId]).
+  Future<int> getHighestUnacknowledgedBatchId({bool skipOtherClients = false});
 
   /// Acknowledges the given [batch].
   Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken);
@@ -59,7 +62,14 @@ abstract class MutationQueue {
   /// mutation in the queue.
   ///
   /// Returns the next [Mutation] or null if there wasn't one.
-  Future<MutationBatch?> getNextMutationBatchAfterBatchId(int batchId);
+  ///
+  /// With [skipOtherClients] the batches that another client of a shared cache wrote are skipped while that client is
+  /// alive: this client does not send them, because it can not tell their owner the result (the clients do not share
+  /// the state of their batches yet). Only a cache that several clients use has such batches.
+  Future<MutationBatch?> getNextMutationBatchAfterBatchId(
+    int batchId, {
+    bool skipOtherClients = false,
+  });
 
   /// Returns all mutation batches in the mutation queue.
   ///

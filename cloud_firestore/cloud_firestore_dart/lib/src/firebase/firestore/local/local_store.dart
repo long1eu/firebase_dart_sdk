@@ -856,14 +856,31 @@ class LocalStore implements BundleCallback {
   /// [afterBatchId] The batch to search after, or -1 for the first mutation in the queue.
   ///
   /// Returns the next mutation or null if there wasn't one.
+  ///
+  /// Skips the batches of the other live clients of a shared cache unless [sendsOtherClientsBatches].
   Future<MutationBatch?> getNextMutationBatch(int afterBatchId) {
-    return _mutationQueue.getNextMutationBatchAfterBatchId(afterBatchId);
+    return _mutationQueue.getNextMutationBatchAfterBatchId(
+      afterBatchId,
+      skipOtherClients: !sendsOtherClientsBatches,
+    );
   }
+
+  /// Whether this client sends the batches that other clients of a shared cache wrote: only when the clients share
+  /// the state of their batches, so that the client that wrote one learns its result. Set by the sync engine.
+  bool sendsOtherClientsBatches = false;
 
   /// Returns the highest batch id of the current user's mutation queue (the newest batch that was not yet acknowledged
   /// or rejected), or [MutationBatch.unknown] if there are no pending writes.
   Future<int> getHighestUnacknowledgedBatchId() {
     return _mutationQueue.getHighestUnacknowledgedBatchId();
+  }
+
+  /// Like [getHighestUnacknowledgedBatchId], among the batches that this client sends (see [getNextMutationBatch]): the
+  /// batch whose acknowledgement completes `waitForPendingWrites`.
+  Future<int> getHighestBatchIdToSend() {
+    return _mutationQueue.getHighestUnacknowledgedBatchId(
+      skipOtherClients: !sendsOtherClientsBatches,
+    );
   }
 
   /// Returns the current value of a document with a given key, or null if not found.

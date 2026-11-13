@@ -143,18 +143,41 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<int> getHighestUnacknowledgedBatchId() async {
+  Future<int> getHighestUnacknowledgedBatchId({
+    bool skipOtherClients = false,
+  }) async {
     final List<Map<String, dynamic>> result = await db.query(
-      // @formatter:off
-      '''
-          SELECT IFNULL(MAX(batch_id), ?) AS highest
-          FROM mutations
-          WHERE uid = ?;
-        ''',
-      // @formatter:on
-      <Object?>[MutationBatch.unknown, uid],
+      'SELECT IFNULL(MAX(batch_id), ?) AS highest FROM mutations WHERE uid = ?'
+      '${skipOtherClients ? ' AND $_sendableByThisClient' : ''}',
+      <Object?>[
+        MutationBatch.unknown,
+        uid,
+        if (skipOtherClients) ..._sendableByThisClientArguments(),
+      ],
     );
     return result.first['highest'] as int;
+  }
+
+  /// The condition on a row of `mutations` that this client sends the batch: the batch has no owner (written before
+  /// schema 18), this client wrote it, or its owner is gone (it has no row in `clients` that it refreshed within
+  /// [SQLiteClientMetadata.maxBatchOwnerAgeMs]; a client that terminates removes its row at once).
+  ///
+  /// PORTING NOTE: the JS SDK sends the batches of all clients from the primary and tells the client that wrote one its
+  /// result through the shared client state. The clients of a SQLite cache do not share that state yet, so the client
+  /// that wrote a batch would never learn its result: it keeps its batches until it is primary itself.
+  static const String _sendableByThisClient =
+      '(client_id IS NULL OR client_id = ? OR NOT EXISTS ('
+      'SELECT 1 FROM clients WHERE clients.client_id = mutations.client_id '
+      'AND clients.update_time_ms >= ? AND clients.update_time_ms <= ?))';
+
+  List<Object?> _sendableByThisClientArguments() {
+    final SQLiteClientMetadata metadata = db.clientMetadata;
+    final int now = metadata._clock();
+    return <Object?>[
+      metadata.clientId,
+      now - SQLiteClientMetadata.maxBatchOwnerAgeMs,
+      now,
+    ];
   }
 
   @override
@@ -208,11 +231,16 @@ class SQLiteMutationQueue implements MutationQueue {
     await db.execute(
       // @formatter:off
       '''
-          INSERT INTO mutations (uid, batch_id, mutations)
-          VALUES (?, ?, ?);
+          INSERT INTO mutations (uid, batch_id, mutations, client_id)
+          VALUES (?, ?, ?, ?);
         ''',
       // @formatter:on
-      <dynamic>[uid, batchId, proto.writeToBuffer()],
+      <dynamic>[
+        uid,
+        batchId,
+        proto.writeToBuffer(),
+        db.clientMetadata.clientId,
+      ],
     );
 
     // PORTING NOTE: Unlike LevelDB, these entries must be unique. Since [user]
@@ -266,22 +294,22 @@ class SQLiteMutationQueue implements MutationQueue {
   }
 
   @override
-  Future<MutationBatch?> getNextMutationBatchAfterBatchId(int batchId) async {
+  Future<MutationBatch?> getNextMutationBatchAfterBatchId(
+    int batchId, {
+    bool skipOtherClients = false,
+  }) async {
     _statsCollector.recordRowsRead(MutationQueue.statsTag, 1);
     final int nextBatchId = batchId + 1;
 
     final List<Map<String, dynamic>> result = await db.query(
-      // @formatter:off
-      '''
-          SELECT mutations
-          FROM mutations
-          WHERE uid = ?
-            AND batch_id >= ?
-          ORDER BY batch_id ASC
-          LIMIT 1;
-        ''',
-      // @formatter:on
-      <dynamic>[uid, nextBatchId],
+      'SELECT mutations FROM mutations WHERE uid = ? AND batch_id >= ?'
+      '${skipOtherClients ? ' AND $_sendableByThisClient' : ''} '
+      'ORDER BY batch_id ASC LIMIT 1',
+      <Object?>[
+        uid,
+        nextBatchId,
+        if (skipOtherClients) ..._sendableByThisClientArguments(),
+      ],
     );
 
     if (result.isNotEmpty) {

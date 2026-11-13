@@ -279,8 +279,11 @@ class _CountingMutationQueue implements MutationQueue {
   Future<bool> isEmpty() => _subject.isEmpty();
 
   @override
-  Future<int> getHighestUnacknowledgedBatchId() =>
-      _subject.getHighestUnacknowledgedBatchId();
+  Future<int> getHighestUnacknowledgedBatchId({
+    bool skipOtherClients = false,
+  }) => _subject.getHighestUnacknowledgedBatchId(
+    skipOtherClients: skipOtherClients,
+  );
 
   @override
   Future<void> acknowledgeBatch(MutationBatch batch, Uint8List streamToken) =>
@@ -305,8 +308,13 @@ class _CountingMutationQueue implements MutationQueue {
       _subject.lookupMutationBatch(batchId);
 
   @override
-  Future<MutationBatch?> getNextMutationBatchAfterBatchId(int batchId) =>
-      _subject.getNextMutationBatchAfterBatchId(batchId);
+  Future<MutationBatch?> getNextMutationBatchAfterBatchId(
+    int batchId, {
+    bool skipOtherClients = false,
+  }) => _subject.getNextMutationBatchAfterBatchId(
+    batchId,
+    skipOtherClients: skipOtherClients,
+  );
 
   @override
   Future<List<MutationBatch>> getAllMutationBatches() async {
