@@ -12,6 +12,7 @@ library;
 import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
@@ -167,15 +168,53 @@ class WriterResult {
   final List<int> sequenceNumbers;
 }
 
+/// Makes writer isolates start every round together: a writer asks with [arrive] and waits until all [parties] have
+/// arrived at the same round. A writer can then not run ahead of the others, so the ids of every round of every
+/// writer come from a database that the others changed since the writer's previous round.
+class RoundBarrier {
+  RoundBarrier(this.parties) {
+    _port.listen((Object? message) {
+      final List<Object?> arrival = message! as List<Object?>;
+      final int round = arrival[0]! as int;
+      final List<SendPort> waiting = _waiting.putIfAbsent(
+        round,
+        () => <SendPort>[],
+      )..add(arrival[1]! as SendPort);
+      if (waiting.length == parties) {
+        _waiting.remove(round);
+        for (final SendPort writer in waiting) {
+          writer.send(null);
+        }
+      }
+    });
+  }
+
+  final int parties;
+  final ReceivePort _port = ReceivePort();
+  final Map<int, List<SendPort>> _waiting = <int, List<SendPort>>{};
+
+  /// Passed to the writer isolates.
+  SendPort get sendPort => _port.sendPort;
+
+  void close() => _port.close();
+
+  /// Called in a writer isolate: completes when every writer has arrived at [round].
+  static Future<void> arrive(SendPort barrier, int round) async {
+    final ReceivePort reply = ReceivePort();
+    barrier.send(<Object?>[round, reply.sendPort]);
+    await reply.first;
+  }
+}
+
 /// Opens the cache [name] in a new isolate and allocates [rounds] targets of its own, one shared target per round,
-/// and writes [rounds] batches. With [openAt] the cache is opened at that moment, otherwise at once and the writes
-/// start at [startAt]: isolates take different times to start, and the writers are meant to overlap.
+/// and writes [rounds] batches. With [openAt] the cache is opened at that moment. With [barrier] (a
+/// [RoundBarrier.sendPort]) every round starts when all writers have arrived at it.
 Future<WriterResult> runWriter(
   String name,
   int writer,
   int rounds, {
   DateTime? openAt,
-  DateTime? startAt,
+  SendPort? barrier,
 }) {
   return Isolate.run(() async {
     Future<void> until(DateTime? time) async {
@@ -189,19 +228,23 @@ Future<WriterResult> runWriter(
 
     await until(openAt);
     final Client client = await Client.open(name);
-    await until(startAt);
     final List<int> targetIds = <int>[];
     final List<int> batchIds = <int>[];
     final List<int> sequenceNumbers = <int>[];
     for (int i = 0; i < rounds; i++) {
+      if (barrier != null) {
+        await RoundBarrier.arrive(barrier, i);
+      }
       final QueryData own = await client.listen('writer$writer-$i');
       targetIds.add(own.targetId);
       sequenceNumbers.add(own.sequenceNumber);
       await client.listen('shared-$i');
       batchIds.add(await client.write('writes/writer$writer-$i'));
-      // Let the other isolates in. A connection that waits for the lock sleeps between its attempts (SQLite's busy
-      // handler), so a writer that takes the lock again at once keeps the others out.
-      await Future<void>.delayed(const Duration(milliseconds: 2));
+      if (barrier == null) {
+        // Let the other isolates in. A connection that waits for the lock sleeps between its attempts (SQLite's
+        // busy handler), so a writer that takes the lock again at once keeps the others out.
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+      }
     }
     await client.persistence.shutdown();
     return WriterResult(targetIds, batchIds, sequenceNumbers);
@@ -576,15 +619,14 @@ void main() {
       final Client first = await open();
       await first.persistence.shutdown();
 
+      // Every round starts in all writers together, whatever the scheduler does: in each round every writer
+      // allocates and writes with ids it remembered from before the other writers' last round.
+      final RoundBarrier barrier = RoundBarrier(writers);
+      addTearDown(barrier.close);
       final List<WriterResult> results =
           await Future.wait(<Future<WriterResult>>[
             for (int writer = 0; writer < writers; writer++)
-              runWriter(
-                name,
-                writer,
-                rounds,
-                startAt: DateTime.now().add(const Duration(seconds: 1)),
-              ),
+              runWriter(name, writer, rounds, barrier: barrier.sendPort),
           ]);
 
       final List<int> targetIds = <int>[
@@ -630,7 +672,21 @@ void main() {
         )).single.values.single,
         'ok',
       );
-      // The clients did interleave: no writer got a contiguous block of ids.
+      // The barrier made the writers interleave: the batches of a round all come after those of the round before,
+      // so no writer got a contiguous block of ids.
+      for (int round = 1; round < rounds; round++) {
+        final Iterable<int> before = results.map(
+          (WriterResult result) => result.batchIds[round - 1],
+        );
+        final Iterable<int> now = results.map(
+          (WriterResult result) => result.batchIds[round],
+        );
+        expect(
+          now.reduce(min),
+          greaterThan(before.reduce(max)),
+          reason: 'round $round: ${results.map((r) => r.batchIds)}',
+        );
+      }
       for (final WriterResult result in results) {
         expect(
           result.batchIds.last - result.batchIds.first,
