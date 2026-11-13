@@ -15,6 +15,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/event_manager.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query_stream.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/serial_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/sync_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/decimal128_value.dart';
@@ -28,6 +29,9 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_co
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/shared_client_state.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/shared_client_state_storage.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/client_metadata_refresher.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -51,6 +55,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart'
     as asserts;
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/retryable_operation_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto;
@@ -85,8 +90,8 @@ class UnsupportedSpecFeature implements Exception {
   String toString() => 'UnsupportedSpecFeature: $message';
 }
 
-/// Runs one spec test. Like `runSpec` of the JS spec_test_runner, it owns one [SpecClient] per `clientIndex` (client 0
-/// is created up front, the others when a step first addresses them) and the state the clients share:
+/// Runs one spec test. Like `runSpec` of the JS spec_test_runner, it owns one [SpecClient] per `clientIndex` (created
+/// when a step first addresses it) and the state the clients share:
 /// - the persistence: every SQLite client opens its own [SQLitePersistence] on the same database file, a memory
 ///   persistence is one instance used by all clients;
 /// - the writes the user made, which the backend acknowledges or rejects in order whichever client sends them (the JS
@@ -99,10 +104,26 @@ class SpecTestCase {
   /// [getPersistence] creates the persistence layer. [useEagerGc] is the value of the spec's `useEagerGCForMemory`
   /// config entry, [name] is a name that is unique per spec test and stable across restarts of that spec test (SQLite
   /// uses it as the database name, so all clients of a spec share the file).
-  SpecTestCase(this.getPersistence);
+  ///
+  /// [getSharedPersistence] creates the persistence of a client of a multi-client spec: the client [clientId] of the
+  /// SQLite database [name], with a primary lease that uses [clock]. Without it the multi-client specs use
+  /// [getPersistence] (memory persistence, which does not support them).
+  SpecTestCase(this.getPersistence, {this.getSharedPersistence});
 
   final Future<Persistence> Function(bool useEagerGc, String name)
       getPersistence;
+
+  final Future<Persistence> Function(
+    String name,
+    ClientId clientId,
+    int Function() clock,
+  )? getSharedPersistence;
+
+  /// The clock of the primary lease of the clients of a multi-client spec. It does not move: no lease expires during
+  /// a spec, the clients give the lease up (shutdown, network, visibility) or a step takes it (applyClientState).
+  final int _now = DateTime.now().millisecondsSinceEpoch;
+
+  int _clock() => _now;
 
   String? currentName;
 
@@ -114,6 +135,14 @@ class SpecTestCase {
 
   /// The clients, by `clientIndex`; null for an index no step addressed yet.
   final List<SpecClient?> _clients = <SpecClient?>[];
+
+  /// The storage of the shared client state of a multi-client spec (the JS `SharedFakeWebStorage`).
+  final InMemorySharedClientStateStorage _sharedStorage =
+      InMemorySharedClientStateStorage();
+
+  /// Whether the clients share their state through [_sharedStorage]: in a multi-client spec. A single-client spec
+  /// uses a [MemorySharedClientState].
+  bool get _isMultiClient => (_config['numClients'] ?? 1) > 1;
 
   /// The writes sent to the [SyncEngine] of any client but not yet acknowledged or rejected by the backend, per user
   /// (see [SpecClient._outstandingWrites]).
@@ -130,14 +159,19 @@ class SpecTestCase {
       <SQLitePersistence>[];
 
   /// Returns the persistence for a client that starts (or restarts).
-  Future<Persistence> _acquirePersistence(bool useEagerGc) async {
+  Future<Persistence> _acquirePersistence(
+    bool useEagerGc,
+    ClientId clientId,
+  ) async {
     final Persistence? shared = _sharedPersistence;
     if (shared != null) {
       _sharedPersistenceHolders++;
       return shared;
     }
-    final Persistence persistence =
-        await getPersistence(useEagerGc, currentName ?? 'init');
+    final Persistence persistence = _isMultiClient &&
+            getSharedPersistence != null
+        ? await getSharedPersistence!(currentName ?? 'init', clientId, _clock)
+        : await getPersistence(useEagerGc, currentName ?? 'init');
     if (persistence is SQLitePersistence) {
       _openSQLitePersistences.add(persistence);
     } else {
@@ -186,7 +220,8 @@ class SpecTestCase {
     Map<String, dynamic> config,
   ) async {
     _config = config;
-    await _client(0);
+    // Like the JS runner, a client is created when a step first addresses it: in a multi-client spec the first client
+    // to start takes the primary lease.
     try {
       for (int i = 0; i < steps.length; ++i) {
         final Map<String, dynamic> step = steps[i];
@@ -352,6 +387,9 @@ class SpecClient implements RemoteStoreCallback {
     await Future<void>.delayed(_delayDuration);
     // A client that a `shutdown` step shut down has released everything already.
     if (!_isShutdown) {
+      _metadataRefresher?.stop();
+      _retryQueue.stop();
+      _sharedClientState.shutdown();
       await _remoteStore.shutdown();
       await _spec._releasePersistence(_localPersistence);
     }
@@ -362,7 +400,7 @@ class SpecClient implements RemoteStoreCallback {
   Future<void> _initClient([bool isRestart = false]) async {
     log('    Set up a new client $clientIndex.');
 
-    _localPersistence = await _spec._acquirePersistence(_useEagerGc);
+    _localPersistence = await _spec._acquirePersistence(_useEagerGc, _clientId);
 
     final LocalStore localStore = LocalStore(_localPersistence, _currentUser);
     _localStore = localStore;
@@ -382,15 +420,123 @@ class SpecClient implements RemoteStoreCallback {
       onNetworkConnected,
       _queue,
     );
+    _retryQueue = RetryableOperationQueue(_queue, _sharedStateQueue);
+    final SharedClientState sharedClientState = _sharedClientState =
+        _spec._isMultiClient
+        ? StorageSharedClientState(
+            _spec._sharedStorage.connect(),
+            _enqueueRetryable,
+            'spec',
+            _clientId,
+            _currentUser,
+          )
+        : MemorySharedClientState();
     _syncEngine = SyncEngine(
       localStore,
       _remoteStore,
       _currentUser,
       maxConcurrentLimboResolutions: _maxConcurrentLimboResolutions,
+      sharedClientState: sharedClientState,
+      // A client of a shared cache is primary once the lease says so (as in the JS SDK).
+      startAsPrimary: !_spec._isMultiClient,
     );
+    sharedClientState
+      ..syncEngine = _syncEngine
+      ..onlineStateHandler = (OnlineState onlineState) => unawaited(
+        _syncEngine.applyOnlineStateChange(
+          onlineState,
+          OnlineStateSource.sharedClientState,
+        ),
+      );
     _eventManager = EventManager(_syncEngine);
     await localStore.start();
+    await sharedClientState.start();
+
+    // The lease decides which client is primary (`setPrimaryStateListener` in the JS
+    // `MultiTabOfflineComponentProvider`). The listener is called right away, and later from inside transactions: the
+    // change is applied after the task that is running. It is applied before the remote store starts, so that a
+    // secondary client never opens a stream.
+    _localPersistence.setPrimaryStateListener((bool isPrimary) {
+      // Retried while it fails with a recoverable persistence error (the JS `enqueueRetryable`).
+      unawaited(
+        _enqueueSharedStateEvent(
+          () => _retryQueue.enqueue(
+            () => _syncEngine.applyPrimaryState(isPrimary),
+          ),
+          later: true,
+        ),
+      );
+    });
+    await _drainSharedStateEvents();
     await _remoteStore.start();
+
+    final SQLitePersistence? persistence = _sharedSQLitePersistence;
+    if (persistence != null) {
+      // The `ClientMetadataRefresh` timer: the lease is refreshed, taken or given up when it fires.
+      _metadataRefresher = ClientMetadataRefresher(
+        _queue,
+        run: () => _enqueueSharedStateEvent(persistence.refreshClientMetadata),
+      )..start();
+    }
+  }
+
+  /// The persistence of a client of a multi-client spec, which has a primary lease.
+  SQLitePersistence? get _sharedSQLitePersistence {
+    final Persistence persistence = _localPersistence;
+    return _spec._isMultiClient && persistence is SQLitePersistence
+        ? persistence
+        : null;
+  }
+
+  ClientMetadataRefresher? _metadataRefresher;
+
+  /// The id of this client in the shared client state.
+  ClientId get _clientId => 'client$clientIndex';
+
+  late SharedClientState _sharedClientState;
+
+  /// Applies the changes of the other clients one after the other (the JS `AsyncQueue` of the client).
+  final SerialQueue _sharedStateQueue = SerialQueue();
+  int _pendingSharedStateEvents = 0;
+
+  ///
+  /// With [later] the operation runs after the task that is running, also when called from it.
+  /// Applies a change of another client, retrying it on the `async_queue_retry` timer while it fails with a
+  /// recoverable persistence error (the JS `AsyncQueue.enqueueRetryable` of `WebStorageSharedClientState`). Waiting for
+  /// it waits for its first attempt only, as the JS `drain` does not run delayed retries.
+  Future<void> _enqueueRetryable(Future<void> Function() operation) {
+    _pendingSharedStateEvents++;
+    return _retryQueue.enqueue(operation).whenComplete(() {
+      _pendingSharedStateEvents--;
+    });
+  }
+
+  late RetryableOperationQueue _retryQueue;
+
+  Future<void> _enqueueSharedStateEvent(
+    Future<void> Function() operation, {
+    bool later = false,
+  }) {
+    _pendingSharedStateEvents++;
+    final Future<void> Function<T>(Future<T> Function()) run = later
+        ? _sharedStateQueue.runLater
+        : _sharedStateQueue.run;
+    return run<void>(() async {
+      try {
+        await operation();
+      } finally {
+        _pendingSharedStateEvents--;
+      }
+    });
+  }
+
+  /// Waits until the changes of the other clients are applied, including the ones that applying them caused (the JS
+  /// `AsyncQueue.drain`).
+  Future<void> _drainSharedStateEvents() async {
+    while (_pendingSharedStateEvents > 0) {
+      await _sharedStateQueue.run<void>(() async {});
+      await Future<void>.delayed(_delayDuration);
+    }
   }
 
   @override
@@ -975,9 +1121,8 @@ class SpecClient implements RemoteStoreCallback {
         }
         break;
       case 'client_metadata_refresh':
-        throw UnsupportedSpecFeature(
-          'runTimer client_metadata_refresh needs the primary lease (multi-client stage 1)',
-        );
+        taskId = TaskId.clientMetadataRefresh;
+        break;
       default:
         throw asserts.fail(
           'runTimer spec step specified unknown timer: $timer',
@@ -994,13 +1139,51 @@ class SpecClient implements RemoteStoreCallback {
     // Make sure to execute all writes that are currently queued. This allows us to assert on the total number of
     // requests sent before shutdown.
     await _remoteStore.fillWritePipeline();
+    _setPersistenceNetworkEnabled(false);
     await _remoteStore.disableNetwork();
     await Future<void>.delayed(_delayDuration);
   }
 
   Future<void> _doEnableNetwork() async {
     _networkEnabled = true;
+    _setPersistenceNetworkEnabled(true);
     await _remoteStore.enableNetwork();
+  }
+
+  /// A client without network gives the primary lease to a client with network (the JS
+  /// `IndexedDbPersistence.setNetworkEnabled`, which refreshes the lease on the queue of the client).
+  void _setPersistenceNetworkEnabled(bool enabled) {
+    final SQLitePersistence? persistence = _sharedSQLitePersistence;
+    if (persistence != null) {
+      unawaited(
+        _enqueueSharedStateEvent(() => persistence.setNetworkEnabled(enabled)),
+      );
+    }
+  }
+
+  /// The `applyClientState` step: the visibility of the client (an application in the foreground is preferred as the
+  /// primary client) and taking the primary lease (the lease is cleared and this client refreshes its metadata).
+  Future<void> _doApplyClientState(Map<String, dynamic> state) async {
+    final SQLitePersistence? persistence = _sharedSQLitePersistence;
+    if (persistence == null) {
+      throw UnsupportedSpecFeature(
+        'applyClientState needs a persistence with a primary lease',
+      );
+    }
+    final String? visibility = state['visibility'];
+    if (visibility != null) {
+      // The JS persistence refreshes its metadata on a visibility change.
+      persistence.clientMetadata.inForeground = visibility == 'visible';
+      unawaited(_enqueueSharedStateEvent(persistence.refreshClientMetadata));
+    }
+    if (state['primary'] == true) {
+      // `clearCurrentPrimaryLease` of the JS runner, then the refresh timer of this client.
+      await _enqueueSharedStateEvent(
+        () => persistence.execute('DELETE FROM primary_client'),
+      );
+      _queue.runUntil(TaskId.clientMetadataRefresh);
+      await Future<void>.delayed(_delayDuration);
+    }
   }
 
   Future<void> _doChangeUser(String? uid) async {
@@ -1020,6 +1203,9 @@ class SpecClient implements RemoteStoreCallback {
     _sdkToRemoteTargetIds.clear();
     _currentRemoteTargetIndex = null;
 
+    _metadataRefresher?.stop();
+    _retryQueue.stop();
+    _sharedClientState.shutdown();
     await Future.wait(<Future<void>>[
       _remoteStore.shutdown(),
       _spec._releasePersistence(_localPersistence),
@@ -1038,6 +1224,9 @@ class SpecClient implements RemoteStoreCallback {
   /// Shuts this client down for good (the JS `doShutdown`): its remote store stops and it releases the persistence. The
   /// other clients keep running on the shared persistence.
   Future<void> _doShutdown() async {
+    _metadataRefresher?.stop();
+    _retryQueue.stop();
+    _sharedClientState.shutdown();
     await _remoteStore.shutdown();
     await _spec._releasePersistence(_localPersistence);
     _isShutdown = true;
@@ -1046,8 +1235,6 @@ class SpecClient implements RemoteStoreCallback {
   /// Steps that exist in the spec format but that the port can not execute. Kept here so that the runner can detect
   /// them up front (spec_skip_list.dart maps them to named skip entries).
   static const Set<String> unsupportedSteps = <String>{
-    // Visibility and primary state of a client: needs the primary lease (stage 1) and SyncEngine.applyPrimaryState.
-    'applyClientState',
     'clearPersistence',
   };
 
@@ -1173,6 +1360,7 @@ class SpecClient implements RemoteStoreCallback {
     } else if (step.containsKey('setIndexConfiguration')) {
       await _doSetIndexConfiguration(step['setIndexConfiguration']);
     } else if (step.containsKey('drainQueue')) {
+      await _drainSharedStateEvents();
       // Upstream waits for its AsyncQueue to be empty. Here the equivalent is letting the event loop settle, which
       // runSteps does after every step anyway.
       await Future<void>.delayed(_delayDuration);
@@ -1219,6 +1407,8 @@ class SpecClient implements RemoteStoreCallback {
       await _doLoadBundle(step['loadBundle']);
     } else if (step.containsKey('restart')) {
       await _doRestart();
+    } else if (step.containsKey('applyClientState')) {
+      await _doApplyClientState(step['applyClientState']);
     } else if (step.containsKey('shutdown')) {
       await _doShutdown();
     } else if (step.containsKey('watchUsesTargetIndex')) {
@@ -1338,12 +1528,20 @@ class SpecClient implements RemoteStoreCallback {
 
   Future<void> _validateStateExpectations(Map<String, dynamic>? expected) async {
     if (expected != null) {
-      for (final String key in <String>['isPrimary', 'numActiveClients']) {
-        if (expected.containsKey(key)) {
-          throw UnsupportedSpecFeature(
-            'expectedState.$key needs the primary lease and client metadata (multi-client stages 1 and 2)',
-          );
-        }
+      if (expected.containsKey('isPrimary')) {
+        expect(
+          _syncEngine.isPrimaryClient,
+          expected['isPrimary'],
+          reason: 'isPrimary',
+        );
+      }
+
+      if (expected.containsKey('numActiveClients')) {
+        expect(
+          (await _localPersistence.getActiveClients()).length,
+          expected['numActiveClients'],
+          reason: 'numActiveClients',
+        );
       }
 
       if (expected.containsKey('isShutdown')) {
@@ -1454,6 +1652,10 @@ class SpecClient implements RemoteStoreCallback {
       }
     }
 
+    // A lone client is always primary.
+    if (!_spec._isMultiClient) {
+      expect(_syncEngine.isPrimaryClient, isTrue, reason: 'isPrimary');
+    }
     // Always validate the we received the expected number of events.
     _validateUserCallbacks(expected);
     // Like upstream: a client that was shut down does not reset its limbo documents and targets, do not validate them.
@@ -1542,6 +1744,11 @@ class SpecClient implements RemoteStoreCallback {
   }
 
   void _validateActiveTargets() {
+    // Like upstream: a secondary client does not listen to anything, the primary client listens for it.
+    if (!_syncEngine.isPrimaryClient) {
+      expect(_datastore.activeTargets, isEmpty);
+      return;
+    }
     if (!_networkEnabled) {
       return;
     }
@@ -1600,6 +1807,7 @@ class SpecClient implements RemoteStoreCallback {
 
     log('    Doing step $step');
     await _doStep(step);
+    await _drainSharedStateEvents();
     // The Android SDK processes everything synchronously. Here the streams deliver their events asynchronously, so
     // let them settle before validating the expectations.
     await Future<void>.delayed(_delayDuration);

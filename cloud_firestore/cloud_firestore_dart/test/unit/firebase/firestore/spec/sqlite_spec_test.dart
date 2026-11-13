@@ -16,6 +16,18 @@ void main() {
       'test-project',
       'firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}',
     ),
+    // The clients of a multi-client spec open the same database, each with its id and the clock of the spec.
+    getSharedPersistence:
+        (
+          String name,
+          String clientId,
+          int Function() clock,
+        ) => createSharedSQLitePersistenceForProject(
+          'test-project',
+          'firebase/firestore/spec/sqlite_spec_test_${Uri.encodeQueryComponent(name)}',
+          clientId,
+          clock,
+        ),
     excludedTags: sqliteExcludedTags,
   );
 }

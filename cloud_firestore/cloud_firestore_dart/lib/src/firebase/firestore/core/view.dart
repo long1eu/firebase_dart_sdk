@@ -6,6 +6,7 @@ import 'package:cloud_firestore_dart/src/database_collection/database_collection
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/document_view_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/document_view_change_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/limbo_document_change.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_change.dart';
@@ -22,13 +23,17 @@ import 'package:firebase_app_dart/internal.dart';
 /// View is responsible for computing the final merged truth of what docs are in a query. It gets notified of local and
 /// remote changes to docs, and applies the query filters and limits to determine the most correct possible results.
 class View {
-  View(this.query, this._syncedDocuments)
+  View(this.query, this._syncedDocuments, {this.limboResolutionEnabled = true})
     : _syncState = ViewSnapshotSyncState.none,
       documentSet = DocumentSet.emptySet(query.comparator),
       _limboDocuments = DocumentKey.emptyKeySet,
       mutatedKeys = DocumentKey.emptyKeySet;
 
   final Query query;
+
+  /// Whether [applyChanges] computes the limbo documents. Only the primary client of a shared persistence resolves
+  /// limbo documents; the views of the other clients do not have any. Set before each [applyChanges].
+  bool limboResolutionEnabled;
 
   ViewSnapshotSyncState _syncState;
 
@@ -347,7 +352,8 @@ class View {
 
     _applyTargetChange(targetChange);
 
-    final List<LimboDocumentChange> limboDocumentChanges = targetIsPendingReset
+    final List<LimboDocumentChange> limboDocumentChanges =
+        targetIsPendingReset || !limboResolutionEnabled
         ? <LimboDocumentChange>[]
         : _updateLimboDocuments();
 
@@ -382,6 +388,39 @@ class View {
       );
     }
     return ViewChange(snapshot, limboDocumentChanges);
+  }
+
+  /// Reconciles the view with the documents and the remote keys of the target in persistence: used when a client
+  /// becomes or stops being the primary client, since a secondary client does not track the documents that the backend
+  /// considers part of the target.
+  ViewChange synchronizeWithPersistedState(QueryResult queryResult) {
+    _syncedDocuments = queryResult.remoteKeys;
+    _limboDocuments = DocumentKey.emptyKeySet;
+    final ViewDocumentChanges docChanges = computeDocChanges(
+      queryResult.documents,
+    );
+    final bool previous = limboResolutionEnabled;
+    limboResolutionEnabled = true;
+    try {
+      return applyChanges(docChanges);
+    } finally {
+      limboResolutionEnabled = previous;
+    }
+  }
+
+  /// Returns a snapshot of the current state of the view, as if all its documents were added. Used when a view that
+  /// exists already (the primary client listens to the query for another client) gets its first local listener.
+  ViewSnapshot computeInitialSnapshot() {
+    final bool fromCache = _syncState == ViewSnapshotSyncState.local;
+    return ViewSnapshot.fromInitialDocuments(
+      query,
+      documentSet,
+      mutatedKeys,
+      isFromCache: fromCache,
+      excludesMetadataChanges: false,
+      hasCachedResults: false,
+      readTime: fromCache ? SnapshotVersion.none : _readTime,
+    );
   }
 
   /// Applies an [OnlineState] change to the view, potentially generating a [ViewChange] if the view's syncState changes

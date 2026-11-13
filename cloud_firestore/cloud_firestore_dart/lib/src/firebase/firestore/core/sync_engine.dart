@@ -3,6 +3,7 @@
 // on 17/09/2018
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
@@ -17,6 +18,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/limbo_document_
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/listent_sequence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/online_state.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target_id_generator.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_change.dart';
@@ -32,6 +34,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dar
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/reference_set.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/shared_client_state.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
@@ -40,6 +43,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutat
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_batch_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.dart';
@@ -59,13 +63,22 @@ import 'package:meta/meta.dart';
 /// Notifying the [RemoteStore] when the [LocalStore] has new mutations in its queue that need sending to the backend.
 ///
 /// The [SyncEngine]’s methods should only ever be called by methods running on our own worker dispatch queue.
-class SyncEngine implements RemoteStoreCallback {
+///
+/// Several clients can share one persistence (the shared client state). One of them is the primary client
+/// ([isPrimaryClient]): it is the only one that uses the network, and listens and writes for all of them. The others
+/// learn about the results through the [SharedClientState] (the [SharedClientStateSyncer] methods). A client that does
+/// not share its persistence is primary, with a [MemorySharedClientState].
+class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
   SyncEngine(
     this._localStore,
     this._remoteStore,
     this._currentUser, {
     int maxConcurrentLimboResolutions = _defaultMaxConcurrentLimboResolutions,
+    SharedClientState? sharedClientState,
+    bool startAsPrimary = true,
   }) : _maxConcurrentLimboResolutions = maxConcurrentLimboResolutions,
+       _sharedClientState = sharedClientState ?? MemorySharedClientState(),
+       _primaryState = startAsPrimary ? true : null,
        _queryViewsByQuery = <Query, QueryView>{},
        _queriesByTarget = <int, List<Query>>{},
        _enqueuedLimboResolutions = <DocumentKey>{},
@@ -128,6 +141,12 @@ class SyncEngine implements RemoteStoreCallback {
 
   User _currentUser;
 
+  /// Manages the state shared with the other clients of the persistence.
+  final SharedClientState _sharedClientState;
+
+  /// The last online state applied to the views.
+  OnlineState _onlineState = OnlineState.unknown;
+
   SyncEngineCallback? _syncEngineListener;
 
   SyncEngineCallback get _listener => _syncEngineListener!;
@@ -157,13 +176,26 @@ class SyncEngine implements RemoteStoreCallback {
   /// Returns the target ID assigned to the query.
   Future<int> listen(Query query, {bool shouldListenToRemote = true}) async {
     _assertCallback('listen');
-    hardAssertLazy(
-      !_queryViewsByQuery.containsKey(query),
-      () => 'We already listen to query: $query',
-    );
+
+    final QueryView? existing = _queryViewsByQuery[query];
+    if (existing != null) {
+      // A primary client may have a view for the query already: it listens to it on behalf of another client. The
+      // view is reused.
+      _sharedClientState.addLocalQueryTarget(existing.targetId);
+      await _listener.onViewSnapshots(<ViewSnapshot>[
+        existing.view.computeInitialSnapshot(),
+      ]);
+      return existing.targetId;
+    }
 
     final QueryData queryData = await _localStore.allocateTarget(
       query.toTarget(),
+    );
+
+    // A query that only listens to the cache is not registered as an active watch target.
+    final QueryTargetState status = _sharedClientState.addLocalQueryTarget(
+      queryData.targetId,
+      addToActiveTargetIds: shouldListenToRemote,
     );
 
     // The view has to exist before the remote store sends the listen request: the request carries the number of
@@ -171,25 +203,33 @@ class SyncEngine implements RemoteStoreCallback {
     final ViewSnapshot viewSnapshot = await initializeViewAndComputeSnapshot(
       query,
       queryData,
+      current: status == QueryTargetState.current,
     );
     await _listener.onViewSnapshots(<ViewSnapshot>[viewSnapshot]);
 
-    if (shouldListenToRemote) {
+    if (_isPrimary && shouldListenToRemote) {
       _listenToRemote(queryData);
     }
     return queryData.targetId;
   }
 
+  /// Creates the view of [query] and returns its first snapshot. [current] is whether another client found the target
+  /// to be current already (see [SharedClientState.addLocalQueryTarget]).
   Future<ViewSnapshot> initializeViewAndComputeSnapshot(
     Query query,
-    QueryData queryData,
-  ) async {
+    QueryData queryData, {
+    bool current = false,
+  }) async {
     final QueryResult queryResult = await _localStore.executeQuery(
       query,
       /* usePreviousResults= */ true,
     );
 
-    final View view = View(query, queryResult.remoteKeys);
+    final View view = View(
+      query,
+      queryResult.remoteKeys,
+      limboResolutionEnabled: _isPrimary,
+    );
     final ViewDocumentChanges viewDocChanges = view.computeDocChanges(
       queryResult.documents,
     );
@@ -197,15 +237,16 @@ class SyncEngine implements RemoteStoreCallback {
     // The initial snapshot carries the resume token of the target so that an empty result of a target that has been
     // synced before can be raised from the cache. If there are already queries mapped to the target, the sync state of
     // those queries is applied to the new query as well.
-    bool targetIsCurrent = false;
+    bool targetIsCurrent = current && _onlineState != OnlineState.offline;
     SnapshotVersion? mirrorReadTime;
     final List<Query>? mirrorQueries = _queriesByTarget[queryData.targetId];
     if (mirrorQueries != null && mirrorQueries.isNotEmpty) {
       final QueryView? mirrorView = _queryViewsByQuery[mirrorQueries.first];
-      targetIsCurrent =
+      final bool mirrorIsCurrent =
           mirrorView != null &&
           mirrorView.view.syncState == ViewSnapshotSyncState.synced;
-      if (targetIsCurrent) {
+      targetIsCurrent = mirrorIsCurrent;
+      if (mirrorIsCurrent) {
         mirrorReadTime = mirrorView.view.readTime;
       }
     }
@@ -220,10 +261,6 @@ class SyncEngine implements RemoteStoreCallback {
       false,
       mirrorReadTime,
     );
-    hardAssert(
-      view.limboDocuments.isEmpty,
-      'View returned limbo docs before target ack from the server',
-    );
 
     final QueryView queryView = QueryView(
       query,
@@ -236,6 +273,11 @@ class SyncEngine implements RemoteStoreCallback {
     _queriesByTarget
         .putIfAbsent(queryData.targetId, () => <Query>[])
         .add(query);
+    // A view that starts out current (another client synced the target) can have limbo documents.
+    await _updateTrackedLimboDocuments(
+      viewChange.limboChanges,
+      queryData.targetId,
+    );
     return viewChange.snapshot!;
   }
 
@@ -247,7 +289,10 @@ class SyncEngine implements RemoteStoreCallback {
     final QueryView? queryView = _queryViewsByQuery[query];
     hardAssert(queryView != null, 'This is the first listen to query: $query');
 
-    _listenToRemote(queryView!.queryData);
+    _sharedClientState.addLocalQueryTarget(queryView!.targetId);
+    if (_isPrimary) {
+      _listenToRemote(queryView.queryData);
+    }
   }
 
   /// Sends the listen to the [RemoteStore] without waiting for it: starting the watch stream needs the network
@@ -280,21 +325,33 @@ class SyncEngine implements RemoteStoreCallback {
       'Trying to stop listening to a query not found',
     );
 
-    _queryViewsByQuery.remove(query);
-
     final int targetId = queryView!.targetId;
     final List<Query> targetQueries = _queriesByTarget[targetId]!;
-    targetQueries.remove(query);
 
-    if (targetQueries.isEmpty) {
-      await _localStore.releaseTarget(
-        targetId,
-        keepPersistedTargetData: !_isPrimary,
-      );
-      if (shouldUnlistenToRemote) {
-        await _remoteStore.stopListening(targetId);
+    // Only clean up the query view and the target if this is the only query mapped to the target.
+    if (targetQueries.length > 1) {
+      _queryViewsByQuery.remove(query);
+      targetQueries.remove(query);
+      return;
+    }
+
+    if (_isPrimary) {
+      // The local query target is removed first, to find out whether another client still listens to the target. If
+      // one does, the view is kept: this client keeps listening to the target on its behalf.
+      _sharedClientState.removeLocalQueryTarget(targetId);
+      if (!_sharedClientState.isActiveQueryTarget(targetId)) {
+        _queryViewsByQuery.remove(query);
+        targetQueries.remove(query);
+        await _localStore.releaseTarget(targetId);
+        _sharedClientState.clearQueryState(targetId);
+        if (shouldUnlistenToRemote) {
+          await _remoteStore.stopListening(targetId);
+        }
+        await _removeAndCleanupTarget(targetId, null);
       }
+    } else {
       await _removeAndCleanupTarget(targetId, null);
+      await _localStore.releaseTarget(targetId, keepPersistedTargetData: true);
     }
   }
 
@@ -309,7 +366,12 @@ class SyncEngine implements RemoteStoreCallback {
       'Trying to stop listening to a query not found',
     );
 
-    await _remoteStore.stopListening(queryView!.targetId);
+    if (_isPrimary) {
+      if (_queriesByTarget[queryView!.targetId]!.length == 1) {
+        _sharedClientState.removeLocalQueryTarget(queryView.targetId);
+      }
+      await _remoteStore.stopListening(queryView.targetId);
+    }
   }
 
   /// Initiates the write of local mutation batch which involves adding the writes to the mutation queue, notifying the
@@ -340,6 +402,7 @@ class SyncEngine implements RemoteStoreCallback {
       );
       return;
     }
+    _sharedClientState.addPendingMutation(result.batchId);
     _addUserCallback(result.batchId, userTask);
 
     await _emitNewSnapsAndNotifyLocalStore(
@@ -371,26 +434,135 @@ class SyncEngine implements RemoteStoreCallback {
     return _remoteStore.runVectorQuery(query, vectorQuery);
   }
 
-  /// Whether this client is the primary client of its cache (always true with a cache only one client can use).
-  bool _isPrimary = true;
+  /// Whether this client is the primary client of its cache (always true with a cache only one client can use); null
+  /// until the first [applyPrimaryState] of a client that does not start as primary (the JS `_isPrimaryClient`).
+  bool? _primaryState;
+
+  bool get _isPrimary => _primaryState == true;
 
   /// Whether this client is the primary client of its cache, as last told by [applyPrimaryState].
   bool get isPrimaryClient => _isPrimary;
 
-  /// Called when this client becomes or stops being the primary client of its cache: only the primary uses the
-  /// network.
+  /// Called when this client becomes or stops being the primary client of its cache (`syncEngineApplyPrimaryState` of
+  /// the JS SDK). Only the primary client uses the network; the client starts and stops the LRU garbage collection and
+  /// the index backfill.
   ///
-  /// PORTING NOTE: `syncEngineApplyPrimaryState` of the JS SDK also reconciles the views with the persisted state and
-  /// takes over (or drops) the targets of the other clients through the state the clients share. Clients do not share
-  /// state yet (stage 1 of the multi-client plan), so this only starts and stops the network; the client starts and
-  /// stops the LRU garbage collection and the index backfill.
+  /// A client that becomes primary reconciles the views of every target that any client listens to with the
+  /// persisted state (a secondary does not know which documents the backend considers part of a target), creates the
+  /// views of the targets of the other clients and listens to all of them. A client that stops being primary drops the
+  /// views of the targets that only other clients listen to, stops all its listens, reconciles its own views and
+  /// forgets its limbo resolutions.
   Future<void> applyPrimaryState(bool isPrimary) async {
-    if (_isPrimary == isPrimary) {
-      return;
+    if (isPrimary && _primaryState != true) {
+      Log.d(_tag, 'Became primary');
+      final List<QueryData> activeQueries =
+          await _synchronizeQueryViewsAndRaiseSnapshots(
+            _sharedClientState.getAllActiveQueryTargets().toList(),
+            transitionToPrimary: true,
+          );
+      _primaryState = true;
+      await _remoteStore.applyPrimaryState(true);
+      activeQueries.forEach(_listenToRemote);
+    } else if (!isPrimary && _primaryState != false) {
+      Log.d(_tag, 'Is no longer primary');
+      final List<int> activeTargets = <int>[];
+      for (final int targetId in _queriesByTarget.keys.toList()) {
+        if (_sharedClientState.isLocalQueryTarget(targetId)) {
+          activeTargets.add(targetId);
+        } else {
+          await _removeAndCleanupTarget(targetId, null);
+          await _localStore.releaseTarget(
+            targetId,
+            keepPersistedTargetData: true,
+          );
+        }
+        await _remoteStore.stopListening(targetId);
+      }
+
+      await _synchronizeQueryViewsAndRaiseSnapshots(
+        activeTargets,
+        transitionToPrimary: false,
+      );
+      await _resetLimboDocuments();
+      _primaryState = false;
+      await _remoteStore.applyPrimaryState(false);
     }
-    Log.d(_tag, isPrimary ? 'Became primary' : 'Is no longer primary');
-    _isPrimary = isPrimary;
-    await _remoteStore.applyPrimaryState(isPrimary);
+  }
+
+  /// Stops the limbo resolutions of a client that is no longer primary.
+  Future<void> _resetLimboDocuments() async {
+    for (final int targetId in _activeLimboResolutionsByTarget.keys.toList()) {
+      await _remoteStore.stopListening(targetId);
+    }
+    _limboDocumentRefs.removeAllReferences();
+    _activeLimboResolutionsByTarget.clear();
+    _activeLimboTargetsByKey.clear();
+  }
+
+  /// Reconciles the views of [targets] with the persisted state, raises the snapshots of the changes and returns the
+  /// current target data of each target. A client that becomes primary ([transitionToPrimary]) also creates the views
+  /// of the targets that only other clients listen to.
+  Future<List<QueryData>> _synchronizeQueryViewsAndRaiseSnapshots(
+    List<int> targets, {
+    required bool transitionToPrimary,
+  }) async {
+    final List<QueryData> activeQueries = <QueryData>[];
+    final List<ViewSnapshot> newViewSnapshots = <ViewSnapshot>[];
+    for (final int targetId in targets) {
+      final QueryData queryData;
+      final List<Query>? queries = _queriesByTarget[targetId];
+      if (queries != null && queries.isNotEmpty) {
+        // The target data is read again (the resume token and the snapshot version may have changed) and the views
+        // are reconciled with the persisted state (their synced documents may be out of date).
+        queryData = await _localStore.allocateTarget(queries.first.toTarget());
+        for (final Query query in queries.toList()) {
+          final QueryView? queryView = _queryViewsByQuery[query];
+          hardAssert(queryView != null, 'No query view found for $query');
+          final ViewChange viewChange =
+              await _synchronizeViewAndComputeSnapshot(queryView!);
+          final ViewSnapshot? snapshot = viewChange.snapshot;
+          if (snapshot != null) {
+            newViewSnapshots.add(snapshot);
+          }
+        }
+      } else {
+        hardAssert(
+          transitionToPrimary,
+          'A secondary client should never have an active view without an active target.',
+        );
+        // A target that this client never listened to: allocate it and create its view.
+        final Target? target = await _localStore.getCachedTarget(targetId);
+        hardAssert(target != null, 'Target for id $targetId not found');
+        queryData = await _localStore.allocateTarget(target!);
+        await initializeViewAndComputeSnapshot(
+          _synthesizeTargetToQuery(target),
+          queryData,
+        );
+      }
+      activeQueries.add(queryData);
+    }
+    await _listener.onViewSnapshots(newViewSnapshots);
+    return activeQueries;
+  }
+
+  /// Reconciles the documents of an existing view with those in persistence.
+  Future<ViewChange> _synchronizeViewAndComputeSnapshot(
+    QueryView queryView,
+  ) async {
+    final QueryResult queryResult = await _localStore.executeQuery(
+      queryView.query,
+      /* usePreviousResults= */ true,
+    );
+    final ViewChange viewChange = queryView.view.synchronizeWithPersistedState(
+      queryResult,
+    );
+    if (_isPrimary) {
+      await _updateTrackedLimboDocuments(
+        viewChange.limboChanges,
+        queryView.targetId,
+      );
+    }
+    return viewChange;
   }
 
   /// The failure of a primary-only transaction of a client that lost the primary lease is ignored
@@ -493,10 +665,25 @@ class SyncEngine implements RemoteStoreCallback {
     return confirmed;
   }
 
-  /// Applies an [OnlineState] change to the sync engine and notifies any views
-  /// of the change.
+  /// Applies an [OnlineState] change of the remote store to the sync engine and notifies any views of the change.
   @override
-  Future<void> handleOnlineStateChange(OnlineState onlineState) async {
+  Future<void> handleOnlineStateChange(OnlineState onlineState) =>
+      applyOnlineStateChange(onlineState, OnlineStateSource.remoteStore);
+
+  /// Applies an [OnlineState] change to the sync engine and notifies any views of the change.
+  ///
+  /// A secondary client ignores the online state of its remote store (it may go offline while the primary client
+  /// stays online) and only applies the one the primary client shares.
+  Future<void> applyOnlineStateChange(
+    OnlineState onlineState,
+    OnlineStateSource source,
+  ) async {
+    // Without shared state (a client that shares no state with the other clients of its cache) the remote store is
+    // the only source, also for a secondary client.
+    final bool fromSharedState = !_isPrimary && _sharedClientState.sharesState;
+    if (fromSharedState != (source == OnlineStateSource.sharedClientState)) {
+      return;
+    }
     final List<ViewSnapshot> newViewSnapshots = <ViewSnapshot>[];
     for (MapEntry<Query, QueryView> entry in _queryViewsByQuery.entries) {
       final View view = entry.value.view;
@@ -512,6 +699,11 @@ class SyncEngine implements RemoteStoreCallback {
     }
     await _listener.onViewSnapshots(newViewSnapshots);
     _listener.handleOnlineStateChange(onlineState);
+
+    _onlineState = onlineState;
+    if (_isPrimary) {
+      _sharedClientState.setOnlineState(onlineState);
+    }
   }
 
   // TODO(long1eu): implement getRemoteKeysForTarget
@@ -545,6 +737,12 @@ class SyncEngine implements RemoteStoreCallback {
   @override
   Future<void> handleRejectedListen(int targetId, GrpcError error) async {
     _assertCallback('handleRejectedListen');
+
+    _sharedClientState.updateQueryState(
+      targetId,
+      QueryTargetState.rejected,
+      exceptionFromStatus(error),
+    );
 
     final _LimboResolution? limboResolution =
         _activeLimboResolutionsByTarget[targetId];
@@ -622,6 +820,10 @@ class SyncEngine implements RemoteStoreCallback {
     // whether the watcher is caught up), so we raise user callbacks before the listen events.
     _notifyAcknowledged(mutationBatchResult);
 
+    _sharedClientState.updateMutationState(
+      mutationBatchResult.batch.batchId,
+      MutationBatchState.acknowledged,
+    );
     await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
   }
 
@@ -661,10 +863,16 @@ class SyncEngine implements RemoteStoreCallback {
     // The local store may or may not be able to apply the write result and raise events immediately (depending on
     // whether the watcher is caught up), so we raise user callbacks first so that they consistently happen before
     // listen events.
-    _notifyUser(batchId, status);
+    final FirestoreError error = exceptionFromStatus(status);
+    _notifyUser(batchId, error);
 
     _resolvePendingWriteTasks(batchId);
 
+    _sharedClientState.updateMutationState(
+      batchId,
+      MutationBatchState.rejected,
+      error,
+    );
     await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
   }
 
@@ -735,7 +943,7 @@ class SyncEngine implements RemoteStoreCallback {
   }
 
   /// Resolves the task corresponding to this write result.
-  void _notifyUser(int batchId, GrpcError? status) {
+  void _notifyUser(int batchId, FirestoreError? error) {
     final Map<int, Completer<void>>? userTasks =
         _mutationUserCallbacks[_currentUser];
 
@@ -745,8 +953,8 @@ class SyncEngine implements RemoteStoreCallback {
       final int boxedBatchId = batchId;
       final Completer<void>? userTask = userTasks[boxedBatchId];
       if (userTask != null) {
-        if (status != null) {
-          userTask.completeError(exceptionFromStatus(status));
+        if (error != null) {
+          userTask.completeError(error);
         } else {
           userTask.complete(null);
         }
@@ -758,6 +966,7 @@ class SyncEngine implements RemoteStoreCallback {
   /// Removes the bookkeeping of all the queries mapped to [targetId]. If [error] is not null, it is raised for each of
   /// those queries.
   Future<void> _removeAndCleanupTarget(int targetId, GrpcError? error) async {
+    _sharedClientState.removeLocalQueryTarget(targetId);
     for (Query query in _queriesByTarget[targetId] ?? const <Query>[]) {
       _queryViewsByQuery.remove(query);
       if (error != null) {
@@ -767,6 +976,10 @@ class SyncEngine implements RemoteStoreCallback {
     }
     _queriesByTarget.remove(targetId);
 
+    if (!_isPrimary) {
+      // Only the primary client resolves limbo documents.
+      return;
+    }
     final ImmutableSortedSet<DocumentKey> limboKeys = _limboDocumentRefs
         .referencesForId(targetId);
     _limboDocumentRefs.removeReferencesForId(targetId);
@@ -847,12 +1060,24 @@ class SyncEngine implements RemoteStoreCallback {
           continue;
         }
       }
+      queryView.view.limboResolutionEnabled = _isPrimary;
       final ViewChange viewChange = queryView.view.applyChanges(
         viewDocChanges,
         targetChange,
         targetIsPendingReset,
         remoteEvent?.snapshotVersion,
       );
+      // If there are changes, or this is a global snapshot, tell the other clients the state of the target: it is
+      // current if the view is synced, or (without changes) if the target change says so.
+      if (_isPrimary && (viewChange.snapshot != null || remoteEvent != null)) {
+        final bool isCurrent = viewChange.snapshot != null
+            ? !viewChange.snapshot!.isFromCache
+            : targetChange?.current ?? false;
+        _sharedClientState.updateQueryState(
+          queryView.targetId,
+          isCurrent ? QueryTargetState.current : QueryTargetState.notCurrent,
+        );
+      }
       await _updateTrackedLimboDocuments(
         viewChange.limboChanges,
         queryView.targetId,
@@ -962,11 +1187,19 @@ class SyncEngine implements RemoteStoreCallback {
       // Fails tasks waiting for pending writes requested by the previous user.
       _failOutstandingPendingWritesAwaitingTasks();
       // Notify local store and emit any resulting events from swapping out the mutation queue.
-      final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
-          await _localStore.handleUserChange(user);
+      final UserChangeResult result = await _localStore
+          .handleUserChangeWithBatchIds(user);
       // Switch the user only once the local store switched its mutation queue, so both agree on the current user.
       _currentUser = user;
-      await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
+      _sharedClientState.handleUserChange(
+        user,
+        result.removedBatchIds,
+        result.addedBatchIds,
+      );
+      await _emitNewSnapsAndNotifyLocalStore(
+        result.affectedDocuments,
+        /*remoteEvent:*/ null,
+      );
     }
   }
 
@@ -975,6 +1208,8 @@ class SyncEngine implements RemoteStoreCallback {
     BundleReader bundleReader,
     LoadBundleTask resultTask,
   ) async {
+    // The collection groups of the loaded documents, for the other clients.
+    Set<String> collectionGroups = <String>{};
     try {
       final BundleMetadata bundleMetadata = await bundleReader
           .getBundleMetadata();
@@ -1014,6 +1249,7 @@ class SyncEngine implements RemoteStoreCallback {
       // The loader also saves the bundle metadata, so that loading the same bundle again is skipped.
       final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
           await bundleLoader.applyChanges();
+      collectionGroups = bundleLoader.collectionGroups;
 
       // TODO(b/160876443): This currently raises snapshots with `fromCache=false` if users already listen to some
       // queries and bundles has newer version.
@@ -1039,6 +1275,164 @@ class SyncEngine implements RemoteStoreCallback {
         Log.w(_tag, 'Exception while closing bundle: $e');
       }
     }
+    _sharedClientState.notifyBundleLoaded(collectionGroups);
+  }
+
+  // Multi-client: the [SharedClientStateSyncer] methods, called with the changes of the other clients.
+
+  @override
+  Future<void> applyBatchState(
+    int batchId,
+    MutationBatchState state,
+    FirestoreError? error,
+  ) async {
+    final ImmutableSortedMap<DocumentKey, MaybeDocument>? documents =
+        await _localStore.lookupMutationDocuments(batchId);
+    if (documents == null) {
+      // A client may not have seen the mutation before it was completed and removed from the mutation queue, in which
+      // case the affected documents were not cached. The update can be ignored: the mutation was not applied locally
+      // (or its documents would be cached), and the resulting changes arrive as remote document updates.
+      Log.d(_tag, 'Cannot apply mutation batch with id: $batchId');
+      return;
+    }
+
+    if (state == MutationBatchState.pending) {
+      // The primary client sends the write to the backend. The other clients do not, their network is disabled.
+      await _remoteStore.fillWritePipeline();
+    } else {
+      // Both are no-ops for the batches that other clients wrote.
+      _notifyUser(batchId, error);
+      _resolvePendingWriteTasks(batchId);
+      _localStore.removeCachedMutationBatchMetadata(batchId);
+    }
+
+    await _emitNewSnapsAndNotifyLocalStore(documents, /*remoteEvent:*/ null);
+  }
+
+  @override
+  Future<void> applyTargetState(
+    int targetId,
+    QueryTargetState state,
+    FirestoreError? error,
+  ) async {
+    if (_isPrimary) {
+      // A primary client gets the state of the targets from the backend.
+      Log.d(_tag, 'Ignoring unexpected query state notification.');
+      return;
+    }
+
+    final List<Query>? queries = _queriesByTarget[targetId];
+    if (queries == null || queries.isEmpty) {
+      return;
+    }
+    switch (state) {
+      case QueryTargetState.current:
+      case QueryTargetState.notCurrent:
+        final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
+            await _localStore.getNewDocumentChanges(
+              _queryCollectionGroup(queries.first),
+            );
+        final RemoteEvent synthesizedRemoteEvent = RemoteEvent(
+          documentUpdates: const <DocumentKey, MaybeDocument>{},
+          resolvedLimboDocuments: const <DocumentKey>{},
+          targetChanges: <int, TargetChange>{
+            targetId:
+                TargetChange.createSynthesizedTargetChangeForCurrentChange(
+                  state == QueryTargetState.current,
+                  Uint8List(0),
+                ),
+          },
+        );
+        await _emitNewSnapsAndNotifyLocalStore(changes, synthesizedRemoteEvent);
+        break;
+      case QueryTargetState.rejected:
+        await _localStore.releaseTarget(
+          targetId,
+          keepPersistedTargetData: true,
+        );
+        await _removeAndCleanupTarget(
+          targetId,
+          GrpcError.custom(error!.code.value, error.message),
+        );
+        break;
+    }
+  }
+
+  @override
+  Future<void> applyActiveTargetsChange(
+    List<int> added,
+    List<int> removed,
+  ) async {
+    if (!_isPrimary) {
+      return;
+    }
+
+    for (final int targetId in added) {
+      // The target is already listened to if this client has it and it is registered in the shared state.
+      if (_queriesByTarget.containsKey(targetId) &&
+          _sharedClientState.isActiveQueryTarget(targetId)) {
+        Log.d(_tag, 'Adding an already active target $targetId');
+        continue;
+      }
+
+      final Target? target = await _localStore.getCachedTarget(targetId);
+      hardAssert(
+        target != null,
+        'Query data for active target $targetId not found',
+      );
+      final QueryData queryData = await _localStore.allocateTarget(target!);
+      await initializeViewAndComputeSnapshot(
+        _synthesizeTargetToQuery(target),
+        queryData,
+      );
+      _listenToRemote(queryData);
+    }
+
+    for (final int targetId in removed) {
+      // The target may be gone already, if the backend rejected it.
+      if (!_queriesByTarget.containsKey(targetId)) {
+        continue;
+      }
+      await _localStore.releaseTarget(targetId);
+      await _remoteStore.stopListening(targetId);
+      await _removeAndCleanupTarget(targetId, null);
+    }
+  }
+
+  @override
+  Future<List<ClientId>> getActiveClients() => _localStore.getActiveClients();
+
+  @override
+  Future<void> synchronizeWithChangedDocuments(String collectionGroup) async {
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
+        await _localStore.getNewDocumentChanges(collectionGroup);
+    await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
+  }
+
+  /// The collection group of the documents of [query]: the collection id of a collection query, the parent
+  /// collection of a document query.
+  static String _queryCollectionGroup(Query query) {
+    final String? collectionGroup = query.collectionGroup;
+    if (collectionGroup != null) {
+      return collectionGroup;
+    }
+    final ResourcePath path = query.path;
+    return query.isDocumentQuery
+        ? path.getSegment(path.length - 2)
+        : path.getSegment(path.length - 1);
+  }
+
+  /// A query whose target is [target], for a view of a target that another client listens to.
+  static Query _synthesizeTargetToQuery(Target target) {
+    return Query(
+      target.path,
+      collectionGroup: target.collectionGroup,
+      filters: target.filters,
+      explicitSortOrder: target.orderBy,
+      limit: target.limit,
+      startAt: target.startAt,
+      endAt: target.endAt,
+    );
   }
 
   /// Logs the error as a warnings if it likely represents a developer mistake such as forgetting to create an index or

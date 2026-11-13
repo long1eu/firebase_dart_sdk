@@ -31,6 +31,11 @@ void registerSpecTests({
   required Future<Persistence> Function(bool useEagerGc, String name)
       getPersistence,
   required Map<String, String> excludedTags,
+  Future<Persistence> Function(
+    String name,
+    String clientId,
+    int Function() clock,
+  )? getSharedPersistence,
 }) {
   final Directory jsonDir = Directory(
     '${Directory.current.path}/test/res/json',
@@ -77,7 +82,10 @@ void registerSpecTests({
             // Steps are mutated while running (expectations are removed): work on a deep copy.
             final Map<String, dynamic> copy =
                 jsonDecode(jsonEncode(testJson)) as Map<String, dynamic>;
-            final SpecTestCase testCase = SpecTestCase(getPersistence)
+            final SpecTestCase testCase = SpecTestCase(
+              getPersistence,
+              getSharedPersistence: getSharedPersistence,
+            )
               ..currentName = '${file.key}_$id';
             await testCase.runSteps(
               copy['steps'] as List<dynamic>,

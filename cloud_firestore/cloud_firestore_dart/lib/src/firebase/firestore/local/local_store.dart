@@ -210,6 +210,17 @@ class LocalStore implements BundleCallback {
   /// Used to generate targetIds for queries tracked locally.
   final TargetIdGenerator _targetIdGenerator;
 
+  /// The keys of the mutation batches that this client wrote or looked up, by batch id, until
+  /// [removeCachedMutationBatchMetadata]: a batch that another client acknowledged is gone from the mutation queue when
+  /// this client learns about it (the JS `IndexedDbMutationQueue.documentKeysByBatchId`). Multi-client only.
+  final Map<int, Set<DocumentKey>> _documentKeysByBatchId =
+      <int, Set<DocumentKey>>{};
+
+  /// The highest read time of the documents of each collection group that [getNewDocumentChanges] returned.
+  /// Multi-client only.
+  final Map<String, SnapshotVersion> _collectionGroupReadTime =
+      <String, SnapshotVersion>{};
+
   Future<void> start() async {
     await _persistence.overlayMigrationManager.run();
     await startIndexManager();
@@ -280,6 +291,13 @@ class LocalStore implements BundleCallback {
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> handleUserChange(
     User user,
   ) async {
+    return (await handleUserChangeWithBatchIds(user)).affectedDocuments;
+  }
+
+  /// Like [handleUserChange], and also returns the ids of the batches of the previous user ([UserChangeResult.removedBatchIds])
+  /// and of the new user ([UserChangeResult.addedBatchIds]), which the other clients of a shared persistence are told
+  /// about.
+  Future<UserChangeResult> handleUserChangeWithBatchIds(User user) async {
     // Swap out the mutation queue, grabbing the pending mutation batches before and after.
     //
     // The components of the new user are started before any of them replaces the current one: when the persistence
@@ -317,6 +335,8 @@ class LocalStore implements BundleCallback {
       indexManager: _indexManager,
     );
     _queryEngine.setLocalDocumentsView(_localDocuments);
+    // The cached keys belong to the batches of the previous mutation queue.
+    _documentKeysByBatchId.clear();
 
     // Union the old/new changed keys.
     ImmutableSortedSet<DocumentKey> changedKeys = DocumentKey.emptyKeySet;
@@ -332,7 +352,11 @@ class LocalStore implements BundleCallback {
     }
 
     // Return the set of all (potentially) changed documents as the result of the user change.
-    return _localDocuments.getDocuments(changedKeys);
+    return UserChangeResult(
+      await _localDocuments.getDocuments(changedKeys),
+      <int>[for (final MutationBatch batch in oldBatches) batch.batchId],
+      <int>[for (final MutationBatch batch in newBatches) batch.batchId],
+    );
   }
 
   /// Accepts locally generated [Mutations] and commits them to storage.
@@ -385,6 +409,7 @@ class LocalStore implements BundleCallback {
         baseMutations,
         mutations,
       );
+      _documentKeysByBatchId[batch.batchId] = batch.keys;
       // Apply the new batch on top of the current local view and save the resulting overlays.
       ImmutableSortedMap<DocumentKey, MaybeDocument> changedDocuments =
           DocumentCollections.emptyMaybeDocumentMap();
@@ -774,6 +799,7 @@ class LocalStore implements BundleCallback {
   Future<void> _notifyLocalViewChanges(
     List<LocalViewChanges> viewChanges,
   ) async {
+    final List<QueryData> toPersist = <QueryData>[];
     await _persistence.runTransaction('notifyLocalViewChanges', () async {
       for (LocalViewChanges viewChange in viewChanges) {
         if (!_targetIds.containsKey(viewChange.targetId)) {
@@ -802,11 +828,35 @@ class LocalStore implements BundleCallback {
           _targetIds[viewChange.targetId] = updatedQueryData;
 
           if (_shouldPersistQueryData(queryData, updatedQueryData, null)) {
-            await _queryCache.updateQueryData(updatedQueryData);
+            toPersist.add(updatedQueryData);
           }
         }
       }
     });
+    if (toPersist.isEmpty) {
+      return;
+    }
+    // Only the primary client writes target data (as in the JS SDK, where this update is not persisted at all): the
+    // in-memory target data of a secondary client is not updated by remote events and would overwrite the resume token
+    // that the primary client stored.
+    try {
+      await _persistence.runPrimaryTransaction(
+        'Persist last limbo free snapshot versions',
+        () async {
+          for (final QueryData queryData in toPersist) {
+            await _queryCache.updateQueryData(queryData);
+          }
+        },
+      );
+    } on FirestoreError catch (e) {
+      if (!isPrimaryLeaseLoss(e)) {
+        rethrow;
+      }
+      Log.d(
+        _tag,
+        'Not primary: the last limbo free snapshot versions are not persisted',
+      );
+    }
   }
 
   /// Returns the mutation batch after the passed in [batchId] in the mutation queue or null if empty.
@@ -860,8 +910,10 @@ class LocalStore implements BundleCallback {
 
     // Several queries may map to the same target (e.g. a limit query and a mirroring limitToLast query), in which case
     // the target is already active and its in-memory data must not be replaced.
+    // A newer persisted state (another client, the primary, updated the target) replaces the in-memory one.
     final QueryData? active = _targetIds[targetId];
-    if (active != null) {
+    if (active != null &&
+        cached.snapshotVersion.compareTo(active.snapshotVersion) <= 0) {
       return active;
     }
     _targetIds[targetId] = cached;
@@ -969,6 +1021,89 @@ class LocalStore implements BundleCallback {
     }
     _targetIds.remove(queryData.targetId);
     _targetIdByTarget.remove(queryData.target);
+  }
+
+  /// Returns the documents changed by the mutation batch [batchId], or null if the batch is neither in the mutation
+  /// queue nor cached (see [_documentKeysByBatchId]). Multi-client only.
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>?>
+  lookupMutationDocuments(int batchId) {
+    return _persistence.runTransactionAndReturn(
+      'Lookup mutation documents',
+      () async {
+        Set<DocumentKey>? keys = _documentKeysByBatchId[batchId];
+        if (keys == null) {
+          final MutationBatch? batch = await _mutationQueue.lookupMutationBatch(
+            batchId,
+          );
+          if (batch == null) {
+            return null;
+          }
+          keys = _documentKeysByBatchId[batchId] = batch.keys;
+        }
+        return _localDocuments.getDocuments(keys);
+      },
+    );
+  }
+
+  /// The ids of the clients of the persistence that are alive, this one included. Multi-client only.
+  Future<List<String>> getActiveClients() => _persistence.getActiveClients();
+
+  /// Forgets the keys of the mutation batch [batchId] once its result is known. Multi-client only.
+  void removeCachedMutationBatchMetadata(int batchId) {
+    _documentKeysByBatchId.remove(batchId);
+  }
+
+  /// Returns the target of [targetId], from the targets of this client or from the query cache. Multi-client only: the
+  /// primary client listens to the targets of the other clients.
+  Future<Target?> getCachedTarget(int targetId) async {
+    final QueryData? active = _targetIds[targetId];
+    if (active != null) {
+      return active.target;
+    }
+    return _persistence.runTransactionAndReturn('Get target data', () async {
+      // PORTING NOTE: the query cache has no lookup by target id.
+      Target? target;
+      await _queryCache.forEachTarget((QueryData queryData) {
+        if (queryData.targetId == targetId) {
+          target = queryData.target;
+        }
+      });
+      return target;
+    });
+  }
+
+  /// Returns the remote documents of [collectionGroup] that were read since the last call (on the first call: since
+  /// the start of the cache), and remembers the highest read time. Multi-client only: a secondary client reads the
+  /// documents that the primary client received.
+  Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> getNewDocumentChanges(
+    String collectionGroup,
+  ) async {
+    final SnapshotVersion readTime =
+        _collectionGroupReadTime[collectionGroup] ?? SnapshotVersion.none;
+    final Map<DocumentKey, ReadDocument> changed = await _persistence
+        .runTransactionAndReturn(
+          'Get new document changes',
+          () => _remoteDocuments.getAllForCollectionGroup(
+            collectionGroup,
+            IndexOffset.createSuccessor(
+              readTime,
+              FieldIndex.initialLargestBatchId,
+            ),
+            0x7fffffff,
+          ),
+        );
+    ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
+        DocumentCollections.emptyMaybeDocumentMap();
+    for (final MapEntry<DocumentKey, ReadDocument> entry in changed.entries) {
+      changes = changes.insert(entry.key, entry.value.document);
+      final String group = entry.key.collectionGroup;
+      final SnapshotVersion current =
+          _collectionGroupReadTime[group] ?? SnapshotVersion.none;
+      if (entry.value.readTime.compareTo(current) > 0) {
+        _collectionGroupReadTime[group] = entry.value.readTime;
+      }
+    }
+    return changes;
   }
 
   /// Runs the specified query against the local store and returns the results, potentially taking advantage of query
@@ -1247,4 +1382,22 @@ class LocalStore implements BundleCallback {
     // It is OK that the path used for the query is not valid, because this will not be read and queried.
     return Query(ResourcePath.fromString('__bundle__/docs/$bundleName'));
   }
+}
+
+/// The result of [LocalStore.handleUserChangeWithBatchIds].
+class UserChangeResult {
+  const UserChangeResult(
+    this.affectedDocuments,
+    this.removedBatchIds,
+    this.addedBatchIds,
+  );
+
+  /// The documents that (potentially) changed: the ones written by the batches of either user.
+  final ImmutableSortedMap<DocumentKey, MaybeDocument> affectedDocuments;
+
+  /// The batches of the previous user.
+  final List<int> removedBatchIds;
+
+  /// The batches of the new user.
+  final List<int> addedBatchIds;
 }

@@ -35,3 +35,13 @@ enum OnlineState {
   /// operate in offline mode.
   offline,
 }
+
+/// Where an [OnlineState] change comes from. The primary client of a shared persistence takes it from its remote store
+/// and shares it, the other clients take it from the shared client state (their own network is not used).
+enum OnlineStateSource {
+  /// The online state of the remote store of the client.
+  remoteStore,
+
+  /// The online state the primary client shared.
+  sharedClientState,
+}

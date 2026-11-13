@@ -95,6 +95,11 @@ class BundleLoader {
         : null;
   }
 
+  /// The collection groups of the documents of the bundle (the parent collection of each document).
+  Set<String> get collectionGroups => <String>{
+    for (final DocumentKey key in _documentsMetadata.keys) key.collectionGroup,
+  };
+
   /// Applies the loaded documents and queries to local store. Returns the document view changes.
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> applyChanges() async {
     if (_currentDocument != null) {
