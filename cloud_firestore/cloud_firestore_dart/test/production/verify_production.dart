@@ -20,6 +20,8 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/lite.dart' as lite;
+import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_provider.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/auth/firebase_auth_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/lite/firestore.dart'
     show liteTransportOverride;
@@ -37,6 +39,8 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto_v1;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
+import 'package:firebase_app_dart/firebase_app_dart.dart' show GetTokenResult;
+import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:grpc/grpc.dart'
     show ChannelCredentials, ChannelOptions, ClientTransportConnectorChannel;
@@ -190,7 +194,11 @@ class WriteCapExceeded implements Exception {
 
 /// What the checks share: the clients, the documents of the run, the write budget.
 class Kit {
-  Kit(this.backend, this.runId, this.maxWrites, this._out);
+  Kit(this.backend, this.runId, this.maxWrites, this._out,
+      [this.environment = const <String, String>{}]);
+
+  /// The environment of the run (only read for the names of optional settings).
+  final Map<String, String> environment;
 
   final Backend backend;
   final String runId;
@@ -263,7 +271,8 @@ class Kit {
   Future<Firestore> client(
       {Transport transport = Transport.grpc,
       ChaosProxy? via,
-      bool authenticated = true}) async {
+      bool authenticated = true,
+      CredentialsProvider? credentials}) async {
     final FirestoreSettings settings = FirestoreSettings(
       host: backend.host,
       port: backend.port,
@@ -288,7 +297,7 @@ class Kit {
       final Firestore firestore = await IntegrationTestUtil.forTests(
         databaseId,
         'verify-production-${_clientIndex}',
-        _credentials(authenticated: authenticated),
+        credentials ?? _credentials(authenticated: authenticated),
         TaskScheduler(''),
         (String path,
             {int? version,
@@ -1634,6 +1643,90 @@ Future<CheckResult> _lite(Kit kit) async {
       details: <String>['REST calls used: $endpoints'], observed: observed);
 }
 
+/// The Web API key of the project, for the optional check of a Firebase Auth user token.
+const String webApiKeyVariable = 'FIREBASE_TEST_WEB_API_KEY';
+
+/// The `host:port` of the Firebase Auth emulator, for the same check in emulator mode.
+const String authEmulatorHostVariable = 'FIREBASE_AUTH_EMULATOR_HOST';
+
+/// A Firebase Auth user signs in anonymously (firebase_auth_providers_dart) and Firestore sends the ID token.
+/// Only when it is configured: it creates an anonymous account in the project (and deletes it again).
+Future<CheckResult> _userToken(Kit kit) async {
+  String? setting(String name) {
+    final String? value = kit.environment[name]?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  final String? emulatorHost =
+      kit.backend.production ? null : setting(authEmulatorHostVariable);
+  final String? apiKey =
+      kit.backend.production ? setting(webApiKeyVariable) : 'fake-api-key';
+  if (kit.backend.production && apiKey == null) {
+    return CheckResult(Status.skipped,
+        '$webApiKeyVariable is not set (the Web API key of the project; anonymous sign-in must be enabled).');
+  }
+  if (!kit.backend.production && emulatorHost == null) {
+    return CheckResult(Status.skipped,
+        '$authEmulatorHostVariable is not set (the Firebase Auth emulator, see tool/start_auth_emulators.sh).');
+  }
+
+  final FirebaseUserAuth auth =
+      FirebaseUserAuth(apiKey: apiKey!, emulatorHost: emulatorHost);
+  try {
+    final AuthUser user;
+    try {
+      user = await auth.signInAnonymously();
+    } on FirebaseAuthProviderException catch (e) {
+      return CheckResult(Status.inconclusive,
+          'Anonymous sign-in failed: ${e.code} (${e.message})',
+          details: <String>[
+            'Enable the Anonymous sign-in provider of the project (Authentication > Sign-in method), check the',
+            'API key, and run --only=13 again.',
+          ],
+          observed: <String, Object?>{'signIn': e.code});
+    }
+    final GetTokenResult token = await auth.getAccessToken(forceRefresh: false);
+    final Firestore db =
+        await kit.client(credentials: FirebaseAuthCredentialsProvider(auth));
+    String outcome;
+    Status status = Status.pass;
+    try {
+      await kit.doc(db, 'vp_user_auth', 'doc').get(Source.server).timeout(_patience);
+      outcome = 'served (the security rules allow this user to read the path)';
+    } on FirestoreError catch (e) {
+      if (e.code == FirestoreErrorCode.permissionDenied) {
+        outcome =
+            'accepted, and the security rules refuse this path for the user (PERMISSION_DENIED)';
+      } else {
+        outcome = 'refused: ${_describeError(e)}';
+        status = Status.fail;
+      }
+    }
+    String cleanUp;
+    try {
+      await auth.deleteCurrentUser();
+      cleanUp = 'The anonymous account was deleted again.';
+    } on Object catch (e) {
+      cleanUp = 'The anonymous account ${user.uid} could not be deleted '
+          '(${e is FirebaseAuthProviderException ? e.code : e.runtimeType}): delete it in the console.';
+    }
+    final Map<String, Object?> observed = <String, Object?>{
+      'signInProvider': token.signInProvider,
+      'outcome': outcome,
+      'accountDeleted': cleanUp.startsWith('The anonymous account was deleted'),
+    };
+    return CheckResult(
+        status,
+        status == Status.pass
+            ? 'A request with the ID token of a Firebase Auth user was $outcome.'
+            : 'A request with the ID token of a Firebase Auth user was $outcome',
+        details: <String>[cleanUp],
+        observed: observed);
+  } finally {
+    await auth.dispose();
+  }
+}
+
 /// The checks, in the order they run.
 final List<Check> checks = <Check>[
   const Check('1a', 'Basic CRUD', _crud),
@@ -1649,6 +1742,7 @@ final List<Check> checks = <Check>[
   const Check('9', 'Half-close timing after unlisten', _halfClose),
   const Check('10', 'Auth token acceptance (App Check: not covered)', _tokens),
   const Check('11', 'Web transport (WebChannel and REST)', _webTransport),
+  const Check('13', 'Firebase Auth user token (optional)', _userToken),
   const Check('12', 'Firestore Lite over gRPC and REST', _lite),
 ];
 
@@ -1775,7 +1869,7 @@ Future<KitRun> runKit(List<String> arguments,
 
   final String runId = 'run_${DateTime.now().toUtc().toIso8601String().replaceAll(RegExp('[^0-9]'), '').substring(0, 14)}'
       '_${DateTime.now().microsecond.toRadixString(36)}';
-  final Kit kit = Kit(backend, runId, maxWrites, sink);
+  final Kit kit = Kit(backend, runId, maxWrites, sink, env);
   sink
     ..writeln('Firestore production verification kit')
     ..writeln('  backend:   ${backend.label} (${backend.host}:${backend.port})')

@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
+import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 
 late FirebaseApp app;
 late Firestore firestore;
@@ -129,8 +130,20 @@ Future<void> firestoreReadmeLine234() async {
   await firestore.terminate();
 }
 
-// README.md:266
-Future<void> firestoreReadmeLine266() async {
+// README.md:267
+Future<void> firestoreReadmeLine267() async {
+  // A signed-in Firebase Auth user: the security rules see request.auth.
+  final auth = await FirebaseUserAuth.forApp(app);
+  final firestore = await Firestore.instanceFor(app: app);
+  await auth.signInWithEmailAndPassword('ada@example.com', 'the password'); // or signInAnonymously(), ...
+
+  // A server (bypasses security rules; access is decided by IAM):
+  //   app.authProvider = OAuthTokenProvider.serviceAccount(serviceAccountJson);
+  //   app.authProvider = applicationDefaultCredentials();   // package:.../adc.dart
+}
+
+// README.md:293
+Future<void> firestoreReadmeLine293() async {
   final PipelineSnapshot snapshot = await firestore
       .pipeline()
       .collection('books')
@@ -153,8 +166,8 @@ Future<void> firestoreReadmeLine266() async {
       .execute();
 }
 
-// README.md:292
-Future<void> firestoreReadmeLine292() async {
+// README.md:319
+Future<void> firestoreReadmeLine319() async {
   // An existing query as a pipeline: the same documents in the same order.
   final Query<Map<String, Object?>> italian = users
       .where('country', isEqualTo: 'IT')
@@ -197,8 +210,8 @@ Future<void> firestoreReadmeLine292() async {
   print(written.results.single.get('documents_modified'));
 }
 
-// README.md:526
-Future<void> firestoreReadmeLine526() async {
+// README.md:553
+Future<void> firestoreReadmeLine553() async {
   final total = await firestore.runTransaction((transaction) async {
     final account = await transaction.get(firestore.doc('accounts/a'));
     final orders = await transaction.getQuery(
@@ -208,8 +221,8 @@ Future<void> firestoreReadmeLine526() async {
   }, options: TransactionOptions(readOnly: true));
 }
 
-// README.md:627
-Future<void> firestoreReadmeLine627() async {
+// README.md:654
+Future<void> firestoreReadmeLine654() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }

@@ -57,6 +57,7 @@ Production (from the repository root):
     unset FIRESTORE_EMULATOR_HOST                 # the kit refuses to guess between the two
     export FIRESTORE_TEST_PROJECT_ID=my-project
     export FIRESTORE_TEST_DATABASE_ID=my-database # optional, default: (default)
+    export FIREBASE_TEST_WEB_API_KEY=...          # optional: runs check 13 (creates and deletes one anonymous Auth user)
 
     tool/verify_production/run.sh --backend=production          # prints the plan, does nothing
     tool/verify_production/run.sh --backend=production --yes    # runs it
@@ -100,6 +101,7 @@ does not handle. `INCONCLUSIVE` means the check could not reach a result and say
 | 10 | Auth token acceptance | Requests with the OAuth access token are served; the detail line says what the same read without a token gets. App Check is not covered: the kit has no App Check token provider. `SKIPPED` on the emulator. |
 | 11 | Web transport | The experimental web transport (REST unary calls and WebChannel streams over `dart:io` HTTP) against the same database: read, transaction, aggregation, listen, batch. The detail lines list the endpoints used and whether the backend asked for session routing (`gsessionid`). |
 | 12 | Firestore Lite over gRPC and REST | The lite library (`package:cloud_firestore_dart/lite.dart`, no cache, no listeners), once over gRPC and once over the transport it has on the web (REST only): set, get, update with transforms, a batch, queries (filter, `limitToLast`, cursor), an aggregation with aliases, a transaction, a read-only transaction with a query (`BeginTransaction` / `Rollback`), delete. `FAIL` names the transport and the step, or says that a client did not use the transport it was asked for (the REST client must not open a WebChannel session). The detail line lists the REST calls used. The clients are made through the public API; their requests carry the credentials of the kit, not those of a `FirebaseApp`. |
+| 13 | Firebase Auth user token (optional) | Only when `FIREBASE_TEST_WEB_API_KEY` is set (the Web API key of the project; the Anonymous sign-in provider must be enabled). Signs in an anonymous user with `firebase_auth_providers_dart` against the real Firebase Auth service, reads one document of the run with the ID token, and deletes the account again. `PASS`: Firestore accepted the token; the line says whether the security rules then served or refused the read (both are a pass). `FAIL`: the token itself was refused. `INCONCLUSIVE`: the sign-in failed (provider not enabled, wrong key). `SKIPPED` without the variable. On the emulator it runs when `FIREBASE_AUTH_EMULATOR_HOST` is set. |
 
 What to send back: the whole report. The most valuable lines are the answers of 2, 3, 4, 6, 8, 9,
 11 and 12, which nobody has seen for production yet.
@@ -110,6 +112,7 @@ What to send back: the whole report. The most valuable lines are the answers of 
 | --- | --- | --- |
 | 1a, 1b, 5, 9, 11 | PASS | PASS |
 | 12 | PASS | PASS |
+| 13 | SKIPPED; PASS with the Auth emulator (`tool/start_auth_emulators.sh`) | not run |
 | 1c | PASS (the emulator needs no index) | PASS (one unexplained FAIL in six runs while other test suites used the emulator; not reproduced) |
 | 2 | PASS, `APPLIED TWICE` | PASS, `APPLIED TWICE` |
 | 3 | PASS, `APPLIED TWICE`, 2 attempts | PASS, `APPLIED TWICE` |

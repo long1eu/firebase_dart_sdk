@@ -153,6 +153,11 @@ Deprecated, still working:
   `Settings` are typedefs of `Firestore` and `FirestoreSettings`.
 ### Added
 
+- Authentication with ready-made token providers from the new `firebase_auth_providers_dart`
+  package of this repository (Firebase Auth user sign-in over REST, service accounts, Application
+  Default Credentials); see the README section "Authentication". `test/integration_auth` shows a
+  signed-in user's token reaching Firestore over gRPC, the web transport and Firestore Lite, the
+  streams restarting on a user switch and access ending at sign-out. Emulators only.
 Queries and aggregations:
 
 - Queries: `!=` / `not-in`, composite `Filter.or` / `Filter.and` (OR queries), multiple

@@ -1,0 +1,5 @@
+# Local development only: use the sibling firebase_app_dart checkout instead of
+# the hosted package. Excluded from the published archive by .pubignore.
+dependency_overrides:
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart

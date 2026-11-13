@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs pub get, analyze (lib) and tests for the two published packages.
+# Runs pub get, analyze (lib) and tests for the packages of the revival.
 # cloud_firestore_dart runs only test/unit (integration needs a live backend).
 # Exits non-zero if any step of any package fails.
 # Usage: tool/test_all.sh [package-name ...]
@@ -11,6 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 PACKAGES=(
   "firebase_app_dart|firebase_core/firebase_app_dart|"
+  "firebase_auth_providers_dart|firebase_auth/firebase_auth_providers_dart|"
   "cloud_firestore_dart|cloud_firestore/cloud_firestore_dart|test/unit"
 )
 

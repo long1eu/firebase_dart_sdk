@@ -4,6 +4,8 @@
 // The expectations are the ones of the Standard edition emulator, pinned per check. One check (8) is expected to
 // FAIL there, for a known reason that is not about the kit (see the comment below).
 
+import 'dart:io';
+
 import 'package:test/test.dart';
 
 import '../util/test_backend.dart';
@@ -16,6 +18,11 @@ void main() {
       : backend.isEnterpriseEdition
           ? 'The expectations are the ones of the Standard edition emulator'
           : null;
+
+  final String? authEmulator =
+      Platform.environment[authEmulatorHostVariable]?.trim().isEmpty ?? true
+          ? null
+          : Platform.environment[authEmulatorHostVariable];
 
   group('arguments', () {
     Future<(KitRun, String)> run(List<String> arguments,
@@ -154,6 +161,7 @@ void main() {
     expect(status('10'), Status.skipped, reason: why('10'));
 
     expect(status('11'), Status.pass, reason: why('11'));
+
     expect(
         observed('11')['endpoints'],
         containsAll(<String>[
@@ -174,6 +182,17 @@ void main() {
       'runAggregationQuery',
       'runQuery',
     ]);
+
+    // Optional: only with the Firebase Auth emulator (tool/start_auth_emulators.sh). The rules of the standard
+    // emulator allow everything, so the request with the ID token is served.
+    if (authEmulator == null) {
+      expect(status('13'), Status.skipped, reason: why('13'));
+    } else {
+      expect(status('13'), Status.pass, reason: why('13'));
+      expect(observed('13')['signInProvider'], 'anonymous');
+      expect(observed('13')['outcome'], startsWith('served'));
+      expect(observed('13')['accountDeleted'], isTrue);
+    }
 
     // The accounting: within the cap, and everything that was handed out was deleted.
     expect(run.writes, lessThanOrEqualTo(defaultMaxWrites));

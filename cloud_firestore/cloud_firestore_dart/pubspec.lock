@@ -160,6 +160,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  firebase_auth_providers_dart:
+    dependency: "direct dev"
+    description:
+      path: "../../firebase_auth/firebase_auth_providers_dart"
+      relative: true
+    source: path
+    version: "0.1.0"
   fixnum:
     dependency: "direct main"
     description:

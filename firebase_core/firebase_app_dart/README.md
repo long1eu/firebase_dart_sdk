@@ -144,8 +144,10 @@ the store is safe and survives app restarts. Default implementation uses an in m
 app restarts.
 
 1. `authProvider` (an `InternalTokenProvider`) supplies the ID token that `cloud_firestore_dart` sends with its
-requests. This repository has no maintained Auth client, so you implement it yourself if your security rules need a
-signed-in user. Defaults to null (unauthenticated requests).
+requests. Ready-made providers (Firebase Auth user sign-in over REST, service accounts, Application Default
+Credentials) are in the `firebase_auth_providers_dart` package of this repository; or implement it yourself. It can
+also be set later with `app.authProvider = ...`, before the Firestore instance is created. Defaults to null
+(unauthenticated requests).
 
 1. `appCheckProvider` (an `InternalAppCheckTokenProvider`) supplies the App Check token that `cloud_firestore_dart`
 sends in the `x-firebase-appcheck` header. Defaults to null.

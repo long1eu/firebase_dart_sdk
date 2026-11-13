@@ -257,6 +257,33 @@ The public entry point is `package:cloud_firestore_dart/cloud_firestore_dart.dar
 emulator, lifecycle), are in [`example/`](example/README.md). See [Testing](#testing) for how
 to run the tests.
 
+## Authentication
+
+Without a token provider the requests are unauthenticated. The provider belongs to the
+`FirebaseApp` and must be there before the Firestore instance is created. Ready-made ones are in
+[`firebase_auth_providers_dart`](https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_auth/firebase_auth_providers_dart)
+(a separate package in this repository, not on pub.dev yet):
+
+```dart
+import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
+
+// A signed-in Firebase Auth user: the security rules see request.auth.
+final auth = await FirebaseUserAuth.forApp(app);
+final firestore = await Firestore.instanceFor(app: app);
+await auth.signInWithEmailAndPassword('ada@example.com', 'the password'); // or signInAnonymously(), ...
+
+// A server (bypasses security rules; access is decided by IAM):
+//   app.authProvider = OAuthTokenProvider.serviceAccount(serviceAccountJson);
+//   app.authProvider = applicationDefaultCredentials();   // package:.../adc.dart
+```
+
+A sign-in, a sign-out or a switch of users restarts the streams with the new identity, and the
+pending writes of a user stay in the queue of that user, as in the official SDKs. This works the
+same over gRPC, over the web transport and in Firestore Lite (`test/integration_auth`, against
+the Firebase Auth emulator and a Firestore emulator whose rules require a user; nothing was run
+against the real services). You can also implement `InternalTokenProvider` yourself and assign
+it to `app.authProvider`.
+
 ## Pipelines (preview)
 
 Pipeline queries are in a separate library, `package:cloud_firestore_dart/pipelines.dart`. The
@@ -786,7 +813,9 @@ Not done:
   scanned, as upstream), and with a memory cache.
 - **A Firebase Auth client.** The app supplies the ID token through `PlatformDependencies`.
 - Android-specific pieces of the Android SDK.
-- Auth, Storage, Realtime Database: see
+- A Firebase Auth SDK. Tokens for Firestore (user sign-in over REST, service accounts,
+  Application Default Credentials) are in `firebase_auth_providers_dart`, see
+  [Authentication](#authentication). For federated sign-in, Storage and Realtime Database see
   [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart).
 
 Known gaps in what is done:
