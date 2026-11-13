@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
@@ -158,6 +159,9 @@ class SpecTestCase {
   final List<SQLitePersistence> _openSQLitePersistences =
       <SQLitePersistence>[];
 
+  /// The shutdowns of SQLite persistences that are in progress.
+  final Set<Future<void>> _closingSQLitePersistences = <Future<void>>{};
+
   /// Returns the persistence for a client that starts (or restarts).
   Future<Persistence> _acquirePersistence(
     bool useEagerGc,
@@ -197,6 +201,28 @@ class SpecTestCase {
       if (_openSQLitePersistences.isNotEmpty && database is DatabaseMock) {
         database.renamePath = false;
       }
+      final Future<void> shutdown = persistence.shutdown();
+      _closingSQLitePersistences.add(shutdown);
+      try {
+        await shutdown;
+      } finally {
+        _closingSQLitePersistences.remove(shutdown);
+      }
+      // The database of a multi-client spec is shared by connections that do not rename it on close (see
+      // createSharedSQLitePersistenceForProject): the last client deletes it, once no other client is still closing
+      // (clients shut down concurrently, e.g. when another client cleared the cache).
+      if (_openSQLitePersistences.isEmpty &&
+          _closingSQLitePersistences.isEmpty &&
+          _isMultiClient &&
+          database is DatabaseMock) {
+        for (final String suffix in <String>['', '_', '-journal', '-wal', '-shm']) {
+          final File file = File('${database.path}$suffix');
+          if (file.existsSync()) {
+            file.deleteSync();
+          }
+        }
+      }
+      return;
     }
     await persistence.shutdown();
   }
@@ -405,7 +431,7 @@ class SpecClient implements RemoteStoreCallback {
     final LocalStore localStore = LocalStore(_localPersistence, _currentUser);
     _localStore = localStore;
 
-    _queue = TaskScheduler('');
+    _queue = TaskScheduler('', manualTasks: <TaskId>{TaskId.asyncQueueRetry});
 
     // Set up the sync engine and various stores.
     _datastore = MockDatastore(_queue)
@@ -472,6 +498,14 @@ class SpecClient implements RemoteStoreCallback {
 
     final SQLitePersistence? persistence = _sharedSQLitePersistence;
     if (persistence != null) {
+      // Another client cleared the cache: this one shuts down (the JS `setDatabaseDeletedListener`).
+      persistence.databaseClearedListener = () => unawaited(
+        _enqueueSharedStateEvent(() async {
+          if (!_isShutdown) {
+            await _doShutdown();
+          }
+        }),
+      );
       // The `ClientMetadataRefresh` timer: the lease is refreshed, taken or given up when it fires.
       _metadataRefresher = ClientMetadataRefresher(
         _queue,
@@ -1234,9 +1268,17 @@ class SpecClient implements RemoteStoreCallback {
 
   /// Steps that exist in the spec format but that the port can not execute. Kept here so that the runner can detect
   /// them up front (spec_skip_list.dart maps them to named skip entries).
-  static const Set<String> unsupportedSteps = <String>{
-    'clearPersistence',
-  };
+  static const Set<String> unsupportedSteps = <String>{};
+
+  /// The `clearPersistence` step of a client that was shut down: the cache is cleared, and the clients that still use
+  /// it shut down (the JS `clearTestPersistence`, which deletes the IndexedDB database).
+  Future<void> _doClearPersistence() async {
+    final Persistence persistence = _localPersistence;
+    if (persistence is! SQLitePersistence) {
+      throw UnsupportedSpecFeature('clearPersistence needs SQLite persistence');
+    }
+    await persistence.clearPersistence();
+  }
 
   /// The step carries the index definition as a JSON object (the JS spec builder) or as its string form.
   Future<void> _doSetIndexConfiguration(Object? configuration) async {
@@ -1407,6 +1449,8 @@ class SpecClient implements RemoteStoreCallback {
       await _doLoadBundle(step['loadBundle']);
     } else if (step.containsKey('restart')) {
       await _doRestart();
+    } else if (step.containsKey('clearPersistence')) {
+      await _doClearPersistence();
     } else if (step.containsKey('applyClientState')) {
       await _doApplyClientState(step['applyClientState']);
     } else if (step.containsKey('shutdown')) {

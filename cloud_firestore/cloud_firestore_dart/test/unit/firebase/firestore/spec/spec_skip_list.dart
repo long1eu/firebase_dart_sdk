@@ -29,8 +29,7 @@ import 'dart:convert';
 const Map<String, String?> skippedSpecFeatures = <String, String?>{
   // --- Excluded by upstream Android too (SpecTestCase.DISABLED_TAGS) ---
   // Upstream Android skips the tag. The port runs the multi-client specs on SQLite (shared client state, primary
-  // lease); memory persistence skips them (memoryExcludedTags), as the JS SDK. The one that needs another missing
-  // feature is caught by a more precise entry below ('clear-persistence').
+  // lease); memory persistence skips them (memoryExcludedTags), as the JS SDK.
   'multi-client': null,
   // Upstream Android skips the tag; the port runs these specs. The single-client ones pass (the bloom filter one, the
   // three "Fix #8474" limbo ones after porting the JS fix to WatchChangeAggregator, the recovery ones after porting
@@ -55,8 +54,8 @@ const Map<String, String?> skippedSpecFeatures = <String, String?>{
   // Landed (recovery from a failing persistence: RemoteStore.enqueueRetryable / disableNetworkUntilRecovery, the
   // failDatabase step over PersistenceFaultInjector): enabled.
   'fail-database': null,
-  'clear-persistence':
-      'clearPersistence step shuts down other clients of a shared persistence; the only spec is multi-client.',
+  // Landed (the clearPersistence step; the other clients of the cache shut down).
+  'clear-persistence': null,
   'write-ack-transform-results': null,
 };
 
@@ -78,24 +77,12 @@ const Map<String, String> sqliteExcludedTags = <String, String>{
 /// not express, keyed by `'<describeName> <itName>'`. Unlike [skippedSpecFeatures] these are not detectable from the
 /// spec JSON: the spec uses only supported steps.
 const Map<String, String> knownSpecDivergences = <String, String>{
-  'Persistence Recovery Multiple user changes during transaction failure (with recovery)':
-      'Harness timing, not the library: after a retried operation succeeds, the next one is scheduled with the reset '
-      'backoff, a zero delay (as JS). The JS runner validates a step before such a timer fires; this runner lets the '
-      'event loop settle after every step, which runs it, so both user changes surface in the first runTimer step. '
-      'The library behaviour (both changes applied in order after the recovery) is the JS one. Fix (verified on '
-      'memory and SQLite, no other spec affected): create the TaskScheduler of SpecClient._initClient with '
-      'manualTasks: {TaskId.asyncQueueRetry}, so that retries only run on runTimer, and remove this entry. See '
-      'docs/ARCHITECTURE.md, "Tests".',
-  'Writes: Writes are held during primary failover':
-      'The SQLite primary lease (stage 1) notices that another client took the lease at the first transaction after '
-      'that client committed (SQLiteClientMetadata._onForeignCommit); the JS SDK notices it only at its next lease '
-      'refresh or primary-only transaction. The old primary steps down one step early, and the spec sees the events of '
-      'the step-down before its client_metadata_refresh step.',
   'Persistence Recovery Query is listened to by primary (with recovery)':
-      'Not understood yet. The primary releases the target of the other client although the "Release target" '
-      'transaction fails: LocalStore.releaseTarget ignores a recoverable failure, as localStoreReleaseTarget of the '
-      'JS SDK (the JS source read here does the same), and the target is unlistened at once. The spec expects the '
-      'release to wait for the recovery (the change applied again on the async_queue_retry timer).',
+      'Not understood yet. With "Release target" failing, the primary still releases the target of the other '
+      'client and unlistens at once: LocalStore.releaseTarget ignores the recoverable failure, as '
+      'localStoreReleaseTarget of the JS SDK does, and syncEngineApplyActiveTargetsChange, removeAndCleanupTarget, '
+      'syncEngineUnlisten and enqueueRetryable as read in the JS source give no retry. The spec expects the primary '
+      'to keep the target until the database recovers and the change is applied again on the async_queue_retry timer.',
   'Listens: Secondary client advances query state with global snapshot from primary':
       'Tagged no-web, no-android and no-ios upstream: no SDK runs it (the JS SDK, which has multi-tab, skips it).',
 };

@@ -105,13 +105,16 @@ Future<SQLitePersistence> createSharedSQLitePersistenceForProject(
             OnVersionChange? onUpgrade,
             OnVersionChange? onDowngrade,
             OnOpen? onOpen}) =>
+        // The file is shared by several connections (clients, and the one that clears it in place): it is not renamed
+        // when one of them closes. The caller deletes it when the last one is done.
         DatabaseMock.create(name,
-            version: version,
-            onConfigure: onConfigure,
-            onCreate: onCreate,
-            onUpgrade: onUpgrade,
-            onDowngrade: onDowngrade,
-            onOpen: onOpen),
+                version: version,
+                onConfigure: onConfigure,
+                onCreate: onCreate,
+                onUpgrade: onUpgrade,
+                onDowngrade: onDowngrade,
+                onOpen: onOpen)
+            .then((DatabaseMock db) => db..renamePath = false),
     const LruGarbageCollectorParams(),
     clientId: clientId,
     clock: clock,

@@ -149,15 +149,15 @@ void main() {
     };
   }
 
-  /// Every running client runs a transaction, so that it has seen the latest lease; then exactly one of them is
-  /// primary, and it is the owner of the lease row.
+  /// Every running client looks at the lease (see [_learnPrimaryState]); then exactly one of them is primary, and it is
+  /// the owner of the lease row.
   Future<SQLitePersistence> expectExactlyOnePrimary() async {
     final List<SQLitePersistence> running = <SQLitePersistence>[
       for (final SQLitePersistence client in clients)
         if (client.started) client,
     ];
     for (final SQLitePersistence client in running) {
-      await client.runTransaction('look', () async {});
+      await _learnPrimaryState(client);
     }
     final List<SQLitePersistence> primaries = <SQLitePersistence>[
       for (final SQLitePersistence client in running)
@@ -400,6 +400,19 @@ void main() {
           <Object?>['from A'],
         );
       });
+      // As in the JS SDK, A learns that it lost the lease at its next refresh or primary-only transaction, not at an
+      // ordinary one.
+      expect(a.isPrimary, isTrue);
+      await expectLater(
+        a.runPrimaryTransaction('op', () async {}),
+        throwsA(
+          isA<FirestoreError>().having(
+            isPrimaryLeaseLoss,
+            'lease loss',
+            isTrue,
+          ),
+        ),
+      );
       expect(a.isPrimary, isFalse);
       expect(await b.query('SELECT bundle_id FROM bundles'), hasLength(1));
     });
@@ -920,7 +933,7 @@ class _IsolateClient {
           case 'refresh':
             await persistence.refreshClientMetadata();
           case 'look':
-            await persistence.runTransaction('look', () async {});
+            await _learnPrimaryState(persistence);
           case 'shutdown':
             await persistence.shutdown();
         }
@@ -928,6 +941,31 @@ class _IsolateClient {
       } catch (e) {
         replies.send('$e');
       }
+    }
+  }
+}
+
+/// Lets [client] see the latest lease without changing it. As in the JS SDK, a client notices that it lost the lease
+/// at its next refresh or primary-only transaction, not at an ordinary transaction: a client that believes it is
+/// primary but does not own the lease row runs a primary-only transaction, which fails (or takes an expired lease).
+/// The owner runs none, so that its lease is not extended.
+Future<void> _learnPrimaryState(SQLitePersistence client) async {
+  await client.runTransaction('look', () async {});
+  if (!client.isPrimary) {
+    return;
+  }
+  final List<Map<String, dynamic>> rows = await client.query(
+    'SELECT owner_id FROM primary_client WHERE id = 0',
+  );
+  if (rows.isNotEmpty &&
+      rows.single['owner_id'] == client.clientMetadata.clientId) {
+    return;
+  }
+  try {
+    await client.runPrimaryTransaction('look', () async {});
+  } on FirestoreError catch (e) {
+    if (!isPrimaryLeaseLoss(e)) {
+      rethrow;
     }
   }
 }

@@ -116,6 +116,29 @@ class SQLitePersistence extends Persistence {
   /// Called (once) when this client notices that another client cleared the cache. The client terminates.
   void Function()? databaseClearedListener;
 
+  /// The persistences of this isolate that have a database file open, by path. A client that clears a cache in place
+  /// tells the others of its isolate at once (as IndexedDB tells the other connections of a deleted database with a
+  /// `versionchange` event); clients in other isolates or processes notice the new epoch at their next transaction or
+  /// metadata refresh.
+  static final Map<String, Set<SQLitePersistence>> _openInIsolate =
+      <String, Set<SQLitePersistence>>{};
+
+  /// Marks the cache as cleared by another client and calls [databaseClearedListener] (once).
+  void _onClearedByOtherClient() {
+    if (_clearedByOtherClient) {
+      return;
+    }
+    _clearedByOtherClient = true;
+    Log.w(
+      tag,
+      'The persistent cache "$databaseName" was cleared by another client: this client terminates.',
+    );
+    final void Function()? listener = databaseClearedListener;
+    if (listener != null) {
+      scheduleMicrotask(listener);
+    }
+  }
+
   static const String tag = 'SQLitePersistence';
 
   final OpenDatabase openDatabase;
@@ -293,6 +316,7 @@ class SQLitePersistence extends Persistence {
       hardAssert(!started, 'SQLitePersistence double-started!');
       _db = await _openDb(databaseName, openDatabase);
       _databasePath = _db.path;
+      (_openInIsolate[_db.path] ??= <SQLitePersistence>{}).add(this);
       try {
         await _startOpened();
       } catch (_) {
@@ -455,6 +479,7 @@ class SQLitePersistence extends Persistence {
       hardAssert(started, 'SQLitePersistence shutdown without start!');
 
       started = false;
+      _openInIsolate[_db.path]?.remove(this);
       // Release the lease now, so that another client takes over at its next refresh instead of when the lease
       // expires.
       try {
@@ -524,15 +549,7 @@ class SQLitePersistence extends Persistence {
     }
 
     if (await _readEpoch() != _epoch) {
-      _clearedByOtherClient = true;
-      Log.w(
-        tag,
-        'The persistent cache "$databaseName" was cleared by another client: this client terminates.',
-      );
-      final void Function()? listener = databaseClearedListener;
-      if (listener != null) {
-        scheduleMicrotask(listener);
-      }
+      _onClearedByOtherClient();
       throw _clearedError();
     }
 
@@ -547,7 +564,6 @@ class SQLitePersistence extends Persistence {
     for (final WeakReference<SqliteIndexManager> reference in _indexManagers) {
       await reference.target?._refresh();
     }
-    await clientMetadata._onForeignCommit();
     _dataVersion = dataVersion;
     foreignCommitsSeen++;
   }
@@ -654,6 +670,13 @@ class SQLitePersistence extends Persistence {
         );
         await db.execute('COMMIT;');
         cleared = true;
+        final String? path = _databasePath;
+        for (final SQLitePersistence other
+            in _openInIsolate[path]?.toList() ?? const <SQLitePersistence>[]) {
+          if (!identical(other, this)) {
+            other._onClearedByOtherClient();
+          }
+        }
       } catch (_) {
         try {
           await db.execute('ROLLBACK;');

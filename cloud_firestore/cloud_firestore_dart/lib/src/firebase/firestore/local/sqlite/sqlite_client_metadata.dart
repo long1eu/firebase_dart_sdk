@@ -299,17 +299,6 @@ class SQLiteClientMetadata {
     _setPrimary(true);
   }
 
-  /// After another connection committed: notices that this client lost the lease. Taking it is left to the next
-  /// refresh.
-  Future<void> _onForeignCommit() async {
-    if (_isPrimary) {
-      final _PrimaryLease? lease = await _readLease();
-      if (lease?.ownerId != clientId) {
-        _setPrimary(false);
-      }
-    }
-  }
-
   /// The primary removes the rows of clients that did not refresh for [maxClientAgeMs], at most once per that time
   /// (`maybeGarbageCollectMultiClientState` of the JS SDK).
   Future<int> _maybeGarbageCollect() async {
