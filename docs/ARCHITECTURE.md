@@ -35,8 +35,12 @@ Also in the tree:
 - **Overlays**: the local view of a document with pending writes is one stored overlay per
   document (`local/persistance/document_overlay_cache.dart`, `local/sqlite/sqlite_overlay_migration_manager.dart`),
   as Android `local/DocumentOverlayCache.java` and `local/SQLiteOverlayMigrationManager.java`.
-- **Pipelines** (preview, separate library `lib/pipelines.dart`): `lib/pipeline/`. Server-executed
-  only. JS `lite-api/pipeline.ts`, `api/pipeline_impl.ts`, `core/pipeline-util.ts`.
+- **Pipelines** (preview, separate library `lib/pipelines.dart`): `lib/pipeline/`. Executed by the
+  server. JS `lite-api/pipeline.ts`, `api/pipeline_impl.ts`, `core/pipeline-util.ts`. A local
+  evaluator for expressions and aggregates and an executor for whole pipelines are in
+  `lib/pipeline/evaluation/` (Android `pipeline/evaluation/`, JS `core/pipeline_run.ts`); they are
+  internal and not yet used by the client (`test/unit/firebase/firestore/pipeline/evaluation/`,
+  `test/integration_enterprise/pipeline_*_property_test.dart`).
 - **Firestore Lite** (experimental, separate library `lib/lite.dart`): `lib/lite/`. No cache, no
   listeners: the API classes call `Datastore` directly (`remote/datastore/unary_client.dart`,
   `TransactionClient`), over gRPC or, on the web, over `remote/datastore/web/rest_transport.dart`
@@ -55,7 +59,9 @@ Also in the tree:
 - **Releasing calls**: `remote/datastore/call_release.dart` (`CallReleaser`) half-closes a call
   that the client is done with and cancels it only after a grace period (see the deviations).
 - **The app layer** is the other package, `firebase_core/firebase_app_dart` (`FirebaseApp`,
-  `FirebaseOptions`, `PlatformDependencies`).
+  `FirebaseOptions`, `PlatformDependencies`). Ready-made token providers (Firebase Auth users over
+  REST, service accounts, Application Default Credentials) are in the optional package
+  `firebase_auth/firebase_auth_providers_dart`; they plug into `FirebaseApp.authProvider`.
 
 ### The serial queue
 
@@ -154,7 +160,8 @@ changes. `PORTING NOTE` comments in `lib/` mark these places in the code.
 | `TransactionOptions(readOnly: true)` runs a read-only transaction of the backend (`BeginTransaction`, reads with its id, `Rollback`), with `Transaction.getQuery` / `getAggregate` and an optional `readTime`. Android and JS have no read-only transactions. | A consistent snapshot across documents and queries, as the server SDKs offer. | `test/integration/firebase/firestore/read_only_transaction_test.dart`, `test/unit/firebase/firestore/core/read_only_transaction_test.dart` |
 | Calls on a terminated instance fail with `FirestoreError` `failedPrecondition` through the returned `Future` or `Stream`, never synchronously (the JS behaviour). | One way to handle the error, whatever the call. | `test/integration/firebase/firestore/terminated_instance_test.dart` |
 | `Query.where('field')` with no non-null named argument throws an `ArgumentError` (FlutterFire returns the query unchanged). | A filter that silently does nothing hides mistakes. | `test/unit/firebase/firestore/query_where_test.dart` |
-| The public API is classes and methods with Java-style names plus Dart aliases, not the modular functions of the JS SDK; there is no multi-tab support. | Dart tree-shakes methods, and a VM client has one process per cache. | `test/unit/api/public_api.golden.txt` is the exact surface |
+| The public API is classes and methods with Java-style names plus Dart aliases, not the modular functions of the JS SDK. Internal members are library-private and reached through extensions that the public libraries do not export. | Dart tree-shakes methods. | `test/unit/api/public_api.golden.txt` is the exact surface |
+| There is no multi-tab coordination (the JS SDK's primary lease and `SharedClientState`): two clients on one SQLite file keep it consistent (see Persistence) but do not share listeners or pending writes, and on the web a second tab is refused by a Web Lock. Android and iOS have none either; the staged plan for it is in progress. | A VM client usually has one process per cache. | `test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`; the `multi-client` entry of `spec/spec_skip_list.dart` |
 
 ### Not deviations, but worth knowing
 

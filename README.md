@@ -48,7 +48,12 @@ dart pub add cloud_firestore_dart firebase_app_dart   # once 0.1.0 is published;
 - Persistent cache indexes (`persistentCacheIndexManager`, `setIndexConfiguration`), and a
   built-in detector of connectivity changes on the VM.
 - For Enterprise edition databases: the BSON value types, and Pipelines as a preview library
-  (server-executed only).
+  (executed by the server).
+- Two clients on the same SQLite cache file (a hot restart, a background isolate) keep it
+  consistent.
+- Authentication through a token provider on the `FirebaseApp`; ready-made ones (Firebase Auth
+  sign-in over REST, service accounts, Application Default Credentials) are in
+  `firebase_auth_providers_dart`.
 - Firestore Lite (experimental, `package:cloud_firestore_dart/lite.dart`): a client without
   cache and listeners where every call is one request.
 
@@ -74,15 +79,17 @@ null safety, and parts of its public API follow the JS SDK.
   tried.
 - A production verification kit exists (`tool/verify_production`) and passes against the
   emulators; **it has not been run against a real project**.
-- Not implemented: sharing one cache between running clients (the multi-tab support of the JS
-  SDK), a Firebase Auth client, and Pipelines beyond the preview (no search, no local
-  evaluation, no listeners). The package README lists the known gaps.
+- Not implemented: coordination between clients that share one cache (the multi-tab support of
+  the JS SDK), a full Firebase Auth SDK (no federated sign-in), and Pipelines beyond the preview
+  (no search stage, no window functions, no real-time pipelines; a local evaluator exists but
+  is internal and not used yet). The package README lists the known gaps.
 
-This repository ports Firestore and the Firebase Core pieces it needs. There is no Auth, Storage or
-Realtime Database client here; for those see
-[appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart). The `firebase_auth`,
-`firebase_storage_dart` and `google_sign_in_dart` directories are older code from the original project and
-are not part of the migrated, tested set.
+This repository ports Firestore and the Firebase Core pieces it needs, plus token providers for
+Firestore in `firebase_auth/firebase_auth_providers_dart`. There is no full Auth SDK, no Storage
+and no Realtime Database client here; for those see
+[appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart). The other directories
+under `firebase_auth`, and `firebase_storage_dart` and `google_sign_in_dart`, are older code from
+the original project and are not part of the migrated, tested set.
 
 ## Packages
 
@@ -90,6 +97,7 @@ are not part of the migrated, tested set.
 |---|---|---|
 | `cloud_firestore_dart` | `cloud_firestore/cloud_firestore_dart` | The Firestore client (formerly `cloud_firestore_vm`) |
 | `firebase_app_dart` | `firebase_core/firebase_app_dart` | `FirebaseApp` and options (formerly `firebase_core_vm`) |
+| `firebase_auth_providers_dart` | `firebase_auth/firebase_auth_providers_dart` | Optional token providers: Firebase Auth users over REST, service accounts, Application Default Credentials (not published) |
 
 The former internal packages are folded in: `_firebase_database_collection_vm` into
 `cloud_firestore_dart` (`lib/src/database_collection`) and `_firebase_internal_vm` into

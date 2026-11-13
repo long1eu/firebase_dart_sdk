@@ -825,14 +825,15 @@ Not done:
   published.
 - **Web beyond the experiment**: OPFS storage, and any browser other than Chrome.
 - **Pipelines** beyond the [preview](#pipelines-preview) described above: full-text search,
-  window functions, pipelines in a `Transaction`, local evaluation and real-time pipelines.
+  window functions, pipelines in a `Transaction`, local evaluation (an evaluator exists inside
+  the package but the client does not use it yet) and real-time pipelines.
 - `Query.findNearest` evaluation against the local cache.
-- **Sharing one cache between running clients** (the multi-tab support of the JS SDK): one
-  process, or one browser tab, at a time. See
+- **Coordination between running clients that share one cache** (the multi-tab support of the
+  JS SDK). Two clients on one SQLite file keep it consistent but do not see each other's
+  listeners or pending writes; in a browser, one tab at a time. See
   [Persistence and connectivity](#persistence-and-connectivity).
 - **Persistent cache indexes** for queries with inequalities on several fields (they are
   scanned, as upstream), and with a memory cache.
-- **A Firebase Auth client.** The app supplies the ID token through `PlatformDependencies`.
 - Android-specific pieces of the Android SDK.
 - A Firebase Auth SDK. Tokens for Firestore (user sign-in over REST, service accounts,
   Application Default Credentials) are in `firebase_auth_providers_dart`, see
