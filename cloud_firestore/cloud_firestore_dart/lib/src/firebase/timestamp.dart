@@ -112,9 +112,11 @@ class Timestamp implements Comparable<Timestamp> {
   /// microsecond precision. Sub-microsecond precision is truncated toward the
   /// earlier time.
   DateTime toDate() {
-    return DateTime.fromMicrosecondsSinceEpoch(
-      seconds * 1000000 + nanoseconds ~/ 1000,
-    );
+    // Milliseconds first, then the remaining microseconds: seconds * 10^6 is
+    // above 2^53 (not exact on the web) for dates after about the year 2255.
+    return DateTime.fromMillisecondsSinceEpoch(
+      seconds * 1000 + nanoseconds ~/ 1000000,
+    ).add(Duration(microseconds: (nanoseconds ~/ 1000) % 1000));
   }
 
   /// The number of milliseconds since the Unix epoch 1970-01-01T00:00:00Z.

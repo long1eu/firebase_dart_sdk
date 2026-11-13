@@ -23,4 +23,28 @@ void main() {
     expect(metadata['x-goog-request-params'], prefix);
     expect(metadata['x-goog-api-client'], isNotEmpty);
   });
+
+  // Review L12: the header used the whole `Platform.version`, which has spaces,
+  // parentheses and quotes ("3.12.2 (stable) (...) on "macos_arm64"").
+  test('x-goog-api-client is space-separated name/version tokens', () async {
+    final ChannelOptionsProvider provider = ChannelOptionsProvider(
+      databaseId: DatabaseId.forDatabase('my-project', 'my-db'),
+      credentialsProvider: EmptyCredentialsProvider(),
+    );
+
+    final Map<String, String> metadata = <String, String>{};
+    for (MetadataProvider metadataProvider
+        in provider.callOptions.metadataProviders) {
+      await metadataProvider(metadata, 'uri');
+    }
+
+    expect(
+      metadata['x-goog-api-client'],
+      matches(
+        RegExp(
+          r'^gl-dart/[0-9A-Za-z.+\-]+ fire/[0-9A-Za-z.+\-]+ grpc/[0-9A-Za-z.+\-]+$',
+        ),
+      ),
+    );
+  });
 }

@@ -263,4 +263,48 @@ void main() {
       expect(log, <String>['open', 'close', 'open']);
     },
   );
+
+  // Review R2-L3: instances that were still being created were kept by app name
+  // only, so an app deleted and recreated in that window got the instance of the
+  // old app object. instanceFor is synchronous since b1a5b833; this pins it.
+  test('an app deleted while its instance is still opening does not hand that '
+      'instance to the new app of the same name', () async {
+    final String name = uniqueApp();
+    final String dbName = uniqueDb();
+    addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
+    final List<String> log = <String>[];
+
+    final FirebaseApp first = newApp(name);
+    final Firestore old = Firestore.instanceFor(
+      app: first,
+      settings: offlineSettings,
+      openDatabase: recording(openFixed(dbName), log),
+    );
+    // Not awaited: the old instance is still opening its cache.
+    first.delete();
+    final FirebaseApp second = newApp(name);
+    addTearDown(second.delete);
+    final Firestore current = Firestore.instanceFor(
+      app: second,
+      settings: offlineSettings,
+      openDatabase: recording(openFixed(dbName), log),
+    );
+    addTearDown(current.terminate);
+
+    expect(identical(current, old), isFalse);
+    expect(identical(current.app, second), isTrue);
+    expect(identical(Firestore.instanceFor(app: second), current), isTrue);
+
+    // The delete event of the first app (delivered asynchronously) must not
+    // shut down the instance of the second one.
+    await current.initialized;
+    await Future<void>.delayed(Duration.zero);
+    expect(identical(Firestore.instanceFor(app: second), current), isTrue);
+    // Throws if the instance was terminated.
+    final QuerySnapshot<Map<String, Object?>> cached = await current
+        .collection('coll')
+        .get(Source.cache);
+    expect(cached.docs, isEmpty);
+    expect(log, <String>['open', 'close', 'open']);
+  });
 }
