@@ -195,7 +195,10 @@ abstract class Mutation {
     final ObjectValue docValue = doc is Document ? doc.data : ObjectValue.empty;
     ObjectValue patchValue = ObjectValue.empty;
     final Set<FieldPath> maskSet = <FieldPath>{};
-    for (FieldPath path in mask.mask) {
+    // In order, as upstream (a sorted FieldMask): a deleted parent such as `a.b` must be handled before the fields
+    // below it (`a.b.c`), or its own parent (`a`, left as an empty map) is dropped from the overlay.
+    final List<FieldPath> paths = mask.mask.toList()..sort();
+    for (FieldPath path in paths) {
       if (maskSet.contains(path)) {
         continue;
       }

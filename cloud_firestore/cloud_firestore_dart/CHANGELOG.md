@@ -8,6 +8,15 @@
   database name the gRPC transport sends.
 - Firestore Lite on the web sends the browser's cookies with its REST calls to a Cloud Workstations
   host (`*.cloudworkstations.dev`), as the JS SDK's FetchConnection does; other hosts get none.
+- `FieldPath.fromServerFormat` (used for field paths from the backend, bundles and index configurations) rejects
+  a path with an unterminated backtick, as the JS SDK does.
+- A bundle whose document or document metadata names something other than a document (a collection, the
+  `documents` root) or that holds a reference value that is not a document is now rejected as an invalid bundle
+  (an `ArgumentError`), as in the iOS SDK. Before, the root name loaded a document with an empty key and the other
+  names failed an internal assertion.
+- The local view of a document is now right when its pending writes delete a nested field and later its
+  parent (for example `a.b.c` set, then `a.b.c` and `a.b` deleted): the overlay kept for it handles the fields
+  in order, as the JS and iOS SDKs do, and no longer drops the parent `a` left as an empty map.
 - A listen or write stream that the backend closes with UNAUTHENTICATED invalidates the token
   only if it has been open for less than 10 seconds, as in the Android and JS SDKs; a stream that
   was healthy keeps it. Before, every UNAUTHENTICATED of a stream invalidated the token (unary

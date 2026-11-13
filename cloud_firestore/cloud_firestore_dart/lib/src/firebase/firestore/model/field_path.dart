@@ -60,6 +60,10 @@ class FieldPath extends BasePath<FieldPath> {
       }
       i++;
     }
+    if (inBackticks) {
+      // As the JS SDK (FieldPath.fromServerFormat) and the iOS SDK.
+      throw ArgumentError('Unterminated ` in path: $path');
+    }
     final String lastElem = buffer.toString();
     if (lastElem.isEmpty) {
       throw ArgumentError(

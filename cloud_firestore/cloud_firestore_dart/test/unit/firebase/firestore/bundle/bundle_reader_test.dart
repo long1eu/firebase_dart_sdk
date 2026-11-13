@@ -26,6 +26,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/named_query.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:test/test.dart';
 
@@ -407,5 +408,69 @@ void main() {
     await bundleReader.close();
     // Closing twice is fine.
     await bundleReader.close();
+  });
+
+  // Ported from the iOS SDK (Firestore/core/test/unit/bundle/bundle_reader_test.cc).
+  group('iOS bundle reader cases', () {
+    /// Reads every element of [bundle]; throws if the bundle is invalid.
+    Future<void> readAll(String bundle) async {
+      final BundleReader bundleReader = readerFor(bundle);
+      await bundleReader.getBundleMetadata();
+      while (await bundleReader.getNextElement() != null) {}
+    }
+
+    test('testReadsEmptyBundle', () async {
+      // A create time without seconds or nanos is the epoch.
+      final String metadata = jsonEncode(<String, dynamic>{
+        'metadata': <String, dynamic>{
+          'id': 'bundle-1',
+          'version': 1,
+          'totalDocuments': 0,
+          'createTime': <String, dynamic>{},
+          'totalBytes': 0,
+        },
+      });
+      final BundleReader bundleReader = readerFor(
+        '${utf8.encode(metadata).length}$metadata',
+      );
+
+      final BundleMetadata actual = await bundleReader.getBundleMetadata();
+      expect(actual.bundleId, 'bundle-1');
+      expect(actual.createTime, SnapshotVersion.none);
+      expect(await bundleReader.getNextElement(), isNull);
+      expect(bundleReader.bytesRead, 0);
+    });
+
+    test('testFailsWithBadLengthPrefix', () async {
+      final String bundle = TestBundleBuilder(
+        testProject,
+      ).build('bundle-1', 6000004000, 0);
+      for (int l = 1; l < 4; ++l) {
+        await expectLater(
+          readerFor(bundle.substring(l)).getBundleMetadata(),
+          throwsA(isA<ArgumentError>()),
+          reason: 'prefix cut by $l',
+        );
+      }
+    });
+
+    test('testFailsWhenBundleIsSomehowCorrupted', () async {
+      final TestBundleBuilder bundleBuilder = TestBundleBuilder(testProject);
+      addDoc1Metadata(bundleBuilder);
+      addDoc1(bundleBuilder);
+      addLimitQuery(bundleBuilder);
+      addDoc2Metadata(bundleBuilder);
+      addDoc2(bundleBuilder);
+      final String bundle = bundleBuilder.build('bundle-1', 6000004000, 0);
+
+      for (int i = 0; i < bundle.length; ++i) {
+        final String copy = '${bundle.substring(0, i)}1${bundle.substring(i)}';
+        await expectLater(
+          readAll(copy),
+          throwsA(isA<ArgumentError>()),
+          reason: 'a "1" inserted at $i',
+        );
+      }
+    });
   });
 }

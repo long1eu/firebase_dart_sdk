@@ -551,4 +551,50 @@ void main() {
     // There are (0! + 6*1! + 15*2! + 20*3! + 15*4! + 6*5! + 6!) * 3 = 5871 cases.
     expect(_runCombinationTests(docs, mutations), 5871);
   });
+
+
+  // Ported from the iOS SDK (Firestore/core/test/unit/model/mutation_test.cc).
+  test('testOverlayWithFieldDeletionOfNestedFieldAndParentField', () {
+    _verifyOverlayRoundTrips(
+        doc('collection/key', 1, map(<dynamic>['foo', 1])), <Mutation>[
+      _patch('collection/key', <String, Object?>{
+        'foo': 'foo-patched-value',
+        'bar.baz': firestore.FieldValue.increment(1),
+      }),
+      _patch('collection/key', <String, Object?>{
+        'foo': 'foo-patched-value',
+        'bar.baz': firestore.FieldValue.serverTimestamp(),
+        'a.b.c': firestore.FieldValue.increment(1),
+      }),
+      _patch('collection/key', <String, Object?>{
+        'foo': 'foo-patched-value',
+        'bar.baz': firestore.FieldValue.delete(),
+        'a.b.c': firestore.FieldValue.delete(),
+      }),
+      _patch('collection/key', <String, Object?>{
+        'foo': 'foo-patched-value',
+        'bar': firestore.FieldValue.delete(),
+        'a.b': firestore.FieldValue.delete(),
+      }),
+    ]);
+  });
+
+  // Ported from the iOS SDK (Firestore/core/test/unit/model/mutation_test.cc).
+  test('testOverlayWorksWithDeletingSameField', () {
+    _verifyOverlayRoundTrips(
+        doc('collection/key', 1, map(<dynamic>['foo', 1])), <Mutation>[
+      _patch('collection/key', <String, Object?>{
+        'foo': 'foo-patched-value',
+        'bar': firestore.FieldValue.serverTimestamp(),
+      }),
+      _patch('collection/key', <String, Object?>{
+        'foo': 'foo-patched-value',
+        'bar': firestore.FieldValue.delete(),
+      }),
+      _patch('collection/key', <String, Object?>{
+        'foo': 'foo-patched-value',
+        'bar': firestore.FieldValue.delete(),
+      }),
+    ]);
+  });
 }

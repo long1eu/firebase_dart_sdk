@@ -761,6 +761,112 @@ void queryEngineTestCase(
     }
   });
 
+  // Ported from the iOS SDK (Firestore/core/test/unit/local/query_engine_test.cc).
+  test('inAndNotInFiltersWithObjectValues', () async {
+    final Document doc1 = doc('coll/1', 1, map(<dynamic>['a', 1, 'b', 0]));
+    final Document doc2 = doc('coll/2', 1, map(<dynamic>['b', 1]));
+    final Document doc3 = doc('coll/3', 1, map(<dynamic>['a', 3, 'b', 2]));
+    final Document doc4 = doc('coll/4', 1, map(<dynamic>['a', 1, 'b', 3]));
+    final Document doc5 = doc(
+      'coll/5',
+      1,
+      map(<dynamic>[
+        'a',
+        <Object>[1, 2],
+        'b',
+        <Object>[
+          1,
+          <Object>[2, 3],
+        ],
+      ]),
+    );
+    final Document doc6 = doc(
+      'coll/6',
+      1,
+      map(<dynamic>[
+        'b',
+        map(<dynamic>['c', 2]),
+      ]),
+    );
+    await addDocument(<Document>[doc1, doc2, doc3, doc4, doc5, doc6]);
+
+    // a IN [1,[1,2]] && b IN [2,3]
+    final Query query1 = query('coll').filter(
+      andFilters(<Filter>[
+        filter('a', 'in', <Object?>[
+          1,
+          <Object>[1, 2],
+        ]),
+        filter('b', 'in', <Object?>[2, 3]),
+      ]),
+    );
+    final DocumentSet result1 = await expectFullCollectionScan(
+      () => runQuery(query1, SnapshotVersion.none),
+    );
+    expect(result1, docSet(query1.comparator, <Document>[doc4]));
+
+    // a != [1,2] && b IN [1, [1,[2,3]]]
+    final Query query2 = query('coll').filter(
+      andFilters(<Filter>[
+        filter('a', 'not-in', <Object?>[
+          <Object>[1, 2],
+        ]),
+        filter('b', 'in', <Object?>[
+          1,
+          <Object>[
+            1,
+            <Object>[2, 3],
+          ],
+        ]),
+      ]),
+    );
+    final DocumentSet result2 = await expectFullCollectionScan(
+      () => runQuery(query2, SnapshotVersion.none),
+    );
+    expect(result2, docSet(query2.comparator, <Document>[]));
+
+    // a IN [1,[1,2]] || b == {c : 2}
+    final Query query3 = query('coll').filter(
+      orFilters(<Filter>[
+        filter('a', 'in', <Object?>[
+          1,
+          <Object>[1, 2],
+        ]),
+        filter('b', 'in', <Object?>[
+          map(<dynamic>['c', 2]),
+        ]),
+      ]),
+    );
+    final DocumentSet result3 = await expectFullCollectionScan(
+      () => runQuery(query3, SnapshotVersion.none),
+    );
+    expect(
+      result3,
+      docSet(query3.comparator, <Document>[doc1, doc4, doc5, doc6]),
+    );
+
+    // (a != 1 && a != [1,2]) || (b != [1,[2,3]] && b != {c : 2})
+    final Query query4 = query('coll').filter(
+      orFilters(<Filter>[
+        filter('a', 'not-in', <Object?>[
+          1,
+          <Object>[1, 2],
+        ]),
+        filter('b', 'not-in', <Object?>[
+          <Object>[
+            1,
+            <Object>[2, 3],
+          ],
+          map(<dynamic>['c', 2]),
+        ]),
+      ]),
+    );
+    final DocumentSet result4 = await expectFullCollectionScan(
+      () => runQuery(query4, SnapshotVersion.none),
+    );
+    expect(result4, docSet(query4.comparator, <Document>[doc1, doc3, doc4]));
+  });
+
   test('orQueryWithArrayMembership', () async {
     final Document doc1 = doc(
       'coll/1',

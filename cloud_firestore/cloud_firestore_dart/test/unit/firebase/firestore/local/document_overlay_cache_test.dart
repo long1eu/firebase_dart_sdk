@@ -205,6 +205,70 @@ void _run(String name, Future<Persistence> Function() createPersistence) {
       expect(await cache.getOverlay(key('coll1/doc4')), isNull);
     });
 
+    // Ported from the iOS SDK (Firestore/core/test/unit/local/document_overlay_cache_test.cc).
+    test('testGetOverlayExactlyMatchesTheGivenDocumentKey', () async {
+      await saveOverlaysForKeys(1, <String>['coll/doc1/sub/doc2']);
+
+      expect(await cache.getOverlay(key('coll/d')), isNull);
+      expect(await cache.getOverlay(key('coll/doc1')), isNull);
+      expect(await cache.getOverlay(key('coll/doc1ZZ')), isNull);
+
+      final Overlay? overlay = await cache.getOverlay(
+        key('coll/doc1/sub/doc2'),
+      );
+      expect(overlay, isNotNull);
+      expect(overlay!.key, key('coll/doc1/sub/doc2'));
+    });
+
+    // Ported from the iOS SDK (Firestore/core/test/unit/local/document_overlay_cache_test.cc).
+    test('testOverwriteEntryUpdatesIndexes', () async {
+      final Mutation mutation1 = patchMutation(
+        'coll/doc1',
+        map(<dynamic>['foo', 'bar']),
+      );
+      await saveOverlays(100, <Mutation>[mutation1]);
+      final Mutation mutation2 = patchMutation(
+        'coll/doc1',
+        map(<dynamic>['biz', 'baz']),
+      );
+      await saveOverlays(101, <Mutation>[mutation2]);
+
+      expect(await cache.getOverlay(key('coll/doc1')), Overlay(101, mutation2));
+      await cache.removeOverlaysForBatchId(101);
+      expect(await cache.getOverlay(key('coll/doc1')), isNull);
+
+      // Overwriting an overlay drops the entry of its old batch: removing that
+      // batch leaves the new overlay alone.
+      final Mutation mutation3 = patchMutation(
+        'coll/doc1',
+        map(<dynamic>['xxx', 'yyy']),
+      );
+      await saveOverlays(200, <Mutation>[mutation3]);
+      await cache.removeOverlaysForBatchId(100);
+      expect(await cache.getOverlay(key('coll/doc1')), Overlay(200, mutation3));
+      expect(await cache.getOverlaysForCollection(path('coll'), -1), hasLength(1));
+    });
+
+    // Ported from the iOS SDK (Firestore/core/test/unit/local/document_overlay_cache_test.cc).
+    test('testSaveDoesntAffectSubCollections', () async {
+      final Mutation mutation1 = patchMutation(
+        'coll/doc/subcoll/subdoc',
+        map(<dynamic>['foo', 'bar1']),
+      );
+      final Mutation mutation2 = patchMutation(
+        'coll/doc',
+        map(<dynamic>['foo', 'bar2']),
+      );
+      await saveOverlays(1, <Mutation>[mutation1]);
+      await saveOverlays(2, <Mutation>[mutation2]);
+
+      expect(
+        (await cache.getOverlay(key('coll/doc/subcoll/subdoc')))!.mutation,
+        mutation1,
+      );
+      expect((await cache.getOverlay(key('coll/doc')))!.mutation, mutation2);
+    });
+
     test('testGetAllOverlaysForCollection', () async {
       final Mutation m1 = patchMutation(
         'coll/doc1',

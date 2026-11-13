@@ -82,8 +82,8 @@ class BundleSerializer {
   BundledDocumentMetadata decodeBundledDocumentMetadata(
     Map<String, dynamic> bundledDocumentMetadata,
   ) {
-    final DocumentKey key = DocumentKey.fromPath(
-      _decodeName(_getString(bundledDocumentMetadata, 'name')),
+    final DocumentKey key = _decodeDocumentKey(
+      _getString(bundledDocumentMetadata, 'name'),
     );
     final SnapshotVersion readTime = _decodeSnapshotVersion(
       _get(bundledDocumentMetadata, 'readTime'),
@@ -108,7 +108,7 @@ class BundleSerializer {
 
   BundleDocument decodeDocument(Map<String, dynamic> document) {
     final String name = _getString(document, 'name');
-    final DocumentKey key = DocumentKey.fromPath(_decodeName(name));
+    final DocumentKey key = _decodeDocumentKey(name);
     final SnapshotVersion updateTime = _decodeSnapshotVersion(
       _get(document, 'updateTime'),
     );
@@ -144,6 +144,37 @@ class BundleSerializer {
       );
     }
     return resourcePath.popFirst(5);
+  }
+
+  /// Decodes the name of a document of this database. A name that is not a
+  /// document (a collection, or the `documents` root) is an invalid bundle, as
+  /// in the iOS SDK (`BundleSerializer::DecodeDocument`); the Android and JS
+  /// SDKs fail an assertion or accept the empty key instead.
+  DocumentKey _decodeDocumentKey(String name) {
+    final ResourcePath path = _decodeName(name);
+    if (path.isEmpty || !DocumentKey.isDocumentKey(path)) {
+      throw ArgumentError('Resource name is not a valid document key: $name');
+    }
+    return DocumentKey.fromPath(path);
+  }
+
+  /// Validates the shape of a reference value, as the iOS SDK does
+  /// (`BundleSerializer::DecodeReferenceValue`): a reference that does not
+  /// name a document is an invalid bundle rather than an assertion failure
+  /// when the document is read. References to other databases are kept, as
+  /// in the Android and JS SDKs.
+  String _decodeReferenceValue(String reference) {
+    final ResourcePath path = ResourcePath.fromString(reference);
+    final bool isDocument =
+        path.length > 5 &&
+        path[0] == 'projects' &&
+        path[2] == 'databases' &&
+        path[4] == 'documents' &&
+        DocumentKey.isDocumentKey(path.popFirst(5));
+    if (!isDocument) {
+      throw ArgumentError('Tried to deserialize an invalid key: $reference');
+    }
+    return reference;
   }
 
   /// Validates that a path has a prefix that belongs to the current database. (Android:
@@ -497,7 +528,9 @@ class BundleSerializer {
     } else if (value.containsKey('bytesValue')) {
       builder.bytesValue = _decodeBytes(_getString(value, 'bytesValue'));
     } else if (value.containsKey('referenceValue')) {
-      builder.referenceValue = _getString(value, 'referenceValue');
+      builder.referenceValue = _decodeReferenceValue(
+        _getString(value, 'referenceValue'),
+      );
     } else if (value.containsKey('geoPointValue')) {
       final Map<String, dynamic> geoPoint = _getObject(value, 'geoPointValue');
       builder.geoPointValue = proto.LatLng.create()

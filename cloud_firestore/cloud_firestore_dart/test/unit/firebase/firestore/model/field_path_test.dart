@@ -146,4 +146,62 @@ void main() {
     expect(path.popFirst().popLast().toString(), 'bar');
     expect(path.popLast().popFirst().toString(), 'bar');
   });
+
+  // Ported from the iOS SDK (Firestore/core/test/unit/model/field_path_test.cc).
+  test('testParsing', () {
+    for (final MapEntry<String, int> entry in <String, int>{
+      'foo': 1,
+      'foo.bar': 2,
+      'foo.bar.baz': 3,
+      r'`.foo\\`': 1,
+      r'`.foo\\`.`.foo`': 2,
+      r'foo.`\``.bar': 3,
+    }.entries) {
+      final FieldPath path = FieldPath.fromServerFormat(entry.key);
+      expect(path.canonicalString, entry.key);
+      expect(path.length, entry.value);
+    }
+
+    final FieldPath pathWithDot = FieldPath.fromServerFormat(r'foo\.bar');
+    expect(pathWithDot.canonicalString, '`foo.bar`');
+    expect(pathWithDot.length, 1);
+  });
+
+  // Ported from the iOS SDK (Firestore/core/test/unit/model/field_path_test.cc).
+  test('testParseFailures', () {
+    for (final String path in <String>[
+      '',
+      '.',
+      '..',
+      'foo.',
+      '.bar',
+      'foo..bar',
+      r'foo\',
+      r'foo.\',
+      'foo`',
+      'foo```',
+      '`foo',
+    ]) {
+      expect(
+        () => FieldPath.fromServerFormat(path),
+        throwsArgumentError,
+        reason: path,
+      );
+    }
+  });
+
+  // Ported from the iOS SDK (Firestore/core/test/unit/model/field_path_test.cc).
+  test('testCanonicalStringEscaping', () {
+    // Should be escaped
+    expect(FieldPath.fromServerFormat('1').canonicalString, '`1`');
+    expect(FieldPath.fromServerFormat('1ab').canonicalString, '`1ab`');
+    expect(FieldPath.fromServerFormat('ab!').canonicalString, '`ab!`');
+    expect(FieldPath.fromServerFormat('/ab').canonicalString, '`/ab`');
+    expect(FieldPath.fromServerFormat('a#b').canonicalString, '`a#b`');
+
+    // Should not be escaped
+    expect(FieldPath.fromServerFormat('_ab').canonicalString, '_ab');
+    expect(FieldPath.fromServerFormat('a1').canonicalString, 'a1');
+    expect(FieldPath.fromServerFormat('a_').canonicalString, 'a_');
+  });
 }

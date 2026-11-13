@@ -865,4 +865,84 @@ void main() {
       );
     });
   });
+
+  // Ported from the iOS SDK (Firestore/core/test/unit/bundle/bundle_serializer_test.cc).
+  group('iOS bundle serializer cases', () {
+    test('testDecodeNonDocumentKeyResourceNameFails', () {
+      // A collection, the `documents` root (an empty key) and a name that
+      // stops before `documents`.
+      for (final String name in <String>[
+        '$testProject/bundle',
+        testProject,
+        'projects/project/databases/(default)',
+      ]) {
+        expect(
+          () => serializer.decodeDocument(<String, dynamic>{
+            'name': name,
+            'updateTime': '2020-01-01T00:00:02.000000002Z',
+          }),
+          throwsA(isA<ArgumentError>()),
+          reason: name,
+        );
+        expect(
+          () => serializer.decodeBundledDocumentMetadata(<String, dynamic>{
+            'name': name,
+            'exists': true,
+            'readTime': '1970-01-01T00:00:00Z',
+          }),
+          throwsA(isA<ArgumentError>()),
+          reason: name,
+        );
+      }
+    });
+
+    test('testDecodeReferenceValueMissingDocumentsSegmentFails', () {
+      for (final String reference in <String>[
+        'projects/project/databases/(default)',
+        'projects/project/databases/(default)/documents',
+        'projects/project/databases/(default)/documents/coll',
+      ]) {
+        expect(
+          () => serializer.decodeDocument(<String, dynamic>{
+            'name': testDocument,
+            'fields': <String, dynamic>{
+              'foo': <String, dynamic>{'referenceValue': reference},
+            },
+            'updateTime': '2020-01-01T00:00:02.000000002Z',
+          }),
+          throwsA(isA<ArgumentError>()),
+          reason: reference,
+        );
+      }
+    });
+
+    test('testDecodeQueriesFromOtherProjectsFails', () {
+      for (final String parent in <String>[
+        'projects/other/databases/(default)/documents',
+        'projects/project/databases/other/documents',
+      ]) {
+        expect(
+          () => serializer.decodeNamedQuery(<String, dynamic>{
+            'name': 'query-1',
+            'bundledQuery': <String, dynamic>{
+              'parent': parent,
+              'structuredQuery': collQuery(),
+            },
+            'readTime': '2020-01-01T00:00:01.000000001Z',
+          }),
+          throwsA(isA<ArgumentError>()),
+          reason: parent,
+        );
+      }
+    });
+
+    test('testDecodeCollectionSourceFromNotArrayFails', () {
+      expect(
+        () => assertDecodesNamedQuery(<String, dynamic>{
+          'from': 'not-an-array',
+        }, query('coll')),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+  });
 }
