@@ -422,13 +422,28 @@ Future<void> checkQueriesAgainstBackend(
     }
     List<String> actual;
     String note = '';
+    final Stopwatch getTime = Stopwatch()..start();
+    final Future<QuerySnapshot<Map<String, Object?>>> serverGet = generated
+        .query
+        .get(Source.server);
     try {
+      QuerySnapshot<Map<String, Object?>> snapshot;
+      try {
+        snapshot = await serverGet.timeout(const Duration(seconds: 10));
+      } on TimeoutException {
+        // Slow is not stuck: under the load of a full suite a get can take
+        // longer than 10 seconds (seen once, PROPERTY_SEED=20269032). Only a
+        // get that does not complete at all is a stuck view.
+        snapshot = await serverGet.timeout(const Duration(seconds: 30));
+        // ignore: avoid_print
+        print(
+          'property: get(Source.server) took ${getTime.elapsedMilliseconds} ms '
+          '(seed $seed, query seed $querySeed): slow, not stuck',
+        );
+      }
       actual = <String>[
         for (final QueryDocumentSnapshot<Map<String, Object?>> doc
-            in (await generated.query
-                    .get(Source.server)
-                    .timeout(const Duration(seconds: 10)))
-                .docs)
+            in snapshot.docs)
           doc.id,
       ];
     } on TimeoutException {
@@ -437,7 +452,7 @@ Future<void> checkQueriesAgainstBackend(
       // instance, which has nothing cached, for the answer of the backend,
       // and go on with it (the old one still has the stuck listener).
       note =
-          '  get(Source.server) did not complete within 10 seconds while '
+          '  get(Source.server) did not complete within 40 seconds while '
           'the documents were cached.\n';
       final Firestore fresh = await newFirestore();
       collection = fresh.collection(collection.path);
