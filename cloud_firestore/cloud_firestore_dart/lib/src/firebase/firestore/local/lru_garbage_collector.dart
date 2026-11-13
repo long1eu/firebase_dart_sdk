@@ -250,13 +250,26 @@ class LruGarbageCollectorScheduler {
   bool _stopped = false;
   TimerTask? _gcTask;
 
+  /// Incremented by every [start]: a run of an earlier start that finishes afterwards does not schedule another one.
+  int _generation = 0;
+
+  /// Whether the scheduler was started and not stopped since.
+  bool get started => _gcTask != null && !_stopped;
+
   /// How long we wait to try running LRU GC after SDK initialization.
   static const Duration _initialGcDelay = Duration(minutes: 1);
 
   /// Minimum amount of time between GC checks, after the first one.
   static const Duration _regularGcDelay = Duration(minutes: 5);
 
+  /// Starts the scheduling, also after [stop] (a client that becomes the primary client of its cache again). Does
+  /// nothing when it is running.
   void start() {
+    if (started) {
+      return;
+    }
+    _stopped = false;
+    _generation++;
     if (_garbageCollector._params.minBytesThreshold !=
         LruGarbageCollectorParams._collectionDisabled) {
       _scheduleGC();
@@ -267,10 +280,12 @@ class LruGarbageCollectorScheduler {
     // A run that is already in flight must not reschedule itself afterwards.
     _stopped = true;
     _gcTask?.cancel();
+    _gcTask = null;
   }
 
   void _scheduleGC() {
     final Duration delay = _hasRun ? _regularGcDelay : _initialGcDelay;
+    final int generation = _generation;
 
     _gcTask = _scheduler.add(TaskId.garbageCollection, delay, () async {
       try {
@@ -280,7 +295,7 @@ class LruGarbageCollectorScheduler {
         Log.w('LruGarbageCollectorScheduler', 'Garbage collection failed: $e');
       }
       _hasRun = true;
-      if (!_stopped) {
+      if (!_stopped && generation == _generation) {
         _scheduleGC();
       }
     });

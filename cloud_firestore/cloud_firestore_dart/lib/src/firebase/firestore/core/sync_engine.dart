@@ -27,6 +27,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_pro
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_view_changes.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_write_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_purpose.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
@@ -286,7 +287,10 @@ class SyncEngine implements RemoteStoreCallback {
     targetQueries.remove(query);
 
     if (targetQueries.isEmpty) {
-      await _localStore.releaseTarget(targetId);
+      await _localStore.releaseTarget(
+        targetId,
+        keepPersistedTargetData: !_isPrimary,
+      );
       if (shouldUnlistenToRemote) {
         await _remoteStore.stopListening(targetId);
       }
@@ -351,6 +355,34 @@ class SyncEngine implements RemoteStoreCallback {
     return _remoteStore.runVectorQuery(query, vectorQuery);
   }
 
+  /// Whether this client is the primary client of its cache (always true with a cache only one client can use).
+  bool _isPrimary = true;
+
+  /// Whether this client is the primary client of its cache, as last told by [applyPrimaryState].
+  bool get isPrimaryClient => _isPrimary;
+
+  /// Called when this client becomes or stops being the primary client of its cache: only the primary uses the
+  /// network.
+  ///
+  /// PORTING NOTE: `syncEngineApplyPrimaryState` of the JS SDK also reconciles the views with the persisted state and
+  /// takes over (or drops) the targets of the other clients through the state the clients share. Clients do not share
+  /// state yet (stage 1 of the multi-client plan), so this only starts and stops the network; the client starts and
+  /// stops the LRU garbage collection and the index backfill.
+  Future<void> applyPrimaryState(bool isPrimary) async {
+    if (_isPrimary == isPrimary) {
+      return;
+    }
+    Log.d(_tag, isPrimary ? 'Became primary' : 'Is no longer primary');
+    _isPrimary = isPrimary;
+    await _remoteStore.applyPrimaryState(isPrimary);
+  }
+
+  /// The failure of a primary-only transaction of a client that lost the primary lease is ignored
+  /// (`ignoreIfPrimaryLeaseLoss` of the JS SDK): the primary client does that work.
+  void _logPrimaryLeaseLoss() {
+    Log.d(_tag, 'Unexpectedly lost the primary lease');
+  }
+
   /// Called by [FirestoreClient] to notify us of a new remote event.
   @override
   Future<void> handleRemoteEvent(RemoteEvent event) async {
@@ -392,8 +424,16 @@ class SyncEngine implements RemoteStoreCallback {
       }
     }
 
-    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
-        await _localStore.applyRemoteEvent(event);
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
+    try {
+      changes = await _localStore.applyRemoteEvent(event);
+    } on FirestoreError catch (e) {
+      if (!isPrimaryLeaseLoss(e)) {
+        rethrow;
+      }
+      _logPrimaryLeaseLoss();
+      return;
+    }
     await _emitNewSnapsAndNotifyLocalStore(
       changes,
       event,
@@ -525,7 +565,10 @@ class SyncEngine implements RemoteStoreCallback {
         _queriesByTarget.containsKey(targetId),
         () => 'Unknown target: $targetId',
       );
-      await _localStore.releaseTarget(targetId);
+      await _localStore.releaseTarget(
+        targetId,
+        keepPersistedTargetData: !_isPrimary,
+      );
       await _removeAndCleanupTarget(targetId, error);
     }
   }
@@ -550,8 +593,16 @@ class SyncEngine implements RemoteStoreCallback {
       _lastAcknowledgedCommitVersion = mutationBatchResult.commitVersion;
     }
 
-    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
-        await _localStore.acknowledgeBatch(mutationBatchResult);
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
+    try {
+      changes = await _localStore.acknowledgeBatch(mutationBatchResult);
+    } on FirestoreError catch (e) {
+      if (!isPrimaryLeaseLoss(e)) {
+        rethrow;
+      }
+      _logPrimaryLeaseLoss();
+      return;
+    }
 
     await _emitNewSnapsAndNotifyLocalStore(changes, /*remoteEvent:*/ null);
   }
@@ -560,8 +611,17 @@ class SyncEngine implements RemoteStoreCallback {
   Future<void> handleRejectedWrite(int batchId, GrpcError status) async {
     _assertCallback('handleRejectedWrite');
 
-    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes =
-        await _localStore.rejectBatch(batchId);
+    final ImmutableSortedMap<DocumentKey, MaybeDocument> changes;
+    try {
+      changes = await _localStore.rejectBatch(batchId);
+    } on FirestoreError catch (e) {
+      // As in the JS SDK the user is not told: the batch stays in the queue for the primary client.
+      if (!isPrimaryLeaseLoss(e)) {
+        rethrow;
+      }
+      _logPrimaryLeaseLoss();
+      return;
+    }
 
     if (changes.isNotEmpty) {
       _logErrorIfInteresting(status, 'Write failed at ${changes.minKey!.path}');

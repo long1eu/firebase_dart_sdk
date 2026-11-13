@@ -16,7 +16,7 @@ class SQLiteSchema {
   const SQLiteSchema(this.db);
 
   /// The version of the schema. Increase this by one for each migration added to [runMigrations] below.
-  static const int version = 14;
+  static const int version = 15;
 
   /// The batch size for data migrations on a large table. This is chosen to balance the memory usage of the rows read
   /// with the number of round trips.
@@ -120,6 +120,12 @@ class SQLiteSchema {
     // (found with tool/bench/local_store_bench.dart).
     if (fromVersion < 14 && toVersion >= 14) {
       await _createV14LookupIndexes();
+    }
+
+    // Migration 15 has no counterpart in the Android SDK (which has a single client per cache): the client metadata,
+    // the primary lease and the epoch of the cache, as the `clientMetadata` and `owner` stores of the JS SDK.
+    if (fromVersion < 15 && toVersion >= 15) {
+      await _createV15ClientMetadata();
     }
 
     // Adding a new migration? READ THIS FIRST!
@@ -567,6 +573,36 @@ class SQLiteSchema {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS index_entries_document_key ON index_entries (index_id, uid, document_key)',
+    );
+  }
+
+  /// The tables of the clients of a cache (see `SQLiteClientMetadata`):
+  ///   * `clients`: one row per client, refreshed every few seconds;
+  ///   * `primary_client`: the single row of the primary lease;
+  ///   * `persistence_epoch`: a counter that `clearPersistence` increments when it empties a cache that other clients
+  ///     still have open.
+  Future<void> _createV15ClientMetadata() async {
+    await db.execute(
+      'CREATE TABLE IF NOT EXISTS clients ('
+      'client_id TEXT PRIMARY KEY, '
+      'update_time_ms INTEGER NOT NULL, '
+      'network_enabled INTEGER NOT NULL, '
+      'in_foreground INTEGER NOT NULL)',
+    );
+    await db.execute(
+      'CREATE TABLE IF NOT EXISTS primary_client ('
+      'id INTEGER PRIMARY KEY CHECK (id = 0), '
+      'owner_id TEXT NOT NULL, '
+      'allow_synchronization INTEGER NOT NULL, '
+      'lease_timestamp_ms INTEGER NOT NULL)',
+    );
+    await db.execute(
+      'CREATE TABLE IF NOT EXISTS persistence_epoch ('
+      'id INTEGER PRIMARY KEY CHECK (id = 0), '
+      'epoch INTEGER NOT NULL)',
+    );
+    await db.execute(
+      'INSERT OR IGNORE INTO persistence_epoch (id, epoch) VALUES (0, 0)',
     );
   }
 

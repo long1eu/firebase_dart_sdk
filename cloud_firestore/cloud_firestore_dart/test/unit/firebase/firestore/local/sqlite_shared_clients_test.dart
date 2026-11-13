@@ -429,6 +429,8 @@ void main() {
       () async {
         final Client a = await open();
         final Client b = await open();
+        // The start of B (its metadata and primary lease) is a commit A sees once.
+        await a.persistence.runTransaction('sync', () async {});
         final int seenByA = a.persistence.foreignCommitsSeen;
 
         await a.listen('a1');

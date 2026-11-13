@@ -58,6 +58,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/logic_utils.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/types.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/admin/v1/index.dart'
     as admin;
@@ -68,6 +69,7 @@ import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:semaphore/semaphore.dart';
 
+part 'sqlite_client_metadata.dart';
 part 'sqlite_index_manager.dart';
 part 'sqlite_lru_reference_delegate.dart';
 part 'sqlite_mutation_queue.dart';
@@ -85,12 +87,32 @@ class SQLitePersistence extends Persistence {
     this.openDatabase,
     this.databaseName,
     StatsCollector statsCollector,
+    String clientId,
+    Clock clock,
+    PrimaryLeaseMode leaseMode,
   ) : _statsCollector = statsCollector,
       // One lock per database (not one for the whole process): instances on different databases never wait on
       // each other, while two handles on the same file are serialized.
       _semaphore = GlobalSemaphore('persistence:$databaseName') {
     indexManager = SqliteIndexManager(this);
+    clientMetadata = SQLiteClientMetadata._(this, clientId, clock, leaseMode);
   }
+
+  /// The metadata of this client in the cache and its primary lease.
+  late final SQLiteClientMetadata clientMetadata;
+
+  /// Whether this client holds the primary lease of the cache (see [SQLiteClientMetadata]).
+  bool get isPrimary => clientMetadata.isPrimary;
+
+  /// The epoch of the cache when this client opened it. `clearPersistence` of another client that finds clients
+  /// alive empties the cache in place and increments the epoch instead of deleting the file.
+  int? _epoch;
+
+  /// Set when the cache was cleared by another client: every transaction fails from then on.
+  bool _clearedByOtherClient = false;
+
+  /// Called (once) when this client notices that another client cleared the cache. The client terminates.
+  void Function()? databaseClearedListener;
 
   static const String tag = 'SQLitePersistence';
 
@@ -99,6 +121,25 @@ class SQLitePersistence extends Persistence {
   final LocalSerializer serializer;
   final StatsCollector _statsCollector;
   final Semaphore _semaphore;
+
+  /// The lock of the database file once it is open, taken after [_semaphore]. Two persistences with different names
+  /// can have the same file open in one isolate (an opener decides the file). One of them can hold the write lock of
+  /// SQLite across an `await`; without this lock the other one would then wait for it in a synchronous call, which
+  /// blocks the isolate, and with it the first one, until the busy timeout.
+  Semaphore? _fileSemaphore;
+
+  Future<void> _lock() async {
+    await _semaphore.acquire();
+    final Semaphore? file = _fileSemaphore;
+    if (file != null) {
+      await file.acquire();
+    }
+  }
+
+  void _unlock() {
+    _fileSemaphore?.release();
+    _semaphore.release();
+  }
 
   late Database _db;
 
@@ -176,6 +217,29 @@ class SQLitePersistence extends Persistence {
     LruGarbageCollectorParams params, [
     StatsCollector statsCollector = StatsCollector.noOp,
   ]) async {
+    return createWithLease(
+      persistenceKey,
+      databaseId,
+      serializer,
+      openDatabase,
+      params,
+      statsCollector: statsCollector,
+    );
+  }
+
+  /// [create] with the parameters of the primary lease: the id of this client (a new random one by default), the
+  /// clock of the lease and how a lease held by another client is treated.
+  static Future<SQLitePersistence> createWithLease(
+    String persistenceKey,
+    DatabaseId databaseId,
+    LocalSerializer serializer,
+    OpenDatabase openDatabase,
+    LruGarbageCollectorParams params, {
+    StatsCollector statsCollector = StatsCollector.noOp,
+    String? clientId,
+    Clock? clock,
+    PrimaryLeaseMode leaseMode = PrimaryLeaseMode.forceOwnership,
+  }) async {
     final String databaseName = sDatabaseName(persistenceKey, databaseId);
 
     final SQLitePersistence persistence = SQLitePersistence._(
@@ -183,6 +247,9 @@ class SQLitePersistence extends Persistence {
       openDatabase,
       databaseName,
       statsCollector,
+      clientId ?? autoId(),
+      clock ?? _systemClock,
+      leaseMode,
     );
 
     final SQLiteQueryCache queryCache = SQLiteQueryCache(
@@ -215,35 +282,149 @@ class SQLitePersistence extends Persistence {
 
   @override
   Future<void> start() async {
-    await _semaphore.acquire();
+    await _lock();
     try {
       Log.d(tag, 'Starting SQLite persistance');
       hardAssert(!started, 'SQLitePersistence double-started!');
       _db = await _openDb(databaseName, openDatabase);
       _databasePath = _db.path;
+      // A persistence that is started again already holds the lock of its file (from [_lock]): the semaphores are
+      // not reentrant, taking it twice would wait forever.
+      final Semaphore file = GlobalSemaphore('sqlite-file:${_db.path}');
+      if (!identical(file, _fileSemaphore)) {
+        await file.acquire();
+        _fileSemaphore?.release();
+        _fileSemaphore = file;
+      }
       final Database db = _db;
       _clearStorage = db is ClearableDatabase ? db.clearStorage : null;
       // Read before the state: a commit of another connection in between is then seen by the next transaction.
       _dataVersion = await _readDataVersion();
       await queryCache.start();
+      _epoch = await _readEpoch();
       started = true;
       referenceDelegate.start(queryCache.highestListenSequenceNumber);
+      await _metadataTransaction(() => clientMetadata._update(atStart: true));
     } finally {
-      _semaphore.release();
+      _unlock();
+    }
+  }
+
+  Future<int> _readEpoch() async {
+    return (await _db.query(
+          'SELECT epoch FROM persistence_epoch WHERE id = 0',
+        )).single['epoch']
+        as int;
+  }
+
+  /// A transaction for the client metadata: no listen sequence number is used up. The caller holds [_semaphore].
+  Future<T> _metadataTransaction<T>(
+    Future<T> Function() operation, {
+    bool checkForeignCommits = true,
+  }) async {
+    bool began = false;
+    try {
+      await _db.execute('BEGIN IMMEDIATE;');
+      began = true;
+      if (checkForeignCommits) {
+        await _refreshAfterForeignCommit();
+      }
+      final T result = await operation();
+      await _db.execute('COMMIT;');
+      began = false;
+      return result;
+    } catch (_) {
+      if (began) {
+        try {
+          await _db.execute('ROLLBACK;');
+        } catch (e) {
+          Log.w(tag, 'Rollback of the client metadata transaction failed: $e');
+        }
+      }
+      rethrow;
+    }
+  }
+
+  /// Writes the metadata of this client, refreshes, takes or releases the primary lease, and lets the primary remove
+  /// the clients that are gone. The client runs this every [SQLiteClientMetadata.refreshInterval], and when its
+  /// network is enabled or disabled.
+  ///
+  /// A failure of the database (another connection holding the lock for longer than [busyTimeout]) is logged and
+  /// leaves the state as it was, as in the JS SDK; a [FirestoreError] (the cache was cleared or migrated by another
+  /// client) is thrown.
+  Future<void> refreshClientMetadata() async {
+    await _lock();
+    try {
+      if (!started) {
+        return;
+      }
+      await _metadataTransaction(() async {
+        await clientMetadata._update();
+        await clientMetadata._maybeGarbageCollect();
+      });
+    } on FirestoreError {
+      rethrow;
+    } catch (e) {
+      Log.w(tag, 'Refreshing the client metadata failed: $e');
+    } finally {
+      _unlock();
+    }
+  }
+
+  /// Records whether the network of this client is enabled and refreshes the metadata: a client without network
+  /// gives the lease to one with network.
+  Future<void> setNetworkEnabled(bool enabled) async {
+    if (clientMetadata.networkEnabled != enabled) {
+      clientMetadata.networkEnabled = enabled;
+      await refreshClientMetadata();
+    }
+  }
+
+  /// Registers [listener] for the changes of [isPrimary] and calls it with the current state. It is not called once
+  /// this persistence is shut down.
+  @override
+  void setPrimaryStateListener(PrimaryStateListener listener) {
+    clientMetadata.primaryStateListener = (bool isPrimary) {
+      if (started) {
+        listener(isPrimary);
+      }
+    };
+    listener(isPrimary);
+  }
+
+  /// The ids of the clients of this cache that refreshed their metadata within
+  /// [SQLiteClientMetadata.maxClientAgeMs], this one included.
+  @override
+  Future<List<String>> getActiveClients() async {
+    await _lock();
+    try {
+      return await _metadataTransaction(clientMetadata._activeClients);
+    } finally {
+      _unlock();
     }
   }
 
   @override
   Future<void> shutdown() async {
-    await _semaphore.acquire();
+    await _lock();
     try {
       Log.d(tag, 'Shutingdown SQLite persistance');
       hardAssert(started, 'SQLitePersistence shutdown without start!');
 
       started = false;
+      // Release the lease now, so that another client takes over at its next refresh instead of when the lease
+      // expires.
+      try {
+        await _metadataTransaction(
+          clientMetadata._remove,
+          checkForeignCommits: false,
+        );
+      } catch (e) {
+        Log.w(tag, 'Could not release the primary lease: $e');
+      }
       _db.close();
     } finally {
-      _semaphore.release();
+      _unlock();
     }
   }
 
@@ -280,6 +461,9 @@ class SQLitePersistence extends Persistence {
   /// restart, a background isolate, a second process. Without this they hand out the same target and batch ids and
   /// overwrite each other's metadata rows with what they remembered.
   Future<void> _refreshAfterForeignCommit() async {
+    if (_clearedByOtherClient) {
+      throw _clearedError();
+    }
     final int dataVersion = await _readDataVersion();
     if (dataVersion == _dataVersion) {
       return;
@@ -296,6 +480,19 @@ class SQLitePersistence extends Persistence {
       );
     }
 
+    if (await _readEpoch() != _epoch) {
+      _clearedByOtherClient = true;
+      Log.w(
+        tag,
+        'The persistent cache "$databaseName" was cleared by another client: this client terminates.',
+      );
+      final void Function()? listener = databaseClearedListener;
+      if (listener != null) {
+        scheduleMicrotask(listener);
+      }
+      throw _clearedError();
+    }
+
     await queryCache.start();
     referenceDelegate.listenSequence.advanceTo(
       queryCache.highestListenSequenceNumber,
@@ -307,9 +504,15 @@ class SQLitePersistence extends Persistence {
     for (final WeakReference<SqliteIndexManager> reference in _indexManagers) {
       await reference.target?._refresh();
     }
+    await clientMetadata._onForeignCommit();
     _dataVersion = dataVersion;
     foreignCommitsSeen++;
   }
+
+  FirestoreError _clearedError() => FirestoreError(
+    'The persistent cache was cleared by another client (Firestore.clearPersistence) while this client was using it.',
+    FirestoreErrorCode.failedPrecondition,
+  );
 
   /// Deletes the database file and its journal, WAL and shared memory side
   /// files, or lets the database delete its own storage when it is a
@@ -320,7 +523,7 @@ class SQLitePersistence extends Persistence {
   /// `Context.getDatabasePath`. Here the file is chosen by the [OpenDatabase]
   /// callback, so the file of the database that was opened is deleted.
   Future<void> clearPersistence() async {
-    await _semaphore.acquire();
+    await _lock();
     try {
       hardAssert(!started, 'SQLitePersistence cleared while running!');
       final String? path = _databasePath;
@@ -338,10 +541,73 @@ class SQLitePersistence extends Persistence {
           );
         }
       } else if (path != null) {
-        deleteSqliteDatabaseFiles(path);
+        if (!await _clearInPlaceIfOthersAreAlive()) {
+          deleteSqliteDatabaseFiles(path);
+        }
       }
     } finally {
-      _semaphore.release();
+      _unlock();
+    }
+  }
+
+  /// Empties the cache in place and increments its epoch when other clients have it open: deleting the file under
+  /// them would leave them working on a file that is gone (or, on some platforms, fail). The other clients notice the
+  /// new epoch at their next transaction or metadata refresh and terminate. Returns false, and changes nothing, when
+  /// no other client refreshed its metadata within [SQLiteClientMetadata.maxClientAgeMs]: the file is deleted then.
+  Future<bool> _clearInPlaceIfOthersAreAlive() async {
+    final Database db = await _openDb(databaseName, openDatabase);
+    try {
+      await db.execute('BEGIN EXCLUSIVE;');
+      try {
+        final int now = clientMetadata._clock();
+        final int others =
+            (await db.query(
+                  'SELECT COUNT(*) AS c FROM clients WHERE client_id != ? AND update_time_ms >= ?',
+                  <Object?>[
+                    clientMetadata.clientId,
+                    now - SQLiteClientMetadata.maxClientAgeMs,
+                  ],
+                )).single['c']
+                as int;
+        if (others == 0) {
+          await db.execute('COMMIT;');
+          return false;
+        }
+
+        Log.w(
+          tag,
+          'clearPersistence: $others other client(s) have the cache "$databaseName" open. The cache is emptied in '
+          'place; they terminate when they notice.',
+        );
+        final List<Map<String, dynamic>> tables = await db.query(
+          "SELECT name FROM sqlite_master WHERE type = 'table'",
+        );
+        for (final Map<String, dynamic> table in tables) {
+          final String name = table['name'] as String;
+          if (name == 'persistence_epoch' ||
+              (name.startsWith('sqlite_') && name != 'sqlite_sequence')) {
+            continue;
+          }
+          await db.execute('DELETE FROM "$name"');
+        }
+        // The one row that a new cache has.
+        await SQLiteSchema(db)._ensureTargetGlobal();
+        await db.execute('UPDATE target_globals SET target_count = 0');
+        await db.execute(
+          'UPDATE persistence_epoch SET epoch = epoch + 1 WHERE id = 0',
+        );
+        await db.execute('COMMIT;');
+        return true;
+      } catch (_) {
+        try {
+          await db.execute('ROLLBACK;');
+        } catch (e) {
+          Log.w(tag, 'Rollback of clearPersistence failed: $e');
+        }
+        rethrow;
+      }
+    } finally {
+      db.close();
     }
   }
 
@@ -378,8 +644,23 @@ class SQLitePersistence extends Persistence {
   Future<T> runTransactionAndReturn<T>(
     String action,
     Transaction<T> operation,
-  ) async {
-    await _semaphore.acquire();
+  ) {
+    return _runTransaction(action, operation, primary: false);
+  }
+
+  /// Verifies (or takes) the primary lease inside the transaction before [operation] and extends it afterwards, see
+  /// [Persistence.runPrimaryTransaction].
+  @override
+  Future<T> runPrimaryTransaction<T>(String action, Transaction<T> operation) {
+    return _runTransaction(action, operation, primary: true);
+  }
+
+  Future<T> _runTransaction<T>(
+    String action,
+    Transaction<T> operation, {
+    required bool primary,
+  }) async {
+    await _lock();
     Log.d(tag, 'Starting transaction: $action');
 
     bool began = false;
@@ -389,8 +670,16 @@ class SQLitePersistence extends Persistence {
       await _db.execute('BEGIN IMMEDIATE;');
       began = true;
       await _refreshAfterForeignCommit();
+      if (primary) {
+        // Before the listen sequence number is taken: a client that is not primary uses none.
+        await clientMetadata._verifyPrimaryLease(action);
+      }
       referenceDelegate.onTransactionStarted();
       final T result = await operation();
+      if (primary) {
+        // After the operation, so that a long operation leaves a lease with a recent timestamp (as in the JS SDK).
+        await clientMetadata._extendPrimaryLease();
+      }
       await _db.execute('COMMIT;');
       began = false;
       await referenceDelegate.onTransactionCommitted();
@@ -406,7 +695,7 @@ class SQLitePersistence extends Persistence {
       }
       rethrow;
     } finally {
-      _semaphore.release();
+      _unlock();
     }
   }
 

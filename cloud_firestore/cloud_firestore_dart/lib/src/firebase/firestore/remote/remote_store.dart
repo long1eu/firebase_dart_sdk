@@ -214,7 +214,10 @@ class RemoteStore implements TargetMetadataProvider {
 
   Future<void> _enableNetwork() async {
     _networkEnabled = true;
+    await _startNetworkIfPossible();
+  }
 
+  Future<void> _startNetworkIfPossible() async {
     if (_canUseNetwork) {
       _writeStream.lastStreamToken = _localStore.lastStreamToken;
 
@@ -228,6 +231,34 @@ class RemoteStore implements TargetMetadataProvider {
       await fillWritePipeline();
     }
   }
+
+  /// Whether this client is the primary client of its cache. Only the primary client uses the network (the
+  /// `OfflineCause.IsSecondary` of the JS SDK); a client that is not primary keeps its listen targets and pending
+  /// writes and starts the network again when it becomes primary. Independent of [enableNetwork] and
+  /// [disableNetwork]: becoming primary does not enable a network that the user disabled.
+  bool _isPrimary = true;
+
+  /// Starts or stops the network when this client becomes or stops being the primary client of its cache
+  /// (`remoteStoreApplyPrimaryState` of the JS SDK).
+  ///
+  /// PORTING NOTE: the JS SDK sets the online state of a secondary to unknown and takes the online state of the
+  /// primary from the state the clients share. Clients do not share state yet, so a secondary reports
+  /// [OnlineState.offline] as with a disabled network: its listeners and gets are served from the cache instead of
+  /// waiting for a connection that it does not open.
+  Future<void> applyPrimaryState(bool isPrimary) => _queue.run<void>(() async {
+    if (_isPrimary == isPrimary) {
+      return;
+    }
+    _isPrimary = isPrimary;
+    if (isPrimary) {
+      await _startNetworkIfPossible();
+    } else {
+      await _disableNetworkInternal();
+      if (_networkEnabled) {
+        await _onlineStateTracker.updateState(OnlineState.offline);
+      }
+    }
+  });
 
   /// Temporarily disables the network. The network can be re-enabled using
   /// [enableNetwork].
@@ -604,13 +635,11 @@ class RemoteStore implements TargetMetadataProvider {
     }
   }
 
-  /// Whether the network is enabled (it is not disabled by the user, and the store was not shut down).
+  /// Whether the network is enabled (it is not disabled by the user, the store was not shut down, and this client is
+  /// the primary client of its cache).
   bool get canUseNetwork => _canUseNetwork;
 
-  bool get _canUseNetwork {
-    // PORTING NOTE: This method exists mostly because web also has to take into account primary vs. secondary state.
-    return _networkEnabled;
-  }
+  bool get _canUseNetwork => _networkEnabled && _isPrimary;
 
   /// Takes a batch of changes from the [Datastore], repackages them as a [RemoteEvent], and passes that on to the
   /// listener, which is typically the [SyncEngine].

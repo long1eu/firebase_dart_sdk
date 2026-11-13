@@ -176,6 +176,9 @@ class TaskId implements Comparable<TaskId> {
   /// A timer used to periodically attempt index backfill.
   static const TaskId indexBackfill = TaskId._(8);
 
+  /// A timer used to refresh the metadata and the primary lease of a client of a persistent cache.
+  static const TaskId clientMetadataRefresh = TaskId._(9);
+
   @override
   int compareTo(TaskId other) => _i.compareTo(other._i);
 
@@ -205,6 +208,7 @@ class TaskId implements Comparable<TaskId> {
     'garbageCollection',
     'retryTransaction',
     'indexBackfill',
+    'clientMetadataRefresh',
   ];
 
   @override

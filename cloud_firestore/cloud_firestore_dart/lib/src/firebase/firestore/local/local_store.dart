@@ -14,6 +14,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/named_query.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target_id_generator.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/default_query_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_documents_view.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_view_changes.dart';
@@ -89,6 +90,8 @@ import 'lru_garbage_collector.dart';
 /// The [LocalStore] must be able to efficiently execute queries against its local cache of the documents, to provide
 /// the initial set of results before any remote changes have been received.
 class LocalStore implements BundleCallback {
+  static const String _tag = 'LocalStore';
+
   /// Creates a local store on top of [persistence] for [initialUser]. Queries are executed by [queryEngine], which
   /// defaults to a [DefaultQueryEngine].
   factory LocalStore(
@@ -421,7 +424,7 @@ class LocalStore implements BundleCallback {
   Future<ImmutableSortedMap<DocumentKey, MaybeDocument>> acknowledgeBatch(
     MutationBatchResult batchResult,
   ) {
-    return _persistence.runTransactionAndReturn<
+    return _persistence.runPrimaryTransaction<
       ImmutableSortedMap<DocumentKey, MaybeDocument>
     >('Acknowledge batch', () async {
       final MutationBatch batch = batchResult.batch;
@@ -443,7 +446,7 @@ class LocalStore implements BundleCallback {
     int batchId,
   ) {
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
-    return _persistence.runTransactionAndReturn<
+    return _persistence.runPrimaryTransaction<
       ImmutableSortedMap<DocumentKey, MaybeDocument>
     >('Reject batch', () async {
       final MutationBatch? foundBatch = await _mutationQueue
@@ -503,7 +506,7 @@ class LocalStore implements BundleCallback {
     RemoteEvent remoteEvent,
   ) {
     // TODO(long1eu): Call queryEngine.handleDocumentChange() appropriately.
-    return _persistence.runTransactionAndReturn<
+    return _persistence.runPrimaryTransaction<
       ImmutableSortedMap<DocumentKey, MaybeDocument>
     >('Apply remote event', () async {
       final int sequenceNumber =
@@ -805,29 +808,63 @@ class LocalStore implements BundleCallback {
   /// Unpin all the documents associated with the given target.
   ///
   /// Releasing a non-existing target is an error.
-  Future<void> releaseTarget(int targetId) {
-    return _persistence.runTransaction('Release target', () async {
-      final QueryData? cachedQueryData = _targetIds[targetId];
-      hardAssertLazy(
-        cachedQueryData != null,
-        () => 'Tried to release nonexistent target: $targetId',
-      );
-      final QueryData queryData = cachedQueryData!;
-
-      // References for documents sent via Watch are automatically removed when we delete a query's target data from the
-      // reference delegate. Since this does not remove references for locally mutated documents, we have to remove the
-      // target associations for these documents manually.
-      final ImmutableSortedSet<DocumentKey> removedReferences =
-          _localViewReferences.removeReferencesForId(queryData.targetId);
-      for (DocumentKey key in removedReferences) {
-        await _persistence.referenceDelegate.removeReference(key);
+  ///
+  /// Recording the final state of the target in the persisted target data is primary-only (as in the JS SDK). With
+  /// [keepPersistedTargetData] (a client that is not primary), or when this client turns out not to be primary, the
+  /// target is only released in memory: the target data was recorded while the target was active, so the loss is a
+  /// slightly older sequence number for the LRU garbage collector.
+  Future<void> releaseTarget(
+    int targetId, {
+    bool keepPersistedTargetData = false,
+  }) async {
+    if (!keepPersistedTargetData) {
+      try {
+        return await _persistence.runPrimaryTransaction(
+          'Release target',
+          () => _releaseTarget(targetId, keepPersistedTargetData: false),
+        );
+      } on FirestoreError catch (e) {
+        if (!isPrimaryLeaseLoss(e)) {
+          rethrow;
+        }
+        Log.d(
+          _tag,
+          'Not primary: target $targetId is released without updating its persisted data',
+        );
       }
-      // Note: This also updates the query cache with the in-memory query data (resume token, last limbo free snapshot
-      // version) that may not have been persisted yet.
+    }
+    return _persistence.runTransaction(
+      'Release target',
+      () => _releaseTarget(targetId, keepPersistedTargetData: true),
+    );
+  }
+
+  Future<void> _releaseTarget(
+    int targetId, {
+    required bool keepPersistedTargetData,
+  }) async {
+    final QueryData? cachedQueryData = _targetIds[targetId];
+    hardAssertLazy(
+      cachedQueryData != null,
+      () => 'Tried to release nonexistent target: $targetId',
+    );
+    final QueryData queryData = cachedQueryData!;
+
+    // References for documents sent via Watch are automatically removed when we delete a query's target data from the
+    // reference delegate. Since this does not remove references for locally mutated documents, we have to remove the
+    // target associations for these documents manually.
+    final ImmutableSortedSet<DocumentKey> removedReferences =
+        _localViewReferences.removeReferencesForId(queryData.targetId);
+    for (DocumentKey key in removedReferences) {
+      await _persistence.referenceDelegate.removeReference(key);
+    }
+    // Note: This also updates the query cache with the in-memory query data (resume token, last limbo free snapshot
+    // version) that may not have been persisted yet.
+    if (!keepPersistedTargetData) {
       await _persistence.referenceDelegate.removeTarget(queryData);
-      _targetIds.remove(queryData.targetId);
-      _targetIdByTarget.remove(queryData.target);
-    });
+    }
+    _targetIds.remove(queryData.targetId);
+    _targetIdByTarget.remove(queryData.target);
   }
 
   /// Runs the specified query against the local store and returns the results, potentially taking advantage of query
@@ -923,7 +960,7 @@ class LocalStore implements BundleCallback {
   Future<LruGarbageCollectorResults> collectGarbage(
     LruGarbageCollector garbageCollector,
   ) {
-    return _persistence.runTransactionAndReturn(
+    return _persistence.runPrimaryTransaction(
       'Collect garbage',
       () => garbageCollector.collect(_targetIds.keys.toSet()),
     );

@@ -34,6 +34,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/lru_garbage_co
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/memory/memory_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_result.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/client_metadata_refresher.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local_cache_settings.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -89,6 +90,18 @@ class FirestoreClient implements RemoteStoreCallback {
   /// Fills the field indexes in the background. Only with SQLite persistence: memory persistence has no field indexes.
   IndexBackfillerScheduler? _indexBackfillScheduler;
   IndexBackfiller? _indexBackfiller;
+
+  /// Refreshes the client metadata and the primary lease. Only with SQLite persistence.
+  ClientMetadataRefresher? _clientMetadataRefresher;
+
+  /// Whether this client holds the primary lease of its cache. Always true with memory persistence. Only the primary
+  /// client uses the network, collects garbage and backfills indexes; the clients of one cache share no other state
+  /// yet (stage 1 of the multi-client plan).
+  @visibleForTesting
+  bool get isPrimaryClient {
+    final Persistence persistence = this.persistence;
+    return persistence is! SQLitePersistence || persistence.isPrimary;
+  }
 
   /// Whether this client has field indexes: only with SQLite persistence. Known when the client is created, before
   /// the persistence is opened.
@@ -274,12 +287,18 @@ class FirestoreClient implements RemoteStoreCallback {
 
   Future<void> disableNetwork() async {
     _verifyNotShutdown();
-    return _enqueue<void>(() => remoteStore.disableNetwork());
+    return _enqueue<void>(() async {
+      await remoteStore.disableNetwork();
+      await _setPersistenceNetworkEnabled(false);
+    });
   }
 
   Future<void> enableNetwork() async {
     _verifyNotShutdown();
-    return _enqueue<void>(() => remoteStore.enableNetwork());
+    return _enqueue<void>(() async {
+      await remoteStore.enableNetwork();
+      await _setPersistenceNetworkEnabled(true);
+    });
   }
 
   /// Shuts down this client, cancels all writes / listeners, and releases all resources.
@@ -300,6 +319,7 @@ class FirestoreClient implements RemoteStoreCallback {
     }
     _lruScheduler?.stop();
     _indexBackfillScheduler?.stop();
+    _clientMetadataRefresher?.stop();
 
     await onCredentialChangeSubscription.cancel();
     await appCheckProvider?.close();
@@ -439,7 +459,18 @@ class FirestoreClient implements RemoteStoreCallback {
     _verifyNotShutdown();
     return _enqueue<int>(() async {
       final IndexBackfiller? backfiller = _indexBackfiller;
-      return backfiller == null ? 0 : backfiller.backfill();
+      if (backfiller == null) {
+        return 0;
+      }
+      try {
+        return await backfiller.backfill();
+      } on FirestoreError catch (e) {
+        // Only the primary client of the cache backfills.
+        if (isPrimaryLeaseLoss(e)) {
+          return 0;
+        }
+        rethrow;
+      }
     });
   }
 
@@ -586,15 +617,26 @@ class FirestoreClient implements RemoteStoreCallback {
           gc.newScheduler(scheduler, localStore) //
             ..start();
     }
-    if (persistence is SQLitePersistence) {
+    final Persistence started = persistence;
+    if (started is SQLitePersistence) {
       final IndexBackfiller indexBackfiller = _indexBackfiller =
-          IndexBackfiller(persistence, localStore);
+          IndexBackfiller(started, localStore);
       _indexBackfillScheduler = IndexBackfillerScheduler(
         indexBackfiller,
         scheduler,
         // On the queue of the client, like every other operation of the local store.
         run: (Future<int> Function() backfill) =>
             _enqueue<int>(() async => _isShutdown ? 0 : await backfill()),
+      )..start();
+      // Another client that clears the cache while this one runs ends this one, as in the JS SDK.
+      started.databaseClearedListener = () => shutdown();
+      _clientMetadataRefresher = ClientMetadataRefresher(
+        scheduler,
+        run: () => _enqueue<void>(() async {
+          if (!_isShutdown) {
+            await started.refreshClientMetadata();
+          }
+        }),
       )..start();
     }
 
@@ -622,6 +664,40 @@ class FirestoreClient implements RemoteStoreCallback {
     // refilling mutation queue, etc.) so must be started after LocalStore.
     await localStore.start();
     await remoteStore.start();
+
+    // Called right away with the current state; a lone client is always primary, and nothing changes then.
+    persistence.setPrimaryStateListener((bool isPrimary) {
+      // Called inside a transaction of the persistence: the work waits for the task that is running to finish.
+      _queue.runLater<void>(() => _applyPrimaryState(isPrimary)).catchError((
+        Object error,
+      ) {
+        Log.w(logTag, 'Applying the primary state $isPrimary failed: $error');
+      });
+    });
+  }
+
+  /// Only the primary client of a cache uses the network, collects garbage and backfills indexes
+  /// (`setPrimaryStateListener` in the `MultiTabOfflineComponentProvider` of the JS SDK).
+  Future<void> _applyPrimaryState(bool isPrimary) async {
+    if (_isShutdown) {
+      return;
+    }
+    await syncEngine.applyPrimaryState(isPrimary);
+    if (isPrimary) {
+      _lruScheduler?.start();
+      _indexBackfillScheduler?.start();
+    } else {
+      _lruScheduler?.stop();
+      _indexBackfillScheduler?.stop();
+    }
+  }
+
+  /// A client without network gives the primary lease to a client with network (as in the JS SDK).
+  Future<void> _setPersistenceNetworkEnabled(bool enabled) async {
+    final Persistence persistence = this.persistence;
+    if (persistence is SQLitePersistence) {
+      await persistence.setNetworkEnabled(enabled);
+    }
   }
 
   /// Throws the error of a terminated client, see [_verifyNotShutdown]. For the entry points of `Firestore` that

@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/bundle_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/document_overlay_cache.dart';
@@ -16,6 +17,22 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/re
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/types.dart';
 
 import 'index_manager.dart';
+
+/// Called when a client becomes, or stops being, the primary client of its cache (see
+/// [Persistence.setPrimaryStateListener]).
+typedef PrimaryStateListener = void Function(bool isPrimary);
+
+/// The message of the error a primary-only transaction fails with when the client is not, and cannot become, the
+/// primary client (`PRIMARY_LEASE_LOST_ERROR_MSG` of the JS SDK, which speaks of browser tabs).
+const String primaryLeaseLostErrorMessage =
+    'This client is not the primary client of its persistent cache: another client that uses the same cache holds '
+    'the primary lease.';
+
+/// Whether [error] is the error of a primary-only transaction of a client that lost the primary lease.
+bool isPrimaryLeaseLoss(Object error) =>
+    error is FirestoreError &&
+    error.code == FirestoreErrorCode.failedPrecondition &&
+    error.message == primaryLeaseLostErrorMessage;
 
 /// Persistence is the lowest-level shared interface to persistent storage in
 /// Firestore.
@@ -116,4 +133,32 @@ abstract class Persistence {
   /// writes against persistence must be performed within a transaction.
   /// Writes will be committed atomically once the transaction completes.
   Future<T> runTransactionAndReturn<T>(String action, Transaction<T> operation);
+
+  /// Performs an operation that only the primary client of the cache may perform (a `readwrite-primary` transaction
+  /// of the JS SDK): applying a remote event, acknowledging or rejecting a batch, releasing the persisted data of a
+  /// target, garbage collection and index backfill.
+  ///
+  /// The client verifies that it holds the primary lease, or takes it if it may, before [operation] runs, and extends
+  /// the lease afterwards. Otherwise the transaction fails with a [FirestoreError] with
+  /// [FirestoreErrorCode.failedPrecondition] and [primaryLeaseLostErrorMessage] (see [isPrimaryLeaseLoss]) and the
+  /// primary state listener is told that this client is not primary.
+  ///
+  /// A cache that only one client can use (memory) is always primary: this is [runTransactionAndReturn].
+  Future<T> runPrimaryTransaction<T>(String action, Transaction<T> operation) {
+    return runTransactionAndReturn(action, operation);
+  }
+
+  /// Registers [listener] to be told when this client becomes or stops being the primary client of its cache, and
+  /// calls it right away with the current state. Only one listener is kept. A cache that only one client can use is
+  /// always primary.
+  ///
+  /// The listener may be called while a transaction is running: it must not run a transaction itself before that one
+  /// finished (it should schedule its work).
+  void setPrimaryStateListener(PrimaryStateListener listener) {
+    listener(true);
+  }
+
+  /// The ids of the clients that use this cache and are alive (refreshed their metadata recently), this one included.
+  /// Empty for a cache that only one client can use.
+  Future<List<String>> getActiveClients() async => const <String>[];
 }

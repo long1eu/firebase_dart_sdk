@@ -133,6 +133,8 @@ void main() {
         SQLitePersistence.busyTimeout.inMilliseconds);
 
     await first.execute('CREATE TABLE IF NOT EXISTS probe (v INTEGER)');
+    // The start of the second client (its metadata and primary lease) is a commit the first one sees once.
+    await first.runTransaction('sync', () async {});
     final int seenByFirst = first.foreignCommitsSeen;
     for (int i = 0; i < 3; i++) {
       await first.runTransaction('write', () async {

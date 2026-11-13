@@ -27,7 +27,12 @@ class SerialQueue {
     if (_isInsideCurrentTask) {
       return operation();
     }
+    return runLater(operation);
+  }
 
+  /// Runs [operation] after every operation requested before it completed, also when called from the task that is
+  /// running right now (it then runs after that task). That task must not wait for the result: it would wait forever.
+  Future<T> runLater<T>(Future<T> Function() operation) {
     final Completer<T> result = Completer<T>();
     final Future<void> previous = _tail;
     _tail = result.future.then<void>((_) {}, onError: (Object _) {});

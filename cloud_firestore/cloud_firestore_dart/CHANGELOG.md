@@ -470,6 +470,14 @@ Documentation and tests:
   cache at the same time migrate it once. A client whose cache is moved to another schema version by a different
   version of the SDK while it runs fails with `failedPrecondition` instead of working on a schema it does not
   know. The clients are still not coordinated (there is no multi-tab support).
+- Clients of one SQLite cache now elect a primary client with the lease of the JS SDK (valid for 5 s, refreshed
+  every 4 s; a terminated client releases it at once, a dead one loses it when it expires). Only the primary uses
+  the network, applies remote events and acknowledgements, collects garbage and backfills indexes. A client that
+  opens a cache another live client holds takes the lease and logs a warning (as after a hot restart); the other
+  client then reports offline, serves its listeners and gets from the cache and keeps its writes pending, until it
+  becomes primary again (when the new client terminates or disables its network). A lone client is always primary.
+- `clearPersistence()` with another live client on the cache empties the cache in place instead of deleting the
+  file under that client; the other client fails with `failedPrecondition` at its next use and terminates.
 - Argument checks that were only `assert`s, and so did nothing in release builds, now throw an `ArgumentError`
   in every build: a collection path with an even number of segments (`firestore.collection('coll/doc')`,
   `doc.collection('')`), a `cacheSizeBytes` below the minimum of 1 MB with persistence enabled, and a `GeoPoint`
@@ -558,8 +566,9 @@ Documentation and tests:
 - Persistent cache indexes for queries with inequalities on several fields (they are scanned,
   as upstream), and indexes with a memory cache.
 - Coordinating running clients that share one persistent cache (the multi-tab support of the JS
-  SDK). Two clients on one SQLite file keep it consistent (see Fixed) but do not share listens or
-  hand over the network; in the browser the cache is refused to a second tab.
+  SDK). Two clients on one SQLite file keep it consistent and elect a primary client that alone
+  uses the network (see Fixed), but they do not share listens or writes; in the browser the cache
+  is refused to a second tab.
 - On the web: OPFS storage, and any browser other than Chrome.
 - Pipelines beyond the preview: full-text search, window functions, pipelines in a
   `Transaction`, evaluation against the local cache and real-time pipelines.

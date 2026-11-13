@@ -50,7 +50,7 @@ class IndexBackfiller {
   /// Runs a single backfill operation and returns the number of documents
   /// processed.
   Future<int> backfill() {
-    return _persistence.runTransactionAndReturn<int>(
+    return _persistence.runPrimaryTransaction<int>(
       'Backfill Indexes',
       _writeIndexEntries,
     );
@@ -160,7 +160,20 @@ class IndexBackfillerScheduler {
   bool _stopped = false;
   TimerTask? _backfillTask;
 
+  /// Incremented by every [start]: a run of an earlier start that finishes afterwards does not schedule another one.
+  int _generation = 0;
+
+  /// Whether the scheduler was started and not stopped since.
+  bool get started => _backfillTask != null && !_stopped;
+
+  /// Starts the scheduling, also after [stop] (a client that becomes the primary client of its cache again). Does
+  /// nothing when it is running.
   void start() {
+    if (started) {
+      return;
+    }
+    _stopped = false;
+    _generation++;
     _scheduleBackfill(initialBackfillDelay);
   }
 
@@ -168,9 +181,11 @@ class IndexBackfillerScheduler {
     // A run that is already in flight must not reschedule itself afterwards.
     _stopped = true;
     _backfillTask?.cancel();
+    _backfillTask = null;
   }
 
   void _scheduleBackfill(Duration delay) {
+    final int generation = _generation;
     _backfillTask = _scheduler.add(TaskId.indexBackfill, delay, () async {
       try {
         final int documentsProcessed = await _run(_backfiller.backfill);
@@ -180,7 +195,7 @@ class IndexBackfillerScheduler {
         // scheduling for the whole process.
         Log.w(_tag, 'Index backfill failed: $e');
       }
-      if (!_stopped) {
+      if (!_stopped && generation == _generation) {
         _scheduleBackfill(regularBackfillDelay);
       }
     });
