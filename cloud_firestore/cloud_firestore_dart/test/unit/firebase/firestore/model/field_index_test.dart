@@ -36,6 +36,19 @@ void main() {
     expect(FieldIndex.semanticCompare(indexOriginal, indexDifferent), 0);
   });
 
+  // JS (field_index.test.ts): "comparator ignores index offset".
+  test('comparator ignores index offset', () {
+    final FieldIndex indexOriginal =
+        fieldIndex('collA', indexState: IndexState(0, IndexOffset.none));
+    final FieldIndex indexSame =
+        fieldIndex('collA', indexState: IndexState(0, IndexOffset.none));
+    final FieldIndex indexDifferent = fieldIndex('collA',
+        indexState:
+            IndexState(0, IndexOffset(version(2), DocumentKey.empty(), -1)));
+    expect(FieldIndex.semanticCompare(indexOriginal, indexSame), 0);
+    expect(FieldIndex.semanticCompare(indexOriginal, indexDifferent), 0);
+  });
+
   test('comparatorIncludesFieldName', () {
     final FieldIndex indexOriginal = fieldIndex('collA',
         fieldsAndKinds: <Object>['a', SegmentKind.ascending]);

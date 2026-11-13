@@ -94,6 +94,35 @@ void main() {
         isTrue,
       );
     });
+
+    // JS: "getPersistentCacheIndexManager() should return distinct instances for distinct Firestore objects";
+    // Android: testCanGetSameOrDifferentPersistentCacheIndexManager.
+    test('returns distinct instances for distinct Firestore objects', () async {
+      final Firestore firestore1 = await open();
+      final Firestore firestore2 = await open();
+      expect(firestore1.persistentCacheIndexManager, isNotNull);
+      expect(
+        identical(
+          firestore1.persistentCacheIndexManager,
+          firestore2.persistentCacheIndexManager,
+        ),
+        isFalse,
+      );
+    });
+
+    // JS: "should fail if invoked after terminate()". DEVIATION: JS throws from the getter; the port does as Android
+    // (testAutoIndexCreationAfterFailsTermination calls the getter after terminate()): the getter returns the
+    // manager, whose methods fail.
+    test('first asked for after terminate(), its methods fail', () async {
+      final Firestore firestore = await open();
+      await firestore.terminate();
+      final PersistentCacheIndexManager? manager =
+          firestore.persistentCacheIndexManager;
+      expect(manager, isNotNull);
+      await expectLater(manager!.enableIndexAutoCreation(), throwsTerminated);
+      await expectLater(manager.disableIndexAutoCreation(), throwsTerminated);
+      await expectLater(manager.deleteAllIndexes(), throwsTerminated);
+    });
   });
 
   group('enable/disable persistent index auto creation', () {

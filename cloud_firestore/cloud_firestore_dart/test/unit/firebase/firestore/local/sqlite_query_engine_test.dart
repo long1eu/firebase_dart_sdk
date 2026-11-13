@@ -14,7 +14,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/in
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/mutation_queue.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/query_cache.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/remote_document_cache.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/local/query_engine.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
@@ -82,7 +81,7 @@ void main() {
   late DocumentOverlayCache documentOverlayCache;
   late QueryCache queryCache;
   late IndexManager indexManager;
-  late QueryEngine queryEngine;
+  late DefaultQueryEngine queryEngine;
   late _ExpectingLocalDocumentsView localDocuments;
 
   setUp(() async {
@@ -136,6 +135,15 @@ void main() {
   Future<T> expectOptimizedCollectionScan<T>(Future<T> Function() c) async {
     try {
       localDocuments.expectFullCollectionScan = false;
+      return await c();
+    } finally {
+      localDocuments.expectFullCollectionScan = null;
+    }
+  }
+
+  Future<T> expectFullCollectionScan<T>(Future<T> Function() c) async {
+    try {
+      localDocuments.expectFullCollectionScan = true;
       return await c();
     } finally {
       localDocuments.expectFullCollectionScan = null;
@@ -958,6 +966,114 @@ void main() {
       () => runQuery(query2, SnapshotVersion.none),
     );
     expect(result2, docSet(query2.comparator, <Document>[doc6, doc3]));
+  });
+
+  // From the JS SDK (query_engine.test.ts, `testIndexAutoCreation` and the five cases that call it); Android has no
+  // such cases in SQLiteQueryEngineTest.
+  Future<void> testIndexAutoCreation({
+    required bool indexAutoCreationEnabled,
+    int? indexAutoCreationMinCollectionSize,
+    double? relativeIndexReadCostPerDocument,
+    int matchingDocumentCount = 3,
+    int nonmatchingDocumentCount = 3,
+    required IndexType expectedPostQueryExecutionIndexType,
+  }) async {
+    final List<Document> matchingDocuments = <Document>[
+      for (int i = 0; i < matchingDocumentCount; i++)
+        doc('coll/A$i', 1, map(<dynamic>['foo', 'match'])),
+    ];
+    await addDocument(matchingDocuments);
+
+    final List<Document> nonmatchingDocuments = <Document>[
+      for (int i = 0; i < nonmatchingDocumentCount; i++)
+        doc('coll/X$i', 1, map(<dynamic>['foo', 'nomatch'])),
+    ];
+    await addDocument(nonmatchingDocuments);
+
+    queryEngine.indexAutoCreationEnabled = indexAutoCreationEnabled;
+    if (indexAutoCreationMinCollectionSize != null) {
+      queryEngine.indexAutoCreationMinCollectionSize =
+          indexAutoCreationMinCollectionSize;
+    }
+    if (relativeIndexReadCostPerDocument != null) {
+      queryEngine.relativeIndexReadCostPerDocument =
+          relativeIndexReadCostPerDocument;
+    }
+
+    final Query q = query('coll').filter(filter('foo', '==', 'match'));
+    expect(
+      indexManager.getIndexType(q.toTarget()),
+      IndexType.none,
+      reason: 'index type for target _before_ running the query',
+    );
+
+    final DocumentSet result = await expectFullCollectionScan(
+      () => runQuery(q, SnapshotVersion.none),
+    );
+    expect(result, docSet(q.comparator, matchingDocuments));
+
+    expect(
+      indexManager.getIndexType(q.toTarget()),
+      expectedPostQueryExecutionIndexType,
+      reason: 'index type for target _after_ running the query',
+    );
+  }
+
+  test('creates indexes when indexAutoCreationEnabled=true', () {
+    return testIndexAutoCreation(
+      indexAutoCreationEnabled: true,
+      indexAutoCreationMinCollectionSize: 0,
+      relativeIndexReadCostPerDocument: 0,
+      expectedPostQueryExecutionIndexType: IndexType.full,
+    );
+  });
+
+  test('does not create indexes when indexAutoCreationEnabled=false', () {
+    return testIndexAutoCreation(
+      indexAutoCreationEnabled: false,
+      indexAutoCreationMinCollectionSize: 0,
+      relativeIndexReadCostPerDocument: 0,
+      expectedPostQueryExecutionIndexType: IndexType.none,
+    );
+  });
+
+  test(
+    'creates indexes when min collection size is met exactly and relative cost is ever-so-slightly better',
+    () {
+      return testIndexAutoCreation(
+        indexAutoCreationEnabled: true,
+        indexAutoCreationMinCollectionSize: 10,
+        relativeIndexReadCostPerDocument: 1.9999,
+        matchingDocumentCount: 5,
+        nonmatchingDocumentCount: 5,
+        expectedPostQueryExecutionIndexType: IndexType.full,
+      );
+    },
+  );
+
+  test(
+    'does not create indexes when min collection size is not met by only 1 document',
+    () {
+      return testIndexAutoCreation(
+        indexAutoCreationEnabled: true,
+        indexAutoCreationMinCollectionSize: 10,
+        relativeIndexReadCostPerDocument: 0,
+        matchingDocumentCount: 5,
+        nonmatchingDocumentCount: 4,
+        expectedPostQueryExecutionIndexType: IndexType.none,
+      );
+    },
+  );
+
+  test('does not create indexes when relative cost is equal', () {
+    return testIndexAutoCreation(
+      indexAutoCreationEnabled: true,
+      indexAutoCreationMinCollectionSize: 0,
+      relativeIndexReadCostPerDocument: 2,
+      matchingDocumentCount: 5,
+      nonmatchingDocumentCount: 5,
+      expectedPostQueryExecutionIndexType: IndexType.none,
+    );
   });
 
   // From the JS SDK (query_engine.test.ts, "query with ins and not-ins on the same field" with configureCsi).

@@ -179,6 +179,18 @@ void main() {
   test('testIndexesAllTypesTogether', () => testCase.testIndexesAllTypesTogether());
   test('testIndexesServerTimestamps', () => testCase.testIndexesServerTimestamps());
 
+  // The BSON cases of local_store_indexeddb.test.ts of the JS SDK, which query differently from Android's.
+  test('testJsIndexesBSONObjectIdFields', () => testCase.testJsIndexesBSONObjectIdFields());
+  test('testJsIndexesBSONTimestampFields', () => testCase.testJsIndexesBSONTimestampFields());
+  test('testJsIndexesBSONBinaryDataFields', () => testCase.testJsIndexesBSONBinaryDataFields());
+  test('testJsIndexesBSONInt32Fields', () => testCase.testJsIndexesBSONInt32Fields());
+  test('testJsIndexesBSONDecimal128Fields', () => testCase.testJsIndexesBSONDecimal128Fields());
+  test('testJsIndexesBSONDecimal128FieldsWithPrecisionLoss', () => testCase.testJsIndexesBSONDecimal128FieldsWithPrecisionLoss());
+  test('testJsIndexesBSONRegexFields', () => testCase.testJsIndexesBSONRegexFields());
+  test('testJsIndexesBSONMinKeyFields', () => testCase.testJsIndexesBSONMinKeyFields());
+  test('testJsIndexesBSONMaxKeyFields', () => testCase.testJsIndexesBSONMaxKeyFields());
+  test('testJsIndexesMultipleBSONTypesTogether', () => testCase.testJsIndexesMultipleBSONTypesTogether());
+
   // The automatic index creation cases of SQLiteLocalStoreTest of the Android SDK.
   test('testCanAutoCreateIndexes', () => testCase.testCanAutoCreateIndexes());
   test('testCanAutoCreateIndexesWorksWithOrQuery', () => testCase.testCanAutoCreateIndexesWorksWithOrQuery());

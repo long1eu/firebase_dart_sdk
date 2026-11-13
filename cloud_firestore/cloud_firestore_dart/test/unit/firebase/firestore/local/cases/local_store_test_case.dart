@@ -1869,6 +1869,941 @@ class LocalStoreTestCase {
     return aggregator.createRemoteEvent(version(theVersion));
   }
 
+  // JS: local_store_indexeddb.test.ts, "Indexes BSON ObjectId fields".
+  @testMethod
+  Future<void> testJsIndexesBSONObjectIdFields() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation(
+        'coll/a',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/b',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860eb')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/c',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ec')]),
+      ),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b', 'coll/c']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', '==', BsonObjectId('507f191e810c19729de860ea')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/a': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/a']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', '!=', BsonObjectId('507f191e810c19729de860ea')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/b', 'coll/c']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', '>=', BsonObjectId('507f191e810c19729de860eb')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/b', 'coll/c']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', '<', BsonObjectId('507f191e810c19729de860ea')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        BsonObjectId('507f191e810c19729de860ea'),
+        BsonObjectId('507f191e810c19729de860eb'),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(
+      filter('key', 'not-in', <Object?>[
+        BsonObjectId('507f191e810c19729de860ea'),
+        BsonObjectId('507f191e810c19729de860eb'),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/c': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/c']);
+  }
+
+  // JS: local_store_indexeddb.test.ts, "Indexes BSON Timestamp fields".
+  @testMethod
+  Future<void> testJsIndexesBSONTimestampFields() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation('coll/a', map(<dynamic>['key', BsonTimestamp(1000, 1000)])),
+    );
+    await _writeMutation(
+      setMutation('coll/b', map(<dynamic>['key', BsonTimestamp(1001, 1000)])),
+    );
+    await _writeMutation(
+      setMutation('coll/c', map(<dynamic>['key', BsonTimestamp(1000, 1001)])),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/c', 'coll/b']);
+    qry = query('coll').filter(filter('key', '==', BsonTimestamp(1000, 1000)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/a': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/a']);
+    qry = query('coll').filter(filter('key', '!=', BsonTimestamp(1000, 1000)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/c', 'coll/b']);
+    qry = query('coll').filter(filter('key', '>=', BsonTimestamp(1000, 1001)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/c', 'coll/b']);
+    qry = query('coll').filter(filter('key', '<', BsonTimestamp(1000, 1000)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        BsonTimestamp(1000, 1000),
+        BsonTimestamp(1001, 1000),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(
+      filter('key', 'not-in', <Object?>[
+        BsonTimestamp(1000, 1000),
+        BsonTimestamp(1001, 1000),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/c': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/c']);
+  }
+
+  // JS: local_store_indexeddb.test.ts, "Indexes BSON Binary Data fields".
+  @testMethod
+  Future<void> testJsIndexesBSONBinaryDataFields() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation(
+        'coll/a',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/b',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2])),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/c',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 4])),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/d',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(2, Uint8List.fromList(<int>[1, 2])),
+        ]),
+      ),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 4, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+      'coll/d': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>[
+      'coll/b',
+      'coll/a',
+      'coll/c',
+      'coll/d',
+    ]);
+    qry = query('coll').filter(
+      filter(
+        'key',
+        '==',
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+      ),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/a': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/a']);
+    qry = query('coll').filter(
+      filter(
+        'key',
+        '!=',
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+      ),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+      'coll/d': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/b', 'coll/c', 'coll/d']);
+    qry = query('coll').filter(
+      filter(
+        'key',
+        '>=',
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+      ),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/c': OverlayType.set,
+      'coll/d': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/c', 'coll/d']);
+    qry = query('coll').filter(
+      filter('key', '<', Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2]))),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2])),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(
+      filter('key', 'not-in', <Object?>[
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+        Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2])),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/c': OverlayType.set,
+      'coll/d': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/c', 'coll/d']);
+  }
+
+  // JS: local_store_indexeddb.test.ts, "Indexes BSON Int32 fields".
+  @testMethod
+  Future<void> testJsIndexesBSONInt32Fields() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation('coll/a', map(<dynamic>['key', Int32Value(-1)])),
+    );
+    await _writeMutation(
+      setMutation('coll/b', map(<dynamic>['key', Int32Value(0)])),
+    );
+    await _writeMutation(
+      setMutation('coll/c', map(<dynamic>['key', Int32Value(1)])),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b', 'coll/c']);
+    qry = query('coll').filter(filter('key', '==', Int32Value(0)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/b': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/b']);
+    qry = query('coll').filter(filter('key', '!=', Int32Value(0)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/c']);
+    qry = query('coll').filter(filter('key', '>=', Int32Value(0)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/b', 'coll/c']);
+    qry = query('coll').filter(filter('key', '<', Int32Value(-1)));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query(
+      'coll',
+    ).filter(filter('key', 'in', <Object?>[Int32Value(0), Int32Value(1)]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/b', 'coll/c']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', 'not-in', <Object?>[Int32Value(0), Int32Value(1)]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/a': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/a']);
+  }
+
+  // JS: local_store_indexeddb.test.ts, "Indexes BSON Decimal128 fields".
+  @testMethod
+  Future<void> testJsIndexesBSONDecimal128Fields() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation('coll/a', map(<dynamic>['key', Decimal128Value('-1.2e3')])),
+    );
+    await _writeMutation(
+      setMutation('coll/b', map(<dynamic>['key', Decimal128Value('0')])),
+    );
+    await _writeMutation(
+      setMutation('coll/c', map(<dynamic>['key', Decimal128Value('1.2e3')])),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b', 'coll/c']);
+    qry = query('coll').filter(filter('key', '==', Decimal128Value('-1200')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/a': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/a']);
+    qry = query('coll').filter(filter('key', '!=', Decimal128Value('0.0')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/c']);
+    qry = query('coll').filter(filter('key', '>=', Decimal128Value('-0')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/b', 'coll/c']);
+    qry = query('coll').filter(filter('key', '<=', Decimal128Value('-0.0')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(filter('key', '>', Decimal128Value('1.2e3')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(filter('key', '<', Decimal128Value('-1.2e3')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        Decimal128Value('-1.2e3'),
+        Decimal128Value('0'),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(
+      filter('key', 'not-in', <Object?>[
+        Decimal128Value('-1200'),
+        Decimal128Value('0.0'),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/c': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/c']);
+  }
+
+  // JS: local_store_indexeddb.test.ts, "Indexes BSON Decimal128 fields with precision loss".
+  @testMethod
+  Future<void> testJsIndexesBSONDecimal128FieldsWithPrecisionLoss() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation(
+        'coll/a',
+        map(<dynamic>['key', Decimal128Value('-0.1234567890123456789')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation('coll/b', map(<dynamic>['key', Decimal128Value('0')])),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/c',
+        map(<dynamic>['key', Decimal128Value('0.1234567890123456789')]),
+      ),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b', 'coll/c']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', '==', Decimal128Value('0.1234567890123456789')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/c': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/c']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', '==', Decimal128Value('0.12345678901234568')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/c': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(filter('key', '!=', Decimal128Value('0.0')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/c']);
+    qry = query('coll').filter(filter('key', '>=', Decimal128Value('1.23e-1')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/c': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/c']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', '<=', Decimal128Value('-1.23e-1')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/a': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/a']);
+    qry = query('coll').filter(filter('key', '>', Decimal128Value('1.2e3')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(filter('key', '<', Decimal128Value('-1.2e3')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturnedInOrder(qry, <String>[]);
+  }
+
+  // JS: local_store_indexeddb.test.ts, "Indexes BSON Regex fields".
+  @testMethod
+  Future<void> testJsIndexesBSONRegexFields() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation('coll/a', map(<dynamic>['key', RegexValue('a', 'i')])),
+    );
+    await _writeMutation(
+      setMutation('coll/b', map(<dynamic>['key', RegexValue('a', 'm')])),
+    );
+    await _writeMutation(
+      setMutation('coll/c', map(<dynamic>['key', RegexValue('b', 'i')])),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 3, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b', 'coll/c']);
+    qry = query('coll').filter(filter('key', '==', RegexValue('a', 'i')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/a': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/a']);
+    qry = query('coll').filter(filter('key', '!=', RegexValue('a', 'i')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/b', 'coll/c']);
+    qry = query('coll').filter(filter('key', '>=', RegexValue('a', 'm')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/b', 'coll/c']);
+    qry = query('coll').filter(filter('key', '<', RegexValue('a', 'i')));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(
+      filter('key', 'in', <Object?>[
+        RegexValue('a', 'i'),
+        RegexValue('a', 'm'),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(
+      filter('key', 'not-in', <Object?>[
+        RegexValue('a', 'i'),
+        RegexValue('a', 'm'),
+      ]),
+    );
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 1, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{'coll/c': OverlayType.set});
+    _expectQueryReturnedInOrder(qry, <String>['coll/c']);
+  }
+
+  // JS: local_store_indexeddb.test.ts, "Indexes BSON minKey fields".
+  @testMethod
+  Future<void> testJsIndexesBSONMinKeyFields() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation('coll/a', map(<dynamic>['key', MinKey.instance])),
+    );
+    await _writeMutation(
+      setMutation('coll/b', map(<dynamic>['key', MinKey.instance])),
+    );
+    await _writeMutation(setMutation('coll/c', map(<dynamic>['key', null])));
+    await _writeMutation(setMutation('coll/d', map(<dynamic>['key', 1])));
+    await _writeMutation(
+      setMutation('coll/e', map(<dynamic>['key', MaxKey.instance])),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 5, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+      'coll/d': OverlayType.set,
+      'coll/e': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>[
+      'coll/c',
+      'coll/a',
+      'coll/b',
+      'coll/d',
+      'coll/e',
+    ]);
+    qry = query('coll').filter(filter('key', '==', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(filter('key', '!=', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/d': OverlayType.set,
+      'coll/e': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/d', 'coll/e']);
+    qry = query('coll').filter(filter('key', '>=', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(filter('key', '<', MinKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(filter('key', 'in', <Object?>[MinKey.instance]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', 'not-in', <Object?>[MinKey.instance]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/d': OverlayType.set,
+      'coll/e': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/d', 'coll/e']);
+  }
+
+  // JS: local_store_indexeddb.test.ts, "Indexes BSON maxKey fields".
+  @testMethod
+  Future<void> testJsIndexesBSONMaxKeyFields() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.ascending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation('coll/a', map(<dynamic>['key', MaxKey.instance])),
+    );
+    await _writeMutation(
+      setMutation('coll/b', map(<dynamic>['key', MaxKey.instance])),
+    );
+    await _writeMutation(setMutation('coll/c', map(<dynamic>['key', null])));
+    await _writeMutation(setMutation('coll/d', map(<dynamic>['key', 1])));
+    await _writeMutation(
+      setMutation('coll/e', map(<dynamic>['key', MinKey.instance])),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'asc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 5, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+      'coll/d': OverlayType.set,
+      'coll/e': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>[
+      'coll/c',
+      'coll/e',
+      'coll/d',
+      'coll/a',
+      'coll/b',
+    ]);
+    qry = query('coll').filter(filter('key', '==', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(filter('key', '!=', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/d': OverlayType.set,
+      'coll/e': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/e', 'coll/d']);
+    qry = query('coll').filter(filter('key', '<=', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query('coll').filter(filter('key', '>', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(filter('key', '<', MaxKey.instance));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 0, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{});
+    _expectQueryReturnedInOrder(qry, <String>[]);
+    qry = query('coll').filter(filter('key', 'in', <Object?>[MaxKey.instance]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/a', 'coll/b']);
+    qry = query(
+      'coll',
+    ).filter(filter('key', 'not-in', <Object?>[MaxKey.instance]));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 2, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/d': OverlayType.set,
+      'coll/e': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>['coll/e', 'coll/d']);
+  }
+
+  // JS: local_store_indexeddb.test.ts, "Indexes multiple BSON types together".
+  @testMethod
+  Future<void> testJsIndexesMultipleBSONTypesTogether() async {
+    final FieldIndex index = fieldIndex(
+      'coll',
+      indexId: 0,
+      indexState: FieldIndex.initialState,
+      fieldsAndKinds: <Object>['key', SegmentKind.descending],
+    );
+    await _configureFieldIndexes(<FieldIndex>[index]);
+    await _writeMutation(
+      setMutation('coll/a', map(<dynamic>['key', MinKey.instance])),
+    );
+    await _writeMutation(
+      setMutation('coll/b', map(<dynamic>['key', Int32Value(2)])),
+    );
+    await _writeMutation(
+      setMutation('coll/c', map(<dynamic>['key', Int32Value(-1)])),
+    );
+    await _writeMutation(
+      setMutation('coll/d', map(<dynamic>['key', Decimal128Value('1.2e3')])),
+    );
+    await _writeMutation(
+      setMutation('coll/e', map(<dynamic>['key', Decimal128Value('-0')])),
+    );
+    await _writeMutation(
+      setMutation('coll/f', map(<dynamic>['key', BsonTimestamp(1000, 1001)])),
+    );
+    await _writeMutation(
+      setMutation('coll/g', map(<dynamic>['key', BsonTimestamp(1000, 1000)])),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/h',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 4])),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/i',
+        map(<dynamic>[
+          'key',
+          Blob.bsonBinary(1, Uint8List.fromList(<int>[1, 2, 3])),
+        ]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/j',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860eb')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation(
+        'coll/k',
+        map(<dynamic>['key', BsonObjectId('507f191e810c19729de860ea')]),
+      ),
+    );
+    await _writeMutation(
+      setMutation('coll/l', map(<dynamic>['key', RegexValue('^bar', 'm')])),
+    );
+    await _writeMutation(
+      setMutation('coll/m', map(<dynamic>['key', RegexValue('^bar', 'i')])),
+    );
+    await _writeMutation(
+      setMutation('coll/n', map(<dynamic>['key', MaxKey.instance])),
+    );
+    await _backfillIndexes();
+    Query qry = query('coll').orderBy(orderBy('key', 'desc'));
+    await _executeQuery(qry);
+    _expectOverlaysReadByEngine(byKey: 14, byCollection: 0);
+    _expectOverlayTypes(<String, OverlayType>{
+      'coll/a': OverlayType.set,
+      'coll/b': OverlayType.set,
+      'coll/c': OverlayType.set,
+      'coll/d': OverlayType.set,
+      'coll/e': OverlayType.set,
+      'coll/f': OverlayType.set,
+      'coll/g': OverlayType.set,
+      'coll/h': OverlayType.set,
+      'coll/i': OverlayType.set,
+      'coll/j': OverlayType.set,
+      'coll/k': OverlayType.set,
+      'coll/l': OverlayType.set,
+      'coll/m': OverlayType.set,
+      'coll/n': OverlayType.set,
+    });
+    _expectQueryReturnedInOrder(qry, <String>[
+      'coll/n',
+      'coll/l',
+      'coll/m',
+      'coll/j',
+      'coll/k',
+      'coll/h',
+      'coll/i',
+      'coll/f',
+      'coll/g',
+      'coll/d',
+      'coll/b',
+      'coll/e',
+      'coll/c',
+      'coll/a',
+    ]);
+  }
+
+  /// `assertQueryReturned` of local_store_indexeddb.test.ts of the JS SDK: unlike [_expectQueryReturned] (Android's
+  /// `assertQueryReturned`), the order counts: the documents sorted by the comparator of [query] must be [keys].
+  void _expectQueryReturnedInOrder(Query query, List<String> keys) {
+    expect(_lastQueryResult, isNotNull);
+    final List<Document> documents = <Document>[
+      for (final MapEntry<DocumentKey, Document> entry
+          in _lastQueryResult!.documents)
+        entry.value,
+    ]..sort(query.comparator);
+    expect(documents.map((Document d) => d.key.path.toString()).toList(), keys);
+  }
+
   void _expectQueryReturned(List<String> keys) {
     expect(_lastQueryResult, isNotNull);
     final ImmutableSortedMap<DocumentKey, Document> documents =
