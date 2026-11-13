@@ -426,10 +426,17 @@ class _ParsedBundle {
             'Reached the end of bundle when a length string is expected.',
           );
         }
-        final String prefix = utf8.decode(bytes.sublist(position, openBracket));
-        final int? length = int.tryParse(prefix);
-        if (length == null || length < 0) {
-          throw FormatException('Invalid length prefix: "$prefix"');
+        final String prefix = utf8.decode(
+          bytes.sublist(position, openBracket),
+          allowMalformed: true,
+        );
+        // Plain decimal digits, as BundleReader requires: int.tryParse also
+        // takes signs, white space and hexadecimal.
+        final int? length = _lengthPrefix.hasMatch(prefix)
+            ? int.tryParse(prefix)
+            : null;
+        if (length == null) {
+          throw FormatException('Invalid length prefix: "${_excerpt(prefix)}"');
         }
         final int end = openBracket + length;
         if (end > bytes.length) {
@@ -443,7 +450,7 @@ class _ParsedBundle {
         position = end;
         if (element is! Map<String, dynamic>) {
           throw FormatException(
-            'Cannot decode unknown Bundle element: $element',
+            'Cannot decode unknown Bundle element: ${_excerpt('$element')}',
           );
         }
 
@@ -475,7 +482,7 @@ class _ParsedBundle {
           documents.add(document.document);
         } else {
           throw FormatException(
-            'Cannot decode unknown Bundle element: $element',
+            'Cannot decode unknown Bundle element: ${_excerpt('$element')}',
           );
         }
       }
@@ -487,14 +494,22 @@ class _ParsedBundle {
     } on FirestoreError {
       rethrow;
     } on Object catch (e) {
+      // The error may repeat the input, which can be megabytes long.
       throw FirestoreError(
-        'Invalid snapshot bundle: $e',
+        'Invalid snapshot bundle: ${_excerpt('$e')}',
         FirestoreErrorCode.invalidArgument,
         e,
       );
     }
     return _ParsedBundle(queries, documents);
   }
+
+  static final RegExp _lengthPrefix = RegExp(r'^[0-9]{1,10}$');
+
+  /// The start of [text], for error messages.
+  static String _excerpt(String text) => text.length <= 200
+      ? text
+      : '${text.substring(0, 200)}... (${text.length} characters)';
 
   final List<NamedQuery> queries;
   final List<Document> documents;

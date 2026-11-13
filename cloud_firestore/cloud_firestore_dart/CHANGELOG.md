@@ -126,6 +126,14 @@ Behaviour changes without a compile error:
     may be nested at most 100 levels, and fields of the wrong JSON type are reported as an
     invalid bundle. A stream without a valid element is rejected at once instead of being
     buffered, and elements that arrive in small chunks are no longer re-copied per chunk.
+  - Over REST (Firestore Lite on the web, and the single calls of the web transport) a document
+    or collection path with a `.` or `..` segment fails with `invalid-argument` before anything
+    is sent: the URL resolved such segments, so the request went to another path (or project)
+    with the credentials of this one. The gRPC transport sends the path as data, and the
+    backend rejects these ids.
+  - The bundle inside a snapshot JSON (`DocumentSnapshot.fromJson`, `QuerySnapshot.fromJson`)
+    needs the same plain decimal length prefix as `loadBundle` (a sign, white space or a hex
+    prefix was accepted), and its errors quote at most 200 characters of the input.
 - The local evaluation of queries and transforms follows the backend where 0.0.7 (and the JS
   and Android SDKs) did not; details under Fixed:
   - `whereIn`, `whereNotIn`, `arrayContains`, `arrayContainsAny`, `arrayUnion` and

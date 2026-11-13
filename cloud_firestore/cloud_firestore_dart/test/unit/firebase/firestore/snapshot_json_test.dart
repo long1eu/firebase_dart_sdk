@@ -349,6 +349,28 @@ void main() {
         expectInvalid(valid()..['bundle'] = 'BadData');
         expectInvalid(valid()..['bundle'] = '10{"a":1}');
       });
+      test('a length prefix that is not plain decimal digits', () {
+        final String bundle = valid()['bundle']! as String;
+        final int brace = bundle.indexOf('{');
+        final int length = int.parse(bundle.substring(0, brace));
+        for (final String prefix in <String>[
+          '0x${length.toRadixString(16)}',
+          '+$length',
+          ' $length',
+        ]) {
+          expectInvalid(
+              valid()..['bundle'] = '$prefix${bundle.substring(brace)}');
+        }
+      });
+      test('the error does not repeat a huge element', () {
+        final String element = '{"unknown":"${'x' * 100000}"}';
+        final String bundle =
+            '${valid()['bundle']}${utf8.encode(element).length}$element';
+        expectInvalid(
+            valid()..['bundle'] = bundle,
+            allOf(contains('Cannot decode unknown Bundle element'),
+                hasLength(lessThan(1000))));
+      });
       test('a bundle written outside of Node by the JS SDK', () {
         expectInvalid(
             valid()..['bundle'] = 'NOT SUPPORTED',

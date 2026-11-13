@@ -57,7 +57,21 @@ class RestClient {
     if (_pathFields[rpcName] == 'database') {
       resource = '$resource/documents';
     }
-    final String path = resource.split('/').map(Uri.encodeComponent).join('/');
+    final List<String> segments = resource.split('/');
+    // `.` and `..` are not valid ids for the backend, but in a URL they are
+    // dot segments, which the URL parser and the browser resolve: the request
+    // would go to another resource (even another project) with the
+    // credentials of this one. gRPC sends the name as data and the backend
+    // rejects it; do the same here.
+    for (final String segment in segments) {
+      if (segment.isEmpty || segment == '.' || segment == '..') {
+        throw GrpcError.invalidArgument(
+          'Invalid resource name for $rpcName: path segments must not be '
+          'empty, "." or ".."',
+        );
+      }
+    }
+    final String path = segments.map(Uri.encodeComponent).join('/');
     return Uri.parse('$_baseUrl/v1/$path:${_verbs[rpcName]}');
   }
 

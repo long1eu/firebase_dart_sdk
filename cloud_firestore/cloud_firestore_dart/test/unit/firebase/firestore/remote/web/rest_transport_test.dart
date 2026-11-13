@@ -202,6 +202,45 @@ void main() {
     );
   });
 
+  test(
+    'a parent with dot segments is refused instead of resolved in the URL',
+    () async {
+      // Without the check, Uri.parse resolves the `..` segments and the query
+      // goes to projects/q with the credentials of projects/p.
+      for (final String parent in <String>[
+        '$database/documents/a/../../../../../q/databases/(default)/documents',
+        '$database/documents/a/./b',
+        '$database/documents/a//b',
+      ]) {
+        await expectLater(
+          transport
+              .startCall(
+                FirestoreRpc.runQuery,
+                Stream<proto.RunQueryRequest>.value(
+                  proto.RunQueryRequest()
+                    ..parent = parent
+                    ..structuredQuery = (proto.StructuredQuery()
+                      ..from.add(
+                        proto.StructuredQuery_CollectionSelector()
+                          ..collectionId = 'c',
+                      )),
+                ),
+              )
+              .toList(),
+          throwsA(
+            isA<GrpcError>().having(
+              (GrpcError e) => e.code,
+              'code',
+              StatusCode.invalidArgument,
+            ),
+          ),
+          reason: parent,
+        );
+      }
+      expect(http.requests, isEmpty);
+    },
+  );
+
   test('the streams of the main library are not available', () async {
     await expectLater(
       transport
