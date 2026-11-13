@@ -100,7 +100,7 @@ Query query(String thePath) {
 }
 
 FieldPath field(String path) {
-  return FieldPath.fromSegments(path.split('.'));
+  return FieldPath.fromServerFormat(path);
 }
 
 DocumentReference ref(String theKey) {

@@ -27,16 +27,7 @@ extension AggregationSerializer on RemoteSerializer {
   /// target, only the explicit sort orders are sent: the implicit key ordering
   /// is irrelevant to an aggregation.
   proto.Target_QueryTarget encodeAggregateQueryTarget(Query query) {
-    final proto.Target_QueryTarget target = encodeQueryTarget(
-      query.toTarget(),
-    ).clone();
-    final List<proto.StructuredQuery_Order> orders =
-        target.structuredQuery.orderBy;
-    final int explicitCount = query.explicitSortOrder.length;
-    if (orders.length > explicitCount) {
-      orders.removeRange(explicitCount, orders.length);
-    }
-    return target..freeze();
+    return encodeQueryTarget(query.toAggregateTarget());
   }
 
   /// Builds the structured aggregation query for [aggregateFields].

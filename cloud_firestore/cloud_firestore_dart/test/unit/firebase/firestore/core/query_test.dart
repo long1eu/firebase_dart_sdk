@@ -15,18 +15,30 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_va
 import 'package:test/test.dart';
 
 import '../../../../util/comparator_test.dart';
+import '../../../../util/core_helpers.dart';
+import '../../../../util/test_access_helper.dart';
 import '../../../../util/test_util.dart';
 
 void main() {
   test('testMatchesBasedDocumentKey', () {
-    final ResourcePath queryPath =
-        ResourcePath.fromString('rooms/eros/messages/1');
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
-    final Document doc3 =
-        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
+    final ResourcePath queryPath = ResourcePath.fromString(
+      'rooms/eros/messages/1',
+    );
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<String>['text', 'msg1']),
+    );
+    final Document doc2 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<String>['text', 'msg2']),
+    );
+    final Document doc3 = doc(
+      'rooms/other/messages/1',
+      0,
+      map(<String>['text', 'msg3']),
+    );
 
     final Query query = Query(queryPath);
     expect(query.matches(doc1), isTrue);
@@ -35,16 +47,29 @@ void main() {
   });
 
   test('testMatchesShallowAncestorQuery', () {
-    final ResourcePath queryPath =
-        ResourcePath.fromString('rooms/eros/messages');
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
-    final Document doc1meta = doc('rooms/eros/messages/1/meta/1', 0,
-        map(<dynamic>['meta', 'meta-value']));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
-    final Document doc3 =
-        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
+    final ResourcePath queryPath = ResourcePath.fromString(
+      'rooms/eros/messages',
+    );
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<String>['text', 'msg1']),
+    );
+    final Document doc1meta = doc(
+      'rooms/eros/messages/1/meta/1',
+      0,
+      map(<dynamic>['meta', 'meta-value']),
+    );
+    final Document doc2 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<String>['text', 'msg2']),
+    );
+    final Document doc3 = doc(
+      'rooms/other/messages/1',
+      0,
+      map(<String>['text', 'msg3']),
+    );
 
     final Query query = Query(queryPath);
     expect(query.matches(doc1), isTrue);
@@ -54,10 +79,14 @@ void main() {
   });
 
   test('testEmptyFieldsAreAllowedForQueries', () {
-    final ResourcePath queryPath =
-        ResourcePath.fromString('rooms/eros/messages');
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
+    final ResourcePath queryPath = ResourcePath.fromString(
+      'rooms/eros/messages',
+    );
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<String>['text', 'msg1']),
+    );
     final Document doc2 = doc('rooms/eros/messages/2', 0, map(<String>[]));
 
     final Query query = Query(queryPath).filter(filter('text', '==', 'msg1'));
@@ -66,17 +95,22 @@ void main() {
   });
 
   test('testPrimitiveValueFilter', () {
-    final Query query1 = Query(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '>=', 2));
-    final Query query2 = Query(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '<=', 2));
+    final Query query1 = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('sort', '>=', 2));
+    final Query query2 = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('sort', '<=', 2));
 
     final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 1]));
     final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', 2]));
     final Document doc3 = doc('collection/3', 0, map(<dynamic>['sort', 3]));
     final Document doc4 = doc('collection/4', 0, map(<dynamic>['sort', false]));
-    final Document doc5 =
-        doc('collection/5', 0, map(<dynamic>['sort', 'string']));
+    final Document doc5 = doc(
+      'collection/5',
+      0,
+      map(<dynamic>['sort', 'string']),
+    );
 
     expect(query1.matches(doc1), isFalse);
     expect(query1.matches(doc2), isTrue);
@@ -92,8 +126,9 @@ void main() {
   });
 
   test('testArrayContainsFilters', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('array', 'array-contains', 42));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('array', 'array-contains', 42));
 
     // not an array
     Document document = doc('collection/1', 0, map(<dynamic>['array', 1]));
@@ -106,113 +141,121 @@ void main() {
     // array without element (and make sure it doesn't match in a nested field
     // or a different field)
     document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'array',
-          <dynamic>[
-            41,
-            '42',
-            map<dynamic>(<dynamic>[
-              'a',
-              42,
-              'b',
-              <int>[42]
-            ])
-          ],
-          'different',
-          42
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'array',
+        <dynamic>[
+          41,
+          '42',
+          map<dynamic>(<dynamic>[
+            'a',
+            42,
+            'b',
+            <int>[42],
+          ]),
+        ],
+        'different',
+        42,
+      ]),
+    );
     expect(query.matches(document), isFalse);
 
     // array with element
     document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'array',
-          <dynamic>[
-            1,
-            '2',
-            42,
-            map<dynamic>(<dynamic>['a', 1])
-          ]
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'array',
+        <dynamic>[
+          1,
+          '2',
+          42,
+          map<dynamic>(<dynamic>['a', 1]),
+        ],
+      ]),
+    );
     expect(query.matches(document), isTrue);
   });
 
   test('testArrayContainsFiltersWithObjectValues', () {
     // Search for arrays containing the object { a: [42] }
-    final Query query =
-        Query(ResourcePath.fromString('collection')).filter(filter(
-            'array',
-            'array-contains',
-            map<dynamic>(<dynamic>[
-              'a',
-              <int>[42]
-            ])));
+    final Query query = Query(ResourcePath.fromString('collection')).filter(
+      filter(
+        'array',
+        'array-contains',
+        map<dynamic>(<dynamic>[
+          'a',
+          <int>[42],
+        ]),
+      ),
+    );
 
     // array without element
     Document document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'array',
-          <dynamic>[
-            map<dynamic>(<dynamic>['a', 42]),
-            map<dynamic>(<dynamic>[
-              'a',
-              <int>[42, 43]
-            ]),
-            map<dynamic>(<dynamic>[
-              'b',
-              <int>[42]
-            ]),
-            map<dynamic>(<dynamic>[
-              'a',
-              <int>[42],
-              'b',
-              42
-            ])
-          ]
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'array',
+        <dynamic>[
+          map<dynamic>(<dynamic>['a', 42]),
+          map<dynamic>(<dynamic>[
+            'a',
+            <int>[42, 43],
+          ]),
+          map<dynamic>(<dynamic>[
+            'b',
+            <int>[42],
+          ]),
+          map<dynamic>(<dynamic>[
+            'a',
+            <int>[42],
+            'b',
+            42,
+          ]),
+        ],
+      ]),
+    );
     expect(query.matches(document), isFalse);
 
     // array with element
     document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'array',
-          <dynamic>[
-            1,
-            '2',
-            42,
-            map<dynamic>(<dynamic>[
-              'a',
-              <int>[42]
-            ])
-          ]
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'array',
+        <dynamic>[
+          1,
+          '2',
+          42,
+          map<dynamic>(<dynamic>[
+            'a',
+            <int>[42],
+          ]),
+        ],
+      ]),
+    );
 
     expect(query.matches(document), isTrue);
   });
 
   test('testInFilters', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('zip', 'in', <dynamic>[12345]));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('zip', 'in', <dynamic>[12345]));
 
     Document document = doc('collection/1', 0, map(<dynamic>['zip', 12345]));
     expect(query.matches(document), isTrue);
 
     // Value matches in array.
     document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'zip',
-          <dynamic>[12345]
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'zip',
+        <dynamic>[12345],
+      ]),
+    );
     expect(query.matches(document), isFalse);
 
     // Non-type match.
@@ -221,67 +264,73 @@ void main() {
 
     // Nested match.
     document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'zip',
-          <dynamic>[
-            '12345',
-            map<dynamic>(<dynamic>['zip', 12345])
-          ]
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'zip',
+        <dynamic>[
+          '12345',
+          map<dynamic>(<dynamic>['zip', 12345]),
+        ],
+      ]),
+    );
     expect(query.matches(document), isFalse);
   });
 
   test('testInFiltersWithObjectValues', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('zip', 'in', <dynamic>[
-      map<dynamic>(<dynamic>[
-        'a',
-        <dynamic>[42]
-      ])
-    ]));
+    final Query query = Query(ResourcePath.fromString('collection')).filter(
+      filter('zip', 'in', <dynamic>[
+        map<dynamic>(<dynamic>[
+          'a',
+          <dynamic>[42],
+        ]),
+      ]),
+    );
 
     // Containing object in array.
     Document document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'zip',
-          <dynamic>[
-            map<dynamic>(<dynamic>[
-              'a',
-              <dynamic>[42]
-            ])
-          ]
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'zip',
+        <dynamic>[
+          map<dynamic>(<dynamic>[
+            'a',
+            <dynamic>[42],
+          ]),
+        ],
+      ]),
+    );
     expect(query.matches(document), isFalse);
 
     // Containing object.
     document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'zip',
-          map<dynamic>(<dynamic>[
-            'a',
-            <dynamic>[42]
-          ])
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'zip',
+        map<dynamic>(<dynamic>[
+          'a',
+          <dynamic>[42],
+        ]),
+      ]),
+    );
     expect(query.matches(document), isTrue);
   });
 
   test('testArrayContainsAnyFilters', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('zip', 'array-contains-any', <dynamic>[12345]));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('zip', 'array-contains-any', <dynamic>[12345]));
 
     Document document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'zip',
-          <dynamic>[12345]
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'zip',
+        <dynamic>[12345],
+      ]),
+    );
     expect(query.matches(document), isTrue);
 
     // Value matches in non-array.
@@ -290,245 +339,308 @@ void main() {
 
     // Non-type match.
     document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'zip',
-          <dynamic>['12345']
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'zip',
+        <dynamic>['12345'],
+      ]),
+    );
     expect(query.matches(document), isFalse);
 
     // Nested match.
     document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'zip',
-          <dynamic>[
-            '12345',
-            map<dynamic>(<dynamic>[
-              'zip',
-              <dynamic>[12345]
-            ])
-          ]
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'zip',
+        <dynamic>[
+          '12345',
+          map<dynamic>(<dynamic>[
+            'zip',
+            <dynamic>[12345],
+          ]),
+        ],
+      ]),
+    );
     expect(query.matches(document), isFalse);
   });
 
   test('testArrayContainsAnyFiltersWithObjectValues', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('zip', 'array-contains-any', <dynamic>[
-      map<dynamic>(<dynamic>[
-        'a',
-        <dynamic>[42]
-      ])
-    ]));
+    final Query query = Query(ResourcePath.fromString('collection')).filter(
+      filter('zip', 'array-contains-any', <dynamic>[
+        map<dynamic>(<dynamic>[
+          'a',
+          <dynamic>[42],
+        ]),
+      ]),
+    );
 
     // Containing object in array.
     Document document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'zip',
-          <dynamic>[
-            map<dynamic>(<dynamic>[
-              'a',
-              <dynamic>[42]
-            ])
-          ]
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'zip',
+        <dynamic>[
+          map<dynamic>(<dynamic>[
+            'a',
+            <dynamic>[42],
+          ]),
+        ],
+      ]),
+    );
     expect(query.matches(document), isTrue);
 
     // Containing object.
     document = doc(
-        'collection/1',
-        0,
-        map(<dynamic>[
-          'zip',
-          map<dynamic>(<dynamic>[
-            'a',
-            <dynamic>[42]
-          ])
-        ]));
+      'collection/1',
+      0,
+      map(<dynamic>[
+        'zip',
+        map<dynamic>(<dynamic>[
+          'a',
+          <dynamic>[42],
+        ]),
+      ]),
+    );
     expect(query.matches(document), isFalse);
   });
 
   test('testNotEqualFilters', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('zip', '!=', 12345));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('zip', '!=', 12345));
 
     // No match.
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['zip', 23456]))),
-        isTrue);
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', 23456]))),
+      isTrue,
+    );
     // Different types always match.
     expect(
-        query.matches(doc('collection/1', 0, map(<dynamic>['zip', '12345']))),
-        isTrue);
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', '12345']))),
+      isTrue,
+    );
     expect(
-        query.matches(doc(
-            'collection/1',
-            0,
-            map(<dynamic>[
-              'zip',
-              <dynamic>[12345]
-            ]))),
-        isTrue);
+      query.matches(
+        doc(
+          'collection/1',
+          0,
+          map(<dynamic>[
+            'zip',
+            <dynamic>[12345],
+          ]),
+        ),
+      ),
+      isTrue,
+    );
     // Null is excluded.
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['zip', null]))),
-        isFalse);
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', null]))),
+      isFalse,
+    );
     // Missing field is excluded.
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['chip', 23456]))),
-        isFalse);
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['chip', 23456]))),
+      isFalse,
+    );
     // NaN matches.
     expect(
-        query
-            .matches(doc('collection/1', 0, map(<dynamic>['zip', double.nan]))),
-        isTrue);
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', double.nan]))),
+      isTrue,
+    );
     // Direct match.
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['zip', 12345]))),
-        isFalse);
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', 12345]))),
+      isFalse,
+    );
     // An equal double does not match either.
     expect(
-        query.matches(doc('collection/1', 0, map(<dynamic>['zip', 12345.0]))),
-        isFalse);
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', 12345.0]))),
+      isFalse,
+    );
   });
 
   test('testNotInFilters', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('zip', 'not-in', <dynamic>[12345]));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('zip', 'not-in', <dynamic>[12345]));
 
     // No match.
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['zip', 23456]))),
-        isTrue);
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', 23456]))),
+      isTrue,
+    );
     // Value matches in array.
     expect(
-        query.matches(doc(
-            'collection/1',
-            0,
-            map(<dynamic>[
-              'zip',
-              <dynamic>[12345]
-            ]))),
-        isTrue);
+      query.matches(
+        doc(
+          'collection/1',
+          0,
+          map(<dynamic>[
+            'zip',
+            <dynamic>[12345],
+          ]),
+        ),
+      ),
+      isTrue,
+    );
     // Non-type match.
     expect(
-        query.matches(doc('collection/1', 0, map(<dynamic>['zip', '12345']))),
-        isTrue);
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', '12345']))),
+      isTrue,
+    );
     // Nested match.
     expect(
-        query.matches(doc(
-            'collection/1',
-            0,
-            map(<dynamic>[
-              'zip',
-              <dynamic>[
-                '12345',
-                map<dynamic>(<dynamic>['zip', 12345])
-              ]
-            ]))),
-        isTrue);
+      query.matches(
+        doc(
+          'collection/1',
+          0,
+          map(<dynamic>[
+            'zip',
+            <dynamic>[
+              '12345',
+              map<dynamic>(<dynamic>['zip', 12345]),
+            ],
+          ]),
+        ),
+      ),
+      isTrue,
+    );
     // Null is excluded.
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['zip', null]))),
-        isFalse);
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', null]))),
+      isFalse,
+    );
     // NaN matches.
     expect(
-        query
-            .matches(doc('collection/1', 0, map(<dynamic>['zip', double.nan]))),
-        isTrue);
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', double.nan]))),
+      isTrue,
+    );
     // Direct match.
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['zip', 12345]))),
-        isFalse);
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', 12345]))),
+      isFalse,
+    );
     // Missing field is excluded.
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['chip', 23456]))),
-        isFalse);
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['chip', 23456]))),
+      isFalse,
+    );
   });
 
   test('testNotInFiltersWithNullInArrayMatchNothing', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('zip', 'not-in', <dynamic>[12345, null]));
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['zip', 23456]))),
-        isFalse);
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('zip', 'not-in', <dynamic>[12345, null]));
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', 23456]))),
+      isFalse,
+    );
   });
 
   test('testNotInFiltersWithObjectValues', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('zip', 'not-in', <dynamic>[
-      map<dynamic>(<dynamic>[
-        'a',
-        <dynamic>[42]
-      ])
-    ]));
+    final Query query = Query(ResourcePath.fromString('collection')).filter(
+      filter('zip', 'not-in', <dynamic>[
+        map<dynamic>(<dynamic>[
+          'a',
+          <dynamic>[42],
+        ]),
+      ]),
+    );
 
     // Containing object in array.
     expect(
-        query.matches(doc(
-            'collection/1',
-            0,
-            map(<dynamic>[
-              'zip',
-              <dynamic>[
-                map<dynamic>(<dynamic>[
-                  'a',
-                  <dynamic>[42]
-                ])
-              ]
-            ]))),
-        isTrue);
-    // Containing object.
-    expect(
-        query.matches(doc(
-            'collection/1',
-            0,
-            map(<dynamic>[
-              'zip',
+      query.matches(
+        doc(
+          'collection/1',
+          0,
+          map(<dynamic>[
+            'zip',
+            <dynamic>[
               map<dynamic>(<dynamic>[
                 'a',
-                <dynamic>[42]
-              ])
-            ]))),
-        isFalse);
+                <dynamic>[42],
+              ]),
+            ],
+          ]),
+        ),
+      ),
+      isTrue,
+    );
+    // Containing object.
+    expect(
+      query.matches(
+        doc(
+          'collection/1',
+          0,
+          map(<dynamic>[
+            'zip',
+            map<dynamic>(<dynamic>[
+              'a',
+              <dynamic>[42],
+            ]),
+          ]),
+        ),
+      ),
+      isFalse,
+    );
   });
 
   test('testNotInFiltersWithArrayValues', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('zip', 'not-in', <dynamic>[
-      <dynamic>[12345, 12346]
-    ]));
+    final Query query = Query(ResourcePath.fromString('collection')).filter(
+      filter('zip', 'not-in', <dynamic>[
+        <dynamic>[12345, 12346],
+      ]),
+    );
     expect(
-        query.matches(doc(
-            'collection/1',
-            0,
-            map(<dynamic>[
-              'zip',
-              <dynamic>[12345, 12346]
-            ]))),
-        isFalse);
-    expect(query.matches(doc('collection/1', 0, map(<dynamic>['zip', 12345]))),
-        isTrue);
+      query.matches(
+        doc(
+          'collection/1',
+          0,
+          map(<dynamic>[
+            'zip',
+            <dynamic>[12345, 12346],
+          ]),
+        ),
+      ),
+      isFalse,
+    );
+    expect(
+      query.matches(doc('collection/1', 0, map(<dynamic>['zip', 12345]))),
+      isTrue,
+    );
   });
 
   test('testKeyFieldNotEqualAndNotInFilters', () {
-    final Query notEqual = Query(ResourcePath.fromString('collection'))
-        .filter(filter('__name__', '!=', ref('collection/a')));
+    final Query notEqual = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('__name__', '!=', ref('collection/a')));
     expect(notEqual.matches(doc('collection/a', 0, map(<dynamic>[]))), isFalse);
     expect(notEqual.matches(doc('collection/b', 0, map(<dynamic>[]))), isTrue);
 
     final Query notIn = Query(ResourcePath.fromString('collection')).filter(
-        filter('__name__', 'not-in',
-            <dynamic>[ref('collection/a'), ref('collection/b')]));
+      filter('__name__', 'not-in', <dynamic>[
+        ref('collection/a'),
+        ref('collection/b'),
+      ]),
+    );
     expect(notIn.matches(doc('collection/a', 0, map(<dynamic>[]))), isFalse);
     expect(notIn.matches(doc('collection/b', 0, map(<dynamic>[]))), isFalse);
     expect(notIn.matches(doc('collection/c', 0, map(<dynamic>[]))), isTrue);
   });
 
   test('testNotEqualAndNotInAreInequalities', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('a', '!=', 1));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('a', '!=', 1));
     expect(query.firstInequalityField, field('a'));
     expect(query.orderByConstraints[0].field, field('a'));
 
-    final Query notIn = Query(ResourcePath.fromString('collection'))
-        .filter(filter('a', 'not-in', <dynamic>[1]));
+    final Query notIn = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('a', 'not-in', <dynamic>[1]));
     expect(notIn.firstInequalityField, field('a'));
     expect(notIn.orderByConstraints[0].field, field('a'));
   });
@@ -536,22 +648,33 @@ void main() {
   test('testNotEqualAndNotInCanonicalIds', () {
     final Query base = Query(ResourcePath.fromString('collection'));
     expect(base.filter(filter('a', '!=', 1)).canonicalId, contains('a != 1'));
-    expect(base.filter(filter('a', 'not-in', <dynamic>[1, 2])).canonicalId,
-        contains('a not_in [1, 2]'));
-    expect(base.filter(filter('a', '!=', 1)).canonicalId,
-        isNot(base.filter(filter('a', '==', 1)).canonicalId));
+    expect(
+      base.filter(filter('a', 'not-in', <dynamic>[1, 2])).canonicalId,
+      contains('a not_in [1, 2]'),
+    );
+    expect(
+      base.filter(filter('a', '!=', 1)).canonicalId,
+      isNot(base.filter(filter('a', '==', 1)).canonicalId),
+    );
   });
 
   test('testNaNFilter', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '==', double.nan));
-    final Document doc1 =
-        doc('collection/1', 0, map(<dynamic>['sort', double.nan]));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('sort', '==', double.nan));
+    final Document doc1 = doc(
+      'collection/1',
+      0,
+      map(<dynamic>['sort', double.nan]),
+    );
     final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', 2]));
     final Document doc3 = doc('collection/3', 0, map(<dynamic>['sort', 3.1]));
     final Document doc4 = doc('collection/4', 0, map(<dynamic>['sort', false]));
-    final Document doc5 =
-        doc('collection/5', 0, map(<dynamic>['sort', 'string']));
+    final Document doc5 = doc(
+      'collection/5',
+      0,
+      map(<dynamic>['sort', 'string']),
+    );
 
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isFalse);
@@ -559,8 +682,9 @@ void main() {
     expect(query.matches(doc4), isFalse);
     expect(query.matches(doc5), isFalse);
 
-    final Query notEqual = Query(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '!=', double.nan));
+    final Query notEqual = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('sort', '!=', double.nan));
     expect(notEqual.matches(doc1), isFalse);
     expect(notEqual.matches(doc2), isTrue);
     expect(notEqual.matches(doc3), isTrue);
@@ -569,14 +693,18 @@ void main() {
   });
 
   test('testNullFilter', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '==', null));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('sort', '==', null));
     final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', null]));
     final Document doc2 = doc('collection/2', 0, map(<dynamic>['sort', 2]));
     final Document doc3 = doc('collection/3', 0, map(<dynamic>['sort', 3.1]));
     final Document doc4 = doc('collection/4', 0, map(<dynamic>['sort', false]));
-    final Document doc5 =
-        doc('collection/5', 0, map(<dynamic>['sort', 'string']));
+    final Document doc5 = doc(
+      'collection/5',
+      0,
+      map(<dynamic>['sort', 'string']),
+    );
 
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isFalse);
@@ -584,8 +712,9 @@ void main() {
     expect(query.matches(doc4), isFalse);
     expect(query.matches(doc5), isFalse);
 
-    final Query notEqual = Query(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '!=', null));
+    final Query notEqual = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('sort', '!=', null));
     expect(notEqual.matches(doc1), isFalse);
     expect(notEqual.matches(doc2), isTrue);
     expect(notEqual.matches(doc3), isTrue);
@@ -598,49 +727,63 @@ void main() {
     for (String op in <String>['<', '<=', '>', '>=', '==', '!=']) {
       expect(() => query.filter(filter('sort', op, null)), returnsNormally);
       expect(
-          () => query.filter(filter('sort', op, double.nan)), returnsNormally);
+        () => query.filter(filter('sort', op, double.nan)),
+        returnsNormally,
+      );
     }
   });
 
   test('testComplexObjectFilters', () {
-    final Query query1 = Query(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '<=', 2));
-    final Query query2 = Query(ResourcePath.fromString('collection'))
-        .filter(filter('sort', '>=', 2));
+    final Query query1 = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('sort', '<=', 2));
+    final Query query2 = Query(
+      ResourcePath.fromString('collection'),
+    ).filter(filter('sort', '>=', 2));
 
     final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 2]));
-    final Document doc2 =
-        doc('collection/2', 0, map(<dynamic>['sort', <int>[]]));
+    final Document doc2 = doc(
+      'collection/2',
+      0,
+      map(<dynamic>['sort', <int>[]]),
+    );
     final Document doc3 = doc(
-        'collection/3',
-        0,
-        map(<dynamic>[
-          'sort',
-          <int>[1]
-        ]));
+      'collection/3',
+      0,
+      map(<dynamic>[
+        'sort',
+        <int>[1],
+      ]),
+    );
     final Document doc4 = doc(
-        'collection/4',
-        0,
-        map(<dynamic>[
-          'sort',
-          map<dynamic>(<dynamic>['foo', 2])
-        ]));
+      'collection/4',
+      0,
+      map(<dynamic>[
+        'sort',
+        map<dynamic>(<dynamic>['foo', 2]),
+      ]),
+    );
     final Document doc5 = doc(
-        'collection/5',
-        0,
-        map(<dynamic>[
-          'sort',
-          map<String>(<String>['foo', 'bar'])
-        ]));
-    final Document doc6 =
-        doc('collection/6', 0, map(<dynamic>['sort', map<int>(<int>[])]));
+      'collection/5',
+      0,
+      map(<dynamic>[
+        'sort',
+        map<String>(<String>['foo', 'bar']),
+      ]),
+    );
+    final Document doc6 = doc(
+      'collection/6',
+      0,
+      map(<dynamic>['sort', map<int>(<int>[])]),
+    );
     final Document doc7 = doc(
-        'collection/7',
-        0,
-        map(<dynamic>[
-          'sort',
-          <int>[3, 1]
-        ]));
+      'collection/7',
+      0,
+      map(<dynamic>[
+        'sort',
+        <int>[3, 1],
+      ]),
+    );
 
     expect(query1.matches(doc1), isTrue);
     expect(query1.matches(doc2), isFalse);
@@ -660,33 +803,40 @@ void main() {
   });
 
   test('testDoesNotRemoveComplexObjectsWithOrderBy', () {
-    final Query query =
-        Query(ResourcePath.fromString('collection')).orderBy(orderBy('sort'));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).orderBy(orderBy('sort'));
 
     final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 2]));
-    final Document doc2 =
-        doc('collection/2', 0, map(<dynamic>['sort', <int>[]]));
+    final Document doc2 = doc(
+      'collection/2',
+      0,
+      map(<dynamic>['sort', <int>[]]),
+    );
     final Document doc3 = doc(
-        'collection/3',
-        0,
-        map(<dynamic>[
-          'sort',
-          <int>[1]
-        ]));
+      'collection/3',
+      0,
+      map(<dynamic>[
+        'sort',
+        <int>[1],
+      ]),
+    );
     final Document doc4 = doc(
-        'collection/4',
-        0,
-        map(<dynamic>[
-          'sort',
-          map<dynamic>(<dynamic>['foo', 2])
-        ]));
+      'collection/4',
+      0,
+      map(<dynamic>[
+        'sort',
+        map<dynamic>(<dynamic>['foo', 2]),
+      ]),
+    );
     final Document doc5 = doc(
-        'collection/5',
-        0,
-        map(<dynamic>[
-          'sort',
-          map<String>(<String>['foo', 'bar'])
-        ]));
+      'collection/5',
+      0,
+      map(<dynamic>[
+        'sort',
+        map<String>(<String>['foo', 'bar']),
+      ]),
+    );
 
     expect(query.matches(doc1), isTrue);
     expect(query.matches(doc2), isTrue);
@@ -698,20 +848,21 @@ void main() {
   test('testFiltersArrays', () {
     final Query baseQuery = Query(ResourcePath.fromString('collection'));
     final Document doc1 = doc(
-        'collection/doc',
-        0,
-        map(<dynamic>[
-          'tags',
-          <dynamic>['foo', 1, true]
-        ]));
+      'collection/doc',
+      0,
+      map(<dynamic>[
+        'tags',
+        <dynamic>['foo', 1, true],
+      ]),
+    );
     final List<Filter> matchingFilters = <Filter>[
-      filter('tags', '==', <dynamic>['foo', 1, true])
+      filter('tags', '==', <dynamic>['foo', 1, true]),
     ];
 
     final List<Filter> nonMatchingFilters = <Filter>[
       filter('tags', '==', 'foo'),
       filter('tags', '==', <dynamic>['foo', 1]),
-      filter('tags', '==', <dynamic>['foo', true, 1])
+      filter('tags', '==', <dynamic>['foo', true, 1]),
     ];
 
     for (Filter filter in matchingFilters) {
@@ -726,32 +877,62 @@ void main() {
   test('testFiltersObjects', () {
     final Query baseQuery = Query(ResourcePath.fromString('collection'));
     final Document doc1 = doc(
-        'collection/doc',
-        0,
-        map(<dynamic>[
-          'tags',
-          map<dynamic>(
-              <dynamic>['foo', 'foo', 'a', 0, 'b', true, 'c', double.nan])
-        ]));
+      'collection/doc',
+      0,
+      map(<dynamic>[
+        'tags',
+        map<dynamic>(<dynamic>[
+          'foo',
+          'foo',
+          'a',
+          0,
+          'b',
+          true,
+          'c',
+          double.nan,
+        ]),
+      ]),
+    );
 
     final List<Filter> matchingFilters = <Filter>[
       filter(
-          'tags',
-          '==',
-          map<dynamic>(
-              <dynamic>['foo', 'foo', 'a', 0, 'b', true, 'c', double.nan])),
+        'tags',
+        '==',
+        map<dynamic>(<dynamic>[
+          'foo',
+          'foo',
+          'a',
+          0,
+          'b',
+          true,
+          'c',
+          double.nan,
+        ]),
+      ),
       filter(
-          'tags',
-          '==',
-          map<dynamic>(
-              <dynamic>['b', true, 'a', 0, 'foo', 'foo', 'c', double.nan])),
-      filter('tags.foo', '==', 'foo')
+        'tags',
+        '==',
+        map<dynamic>(<dynamic>[
+          'b',
+          true,
+          'a',
+          0,
+          'foo',
+          'foo',
+          'c',
+          double.nan,
+        ]),
+      ),
+      filter('tags.foo', '==', 'foo'),
     ];
 
     final List<Filter> nonMatchingFilters = <Filter>[
       filter('tags', '==', 'foo'),
-      filter('tags', '==',
-          map<dynamic>(<dynamic>['foo', 'foo', 'a', 0, 'b', true]))
+      filter(
+        'tags',
+        '==',
+        map<dynamic>(<dynamic>['foo', 'foo', 'a', 0, 'b', true]),
+      ),
     ];
 
     for (Filter filter in matchingFilters) {
@@ -764,8 +945,9 @@ void main() {
   });
 
   test('testSortsDocuments', () {
-    final Query query =
-        Query(ResourcePath.fromString('collection')).orderBy(orderBy('sort'));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).orderBy(orderBy('sort'));
     ComparatorTester<Document>(query.comparator)
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', null])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', false])))
@@ -780,61 +962,70 @@ void main() {
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', 'a'])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', 'ab'])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort', 'b'])))
-        .addItem(doc(
-            'collection/1', 0, map(<dynamic>['sort', ref('collection/id1')])))
+        .addItem(
+          doc('collection/1', 0, map(<dynamic>['sort', ref('collection/id1')])),
+        )
         .testCompare();
   });
 
   test('testSortsWithMultipleFields', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .orderBy(orderBy('sort1'))
-        .orderBy(orderBy('sort2'));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).orderBy(orderBy('sort1')).orderBy(orderBy('sort2'));
 
     ComparatorTester<Document>(query.comparator)
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 1])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 2])))
-        .addItem(doc('collection/2', 0,
-            map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
-        .addItem(doc('collection/3', 0,
-            map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
+        .addItem(
+          doc('collection/2', 0, map(<dynamic>['sort1', 1, 'sort2', 2])),
+        ) // by key
+        .addItem(
+          doc('collection/3', 0, map(<dynamic>['sort1', 1, 'sort2', 2])),
+        ) // by key
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 3])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 1])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 2])))
-        .addItem(doc('collection/2', 0,
-            map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
-        .addItem(doc('collection/3', 0,
-            map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
+        .addItem(
+          doc('collection/2', 0, map(<dynamic>['sort1', 2, 'sort2', 2])),
+        ) // by key
+        .addItem(
+          doc('collection/3', 0, map(<dynamic>['sort1', 2, 'sort2', 2])),
+        ) // by key
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 3])))
         .testCompare();
   });
 
   test('testSortsDescending', () {
-    final Query query = Query(ResourcePath.fromString('collection'))
-        .orderBy(orderBy('sort1', 'desc'))
-        .orderBy(orderBy('sort2', 'desc'));
+    final Query query = Query(
+      ResourcePath.fromString('collection'),
+    ).orderBy(orderBy('sort1', 'desc')).orderBy(orderBy('sort2', 'desc'));
 
     ComparatorTester<Document>(query.comparator)
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 3])))
         .addItem(doc('collection/3', 0, map(<dynamic>['sort1', 2, 'sort2', 2])))
-        .addItem(doc('collection/2', 0,
-            map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
-        .addItem(doc('collection/1', 0,
-            map(<dynamic>['sort1', 2, 'sort2', 2]))) // by key
+        .addItem(
+          doc('collection/2', 0, map(<dynamic>['sort1', 2, 'sort2', 2])),
+        ) // by key
+        .addItem(
+          doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 2])),
+        ) // by key
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 2, 'sort2', 1])))
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 3])))
         .addItem(doc('collection/3', 0, map(<dynamic>['sort1', 1, 'sort2', 2])))
-        .addItem(doc('collection/2', 0,
-            map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
-        .addItem(doc('collection/1', 0,
-            map(<dynamic>['sort1', 1, 'sort2', 2]))) // by key
+        .addItem(
+          doc('collection/2', 0, map(<dynamic>['sort1', 1, 'sort2', 2])),
+        ) // by key
+        .addItem(
+          doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 2])),
+        ) // by key
         .addItem(doc('collection/1', 0, map(<dynamic>['sort1', 1, 'sort2', 1])))
         .testCompare();
   });
 
   test('testHashCode', () {
-    final Query q1a = Query(ResourcePath.fromString('foo'))
-        .filter(filter('i1', '<', 2))
-        .filter(filter('i2', '==', 3));
+    final Query q1a = Query(
+      ResourcePath.fromString('foo'),
+    ).filter(filter('i1', '<', 2)).filter(filter('i2', '==', 3));
 
     // TODO(long1eu): uncomment this when hashcode does not depend on filter order.
     /*
@@ -850,20 +1041,20 @@ void main() {
     final Query q3a = Query(ResourcePath.fromString('foo/bar'));
     final Query q3b = Query(ResourcePath.fromString('foo/bar'));
 
-    final Query q4a = Query(ResourcePath.fromString('foo'))
-        .orderBy(orderBy('foo'))
-        .orderBy(orderBy('bar'));
-    final Query q4b = Query(ResourcePath.fromString('foo'))
-        .orderBy(orderBy('foo'))
-        .orderBy(orderBy('bar'));
+    final Query q4a = Query(
+      ResourcePath.fromString('foo'),
+    ).orderBy(orderBy('foo')).orderBy(orderBy('bar'));
+    final Query q4b = Query(
+      ResourcePath.fromString('foo'),
+    ).orderBy(orderBy('foo')).orderBy(orderBy('bar'));
 
-    final Query q5a = Query(ResourcePath.fromString('foo'))
-        .orderBy(orderBy('bar'))
-        .orderBy(orderBy('foo'));
+    final Query q5a = Query(
+      ResourcePath.fromString('foo'),
+    ).orderBy(orderBy('bar')).orderBy(orderBy('foo'));
 
-    final Query q6a = Query(ResourcePath.fromString('foo'))
-        .filter(filter('bar', '>', 2))
-        .orderBy(orderBy('bar'));
+    final Query q6a = Query(
+      ResourcePath.fromString('foo'),
+    ).filter(filter('bar', '>', 2)).orderBy(orderBy('bar'));
 
     final Query q7a = Query(ResourcePath.fromString('foo')).limit(10);
 
@@ -875,77 +1066,440 @@ void main() {
       <int>[q4a.hashCode, q4b.hashCode],
       <int>[q5a.hashCode],
       <int>[q6a.hashCode],
-      <int>[q7a.hashCode]
+      <int>[q7a.hashCode],
     ]);
   });
 
   test('testImplicitOrderBy', () {
     final Query baseQuery = Query(path('foo'));
     // Default is ascending
-    expect(baseQuery.orderByConstraints,
-        <OrderBy>[orderBy(DocumentKey.keyFieldName, 'asc')]);
+    expect(baseQuery.orderByConstraints, <OrderBy>[
+      orderBy(DocumentKey.keyFieldName, 'asc'),
+    ]);
 
     // Explicit key ordering is respected
     expect(
-        baseQuery
-            .orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
-            .orderByConstraints,
-        <OrderBy>[orderBy(DocumentKey.keyFieldName, 'asc')]);
+      baseQuery
+          .orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
+          .orderByConstraints,
+      <OrderBy>[orderBy(DocumentKey.keyFieldName, 'asc')],
+    );
     expect(
-        baseQuery
-            .orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
-            .orderByConstraints,
-        <OrderBy>[orderBy(DocumentKey.keyFieldName, 'desc')]);
+      baseQuery
+          .orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
+          .orderByConstraints,
+      <OrderBy>[orderBy(DocumentKey.keyFieldName, 'desc')],
+    );
     expect(
-        baseQuery
-            .orderBy(orderBy('foo'))
-            .orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
-            .orderByConstraints,
-        <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'asc')]);
+      baseQuery
+          .orderBy(orderBy('foo'))
+          .orderBy(orderBy(DocumentKey.keyFieldName, 'asc'))
+          .orderByConstraints,
+      <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'asc')],
+    );
     expect(
-        baseQuery
-            .orderBy(orderBy('foo'))
-            .orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
-            .orderByConstraints,
-        <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'desc')]);
+      baseQuery
+          .orderBy(orderBy('foo'))
+          .orderBy(orderBy(DocumentKey.keyFieldName, 'desc'))
+          .orderByConstraints,
+      <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'desc')],
+    );
 
     // Inequality filters add order bys
-    expect(baseQuery.filter(filter('foo', '<', 5)).orderByConstraints,
-        <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'asc')]);
+    expect(
+      baseQuery.filter(filter('foo', '<', 5)).orderByConstraints,
+      <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName, 'asc')],
+    );
 
     // Descending order by applies to implicit key ordering
     expect(
-        baseQuery.orderBy(orderBy('foo', 'desc')).orderByConstraints, <OrderBy>[
-      orderBy('foo', 'desc'),
-      orderBy(DocumentKey.keyFieldName, 'desc')
+      baseQuery.orderBy(orderBy('foo', 'desc')).orderByConstraints,
+      <OrderBy>[
+        orderBy('foo', 'desc'),
+        orderBy(DocumentKey.keyFieldName, 'desc'),
+      ],
+    );
+    expect(
+      baseQuery
+          .orderBy(orderBy('foo', 'asc'))
+          .orderBy(orderBy('bar', 'desc'))
+          .orderByConstraints,
+      <OrderBy>[
+        orderBy('foo', 'asc'),
+        orderBy('bar', 'desc'),
+        orderBy(DocumentKey.keyFieldName, 'desc'),
+      ],
+    );
+    expect(
+      baseQuery
+          .orderBy(orderBy('foo', 'desc'))
+          .orderBy(orderBy('bar', 'asc'))
+          .orderByConstraints,
+      <OrderBy>[
+        orderBy('foo', 'desc'),
+        orderBy('bar', 'asc'),
+        orderBy(DocumentKey.keyFieldName, 'asc'),
+      ],
+    );
+  });
+
+  test('testMatchesAllDocuments', () {
+    final Query baseQuery = Query(ResourcePath.fromString('collection'));
+    expect(baseQuery.matchesAllDocuments, isTrue);
+
+    Query query = baseQuery.orderBy(orderBy('__name__'));
+    expect(query.matchesAllDocuments, isTrue);
+
+    query = baseQuery.orderBy(orderBy('foo'));
+    expect(query.matchesAllDocuments, isFalse);
+
+    query = baseQuery.filter(filter('foo', '==', 'bar'));
+    expect(query.matchesAllDocuments, isFalse);
+
+    query = baseQuery.limitToFirst(1);
+    expect(query.matchesAllDocuments, isFalse);
+
+    query = baseQuery.startAt(bound(true));
+    expect(query.matchesAllDocuments, isFalse);
+
+    query = baseQuery.endAt(bound(true));
+    expect(query.matchesAllDocuments, isFalse);
+  });
+
+  // Upstream matches the documents concurrently on a BackgroundQueue to
+  // exercise the memoized normalized orderBy. A Query cannot be shared between
+  // isolates, so the matches are interleaved as concurrent async tasks.
+  test('testSynchronousMatchesOrderBy', () async {
+    const String letters = 'abcdefghijklmnopqrstuvwxyz';
+    final List<Document> docs = <Document>[];
+
+    // Add one hundred documents to the collection, each with many fields (26).
+    // These will match the query and order by
+    for (int i = 0; i < 100; i++) {
+      docs.add(
+        doc('collection/$i', 0, <String, Object>{
+          for (final String letter in letters.split('')) letter: 2,
+        }),
+      );
+    }
+
+    // Add the an additional document to the collection, which
+    // will match the query but not the order by.
+    docs.add(doc('collection/100', 0, map(<dynamic>['a', 2])));
+
+    // Create a query that orders by many fields (26).
+    Query query = Query(path('collection')).filter(filter('a', '>', 1));
+    for (final String letter in letters.split('')) {
+      query = query.orderBy(orderBy(letter));
+    }
+
+    final Map<DocumentKey, bool> results = <DocumentKey, bool>{};
+    await Future.wait(<Future<void>>[
+      for (final Document d in docs)
+        Future<void>(() {
+          // We call query.matches() to indirectly test query.matchesOrderBy()
+          results[d.key] = query.matches(d);
+        }),
     ]);
-    expect(
-        baseQuery
-            .orderBy(orderBy('foo', 'asc'))
-            .orderBy(orderBy('bar', 'desc'))
-            .orderByConstraints,
-        <OrderBy>[
-          orderBy('foo', 'asc'),
-          orderBy('bar', 'desc'),
-          orderBy(DocumentKey.keyFieldName, 'desc')
-        ]);
-    expect(
-        baseQuery
-            .orderBy(orderBy('foo', 'desc'))
-            .orderBy(orderBy('bar', 'asc'))
-            .orderByConstraints,
-        <OrderBy>[
-          orderBy('foo', 'desc'),
-          orderBy('bar', 'asc'),
-          orderBy(DocumentKey.keyFieldName, 'asc')
-        ]);
+
+    expect(results.length, 101);
+    for (final DocumentKey key in results.keys) {
+      // Only for document 100 do we expect the match to be false
+      // otherwise it will be true.
+      expect(
+        results[key],
+        key != DocumentKey.fromPathString('collection/100'),
+        reason: '$key',
+      );
+    }
+  });
+
+  test('testGetOrderByReturnsUnmodifiableList', () {
+    final Query query = Query(path('collection'))
+        .filter(filter('a', '>', 1))
+        .orderBy(orderBy('a'))
+        .orderBy(orderBy('b'))
+        .orderBy(orderBy('c'))
+        .orderBy(orderBy('d'))
+        .orderBy(orderBy('e'))
+        .orderBy(orderBy('f'));
+
+    final List<OrderBy> orderByList = query.orderByConstraints;
+
+    expect(() => orderByList.add(orderBy('g')), throwsUnsupportedError);
+  });
+
+  void expectFooAndKeyAscending(Target target) {
+    expect(target.orderBy.length, 2);
+    expect(target.orderBy[0].direction, OrderByDirection.ascending);
+    expect(target.orderBy[0].field.toString(), 'foo');
+    expect(target.orderBy[1].direction, OrderByDirection.ascending);
+    expect(target.orderBy[1].field.toString(), '__name__');
+  }
+
+  test('testOrderByForAggregateAndNonAggregate', () {
+    final Query col = Query(path('collection'));
+
+    // Build two identical queries
+    final Query query1 = col.filter(filter('foo', '>', 1));
+    final Query query2 = col.filter(filter('foo', '>', 1));
+
+    // Compute an aggregate and non-aggregate target from the queries
+    final Target aggregateTarget = query1.toAggregateTarget();
+    final Target target = query2.toTarget();
+
+    expect(aggregateTarget.orderBy.length, 0);
+    expectFooAndKeyAscending(target);
+  });
+
+  test('testGeneratedOrderBysNotAffectedByPreviouslyMemoizedTargets', () {
+    final Query col = Query(path('collection'));
+
+    // Build two identical queries
+    final Query query1 = col.filter(filter('foo', '>', 1));
+    final Query query2 = col.filter(filter('foo', '>', 1));
+
+    // query1 - first to aggregate target, then to non-aggregate target
+    final Target aggregateTarget1 = query1.toAggregateTarget();
+    final Target target1 = query1.toTarget();
+
+    // query2 - first to non-aggregate target, then to aggregate target
+    final Target target2 = query2.toTarget();
+    final Target aggregateTarget2 = query2.toAggregateTarget();
+
+    expect(aggregateTarget1.orderBy.length, 0);
+    expect(aggregateTarget2.orderBy.length, 0);
+    expectFooAndKeyAscending(target1);
+    expectFooAndKeyAscending(target2);
+  });
+
+  // Ported from the JS SDK (test/unit/core/query.test.ts).
+  group('JS SDK', () {
+    test('implements isEqual', () {
+      Bound makeBound(List<Object> values, bool inclusive) =>
+          bound(inclusive, values);
+
+      Bound b = makeBound(<Object>[1, 2], true);
+      expect(b == makeBound(<Object>[1, 2], true), isTrue);
+
+      // Mismatch values
+      expect(b == makeBound(<Object>[2, 2], true), isFalse);
+      expect(b == makeBound(<Object>[1, 3], true), isFalse);
+
+      // Mismatch before
+      expect(b == makeBound(<Object>[1, 2], false), isFalse);
+
+      // Unequal lengths
+      expect(b == makeBound(<Object>[], true), isFalse);
+      expect(b == makeBound(<Object>[1], true), isFalse);
+      expect(b == makeBound(<Object>[1, 2, 3], true), isFalse);
+
+      // Zero length
+      b = makeBound(<Object>[], false);
+      expect(b == makeBound(<Object>[], false), isTrue);
+    });
+
+    test("doesn't crash querying unset fields", () {
+      final Query query1 = query('collection').filter(filter('sort', '==', 2));
+
+      final Document doc1 = doc('collection/1', 0, map(<dynamic>['sort', 2]));
+      final Document doc2 = doc('collection/1', 0, map());
+
+      expect(query1.matches(doc1), isTrue);
+      expect(query1.matches(doc2), isFalse);
+    });
+
+    test('generates canonical ids', () {
+      final Query q1a = query(
+        'foo',
+      ).filter(filter('i1', '<', 2)).filter(filter('i2', '==', 3));
+      final Query q1b = query(
+        'foo',
+      ).filter(filter('i1', '<', 2)).filter(filter('i2', '==', 3));
+
+      final Query q2a = query('foo');
+      final Query q2b = query('foo');
+
+      final Query q3a = query('foo/bar');
+      final Query q3b = query('foo/bar');
+
+      final Query q4a = query(
+        'foo',
+      ).orderBy(orderBy('foo')).orderBy(orderBy('bar'));
+      final Query q4b = query(
+        'foo',
+      ).orderBy(orderBy('foo')).orderBy(orderBy('bar'));
+      final Query q5a = query(
+        'foo',
+      ).orderBy(orderBy('bar')).orderBy(orderBy('foo'));
+
+      final Query q6a = query(
+        'foo',
+      ).filter(filter('bar', '>', 2)).orderBy(orderBy('bar'));
+
+      final Query q7a = query('foo').limitToFirst(10);
+      final Query q8a = query('foo').limitToLast(10);
+
+      final Bound lip1a = bound(false, <Object>['coll/foo']);
+      final Bound lip1b = bound(true, <Object>['coll/foo']);
+      final Bound lip2 = bound(false, <Object>['coll/bar']);
+
+      final Query q9a = query('foo').startAt(lip1a);
+      final Query q10a = query('foo').startAt(lip1b);
+      final Query q11a = query('foo').startAt(lip2);
+      final Query q12a = query('foo').endAt(lip1a);
+      final Query q13a = query('foo').endAt(lip1b);
+      final Query q14a = query('foo').endAt(lip2);
+
+      // upstream builds the absolute reference from
+      // 'projects/project1/databases/database1/documents/col/doc' with the
+      // first 5 segments dropped.
+      final Object relativeReference = ref('col/doc');
+      final Object absoluteReference = TestAccessHelper.createDocumentReference(
+        DocumentKey.fromPath(
+          ResourcePath.fromString(
+            'projects/project1/databases/database1/documents/col/doc',
+          ).popFirst(5),
+        ),
+      );
+
+      final Query q17a = query('foo').filter(
+        filter('object', '==', <String, Object>{'ref': relativeReference}),
+      );
+      final Query q17b = query('foo').filter(
+        filter('object', '==', <String, Object>{'ref': absoluteReference}),
+      );
+
+      final Query q18a = query(
+        'foo',
+      ).filter(filter('array', '==', <Object>[relativeReference]));
+      final Query q18b = query(
+        'foo',
+      ).filter(filter('array', '==', <Object>[absoluteReference]));
+
+      final List<List<Query>> queries = <List<Query>>[
+        <Query>[q1a, q1b],
+        <Query>[q2a, q2b],
+        <Query>[q3a, q3b],
+        <Query>[q4a, q4b],
+        <Query>[q5a],
+        <Query>[q6a],
+        <Query>[q7a],
+        <Query>[q8a],
+        <Query>[q9a],
+        <Query>[q10a],
+        <Query>[q11a],
+        <Query>[q12a],
+        <Query>[q13a],
+        <Query>[q14a],
+        <Query>[q17a, q17b],
+        <Query>[q18a, q18b],
+      ];
+
+      for (int i = 0; i < queries.length; i++) {
+        for (final Query q in queries[i]) {
+          for (int j = 0; j < queries.length; j++) {
+            for (final Query other in queries[j]) {
+              expect(
+                q.canonicalId == other.canonicalId,
+                i == j,
+                reason: 'Expected ($q).isEqual($other).to.equal(${i == j})',
+              );
+            }
+          }
+        }
+      }
+    });
+
+    test('matches composite queries with multiple inequality', () {
+      final Document doc1 = doc(
+        'collection/1',
+        0,
+        map(<dynamic>['a', 1, 'b', 0]),
+      );
+      final Document doc2 = doc(
+        'collection/2',
+        0,
+        map(<dynamic>['a', 2, 'b', 1]),
+      );
+      final Document doc3 = doc(
+        'collection/3',
+        0,
+        map(<dynamic>['a', 3, 'b', 2]),
+      );
+      final Document doc4 = doc(
+        'collection/4',
+        0,
+        map(<dynamic>['a', 1, 'b', 3]),
+      );
+      final Document doc5 = doc(
+        'collection/5',
+        0,
+        map(<dynamic>['a', 1, 'b', 1]),
+      );
+
+      void assertQueryMatches(
+        Query query,
+        List<Document> matching,
+        List<Document> nonMatching,
+      ) {
+        for (final Document d in matching) {
+          expect(query.matches(d), isTrue, reason: '${d.key} should match');
+        }
+        for (final Document d in nonMatching) {
+          expect(
+            query.matches(d),
+            isFalse,
+            reason: '${d.key} should not match',
+          );
+        }
+      }
+
+      // a>1 || b!=1.
+      final Query query1 = query(
+        'collection',
+      ).filter(orFilters(<Filter>[filter('a', '>', 1), filter('b', '!=', 1)]));
+      assertQueryMatches(
+        query1,
+        <Document>[doc1, doc2, doc3, doc4],
+        <Document>[doc5],
+      );
+
+      // (a>=1 && b==0) || (a==1 && b!=1)
+      final Query query2 = query('collection').filter(
+        orFilters(<Filter>[
+          andFilters(<Filter>[filter('a', '>=', 1), filter('b', '==', 0)]),
+          andFilters(<Filter>[filter('a', '==', 1), filter('b', '!=', 1)]),
+        ]),
+      );
+      assertQueryMatches(
+        query2,
+        <Document>[doc1, doc4],
+        <Document>[doc2, doc3, doc5],
+      );
+
+      // a<=2 && (a!=1 || b<3).
+      final Query query3 = query('collection').filter(
+        andFilters(<Filter>[
+          filter('a', '<=', 2),
+          orFilters(<Filter>[filter('a', '!=', 1), filter('b', '<', 3)]),
+        ]),
+      );
+      assertQueryMatches(
+        query3,
+        <Document>[doc1, doc2, doc5],
+        <Document>[doc3, doc4],
+      );
+    });
   });
 
   test('canonicalId contains the limit value', () {
     final Query base = Query(ResourcePath.fromString('a'));
     expect(base.limit(5).toTarget().canonicalId, 'a|f:|ob:__name__asc|l:5');
     expect(
-        base.limit(5).canonicalId, 'a|f:|ob:__name__asc|l:5|lt:LIMIT_TO_FIRST');
+      base.limit(5).canonicalId,
+      'a|f:|ob:__name__asc|l:5|lt:LIMIT_TO_FIRST',
+    );
     expect(base.limit(5).canonicalId, isNot(base.limit(10).canonicalId));
     expect(base.toTarget().canonicalId, 'a|f:|ob:__name__asc');
     expect(base.canonicalId, 'a|f:|ob:__name__asc|lt:LIMIT_TO_FIRST');
@@ -981,8 +1535,10 @@ void main() {
       final Query query = base().orderBy(orderBy('foo')).limit(4);
       final Target target = query.toTarget();
       expect(target.orderBy, query.orderByConstraints);
-      expect(target.orderBy,
-          <OrderBy>[orderBy('foo'), orderBy(DocumentKey.keyFieldName)]);
+      expect(target.orderBy, <OrderBy>[
+        orderBy('foo'),
+        orderBy(DocumentKey.keyFieldName),
+      ]);
       expect(target.limit, 4);
     });
 
@@ -1008,8 +1564,10 @@ void main() {
     });
 
     test('toTarget of a limitToLast query swaps and flips the bounds', () {
-      final Bound start =
-          Bound(position: <FieldValue>[wrap(1)], inclusive: true);
+      final Bound start = Bound(
+        position: <FieldValue>[wrap(1)],
+        inclusive: true,
+      );
       final Bound end = Bound(position: <FieldValue>[wrap(9)], inclusive: true);
       final Target target = base()
           .orderBy(orderBy('foo'))
@@ -1024,22 +1582,28 @@ void main() {
       expect(target.endAt!.inclusive, isTrue);
 
       // Without bounds nothing is invented.
-      final Target unbounded =
-          base().orderBy(orderBy('foo')).limitToLast(2).toTarget();
+      final Target unbounded = base()
+          .orderBy(orderBy('foo'))
+          .limitToLast(2)
+          .toTarget();
       expect(unbounded.startAt, isNull);
       expect(unbounded.endAt, isNull);
 
       // Only one bound.
-      final Target onlyStart =
-          base().orderBy(orderBy('foo')).startAt(start).limitToLast(2).toTarget();
+      final Target onlyStart = base()
+          .orderBy(orderBy('foo'))
+          .startAt(start)
+          .limitToLast(2)
+          .toTarget();
       expect(onlyStart.startAt, isNull);
       expect(onlyStart.endAt!.inclusive, isTrue);
     });
 
     test('mirror queries map to the same target', () {
       final Query limit = base().orderBy(orderBy('sort')).limit(2);
-      final Query limitToLast =
-          base().orderBy(orderBy('sort', 'desc')).limitToLast(2);
+      final Query limitToLast = base()
+          .orderBy(orderBy('sort', 'desc'))
+          .limitToLast(2);
 
       expect(limit.toTarget(), limitToLast.toTarget());
       expect(limit.toTarget().canonicalId, limitToLast.toTarget().canonicalId);
@@ -1064,9 +1628,13 @@ void main() {
     test('target canonicalId matches the Java format', () {
       final Query q = base().orderBy(orderBy('foo', 'desc')).limitToLast(7);
       expect(
-          q.toTarget().canonicalId, 'collection|f:|ob:fooasc__name__asc|l:7');
-      expect(q.canonicalId,
-          'collection|f:|ob:fooasc__name__asc|l:7|lt:LIMIT_TO_LAST');
+        q.toTarget().canonicalId,
+        'collection|f:|ob:fooasc__name__asc|l:7',
+      );
+      expect(
+        q.canonicalId,
+        'collection|f:|ob:fooasc__name__asc|l:7|lt:LIMIT_TO_LAST',
+      );
     });
 
     test('the target is memoized', () {
@@ -1076,19 +1644,24 @@ void main() {
 
     test('matches ignores the limit type', () {
       final Query q = base().orderBy(orderBy('foo')).limitToLast(1);
-      expect(q.matches(doc('collection/a', 0, map(<dynamic>['foo', 1]))),
-          isTrue);
-      expect(q.matches(doc('collection/a', 0, map(<dynamic>['bar', 1]))),
-          isFalse);
+      expect(
+        q.matches(doc('collection/a', 0, map(<dynamic>['foo', 1]))),
+        isTrue,
+      );
+      expect(
+        q.matches(doc('collection/a', 0, map(<dynamic>['bar', 1]))),
+        isFalse,
+      );
     });
 
     test('asCollectionQueryAtPath keeps the limit type', () {
-      final Query group = Query(ResourcePath.fromString(''),
-              collectionGroup: 'messages')
-          .orderBy(orderBy('foo'))
-          .limitToLast(3);
-      final Query atPath =
-          group.asCollectionQueryAtPath(ResourcePath.fromString('rooms/1/messages'));
+      final Query group = Query(
+        ResourcePath.fromString(''),
+        collectionGroup: 'messages',
+      ).orderBy(orderBy('foo')).limitToLast(3);
+      final Query atPath = group.asCollectionQueryAtPath(
+        ResourcePath.fromString('rooms/1/messages'),
+      );
       expect(atPath.limitType, LimitType.limitToLast);
       expect(atPath.getLimit(), 3);
     });
@@ -1098,134 +1671,163 @@ void main() {
     Query base() => Query(ResourcePath.fromString('foo'));
     const String key = DocumentKey.keyFieldName;
 
-    // Port of upstream QueryTest.testImplicitOrderByInMultipleInequality.
-    test('implicit orderBy over several inequality fields', () {
+    test('testImplicitOrderByInMultipleInequality', () {
       expect(
-          base()
-              .filter(filter('a', '<', 5))
-              .filter(filter('a', '>=', 5))
-              .filter(filter('aa', '<', 5))
-              .filter(filter('b', '<', 5))
-              .filter(filter('A', '<', 5))
-              .orderByConstraints,
-          <OrderBy>[
-            orderBy('A'),
-            orderBy('a'),
-            orderBy('aa'),
-            orderBy('b'),
-            orderBy(key),
-          ]);
+        base()
+            .filter(filter('a', '<', 5))
+            .filter(filter('a', '>=', 5))
+            .filter(filter('aa', '<', 5))
+            .filter(filter('b', '<', 5))
+            .filter(filter('A', '<', 5))
+            .orderByConstraints,
+        <OrderBy>[
+          orderBy('A'),
+          orderBy('a'),
+          orderBy('aa'),
+          orderBy('b'),
+          orderBy(key),
+        ],
+      );
 
       // numbers
       expect(
-          base()
-              .filter(filter('a', '<', 5))
-              .filter(filter('1', '<', 5))
-              .filter(filter('2', '<', 5))
-              .filter(filter('19', '<', 5))
-              .orderByConstraints,
-          <OrderBy>[
-            orderBy('1'),
-            orderBy('19'),
-            orderBy('2'),
-            orderBy('a'),
-            orderBy(key),
-          ]);
+        base()
+            .filter(filter('a', '<', 5))
+            .filter(filter('1', '<', 5))
+            .filter(filter('2', '<', 5))
+            .filter(filter('19', '<', 5))
+            .orderByConstraints,
+        <OrderBy>[
+          orderBy('1'),
+          orderBy('19'),
+          orderBy('2'),
+          orderBy('a'),
+          orderBy(key),
+        ],
+      );
 
       // nested fields
       expect(
-          base()
-              .filter(filter('a', '<', 5))
-              .filter(filter('aa', '<', 5))
-              .filter(filter('a.a', '<', 5))
-              .orderByConstraints,
-          <OrderBy>[orderBy('a'), orderBy('a.a'), orderBy('aa'), orderBy(key)]);
+        base()
+            .filter(filter('a', '<', 5))
+            .filter(filter('aa', '<', 5))
+            .filter(filter('a.a', '<', 5))
+            .orderByConstraints,
+        <OrderBy>[orderBy('a'), orderBy('a.a'), orderBy('aa'), orderBy(key)],
+      );
 
       // special characters
       expect(
-          base()
-              .filter(filter('a', '<', 5))
-              .filter(filter('_a', '<', 5))
-              .filter(filter('a.a', '<', 5))
-              .orderByConstraints,
-          <OrderBy>[orderBy('_a'), orderBy('a'), orderBy('a.a'), orderBy(key)]);
+        base()
+            .filter(filter('a', '<', 5))
+            .filter(filter('_a', '<', 5))
+            .filter(filter('a.a', '<', 5))
+            .orderByConstraints,
+        <OrderBy>[orderBy('_a'), orderBy('a'), orderBy('a.a'), orderBy(key)],
+      );
+
+      // field name with dot
+      expect(
+        base()
+            .filter(filter('a', '<', 5))
+            .filter(filter('`a.a`', '<', 5)) // Field name with dot
+            .filter(filter('a.z', '<', 5)) // Nested field
+            .orderByConstraints,
+        <OrderBy>[orderBy('a'), orderBy('a.z'), orderBy('`a.a`'), orderBy(key)],
+      );
 
       // composite filter
       expect(
-          base().filter(filter('a', '<', 5)).filter(andFilters(<Filter>[
-            orFilters(<Filter>[filter('b', '>=', 1), filter('c', '<=', 1)]),
-            orFilters(<Filter>[filter('d', '<=', 1), filter('e', '==', 1)]),
-          ])).orderByConstraints,
-          <OrderBy>[
-            orderBy('a'),
-            orderBy('b'),
-            orderBy('c'),
-            orderBy('d'),
-            orderBy(key),
-          ]);
+        base()
+            .filter(filter('a', '<', 5))
+            .filter(
+              andFilters(<Filter>[
+                orFilters(<Filter>[filter('b', '>=', 1), filter('c', '<=', 1)]),
+                orFilters(<Filter>[filter('d', '<=', 1), filter('e', '==', 1)]),
+              ]),
+            )
+            .orderByConstraints,
+        <OrderBy>[
+          orderBy('a'),
+          orderBy('b'),
+          orderBy('c'),
+          orderBy('d'),
+          orderBy(key),
+        ],
+      );
 
       // explicit orderBy comes first
       expect(
-          base()
-              .filter(filter('b', '<', 5))
-              .filter(filter('a', '<', 5))
-              .filter(filter('z', '<', 5))
-              .orderBy(orderBy('z'))
-              .orderByConstraints,
-          <OrderBy>[orderBy('z'), orderBy('a'), orderBy('b'), orderBy(key)]);
+        base()
+            .filter(filter('b', '<', 5))
+            .filter(filter('a', '<', 5))
+            .filter(filter('z', '<', 5))
+            .orderBy(orderBy('z'))
+            .orderByConstraints,
+        <OrderBy>[orderBy('z'), orderBy('a'), orderBy('b'), orderBy(key)],
+      );
 
       // the direction of the last explicit orderBy applies to the implicit ones
       expect(
-          base()
-              .filter(filter('b', '<', 5))
-              .filter(filter('a', '<', 5))
-              .orderBy(orderBy('z', 'desc'))
-              .orderByConstraints,
-          <OrderBy>[
-            orderBy('z', 'desc'),
-            orderBy('a', 'desc'),
-            orderBy('b', 'desc'),
-            orderBy(key, 'desc'),
-          ]);
+        base()
+            .filter(filter('b', '<', 5))
+            .filter(filter('a', '<', 5))
+            .orderBy(orderBy('z', 'desc'))
+            .orderByConstraints,
+        <OrderBy>[
+          orderBy('z', 'desc'),
+          orderBy('a', 'desc'),
+          orderBy('b', 'desc'),
+          orderBy(key, 'desc'),
+        ],
+      );
 
       expect(
-          base()
-              .filter(filter('b', '<', 5))
-              .filter(filter('a', '<', 5))
-              .orderBy(orderBy('z', 'desc'))
-              .orderBy(orderBy('c'))
-              .orderByConstraints,
-          <OrderBy>[
-            orderBy('z', 'desc'),
-            orderBy('c'),
-            orderBy('a'),
-            orderBy('b'),
-            orderBy(key),
-          ]);
+        base()
+            .filter(filter('b', '<', 5))
+            .filter(filter('a', '<', 5))
+            .orderBy(orderBy('z', 'desc'))
+            .orderBy(orderBy('c'))
+            .orderByConstraints,
+        <OrderBy>[
+          orderBy('z', 'desc'),
+          orderBy('c'),
+          orderBy('a'),
+          orderBy('b'),
+          orderBy(key),
+        ],
+      );
     });
 
     test('inequality on the key field is ordered last', () {
       expect(
-          base().filter(filter(key, '>', ref('foo/a'))).orderByConstraints,
-          <OrderBy>[orderBy(key)]);
+        base().filter(filter(key, '>', ref('foo/a'))).orderByConstraints,
+        <OrderBy>[orderBy(key)],
+      );
       expect(
-          base()
-              .filter(filter(key, '>', ref('foo/a')))
-              .filter(filter('a', '<', 1))
-              .orderByConstraints,
-          <OrderBy>[orderBy('a'), orderBy(key)]);
+        base()
+            .filter(filter(key, '>', ref('foo/a')))
+            .filter(filter('a', '<', 1))
+            .orderByConstraints,
+        <OrderBy>[orderBy('a'), orderBy(key)],
+      );
     });
 
     test('inequalityFilterFields includes nested composite filters', () {
       final Query query = base()
           .filter(filter('c', '==', 1))
-          .filter(orFilters(<Filter>[
-            filter('b', '>', 1),
-            andFilters(<Filter>[filter('a', '!=', 1), filter('d', '==', 2)]),
-          ]))
+          .filter(
+            orFilters(<Filter>[
+              filter('b', '>', 1),
+              andFilters(<Filter>[filter('a', '!=', 1), filter('d', '==', 2)]),
+            ]),
+          )
           .filter(filter('e', 'not-in', <int>[1]));
-      expect(query.inequalityFilterFields,
-          <FieldPath>[field('a'), field('b'), field('e')]);
+      expect(query.inequalityFilterFields, <FieldPath>[
+        field('a'),
+        field('b'),
+        field('e'),
+      ]);
       expect(query.firstInequalityField, field('a'));
       expect(base().filter(filter('a', '==', 1)).firstInequalityField, isNull);
     });
@@ -1233,23 +1835,33 @@ void main() {
     test('canonicalId of a flat conjunction equals the chained filters', () {
       final Filter a = filter('a', '==', 1);
       final Filter b = filter('b', '==', 2);
-      expect(base().filter(andFilters(<Filter>[a, b])).canonicalId,
-          base().filter(a).filter(b).canonicalId);
-      expect(base().filter(orFilters(<Filter>[a, b])).toTarget().canonicalId,
-          'foo|f:or(a == 1,b == 2)|ob:__name__asc');
       expect(
-          base()
-              .filter(orFilters(<Filter>[
+        base().filter(andFilters(<Filter>[a, b])).canonicalId,
+        base().filter(a).filter(b).canonicalId,
+      );
+      expect(
+        base().filter(orFilters(<Filter>[a, b])).toTarget().canonicalId,
+        'foo|f:or(a == 1,b == 2)|ob:__name__asc',
+      );
+      expect(
+        base()
+            .filter(
+              orFilters(<Filter>[
                 a,
-                andFilters(<Filter>[b, filter('c', '>', 3)])
-              ]))
-              .toTarget()
-              .canonicalId,
-          'foo|f:or(a == 1,b == 2c > 3)|ob:casc__name__asc');
+                andFilters(<Filter>[b, filter('c', '>', 3)]),
+              ]),
+            )
+            .toTarget()
+            .canonicalId,
+        'foo|f:or(a == 1,b == 2c > 3)|ob:casc__name__asc',
+      );
     });
 
     void assertQueryMatches(
-        Query query, List<Document> matching, List<Document> nonMatching) {
+      Query query,
+      List<Document> matching,
+      List<Document> nonMatching,
+    ) {
       for (Document d in matching) {
         expect(query.matches(d), isTrue, reason: '${d.key} should match');
       }
@@ -1258,74 +1870,104 @@ void main() {
       }
     }
 
-    // Port of upstream QueryTest.testOrQuery.
-    test('OR queries match', () {
-      final Document doc1 =
-          doc('collection/1', 0, map(<dynamic>['a', 1, 'b', 0]));
-      final Document doc2 =
-          doc('collection/2', 0, map(<dynamic>['a', 2, 'b', 1]));
-      final Document doc3 =
-          doc('collection/3', 0, map(<dynamic>['a', 3, 'b', 2]));
-      final Document doc4 =
-          doc('collection/4', 0, map(<dynamic>['a', 1, 'b', 3]));
-      final Document doc5 =
-          doc('collection/5', 0, map(<dynamic>['a', 1, 'b', 1]));
+    test('testOrQuery', () {
+      final Document doc1 = doc(
+        'collection/1',
+        0,
+        map(<dynamic>['a', 1, 'b', 0]),
+      );
+      final Document doc2 = doc(
+        'collection/2',
+        0,
+        map(<dynamic>['a', 2, 'b', 1]),
+      );
+      final Document doc3 = doc(
+        'collection/3',
+        0,
+        map(<dynamic>['a', 3, 'b', 2]),
+      );
+      final Document doc4 = doc(
+        'collection/4',
+        0,
+        map(<dynamic>['a', 1, 'b', 3]),
+      );
+      final Document doc5 = doc(
+        'collection/5',
+        0,
+        map(<dynamic>['a', 1, 'b', 1]),
+      );
       Query collection() => query('collection');
 
       // Two equalities: a==1 || b==1.
       assertQueryMatches(
-          collection().filter(orFilters(
-              <Filter>[filter('a', '==', 1), filter('b', '==', 1)])),
-          <Document>[doc1, doc2, doc4, doc5],
-          <Document>[doc3]);
+        collection().filter(
+          orFilters(<Filter>[filter('a', '==', 1), filter('b', '==', 1)]),
+        ),
+        <Document>[doc1, doc2, doc4, doc5],
+        <Document>[doc3],
+      );
 
       // with one inequality: a>2 || b==1.
       assertQueryMatches(
-          collection().filter(orFilters(
-              <Filter>[filter('a', '>', 2), filter('b', '==', 1)])),
-          <Document>[doc2, doc3, doc5],
-          <Document>[doc1, doc4]);
+        collection().filter(
+          orFilters(<Filter>[filter('a', '>', 2), filter('b', '==', 1)]),
+        ),
+        <Document>[doc2, doc3, doc5],
+        <Document>[doc1, doc4],
+      );
 
       // (a==1 && b==0) || (a==3 && b==2)
       assertQueryMatches(
-          collection().filter(orFilters(<Filter>[
+        collection().filter(
+          orFilters(<Filter>[
             andFilters(<Filter>[filter('a', '==', 1), filter('b', '==', 0)]),
             andFilters(<Filter>[filter('a', '==', 3), filter('b', '==', 2)]),
-          ])),
-          <Document>[doc1, doc3],
-          <Document>[doc2, doc4, doc5]);
+          ]),
+        ),
+        <Document>[doc1, doc3],
+        <Document>[doc2, doc4, doc5],
+      );
 
       // a==1 && (b==0 || b==3).
       assertQueryMatches(
-          collection().filter(andFilters(<Filter>[
+        collection().filter(
+          andFilters(<Filter>[
             filter('a', '==', 1),
             orFilters(<Filter>[filter('b', '==', 0), filter('b', '==', 3)]),
-          ])),
-          <Document>[doc1, doc4],
-          <Document>[doc2, doc3, doc5]);
+          ]),
+        ),
+        <Document>[doc1, doc4],
+        <Document>[doc2, doc3, doc5],
+      );
 
       // (a==2 || b==2) && (a==3 || b==3)
       assertQueryMatches(
-          collection().filter(andFilters(<Filter>[
+        collection().filter(
+          andFilters(<Filter>[
             orFilters(<Filter>[filter('a', '==', 2), filter('b', '==', 2)]),
             orFilters(<Filter>[filter('a', '==', 3), filter('b', '==', 3)]),
-          ])),
-          <Document>[doc3],
-          <Document>[doc1, doc2, doc4, doc5]);
+          ]),
+        ),
+        <Document>[doc3],
+        <Document>[doc1, doc2, doc4, doc5],
+      );
     });
 
     test('OR query with an inequality requires the implicit orderBy field', () {
       // "a > 1 || b == 1" has an implicit "orderBy a": a document with only
       // {b: 1} satisfies the filter but not the orderBy.
       final Query query = base().filter(
-          orFilters(<Filter>[filter('a', '>', 1), filter('b', '==', 1)]));
+        orFilters(<Filter>[filter('a', '>', 1), filter('b', '==', 1)]),
+      );
       expect(query.matches(doc('foo/1', 0, map(<dynamic>['b', 1]))), isFalse);
       expect(
-          query.matches(doc('foo/2', 0, map(<dynamic>['a', 2, 'b', 0]))),
-          isTrue);
+        query.matches(doc('foo/2', 0, map(<dynamic>['a', 2, 'b', 0]))),
+        isTrue,
+      );
       expect(
-          query.matches(doc('foo/3', 0, map(<dynamic>['a', 0, 'b', 1]))),
-          isTrue);
+        query.matches(doc('foo/3', 0, map(<dynamic>['a', 0, 'b', 1]))),
+        isTrue,
+      );
     });
 
     test('multiple inequality fields all have to match', () {
@@ -1334,30 +1976,45 @@ void main() {
           .filter(filter('b', '<=', 5))
           .filter(filter('c', '!=', 3));
       expect(
-          query.matches(doc('foo/1', 0, map(<dynamic>['a', 2, 'b', 5, 'c', 4]))),
-          isTrue);
+        query.matches(doc('foo/1', 0, map(<dynamic>['a', 2, 'b', 5, 'c', 4]))),
+        isTrue,
+      );
       expect(
-          query.matches(doc('foo/2', 0, map(<dynamic>['a', 1, 'b', 5, 'c', 4]))),
-          isFalse);
+        query.matches(doc('foo/2', 0, map(<dynamic>['a', 1, 'b', 5, 'c', 4]))),
+        isFalse,
+      );
       expect(
-          query.matches(doc('foo/3', 0, map(<dynamic>['a', 2, 'b', 6, 'c', 4]))),
-          isFalse);
+        query.matches(doc('foo/3', 0, map(<dynamic>['a', 2, 'b', 6, 'c', 4]))),
+        isFalse,
+      );
       expect(
-          query.matches(doc('foo/4', 0, map(<dynamic>['a', 2, 'b', 5, 'c', 3]))),
-          isFalse);
-      expect(query.matches(doc('foo/5', 0, map(<dynamic>['a', 2, 'b', 5]))),
-          isFalse);
+        query.matches(doc('foo/4', 0, map(<dynamic>['a', 2, 'b', 5, 'c', 3]))),
+        isFalse,
+      );
+      expect(
+        query.matches(doc('foo/5', 0, map(<dynamic>['a', 2, 'b', 5]))),
+        isFalse,
+      );
     });
 
-    test('filters nested in a composite filter do not break isDocumentQuery',
-        () {
-      expect(Query(ResourcePath.fromString('foo/bar')).isDocumentQuery, isTrue);
-      expect(
-          Query(ResourcePath.fromString('foo/bar'),
-                  filters: <Filter>[orFilters(<Filter>[filter('a', '==', 1)])])
-              .isDocumentQuery,
-          isFalse);
-    });
+    test(
+      'filters nested in a composite filter do not break isDocumentQuery',
+      () {
+        expect(
+          Query(ResourcePath.fromString('foo/bar')).isDocumentQuery,
+          isTrue,
+        );
+        expect(
+          Query(
+            ResourcePath.fromString('foo/bar'),
+            filters: <Filter>[
+              orFilters(<Filter>[filter('a', '==', 1)]),
+            ],
+          ).isDocumentQuery,
+          isFalse,
+        );
+      },
+    );
 
     test('limitToLast flips the implicit multiple inequality orderings', () {
       final Query q = base()

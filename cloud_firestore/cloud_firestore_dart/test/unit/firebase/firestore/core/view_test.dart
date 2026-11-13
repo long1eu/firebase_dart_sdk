@@ -26,8 +26,10 @@ void main() {
     return Query(ResourcePath.fromString('rooms/eros/messages'));
   }
 
-  ViewChange applyChanges(View view,
-      [List<MaybeDocument> docs = const <MaybeDocument>[]]) {
+  ViewChange applyChanges(
+    View view, [
+    List<MaybeDocument> docs = const <MaybeDocument>[],
+  ]) {
     return view.applyChanges(view.computeDocChanges(docUpdates(docs)));
   }
 
@@ -35,24 +37,35 @@ void main() {
     final Query query = messageQuery();
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
-    final Document doc3 =
-        doc('rooms/other/messages/1', 0, map(<String>['text', 'msg3']));
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<String>['text', 'msg1']),
+    );
+    final Document doc2 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<String>['text', 'msg2']),
+    );
+    final Document doc3 = doc(
+      'rooms/other/messages/1',
+      0,
+      map(<String>['text', 'msg3']),
+    );
 
-    final ImmutableSortedMap<DocumentKey, Document> updates =
-        docUpdates(<Document>[doc1, doc2, doc3]);
+    final ImmutableSortedMap<DocumentKey, Document> updates = docUpdates(
+      <Document>[doc1, doc2, doc3],
+    );
     final ViewDocumentChanges docViewChanges = view.computeDocChanges(updates);
     final TargetChange targetChange = ackTarget(<Document>[doc1, doc2, doc3]);
-    final ViewSnapshot snapshot =
-        view.applyChanges(docViewChanges, targetChange).snapshot!;
+    final ViewSnapshot snapshot = view
+        .applyChanges(docViewChanges, targetChange)
+        .snapshot!;
     expect(snapshot!.query, query);
     expect(snapshot!.documents.toList(), <Document>[doc1, doc2]);
     expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.added, doc1),
-      DocumentViewChange(DocumentViewChangeType.added, doc2)
+      DocumentViewChange(DocumentViewChangeType.added, doc2),
     ]);
     expect(snapshot!.isFromCache, isFalse);
     expect(snapshot!.didSyncStateChange, isTrue);
@@ -63,12 +76,21 @@ void main() {
     final Query query = messageQuery();
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
-    final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<String>['text', 'msg3']));
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<String>['text', 'msg1']),
+    );
+    final Document doc2 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<String>['text', 'msg2']),
+    );
+    final Document doc3 = doc(
+      'rooms/eros/messages/3',
+      0,
+      map(<String>['text', 'msg3']),
+    );
 
     // initial state
     applyChanges(view, <Document>[doc1, doc2]);
@@ -76,16 +98,21 @@ void main() {
     // delete doc2, add doc3
     final ViewSnapshot snapshot = view
         .applyChanges(
-            view.computeDocChanges(docUpdates(
-                <MaybeDocument>[deletedDoc('rooms/eros/messages/2', 0), doc3])),
-            ackTarget(<Document>[doc1, doc3]))
+          view.computeDocChanges(
+            docUpdates(<MaybeDocument>[
+              deletedDoc('rooms/eros/messages/2', 0),
+              doc3,
+            ]),
+          ),
+          ackTarget(<Document>[doc1, doc3]),
+        )
         .snapshot!;
 
     expect(snapshot!.query, query);
     expect(snapshot!.documents.toList(), <Document>[doc1, doc3]);
     expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc2),
-      DocumentViewChange(DocumentViewChangeType.added, doc3)
+      DocumentViewChange(DocumentViewChangeType.added, doc3),
     ]);
     expect(snapshot!.isFromCache, isFalse);
     expect(snapshot!.didSyncStateChange, isTrue);
@@ -95,16 +122,24 @@ void main() {
     final Query query = messageQuery();
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<String>['text', 'msg1']),
+    );
+    final Document doc2 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<String>['text', 'msg2']),
+    );
 
     // initial state
     applyChanges(view, <Document>[doc1, doc2]);
 
-    final ViewSnapshot? snapshot =
-        applyChanges(view, <Document>[doc1, doc2]).snapshot;
+    final ViewSnapshot? snapshot = applyChanges(view, <Document>[
+      doc1,
+      doc2,
+    ]).snapshot;
     expect(snapshot, isNull);
   });
 
@@ -120,26 +155,46 @@ void main() {
     final Query query = messageQuery().filter(filter('sort', '<=', 2));
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['sort', 1]));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['sort', 2]));
-    final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<dynamic>['sort', 3]));
-    final Document doc4 =
-        doc('rooms/eros/messages/4', 0, map()); // no sort, no match
-    final Document doc5 =
-        doc('rooms/eros/messages/5', 0, map(<dynamic>['sort', 1]));
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<dynamic>['sort', 1]),
+    );
+    final Document doc2 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<dynamic>['sort', 2]),
+    );
+    final Document doc3 = doc(
+      'rooms/eros/messages/3',
+      0,
+      map(<dynamic>['sort', 3]),
+    );
+    final Document doc4 = doc(
+      'rooms/eros/messages/4',
+      0,
+      map(),
+    ); // no sort, no match
+    final Document doc5 = doc(
+      'rooms/eros/messages/5',
+      0,
+      map(<dynamic>['sort', 1]),
+    );
 
-    final ViewSnapshot snapshot =
-        applyChanges(view, <Document>[doc1, doc2, doc3, doc4, doc5]).snapshot!;
+    final ViewSnapshot snapshot = applyChanges(view, <Document>[
+      doc1,
+      doc2,
+      doc3,
+      doc4,
+      doc5,
+    ]).snapshot!;
 
     expect(snapshot!.query, query);
     expect(snapshot!.documents.toList(), <Document>[doc1, doc5, doc2]);
     expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.added, doc1),
       DocumentViewChange(DocumentViewChangeType.added, doc5),
-      DocumentViewChange(DocumentViewChangeType.added, doc2)
+      DocumentViewChange(DocumentViewChangeType.added, doc2),
     ]);
     expect(snapshot!.isFromCache, isTrue);
     expect(snapshot!.didSyncStateChange, isTrue);
@@ -149,29 +204,54 @@ void main() {
     final Query query = messageQuery().filter(filter('sort', '<=', 2));
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['sort', 1]));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['sort', 3]));
-    final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<dynamic>['sort', 2]));
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<dynamic>['sort', 1]),
+    );
+    final Document doc2 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<dynamic>['sort', 3]),
+    );
+    final Document doc3 = doc(
+      'rooms/eros/messages/3',
+      0,
+      map(<dynamic>['sort', 2]),
+    );
     final Document doc4 = doc('rooms/eros/messages/4', 0, map());
 
-    ViewSnapshot snapshot =
-        applyChanges(view, <Document>[doc1, doc2, doc3, doc4]).snapshot!;
+    ViewSnapshot snapshot = applyChanges(view, <Document>[
+      doc1,
+      doc2,
+      doc3,
+      doc4,
+    ]).snapshot!;
 
     expect(snapshot!.query, query);
     expect(snapshot!.documents.toList(), <Document>[doc1, doc3]);
 
-    final Document newDoc2 =
-        doc('rooms/eros/messages/2', 1, map(<dynamic>['sort', 2]));
-    final Document newDoc3 =
-        doc('rooms/eros/messages/3', 1, map(<dynamic>['sort', 3]));
-    final Document newDoc4 =
-        doc('rooms/eros/messages/4', 1, map(<dynamic>['sort', 0]));
+    final Document newDoc2 = doc(
+      'rooms/eros/messages/2',
+      1,
+      map(<dynamic>['sort', 2]),
+    );
+    final Document newDoc3 = doc(
+      'rooms/eros/messages/3',
+      1,
+      map(<dynamic>['sort', 3]),
+    );
+    final Document newDoc4 = doc(
+      'rooms/eros/messages/4',
+      1,
+      map(<dynamic>['sort', 0]),
+    );
 
-    snapshot =
-        applyChanges(view, <Document>[newDoc2, newDoc3, newDoc4]).snapshot!;
+    snapshot = applyChanges(view, <Document>[
+      newDoc2,
+      newDoc3,
+      newDoc4,
+    ]).snapshot!;
 
     expect(snapshot!.query, query);
     expect(snapshot!.documents.toList(), <Document>[newDoc4, doc1, newDoc2]);
@@ -179,7 +259,7 @@ void main() {
     expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc3),
       DocumentViewChange(DocumentViewChangeType.added, newDoc4),
-      DocumentViewChange(DocumentViewChangeType.added, newDoc2)
+      DocumentViewChange(DocumentViewChangeType.added, newDoc2),
     ]);
     expect(snapshot!.isFromCache, isTrue);
     expect(snapshot!.didSyncStateChange, isFalse);
@@ -189,26 +269,37 @@ void main() {
     final Query query = messageQuery().limit(2);
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<String>['text', 'msg1']));
-    final Document doc2 =
-        doc('rooms/eros/messages/2', 0, map(<String>['text', 'msg2']));
-    final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<String>['text', 'msg3']));
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<String>['text', 'msg1']),
+    );
+    final Document doc2 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<String>['text', 'msg2']),
+    );
+    final Document doc3 = doc(
+      'rooms/eros/messages/3',
+      0,
+      map(<String>['text', 'msg3']),
+    );
 
     // initial state
     applyChanges(view, <Document>[doc1, doc3]);
 
     final ViewSnapshot snapshot = view
-        .applyChanges(view.computeDocChanges(docUpdates(<Document>[doc2])),
-            ackTarget(<Document>[doc1, doc2, doc3]))
+        .applyChanges(
+          view.computeDocChanges(docUpdates(<Document>[doc2])),
+          ackTarget(<Document>[doc1, doc2, doc3]),
+        )
         .snapshot!;
     expect(snapshot!.query, query);
     expect(snapshot!.documents.toList(), <Document>[doc1, doc2]);
 
     expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc3),
-      DocumentViewChange(DocumentViewChangeType.added, doc2)
+      DocumentViewChange(DocumentViewChangeType.added, doc2),
     ]);
     expect(snapshot!.isFromCache, isFalse);
     expect(snapshot!.didSyncStateChange, isTrue);
@@ -218,13 +309,22 @@ void main() {
     final Query query = messageQuery().orderBy(orderBy('num')).limit(2);
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['num', 1]));
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<dynamic>['num', 1]),
+    );
     Document doc2 = doc('rooms/eros/messages/2', 0, map(<dynamic>['num', 2]));
-    final Document doc3 =
-        doc('rooms/eros/messages/3', 0, map(<dynamic>['num', 3]));
-    final Document doc4 =
-        doc('rooms/eros/messages/4', 0, map(<dynamic>['num', 4]));
+    final Document doc3 = doc(
+      'rooms/eros/messages/3',
+      0,
+      map(<dynamic>['num', 3]),
+    );
+    final Document doc4 = doc(
+      'rooms/eros/messages/4',
+      0,
+      map(<dynamic>['num', 4]),
+    );
 
     applyChanges(view, <Document>[doc1, doc2]);
 
@@ -233,15 +333,20 @@ void main() {
     // doc3 will be added
     // doc4 will be added + removed = nothing
     doc2 = doc('rooms/eros/messages/2', 1, map(<dynamic>['num', 5]));
-    ViewDocumentChanges viewDocChanges =
-        view.computeDocChanges(docUpdates(<Document>[doc2, doc3, doc4]));
+    ViewDocumentChanges viewDocChanges = view.computeDocChanges(
+      docUpdates(<Document>[doc2, doc3, doc4]),
+    );
     expect(viewDocChanges.needsRefill, isTrue);
     // Verify that all the docs still match.
     viewDocChanges = view.computeDocChanges(
-        docUpdates(<Document>[doc1, doc2, doc3, doc4]), viewDocChanges);
+      docUpdates(<Document>[doc1, doc2, doc3, doc4]),
+      viewDocChanges,
+    );
     final ViewSnapshot snapshot = view
         .applyChanges(
-            viewDocChanges, ackTarget(<Document>[doc1, doc2, doc3, doc4]))
+          viewDocChanges,
+          ackTarget(<Document>[doc1, doc2, doc3, doc4]),
+        )
         .snapshot!;
 
     expect(snapshot!.query, query);
@@ -249,7 +354,7 @@ void main() {
 
     expect(snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.removed, doc2),
-      DocumentViewChange(DocumentViewChangeType.added, doc3)
+      DocumentViewChange(DocumentViewChangeType.added, doc3),
     ]);
     expect(snapshot!.isFromCache, isFalse);
     expect(snapshot!.didSyncStateChange, isTrue);
@@ -268,35 +373,80 @@ void main() {
     ViewDocumentChanges viewDocChanges = view.computeDocChanges(docUpdates());
     change = view.applyChanges(viewDocChanges, ackTarget());
     expect(change.limboChanges, <LimboDocumentChange>[
-      LimboDocumentChange(LimboDocumentChangeType.added, doc1.key)
+      LimboDocumentChange(LimboDocumentChangeType.added, doc1.key),
     ]);
 
     viewDocChanges = view.computeDocChanges(docUpdates());
     change = view.applyChanges(
-        viewDocChanges,
-        targetChange(Uint8List.fromList(<int>[]), <Document>[doc1], null, null,
-            current: true));
+      viewDocChanges,
+      targetChange(
+        Uint8List.fromList(<int>[]),
+        <Document>[doc1],
+        null,
+        null,
+        current: true,
+      ),
+    );
     expect(change.limboChanges, <LimboDocumentChange>[
-      LimboDocumentChange(LimboDocumentChangeType.removed, doc1.key)
+      LimboDocumentChange(LimboDocumentChangeType.removed, doc1.key),
     ]);
 
     viewDocChanges = view.computeDocChanges(docUpdates(<Document>[doc2]));
     change = view.applyChanges(
-        viewDocChanges,
-        targetChange(Uint8List.fromList(<int>[]), <Document>[doc2], null, null,
-            current: true));
+      viewDocChanges,
+      targetChange(
+        Uint8List.fromList(<int>[]),
+        <Document>[doc2],
+        null,
+        null,
+        current: true,
+      ),
+    );
     expect(change.limboChanges, isEmpty);
 
     change = applyChanges(view, <Document>[doc3]);
     expect(change.limboChanges, <LimboDocumentChange>[
-      LimboDocumentChange(LimboDocumentChangeType.added, doc3.key)
+      LimboDocumentChange(LimboDocumentChangeType.added, doc3.key),
     ]);
 
-    change = applyChanges(
-        view, <NoDocument>[deletedDoc('rooms/eros/messages/2', 1)]);
-    expect(change.limboChanges, <LimboDocumentChange>[
-      LimboDocumentChange(LimboDocumentChangeType.removed, doc3.key)
+    change = applyChanges(view, <NoDocument>[
+      deletedDoc('rooms/eros/messages/2', 1),
     ]);
+    expect(change.limboChanges, <LimboDocumentChange>[
+      LimboDocumentChange(LimboDocumentChangeType.removed, doc3.key),
+    ]);
+  });
+
+  test('testViewsWithLimboDocumentsAreMarkedFromCache', () {
+    final Query query = messageQuery();
+    final View view = View(query, DocumentKey.emptyKeySet);
+    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+    final Document doc2 = doc('rooms/eros/messages/1', 0, map());
+
+    // Doc1 is contained in the local view, but we are not yet CURRENT so it is
+    // expected that the backend hasn't told us about all documents yet.
+    ViewChange change = view.applyChanges(
+      view.computeDocChanges(docUpdates(<Document>[doc1])),
+    );
+    expect(change.snapshot!.isFromCache, isTrue);
+
+    // Add doc2 to generate a snapshot. Doc1 is still missing.
+    final ViewDocumentChanges viewDocChanges = view.computeDocChanges(
+      docUpdates(<Document>[doc2]),
+    );
+    change = view.applyChanges(
+      viewDocChanges,
+      targetChange(Uint8List(0), <Document>[doc2], null, null, current: true),
+    );
+    // We are CURRENT but doc1 is in limbo.
+    expect(change.snapshot!.isFromCache, isTrue);
+
+    // Add doc1 to the backend's result set.
+    change = view.applyChanges(
+      viewDocChanges,
+      targetChange(Uint8List(0), <Document>[doc1], null, null, current: true),
+    );
+    expect(change.snapshot!.isFromCache, isFalse);
   });
 
   test('testResumingQueryCreatesNoLimbos', () {
@@ -322,18 +472,21 @@ void main() {
     // target is pending a reset (existence filter mismatch) that must not happen and the view must not be synced.
     final View view = View(query, DocumentKey.emptyKeySet);
     final ViewChange change = view.applyChanges(
-        view.computeDocChanges(docUpdates(<Document>[doc1])),
-        ackTarget(),
-        true);
+      view.computeDocChanges(docUpdates(<Document>[doc1])),
+      ackTarget(),
+      true,
+    );
 
     expect(change.limboChanges, isEmpty);
     expect(change.snapshot!.isFromCache, isTrue);
 
     // Without the pending reset the same state does resolve doc1 as limbo.
-    final ViewChange next =
-        view.applyChanges(view.computeDocChanges(docUpdates()), ackTarget());
+    final ViewChange next = view.applyChanges(
+      view.computeDocChanges(docUpdates()),
+      ackTarget(),
+    );
     expect(next.limboChanges, <LimboDocumentChange>[
-      LimboDocumentChange(LimboDocumentChangeType.added, doc1.key)
+      LimboDocumentChange(LimboDocumentChangeType.added, doc1.key),
     ]);
   });
 
@@ -344,8 +497,9 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+    ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1, doc2]),
+    );
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 2);
@@ -353,7 +507,8 @@ void main() {
 
     // Remove one of the docs.
     changes = view.computeDocChanges(
-        docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/0', 0)]));
+      docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/0', 0)]),
+    );
     expect(changes.documentSet.length, 1);
     expect(changes.needsRefill, isTrue);
     expect(changes.changeSet.changes.length, 1);
@@ -367,16 +522,23 @@ void main() {
 
   test('testReturnsNeedsRefillOnReorderInLimitQuery', () {
     final Query query = messageQuery().orderBy(orderBy('order')).limit(2);
-    final Document doc1 =
-        doc('rooms/eros/messages/0', 0, map(<dynamic>['order', 1]));
+    final Document doc1 = doc(
+      'rooms/eros/messages/0',
+      0,
+      map(<dynamic>['order', 1]),
+    );
     Document doc2 = doc('rooms/eros/messages/1', 0, map(<dynamic>['order', 2]));
-    final Document doc3 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['order', 3]));
+    final Document doc3 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<dynamic>['order', 3]),
+    );
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3]));
+    ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1, doc2, doc3]),
+    );
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 2);
@@ -390,7 +552,9 @@ void main() {
     expect(changes.changeSet.changes.length, 1);
     // Refill it with all three current docs.
     changes = view.computeDocChanges(
-        docUpdates(<Document>[doc1, doc2, doc3]), changes);
+      docUpdates(<Document>[doc1, doc2, doc3]),
+      changes,
+    );
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 2);
@@ -400,19 +564,32 @@ void main() {
   test('testDoesNotNeedRefillOnReorderWithinLimit', () {
     final Query query = messageQuery().orderBy(orderBy('order')).limit(3);
     Document doc1 = doc('rooms/eros/messages/0', 0, map(<dynamic>['order', 1]));
-    final Document doc2 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['order', 2]));
-    final Document doc3 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['order', 3]));
-    final Document doc4 =
-        doc('rooms/eros/messages/3', 0, map(<dynamic>['order', 4]));
-    final Document doc5 =
-        doc('rooms/eros/messages/4', 0, map(<dynamic>['order', 5]));
+    final Document doc2 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<dynamic>['order', 2]),
+    );
+    final Document doc3 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<dynamic>['order', 3]),
+    );
+    final Document doc4 = doc(
+      'rooms/eros/messages/3',
+      0,
+      map(<dynamic>['order', 4]),
+    );
+    final Document doc5 = doc(
+      'rooms/eros/messages/4',
+      0,
+      map(<dynamic>['order', 5]),
+    );
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
     ViewDocumentChanges changes = view.computeDocChanges(
-        docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]));
+      docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]),
+    );
     expect(changes.documentSet.length, 3);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 3);
@@ -429,20 +606,33 @@ void main() {
 
   test('testDoesNotNeedRefillOnReorderAfterLimitQuery', () {
     final Query query = messageQuery().orderBy(orderBy('order')).limit(3);
-    final Document doc1 =
-        doc('rooms/eros/messages/0', 0, map(<dynamic>['order', 1]));
-    final Document doc2 =
-        doc('rooms/eros/messages/1', 0, map(<dynamic>['order', 2]));
-    final Document doc3 =
-        doc('rooms/eros/messages/2', 0, map(<dynamic>['order', 3]));
+    final Document doc1 = doc(
+      'rooms/eros/messages/0',
+      0,
+      map(<dynamic>['order', 1]),
+    );
+    final Document doc2 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(<dynamic>['order', 2]),
+    );
+    final Document doc3 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(<dynamic>['order', 3]),
+    );
     Document doc4 = doc('rooms/eros/messages/3', 0, map(<dynamic>['order', 4]));
-    final Document doc5 =
-        doc('rooms/eros/messages/4', 0, map(<dynamic>['order', 5]));
+    final Document doc5 = doc(
+      'rooms/eros/messages/4',
+      0,
+      map(<dynamic>['order', 5]),
+    );
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
     ViewDocumentChanges changes = view.computeDocChanges(
-        docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]));
+      docUpdates(<Document>[doc1, doc2, doc3, doc4, doc5]),
+    );
     expect(changes.documentSet.length, 3);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 3);
@@ -464,8 +654,9 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+    ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1, doc2]),
+    );
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 2);
@@ -473,7 +664,8 @@ void main() {
 
     // Add a doc that is past the limit.
     changes = view.computeDocChanges(
-        docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/2', 0)]));
+      docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/2', 0)]),
+    );
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes, isEmpty);
@@ -486,8 +678,9 @@ void main() {
     final Document doc2 = doc('rooms/eros/messages/1', 0, map());
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+    ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1, doc2]),
+    );
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 2);
@@ -495,7 +688,8 @@ void main() {
 
     // Remove one of the docs.
     changes = view.computeDocChanges(
-        docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/1', 0)]));
+      docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/1', 0)]),
+    );
     expect(changes.documentSet.length, 1);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 1);
@@ -509,8 +703,9 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+    ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1, doc2]),
+    );
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 2);
@@ -518,7 +713,8 @@ void main() {
 
     // Remove a doc that isn't even in the results.
     changes = view.computeDocChanges(
-        docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/2', 0)]));
+      docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/2', 0)]),
+    );
     expect(changes.documentSet.length, 2);
     expect(changes.needsRefill, isFalse);
     expect(changes.changeSet.changes.length, 0);
@@ -532,49 +728,66 @@ void main() {
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+    ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1, doc2]),
+    );
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet());
 
-    final Document doc3 =
-        doc('rooms/eros/messages/2', 0, map(), DocumentState.localMutations);
+    final Document doc3 = doc(
+      'rooms/eros/messages/2',
+      0,
+      map(),
+      DocumentState.localMutations,
+    );
     changes = view.computeDocChanges(docUpdates(<Document>[doc3]));
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc3.key]));
   });
 
-  test('testRemovesKeysFromMutatedDocumentKeysWhenNewDocDoesNotHaveChanges',
-      () {
-    final Query query = messageQuery().limit(2);
-    final Document doc1 = doc('rooms/eros/messages/0', 0, map());
-    final Document doc2 =
-        doc('rooms/eros/messages/1', 0, map(), DocumentState.localMutations);
-    final View view = View(query, DocumentKey.emptyKeySet);
+  test(
+    'testRemovesKeysFromMutatedDocumentKeysWhenNewDocDoesNotHaveChanges',
+    () {
+      final Query query = messageQuery().limit(2);
+      final Document doc1 = doc('rooms/eros/messages/0', 0, map());
+      final Document doc2 = doc(
+        'rooms/eros/messages/1',
+        0,
+        map(),
+        DocumentState.localMutations,
+      );
+      final View view = View(query, DocumentKey.emptyKeySet);
 
-    // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
-    view.applyChanges(changes);
-    expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
+      // Start with a full view.
+      ViewDocumentChanges changes = view.computeDocChanges(
+        docUpdates(<Document>[doc1, doc2]),
+      );
+      view.applyChanges(changes);
+      expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
 
-    final Document doc2Prime = doc('rooms/eros/messages/1', 0, map());
+      final Document doc2Prime = doc('rooms/eros/messages/1', 0, map());
 
-    changes = view.computeDocChanges(docUpdates(<Document>[doc2Prime]));
-    view.applyChanges(changes);
-    expect(changes.mutatedKeys, keySet());
-  });
+      changes = view.computeDocChanges(docUpdates(<Document>[doc2Prime]));
+      view.applyChanges(changes);
+      expect(changes.mutatedKeys, keySet());
+    },
+  );
 
   test('testRemembersLocalMutationsFromPreviousSnapshot', () {
     final Query query = messageQuery().limit(2);
     final Document doc1 = doc('rooms/eros/messages/0', 0, map());
-    final Document doc2 =
-        doc('rooms/eros/messages/1', 0, map(), DocumentState.localMutations);
+    final Document doc2 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(),
+      DocumentState.localMutations,
+    );
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+    ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1, doc2]),
+    );
     view.applyChanges(changes);
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
 
@@ -586,13 +799,18 @@ void main() {
   test('testRemembersLocalMutationsFromPreviousCallToComputeChanges', () {
     final Query query = messageQuery().limit(2);
     final Document doc1 = doc('rooms/eros/messages/0', 0, map());
-    final Document doc2 =
-        doc('rooms/eros/messages/1', 0, map(), DocumentState.localMutations);
+    final Document doc2 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(),
+      DocumentState.localMutations,
+    );
     final View view = View(query, DocumentKey.emptyKeySet);
 
     // Start with a full view.
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+    ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1, doc2]),
+    );
     expect(changes.mutatedKeys, keySet(<DocumentKey>[doc2.key]));
 
     final Document doc3 = doc('rooms/eros/messages/2', 0, map());
@@ -602,30 +820,42 @@ void main() {
 
   test('testRaisesHasPendingWritesForPendingMutationsInInitialSnapshot', () {
     final Query query = messageQuery();
-    final Document doc1 =
-        doc('rooms/eros/messages/1', 0, map(), DocumentState.localMutations);
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      0,
+      map(),
+      DocumentState.localMutations,
+    );
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    final ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<MaybeDocument>[doc1]));
+    final ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<MaybeDocument>[doc1]),
+    );
     final ViewChange viewChange = view.applyChanges(changes);
 
     expect(viewChange.snapshot!.hasPendingWrites, isTrue);
   });
 
-  test('testDoesntRaiseHasPendingWritesForCommittedMutationsInInitialSnapshot',
-      () {
-    final Query query = messageQuery();
-    final Document doc1 = doc(
-        'rooms/eros/messages/1', 0, map(), DocumentState.committedMutations);
-    final View view = View(query, DocumentKey.emptyKeySet);
+  test(
+    'testDoesntRaiseHasPendingWritesForCommittedMutationsInInitialSnapshot',
+    () {
+      final Query query = messageQuery();
+      final Document doc1 = doc(
+        'rooms/eros/messages/1',
+        0,
+        map(),
+        DocumentState.committedMutations,
+      );
+      final View view = View(query, DocumentKey.emptyKeySet);
 
-    final ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<MaybeDocument>[doc1]));
-    final ViewChange viewChange = view.applyChanges(changes);
+      final ViewDocumentChanges changes = view.computeDocChanges(
+        docUpdates(<MaybeDocument>[doc1]),
+      );
+      final ViewChange viewChange = view.applyChanges(changes);
 
-    expect(viewChange.snapshot!.hasPendingWrites, isFalse);
-  });
+      expect(viewChange.snapshot!.hasPendingWrites, isFalse);
+    },
+  );
 
   test('testSuppressesWriteAcknowledgementIfWatchHasNotCaughtUp', () {
     // This test verifies that we don't get three events for a ServerTimestamp
@@ -633,53 +863,80 @@ void main() {
     // and instead wait for Watch to catch up.
     final Query query = messageQuery();
 
-    final Document doc1 = doc('rooms/eros/messages/1', 1,
-        map(<dynamic>['time', 1]), DocumentState.localMutations);
-    final Document doc1Committed = doc('rooms/eros/messages/1', 2,
-        map(<dynamic>['time', 2]), DocumentState.committedMutations);
-    final Document doc1Acknowledged = doc('rooms/eros/messages/1', 2,
-        map(<dynamic>['time', 2]), DocumentState.synced);
+    final Document doc1 = doc(
+      'rooms/eros/messages/1',
+      1,
+      map(<dynamic>['time', 1]),
+      DocumentState.localMutations,
+    );
+    final Document doc1Committed = doc(
+      'rooms/eros/messages/1',
+      2,
+      map(<dynamic>['time', 2]),
+      DocumentState.committedMutations,
+    );
+    final Document doc1Acknowledged = doc(
+      'rooms/eros/messages/1',
+      2,
+      map(<dynamic>['time', 2]),
+      DocumentState.synced,
+    );
 
-    final Document doc2 = doc('rooms/eros/messages/2', 1,
-        map(<dynamic>['time', 1]), DocumentState.localMutations);
-    final Document doc2Modified = doc('rooms/eros/messages/2', 2,
-        map(<dynamic>['time', 3]), DocumentState.localMutations);
-    final Document doc2Acknowledged = doc('rooms/eros/messages/2', 2,
-        map(<dynamic>['time', 3]), DocumentState.synced);
+    final Document doc2 = doc(
+      'rooms/eros/messages/2',
+      1,
+      map(<dynamic>['time', 1]),
+      DocumentState.localMutations,
+    );
+    final Document doc2Modified = doc(
+      'rooms/eros/messages/2',
+      2,
+      map(<dynamic>['time', 3]),
+      DocumentState.localMutations,
+    );
+    final Document doc2Acknowledged = doc(
+      'rooms/eros/messages/2',
+      2,
+      map(<dynamic>['time', 3]),
+      DocumentState.synced,
+    );
 
     final View view = View(query, DocumentKey.emptyKeySet);
 
-    ViewDocumentChanges changes =
-        view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+    ViewDocumentChanges changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1, doc2]),
+    );
     ViewChange snap = view.applyChanges(changes);
 
     expect(snap.snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.added, doc1),
-      DocumentViewChange(DocumentViewChangeType.added, doc2)
+      DocumentViewChange(DocumentViewChangeType.added, doc2),
     ]);
 
-    changes = view
-        .computeDocChanges(docUpdates(<Document>[doc1Committed, doc2Modified]));
+    changes = view.computeDocChanges(
+      docUpdates(<Document>[doc1Committed, doc2Modified]),
+    );
     snap = view.applyChanges(changes);
 
     // The 'doc1Committed' update is suppressed
     expect(snap.snapshot!.changes, <DocumentViewChange>[
-      DocumentViewChange(DocumentViewChangeType.modified, doc2Modified)
+      DocumentViewChange(DocumentViewChangeType.modified, doc2Modified),
     ]);
 
     changes = view.computeDocChanges(
-        docUpdates(<Document>[doc1Acknowledged, doc2Acknowledged]));
+      docUpdates(<Document>[doc1Acknowledged, doc2Acknowledged]),
+    );
     snap = view.applyChanges(changes);
 
     expect(snap.snapshot!.changes, <DocumentViewChange>[
       DocumentViewChange(DocumentViewChangeType.modified, doc1Acknowledged),
-      DocumentViewChange(DocumentViewChangeType.metadata, doc2Acknowledged)
+      DocumentViewChange(DocumentViewChangeType.metadata, doc2Acknowledged),
     ]);
   });
 
   group('limitToLast', () {
-    Document numDoc(int id, int num, [int version = 0]) => doc(
-        'rooms/eros/messages/$id', version, map(<dynamic>['num', num]));
+    Document numDoc(int id, int num, [int version = 0]) =>
+        doc('rooms/eros/messages/$id', version, map(<dynamic>['num', num]));
 
     Query lastQuery(int limit) =>
         messageQuery().orderBy(orderBy('num')).limitToLast(limit);
@@ -694,8 +951,9 @@ void main() {
 
       final ViewSnapshot snapshot = view
           .applyChanges(
-              view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])),
-              ackTarget(<Document>[doc1, doc2, doc3]))
+            view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])),
+            ackTarget(<Document>[doc1, doc2, doc3]),
+          )
           .snapshot!;
 
       expect(snapshot.query, query);
@@ -722,8 +980,9 @@ void main() {
       final Document doc3 = numDoc(3, 3);
 
       final ViewSnapshot snapshot = view
-          .applyChanges(view
-              .computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])))
+          .applyChanges(
+            view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])),
+          )
           .snapshot!;
 
       // Descending order: doc3, doc2, doc1. The last two are doc2 and doc1.
@@ -756,8 +1015,9 @@ void main() {
       final Document doc3 = numDoc(3, 3);
       applyChanges(view, <Document>[doc2, doc3]);
 
-      final ViewDocumentChanges changes = view
-          .computeDocChanges(docUpdates(<Document>[numDoc(1, 1)]));
+      final ViewDocumentChanges changes = view.computeDocChanges(
+        docUpdates(<Document>[numDoc(1, 1)]),
+      );
       expect(changes.needsRefill, isFalse);
       expect(changes.changeSet.changes, isEmpty);
       expect(changes.documentSet.toList(), <Document>[doc2, doc3]);
@@ -769,15 +1029,17 @@ void main() {
       final Document doc2 = numDoc(1, 2);
 
       // Start with a full view.
-      ViewDocumentChanges changes =
-          view.computeDocChanges(docUpdates(<Document>[doc1, doc2]));
+      ViewDocumentChanges changes = view.computeDocChanges(
+        docUpdates(<Document>[doc1, doc2]),
+      );
       expect(changes.documentSet.length, 2);
       expect(changes.needsRefill, isFalse);
       view.applyChanges(changes);
 
       // Remove one of the docs.
       changes = view.computeDocChanges(
-          docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/1', 0)]));
+        docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/1', 0)]),
+      );
       expect(changes.documentSet.length, 1);
       expect(changes.needsRefill, isTrue);
       expect(changes.changeSet.changes.length, 1);
@@ -796,8 +1058,9 @@ void main() {
       final View view = View(lastQuery(2), DocumentKey.emptyKeySet);
 
       // Start with a full view holding doc2 and doc3.
-      ViewDocumentChanges changes =
-          view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3]));
+      ViewDocumentChanges changes = view.computeDocChanges(
+        docUpdates(<Document>[doc1, doc2, doc3]),
+      );
       expect(changes.documentSet.toList(), <Document>[doc2, doc3]);
       expect(changes.needsRefill, isFalse);
       view.applyChanges(changes);
@@ -809,7 +1072,9 @@ void main() {
 
       // Refill it with all three current docs.
       changes = view.computeDocChanges(
-          docUpdates(<Document>[doc1, doc2, doc3]), changes);
+        docUpdates(<Document>[doc1, doc2, doc3]),
+        changes,
+      );
       expect(changes.needsRefill, isFalse);
       expect(changes.documentSet.toList(), <Document>[doc1, doc3]);
       view.applyChanges(changes);
@@ -822,11 +1087,13 @@ void main() {
       final View view = View(lastQuery(3), DocumentKey.emptyKeySet);
 
       view.applyChanges(
-          view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])));
+        view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])),
+      );
 
       doc2 = numDoc(1, 2000, 1);
-      final ViewDocumentChanges changes =
-          view.computeDocChanges(docUpdates(<Document>[doc2]));
+      final ViewDocumentChanges changes = view.computeDocChanges(
+        docUpdates(<Document>[doc2]),
+      );
       expect(changes.needsRefill, isFalse);
       expect(changes.documentSet.toList(), <Document>[doc1, doc3, doc2]);
     });
@@ -838,12 +1105,14 @@ void main() {
       final View view = View(lastQuery(2), DocumentKey.emptyKeySet);
 
       view.applyChanges(
-          view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])));
+        view.computeDocChanges(docUpdates(<Document>[doc1, doc2, doc3])),
+      );
 
       // Still sorts after the first document of the view (doc2).
       doc3 = numDoc(2, 2500, 1);
-      final ViewDocumentChanges changes =
-          view.computeDocChanges(docUpdates(<Document>[doc3]));
+      final ViewDocumentChanges changes = view.computeDocChanges(
+        docUpdates(<Document>[doc3]),
+      );
       expect(changes.needsRefill, isFalse);
       expect(changes.documentSet.toList(), <Document>[doc2, doc3]);
     });
@@ -854,10 +1123,12 @@ void main() {
       final View view = View(lastQuery(20), DocumentKey.emptyKeySet);
 
       view.applyChanges(
-          view.computeDocChanges(docUpdates(<Document>[doc1, doc2])));
+        view.computeDocChanges(docUpdates(<Document>[doc1, doc2])),
+      );
 
       final ViewDocumentChanges changes = view.computeDocChanges(
-          docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/0', 0)]));
+        docUpdates(<NoDocument>[deletedDoc('rooms/eros/messages/0', 0)]),
+      );
       expect(changes.needsRefill, isFalse);
       expect(changes.documentSet.toList(), <Document>[doc2]);
     });
@@ -870,8 +1141,10 @@ void main() {
       applyChanges(view, <Document>[doc1]);
       expect(view.syncState, ViewSnapshotSyncState.local);
 
-      view.applyChanges(view.computeDocChanges(docUpdates(<Document>[doc1])),
-          ackTarget(<Document>[doc1]));
+      view.applyChanges(
+        view.computeDocChanges(docUpdates(<Document>[doc1])),
+        ackTarget(<Document>[doc1]),
+      );
       expect(view.syncState, ViewSnapshotSyncState.synced);
     });
   });

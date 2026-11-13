@@ -67,8 +67,10 @@ class SyncEngineMock extends Fake implements SyncEngine {
   }
 
   @override
-  Future<void> stopListening(Query query,
-      {bool shouldUnlistenToRemote = true}) async {
+  Future<void> stopListening(
+    Query query, {
+    bool shouldUnlistenToRemote = true,
+  }) async {
     stopped.add(query);
     unlistenedFromRemote.add(shouldUnlistenToRemote);
   }
@@ -94,7 +96,7 @@ void main() {
     return QueryStream(query)..listen(null);
   }
 
-  test('testMultipleListenersPerQuery', () async {
+  test('testMultipleListensPerQuery', () async {
     final Query query = Query(path('foo/bar'));
 
     final QueryStream listener1 = queryListener(query);
@@ -165,8 +167,10 @@ void main() {
     unawaited(eventManager.addQueryListener(spy));
     expect(spy.onlineStates, <OnlineState>[OnlineState.unknown]);
     eventManager.handleOnlineStateChange(OnlineState.online);
-    expect(spy.onlineStates,
-        <OnlineState>[OnlineState.unknown, OnlineState.online]);
+    expect(spy.onlineStates, <OnlineState>[
+      OnlineState.unknown,
+      OnlineState.online,
+    ]);
   });
 }
 
@@ -195,82 +199,100 @@ void listenSourceTests() {
       final SyncEngineMock sync = SyncEngineMock();
       final EventManager manager = EventManager(sync);
 
-      await manager
-          .addQueryListener(listenerFor(query, ListenSource.defaultSource));
+      await manager.addQueryListener(
+        listenerFor(query, ListenSource.defaultSource),
+      );
 
       expect(sync.listenedToRemote, <bool>[true]);
     });
 
-    test('a default listener added to a cache query starts the backend listen',
-        () async {
-      final Query query = Query(path('foo/bar'));
-      final SyncEngineMock sync = SyncEngineMock();
-      final EventManager manager = EventManager(sync);
+    test(
+      'a default listener added to a cache query starts the backend listen',
+      () async {
+        final Query query = Query(path('foo/bar'));
+        final SyncEngineMock sync = SyncEngineMock();
+        final EventManager manager = EventManager(sync);
 
-      final QueryStream cache = listenerFor(query, ListenSource.cache);
-      final QueryStream remote = listenerFor(query, ListenSource.defaultSource);
-      final QueryStream remote2 =
-          listenerFor(query, ListenSource.defaultSource);
-      await manager.addQueryListener(cache);
-      await manager.addQueryListener(remote);
-      await manager.addQueryListener(remote2);
+        final QueryStream cache = listenerFor(query, ListenSource.cache);
+        final QueryStream remote = listenerFor(
+          query,
+          ListenSource.defaultSource,
+        );
+        final QueryStream remote2 = listenerFor(
+          query,
+          ListenSource.defaultSource,
+        );
+        await manager.addQueryListener(cache);
+        await manager.addQueryListener(remote);
+        await manager.addQueryListener(remote2);
 
-      expect(sync.listened, <Query>[query]);
-      expect(sync.listenedToRemote, <bool>[false]);
-      // Only the first listener that needs the backend starts the listen.
-      expect(sync.remoteListened, <Query>[query]);
+        expect(sync.listened, <Query>[query]);
+        expect(sync.listenedToRemote, <bool>[false]);
+        // Only the first listener that needs the backend starts the listen.
+        expect(sync.remoteListened, <Query>[query]);
 
-      // Removing one of two remote listeners keeps the backend listen.
-      await manager.removeQueryListener(remote);
-      expect(sync.remoteStopped, isEmpty);
-      // Removing the last remote listener stops it, the cache keeps listening.
-      await manager.removeQueryListener(remote2);
-      expect(sync.remoteStopped, <Query>[query]);
-      expect(sync.stopped, isEmpty);
+        // Removing one of two remote listeners keeps the backend listen.
+        await manager.removeQueryListener(remote);
+        expect(sync.remoteStopped, isEmpty);
+        // Removing the last remote listener stops it, the cache keeps listening.
+        await manager.removeQueryListener(remote2);
+        expect(sync.remoteStopped, <Query>[query]);
+        expect(sync.stopped, isEmpty);
 
-      await manager.removeQueryListener(cache);
-      expect(sync.stopped, <Query>[query]);
-      expect(sync.unlistenedFromRemote, <bool>[false]);
-    });
+        await manager.removeQueryListener(cache);
+        expect(sync.stopped, <Query>[query]);
+        expect(sync.unlistenedFromRemote, <bool>[false]);
+      },
+    );
 
-    test('a cache listener added to a default query does not touch the backend',
-        () async {
-      final Query query = Query(path('foo/bar'));
-      final SyncEngineMock sync = SyncEngineMock();
-      final EventManager manager = EventManager(sync);
+    test(
+      'a cache listener added to a default query does not touch the backend',
+      () async {
+        final Query query = Query(path('foo/bar'));
+        final SyncEngineMock sync = SyncEngineMock();
+        final EventManager manager = EventManager(sync);
 
-      final QueryStream remote = listenerFor(query, ListenSource.defaultSource);
-      final QueryStream cache = listenerFor(query, ListenSource.cache);
-      await manager.addQueryListener(remote);
-      await manager.addQueryListener(cache);
+        final QueryStream remote = listenerFor(
+          query,
+          ListenSource.defaultSource,
+        );
+        final QueryStream cache = listenerFor(query, ListenSource.cache);
+        await manager.addQueryListener(remote);
+        await manager.addQueryListener(cache);
 
-      expect(sync.listened, <Query>[query]);
-      expect(sync.listenedToRemote, <bool>[true]);
-      expect(sync.remoteListened, isEmpty);
+        expect(sync.listened, <Query>[query]);
+        expect(sync.listenedToRemote, <bool>[true]);
+        expect(sync.remoteListened, isEmpty);
 
-      await manager.removeQueryListener(cache);
-      expect(sync.remoteStopped, isEmpty);
-      expect(sync.stopped, isEmpty);
+        await manager.removeQueryListener(cache);
+        expect(sync.remoteStopped, isEmpty);
+        expect(sync.stopped, isEmpty);
 
-      await manager.removeQueryListener(remote);
-      expect(sync.stopped, <Query>[query]);
-      expect(sync.unlistenedFromRemote, <bool>[true]);
-    });
+        await manager.removeQueryListener(remote);
+        expect(sync.stopped, <Query>[query]);
+        expect(sync.unlistenedFromRemote, <bool>[true]);
+      },
+    );
 
-    test('removing the remote listener of a mixed query stops only the backend',
-        () async {
-      final Query query = Query(path('foo/bar'));
-      final SyncEngineMock sync = SyncEngineMock();
-      final EventManager manager = EventManager(sync);
+    test(
+      'removing the remote listener of a mixed query stops only the backend',
+      () async {
+        final Query query = Query(path('foo/bar'));
+        final SyncEngineMock sync = SyncEngineMock();
+        final EventManager manager = EventManager(sync);
 
-      final QueryStream remote = listenerFor(query, ListenSource.defaultSource);
-      final QueryStream cache = listenerFor(query, ListenSource.cache);
-      await manager.addQueryListener(remote);
-      await manager.addQueryListener(cache);
+        final QueryStream remote = listenerFor(
+          query,
+          ListenSource.defaultSource,
+        );
+        final QueryStream cache = listenerFor(query, ListenSource.cache);
+        await manager.addQueryListener(remote);
+        await manager.addQueryListener(cache);
 
-      await manager.removeQueryListener(remote);
-      expect(sync.remoteStopped, <Query>[query]);
-      expect(sync.stopped, isEmpty);
-    });
+        await manager.removeQueryListener(remote);
+        expect(sync.remoteStopped, <Query>[query]);
+        expect(sync.stopped, isEmpty);
+      },
+    );
   });
 }

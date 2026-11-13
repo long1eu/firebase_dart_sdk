@@ -68,6 +68,8 @@ class Query {
 
   Target? _memoizedTarget;
 
+  Target? _memoizedAggregateTarget;
+
   List<OrderBy>? _memoizedOrderBy;
 
   /// An optional bound to start the query at.
@@ -338,18 +340,21 @@ class Query {
   /// Returns the [Target] this query is mapped to in the backend and the local
   /// store. For a limit-to-last query the orderings are flipped and the bounds
   /// swapped, so that an ordinary limit query is evaluated.
-  Target toTarget() {
-    final Target? memoized = _memoizedTarget;
-    if (memoized != null) {
-      return memoized;
-    }
+  Target toTarget() => _memoizedTarget ??= _toTarget(orderByConstraints);
 
+  /// Returns the [Target] of an aggregation over this query. Unlike
+  /// [toTarget] it only carries the explicit orderings: the implicit ones are
+  /// irrelevant to an aggregation.
+  Target toAggregateTarget() =>
+      _memoizedAggregateTarget ??= _toTarget(explicitSortOrder);
+
+  Target _toTarget(List<OrderBy> orderBys) {
     if (limitType == LimitType.limitToFirst) {
-      return _memoizedTarget = Target(
+      return Target(
         path,
         collectionGroup: collectionGroup,
         filters: filters,
-        orderBy: orderByConstraints,
+        orderBy: orderBys,
         limit: _limit,
         startAt: _startAt,
         endAt: _endAt,
@@ -357,7 +362,7 @@ class Query {
     } else {
       // Flip the orderBy directions since we want the last results.
       final List<OrderBy> newOrderBy = <OrderBy>[];
-      for (OrderBy orderBy in orderByConstraints) {
+      for (OrderBy orderBy in orderBys) {
         final OrderByDirection dir =
             orderBy.direction == OrderByDirection.descending
             ? OrderByDirection.ascending
@@ -375,7 +380,7 @@ class Query {
           ? Bound(position: startAt.position, inclusive: startAt.inclusive)
           : null;
 
-      return _memoizedTarget = Target(
+      return Target(
         path,
         collectionGroup: collectionGroup,
         filters: filters,
