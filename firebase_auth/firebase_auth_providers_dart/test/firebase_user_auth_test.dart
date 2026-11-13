@@ -679,6 +679,16 @@ void main() {
       expect(auth.uid, isNull);
     });
 
+    test('a stored email that is not a string is dropped', () async {
+      storage.write(
+        key,
+        '{"uid": "u", "refreshToken": "r", "email": 1, "isAnonymous": false}',
+      );
+      await auth.restore();
+      expect(auth.uid, 'u');
+      expect(auth.currentUser!.email, isNull);
+    });
+
     test('an asynchronous storage works', () async {
       final _AsyncStorage asyncStorage = _AsyncStorage();
       await auth.dispose();

@@ -26,21 +26,29 @@ enum _Kind { nan, negativeInfinity, finite, positiveInfinity }
 ///
 /// PORTING NOTE: the Android and JS SDKs convert every operand to a `Quadruple`
 /// (a binary float with a 128-bit mantissa) for this. This class keeps the
-/// exact value `mantissa * 2^exp2 * 10^exp10` instead, which orders every valid
-/// 34-digit decimal128 the same way and needs no rounding.
+/// exact value instead, which orders every valid 34-digit decimal128 the same
+/// way and needs no rounding: a parsed decimal as its significant digits and a
+/// power of ten, an integer or a double as `mantissa * 2^exp2` (turned into
+/// decimal digits when two numbers of about the same magnitude are compared).
+///
+/// The digits of a decimal are kept as a string: parsing, comparing and
+/// hashing are linear in the length of the input. A [BigInt] of the digits
+/// would make a long input (a hostile bundle) cost quadratic time.
 class ExactNumber implements Comparable<ExactNumber> {
-  ExactNumber._(
-    this._kind,
-    this._negative,
-    this._mantissa,
-    this._exp2,
-    this._exp10,
-  );
+  ExactNumber._decimal(this._kind, this._negative, String digits, int exp10)
+    : _binaryMantissa = null,
+      _exp2 = 0,
+      _decimalCache = (digits, exp10);
+
+  ExactNumber._binary(this._negative, BigInt mantissa, this._exp2)
+    : _kind = _Kind.finite,
+      _binaryMantissa = mantissa,
+      _decimalCache = null;
 
   /// Creates the exact value of the integer [value].
   factory ExactNumber.fromInt(int value) {
     final BigInt big = BigInt.from(value);
-    return ExactNumber._(_Kind.finite, value < 0, big.abs(), 0, 0);
+    return ExactNumber._binary(value < 0, big.abs(), 0);
   }
 
   /// Creates the exact value of the double [value].
@@ -67,7 +75,7 @@ class ExactNumber implements Comparable<ExactNumber> {
       mantissa |= BigInt.one << 52;
       exp2 = biasedExponent - 1075;
     }
-    return ExactNumber._(_Kind.finite, negative, mantissa, exp2, 0);
+    return ExactNumber._binary(negative, mantissa, exp2);
   }
 
   /// Parses a decimal number. The supported format (no whitespace allowed) is:
@@ -78,6 +86,8 @@ class ExactNumber implements Comparable<ExactNumber> {
   ///     an exponent of at most 9 digits
   ///
   /// Throws a [FormatException] if [source] does not have this format.
+  ///
+  /// Linear in the length of [source].
   factory ExactNumber.parse(String source) {
     if (source == 'NaN') {
       return nan;
@@ -88,7 +98,6 @@ class ExactNumber implements Comparable<ExactNumber> {
     }
 
     final int length = source.length;
-    final StringBuffer digits = StringBuffer();
     int i = 0;
     int exponent = 0;
     bool negative = false;
@@ -100,14 +109,18 @@ class ExactNumber implements Comparable<ExactNumber> {
         i++;
       }
     }
+    final int integerStart = i;
     while (i < length && _isDigit(source.codeUnitAt(i))) {
-      digits.writeCharCode(source.codeUnitAt(i++));
+      i++;
     }
+    final String integer = source.substring(integerStart, i);
+    String fraction = '';
     if (i < length && source[i] == '.') {
       final int decimal = ++i;
       while (i < length && _isDigit(source.codeUnitAt(i))) {
-        digits.writeCharCode(source.codeUnitAt(i++));
+        i++;
       }
+      fraction = source.substring(decimal, i);
       exponent = decimal - i;
     }
     if (i < length && (source[i] == 'e' || source[i] == 'E')) {
@@ -134,53 +147,75 @@ class ExactNumber implements Comparable<ExactNumber> {
       }
       exponent += exponentValue * exponentSign;
     }
-    if (digits.isEmpty || i != length) {
+    if ((integer.isEmpty && fraction.isEmpty) || i != length) {
       throw FormatException('Invalid number', source);
     }
 
-    BigInt mantissa = BigInt.parse(digits.toString());
-    // Normalize, so that equal values have the same representation.
-    if (mantissa == BigInt.zero) {
-      exponent = 0;
-    } else {
-      final BigInt ten = BigInt.from(10);
-      while (mantissa.remainder(ten) == BigInt.zero) {
-        mantissa = mantissa ~/ ten;
-        exponent++;
-      }
-    }
-    return ExactNumber._(_Kind.finite, negative, mantissa, 0, exponent);
+    final (String digits, int exp10) = _normalize(
+      '$integer$fraction',
+      exponent,
+    );
+    return ExactNumber._decimal(_Kind.finite, negative, digits, exp10);
   }
 
-  static final ExactNumber nan = ExactNumber._(
-    _Kind.nan,
-    false,
-    BigInt.zero,
-    0,
-    0,
-  );
-  static final ExactNumber positiveInfinity = ExactNumber._(
+  /// The significant digits of `digits * 10^exponent`, without leading and
+  /// trailing zeros, and the matching power of ten, so that equal values have
+  /// the same representation. Zero is `('', 0)`.
+  static (String, int) _normalize(String digits, int exponent) {
+    int start = 0;
+    while (start < digits.length && digits.codeUnitAt(start) == 0x30) {
+      start++;
+    }
+    int end = digits.length;
+    while (end > start && digits.codeUnitAt(end - 1) == 0x30) {
+      end--;
+    }
+    if (start == end) {
+      return ('', 0);
+    }
+    return (digits.substring(start, end), exponent + digits.length - end);
+  }
+
+  static final ExactNumber nan = ExactNumber._decimal(_Kind.nan, false, '', 0);
+  static final ExactNumber positiveInfinity = ExactNumber._decimal(
     _Kind.positiveInfinity,
     false,
-    BigInt.zero,
-    0,
+    '',
     0,
   );
-  static final ExactNumber negativeInfinity = ExactNumber._(
+  static final ExactNumber negativeInfinity = ExactNumber._decimal(
     _Kind.negativeInfinity,
     true,
-    BigInt.zero,
-    0,
+    '',
     0,
   );
 
   final _Kind _kind;
   final bool _negative;
 
-  /// The absolute value is `_mantissa * 2^_exp2 * 10^_exp10`.
-  final BigInt _mantissa;
+  /// The absolute value is `_binaryMantissa * 2^_exp2`, for numbers created
+  /// from an integer or a double; null for parsed decimals.
+  final BigInt? _binaryMantissa;
   final int _exp2;
-  final int _exp10;
+
+  /// The absolute value as significant digits (no leading or trailing zeros,
+  /// empty for zero) times a power of ten. Set by the parser, computed on
+  /// demand for the others: a double has at most 767 significant digits.
+  (String, int)? _decimalCache;
+
+  (String, int) get _decimalForm => _decimalCache ??= _binaryToDecimal();
+
+  (String, int) _binaryToDecimal() {
+    final BigInt mantissa = _binaryMantissa!;
+    if (_exp2 >= 0) {
+      return _normalize((mantissa << _exp2).toString(), 0);
+    }
+    // 2^-k is 5^k / 10^k.
+    return _normalize(
+      (mantissa * BigInt.from(5).pow(-_exp2)).toString(),
+      _exp2,
+    );
+  }
 
   static bool _isDigit(int codeUnit) => codeUnit >= 0x30 && codeUnit <= 0x39;
 
@@ -190,7 +225,13 @@ class ExactNumber implements Comparable<ExactNumber> {
       _kind == _Kind.positiveInfinity || _kind == _Kind.negativeInfinity;
 
   /// Whether this is `0` or `-0`.
-  bool get isZero => _kind == _Kind.finite && _mantissa == BigInt.zero;
+  bool get isZero {
+    if (_kind != _Kind.finite) {
+      return false;
+    }
+    final BigInt? mantissa = _binaryMantissa;
+    return mantissa != null ? mantissa == BigInt.zero : _decimalForm.$1.isEmpty;
+  }
 
   /// Whether the sign is negative, which is also true for `-0`.
   bool get isNegative => _negative;
@@ -227,14 +268,21 @@ class ExactNumber implements Comparable<ExactNumber> {
 
   static const double _log10Of2 = math.ln2 / math.ln10;
 
-  /// An estimate of the base 10 logarithm that is off by less than one.
-  double get _approximateLog10 =>
-      (_mantissa.bitLength + _exp2) * _log10Of2 + _exp10;
+  /// An estimate of the base 10 logarithm of a number that is not zero, at
+  /// most one above the true value.
+  double get _approximateLog10 {
+    final BigInt? mantissa = _binaryMantissa;
+    if (mantissa != null) {
+      return (mantissa.bitLength + _exp2) * _log10Of2;
+    }
+    final (String digits, int exp10) = _decimalForm;
+    return (digits.length + exp10).toDouble();
+  }
 
   /// Compares the absolute values of two finite numbers that are not zero.
   int _compareMagnitude(ExactNumber other) {
     // Numbers that are orders of magnitude apart are compared by their
-    // magnitude, which keeps the powers below small.
+    // magnitude, which keeps the conversions below small.
     final double difference = _approximateLog10 - other._approximateLog10;
     if (difference > 2) {
       return 1;
@@ -242,21 +290,24 @@ class ExactNumber implements Comparable<ExactNumber> {
       return -1;
     }
 
-    BigInt left = _mantissa;
-    BigInt right = other._mantissa;
-    final int exp2 = _exp2 - other._exp2;
-    if (exp2 > 0) {
-      left = left << exp2;
-    } else {
-      right = right << -exp2;
+    // Both as `0.d1d2d3... * 10^point`: the larger point is the larger number,
+    // otherwise the digits decide. With no trailing zeros, a longer string
+    // whose start equals the shorter one is the larger number.
+    final (String left, int leftExp10) = _decimalForm;
+    final (String right, int rightExp10) = other._decimalForm;
+    final int leftPoint = left.length + leftExp10;
+    final int rightPoint = right.length + rightExp10;
+    if (leftPoint != rightPoint) {
+      return leftPoint.compareTo(rightPoint);
     }
-    final int exp10 = _exp10 - other._exp10;
-    if (exp10 > 0) {
-      left = left * BigInt.from(10).pow(exp10);
-    } else {
-      right = right * BigInt.from(10).pow(-exp10);
+    final int common = math.min(left.length, right.length);
+    for (int i = 0; i < common; i++) {
+      final int c = left.codeUnitAt(i) - right.codeUnitAt(i);
+      if (c != 0) {
+        return c.sign;
+      }
     }
-    return left.compareTo(right);
+    return left.length.compareTo(right.length);
   }
 
   /// The closest double. Only meant for numbers created by [ExactNumber.parse].
@@ -279,7 +330,8 @@ class ExactNumber implements Comparable<ExactNumber> {
         } else if (_approximateLog10 < -400) {
           return _negative ? -0.0 : 0.0;
         }
-        return double.parse('${_negative ? '-' : ''}${_mantissa}e$_exp10');
+        final (String digits, int exp10) = _decimalForm;
+        return double.parse('${_negative ? '-' : ''}${digits}e$exp10');
     }
   }
 
@@ -291,6 +343,7 @@ class ExactNumber implements Comparable<ExactNumber> {
     } else if (isZero) {
       return 0;
     }
-    return Object.hash(_negative, _mantissa, _exp10);
+    final (String digits, int exp10) = _decimalForm;
+    return Object.hash(_negative, digits, exp10);
   }
 }

@@ -648,6 +648,23 @@ then fails whichever test is running.
   clients on one persistence key on purpose; use different app names or databases. Handles
   inside one process are serialized per database name
   (`test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`).
+- **Protect the cache files.** The cache holds every document the app has read and its pending
+  writes, in clear text. SQLite creates the database and its `-wal`, `-shm` and `-journal`
+  files with mode 0644 minus the process umask, and `Directory.createSync` creates directories
+  with 0777 minus the umask: with the usual umask 022 every local user can read them
+  (measured: `rw-r--r--` for the files, `rwxr-xr-x` for the directory). On a desktop or server
+  that other users can log in to:
+  - put the database in a per-user application directory (for example the application support
+    directory from `path_provider` in Flutter, `$XDG_DATA_HOME` or `~/.local/share/<app>` on
+    Linux, `~/Library/Application Support/<app>` on macOS, `%LOCALAPPDATA%` on Windows), never
+    in a shared location such as `/tmp` or `/var/lib` without restricting it;
+  - make that directory private before the first file is opened, for example
+    `Process.runSync('chmod', <String>['700', directory.path])` on Linux and macOS (`dart:io` has
+    no chmod), or run the process with `umask 077` so that the files come out 0600;
+  - `Firestore.clearPersistence()` deletes the files of the cache, and signing out does not:
+    call it (after `terminate()`) when a user signs out of a shared machine.
+  The examples use `Directory.systemTemp.createTempSync`, which is private (0700). On the web
+  the cache lives in IndexedDB, which the browser keeps per origin.
 - Instances are independent: each `Firestore` has its own scheduler and work queue, and the
   persistence lock is per database, so an instance never waits for another one (issue #2).
 - Connectivity: a failed stream is the only thing that makes the client consider itself

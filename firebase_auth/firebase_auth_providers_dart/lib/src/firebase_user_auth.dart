@@ -259,7 +259,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
           _Session(
             AuthUser(
               uid: json['uid']! as String,
-              email: json['email'] as String?,
+              email: json['email'] is String ? json['email']! as String : null,
               isAnonymous: json['isAnonymous'] == true,
             ),
             json['refreshToken']! as String,

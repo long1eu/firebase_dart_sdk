@@ -152,6 +152,9 @@ Behaviour changes without a compile error:
   - The bundle inside a snapshot JSON (`DocumentSnapshot.fromJson`, `QuerySnapshot.fromJson`)
     needs the same plain decimal length prefix as `loadBundle` (a sign, white space or a hex
     prefix was accepted), and its errors quote at most 200 characters of the input.
+  - Decimal128 values are parsed, compared and hashed in linear time: a value with a million
+    digits (in a bundle or a snapshot JSON) took seconds to minutes and blocked the isolate.
+    The accepted strings and the order are unchanged.
 - The local evaluation of queries and transforms follows the backend where 0.0.7 (and the JS
   and Android SDKs) did not; details under Fixed:
   - `whereIn`, `whereNotIn`, `arrayContains`, `arrayContainsAny`, `arrayUnion` and
