@@ -36,4 +36,22 @@ void main() {
     expect(foo.hashCode, fooDup.hashCode);
     expect(foo.hashCode, isNot(bar.hashCode));
   });
+
+  // Ported from the JS SDK's test/unit/api/field_path.test.ts.
+  group('FieldPath', () {
+    test('support equality checking with isEqual()', () {
+      expect(
+        FieldPath.fromDotSeparatedPath('foo'),
+        FieldPath.fromDotSeparatedPath('foo'),
+      );
+      expect(
+        FieldPath.fromDotSeparatedPath('foo').hashCode,
+        FieldPath.fromDotSeparatedPath('foo').hashCode,
+      );
+      expect(
+        FieldPath.fromDotSeparatedPath('foo'),
+        isNot(FieldPath.fromDotSeparatedPath('bar')),
+      );
+    });
+  });
 }

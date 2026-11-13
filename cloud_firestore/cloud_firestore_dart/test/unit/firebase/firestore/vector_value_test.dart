@@ -42,14 +42,22 @@ void main() {
     });
 
     test('equality and hashCode', () {
-      expect(FieldValue.vector(<double>[1.0, 2.0]),
-          FieldValue.vector(<double>[1.0, 2.0]));
-      expect(FieldValue.vector(<double>[1.0, 2.0]).hashCode,
-          FieldValue.vector(<double>[1.0, 2.0]).hashCode);
-      expect(FieldValue.vector(<double>[1.0, 2.0]),
-          isNot(FieldValue.vector(<double>[1.0, 3.0])));
-      expect(FieldValue.vector(<double>[1.0]),
-          isNot(FieldValue.vector(<double>[1.0, 0.0])));
+      expect(
+        FieldValue.vector(<double>[1.0, 2.0]),
+        FieldValue.vector(<double>[1.0, 2.0]),
+      );
+      expect(
+        FieldValue.vector(<double>[1.0, 2.0]).hashCode,
+        FieldValue.vector(<double>[1.0, 2.0]).hashCode,
+      );
+      expect(
+        FieldValue.vector(<double>[1.0, 2.0]),
+        isNot(FieldValue.vector(<double>[1.0, 3.0])),
+      );
+      expect(
+        FieldValue.vector(<double>[1.0]),
+        isNot(FieldValue.vector(<double>[1.0, 0.0])),
+      );
       expect(FieldValue.vector(<double>[]), FieldValue.vector(<double>[]));
     });
   });
@@ -77,29 +85,35 @@ void main() {
       ];
       for (int i = 0; i < ordered.length; i++) {
         for (int j = 0; j < ordered.length; j++) {
-          expect(ordered[i].compareTo(ordered[j]).sign, i.compareTo(j).sign,
-              reason: 'comparing $i with $j');
+          expect(
+            ordered[i].compareTo(ordered[j]).sign,
+            i.compareTo(j).sign,
+            reason: 'comparing $i with $j',
+          );
         }
       }
-      expect(wrap(FieldValue.vector(<double>[1.0])),
-          wrap(FieldValue.vector(<double>[1.0])));
+      expect(
+        wrap(FieldValue.vector(<double>[1.0])),
+        wrap(FieldValue.vector(<double>[1.0])),
+      );
     });
   });
 
   group('serializer', () {
     test('encodes a vector as a reserved-key map', () {
-      final proto_.Value encoded =
-          serializer.encodeValue(wrap(FieldValue.vector(<double>[1.0, 2.5])));
+      final proto_.Value encoded = serializer.encodeValue(
+        wrap(FieldValue.vector(<double>[1.0, 2.5])),
+      );
       expect(encoded.hasMapValue(), isTrue);
       final Map<String, proto_.Value> fields = encoded.mapValue.fields;
       expect(fields.keys, unorderedEquals(<String>['__type__', 'value']));
       expect(fields['__type__']!.stringValue, '__vector__');
       expect(
-          fields['value']!
-              .arrayValue
-              .values
-              .map((proto_.Value v) => v.doubleValue),
-          <double>[1.0, 2.5]);
+        fields['value']!.arrayValue.values.map(
+          (proto_.Value v) => v.doubleValue,
+        ),
+        <double>[1.0, 2.5],
+      );
     });
 
     test('round trips', () {
@@ -111,8 +125,8 @@ void main() {
       final proto_.Value value = proto_.Value.create()
         ..mapValue = (proto_.MapValue.create()
           ..fields['__type__'] = (proto_.Value.create()..stringValue = 'other')
-          ..fields['value'] =
-              (proto_.Value.create()..arrayValue = proto_.ArrayValue.create()));
+          ..fields['value'] = (proto_.Value.create()
+            ..arrayValue = proto_.ArrayValue.create()));
       expect(serializer.decodeValue(value), isA<model.ObjectValue>());
     });
 
@@ -120,11 +134,14 @@ void main() {
       final model.FieldValue doc = wrap(<String, Object>{
         'embedding': FieldValue.vector(<double>[0.5, 1.5]),
       });
-      final model.FieldValue decoded =
-          serializer.decodeValue(serializer.encodeValue(doc));
+      final model.FieldValue decoded = serializer.decodeValue(
+        serializer.encodeValue(doc),
+      );
       expect(decoded, doc);
-      expect((decoded as model.ObjectValue).value['embedding'],
-          FieldValue.vector(<double>[0.5, 1.5]));
+      expect(
+        (decoded as model.ObjectValue).value['embedding'],
+        FieldValue.vector(<double>[0.5, 1.5]),
+      );
     });
   });
 
@@ -141,42 +158,128 @@ void main() {
       final VectorValue vector = VectorValue(<double>[1, 2.5, -3]);
       expect(VectorValue.fromJson(vector.toJson()), vector);
       expect(
-          VectorValue.fromJson(<String, Object?>{
-            'type': 'firestore/vectorValue/1.0',
-            'vectorValues': <Object?>[1, 2.5, -3],
-          }),
-          vector);
-      expect(VectorValue.fromJson(VectorValue(<double>[]).toJson()),
-          VectorValue(<double>[]));
+        VectorValue.fromJson(<String, Object?>{
+          'type': 'firestore/vectorValue/1.0',
+          'vectorValues': <Object?>[1, 2.5, -3],
+        }),
+        vector,
+      );
+      expect(
+        VectorValue.fromJson(VectorValue(<double>[]).toJson()),
+        VectorValue(<double>[]),
+      );
     });
 
     test('fromJson throws with invalid data', () {
       for (final Map<String, Object?> json in <Map<String, Object?>>[
         <String, Object?>{},
         <String, Object?>{
-          'vectorValues': <Object?>[1]
+          'vectorValues': <Object?>[1],
         },
         <String, Object?>{
           'type': 'firestore/geoPoint/1.0',
-          'vectorValues': <Object?>[1]
+          'vectorValues': <Object?>[1],
         },
         <String, Object?>{'type': 'firestore/vectorValue/1.0'},
         <String, Object?>{
           'type': 'firestore/vectorValue/1.0',
-          'vectorValues': 'x'
+          'vectorValues': 'x',
         },
         <String, Object?>{
           'type': 'firestore/vectorValue/1.0',
-          'vectorValues': <Object?>[1, 'x']
+          'vectorValues': <Object?>[1, 'x'],
         },
         <String, Object?>{
           'type': 'firestore/vectorValue/1.0',
-          'vectorValues': <Object?>[null]
+          'vectorValues': <Object?>[null],
         },
       ]) {
-        expect(() => VectorValue.fromJson(json), throwsArgumentError,
-            reason: '$json');
+        expect(
+          () => VectorValue.fromJson(json),
+          throwsArgumentError,
+          reason: '$json',
+        );
       }
+    });
+  });
+
+  // Ported from the JS SDK's test/unit/api/vector_value.test.ts.
+  group('VectorValue', () {
+    test('fromJSON reconstructs the value from toJSON', () {
+      final List<double> num = <double>[1, 2, 3];
+      final VectorValue vectorValue = VectorValue(num);
+      final Map<String, Object> json = vectorValue.toJson();
+      final VectorValue parsedVectorValue = VectorValue.fromJson(json);
+      expect(parsedVectorValue, vectorValue);
+    });
+
+    test('fromJSON parameter order does not matter', () {
+      const String type = VectorValue.jsonType;
+      const List<int> vectorValues = <int>[1, 2, 3];
+      final VectorValue control = VectorValue(<double>[1, 2, 3]);
+
+      expect(
+        VectorValue.fromJson(<String, Object?>{
+          'vectorValues': vectorValues,
+          'type': type,
+        }),
+        control,
+      );
+      expect(
+        VectorValue.fromJson(<String, Object?>{
+          'type': type,
+          'vectorValues': vectorValues,
+        }),
+        control,
+      );
+    });
+
+    test('fromJSON empty array does not throw', () {
+      const String type = VectorValue.jsonType;
+      const List<int> vectorValues = <int>[1, 2, 3];
+      expect(
+        () => VectorValue.fromJson(<String, Object?>{
+          'type': type,
+          'vectorValues': vectorValues,
+        }),
+        returnsNormally,
+      );
+    });
+
+    test('fromJSON missing fields throws', () {
+      const String type = VectorValue.jsonType;
+      const List<int> vectorValues = <int>[1, 2, 3];
+      expect(
+        () => VectorValue.fromJson(<String, Object?>{'type': type}),
+        throwsArgumentError,
+      );
+      expect(
+        () => VectorValue.fromJson(<String, Object?>{
+          'vectorValues': vectorValues,
+        }),
+        throwsArgumentError,
+      );
+      expect(
+        () => VectorValue.fromJson(<String, Object?>{
+          'type': 1,
+          'vectorValues': vectorValues,
+        }),
+        throwsArgumentError,
+      );
+      expect(
+        () => VectorValue.fromJson(<String, Object?>{
+          'type': 'firestore/bytes/1.0',
+          'vectorValues': vectorValues,
+        }),
+        throwsArgumentError,
+      );
+      expect(
+        () => VectorValue.fromJson(<String, Object?>{
+          'type': type,
+          'vectorValues': 'not a number',
+        }),
+        throwsArgumentError,
+      );
     });
   });
 }

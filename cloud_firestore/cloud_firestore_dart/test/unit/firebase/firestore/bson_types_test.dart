@@ -20,7 +20,7 @@ void main() {
     expect(a.value, '507f191e810c19729de860ea');
   });
 
-  test('testBsonTimestampEquality', () {
+  test('testBsonTimeStampEquality', () {
     final BsonTimestamp a = BsonTimestamp(1, 2);
     expect(a, BsonTimestamp(1, 2));
     expect(a.hashCode, BsonTimestamp(1, 2).hashCode);
@@ -62,8 +62,11 @@ void main() {
   test('testDecimal128Equality', () {
     void expectEqual(String a, String b) {
       expect(Decimal128Value(a), Decimal128Value(b), reason: '$a == $b');
-      expect(Decimal128Value(a).hashCode, Decimal128Value(b).hashCode,
-          reason: 'hashCode of $a and $b');
+      expect(
+        Decimal128Value(a).hashCode,
+        Decimal128Value(b).hashCode,
+        reason: 'hashCode of $a and $b',
+      );
     }
 
     expectEqual('1.2e3', '1.2e3');
@@ -85,7 +88,7 @@ void main() {
       '+0',
       '+0.0',
       '0e5',
-      '-0e-3'
+      '-0e-3',
     ]) {
       expectEqual('0', zero);
     }
@@ -112,18 +115,51 @@ void main() {
       ' 1',
       '1 ',
       '0x10',
-      '1e1234567890'
+      '1e1234567890',
     ]) {
-      expect(() => Decimal128Value(invalid), throwsFormatException,
-          reason: "'$invalid'");
+      expect(
+        () => Decimal128Value(invalid),
+        throwsFormatException,
+        reason: "'$invalid'",
+      );
     }
   });
 
-  test('testMinKeyAndMaxKeyAreSingletons', () {
-    expect(identical(MinKey.instance, MinKey.instance), isTrue);
-    expect(identical(MaxKey.instance, MaxKey.instance), isTrue);
-    expect(MinKey.instance, MinKey.instance);
-    expect(MaxKey.instance, MaxKey.instance);
+  test('testBsonBinaryEquality', () {
+    final Blob bsonBinaryData = Blob.bsonBinary(1, _bytes(<int>[1, 2, 3]));
+    final Blob bsonBinaryDataDup = Blob.bsonBinary(1, _bytes(<int>[1, 2, 3]));
+    final Blob differentSubtypeBinaryData = Blob.bsonBinary(
+      2,
+      _bytes(<int>[1, 2, 3]),
+    );
+    final Blob differentDataBinaryData = Blob.bsonBinary(
+      1,
+      _bytes(<int>[1, 2, 4]),
+    );
+
+    expect(bsonBinaryData, bsonBinaryDataDup);
+    expect(bsonBinaryData, isNot(differentSubtypeBinaryData));
+    expect(bsonBinaryData, isNot(differentDataBinaryData));
+    expect(bsonBinaryDataDup, isNot(differentSubtypeBinaryData));
+    expect(bsonBinaryDataDup, isNot(differentDataBinaryData));
+
+    expect(bsonBinaryData.hashCode, bsonBinaryDataDup.hashCode);
+  });
+
+  test('testMaxKeyIsSingleton', () {
+    const MaxKey maxKey = MaxKey.instance;
+    const MaxKey maxKeyDup = MaxKey.instance;
+    expect(identical(maxKey, maxKeyDup), isTrue);
+    expect(maxKey, maxKeyDup);
+    expect(maxKey.hashCode, maxKeyDup.hashCode);
+  });
+
+  test('testMinKeyIsSingleton', () {
+    const MinKey minKey = MinKey.instance;
+    const MinKey minKeyDup = MinKey.instance;
+    expect(identical(minKey, minKeyDup), isTrue);
+    expect(minKey, minKeyDup);
+    expect(minKey.hashCode, minKeyDup.hashCode);
   });
 
   test('testMinKeyMaxKeyNullNotEqual', () {
@@ -144,13 +180,19 @@ void main() {
     expect(() => Blob.bsonBinary(-1, _bytes(<int>[1])), throwsArgumentError);
   });
 
+  test('testThrows', () {
+    expect(() => Blob.bsonBinary(256, _bytes(<int>[1])), throwsArgumentError);
+  });
+
   test('testBlobEqualityWithSubtypes', () {
     final Blob regular = Blob(_bytes(<int>[1, 2, 3]));
     expect(regular.subtype, 0);
     // A subtype of 0 is a regular blob.
     expect(Blob.bsonBinary(0, _bytes(<int>[1, 2, 3])), regular);
     expect(
-        Blob.bsonBinary(0, _bytes(<int>[1, 2, 3])).hashCode, regular.hashCode);
+      Blob.bsonBinary(0, _bytes(<int>[1, 2, 3])).hashCode,
+      regular.hashCode,
+    );
     expect(Blob.bsonBinary(1, _bytes(<int>[1, 2, 3])), isNot(regular));
   });
 
@@ -179,63 +221,93 @@ void main() {
       // 0.1 has no exact double, the closest double is slightly larger.
       expect(compare(dec('0.1'), ExactNumber.fromDouble(0.1)), -1);
       expect(
-          compare(
-              dec('0.1000000000000000055511151231257827021181583404541015625'),
-              ExactNumber.fromDouble(0.1)),
-          0);
+        compare(
+          dec('0.1000000000000000055511151231257827021181583404541015625'),
+          ExactNumber.fromDouble(0.1),
+        ),
+        0,
+      );
       expect(compare(dec('0.5'), ExactNumber.fromDouble(0.5)), 0);
       expect(compare(dec('-1.5'), ExactNumber.fromDouble(-1.5)), 0);
       expect(compare(dec('1.1'), ExactNumber.fromDouble(1.1)), -1);
       expect(compare(dec('4.9e-324'), ExactNumber.fromDouble(5e-324)), -1);
       expect(compare(dec('5e-324'), ExactNumber.fromDouble(5e-324)), 1);
       expect(
-          compare(dec('1.7976931348623157e308'),
-              ExactNumber.fromDouble(double.maxFinite)),
-          -1);
+        compare(
+          dec('1.7976931348623157e308'),
+          ExactNumber.fromDouble(double.maxFinite),
+        ),
+        -1,
+      );
       expect(
-          compare(dec('1e309'), ExactNumber.fromDouble(double.maxFinite)), 1);
+        compare(dec('1e309'), ExactNumber.fromDouble(double.maxFinite)),
+        1,
+      );
     });
 
     test('compares decimals with integers exactly', () {
       expect(
-          compare(dec('9223372036854775807'),
-              ExactNumber.fromInt(9223372036854775807)),
-          0);
+        compare(
+          dec('9223372036854775807'),
+          ExactNumber.fromInt(9223372036854775807),
+        ),
+        0,
+      );
       expect(
-          compare(dec('9223372036854775807.5'),
-              ExactNumber.fromInt(9223372036854775807)),
-          1);
+        compare(
+          dec('9223372036854775807.5'),
+          ExactNumber.fromInt(9223372036854775807),
+        ),
+        1,
+      );
       expect(
-          compare(dec('-9223372036854775808'),
-              ExactNumber.fromInt(-9223372036854775808)),
-          0);
+        compare(
+          dec('-9223372036854775808'),
+          ExactNumber.fromInt(-9223372036854775808),
+        ),
+        0,
+      );
       expect(
-          compare(dec('-9223372036854775808.5'),
-              ExactNumber.fromInt(-9223372036854775808)),
-          -1);
+        compare(
+          dec('-9223372036854775808.5'),
+          ExactNumber.fromInt(-9223372036854775808),
+        ),
+        -1,
+      );
       expect(compare(dec('2.147483647e9'), ExactNumber.fromInt(2147483647)), 0);
     });
 
     test('keeps 34 significant digits apart', () {
       expect(
-          compare(dec('9.000000000000000000000000000000001'),
-              dec('9.000000000000000000000000000000002')),
-          -1);
+        compare(
+          dec('9.000000000000000000000000000000001'),
+          dec('9.000000000000000000000000000000002'),
+        ),
+        -1,
+      );
       expect(compare(dec('1.000000000000000000000000000000001'), dec('1')), 1);
     });
 
     test('handles the extremes of the decimal128 exponent range', () {
       expect(
-          compare(
-              dec('9.999999999999999999999999999999999E+6144'), dec('1E-6176')),
-          1);
+        compare(
+          dec('9.999999999999999999999999999999999E+6144'),
+          dec('1E-6176'),
+        ),
+        1,
+      );
       expect(
-          compare(dec('-9.999999999999999999999999999999999E+6144'),
-              dec('1E-6176')),
-          -1);
+        compare(
+          dec('-9.999999999999999999999999999999999E+6144'),
+          dec('1E-6176'),
+        ),
+        -1,
+      );
       expect(compare(dec('1E-6176'), ExactNumber.fromDouble(5e-324)), -1);
       expect(
-          compare(dec('1E+6144'), ExactNumber.fromDouble(double.maxFinite)), 1);
+        compare(dec('1E+6144'), ExactNumber.fromDouble(double.maxFinite)),
+        1,
+      );
       expect(compare(dec('1e999999999'), dec('1e-999999999')), 1);
     });
 
@@ -245,12 +317,17 @@ void main() {
       expect(compare(nan, dec('-Infinity')), -1);
       expect(compare(dec('-Infinity'), nan), 1);
       expect(
-          compare(dec('-Infinity'),
-              ExactNumber.fromDouble(double.negativeInfinity)),
-          0);
+        compare(
+          dec('-Infinity'),
+          ExactNumber.fromDouble(double.negativeInfinity),
+        ),
+        0,
+      );
       expect(compare(dec('-Infinity'), dec('-1e6144')), -1);
       expect(
-          compare(dec('Infinity'), ExactNumber.fromDouble(double.infinity)), 0);
+        compare(dec('Infinity'), ExactNumber.fromDouble(double.infinity)),
+        0,
+      );
       expect(compare(dec('Infinity'), dec('1e6144')), 1);
       expect(compare(dec('-0'), ExactNumber.fromDouble(0)), 0);
       expect(compare(dec('0'), ExactNumber.fromDouble(-0.0)), 0);
