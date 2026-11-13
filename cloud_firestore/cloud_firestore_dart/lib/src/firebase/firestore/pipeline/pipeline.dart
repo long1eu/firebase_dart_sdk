@@ -14,10 +14,13 @@
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/explain_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/expression.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/functions.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_result.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/stage.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/window.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as pb;
@@ -222,6 +225,156 @@ class Pipeline {
   /// names (`String`), [Field]s or aliased expressions.
   Pipeline distinct(List<Object> groups, {Map<String, Object?>? rawOptions}) {
     return _expressionMapStage('distinct', 'distinct', groups, rawOptions);
+  }
+
+  /// Adds the results of window functions to every input, keeping the
+  /// existing fields and the number of inputs.
+  ///
+  /// [window] groups the inputs into partitions, orders them and gives the
+  /// default frame. Every element of [fields] is an [AliasedAggregate] (an
+  /// aggregate over the frame of the window) or an [AliasedWindowFunction]
+  /// (`rank()`, or an aggregate with its own frame from
+  /// `AggregateFunction.over`).
+  ///
+  /// ```dart
+  /// pipeline.addWindowFields(
+  ///   WindowSpec(
+  ///     partition: ['region'],
+  ///     sort: [field('date').ascending()],
+  ///     frame: WindowFrame.documents(
+  ///       preceding: WindowFrame.unbounded,
+  ///       following: WindowFrame.current,
+  ///     ),
+  ///   ),
+  ///   [field('amount').sum().as('runningTotal'), rank().as('rank')],
+  /// );
+  /// ```
+  ///
+  /// **Beta**: window functions are a preview feature of the server; the
+  /// Enterprise emulator rejects this stage.
+  Pipeline addWindowFields(
+    WindowSpec window,
+    List<Object> fields, {
+    Map<String, Object?>? rawOptions,
+  }) {
+    _requireNotEmpty(fields, 'addWindowFields');
+    final Map<String, pb.Value Function(PipelineEncoder)> functions =
+        <String, pb.Value Function(PipelineEncoder)>{};
+    for (final Object field in fields) {
+      final String alias;
+      final pb.Value Function(PipelineEncoder) encode;
+      if (field is AliasedAggregate) {
+        alias = field.alias;
+        encode = field.aggregate.toProto;
+      } else if (field is AliasedWindowFunction) {
+        alias = field.alias;
+        encode = field.windowFunction.toProto;
+      } else {
+        throw ArgumentError(
+          'addWindowFields() takes AliasedAggregates and '
+          'AliasedWindowFunctions, but got: $field',
+        );
+      }
+      if (functions.containsKey(alias)) {
+        throw ArgumentError(
+          "Duplicate alias or field '$alias' in addWindowFields().",
+        );
+      }
+      functions[alias] = encode;
+    }
+    return _append(
+      Stage(
+        'add_window_fields',
+        args: <pb.Value Function(PipelineEncoder)>[
+          window.toProto,
+          (PipelineEncoder encoder) {
+            final pb.MapValue map = pb.MapValue();
+            functions.forEach((
+              String alias,
+              pb.Value Function(PipelineEncoder) encode,
+            ) {
+              map.fields[alias] = encode(encoder);
+            });
+            return pb.Value()..mapValue = map;
+          },
+        ],
+        rawOptions: rawOptions,
+      ),
+    );
+  }
+
+  /// Keeps the documents that match [query], a full-text or geo search, and
+  /// orders them by relevance or by [sort].
+  ///
+  /// [query] is a condition built from search functions (such as
+  /// `documentMatches`, or `geoDistance` compared with a distance), or a
+  /// `String` that is short for `documentMatches(query)`. [addFields] are
+  /// aliased expressions added to every result (for example
+  /// `score().as('score')`). [limit] and [offset] page through the matches,
+  /// [retrievalDepth] bounds how many matches the server considers and
+  /// [languageCode] is the language of the text query.
+  ///
+  /// Must be the first stage after the source, and only a limited set of
+  /// expressions is allowed in it.
+  ///
+  /// ```dart
+  /// firestore.pipeline().collection('restaurants').search(
+  ///   documentMatches('waffles OR pancakes'),
+  ///   sort: [score().descending()],
+  ///   addFields: [score().as('searchScore')],
+  /// );
+  /// ```
+  ///
+  /// **Not verified against a backend**: the Enterprise emulator does not
+  /// support search; the stage is encoded like the JS SDK encodes it.
+  Pipeline search(
+    Object query, {
+    List<Ordering>? sort,
+    List<Selectable>? addFields,
+    String? languageCode,
+    int? retrievalDepth,
+    int? offset,
+    int? limit,
+    Map<String, Object?>? rawOptions,
+  }) {
+    final BooleanExpression condition = query is BooleanExpression
+        ? query
+        : query is String
+        ? documentMatches(query)
+        : throw ArgumentError(
+            'search() takes a BooleanExpression or a String query, but got: '
+            '$query',
+          );
+    final List<Ordering>? orderings = sort == null
+        ? null
+        : List<Ordering>.of(sort);
+    final Map<String, Expression>? fields = addFields == null
+        ? null
+        : selectablesToMap(addFields, method: 'search');
+    return _append(
+      Stage(
+        'search',
+        options: <String, pb.Value Function(PipelineEncoder)>{
+          'query': condition.toProto,
+          if (limit != null) 'limit': (_) => integerValue(limit),
+          if (retrievalDepth != null)
+            'retrieval_depth': (_) => integerValue(retrievalDepth),
+          if (orderings != null)
+            'sort': (PipelineEncoder encoder) => pb.Value()
+              ..arrayValue = (pb.ArrayValue()
+                ..values.addAll(
+                  orderings.map((Ordering o) => o.toProto(encoder)),
+                )),
+          if (fields != null)
+            'add_fields': (PipelineEncoder encoder) =>
+                encodeExpressionMap(encoder, fields),
+          if (offset != null) 'offset': (_) => integerValue(offset),
+          if (languageCode != null)
+            'language_code': (_) => stringValue(languageCode),
+        },
+        rawOptions: rawOptions,
+      ),
+    );
   }
 
   /// Keeps the inputs whose vector [field] (a `String` name or a [Field]) is
@@ -563,26 +716,25 @@ class Pipeline {
   /// committed when it completes, so the writes of a write stage ([delete],
   /// [update], [insert], [upsert]) are applied together or not at all.
   ///
-  /// Options this SDK has no parameter for go into [rawOptions]. If such an
-  /// option makes the server explain how it ran the pipeline, the answer is in
-  /// [PipelineSnapshot.explainStats].
+  /// With [explainOptions] the server is asked to explain how it runs the
+  /// pipeline; the explanation is in [PipelineSnapshot.explainStats].
+  ///
+  /// Options this SDK has no parameter for go into [rawOptions].
+  ///
+  /// To run a pipeline inside a transaction, use `Transaction.execute`.
   Future<PipelineSnapshot> execute({
     bool atomic = false,
     PipelineIndexMode? indexMode,
+    PipelineExplainOptions? explainOptions,
     Map<String, Object?>? rawOptions,
   }) async {
-    if (stages.isNotEmpty && stages.first.name == 'subcollection') {
-      throw StateError(
-        'This pipeline starts at a subcollection of the document of an '
-        'enclosing pipeline and cannot be executed directly. It can only '
-        'be used as part of another pipeline.',
-      );
-    }
+    checkExecutable();
     final PipelineEncoder encoder = PipelineEncoder(firestore.modelDatabaseId);
     final proto.ExecutePipelineRequest request = toExecuteRequest(
       encoder,
       atomic: atomic,
       indexMode: indexMode,
+      explainOptions: explainOptions,
       rawOptions: rawOptions,
     );
     final List<proto.ExecutePipelineResponse> responses = await firestore.client
@@ -595,18 +747,34 @@ class Pipeline {
     );
   }
 
+  /// Fails if this pipeline cannot be executed on its own.
+  @internal
+  void checkExecutable() {
+    if (stages.isNotEmpty && stages.first.name == 'subcollection') {
+      throw StateError(
+        'This pipeline starts at a subcollection of the document of an '
+        'enclosing pipeline and cannot be executed directly. It can only '
+        'be used as part of another pipeline.',
+      );
+    }
+  }
+
   /// Builds the request that [execute] sends.
   @internal
   proto.ExecutePipelineRequest toExecuteRequest(
     PipelineEncoder encoder, {
     bool atomic = false,
     PipelineIndexMode? indexMode,
+    PipelineExplainOptions? explainOptions,
     Map<String, Object?>? rawOptions,
   }) {
     final proto.StructuredPipeline structured = proto.StructuredPipeline()
       ..pipeline = toProto(encoder);
     if (indexMode != null) {
       structured.options['index_mode'] = stringValue(indexMode.serverName);
+    }
+    if (explainOptions != null) {
+      structured.options['explain_options'] = explainOptions.toProto();
     }
     structured.options.addAll(encodeOptions(encoder, rawOptions));
     final proto.ExecutePipelineRequest request = proto.ExecutePipelineRequest()

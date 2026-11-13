@@ -21,6 +21,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_versi
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 
 /// Internal transaction object responsible for accumulating the mutations to
 /// perform and the base versions for any documents read.
@@ -91,6 +92,18 @@ class Transaction {
     return _transactionClient.runAggregateQuery(
       query,
       aggregateFields,
+      await _ensureBackendTransaction(),
+    );
+  }
+
+  /// Executes the pipeline of [request] on the backend, in the snapshot of this (read-only) transaction.
+  Future<List<proto.ExecutePipelineResponse>> executePipeline(
+    proto.ExecutePipelineRequest request,
+  ) async {
+    _ensureCommitNotCalled();
+    _ensureReadOnly('Pipelines');
+    return _transactionClient.executePipeline(
+      request,
       await _ensureBackendTransaction(),
     );
   }

@@ -3,6 +3,7 @@ class AggregateFunction
   final args: List<Expression>
   final name: String
   new AggregateFunction(String name, [List<Object> args])
+  over(WindowFrame frame): WindowFunction
   toProto(PipelineEncoder encoder): Value @internal
   toString(): String
 class AliasedAggregate
@@ -14,6 +15,11 @@ class AliasedExpression
   final alias: String
   final expression: Expression
   new AliasedExpression(Expression expression, String alias)
+  toString(): String
+class AliasedWindowFunction
+  final alias: String
+  final windowFunction: WindowFunction
+  new AliasedWindowFunction(WindowFunction windowFunction, String alias)
   toString(): String
 class BooleanExpression extends Expression
   and(BooleanExpression other, [List<BooleanExpression> others]): BooleanExpression
@@ -58,6 +64,7 @@ abstract class Expression
   arrayMinimumN(Object n): FunctionExpression
   arrayReverse(): FunctionExpression
   arraySlice(Object offset, [Object length]): FunctionExpression
+  arraySum(): FunctionExpression
   arrayTransform((.Expression) -> dart.core.Object transform, {String alias}): FunctionExpression
   arrayTransformWithIndex((.Expression, .Expression) -> dart.core.Object transform, {String elementAlias, String indexAlias}): FunctionExpression
   as(String alias): AliasedExpression
@@ -103,6 +110,7 @@ abstract class Expression
   like(Object pattern): BooleanExpression
   ln(): FunctionExpression
   log(Object base): FunctionExpression
+  log10(): FunctionExpression
   logicalMaximum(List<Object> others): FunctionExpression
   logicalMinimum(List<Object> others): FunctionExpression
   ltrim([Object characters]): FunctionExpression
@@ -111,7 +119,7 @@ abstract class Expression
   mapKeys(): FunctionExpression
   mapMerge(Object second, [List<Object> others]): FunctionExpression
   mapRemove(Object key): FunctionExpression
-  mapSet(Object key, Object value): FunctionExpression
+  mapSet(Object key, Object value, [List<Object> moreKeyValues]): FunctionExpression
   mapValues(): FunctionExpression
   maximum(): AggregateFunction
   minimum(): AggregateFunction
@@ -193,11 +201,13 @@ enum OrderingDirection
   static final values: List<OrderingDirection>
 class Pipeline
   addFields(List<Selectable> fields, {Map<String, Object> rawOptions}): Pipeline
+  addWindowFields(WindowSpec window, List<Object> fields, {Map<String, Object> rawOptions}): Pipeline
   aggregate(List<AliasedAggregate> accumulators, {List<Object> groups, Map<String, Object> rawOptions}): Pipeline
+  checkExecutable(): void @internal
   define(List<AliasedExpression> variables, {Map<String, Object> rawOptions}): Pipeline
   delete({Map<String, Object> rawOptions}): Pipeline
   distinct(List<Object> groups, {Map<String, Object> rawOptions}): Pipeline
-  execute({bool atomic, PipelineIndexMode indexMode, Map<String, Object> rawOptions}): Future<PipelineSnapshot>
+  execute({bool atomic, PipelineIndexMode indexMode, PipelineExplainOptions explainOptions, Map<String, Object> rawOptions}): Future<PipelineSnapshot>
   final firestore: Firestore
   final stages: List<Stage> @internal
   findNearest(Object field, Object vector, DistanceMeasure distanceMeasure, {int limit, String distanceField, Map<String, Object> rawOptions}): Pipeline
@@ -209,10 +219,11 @@ class Pipeline
   removeFields(List<Object> fields, {Map<String, Object> rawOptions}): Pipeline
   replaceWith(Object fieldOrExpression, {Map<String, Object> rawOptions}): Pipeline
   sample({int documents, double percentage, Map<String, Object> rawOptions}): Pipeline
+  search(Object query, {List<Ordering> sort, List<Selectable> addFields, String languageCode, int retrievalDepth, int offset, int limit, Map<String, Object> rawOptions}): Pipeline
   select(List<Object> selections, {Map<String, Object> rawOptions}): Pipeline
   sort(List<Ordering> orderings, {Map<String, Object> rawOptions}): Pipeline
   toArrayExpression(): Expression
-  toExecuteRequest(PipelineEncoder encoder, {bool atomic, PipelineIndexMode indexMode, Map<String, Object> rawOptions}): ExecutePipelineRequest @internal
+  toExecuteRequest(PipelineEncoder encoder, {bool atomic, PipelineIndexMode indexMode, PipelineExplainOptions explainOptions, Map<String, Object> rawOptions}): ExecutePipelineRequest @internal
   toProto(PipelineEncoder encoder): Pipeline @internal
   toScalarExpression(): Expression
   toString(): String
@@ -221,6 +232,24 @@ class Pipeline
   update({List<Selectable> transformedFields, Map<String, Object> rawOptions}): Pipeline
   upsert({List<Selectable> additionalFields, Object collection, Object documentId, Map<String, Object> rawOptions}): Pipeline
   where(BooleanExpression condition, {Map<String, Object> rawOptions}): Pipeline
+enum PipelineExplainMode
+  final serverName: String @internal
+  new PipelineExplainMode(int #index, String #name, String serverName)
+  static final analyze: PipelineExplainMode
+  static final execute: PipelineExplainMode
+  static final explain: PipelineExplainMode
+  static final values: List<PipelineExplainMode>
+class PipelineExplainOptions
+  final mode: PipelineExplainMode
+  final outputFormat: PipelineExplainOutputFormat
+  new PipelineExplainOptions({PipelineExplainMode mode, PipelineExplainOutputFormat outputFormat})
+  toProto(): Value @internal
+  toString(): String
+enum PipelineExplainOutputFormat
+  final serverName: String @internal
+  new PipelineExplainOutputFormat(int #index, String #name, String serverName)
+  static final text: PipelineExplainOutputFormat
+  static final values: List<PipelineExplainOutputFormat>
 class PipelineExplainStats
   final typeUrl: String
   final value: List<int>
@@ -264,10 +293,39 @@ abstract class Selectable
   get alias: String
   get expression: Expression
   new Selectable()
+TransactionPipelines.execute(Transaction #this, Pipeline pipeline, {PipelineIndexMode indexMode, PipelineExplainOptions explainOptions, Map<String, Object> rawOptions}): Future<PipelineSnapshot>
 class VariableExpression extends Expression
   final name: String
   new VariableExpression(String name)
   toProto(PipelineEncoder encoder): Value
+  toString(): String
+class WindowFrame
+  final following: Object
+  final kind: String @internal
+  final preceding: Object
+  final unit: Object
+  new WindowFrame.documents({Object preceding, Object following})
+  new WindowFrame.range({Object preceding, Object following, Object unit})
+  static final current: String
+  static final unbounded: String
+  toProto(PipelineEncoder encoder): Value @internal
+  toString(): String
+class WindowFunction
+  as(String alias): AliasedWindowFunction
+  final args: List<Expression>
+  final frame: WindowFrame
+  final name: String
+  new WindowFunction(String name, [List<Object> args])
+  new WindowFunction.withFrame(String name, List<Expression> args, WindowFrame frame) @internal
+  over(WindowFrame frame): WindowFunction
+  toProto(PipelineEncoder encoder): Value @internal
+  toString(): String
+class WindowSpec
+  final frame: WindowFrame
+  final partition: List<Object>
+  final sort: List<Ordering>
+  new WindowSpec({List<Object> partition, List<Ordering> sort, WindowFrame frame})
+  toProto(PipelineEncoder encoder): Value @internal
   toString(): String
 and(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression
 array(List<Object> elements): FunctionExpression
@@ -277,12 +335,16 @@ countAll(): AggregateFunction
 countIf(BooleanExpression condition): AggregateFunction
 currentDocument(): FunctionExpression
 currentTimestamp(): FunctionExpression
+documentMatches(Object query): BooleanExpression
 field(Object nameOrPath): Field
 map(Map<String, Object> entries): FunctionExpression
 nor(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression
 not(BooleanExpression condition): BooleanExpression
 or(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression
+pipelineResultEqual(PipelineResult left, PipelineResult right): bool
 rand(): FunctionExpression
+rank(): WindowFunction
+score(): FunctionExpression
 switchOn(BooleanExpression condition, Object result, [List<Object> others]): FunctionExpression
 variable(String name): VariableExpression
 xor(BooleanExpression first, BooleanExpression second, [List<BooleanExpression> more]): BooleanExpression

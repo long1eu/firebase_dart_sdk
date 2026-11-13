@@ -15,6 +15,7 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/expression.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/window.dart';
 
 /// Adds [pipeline] to [Firestore]. Importing
 /// `package:cloud_firestore_dart/pipelines.dart` makes it available.
@@ -127,3 +128,34 @@ VariableExpression variable(String name) => VariableExpression(name);
 /// The document that the enclosing stage is processing, as a map. Useful in
 /// `Pipeline.define` to hand the outer document to a subquery.
 FunctionExpression currentDocument() => FunctionExpression('current_document');
+
+/// Whether the document matches the full-text search [query] (a `String` in
+/// the search query language, or an expression that evaluates to one).
+///
+/// Only allowed in the query of `Pipeline.search`:
+///
+/// ```dart
+/// firestore.pipeline().collection('restaurants').search(
+///   documentMatches('waffles OR pancakes'),
+///   sort: [score().descending()],
+/// );
+/// ```
+///
+/// **Not verified against a backend**: the Enterprise emulator does not
+/// support search.
+BooleanExpression documentMatches(Object query) =>
+    BooleanExpression(FunctionExpression('document_matches', <Object?>[query]));
+
+/// The relevance of the document to the text conditions (such as
+/// [documentMatches]) of the enclosing `Pipeline.search` query; 0 when the
+/// query has none. Only allowed in a `search` stage.
+///
+/// **Not verified against a backend**: the Enterprise emulator does not
+/// support search.
+FunctionExpression score() => FunctionExpression('score');
+
+/// The rank of the current input in its window partition, by the sort order
+/// of the window; tied inputs share a rank. For `Pipeline.addWindowFields`.
+///
+/// **Beta**: window functions are a preview feature of the server.
+WindowFunction rank() => WindowFunction('rank');

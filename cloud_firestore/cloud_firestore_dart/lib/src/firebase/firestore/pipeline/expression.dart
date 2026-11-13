@@ -18,6 +18,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dar
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart'
     as model;
+import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/window.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
@@ -414,6 +415,9 @@ abstract class Expression {
   /// The logarithm of this number to the given [base].
   FunctionExpression log(Object base) => _function('log', <Object?>[base]);
 
+  /// The base 10 logarithm of this number.
+  FunctionExpression log10() => _function('log10');
+
   /// The largest of this value and [others], in Firestore's value ordering.
   FunctionExpression logicalMaximum(List<Object?> others) =>
       _function('maximum', others);
@@ -612,6 +616,9 @@ abstract class Expression {
   /// The smallest element of this array.
   FunctionExpression arrayMinimum() => _function('minimum');
 
+  /// The sum of the numeric elements of this array.
+  FunctionExpression arraySum() => _function('sum');
+
   /// The [n] largest elements of this array, largest first.
   FunctionExpression arrayMaximumN(Object n) =>
       _function('maximum_n', <Object?>[n]);
@@ -633,8 +640,22 @@ abstract class Expression {
       _function('map_remove', <Object?>[key]);
 
   /// This map with [key] set to [value].
-  FunctionExpression mapSet(Object key, Object? value) =>
-      _function('map_set', <Object?>[key, value]);
+  ///
+  /// [moreKeyValues] continues with further key/value pairs:
+  /// `mapSet('a', 1, ['b', 2])` sets both `a` and `b`.
+  FunctionExpression mapSet(
+    Object key,
+    Object? value, [
+    List<Object?> moreKeyValues = const <Object?>[],
+  ]) {
+    if (moreKeyValues.length.isOdd) {
+      throw ArgumentError(
+        'mapSet() takes key/value pairs, but moreKeyValues has an odd number '
+        'of elements: $moreKeyValues',
+      );
+    }
+    return _function('map_set', <Object?>[key, value, ...moreKeyValues]);
+  }
 
   /// The value of the field [key] of this map or document, for example of
   /// `currentDocument()` or of a variable that holds a document.
@@ -1016,6 +1037,25 @@ class AggregateFunction {
 
   /// Names the result of this aggregate.
   AliasedAggregate as(String alias) => AliasedAggregate(this, alias);
+
+  /// This aggregate evaluated over [frame], relative to each input, instead
+  /// of over the frame of the enclosing `Pipeline.addWindowFields` stage.
+  ///
+  /// ```dart
+  /// pipeline.addWindowFields(
+  ///   WindowSpec(sort: [field('date').ascending()]),
+  ///   [
+  ///     field('amount')
+  ///         .average()
+  ///         .over(WindowFrame.documents(preceding: 1, following: 1))
+  ///         .as('movingAverage'),
+  ///   ],
+  /// );
+  /// ```
+  ///
+  /// **Beta**: window functions are a preview feature of the server.
+  WindowFunction over(WindowFrame frame) =>
+      WindowFunction.withFrame(name, args, frame);
 
   @internal
   pb.Value toProto(PipelineEncoder encoder) {

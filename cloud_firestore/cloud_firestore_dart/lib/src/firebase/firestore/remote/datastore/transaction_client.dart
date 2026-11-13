@@ -120,6 +120,15 @@ class TransactionClient {
     );
   }
 
+  /// Executes the pipeline of [request] on the backend inside the transaction with the id [transaction] and collects
+  /// every response of the stream.
+  Future<List<proto.ExecutePipelineResponse>> executePipeline(
+    proto.ExecutePipelineRequest request,
+    Uint8List transaction,
+  ) {
+    return _client.executePipeline(request..transaction = transaction).toList();
+  }
+
   /// Reads the documents with the given [keys] from the backend. With [transaction] (the id of a read-only
   /// transaction) they are read as of the snapshot of that transaction.
   Future<List<MaybeDocument>> lookup(

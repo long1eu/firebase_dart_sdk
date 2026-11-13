@@ -210,8 +210,8 @@ Future<void> firestoreReadmeLine340() async {
   print(written.results.single.get('documents_modified'));
 }
 
-// README.md:574
-Future<void> firestoreReadmeLine574() async {
+// README.md:578
+Future<void> firestoreReadmeLine578() async {
   final total = await firestore.runTransaction((transaction) async {
     final account = await transaction.get(firestore.doc('accounts/a'));
     final orders = await transaction.getQuery(
@@ -221,8 +221,8 @@ Future<void> firestoreReadmeLine574() async {
   }, options: TransactionOptions(readOnly: true));
 }
 
-// README.md:675
-Future<void> firestoreReadmeLine675() async {
+// README.md:679
+Future<void> firestoreReadmeLine679() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }

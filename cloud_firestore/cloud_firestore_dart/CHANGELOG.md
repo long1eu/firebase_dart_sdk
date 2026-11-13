@@ -1,3 +1,13 @@
+## Unreleased
+
+- Pipelines (preview): `Pipeline.search` with `documentMatches` and `score`; window functions
+  with `Pipeline.addWindowFields`, `WindowSpec`, `WindowFrame`, `WindowFunction`, `rank()` and
+  `AggregateFunction.over` (beta upstream; the emulator rejects search and window functions, so
+  both are checked for their encoding only); `Transaction.execute(pipeline)` in read-only
+  transactions; typed `PipelineExplainOptions` for `Pipeline.execute`; `Expression.arraySum`,
+  `Expression.log10`, more key/value pairs for `Expression.mapSet`, and `pipelineResultEqual`.
+  The surface now has every symbol of the JS `firestore-pipelines` API, in Dart shape.
+
 ## 0.1.0
 
 First release under the new name. This package was published as `cloud_firestore_vm` (last

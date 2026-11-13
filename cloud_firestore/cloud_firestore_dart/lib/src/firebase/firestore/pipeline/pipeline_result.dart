@@ -121,6 +121,18 @@ class PipelineResult {
   String toString() => 'PipelineResult{ref: ${_key?.path}, data: ${data()}}';
 }
 
+/// Whether [left] and [right] are the same row: the same document (or both
+/// not documents) of the same [Firestore] instance, with equal data. The read
+/// times are not compared.
+bool pipelineResultEqual(PipelineResult left, PipelineResult right) {
+  if (identical(left, right)) {
+    return true;
+  }
+  return left._key == right._key &&
+      (left._key == null || identical(left._firestore, right._firestore)) &&
+      left._fields == right._fields;
+}
+
 /// The results of executing a pipeline.
 ///
 /// **Preview**: the Pipelines API is experimental and may change.
@@ -146,10 +158,9 @@ class PipelineSnapshot {
   /// What the server reported about how it ran the pipeline, or null if it
   /// reported nothing.
   ///
-  /// The server only explains a pipeline when asked to with an option. This
-  /// SDK has no parameter for that option yet, because its name could not be
-  /// verified (the other client SDKs do not have it and the emulator ignores
-  /// every option); send it with the `rawOptions` of `Pipeline.execute`.
+  /// The server only explains a pipeline when asked to with the
+  /// `explainOptions` of `Pipeline.execute`. The Enterprise emulator never
+  /// sends an explanation.
   final PipelineExplainStats? explainStats;
 
   @override

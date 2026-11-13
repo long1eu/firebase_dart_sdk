@@ -235,4 +235,10 @@ extension TransactionInternal on Transaction {
     core.Transaction transaction,
     Firestore firestore,
   ) => Transaction._(transaction, firestore);
+
+  /// The core transaction this transaction wraps.
+  core.Transaction get coreTransaction => _transaction;
+
+  /// The database this transaction runs against.
+  Firestore get firestore => _firestore;
 }

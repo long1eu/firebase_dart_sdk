@@ -428,14 +428,18 @@ print(written.results.single.get('documents_modified'));
 - **Lambdas**: `arrayFilter((e) => e.greaterThan(1))`, `arrayTransform`,
   `arrayTransformWithIndex`; the callback builds the expression once, from a variable that
   stands for the element (name it with `alias` when lambdas are nested).
-- **Explain**: there is no typed option, because its name could not be verified (the JS and
-  Android SDKs do not have one and the emulator ignores every option). Send it with
-  `execute(rawOptions: {...})`; whatever the server then reports is in
-  `PipelineSnapshot.explainStats`.
-- **Not done yet**: full-text search (the emulator has no `document_matches` function, so the
-  `search` stage could not be checked; `rawStage('search', [], options: {...})` can send it),
-  window functions, pipelines inside a `Transaction`, and evaluation against the local cache or
-  real-time pipelines.
+- **Explain**: `execute(explainOptions: PipelineExplainOptions(mode: PipelineExplainMode.analyze))`
+  asks the server to explain the pipeline; the answer is in `PipelineSnapshot.explainStats`. The
+  option names are those of the Node.js server SDK (the JS and Android client SDKs have no such
+  option), and the emulator ignores them, so no explanation was seen in a test.
+- **Transactions**: `transaction.execute(pipeline)` runs a pipeline inside a read-only transaction
+  (`TransactionOptions(readOnly: true)`), in the snapshot that all its reads see. Read-write
+  transactions and pipelines with write stages are rejected, as for `Transaction.getQuery`.
+- **Search and window functions** (beta upstream, encoded like the JS SDK; the emulator rejects
+  both, so they were checked for their encoding only): `search(documentMatches('...'), sort:
+  [score().descending()])`, and `addWindowFields(WindowSpec(...), [rank().as('rank'),
+  field('n').sum().over(WindowFrame.documents(preceding: 1, following: 1)).as('moving')])`.
+- **Not done yet**: evaluation against the local cache and real-time pipelines.
 - **Emulator gaps** (v1.22.0): `geoDistance`, `search` and window functions are rejected, and the
   `literals` source is denied for clients that are subject to security rules.
 - A result is a document (`ref`, `id`, `createTime`, `updateTime`) only while the pipeline filters,
@@ -824,9 +828,10 @@ Not done:
   the opt-in real-project test mode exist but have not been run. The packages are not
   published.
 - **Web beyond the experiment**: OPFS storage, and any browser other than Chrome.
-- **Pipelines** beyond the [preview](#pipelines-preview) described above: full-text search,
-  window functions, pipelines in a `Transaction`, local evaluation (an evaluator exists inside
-  the package but the client does not use it yet) and real-time pipelines.
+- **Pipelines** beyond the [preview](#pipelines-preview) described above: local evaluation (an
+  evaluator exists inside the package but the client does not use it yet) and real-time
+  pipelines. Full-text search, window functions and explain options are encoded but were not
+  run against a backend that supports them.
 - `Query.findNearest` evaluation against the local cache.
 - **Coordination between running clients that share one cache** (the multi-tab support of the
   JS SDK). Two clients on one SQLite file keep it consistent but do not see each other's
