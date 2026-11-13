@@ -28,8 +28,11 @@ import 'dart:convert';
 /// with the first one in this map's iteration order.
 const Map<String, String?> skippedSpecFeatures = <String, String?>{
   // --- Excluded by upstream Android too (SpecTestCase.DISABLED_TAGS) ---
+  // The harness runs several clients on one persistence (SpecTestCase / SpecClient); the library is what is missing.
+  // The reason of each spec also lists what it uses (see [multiClientCapabilities]), so that the specs can be enabled
+  // group by group (parity/multi_client_plan.md).
   'multi-client':
-      'Needs several clients sharing one persistence (multi-tab / primary lease); the port is single client.',
+      'Needs the primary lease (multi-client stage 1) and SharedClientState with SyncEngine.applyPrimaryState (stage 2).',
   'no-android':
       'Tagged no-android upstream: behaviour deliberately differs on Android, and the port follows Android.',
   'benchmark':
@@ -58,6 +61,8 @@ const Map<String, String?> skippedSpecFeatures = <String, String?>{
 /// Tags that exclude a spec for one persistence variant only (not a missing feature: the spec simply does not apply to
 /// that persistence). Mirrors MemorySpecTest / SQLiteSpecTest upstream.
 const Map<String, String> memoryExcludedTags = <String, String>{
+  'multi-client':
+      'multi-client: several clients need a durable shared persistence; like the JS SDK, the memory persistence variant skips it.',
   'durable-persistence':
       'durable-persistence: needs a persistence that survives restart; the memory persistence variant skips it (as upstream).',
 };
@@ -71,6 +76,73 @@ const Map<String, String> sqliteExcludedTags = <String, String>{
 /// `'<describeName> <itName>'`. Unlike [skippedSpecFeatures] these are not detectable from the spec JSON: the spec
 /// uses only supported steps but expects behaviour that only the JS SDK implements.
 const Map<String, String> knownSpecDivergences = <String, String>{};
+
+/// What a multi-client spec uses beyond a second client, keyed by a short name, with the library part it needs. Only
+/// used to explain the skip reason of a multi-client spec (see [multiClientCapabilitiesOf]).
+const Map<String, String> multiClientCapabilities = <String, String>{
+  'client-state':
+      'applyClientState (visibility or forced primary: lease election, stage 1)',
+  'primary-state':
+      'expectedState.isPrimary / numActiveClients (lease and client metadata, stage 1)',
+  'metadata-refresh':
+      'runTimer client_metadata_refresh (lease refresh and failover, stage 1)',
+  'shutdown': 'shutdown of a client (lease release and failover, stage 1)',
+  'remote-listen':
+      'listens on a client other than 0 (target state through SharedClientState, stage 2)',
+  'remote-write':
+      'writes on a client other than 0 (batch state through SharedClientState, stage 2)',
+  'remote-bundle':
+      'loadBundle on a client other than 0 (changed documents through SharedClientState, stage 2)',
+  'remote-network':
+      'network, user or pending-writes steps on a client other than 0 (stage 2)',
+};
+
+/// Returns the keys of [multiClientCapabilities] that [testJson] uses, in the order of that map.
+List<String> multiClientCapabilitiesOf(Map<String, dynamic> testJson) {
+  final Set<String> found = <String>{};
+  final List<dynamic> steps = testJson['steps'] ?? const <dynamic>[];
+  for (final dynamic stepObject in steps) {
+    final Map<String, dynamic> step = stepObject as Map<String, dynamic>;
+    final bool otherClient = (step['clientIndex'] ?? 0) != 0;
+    final Map<String, dynamic> state =
+        step['expectedState'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    if (step.containsKey('applyClientState')) {
+      found.add('client-state');
+    }
+    if (state.containsKey('isPrimary') ||
+        state.containsKey('numActiveClients')) {
+      found.add('primary-state');
+    }
+    if (step['runTimer'] == 'client_metadata_refresh') {
+      found.add('metadata-refresh');
+    }
+    if (step.containsKey('shutdown')) {
+      found.add('shutdown');
+    }
+    if (otherClient && step.containsKey('userListen')) {
+      found.add('remote-listen');
+    }
+    if (otherClient &&
+        (step.containsKey('userSet') ||
+            step.containsKey('userPatch') ||
+            step.containsKey('userDelete'))) {
+      found.add('remote-write');
+    }
+    if (otherClient && step.containsKey('loadBundle')) {
+      found.add('remote-bundle');
+    }
+    if (otherClient &&
+        (step.containsKey('enableNetwork') ||
+            step.containsKey('changeUser') ||
+            step.containsKey('waitForPendingWrites'))) {
+      found.add('remote-network');
+    }
+  }
+  return <String>[
+    for (final String key in multiClientCapabilities.keys)
+      if (found.contains(key)) key,
+  ];
+}
 
 /// Returns the names (keys of [skippedSpecFeatures]) of all features that [testJson] needs.
 Set<String> detectSpecFeatures(Map<String, dynamic> testJson) {
@@ -160,6 +232,9 @@ String? skipReasonFor(
   final Set<String> features = detectSpecFeatures(testJson);
   for (final MapEntry<String, String?> entry in skippedSpecFeatures.entries) {
     if (entry.value != null && features.contains(entry.key)) {
+      if (entry.key == 'multi-client') {
+        return '[multi-client] ${entry.value}${_multiClientDetails(features, testJson)}';
+      }
       return '[${entry.key}] ${entry.value}';
     }
   }
@@ -170,4 +245,24 @@ String? skipReasonFor(
     }
   }
   return null;
+}
+
+/// The capabilities a multi-client spec uses and the other skipped features it needs, appended to its skip reason.
+String _multiClientDetails(
+  Set<String> features,
+  Map<String, dynamic> testJson,
+) {
+  final List<String> uses = <String>[
+    for (final String key in multiClientCapabilitiesOf(testJson))
+      multiClientCapabilities[key]!,
+  ];
+  final List<String> alsoNeeds = <String>[
+    for (final MapEntry<String, String?> entry in skippedSpecFeatures.entries)
+      if (entry.key != 'multi-client' &&
+          entry.value != null &&
+          features.contains(entry.key))
+        entry.key,
+  ];
+  return '${uses.isEmpty ? '' : ' Uses: ${uses.join('; ')}.'}'
+      '${alsoNeeds.isEmpty ? '' : ' Also needs: ${alsoNeeds.join(', ')}.'}';
 }

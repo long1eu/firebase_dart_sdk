@@ -84,19 +84,145 @@ class UnsupportedSpecFeature implements Exception {
   String toString() => 'UnsupportedSpecFeature: $message';
 }
 
-class SpecTestCase implements RemoteStoreCallback {
+/// Runs one spec test. Like `runSpec` of the JS spec_test_runner, it owns one [SpecClient] per `clientIndex` (client 0
+/// is created up front, the others when a step first addresses them) and the state the clients share:
+/// - the persistence: every SQLite client opens its own [SQLitePersistence] on the same database file, a memory
+///   persistence is one instance used by all clients;
+/// - the writes the user made, which the backend acknowledges or rejects in order whichever client sends them (the JS
+///   `SharedWriteTracker`).
+///
+/// Each client has its own task scheduler, local store, remote store, mock datastore (watch and write streams), sync
+/// engine and event manager, and validates the expectations of the steps addressed to it. A single-client spec only
+/// ever has client 0.
+class SpecTestCase {
   /// [getPersistence] creates the persistence layer. [useEagerGc] is the value of the spec's `useEagerGCForMemory`
   /// config entry, [name] is a name that is unique per spec test and stable across restarts of that spec test (SQLite
-  /// uses it as the database name).
+  /// uses it as the database name, so all clients of a spec share the file).
   SpecTestCase(this.getPersistence);
-
-  /// Set this to true when debugging test failures.
-  static const bool _debug = false;
 
   final Future<Persistence> Function(bool useEagerGc, String name)
       getPersistence;
 
   String? currentName;
+
+  static void info(String line) => SpecClient.info(line);
+
+  static void log(String line) => SpecClient.log(line);
+
+  late Map<String, dynamic> _config;
+
+  /// The clients, by `clientIndex`; null for an index no step addressed yet.
+  final List<SpecClient?> _clients = <SpecClient?>[];
+
+  /// The writes sent to the [SyncEngine] of any client but not yet acknowledged or rejected by the backend, per user
+  /// (see [SpecClient._outstandingWrites]).
+  final Map<User, List<Pair<Mutation, Future<void>>>> _outstandingWrites =
+      <User, List<Pair<Mutation, Future<void>>>>{};
+
+  /// The persistence instance all clients share when the variant's persistence is not SQLite (memory), and how many
+  /// clients hold it.
+  Persistence? _sharedPersistence;
+  int _sharedPersistenceHolders = 0;
+
+  /// The SQLite persistences currently open on the spec's database file, one per running client.
+  final List<SQLitePersistence> _openSQLitePersistences =
+      <SQLitePersistence>[];
+
+  /// Returns the persistence for a client that starts (or restarts).
+  Future<Persistence> _acquirePersistence(bool useEagerGc) async {
+    final Persistence? shared = _sharedPersistence;
+    if (shared != null) {
+      _sharedPersistenceHolders++;
+      return shared;
+    }
+    final Persistence persistence =
+        await getPersistence(useEagerGc, currentName ?? 'init');
+    if (persistence is SQLitePersistence) {
+      _openSQLitePersistences.add(persistence);
+    } else {
+      _sharedPersistence = persistence;
+      _sharedPersistenceHolders = 1;
+    }
+    return persistence;
+  }
+
+  /// Releases the persistence of a client that shuts down (or restarts). The bookkeeping is done synchronously, before
+  /// the first await, so that a restart can release and acquire concurrently.
+  Future<void> _releasePersistence(Persistence persistence) async {
+    if (identical(persistence, _sharedPersistence)) {
+      if (--_sharedPersistenceHolders > 0) {
+        return;
+      }
+      _sharedPersistence = null;
+    } else if (persistence is SQLitePersistence) {
+      _openSQLitePersistences.remove(persistence);
+      // The database file is renamed on close so that the next run of the spec starts from scratch; keep it for the
+      // clients that still use it.
+      final Object database = persistence.database;
+      if (_openSQLitePersistences.isNotEmpty && database is DatabaseMock) {
+        database.renamePath = false;
+      }
+    }
+    await persistence.shutdown();
+  }
+
+  /// Returns the client [clientIndex], creating and starting it first if needed.
+  Future<SpecClient> _client(int clientIndex) async {
+    while (_clients.length <= clientIndex) {
+      _clients.add(null);
+    }
+    SpecClient? client = _clients[clientIndex];
+    if (client == null) {
+      client = SpecClient(this, clientIndex);
+      await client.specSetUp(_config);
+      _clients[clientIndex] = client;
+    }
+    return client;
+  }
+
+  Future<void> runSteps(
+    List<dynamic> steps,
+    Map<String, dynamic> config,
+  ) async {
+    _config = config;
+    await _client(0);
+    try {
+      for (int i = 0; i < steps.length; ++i) {
+        final Map<String, dynamic> step = steps[i];
+        final int clientIndex = step['clientIndex'] ?? 0;
+        final SpecClient client = await _client(clientIndex);
+        await client.runStep(step);
+      }
+    } catch (_) {
+      // Always release the persistence (SQLite opens its database exclusively), but report the original failure.
+      for (final SpecClient? client in _clients) {
+        try {
+          await client?.specTearDown(isError: true);
+        } catch (_) {}
+      }
+      rethrow;
+    }
+    for (final SpecClient? client in _clients) {
+      await client?.specTearDown();
+    }
+  }
+}
+
+/// One client of a spec test (the JS `TestRunner`): a Firestore client stack on the persistence shared by the spec, and
+/// the expectations of the steps addressed to it.
+class SpecClient implements RemoteStoreCallback {
+  SpecClient(this._spec, this.clientIndex);
+
+  /// Set this to true when debugging test failures.
+  static const bool _debug = false;
+
+  final SpecTestCase _spec;
+
+  /// The index of this client in the spec (the `clientIndex` of its steps).
+  final int clientIndex;
+
+  /// Whether a `shutdown` step shut this client down.
+  bool _isShutdown = false;
 
   late bool _useEagerGc;
   late LocalStore _localStore;
@@ -160,7 +286,11 @@ class SpecTestCase implements RemoteStoreCallback {
   ///
   /// Note: The size of the list for the current user will generally be the same as [_writesSent], but not necessarily,
   /// since the [RemoteStore] limits the number of outstanding writes to the backend at a given time.
-  late Map<User, List<Pair<Mutation, Future<void>>>> _outstandingWrites;
+  ///
+  /// Shared by all clients of the spec: in a multi-client spec the client that sends a write to the backend (the
+  /// primary) is not necessarily the one that made it.
+  Map<User, List<Pair<Mutation, Future<void>>>> get _outstandingWrites =>
+      _spec._outstandingWrites;
 
   final List<DocumentKey> _acknowledgedDocs = <DocumentKey>[];
   final List<DocumentKey> _rejectedDocs = <DocumentKey>[];
@@ -188,18 +318,12 @@ class SpecTestCase implements RemoteStoreCallback {
   Future<void> specSetUp(Map<String, dynamic> config) async {
     log('    Clearing all state.');
 
-    _outstandingWrites = <User, List<Pair<Mutation, Future<void>>>>{};
-
     _useEagerGc = config['useEagerGCForMemory'] ?? true;
     _maxConcurrentLimboResolutions =
         config['maxConcurrentLimboResolutions'] ?? 0x7fffffff;
     _allowUnlistedTargetRemoval = config['allowUnlistedTargetRemoval'] ?? false;
 
     _currentUser = User.unauthenticated;
-
-    if ((config['numClients'] ?? 1) != 1) {
-      throw UnsupportedSpecFeature('multi-client tests (numClients != 1)');
-    }
 
     _networkEnabled = true;
     _acknowledgedDocs.clear();
@@ -225,19 +349,19 @@ class SpecTestCase implements RemoteStoreCallback {
       log('~~~onError~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
     }
     await Future<void>.delayed(_delayDuration);
-    await _remoteStore.shutdown();
-    await _localPersistence.shutdown();
+    // A client that a `shutdown` step shut down has released everything already.
+    if (!_isShutdown) {
+      await _remoteStore.shutdown();
+      await _spec._releasePersistence(_localPersistence);
+    }
     log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
   }
 
   /// Sets up a new client. Is used to initially setup the client initially and after every restart.
   Future<void> _initClient([bool isRestart = false]) async {
-    log('    Set up a new client.');
+    log('    Set up a new client $clientIndex.');
 
-    _localPersistence = await getPersistence(
-      _useEagerGc,
-      currentName ?? 'init',
-    );
+    _localPersistence = await _spec._acquirePersistence(_useEagerGc);
 
     final LocalStore localStore = LocalStore(_localPersistence, _currentUser);
     _localStore = localStore;
@@ -830,6 +954,10 @@ class SpecTestCase implements RemoteStoreCallback {
       case 'online_state_timeout':
         taskId = TaskId.onlineStateTimeout;
         break;
+      case 'client_metadata_refresh':
+        throw UnsupportedSpecFeature(
+          'runTimer client_metadata_refresh needs the primary lease (multi-client stage 1)',
+        );
       default:
         throw asserts.fail(
           'runTimer spec step specified unknown timer: $timer',
@@ -874,7 +1002,7 @@ class SpecTestCase implements RemoteStoreCallback {
 
     await Future.wait(<Future<void>>[
       _remoteStore.shutdown(),
-      _localPersistence.shutdown(),
+      _spec._releasePersistence(_localPersistence),
       _initClient(true),
     ]);
 
@@ -887,11 +1015,19 @@ class SpecTestCase implements RemoteStoreCallback {
     }
   }
 
+  /// Shuts this client down for good (the JS `doShutdown`): its remote store stops and it releases the persistence. The
+  /// other clients keep running on the shared persistence.
+  Future<void> _doShutdown() async {
+    await _remoteStore.shutdown();
+    await _spec._releasePersistence(_localPersistence);
+    _isShutdown = true;
+  }
+
   /// Steps that exist in the spec format but that the port can not execute. Kept here so that the runner can detect
   /// them up front (spec_skip_list.dart maps them to named skip entries).
   static const Set<String> unsupportedSteps = <String>{
+    // Visibility and primary state of a client: needs the primary lease (stage 1) and SyncEngine.applyPrimaryState.
     'applyClientState',
-    'shutdown',
     'failDatabase',
     'clearPersistence',
   };
@@ -970,11 +1106,7 @@ class SpecTestCase implements RemoteStoreCallback {
   }
 
   Future<void> _doStep(Map<String, dynamic> step) async {
-    // Single client tests (numClients == 1) address their only client as 0.
-    if (step['clientIndex'] != null && step['clientIndex'] != 0) {
-      throw UnsupportedSpecFeature('switching clients');
-    }
-
+    // The `clientIndex` of the step was used by SpecTestCase to pick this client.
     if (step.containsKey('userListen')) {
       await _doListen(step['userListen']);
     } else if (step.containsKey('userUnlisten')) {
@@ -1040,6 +1172,8 @@ class SpecTestCase implements RemoteStoreCallback {
       await _doLoadBundle(step['loadBundle']);
     } else if (step.containsKey('restart')) {
       await _doRestart();
+    } else if (step.containsKey('shutdown')) {
+      await _doShutdown();
     } else if (step.containsKey('watchUsesTargetIndex')) {
       // Every listen of a target gets a fresh remote target id; this step picks which of them the following watch
       // steps address.
@@ -1153,8 +1287,20 @@ class SpecTestCase implements RemoteStoreCallback {
     }
   }
 
-  void _validateStateExpectations(Map<String, dynamic>? expected) {
+  Future<void> _validateStateExpectations(Map<String, dynamic>? expected) async {
     if (expected != null) {
+      for (final String key in <String>['isPrimary', 'numActiveClients']) {
+        if (expected.containsKey(key)) {
+          throw UnsupportedSpecFeature(
+            'expectedState.$key needs the primary lease and client metadata (multi-client stages 1 and 2)',
+          );
+        }
+      }
+
+      if (expected.containsKey('isShutdown')) {
+        expect(_isShutdown, expected['isShutdown'], reason: 'isShutdown');
+      }
+
       if (expected.containsKey('numOutstandingWrites')) {
         expect(_writesSent(), expected['numOutstandingWrites']);
       }
@@ -1180,7 +1326,11 @@ class SpecTestCase implements RemoteStoreCallback {
           for (final dynamic index in expected['indexes'] as List<dynamic>)
             _parseExpectedIndex(index as Map<String, dynamic>),
         ]..sort(FieldIndex.semanticCompare);
-        final List<FieldIndex> actualIndexes = _localStore.getFieldIndexes()
+        // Read in a transaction, like the JS runner (localStoreGetFieldIndexes): it picks up the indexes another client
+        // configured on the shared database.
+        final List<FieldIndex> actualIndexes = (await _localPersistence
+            .runTransactionAndReturn('Get field indexes',
+                () async => _localStore.getFieldIndexes()))
           ..sort(FieldIndex.semanticCompare);
         expect(
           actualIndexes.length,
@@ -1257,6 +1407,10 @@ class SpecTestCase implements RemoteStoreCallback {
 
     // Always validate the we received the expected number of events.
     _validateUserCallbacks(expected);
+    // Like upstream: a client that was shut down does not reset its limbo documents and targets, do not validate them.
+    if (_isShutdown) {
+      return;
+    }
     // Always validate that the expected limbo docs match the actual limbo docs.
     _validateActiveLimboDocs();
     _validateEnqueuedLimboDocs();
@@ -1381,63 +1535,46 @@ class SpecTestCase implements RemoteStoreCallback {
     expect(actualTargets, isEmpty);
   }
 
-  Future<void> runSteps(
-    List<dynamic> steps,
-    Map<String, dynamic> config,
-  ) async {
-    await specSetUp(config);
-    try {
-      await _runSteps(steps);
-    } catch (_) {
-      // Always release the persistence (SQLite opens its database exclusively), but report the original failure.
-      try {
-        await specTearDown(isError: true);
-      } catch (_) {}
-      rethrow;
+  /// Runs one step addressed to this client and validates its expectations against this client (the JS
+  /// `TestRunner.run`). Events of this client caused by the steps of other clients are validated with the next step of
+  /// this client.
+  Future<void> runStep(Map<String, dynamic> step) async {
+    final List<dynamic>? expect = step.remove('expectedSnapshotEvents');
+    final Map<String, dynamic>? stateExpect = step.remove('expectedState');
+    final int expectedSnapshotsInSync =
+        step.remove('expectedSnapshotsInSyncEvents') ?? 0;
+    final int expectedWaitForPendingWrites =
+        step.remove('expectedWaitForPendingWritesEvents') ?? 0;
+
+    log('    Doing step $step');
+    await _doStep(step);
+    // The Android SDK processes everything synchronously. Here the streams deliver their events asynchronously, so
+    // let them settle before validating the expectations.
+    await Future<void>.delayed(_delayDuration);
+
+    if (expect != null) {
+      log('      Validating step expectations $expect');
     }
-    await specTearDown();
-  }
 
-  Future<void> _runSteps(List<dynamic> steps) async {
-    for (int i = 0; i < steps.length; ++i) {
-      final Map<String, dynamic> step = steps[i];
-      final List<dynamic>? expect = step.remove('expectedSnapshotEvents');
-      final Map<String, dynamic>? stateExpect = step.remove('expectedState');
-      final int expectedSnapshotsInSync =
-          step.remove('expectedSnapshotsInSyncEvents') ?? 0;
-      final int expectedWaitForPendingWrites =
-          step.remove('expectedWaitForPendingWritesEvents') ?? 0;
-
-      log('    Doing step $step');
-      await _doStep(step);
-      // The Android SDK processes everything synchronously. Here the streams deliver their events asynchronously, so
-      // let them settle before validating the expectations.
-      await Future<void>.delayed(_delayDuration);
-
-      if (expect != null) {
-        log('      Validating step expectations $expect');
-      }
-
-      _validateStepExpectations(expect);
-      if (stateExpect != null) {
-        log('      Validating state expectations $stateExpect');
-      }
-      _validateStateExpectations(stateExpect);
-      if (_snapshotsInSyncEvents != expectedSnapshotsInSync) {
-        fail('Expected $expectedSnapshotsInSync snapshots in sync events but '
-            'got $_snapshotsInSyncEvents');
-      }
-      _snapshotsInSyncEvents = 0;
-      if (_waitForPendingWritesEvents != expectedWaitForPendingWrites) {
-        fail('Expected $expectedWaitForPendingWrites waitForPendingWrites '
-            'events but got $_waitForPendingWritesEvents');
-      }
-      _waitForPendingWritesEvents = 0;
-
-      _events.clear();
-      _acknowledgedDocs.clear();
-      _rejectedDocs.clear();
+    _validateStepExpectations(expect);
+    if (stateExpect != null) {
+      log('      Validating state expectations $stateExpect');
     }
+    await _validateStateExpectations(stateExpect);
+    if (_snapshotsInSyncEvents != expectedSnapshotsInSync) {
+      fail('Expected $expectedSnapshotsInSync snapshots in sync events but '
+          'got $_snapshotsInSyncEvents');
+    }
+    _snapshotsInSyncEvents = 0;
+    if (_waitForPendingWritesEvents != expectedWaitForPendingWrites) {
+      fail('Expected $expectedWaitForPendingWrites waitForPendingWrites '
+          'events but got $_waitForPendingWritesEvents');
+    }
+    _waitForPendingWritesEvents = 0;
+
+    _events.clear();
+    _acknowledgedDocs.clear();
+    _rejectedDocs.clear();
   }
 
   // RemoteStoreCallback Methods
