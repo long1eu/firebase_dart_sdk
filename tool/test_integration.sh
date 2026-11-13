@@ -75,7 +75,9 @@ run() {
   local label="$1$([ -n "$SUFFIX" ] && echo " [$TRANSPORT]")" log="$LOG_DIR/$2$SUFFIX.log"
   shift 2
   echo "=== $label: dart test $*"
-  (cd "$PKG" && env "${RUN_ENV[@]}" "$TRANSPORT_ENV" dart test "$@") >"$log" 2>&1
+  # The expanded reporter is named explicitly: under GitHub Actions `dart test` switches to
+  # its github reporter, whose output the summary below cannot read.
+  (cd "$PKG" && env "${RUN_ENV[@]}" "$TRANSPORT_ENV" dart test --reporter expanded "$@") >"$log" 2>&1
   local rc=$?
   # The final progress line looks like "00:05 +42 ~3 -2: Some tests failed."
   local last
@@ -89,7 +91,7 @@ run() {
   else
     failed=1
     summary+=("$label: FAIL ($p passed, $s skipped, $f failed) log $log")
-    grep -E "\[E\]$" "$log" | sed -E 's/^[0-9:]+ [^:]*: /  failed: /; s/ \[E\]$//' | sort -u
+    "$ROOT/tool/print_test_failures.sh" "$log"
   fi
 }
 

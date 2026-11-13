@@ -20,7 +20,10 @@ import '../../../util/test_util.dart';
 /// an updated document via watch). As such they also rely on persistence being
 /// enabled so documents remain in the cache after the write.
 void main() {
-  IntegrationTestUtil.currentDatabasePath = 'integration/array_transforms';
+  // Not the path of array_transforms_test.dart: the two files run side by side
+  // and each deletes the database files it is about to use.
+  IntegrationTestUtil.currentDatabasePath =
+      'integration/array_transforms_server_application';
 
   // A document reference to read and write to.
   late DocumentReference docRef;

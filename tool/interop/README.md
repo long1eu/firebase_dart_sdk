@@ -5,11 +5,15 @@ Node harness for the interop tests between `cloud_firestore_dart` and the real J
 needs no credentials.
 
 ```sh
-cd tool/interop && npm install          # node_modules is git-ignored
+cd tool/interop && npm install          # Node 22 or newer; node_modules is git-ignored
 tool/start_emulator.sh                  # emulator on 127.0.0.1:8080, project demo-test
 cd cloud_firestore/cloud_firestore_dart
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test test/integration/firebase/firestore/js_interop_test.dart
 ```
+
+Node 22 or newer is required: `firebase-admin` needs it, and on an older Node npm silently leaves
+out its optional `@google-cloud/firestore`, without which the bundle test fails with "Cannot find
+module".
 
 The tests are skipped (with the reason) when `node`, `node_modules` or the emulator host is
 missing. `harness.mjs <command> <input.json> <output.json>` is run by the Dart tests, one Node

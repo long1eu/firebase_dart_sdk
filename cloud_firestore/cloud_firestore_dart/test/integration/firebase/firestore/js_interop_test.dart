@@ -692,6 +692,13 @@ void main() {
     /// Every supported value type. [jsWritable] is false for the values the JS SDK cannot write.
     Map<String, Map<String, Object?>> allTypes(String refPath,
         {required bool jsWritable}) {
+      // Written by the Dart SDK over the web transport, -0.0 arrives as 0.0:
+      // the JSON endpoints of the emulator (v1.22.0) drop the sign, whatever
+      // the client sends (`-0.0`, `-0`, `"-0"`). The JS SDK writes over gRPC.
+      final bool dartWritesJson = !jsWritable &&
+          (Platform.environment['FIRESTORE_TEST_TRANSPORT'] ?? '')
+              .startsWith('webchannel');
+      final double negativeZero = dartWritesJson ? 0.0 : -0.0;
       return <String, Map<String, Object?>>{
         'null': nullSpec(),
         'true': boolSpec(true),
@@ -707,7 +714,7 @@ void main() {
         },
         'double': doubleSpec(1.5),
         'doubleIntegral': doubleSpec(3.0),
-        'doubleNegativeZero': doubleSpec(-0.0),
+        'doubleNegativeZero': doubleSpec(negativeZero),
         'doubleZero': doubleSpec(0.0),
         'doubleNaN': doubleSpec(double.nan),
         'doubleInfinity': doubleSpec(double.infinity),
@@ -750,7 +757,7 @@ void main() {
             'deep': mapSpec(<String, Map<String, Object?>>{
               'deeper': arraySpec(<Map<String, Object?>>[
                 stringSpec('x'),
-                doubleSpec(-0.0),
+                doubleSpec(negativeZero),
               ]),
             }),
           }),

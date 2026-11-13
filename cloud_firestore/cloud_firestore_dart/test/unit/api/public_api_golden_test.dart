@@ -19,6 +19,19 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:test/test.dart';
 
+/// The type variables of the class in the parameters of a constructor, as
+/// dart:mirrors prints them: `X0`, `C1X0`, `dart.core.Null.X0`.
+final RegExp _classTypeVariable =
+    RegExp(r'(?:dart\.core\.Null\.)?\b(?:C\d+)?X\d+\b');
+
+/// The parameter list of a constructor with the type variables of its class
+/// written as `dynamic`. Dart SDKs disagree about them: up to 3.12 mirrors
+/// print the variable (`FirestoreDataConverter<X0> converter`) for every
+/// constructor, 3.14 prints `dynamic` for factory constructors only. The
+/// listing must not depend on the SDK that runs the test.
+String _constructorParams(String params) =>
+    params.replaceAll(_classTypeVariable, 'dynamic');
+
 bool _isPublic(Symbol symbol) => !MirrorSystem.getName(symbol).startsWith('_');
 
 final RegExp _typedef =
@@ -119,7 +132,8 @@ List<String> _describeClass(ClassMirror cls) {
         if (_name(d.constructorName).startsWith('_')) {
           continue;
         }
-        members.add('  new $name${_params(d)}${_flags(d)}');
+        members.add(
+            '  new $name${_constructorParams(_params(d))}${_flags(d)}');
       } else if (d.isGetter) {
         members
             .add('  ${isStatic}get $name: ${_type(d.returnType)}${_flags(d)}');

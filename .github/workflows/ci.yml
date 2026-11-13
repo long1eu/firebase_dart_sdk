@@ -1,4 +1,3 @@
-# NOTE: this workflow has not been run yet (written without access to GitHub Actions).
 name: CI
 
 on:
@@ -17,19 +16,31 @@ jobs:
     name: Unit tests and formatting (Dart 3.8.0)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dart-lang/setup-dart@v1.7.1
+      - uses: actions/checkout@v7.0.1
+      - uses: dart-lang/setup-dart@v1.8.2
         with:
           sdk: 3.8.0
       - name: Analyze and run unit tests
+        env:
+          TEST_LOG_DIR: ${{ runner.temp }}/unit
         run: ./tool/test_all.sh
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: unit-log
+          path: ${{ runner.temp }}/unit/*
       # After test_all.sh, which runs `dart pub get`: the formatter takes the language version
       # (and so the style) from the resolved package. Generated protos are included; the
       # plugin and tool/gen_protos.sh emit formatted code.
       - name: Check formatting (firebase_app_dart)
+        # Also when a test failed: test_all.sh has run `dart pub get` by then.
+        if: ${{ !cancelled() }}
         working-directory: firebase_core/firebase_app_dart
         run: dart format --output=none --set-exit-if-changed lib example
       - name: Check formatting (cloud_firestore_dart)
+        # Also when a test failed: test_all.sh has run `dart pub get` by then.
+        if: ${{ !cancelled() }}
         working-directory: cloud_firestore/cloud_firestore_dart
         run: dart format --output=none --set-exit-if-changed lib example
 
@@ -38,12 +49,20 @@ jobs:
     name: Unit tests (Dart stable)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dart-lang/setup-dart@v1.7.1
+      - uses: actions/checkout@v7.0.1
+      - uses: dart-lang/setup-dart@v1.8.2
         with:
           sdk: stable
       - name: Analyze and run unit tests
+        env:
+          TEST_LOG_DIR: ${{ runner.temp }}/unit
         run: ./tool/test_all.sh
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: unit-stable-log
+          path: ${{ runner.temp }}/unit/*
 
   # The emulator suite has 1-2 known flaky tests (event ordering in the emulator, e.g.
   # write_batch_test testWriteTheSameServerTimestampAcrossWrites).
@@ -55,17 +74,17 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dart-lang/setup-dart@v1.7.1
+      - uses: actions/checkout@v7.0.1
+      - uses: dart-lang/setup-dart@v1.8.2
         with:
           sdk: stable
-      - uses: actions/setup-java@v4.7.1
+      - uses: actions/setup-java@v6.2.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: actions/setup-node@v4.4.0
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
       - name: Start Firestore emulator
@@ -80,6 +99,8 @@ jobs:
           echo "emulator did not start"; cat "$RUNNER_TEMP/emulator.log"; exit 1
       - name: Install the JS interop harness
         # js_interop_test.dart is skipped (with a reason) without tool/interop/node_modules.
+        # firebase-admin and its optional @google-cloud/firestore need Node 22: on an older
+        # Node, npm leaves the optional package out and the bundle test cannot load it.
         working-directory: tool/interop
         run: npm ci
       - name: Run integration tests
@@ -90,7 +111,7 @@ jobs:
           ./tool/test_integration.sh standard
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: integration-log
           path: ${{ runner.temp }}/*.log
@@ -105,20 +126,20 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v7.0.1
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
-      - uses: dart-lang/setup-dart@v1.7.1
+      - uses: dart-lang/setup-dart@v1.8.2
         with:
           sdk: stable
-      - uses: actions/setup-java@v4.7.1
+      - uses: actions/setup-java@v6.2.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: actions/setup-node@v4.4.0
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
       - name: Download the Firestore emulator JAR
@@ -148,7 +169,7 @@ jobs:
         run: ./tool/stop_private_emulator.sh 8090
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: integration-webchannel-log
           path: ${{ runner.temp }}/emulator/*.log
@@ -162,33 +183,35 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v7.0.1
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
-      - uses: dart-lang/setup-dart@v1.7.1
+      - uses: dart-lang/setup-dart@v1.8.2
         with:
           sdk: stable
-      - uses: actions/setup-java@v4.7.1
+      - uses: actions/setup-java@v6.2.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: actions/setup-node@v4.4.0
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
       - name: Download the Firestore emulator JAR
         # Puts cloud-firestore-emulator-v*.jar in ~/.cache/firebase/emulators.
         run: firebase setup:emulators:firestore
       - name: Run browser tests (dart2wasm and dart2js)
-        # Chrome is preinstalled on the ubuntu-latest image.
+        # Chrome is preinstalled on the ubuntu-latest image. The script downloads sqlite3.wasm
+        # for the persistence tests from the releases of the sqlite3 package and checks it
+        # against the sha256 pinned in the script.
         run: |
           (cd cloud_firestore/cloud_firestore_dart && dart pub get)
           TEST_LOG_DIR="$EMULATOR_DIR" ./tool/test_browser.sh both
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: browser-log
           path: ${{ runner.temp }}/emulator/*.log
@@ -203,20 +226,20 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v7.0.1
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
-      - uses: dart-lang/setup-dart@v1.7.1
+      - uses: dart-lang/setup-dart@v1.8.2
         with:
           sdk: stable
-      - uses: actions/setup-java@v4.7.1
+      - uses: actions/setup-java@v6.2.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: actions/setup-node@v4.4.0
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
       - name: Download the Firestore emulator JAR
@@ -242,14 +265,14 @@ jobs:
           FIRESTORE_ENTERPRISE_EMULATOR_HOST: 127.0.0.1:8181
         run: |
           dart pub get
-          dart test test/integration_enterprise 2>&1 | tee "$EMULATOR_DIR/enterprise.log"
+          dart test --reporter expanded test/integration_enterprise 2>&1 | tee "$EMULATOR_DIR/enterprise.log"
           exit "${PIPESTATUS[0]}"
       - name: Stop Enterprise Firestore emulator
         if: always()
         run: ./tool/stop_enterprise_emulator.sh
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: enterprise-log
           path: ${{ runner.temp }}/emulator/*.log
@@ -263,20 +286,20 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v7.0.1
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
-      - uses: dart-lang/setup-dart@v1.7.1
+      - uses: dart-lang/setup-dart@v1.8.2
         with:
           sdk: stable
-      - uses: actions/setup-java@v4.7.1
+      - uses: actions/setup-java@v6.2.0
         with:
           distribution: temurin
           java-version: '21'
-      - uses: actions/setup-node@v4.4.0
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
       - name: Download the Firestore emulator JAR
@@ -293,7 +316,7 @@ jobs:
         run: ./tool/stop_enterprise_emulator.sh
       - name: Upload test output
         if: always()
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: standard-suite-on-enterprise-log
           path: ${{ runner.temp }}/emulator/*.log

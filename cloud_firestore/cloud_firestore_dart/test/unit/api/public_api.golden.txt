@@ -73,7 +73,7 @@ class CollectionReference extends Query<X0>
   get id: String
   get parent: DocumentReference<Map<String, Object>>
   get path: String
-  new CollectionReference(ResourcePath path, Firestore firestore, [FirestoreDataConverter<X0> converter]) @internal
+  new CollectionReference(ResourcePath path, Firestore firestore, [FirestoreDataConverter<dynamic> converter]) @internal
   withConverter(FirestoreDataConverter<dynamic> converter): CollectionReference<dynamic>
   withoutConverter(): CollectionReference<Map<String, Object>>
 class CountAggregateField extends AggregateField
@@ -108,7 +108,7 @@ class DocumentChange
   final oldIndex: int
   final type: DocumentChangeType
   get hashCode: int
-  new DocumentChange(QueryDocumentSnapshot<X0> document, DocumentChangeType type, int oldIndex, int newIndex) @internal
+  new DocumentChange(QueryDocumentSnapshot<dynamic> document, DocumentChangeType type, int oldIndex, int newIndex) @internal
   static changesFromSnapshot(Firestore firestore, MetadataChanges metadataChanges, ViewSnapshot snapshot, [FirestoreDataConverter<dynamic> converter]): List<DocumentChange<dynamic>> @internal
   toString(): String
 enum DocumentChangeType
@@ -132,9 +132,9 @@ class DocumentReference
   get([Source source]): Future<DocumentSnapshot<X0>>
   getSnapshots([MetadataChanges changes]): Stream<DocumentSnapshot<X0>>
   getSnapshotsWithOptions(SnapshotListenOptions options): Stream<DocumentSnapshot<X0>>
-  new DocumentReference(DocumentKey key, Firestore firestore, [FirestoreDataConverter<X0> converter]) @internal
-  new DocumentReference.forPath(ResourcePath path, Firestore firestore, [FirestoreDataConverter<X0> converter]) @internal
-  new DocumentReference.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<X0> converter})
+  new DocumentReference(DocumentKey key, Firestore firestore, [FirestoreDataConverter<dynamic> converter]) @internal
+  new DocumentReference.forPath(ResourcePath path, Firestore firestore, [FirestoreDataConverter<dynamic> converter]) @internal
+  new DocumentReference.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<dynamic> converter})
   set(X0 data, [SetOptions options]): Future<void>
   static final jsonType: String
   toJson(): Map<String, Object>
@@ -175,10 +175,10 @@ class DocumentSnapshot
   getString(String field): String
   getTimestamp(String field, [ServerTimestampBehavior serverTimestampBehavior]): Timestamp
   getVectorValue(String field): VectorValue
-  new DocumentSnapshot(Firestore _firestore, DocumentKey _key, Document document, {bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<X0> converter}) @internal
-  new DocumentSnapshot.fromDocument(Firestore firestore, Document doc, {bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<X0> converter}) @internal
-  new DocumentSnapshot.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<X0> converter})
-  new DocumentSnapshot.fromNoDocument(Firestore firestore, DocumentKey key, {bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<X0> converter}) @internal
+  new DocumentSnapshot(Firestore _firestore, DocumentKey _key, Document document, {bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<dynamic> converter}) @internal
+  new DocumentSnapshot.fromDocument(Firestore firestore, Document doc, {bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<dynamic> converter}) @internal
+  new DocumentSnapshot.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<dynamic> converter})
+  new DocumentSnapshot.fromNoDocument(Firestore firestore, DocumentKey key, {bool isFromCache, bool hasPendingWrites, FirestoreDataConverter<dynamic> converter}) @internal
   static final jsonType: String
   toJson(): Map<String, Object>
   toString(): String
@@ -277,7 +277,7 @@ class Firestore
 abstract class FirestoreDataConverter
   fromFirestore(DocumentSnapshot<Map<String, Object>> snapshot, SnapshotOptions options): X0
   new FirestoreDataConverter()
-  new FirestoreDataConverter.from({(.DocumentSnapshot, .SnapshotOptions) -> dart.core.Null.X0 fromFirestore, (dynamic, .SetOptions) -> dart.core.Map toFirestore})
+  new FirestoreDataConverter.from({(.DocumentSnapshot, .SnapshotOptions) -> dynamic fromFirestore, (dynamic, .SetOptions) -> dart.core.Map toFirestore})
   toFirestore(X0 value, SetOptions options): Map<String, Object>
 class FirestoreError extends FirebaseError
   final cause: Object
@@ -459,7 +459,7 @@ class Query
   getSnapshotsWithOptions(SnapshotListenOptions options): Stream<QuerySnapshot<X0>>
   limit(int limit): Query<X0>
   limitToLast(int limit): Query<X0>
-  new Query(Query query, Firestore firestore, [FirestoreDataConverter<X0> converter]) @internal
+  new Query(Query query, Firestore firestore, [FirestoreDataConverter<dynamic> converter]) @internal
   orderBy(String field, [Direction direction]): Query<X0>
   orderByField(FieldPath fieldPath, [Direction direction]): Query<X0>
   startAfter(List<Object> fieldValues): Query<X0>
@@ -493,7 +493,7 @@ class Query
 class QueryDocumentSnapshot extends DocumentSnapshot<X0>
   get data: X0
   getData(ServerTimestampBehavior serverTimestampBehavior): X0
-  new QueryDocumentSnapshot.fromDocument(Firestore firestore, Document doc, {bool fromCache, bool hasPendingWrites, FirestoreDataConverter<X0> converter}) @internal
+  new QueryDocumentSnapshot.fromDocument(Firestore firestore, Document doc, {bool fromCache, bool hasPendingWrites, FirestoreDataConverter<dynamic> converter}) @internal
 class QuerySnapshot extends Iterable<QueryDocumentSnapshot<C1X0>>
   ==(Object other): bool
   final metadata: SnapshotMetadata
@@ -508,8 +508,8 @@ class QuerySnapshot extends Iterable<QueryDocumentSnapshot<C1X0>>
   get iterator: Iterator<QueryDocumentSnapshot<C1X0>>
   get length: int
   getDocumentChanges(MetadataChanges metadataChanges): List<DocumentChange<C1X0>>
-  new QuerySnapshot(Query<C1X0> query, ViewSnapshot snapshot, Firestore _firestore) @internal
-  new QuerySnapshot.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<C1X0> converter})
+  new QuerySnapshot(Query<dynamic> query, ViewSnapshot snapshot, Firestore _firestore) @internal
+  new QuerySnapshot.fromJson(Firestore firestore, Map<String, Object> json, {FirestoreDataConverter<dynamic> converter})
   static final jsonType: String
   toJson(): Map<String, Object>
   toString(): String

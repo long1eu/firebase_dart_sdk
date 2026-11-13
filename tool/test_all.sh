@@ -3,6 +3,9 @@
 # cloud_firestore_dart runs only test/unit (integration needs a live backend).
 # Exits non-zero if any step of any package fails.
 # Usage: tool/test_all.sh [package-name ...]
+#
+# Environment:
+#   TEST_LOG_DIR  where the outputs of pub get, analyze and test go (default: a new temp dir)
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -13,7 +16,8 @@ PACKAGES=(
 
 summary=()
 failed=0
-LOG="$(mktemp -d)"
+LOG="${TEST_LOG_DIR:-$(mktemp -d)}"
+mkdir -p "$LOG" || exit 2
 
 for entry in "${PACKAGES[@]}"; do
   IFS='|' read -r name dir testpath <<<"$entry"
@@ -37,14 +41,16 @@ for entry in "${PACKAGES[@]}"; do
 
   target="${testpath:-test}"
   if [ -d "$target" ]; then
-    dart test "$target" >"$LOG/$name.test" 2>&1
+    # The expanded reporter is named explicitly: under GitHub Actions `dart test` switches
+    # to its github reporter, whose output the summary below cannot read.
+    dart test --reporter expanded "$target" >"$LOG/$name.test" 2>&1
     rc=$?
     # Final progress line looks like "00:05 +42 -2: ..." / "+44: All tests passed!"
     last=$(grep -E "^[0-9:]+ \+[0-9]+" "$LOG/$name.test" | tail -1)
     p=$(echo "$last" | sed -nE 's/.*\+([0-9]+).*/\1/p'); p=${p:-0}
     f=$(echo "$last" | sed -nE 's/.* -([0-9]+).*/\1/p'); f=${f:-0}
     if [ $rc -eq 0 ]; then tests="PASS ($p passed, $f failed)"; else
-      tests="FAIL ($p passed, $f failed)"; tail -15 "$LOG/$name.test"; fi
+      tests="FAIL ($p passed, $f failed)"; "$ROOT/tool/print_test_failures.sh" "$LOG/$name.test"; fi
   fi
 
   case "$pub$analyze$tests" in *FAIL*) failed=1;; esac
