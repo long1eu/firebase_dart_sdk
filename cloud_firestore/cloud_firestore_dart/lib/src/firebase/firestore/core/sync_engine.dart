@@ -943,14 +943,16 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     if (userTasks != null) {
       final int boxedBatchId = batchId;
       final Completer<void>? userTask = userTasks[boxedBatchId];
-      if (userTask != null) {
+      // FirestoreClient.write fails the task with an error of the queued work, which can come after the batch was
+      // stored (and is then still sent): the outcome of the batch does not complete it a second time.
+      if (userTask != null && !userTask.isCompleted) {
         if (error != null) {
           userTask.completeError(error);
         } else {
           userTask.complete(null);
         }
-        userTasks.remove(boxedBatchId);
       }
+      userTasks.remove(boxedBatchId);
     }
   }
 
