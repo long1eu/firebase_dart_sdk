@@ -1,5 +1,9 @@
 ## Unreleased
 
+- The switch of a SQLite cache to write-ahead logging is tried again a few times (within 1.5 s) when
+  another connection opening the same file at that moment makes it fail with `database is locked`;
+  if it still fails, that is logged at debug level instead of as a warning, and the next open
+  switches the file.
 - Web transport (and Firestore Lite on the web): the calls in flight when the instance is terminated fail with
   `unavailable`, as over gRPC. Their responses used to just end, so a transaction read failed with "Mismatch in
   docs returned from document lookup" and a commit with `unimplemented` ("No responses received").

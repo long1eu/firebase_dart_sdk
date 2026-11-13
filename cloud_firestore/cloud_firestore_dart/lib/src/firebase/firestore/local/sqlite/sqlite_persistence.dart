@@ -842,32 +842,75 @@ class SQLitePersistence extends Persistence {
   ///
   /// The mode is stored in the file, so it is switched once. A journal mode that the opener chose (anything but
   /// `delete`, or `wal` already) is kept, and a file system without the shared memory WAL needs answers with the mode
-  /// it keeps; a failure is only logged. Not on the web: there one tab at a time has the database (a Web Lock guards
-  /// it), and the crash safety of the example openers is built on the rollback journal.
+  /// it keeps. Not on the web: there one tab at a time has the database (a Web Lock guards it), and the crash safety
+  /// of the example openers is built on the rollback journal.
+  ///
+  /// The switch needs the file to itself for a moment. When other connections are opening the same file at once
+  /// (several isolates or processes) it can fail with `database is locked` (SQLITE_BUSY or SQLITE_LOCKED) without
+  /// waiting for the busy timeout; it is then tried again [_walSwitchRetries] times, a little later each time, and
+  /// given up at debug level: the file keeps working in its current mode, and the next open that finds it in
+  /// `delete` mode switches it. Any other failure is logged as a warning.
   static Future<void> _useWriteAheadLog(Database db) async {
     if (_isWeb) {
       return;
     }
-    try {
-      final List<Map<String, dynamic>> current = await db.query(
-        'PRAGMA journal_mode',
-      );
-      if (current.isEmpty ||
-          '${current.first.values.first}'.toLowerCase() != 'delete') {
+    for (int attempt = 0; ; attempt++) {
+      try {
+        final List<Map<String, dynamic>> current = await db.query(
+          'PRAGMA journal_mode',
+        );
+        // Also when another connection switched the file in the meantime.
+        if (current.isEmpty ||
+            '${current.first.values.first}'.toLowerCase() != 'delete') {
+          return;
+        }
+        final List<Map<String, dynamic>> result = await db.query(
+          'PRAGMA journal_mode = WAL',
+        );
+        final String mode = result.isEmpty
+            ? ''
+            : '${result.first.values.first}'.toLowerCase();
+        if (mode != 'wal') {
+          Log.d(tag, 'The database stays in journal mode "$mode".');
+        }
         return;
+      } catch (e) {
+        if (!_isBusyOrLocked(e)) {
+          Log.w(
+            tag,
+            'Could not switch the database to write-ahead logging: $e',
+          );
+          return;
+        }
+        if (attempt == _walSwitchRetries) {
+          Log.d(
+            tag,
+            'The database is busy; it stays in its journal mode until the next open: $e',
+          );
+          return;
+        }
+        await Future<void>.delayed(_walSwitchRetryDelay * (attempt + 1));
       }
-      final List<Map<String, dynamic>> result = await db.query(
-        'PRAGMA journal_mode = WAL',
-      );
-      final String mode = result.isEmpty
-          ? ''
-          : '${result.first.values.first}'.toLowerCase();
-      if (mode != 'wal') {
-        Log.d(tag, 'The database stays in journal mode "$mode".');
-      }
-    } catch (e) {
-      Log.w(tag, 'Could not switch the database to write-ahead logging: $e');
     }
+  }
+
+  /// How often a switch to write-ahead logging that found the database busy is tried again.
+  static const int _walSwitchRetries = 5;
+
+  /// The wait before the first retry; it grows by this much with each one (at most 1.5 s in all, well within
+  /// [busyTimeout]).
+  static const Duration _walSwitchRetryDelay = Duration(milliseconds: 100);
+
+  /// Whether [error] of a [Database] is SQLite's SQLITE_BUSY (5) or SQLITE_LOCKED (6). The binding is the app's, so
+  /// the error is recognized by its text (and the one of its cause, for a [TransientDatabaseException]).
+  static bool _isBusyOrLocked(Object error) {
+    final String text = <Object?>[
+      error,
+      if (error is TransientDatabaseException) error.cause,
+    ].join(' ');
+    return RegExp(
+      r'database (table )?is locked|SQLITE_(BUSY|LOCKED)|Exception\((5|6)\)',
+    ).hasMatch(text);
   }
 
   /// Unlike the Android SDK this does NOT take exclusive access to the database (`PRAGMA locking_mode = EXCLUSIVE`),

@@ -15,6 +15,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/local/sqlite/sqlite_
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
+import 'package:firebase_app_dart/internal.dart';
 import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 
@@ -92,6 +93,94 @@ OpenDatabase _openFile(String dbName, {Database Function(Database db)? wrap}) {
     db.renamePath = false;
     return wrap == null ? db : wrap(db);
   };
+}
+
+/// A database whose `PRAGMA journal_mode = WAL` fails [failures] times with [error] (forever when null).
+class _SwitchFailingDatabase extends Database {
+  _SwitchFailingDatabase(this._delegate, this.error, {this.failures});
+
+  final DatabaseMock _delegate;
+  final Object error;
+  final int? failures;
+  int attempts = 0;
+
+  @override
+  String get path => _delegate.path;
+
+  @override
+  Future<void> execute(String statement, [List<Object?>? arguments]) =>
+      _delegate.execute(statement, arguments);
+
+  @override
+  Future<List<Map<String, dynamic>>> query(
+    String statement, [
+    List<Object?>? arguments,
+  ]) {
+    if (statement.toUpperCase() == 'PRAGMA JOURNAL_MODE = WAL') {
+      attempts++;
+      final int? limit = failures;
+      if (limit == null || attempts <= limit) {
+        throw error;
+      }
+    }
+    return _delegate.query(statement, arguments);
+  }
+
+  @override
+  Future<int> delete(String statement, [List<Object?>? arguments]) =>
+      _delegate.delete(statement, arguments);
+
+  @override
+  void close() => _delegate.close();
+}
+
+/// An opener of a new file [dbName] that runs the callbacks on [wrap] of the database, so that the wrapper also sees
+/// the statements of onConfigure.
+OpenDatabase _openNewWrapped(
+  String dbName,
+  Database Function(DatabaseMock db) wrap,
+) {
+  return (
+    String path, {
+    int? version,
+    OnConfigure? onConfigure,
+    OnCreate? onCreate,
+    OnVersionChange? onUpgrade,
+    OnVersionChange? onDowngrade,
+    OnOpen? onOpen,
+  }) async {
+    final DatabaseMock mock = await DatabaseMock.create(dbName)
+      ..renamePath = false;
+    mock.database.userVersion = 0;
+    final Database db = wrap(mock);
+    await onConfigure?.call(db);
+    await onCreate?.call(db, version!);
+    mock.database.userVersion = version!;
+    await onOpen?.call(db);
+    return db;
+  };
+}
+
+/// Runs [body] with the log at [level] and returns what was printed.
+Future<List<String>> _printed(
+  InternalLogLevel level,
+  Future<void> Function() body,
+) async {
+  final InternalLogLevel original = Log.level;
+  final List<String> printed = <String>[];
+  Log.level = level;
+  try {
+    await runZoned(
+      body,
+      zoneSpecification: ZoneSpecification(
+        print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
+            printed.add(line),
+      ),
+    );
+  } finally {
+    Log.level = original;
+  }
+  return printed;
 }
 
 Future<SQLitePersistence> _create(String key, OpenDatabase opener) {
@@ -249,6 +338,90 @@ void main() {
         <String, Object?>{'journal_mode': 'truncate'},
       ]);
     });
+
+    // Another connection opening the file at the same moment makes the switch fail with SQLITE_BUSY.
+    final Object busy = StateError(
+      'SqliteException(5): while selecting from statement, database is locked',
+    );
+
+    test('a switch that finds the database busy is tried again', () async {
+      late _SwitchFailingDatabase db;
+      late SQLitePersistence a;
+      final List<String> printed = await _printed(InternalLogLevel.d, () async {
+        a = await start(
+          'app-a',
+          opener: _openNewWrapped(
+            dbName,
+            (DatabaseMock mock) =>
+                db = _SwitchFailingDatabase(mock, busy, failures: 2),
+          ),
+        );
+      });
+      expect(db.attempts, 3);
+      expect(await a.query('PRAGMA journal_mode'), <Object>[
+        <String, Object?>{'journal_mode': 'wal'},
+      ]);
+      expect(printed.where((String line) => line.startsWith('W:')), isEmpty);
+    });
+
+    test('a database that stays busy keeps its mode, logged at debug level '
+        'only', () async {
+      late _SwitchFailingDatabase db;
+      late SQLitePersistence a;
+      final List<String> printed = await _printed(InternalLogLevel.d, () async {
+        a = await start(
+          'app-a',
+          opener: _openNewWrapped(
+            dbName,
+            (DatabaseMock mock) => db = _SwitchFailingDatabase(mock, busy),
+          ),
+        );
+      });
+      expect(db.attempts, 6, reason: 'the first try and five retries');
+      expect(a.started, isTrue);
+      expect(await a.query('PRAGMA journal_mode'), <Object>[
+        <String, Object?>{'journal_mode': 'delete'},
+      ]);
+      expect(printed.where((String line) => line.startsWith('W:')), isEmpty);
+      expect(
+        printed.where(
+          (String line) =>
+              line.startsWith('D:') &&
+              line.contains('stays in its journal mode'),
+        ),
+        hasLength(1),
+      );
+    });
+
+    test(
+      'another failure of the switch is not retried and is a warning',
+      () async {
+        late _SwitchFailingDatabase db;
+        final List<String> printed = await _printed(
+          InternalLogLevel.w,
+          () async {
+            await start(
+              'app-a',
+              opener: _openNewWrapped(
+                dbName,
+                (DatabaseMock mock) => db = _SwitchFailingDatabase(
+                  mock,
+                  StateError('SqliteException(10): disk I/O error'),
+                ),
+              ),
+            );
+          },
+        );
+        expect(db.attempts, 1);
+        expect(
+          printed.where(
+            (String line) =>
+                line.startsWith('W:') && line.contains('write-ahead logging'),
+          ),
+          hasLength(1),
+        );
+      },
+    );
   });
 
   group('a start that fails after the open (L2)', () {

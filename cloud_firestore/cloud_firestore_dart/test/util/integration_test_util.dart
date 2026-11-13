@@ -109,6 +109,18 @@ class IntegrationTestUtil {
   /// The project of the Enterprise edition emulator.
   static const String enterpriseProjectId = FirestoreProvider.fallbackProjectId;
 
+  /// The database of the Enterprise edition emulator that [testEnterpriseFirestore] uses: a new one for every test
+  /// file (each file runs in an isolate of its own), so that the files that run at the same time do not share their
+  /// data.
+  ///
+  /// The emulator (v1.22.0) keeps the locks of an atomic pipeline (`execute(atomic: true)`) that fails, for about a
+  /// minute, and they block every write to the same database: one such test held up the writes of the files next
+  /// to it until they timed out after 30 s. Its locks do not reach another database. A database of its own also
+  /// keeps a collection group or `database()` pipeline from reading what the other files and earlier runs wrote.
+  /// The emulator creates a database on its first use.
+  static final String enterpriseDatabaseId =
+      'it-$pid-${Random.secure().nextInt(1 << 32).toRadixString(36)}';
+
   /// Whether the suite runs against a real Firebase project (opt-in with
   /// `FIRESTORE_TEST_PROJECT_ID`, see `test/util/test_backend.dart`).
   static bool get usesRealProject => TestBackend().usesRealProject;
@@ -181,8 +193,10 @@ class IntegrationTestUtil {
   }
 
   /// Initializes a new Firestore instance that talks to the Enterprise edition
-  /// emulator. Guard the tests that use it with [enterpriseEmulatorSkipReason].
-  static Future<Firestore> testEnterpriseFirestore([String? dbPath]) {
+  /// emulator, on [enterpriseDatabaseId] unless [databaseId] names another
+  /// database. Guard the tests that use it with [enterpriseEmulatorSkipReason].
+  static Future<Firestore> testEnterpriseFirestore([String? dbPath,
+      String? databaseId]) {
     final String? emulator = enterpriseEmulatorHost;
     if (emulator == null) {
       throw StateError(enterpriseEmulatorSkipReason!);
@@ -192,19 +206,20 @@ class IntegrationTestUtil {
       InternalLogLevel.w,
       _emulatorSettings(emulator),
       dbPath ?? currentDatabasePath,
+      databaseName: databaseId ?? enterpriseDatabaseId,
     );
   }
 
-  /// Deletes all the documents from the Enterprise edition emulator.
-  static Future<void> clearEnterpriseEmulatorData() =>
-      _clearEmulatorData(enterpriseEmulatorHost, enterpriseProjectId);
+  /// Deletes all the documents of [enterpriseDatabaseId] from the Enterprise edition emulator.
+  static Future<void> clearEnterpriseEmulatorData() => _clearEmulatorData(
+      enterpriseEmulatorHost, enterpriseProjectId, enterpriseDatabaseId);
 
   /// Deletes all the documents from the emulator for the test project.
   static Future<void> clearEmulatorData() =>
       _clearEmulatorData(emulatorHost, provider.projectId);
 
-  static Future<void> _clearEmulatorData(
-      String? emulator, String projectId) async {
+  static Future<void> _clearEmulatorData(String? emulator, String projectId,
+      [String databaseId = DatabaseId.defaultDatabaseId]) async {
     if (emulator == null) {
       return;
     }
@@ -212,7 +227,7 @@ class IntegrationTestUtil {
     final HttpClient client = HttpClient();
     try {
       final HttpClientRequest request = await client.deleteUrl(Uri.parse(
-          'http://$emulator/emulator/v1/projects/$projectId/databases/(default)/documents'));
+          'http://$emulator/emulator/v1/projects/$projectId/databases/$databaseId/documents'));
       final HttpClientResponse response = await request.close();
       await response.drain<void>();
     } finally {

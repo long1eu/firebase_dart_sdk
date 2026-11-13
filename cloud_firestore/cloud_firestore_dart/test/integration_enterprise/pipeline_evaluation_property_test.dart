@@ -17,6 +17,7 @@ import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
 import 'package:cloud_firestore_dart/pipelines.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart'
     show FirestoreInternal;
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart'
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/evaluation/evaluate_result.dart';
@@ -99,8 +100,11 @@ void main() {
     'the recorded emulator results of the fixed cases are current',
     skip: IntegrationTestUtil.enterpriseEmulatorSkipReason,
     () async {
-      final Firestore db = await IntegrationTestUtil.testEnterpriseFirestore();
-      // The recorded references name the project and the document.
+      // The recorded references name the project, the default database and the document.
+      final Firestore db = await IntegrationTestUtil.testEnterpriseFirestore(
+        null,
+        DatabaseId.defaultDatabaseId,
+      );
       expect(db.projectId, evaluationCasesProject);
       // ignore: invalid_use_of_internal_member
       final LocalEvaluation local = LocalEvaluation(db.modelDatabaseId);
