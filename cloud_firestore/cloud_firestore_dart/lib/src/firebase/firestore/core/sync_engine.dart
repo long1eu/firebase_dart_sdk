@@ -493,6 +493,15 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     }
   }
 
+  /// Called after each refresh of the client metadata of a shared cache. The primary fills its write pipeline: the
+  /// batches of a client that is gone (see `LocalStore.sendsOtherClientsBatches`) are only sendable once its metadata
+  /// is old enough, and nothing else would make the primary look again until it writes itself.
+  Future<void> handleClientMetadataRefresh() async {
+    if (_isPrimary) {
+      await _remoteStore.fillWritePipeline();
+    }
+  }
+
   /// Stops the limbo resolutions of a client that is no longer primary.
   Future<void> _resetLimboDocuments() async {
     for (final int targetId in _activeLimboResolutionsByTarget.keys.toList()) {

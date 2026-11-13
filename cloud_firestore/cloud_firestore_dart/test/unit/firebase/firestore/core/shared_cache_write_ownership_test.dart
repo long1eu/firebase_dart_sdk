@@ -278,6 +278,26 @@ void main() {
     await bWritten;
   });
 
+  test(
+    'after a refresh, the primary sends the batch of a client that is gone without writing itself',
+    () async {
+      final _Client b = await start('B');
+      final _Client c = await start('C');
+      final Mutation writeC = setMutation('col/c', <String, Object?>{
+        'by': 'C',
+      });
+      unawaited(c.write(writeC));
+      expect(c.datastore.writesSent, 0);
+
+      // C crashed. B's next refresh (as the client runs it every 4 s) makes B send C's batch.
+      now += SQLiteClientMetadata.maxBatchOwnerAgeMs + 1;
+      await b.refresh();
+      await b.syncEngine.handleClientMetadataRefresh();
+      await _expectSent(b.datastore, 1);
+      await b.acknowledge(writeC, 1000);
+    },
+  );
+
   test('a client that refreshed 30 s ago keeps its batch', () async {
     final _Client b = await start('B');
     final _Client c = await start('C');

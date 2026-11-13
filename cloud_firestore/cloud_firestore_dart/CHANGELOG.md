@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Two clients on one SQLite cache: the primary client now sends the pending writes of a client that is gone (it
+  crashed or was killed, see below) at its next metadata refresh, every 4 s. It only looked for them when it wrote
+  something itself, so with an idle primary they were never sent.
 - Web transport: the double -0.0 read from production Firestore came back as 0.0. Production writes it as the
   JSON number `-0`, which `jsonDecode` reads as the int 0; the responses of REST and WebChannel are now decoded
   keeping the sign, as `JSON.parse` does in the JS SDK. (The emulator writes `-0.0`, so its tests did not show

@@ -69,6 +69,16 @@ class SQLiteClientMetadata {
   /// the result. Separate from [maxClientAgeMs], after which the row of a client is removed.
   static const int maxBatchOwnerAgeMs = 15 * _refreshIntervalMs;
 
+  /// Replaces [maxBatchOwnerAgeMs] in tests that can not wait a minute (end-to-end tests with real time). Null: the
+  /// default.
+  @visibleForTesting
+  static int? batchOwnerAgeOverrideMs;
+
+  /// The age after which the batches of a client are sent by the primary client: [maxBatchOwnerAgeMs], or
+  /// [batchOwnerAgeOverrideMs] in a test.
+  static int get batchOwnerAgeMs =>
+      batchOwnerAgeOverrideMs ?? maxBatchOwnerAgeMs;
+
   static const String _tag = 'PrimaryLease';
 
   final SQLitePersistence _persistence;

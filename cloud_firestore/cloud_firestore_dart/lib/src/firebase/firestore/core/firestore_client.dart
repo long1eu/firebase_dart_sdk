@@ -672,6 +672,7 @@ class FirestoreClient implements RemoteStoreCallback {
         run: () => _enqueue<void>(() async {
           if (!_isShutdown) {
             await started.refreshClientMetadata();
+            await syncEngine.handleClientMetadataRefresh();
           }
         }),
       )..start();

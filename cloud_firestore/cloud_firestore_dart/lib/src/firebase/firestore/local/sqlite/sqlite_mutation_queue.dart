@@ -175,7 +175,7 @@ class SQLiteMutationQueue implements MutationQueue {
     final int now = metadata._clock();
     return <Object?>[
       metadata.clientId,
-      now - SQLiteClientMetadata.maxBatchOwnerAgeMs,
+      now - SQLiteClientMetadata.batchOwnerAgeMs,
       now,
     ];
   }
