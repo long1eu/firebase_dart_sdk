@@ -41,8 +41,17 @@ yet**, so the `dart pub add` command above only works once it is.
 
 Pure Dart on the VM (`dart:io`, `package:grpc`, SQLite through an `OpenDatabase` function you
 supply, for example with `package:sqlite3`). Targets Dart `^3.8.0` (the minimum of `grpc` 5). Developed and tested on
-macOS; Linux and Windows are expected to work but are not tested. Flutter apps (Android, iOS,
-desktop) can use it as a plain Dart package.
+macOS. On Linux the unit tests and the standard integration suite (against the emulator) pass in a Debian arm64
+container (`tool/linux/run_in_container.sh`), and CI runs them on Ubuntu x64. Windows is
+expected to work but is not tested. Flutter apps (Android, iOS, desktop) can use it as a plain Dart package.
+
+- Linux: `package:sqlite3` 2.x loads `libsqlite3.so`, which only the development package installs (`libsqlite3-dev`
+  on Debian and Ubuntu); with just the runtime package (`libsqlite3-0`) it fails with "Failed to load dynamic library
+  'libsqlite3.so'". The opener in `example/sqlite_database.dart` falls back to `libsqlite3.so.0`.
+- Windows: `package:sqlite3` loads `sqlite3.dll`, which Windows does not ship: put it next to the executable or on
+  the `PATH` (`sqlite3_flutter_libs` bundles it in a Flutter app). SQLite locks files with `LockFileEx` there, so
+  two clients on one file behave as on Linux and macOS, but `Firestore.clearPersistence()` fails with `unknown` while
+  any other handle (another isolate or process) still has the file open, where Linux and macOS delete it anyway.
 
 Web support is experimental. Browsers have no sockets, so there the client talks to
 Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChannel for the
@@ -647,7 +656,8 @@ then fails whichever test is running.
   or the pending writes of the other until it reads the cache again, so do not run two active
   clients on one persistence key on purpose; use different app names or databases. Handles
   inside one process are serialized per database name
-  (`test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`).
+  (`test/unit/firebase/firestore/local/sqlite_shared_clients_test.dart`; two processes in
+  `sqlite_shared_processes_test.dart` next to it).
 - **Protect the cache files.** The cache holds every document the app has read and its pending
   writes, in clear text. SQLite creates the database and its `-wal`, `-shm` and `-journal`
   files with mode 0644 minus the process umask, and `Directory.createSync` creates directories

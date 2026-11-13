@@ -77,6 +77,17 @@ jobs:
         env:
           TEST_LOG_DIR: ${{ runner.temp }}/unit
         run: ./tool/test_all.sh
+      # The connectivity detector against a real change of the network interfaces: the test adds a dummy interface
+      # with `ip`, so it runs as root (it is skipped, with a reason, everywhere else). Last, because it leaves root
+      # owned files in .dart_tool. It passed in a Debian container with CAP_NET_ADMIN (tool/linux/run_in_container.sh)
+      # but has not run on a GitHub runner yet: allowed to fail until it did.
+      - name: Connectivity detector with a real interface change (root)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        working-directory: cloud_firestore/cloud_firestore_dart
+        run: |
+          sudo env "PATH=$PATH" FIRESTORE_TEST_NET_ADMIN=1 "$(command -v dart)" test --reporter expanded \
+            test/unit/firebase/firestore/remote/connectivity_interface_change_test.dart
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -84,15 +95,13 @@ jobs:
           name: unit-stable-log
           path: ${{ runner.temp }}/unit/*
 
-  # The emulator suite has 1-2 known flaky tests (event ordering in the emulator, e.g.
-  # write_batch_test testWriteTheSameServerTimestampAcrossWrites).
-  # `continue-on-error: true` keeps this job from failing the workflow, but the job still
-  # shows as failed in the UI and the full test output is uploaded, so failures stay visible.
-  # Do not rely on this job to gate merges until the flaky tests are fixed.
+  # Required: the suite passed on Linux in Debian containers (arm64, and x64 under emulation;
+  # tool/linux/run_in_container.sh) and in five stress runs on macOS, where one test failed once
+  # (an HTTP/2 connection error in aggregation_test). transaction_test has failed rarely with an
+  # increment counted twice. A failure here is a signal to look at; the full output is uploaded.
   integration:
-    name: Standard emulator integration tests (allowed to fail)
+    name: Standard emulator integration tests
     runs-on: ubuntu-26.04
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dart-lang/setup-dart@v1.8.2
@@ -112,7 +121,7 @@ jobs:
         run: |
           firebase emulators:start --only firestore --project demo-test \
             --config firebase.json > "$RUNNER_TEMP/emulator.log" 2>&1 &
-          for i in $(seq 1 120); do
+          for _ in $(seq 1 120); do
             if curl -s -o /dev/null http://127.0.0.1:8080; then echo "emulator up"; exit 0; fi
             sleep 1
           done
@@ -139,12 +148,11 @@ jobs:
   # The same standard suite over the web transport (REST and WebChannel instead of gRPC),
   # still on the VM: tool/test_integration.sh --transport=webchannel, then the same with the
   # streams in long polling mode. Against a private emulator started from the JAR on port 8090
-  # (tool/start_private_emulator.sh), which is where the web runs go by default. Allowed to
-  # fail for the same reason as the job above.
+  # (tool/start_private_emulator.sh), which is where the web runs go by default. Required, like
+  # the job above: both modes passed in a Debian arm64 container.
   integration-webchannel:
-    name: Standard emulator integration tests over the web transport (allowed to fail)
+    name: Standard emulator integration tests over the web transport
     runs-on: ubuntu-26.04
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Set the emulator work directory
@@ -314,12 +322,10 @@ jobs:
   # Tests that need the Enterprise edition of Firestore (test/integration_enterprise). They run
   # against a second emulator started from the emulator JAR with `--database-edition enterprise`
   # on port 8181 (tool/start_enterprise_emulator.sh); the standard emulator runs next to it on
-  # 8080 for the tests that compare the two. Allowed to fail for the same reason as the job
-  # above, and because Enterprise support in the emulator is recent.
+  # 8080 for the tests that compare the two. Required: they passed in a Debian arm64 container.
   enterprise:
-    name: Enterprise emulator tests (allowed to fail)
+    name: Enterprise emulator tests
     runs-on: ubuntu-26.04
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Set the emulator work directory
@@ -346,7 +352,7 @@ jobs:
           mkdir -p "$EMULATOR_DIR"
           firebase emulators:start --only firestore --project demo-test \
             --config firebase.json > "$EMULATOR_DIR/emulator.log" 2>&1 &
-          for i in $(seq 1 120); do
+          for _ in $(seq 1 120); do
             if curl -s -o /dev/null http://127.0.0.1:8080; then echo "emulator up"; exit 0; fi
             sleep 1
           done
@@ -375,7 +381,9 @@ jobs:
   # The standard integration suite (test/integration) against the Enterprise edition emulator:
   # shows whether the client behaves the same on both editions. The tests whose expectations
   # only hold for the Standard edition are skipped with a reason (see the "Enterprise edition"
-  # section of the package README). Allowed to fail, like the jobs above.
+  # section of the package README). Allowed to fail: in a Debian arm64 container under load one
+  # chaos test (writes_chaos_test, "lose requests") counted an increment twice once and passed
+  # three times on its own; the timing of that test is not yet robust on this emulator.
   standard-suite-on-enterprise:
     name: Standard suite on the Enterprise emulator (allowed to fail)
     runs-on: ubuntu-26.04

@@ -37,7 +37,8 @@ void main() {
     ).writeAsStringSync(buffer.toString());
 
     _buffer.writeln(
-      'export \'${dir.absolute.path.split('/lib/src/proto/')[1]}/index.dart\';',
+      // `posix` separators also on Windows: an import URI always uses `/`.
+      'export \'${posix.joinAll(split(relative(dir.path, from: directory.path)))}/index.dart\';',
     );
   }
   File('${directory.path}/user.dart').writeAsStringSync(_buffer.toString());

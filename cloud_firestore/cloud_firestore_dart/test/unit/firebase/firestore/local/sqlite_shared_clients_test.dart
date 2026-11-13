@@ -35,6 +35,7 @@ import 'package:sqlite3/sqlite3.dart' as sql;
 import 'package:test/test.dart';
 
 import '../../../../util/sqlite3_database.dart';
+import '../../../../util/sqlite3_library.dart';
 import '../../../../util/test_util.dart';
 
 const String fixturePath =
@@ -52,7 +53,7 @@ String newName(String label) =>
 
 /// The schema version stored in the file [name].
 int storedVersion(String name) {
-  final sql.Database raw = sql.sqlite3.open(
+  final sql.Database raw = nativeSqlite3.open(
     DatabaseMock.pathForName(name).path,
   );
   try {
@@ -451,7 +452,7 @@ void main() {
         final Client a = await open();
         await a.listen('a1');
 
-        final sql.Database raw = sql.sqlite3.open(
+        final sql.Database raw = nativeSqlite3.open(
           DatabaseMock.pathForName(name).path,
         );
         addTearDown(raw.dispose);
@@ -494,7 +495,7 @@ void main() {
       await a.listen('a1');
       await a.persistence.shutdown();
 
-      final sql.Database raw = sql.sqlite3.open(
+      final sql.Database raw = nativeSqlite3.open(
         DatabaseMock.pathForName(name).path,
       );
       raw
@@ -729,7 +730,7 @@ void main() {
           name,
         )..parent.createSync(recursive: true)).path,
       );
-      final sql.Database before = sql.sqlite3.open(
+      final sql.Database before = nativeSqlite3.open(
         DatabaseMock.pathForName(name).path,
       );
       expect(before.userVersion, 8);

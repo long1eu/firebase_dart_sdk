@@ -77,8 +77,8 @@ Future<void> rootReadmeLine11() async {
       .listen((snapshot) => print(snapshot.docs.length));
 }
 
-// README.md:146
-Future<void> firestoreReadmeLine146() async {
+// README.md:155
+Future<void> firestoreReadmeLine155() async {
   // `app` is a FirebaseApp created with firebase_app_dart.
   final firestore = Firestore.instanceFor(app: app);
   final users = firestore.collection('users');
@@ -86,16 +86,16 @@ Future<void> firestoreReadmeLine146() async {
   final adults = await users.whereGreaterThanOrEqualTo('age', 18).get();
 }
 
-// README.md:164
-Future<void> firestoreReadmeLine164() async {
+// README.md:173
+Future<void> firestoreReadmeLine173() async {
   final firestore = Firestore.instanceFor(
     app: app,
     settings: FirestoreSettings().withEmulator('127.0.0.1', 8080),
   );
 }
 
-// README.md:181
-Future<void> firestoreReadmeLine181() async {
+// README.md:190
+Future<void> firestoreReadmeLine190() async {
   final count = await users.count().get();                 // AggregateQuerySnapshot
   final agg = await users.aggregate([
     AggregateField.sum('age'),
@@ -114,8 +114,8 @@ Future<void> firestoreReadmeLine181() async {
       .get();
 }
 
-// README.md:203
-Future<void> firestoreReadmeLine203() async {
+// README.md:212
+Future<void> firestoreReadmeLine212() async {
   final converter = FirestoreDataConverter<City>.from(
     fromFirestore: (snapshot, options) => City.fromMap(snapshot.data!),
     toFirestore: (city, options) => city.toMap(),
@@ -129,8 +129,8 @@ Future<void> firestoreReadmeLine203() async {
   final raw = cities.withoutConverter();                              // back to Map<String, Object?>
 }
 
-// README.md:234
-Future<void> firestoreReadmeLine234() async {
+// README.md:243
+Future<void> firestoreReadmeLine243() async {
   final settings = FirestoreSettings(
       cacheSettings: PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024));
   final task = firestore.loadBundle(bundleBytes);          // LoadBundleTask
@@ -142,8 +142,8 @@ Future<void> firestoreReadmeLine234() async {
   await firestore.terminate();
 }
 
-// README.md:288
-Future<void> firestoreReadmeLine288() async {
+// README.md:297
+Future<void> firestoreReadmeLine297() async {
   // A signed-in Firebase Auth user: the security rules see request.auth.
   final auth = await FirebaseUserAuth.forApp(app);
   final firestore = Firestore.instanceFor(app: app);
@@ -154,8 +154,8 @@ Future<void> firestoreReadmeLine288() async {
   //   app.authProvider = applicationDefaultCredentials();   // package:.../adc.dart
 }
 
-// README.md:314
-Future<void> firestoreReadmeLine314() async {
+// README.md:323
+Future<void> firestoreReadmeLine323() async {
   final PipelineSnapshot snapshot = await firestore
       .pipeline()
       .collection('books')
@@ -178,8 +178,8 @@ Future<void> firestoreReadmeLine314() async {
       .execute();
 }
 
-// README.md:340
-Future<void> firestoreReadmeLine340() async {
+// README.md:349
+Future<void> firestoreReadmeLine349() async {
   // An existing query as a pipeline: the same documents in the same order.
   final Query<Map<String, Object?>> italian = users
       .where('country', isEqualTo: 'IT')
@@ -222,8 +222,8 @@ Future<void> firestoreReadmeLine340() async {
   print(written.results.single.get('documents_modified'));
 }
 
-// README.md:578
-Future<void> firestoreReadmeLine578() async {
+// README.md:587
+Future<void> firestoreReadmeLine587() async {
   final total = await firestore.runTransaction((transaction) async {
     final account = await transaction.get(firestore.doc('accounts/a'));
     final orders = await transaction.getQuery(
@@ -233,8 +233,8 @@ Future<void> firestoreReadmeLine578() async {
   }, options: TransactionOptions(readOnly: true));
 }
 
-// README.md:696
-Future<void> firestoreReadmeLine696() async {
+// README.md:706
+Future<void> firestoreReadmeLine706() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }

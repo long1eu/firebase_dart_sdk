@@ -45,6 +45,7 @@ import 'package:rxdart/subjects.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 import 'package:test/test.dart';
 
+import '../../../../util/sqlite3_library.dart';
 import '../../../../util/test_util.dart';
 import '../remote/mock_datastore.dart';
 import '../remote/remote_store_test.dart' show MockRemoteStoreCallback;
@@ -58,7 +59,7 @@ const String fixturePath =
 /// database files by content (the bytes of a SQLite file depend on the SQLite
 /// version that wrote it).
 Map<String, List<String>> dump(String path) {
-  final sql.Database db = sql.sqlite3.open(path, mode: sql.OpenMode.readOnly);
+  final sql.Database db = nativeSqlite3.open(path, mode: sql.OpenMode.readOnly);
   try {
     final Map<String, List<String>> result = <String, List<String>>{
       'user_version': <String>['${db.userVersion}'],
@@ -89,7 +90,7 @@ Future<void> generate(File file) async {
     file.deleteSync();
   }
   file.parent.createSync(recursive: true);
-  final sql.Database raw = sql.sqlite3.open(file.path);
+  final sql.Database raw = nativeSqlite3.open(file.path);
   try {
     await buildSchema8Database(_RawDatabase(raw, file.path));
     raw.userVersion = legacySchemaVersion;
@@ -233,7 +234,7 @@ void main() {
       current.deleteSync();
     }
     current.parent.createSync(recursive: true);
-    final sql.Database raw = sql.sqlite3.open(current.path);
+    final sql.Database raw = nativeSqlite3.open(current.path);
     await SQLiteSchema(_RawDatabase(raw, current.path))
         .runMigrations(0, legacySchemaVersion);
     raw.dispose();
@@ -241,7 +242,7 @@ void main() {
 
     Map<String, Set<String>> columns(String path) {
       final sql.Database db =
-          sql.sqlite3.open(path, mode: sql.OpenMode.readOnly);
+          nativeSqlite3.open(path, mode: sql.OpenMode.readOnly);
       try {
         return <String, Set<String>>{
           for (final sql.Row table in db.select(
@@ -491,7 +492,7 @@ void main() {
           source.deleteSync();
         }
         source.parent.createSync(recursive: true);
-        final sql.Database raw = sql.sqlite3.open(source.path);
+        final sql.Database raw = nativeSqlite3.open(source.path);
         final _RawDatabase db = _RawDatabase(raw, source.path);
         await SQLiteSchema(db).runMigrations(0, from);
 

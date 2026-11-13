@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/database.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
+import 'sqlite3_library.dart';
+
 /// A file backed [Database] implemented on top of the `sqlite3` package. Used
 /// by the tests that need a real SQLite database.
 ///
@@ -50,7 +52,7 @@ class DatabaseMock extends Database {
     final bool callOnCreate = !file.existsSync();
     file.createSync(recursive: true);
 
-    final sql.Database database = sql.sqlite3.open(file.path);
+    final sql.Database database = nativeSqlite3.open(file.path);
     final DatabaseMock mock = DatabaseMock._(database, file);
 
     await onConfigure?.call(mock);
@@ -86,10 +88,14 @@ class DatabaseMock extends Database {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> query(String statement,
-      [List<Object?>? arguments]) async {
-    final sql.ResultSet result =
-        database.select(statement, arguments ?? const <Object?>[]);
+  Future<List<Map<String, dynamic>>> query(
+    String statement, [
+    List<Object?>? arguments,
+  ]) async {
+    final sql.ResultSet result = database.select(
+      statement,
+      arguments ?? const <Object?>[],
+    );
     return result.map(Map<String, dynamic>.of).toList();
   }
 

@@ -1,0 +1,8 @@
+# LF in the working tree on every platform, also on Windows with core.autocrlf (the default of Git for Windows and of
+# actions/checkout there). Tests compare text files byte for byte (the API goldens, the README snippets) or read
+# length-prefixed data (the bundle test vectors), and the shell scripts in tool/ do not run with CRLF.
+* text=auto eol=lf
+
+# Binary test fixtures (SQLite files, protobuf payloads).
+*.db binary
+*.dat binary

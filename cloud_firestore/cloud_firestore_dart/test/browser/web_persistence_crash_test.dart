@@ -79,7 +79,21 @@ void main() {
     final String storageName = 'crash-test/$name';
     final sqlite.WasmSqlite3 sqlite3 =
         await sqlite.WasmSqlite3.loadFromUrl(sqlite3Wasm);
-    addTearDown(() => sqlite.IndexedDbFileSystem.deleteDatabase(storageName));
+    // deleteDatabase gives up after one second (VfsException(1)) while a connection is still open: the killed
+    // workers' connections are closed by the browser some time later. Seen once on Chromium on Linux under load.
+    addTearDown(() async {
+      for (int attempt = 1; ; attempt++) {
+        try {
+          await sqlite.IndexedDbFileSystem.deleteDatabase(storageName);
+          return;
+        } on sqlite.VfsException {
+          if (attempt == 5) {
+            rethrow;
+          }
+          await Future<void>.delayed(const Duration(seconds: 1));
+        }
+      }
+    });
 
     int verifiedMaxId = 0;
     int acknowledged = 0;

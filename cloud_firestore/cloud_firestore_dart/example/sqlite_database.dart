@@ -7,9 +7,11 @@
 // and pass `sqliteOpener(directory)` to `Firestore.instanceFor`. See
 // offline_persistence.dart for the usage.
 
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:sqlite3/open.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 /// Returns an [OpenDatabase] that keeps the database files in [directory].
@@ -17,6 +19,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 /// In a Flutter app use a directory from `path_provider`, for example
 /// `getApplicationSupportDirectory()`.
 OpenDatabase sqliteOpener(Directory directory) {
+  // Before the first use of `sqlite3` in this isolate.
+  open.overrideFor(OperatingSystem.linux, openLinuxSqlite);
   return (
     String name, {
     int? version,
@@ -62,6 +66,21 @@ OpenDatabase sqliteOpener(Directory directory) {
       rethrow;
     }
   };
+}
+
+/// Opens the system SQLite library on Linux.
+///
+/// `package:sqlite3` 2.x opens `libsqlite3.so`, which only the development
+/// package installs (`libsqlite3-dev` on Debian and Ubuntu). A machine with
+/// just the runtime package (`libsqlite3-0`) has `libsqlite3.so.0`, so that
+/// name is tried next. On Windows `sqlite3.dll` must be next to the
+/// executable or on the `PATH`.
+DynamicLibrary openLinuxSqlite() {
+  try {
+    return DynamicLibrary.open('libsqlite3.so');
+  } on ArgumentError {
+    return DynamicLibrary.open('libsqlite3.so.0');
+  }
 }
 
 /// One open SQLite connection. Firestore runs its own SQL through it.

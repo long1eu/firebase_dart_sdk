@@ -34,6 +34,10 @@ How this was verified:
 - Web support is experimental: it was run in Chrome only, against the emulator only, with a
   memory cache or the opt-in SQLite cache in IndexedDB (browser tests, and the standard
   integration suite on the VM over the web transport).
+- On the VM: macOS, Ubuntu x64 (CI) and Debian arm64 (a container: unit tests, the standard
+  integration suite, SQLite shared by two isolates and by two processes, the connectivity
+  detector against a real interface change). Windows was not run. The SQLite opener of the
+  example falls back to `libsqlite3.so.0` on Linux systems without `libsqlite3-dev`.
 
 ### Renamed packages
 
