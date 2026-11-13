@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+# Every job names its runner image instead of ubuntu-latest: the jobs use what the image ships
+# (Chrome, libsqlite3, openssl), so a new image must be a deliberate change. ubuntu-26.04 is
+# the image ubuntu-latest resolved to in every run so far, the only one the jobs were seen
+# green on.
 jobs:
   # The lowest supported SDK (the `sdk: ^3.8.0` floor of cloud_firestore_dart). The formatting
   # check runs only here, on a pinned SDK, so that a formatter change in a new Dart release
@@ -14,7 +18,7 @@ jobs:
   # SDK it was last formatted with (3.12.2); when the pin moves, reformat with the new one.
   unit:
     name: Unit tests and formatting (Dart 3.8.0)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dart-lang/setup-dart@v1.8.2
@@ -47,7 +51,7 @@ jobs:
   # The same on the current stable SDK, without the formatting check.
   unit-stable:
     name: Unit tests (Dart stable)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: dart-lang/setup-dart@v1.8.2
@@ -71,7 +75,7 @@ jobs:
   # Do not rely on this job to gate merges until the flaky tests are fixed.
   integration:
     name: Standard emulator integration tests (allowed to fail)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1
@@ -123,7 +127,7 @@ jobs:
   # fail for the same reason as the job above.
   integration-webchannel:
     name: Standard emulator integration tests over the web transport (allowed to fail)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1
@@ -180,7 +184,7 @@ jobs:
   # Allowed to fail: web support is experimental.
   browser:
     name: Browser tests in Chrome (allowed to fail)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1
@@ -203,12 +207,18 @@ jobs:
         # Puts cloud-firestore-emulator-v*.jar in ~/.cache/firebase/emulators.
         run: firebase setup:emulators:firestore
       - name: Run browser tests (dart2wasm and dart2js)
-        # Chrome is preinstalled on the ubuntu-latest image. The script downloads sqlite3.wasm
-        # for the persistence tests from the releases of the sqlite3 package and checks it
-        # against the sha256 pinned in the script.
+        # Chrome is preinstalled on the runner image. tool/build_web_test_assets.sh, which
+        # the script calls, downloads sqlite3.wasm for the persistence tests from the releases
+        # of the sqlite3 package (checked against the sha256 pinned there) and compiles the
+        # worker of the crash test.
         run: |
           (cd cloud_firestore/cloud_firestore_dart && dart pub get)
           TEST_LOG_DIR="$EMULATOR_DIR" ./tool/test_browser.sh both
+      - name: Run the SQLite unit tests in Chrome (dart2js)
+        # The unit tests of the SQLite layer on the WebAssembly build of SQLite. The files
+        # that cannot run there are listed, with the reasons, in the script.
+        if: ${{ !cancelled() }}
+        run: TEST_LOG_DIR="$EMULATOR_DIR" ./tool/test_unit_browser.sh
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -223,7 +233,7 @@ jobs:
   # above, and because Enterprise support in the emulator is recent.
   enterprise:
     name: Enterprise emulator tests (allowed to fail)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1
@@ -283,7 +293,7 @@ jobs:
   # section of the package README). Allowed to fail, like the jobs above.
   standard-suite-on-enterprise:
     name: Standard suite on the Enterprise emulator (allowed to fail)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1
@@ -328,7 +338,7 @@ jobs:
   # measure again and update the budget and the README. Allowed to fail.
   size:
     name: Firestore Lite size check (Dart 3.12.2, allowed to fail)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7.0.1

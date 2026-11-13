@@ -7,7 +7,9 @@
 #                                 [--transport=grpc|webchannel|webchannel-longpolling]
 #                                 [dart test arguments...]
 #
-#   standard    (default) test/integration against the Standard edition emulator.
+#   standard    (default) test/integration against the Standard edition emulator, and with
+#               the gRPC transport also test/production (the tests of the production
+#               verification kit, against the emulator).
 #   enterprise  test/integration against the Enterprise edition emulator (tests whose
 #               expectations only hold for the Standard edition are skipped, see the
 #               "Enterprise edition" section of the package README), then
@@ -37,7 +39,7 @@ PKG="$ROOT/cloud_firestore/cloud_firestore_dart"
 MODE="standard"
 case "${1:-}" in
   standard|enterprise|both) MODE="$1"; shift;;
-  -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+  -h|--help) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
 esac
 
 TRANSPORT="${FIRESTORE_TEST_TRANSPORT:-grpc}"
@@ -101,7 +103,15 @@ run_standard() {
     summary+=("standard: NOT RUN (no emulator on $STANDARD_HOST)"); failed=1; return
   fi
   RUN_ENV=("FIRESTORE_EMULATOR_HOST=$STANDARD_HOST" "FIRESTORE_EMULATOR_EDITION=standard")
-  if [ $# -gt 0 ]; then run "standard" standard "$@"; else run "standard" standard test/integration; fi
+  if [ $# -gt 0 ]; then
+    run "standard" standard "$@"
+  elif [ -z "$SUFFIX" ]; then
+    # test/production: the tests of the production verification kit, against the emulator
+    # (its checks choose their own transports, so it runs once, with the gRPC suite).
+    run "standard" standard test/integration test/production
+  else
+    run "standard" standard test/integration
+  fi
 }
 
 run_enterprise() {

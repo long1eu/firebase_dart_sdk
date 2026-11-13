@@ -12,13 +12,13 @@
 # HTTP/1.1, which is what the emulator speaks, and every client keeps up to two of them open
 # for its listen and write streams: test files running side by side starve each other.
 #
-# The persistence tests need the WebAssembly build of SQLite that belongs to the sqlite3 package
-# version in pubspec.lock. It is downloaded once from the releases of that package to
-# test/browser/sqlite3.wasm (not in the repository). Without it those tests are skipped.
+# The files the tests load at run time and that are not in the repository (sqlite3.wasm for the
+# persistence tests, the compiled worker of the crash test) are fetched or built first by
+# tool/build_web_test_assets.sh. Without them those tests skip themselves.
 #
 # Environment:
 #   TEST_LOG_DIR  where the full outputs go (default: a new temp dir)
-#   SQLITE3_WASM  a sqlite3.wasm to use instead of downloading one
+#   SQLITE3_WASM  a sqlite3.wasm to use instead of downloading one (build_web_test_assets.sh)
 #
 # Exits non-zero if a run fails.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -44,51 +44,7 @@ fi
 LOG_DIR="${TEST_LOG_DIR:-$(mktemp -d)}"
 mkdir -p "$LOG_DIR" || exit 2
 
-# sqlite3.wasm for the persistence tests, of the resolved sqlite3 version. The file is executed
-# in the test browser, so it is only accepted with the checksum pinned here: the sha256 of the
-# sqlite3.wasm asset of the release "sqlite3-<version>" of simolus3/sqlite3.dart. When the
-# sqlite3 version in pubspec.lock changes, update both lines together.
-SQLITE3_WASM_VERSION=2.9.4
-SQLITE3_WASM_SHA256=922a76b182b6af69b030c8e2fdd3283ecc8e827248b20e4b1f3f3db170b52117
-
-sha256_of() {
-  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1
-  else shasum -a 256 "$1" | cut -d' ' -f1; fi
-}
-
-WASM="$PKG/test/browser/sqlite3.wasm"
-(cd "$PKG" && dart pub get >/dev/null) || exit 1
-SQLITE3_VERSION=$(awk '/^  sqlite3:/{f=1} f && /version:/{gsub(/"/,"",$2); print $2; exit}' "$PKG/pubspec.lock")
-if [ -n "${SQLITE3_WASM:-}" ]; then
-  # A file the caller chose: used as it is.
-  cp "$SQLITE3_WASM" "$WASM" || exit 1
-  echo "Using $SQLITE3_WASM as sqlite3.wasm (not checked against the pinned checksum)"
-else
-  if [ "$SQLITE3_VERSION" != "$SQLITE3_WASM_VERSION" ]; then
-    echo "pubspec.lock has sqlite3 $SQLITE3_VERSION but $0 pins the checksum of sqlite3.wasm"
-    echo "$SQLITE3_WASM_VERSION: update SQLITE3_WASM_VERSION and SQLITE3_WASM_SHA256 in the script"
-    echo "(or pass a file with SQLITE3_WASM)."
-    exit 1
-  fi
-  if [ ! -s "$WASM" ] || [ "$(sha256_of "$WASM")" != "$SQLITE3_WASM_SHA256" ]; then
-    URL="https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-$SQLITE3_VERSION/sqlite3.wasm"
-    echo "Downloading $URL"
-    rm -f "$WASM" "$WASM.version"
-    if ! curl -sfL -o "$WASM.tmp" "$URL" || [ ! -s "$WASM.tmp" ]; then
-      rm -f "$WASM.tmp"
-      echo "Could not download sqlite3.wasm: the persistence tests will be skipped."
-    elif [ "$(sha256_of "$WASM.tmp")" != "$SQLITE3_WASM_SHA256" ]; then
-      echo "sqlite3.wasm from $URL has sha256 $(sha256_of "$WASM.tmp"),"
-      echo "expected $SQLITE3_WASM_SHA256. Not using it."
-      rm -f "$WASM.tmp"
-      exit 1
-    else
-      mv "$WASM.tmp" "$WASM"; echo "$SQLITE3_VERSION" >"$WASM.version"
-    fi
-  fi
-fi
-
-# The compiled assets of the tests (the worker of the crash test).
+# sqlite3.wasm, the crash test worker and whatever else the tests load at run time.
 "$ROOT/tool/build_web_test_assets.sh" || exit 1
 
 STARTED=0
