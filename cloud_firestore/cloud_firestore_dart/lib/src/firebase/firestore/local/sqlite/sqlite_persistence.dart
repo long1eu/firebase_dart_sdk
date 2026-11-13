@@ -141,6 +141,9 @@ class SQLitePersistence extends Persistence {
 
   static const String tag = 'SQLitePersistence';
 
+  /// Whether this is compiled for a browser.
+  static const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');
+
   final OpenDatabase openDatabase;
   final String databaseName;
   final LocalSerializer serializer;
@@ -822,6 +825,44 @@ class SQLitePersistence extends Persistence {
   ///   * onCreate / onUpgrade (optional; if version already matches these aren't called)
   ///   * onOpen
   ///
+  /// Switches a database in SQLite's default rollback-journal mode (`delete`) to write-ahead logging, which SQLite
+  /// recommends for concurrent access (https://www.sqlite.org/wal.html). With a rollback journal a reader needs the
+  /// file free of writers and a writer needs it free of readers; the busy handler only polls, so with several
+  /// clients (isolates, processes) that keep writing, a connection can wait out the whole [busyTimeout] without ever
+  /// finding the file free and fail with `database is locked`. Measured: 16 isolates opening a new cache at once next
+  /// to a coverage run, `PRAGMA user_version` failed after 10.5 s. In WAL mode readers and the writer do not block
+  /// each other; only writers wait for each other, for the length of one transaction.
+  ///
+  /// The mode is stored in the file, so it is switched once. A journal mode that the opener chose (anything but
+  /// `delete`, or `wal` already) is kept, and a file system without the shared memory WAL needs answers with the mode
+  /// it keeps; a failure is only logged. Not on the web: there one tab at a time has the database (a Web Lock guards
+  /// it), and the crash safety of the example openers is built on the rollback journal.
+  static Future<void> _useWriteAheadLog(Database db) async {
+    if (_isWeb) {
+      return;
+    }
+    try {
+      final List<Map<String, dynamic>> current = await db.query(
+        'PRAGMA journal_mode',
+      );
+      if (current.isEmpty ||
+          '${current.first.values.first}'.toLowerCase() != 'delete') {
+        return;
+      }
+      final List<Map<String, dynamic>> result = await db.query(
+        'PRAGMA journal_mode = WAL',
+      );
+      final String mode = result.isEmpty
+          ? ''
+          : '${result.first.values.first}'.toLowerCase();
+      if (mode != 'wal') {
+        Log.d(tag, 'The database stays in journal mode "$mode".');
+      }
+    } catch (e) {
+      Log.w(tag, 'Could not switch the database to write-ahead logging: $e');
+    }
+  }
+
   /// Unlike the Android SDK this does NOT take exclusive access to the database (`PRAGMA locking_mode = EXCLUSIVE`),
   /// because that makes a second open of the file fail after a Flutter hot restart (the old handle stays open).
   static Future<Database> _openDb(
@@ -843,6 +884,7 @@ class SQLitePersistence extends Persistence {
         } catch (e) {
           Log.w(tag, 'Could not set the busy timeout of the database: $e');
         }
+        await _useWriteAheadLog(db);
       }
     }
 

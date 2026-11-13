@@ -549,6 +549,10 @@ Documentation and tests:
 
 ### Fixed
 
+- On the VM a SQLite cache in the default rollback-journal mode is switched to write-ahead logging when it is
+  opened (a journal mode the opener sets is kept). With several clients on one cache (isolates, processes), a
+  client could wait out the 10-second busy timeout without ever getting the file and fail with `database is
+  locked`, for example when several isolates opened a new cache at once.
 - `Firestore.instance` before the default instance exists throws a `StateError` that says to call
   `Firestore.instanceFor(app: FirebaseApp.instance)` (0.0.7 named `Firestore.getInstance`).
 - Two clients with the same SQLite cache open (the isolate before a Flutter hot restart, a background isolate, a

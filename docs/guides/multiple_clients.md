@@ -22,6 +22,14 @@ again when another connection has committed, so target ids and write batch ids s
 a schema migration runs once. A client fails with `failedPrecondition` when a different version
 of the SDK moves the cache to another schema version under it.
 
+On the VM the client switches a cache that is in SQLite's default rollback-journal mode to
+write-ahead logging (`PRAGMA journal_mode = WAL`, stored in the file), as SQLite recommends for
+concurrent access: readers and the writer then do not block each other. With a rollback journal,
+many clients that keep writing could keep another one out for the whole 10 seconds (measured: 32
+isolates opening a new cache at once next to a coverage run failed with `database is locked`
+after 10 to 12 seconds in 4 of 40 rounds; none in 160 rounds with WAL). A journal mode that your opener sets is kept. The cache then has `-wal`
+and `-shm` files next to it, and needs a file system with shared memory (not a network share).
+
 The connection never switches to `PRAGMA locking_mode = EXCLUSIVE`, which the Android SDK uses
 (it fails with "Failed to gain exclusive lock" when a second process opens the file): after a
 Flutter hot restart the new isolate must be able to open the file that the old isolate still

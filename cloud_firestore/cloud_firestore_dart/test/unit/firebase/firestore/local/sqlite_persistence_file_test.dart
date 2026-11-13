@@ -205,6 +205,52 @@ void main() {
     });
   });
 
+  group('journal mode', () {
+    test('a cache in the default rollback-journal mode is switched to '
+        'write-ahead logging', () async {
+      final SQLitePersistence a = await start('app-a');
+      expect(await a.query('PRAGMA journal_mode'), <Object>[
+        <String, Object?>{'journal_mode': 'wal'},
+      ]);
+      // A second client on the file finds it in WAL mode.
+      final SQLitePersistence b = await start('app-b');
+      expect(await b.query('PRAGMA journal_mode'), <Object>[
+        <String, Object?>{'journal_mode': 'wal'},
+      ]);
+    });
+
+    test('a journal mode that the opener chose is kept', () async {
+      final OpenDatabase opener =
+          (
+            String path, {
+            int? version,
+            OnConfigure? onConfigure,
+            OnCreate? onCreate,
+            OnVersionChange? onUpgrade,
+            OnVersionChange? onDowngrade,
+            OnOpen? onOpen,
+          }) async {
+            final DatabaseMock db = await DatabaseMock.create(
+              dbName,
+              version: version,
+              onConfigure: (Database db) async {
+                await db.query('PRAGMA journal_mode = TRUNCATE');
+                await onConfigure?.call(db);
+              },
+              onCreate: onCreate,
+              onUpgrade: onUpgrade,
+              onDowngrade: onDowngrade,
+              onOpen: onOpen,
+            );
+            return db..renamePath = false;
+          };
+      final SQLitePersistence a = await start('app-a', opener: opener);
+      expect(await a.query('PRAGMA journal_mode'), <Object>[
+        <String, Object?>{'journal_mode': 'truncate'},
+      ]);
+    });
+  });
+
   group('a start that fails after the open (L2)', () {
     test('closes the database, and the file can be used again', () async {
       final List<_FailingDatabase> opened = <_FailingDatabase>[];
