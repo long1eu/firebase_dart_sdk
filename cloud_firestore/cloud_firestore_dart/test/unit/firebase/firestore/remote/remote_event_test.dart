@@ -724,6 +724,48 @@ void main() {
     expect(event.targetChanges[1], mapping1);
   });
 
+  // Ported from the JS SDK (remote_event.test.ts, 'only raises events for
+  // updated targets'). JS calls the aggregator's addDocumentToTarget() directly;
+  // here, as on Android, that method is private and is reached through a
+  // document change.
+  test('only raises events for updated targets', () {
+    final Map<int, QueryData> targetMap = util.activeQueries(<int>[1, 2]);
+
+    final Document doc1 =
+        util.doc('docs/1', 1, util.map(<dynamic>['value', 1]));
+    final Document doc2 =
+        util.doc('docs/2', 2, util.map(<dynamic>['value', 2]));
+    final Document updatedDoc2 =
+        util.doc('docs/2', 3, util.map(<dynamic>['value', 2]));
+
+    final WatchChange change1 =
+        WatchChangeDocumentChange(<int>[1], <int>[], doc1.key, doc1);
+    final WatchChange change2 =
+        WatchChangeDocumentChange(<int>[2], <int>[], doc2.key, doc2);
+
+    final WatchChangeAggregator aggregator = createAggregator(
+        targetMap,
+        noOutstandingResponses,
+        util.keySet(<DocumentKey>[doc1.key, doc2.key]),
+        <WatchChange>[change1, change2]);
+
+    RemoteEvent event = aggregator.createRemoteEvent(util.version(2));
+    expect(event.documentUpdates.length, 2);
+    expect(event.targetChanges.length, 2);
+
+    aggregator.handleDocumentChange(WatchChangeDocumentChange(
+        <int>[2], <int>[], updatedDoc2.key, updatedDoc2));
+    event = aggregator.createRemoteEvent(util.version(2));
+
+    expect(event.documentUpdates.length, 1);
+    expect(event.targetChanges.length, 1);
+
+    final TargetChange mapping1 = util.targetChange(
+        resumeToken, <Document>[], <Document>[updatedDoc2], <NoDocument>[],
+        current: false);
+    expect(event.targetChanges[2], mapping1);
+  });
+
   test('testResumeTokenHandledPerTarget', () {
     final Map<int, QueryData> targetMap = util.activeQueries(<int>[1, 2]);
 

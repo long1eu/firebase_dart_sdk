@@ -21,6 +21,17 @@ class FirestoreClient {
 
   final ChannelOptionsProvider _optionsProvider;
   final FirestoreTransport _transport;
+  bool _terminated = false;
+
+  /// Fails a request made after [shutdown], like `DatastoreImpl.verifyInitialized()` of the JS SDK.
+  void _verifyNotTerminated() {
+    if (_terminated) {
+      throw FirestoreError(
+        'The client has already been terminated.',
+        FirestoreErrorCode.failedPrecondition,
+      );
+    }
+  }
 
   /// Gets multiple documents.
   ///
@@ -30,6 +41,7 @@ class FirestoreClient {
     proto.BatchGetDocumentsRequest request, {
     CallOptions? options,
   }) {
+    _verifyNotTerminated();
     final ResponseStream<proto.BatchGetDocumentsResponse> call = _transport
         .startCall(
           FirestoreRpc.batchGetDocuments,
@@ -47,6 +59,7 @@ class FirestoreClient {
     proto.RunQueryRequest request, {
     CallOptions? options,
   }) {
+    _verifyNotTerminated();
     final ResponseStream<proto.RunQueryResponse> call = _transport.startCall(
       FirestoreRpc.runQuery,
       Stream<proto.RunQueryRequest>.value(request),
@@ -60,6 +73,7 @@ class FirestoreClient {
     proto.RunAggregationQueryRequest request, {
     CallOptions? options,
   }) {
+    _verifyNotTerminated();
     final ResponseStream<proto.RunAggregationQueryResponse> call = _transport
         .startCall(
           FirestoreRpc.runAggregationQuery,
@@ -77,6 +91,7 @@ class FirestoreClient {
     proto.ExecutePipelineRequest request, {
     CallOptions? options,
   }) {
+    _verifyNotTerminated();
     final ResponseStream<proto.ExecutePipelineResponse> call = _transport
         .startCall(
           FirestoreRpc.executePipeline,
@@ -94,6 +109,7 @@ class FirestoreClient {
     proto.BeginTransactionRequest request, {
     CallOptions? options,
   }) {
+    _verifyNotTerminated();
     final ResponseStream<proto.BeginTransactionResponse> call = _transport
         .startCall(
           FirestoreRpc.beginTransaction,
@@ -108,6 +124,7 @@ class FirestoreClient {
     proto.RollbackRequest request, {
     CallOptions? options,
   }) {
+    _verifyNotTerminated();
     final ResponseStream<Empty> call = _transport.startCall(
       FirestoreRpc.rollback,
       Stream<proto.RollbackRequest>.value(request),
@@ -121,6 +138,7 @@ class FirestoreClient {
     proto.CommitRequest request, {
     CallOptions? options,
   }) {
+    _verifyNotTerminated();
     final ResponseStream<proto.CommitResponse> call = _transport.startCall(
       FirestoreRpc.commit,
       Stream<proto.CommitRequest>.value(request),
@@ -166,6 +184,7 @@ class FirestoreClient {
   ///
   /// All open calls are terminated immediately, and no further calls may be made on this connection.
   Future<void> shutdown() {
+    _terminated = true;
     callReleaser.cancelAll();
     return _transport.shutdown();
   }

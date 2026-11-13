@@ -911,11 +911,11 @@ class RemoteSerializer {
       builder.resumeToken = queryData.resumeToken;
     }
 
-    // The expected count only makes sense relative to a resume token: it is the
-    // number of documents the client had when that token was handed out.
-    // PORTING NOTE: upstream also sends it together with a read time; this port
-    // only does so for resume tokens.
-    if (queryData.expectedCount != null && queryData.resumeToken.isNotEmpty) {
+    // The expected count only makes sense relative to a resume token or a read
+    // time: it is the number of documents the client had at that point.
+    if (queryData.expectedCount != null &&
+        (queryData.resumeToken.isNotEmpty ||
+            queryData.snapshotVersion.compareTo(SnapshotVersion.none) > 0)) {
       builder.expectedCount = proto.Int32Value(value: queryData.expectedCount);
     }
 

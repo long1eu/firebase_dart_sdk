@@ -33,6 +33,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_versi
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/watch_change.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as proto_;
@@ -392,6 +393,34 @@ void main() {
     assertRoundTrip(model, data, ValueTypeCase.mapValue);
   });
 
+  test('testEncodesVectorValue', () {
+    final FieldValue model =
+        wrap(firestore.FieldValue.vector(<double>[1, 2, 3]));
+
+    final proto.ArrayValue array = proto.ArrayValue.create()
+      ..values.add(valueBuilder()..doubleValue = 1)
+      ..values.add(valueBuilder()..doubleValue = 2)
+      ..values.add(valueBuilder()..doubleValue = 3);
+
+    final proto.MapValue obj = proto.MapValue.create()
+      ..fields['__type__'] = (valueBuilder()..stringValue = '__vector__')
+      ..fields['value'] = (valueBuilder()..arrayValue = array);
+
+    final proto_.Value data = valueBuilder()
+      ..mapValue = obj
+      ..freeze();
+
+    assertRoundTrip(model, data, ValueTypeCase.mapValue);
+  });
+
+
+
+
+
+
+
+
+
   test('testEncodeDeleteMutation', () {
     final Mutation mutation = deleteMutation('docs/1');
 
@@ -526,6 +555,102 @@ void main() {
     assertRoundTripForMutation(mutation, expected);
   });
 
+  /// The Android TestUtil `setMutation`: parses [values] like a `set()` call,
+  /// so field value sentinels become field transforms.
+  Mutation setMutationWithTransforms(String path, Map<String, Object?> values) {
+    return UserDataConverter(DatabaseId.forProject('project'))
+        .parseSetData(values)
+        .toMutation(key(path), Precondition.none);
+  }
+
+  test('testEncodesServerTimestampMutation', () {
+    Mutation mutation = setMutationWithTransforms('docs/1', <String, Object?>{
+      'a': firestore.FieldValue.serverTimestamp(),
+      'bar': firestore.FieldValue.serverTimestamp(),
+    });
+    proto.Write expected = proto.Write.create()
+      ..update = (proto.Document.create()
+        ..name = 'projects/p/databases/d/documents/docs/1')
+      ..updateTransforms.add(proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = 'a'
+        ..setToServerValue =
+            proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME)
+      ..updateTransforms.add(proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = 'bar'
+        ..setToServerValue =
+            proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME)
+      ..freeze();
+    assertRoundTripForMutation(mutation, expected);
+
+    mutation = transformMutation('docs/1', <String, Object>{
+      'a': firestore.FieldValue.serverTimestamp(),
+      'bar.baz': firestore.FieldValue.serverTimestamp(),
+    });
+    expected = proto.Write.create()
+      ..update = (proto.Document.create()
+        ..name = 'projects/p/databases/d/documents/docs/1')
+      ..updateMask = proto.DocumentMask.create()
+      ..updateTransforms.add(proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = 'a'
+        ..setToServerValue =
+            proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME)
+      ..updateTransforms.add(proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = 'bar.baz'
+        ..setToServerValue =
+            proto.DocumentTransform_FieldTransform_ServerValue.REQUEST_TIME)
+      ..currentDocument = (proto.Precondition.create()..exists = true)
+      ..freeze();
+    assertRoundTripForMutation(mutation, expected);
+  });
+
+  test('testEncodesArrayMutations', () {
+    Mutation mutation = setMutationWithTransforms('docs/1', <String, Object?>{
+      'a': firestore.FieldValue.arrayUnion(<Object>['a', 2]),
+      'bar': firestore.FieldValue.arrayRemove(<Object>[
+        <String, Object>{'x': 1}
+      ]),
+    });
+    proto.Write expected = proto.Write.create()
+      ..update = (proto.Document.create()
+        ..name = 'projects/p/databases/d/documents/docs/1')
+      ..updateTransforms.add(proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = 'a'
+        ..appendMissingElements = (proto.ArrayValue.create()
+          ..values.add(serializer.encodeValue(wrap('a')))
+          ..values.add(serializer.encodeValue(wrap(2)))))
+      ..updateTransforms.add(proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = 'bar'
+        ..removeAllFromArray = (proto.ArrayValue.create()
+          ..values
+              .add(serializer.encodeValue(wrap(<String, Object>{'x': 1})))))
+      ..freeze();
+    assertRoundTripForMutation(mutation, expected);
+
+    mutation = transformMutation('docs/1', <String, Object>{
+      'a': firestore.FieldValue.arrayUnion(<Object>['a', 2]),
+      'bar.baz': firestore.FieldValue.arrayRemove(<Object>[
+        <String, Object>{'x': 1}
+      ]),
+    });
+    expected = proto.Write.create()
+      ..update = (proto.Document.create()
+        ..name = 'projects/p/databases/d/documents/docs/1')
+      ..updateMask = proto.DocumentMask.create()
+      ..updateTransforms.add(proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = 'a'
+        ..appendMissingElements = (proto.ArrayValue.create()
+          ..values.add(serializer.encodeValue(wrap('a')))
+          ..values.add(serializer.encodeValue(wrap(2)))))
+      ..updateTransforms.add(proto.DocumentTransform_FieldTransform.create()
+        ..fieldPath = 'bar.baz'
+        ..removeAllFromArray = (proto.ArrayValue.create()
+          ..values
+              .add(serializer.encodeValue(wrap(<String, Object>{'x': 1})))))
+      ..currentDocument = (proto.Precondition.create()..exists = true)
+      ..freeze();
+    assertRoundTripForMutation(mutation, expected);
+  });
+
   test('testEncodesSetMutationWithTransforms', () {
     final List<FieldTransform> transforms = <FieldTransform>[
       FieldTransform(field('a'), ServerTimestampOperation()),
@@ -647,27 +772,6 @@ void main() {
     result = serializer.encodeListenRequestLabels(queryData).entries.first;
     expect(result.key, 'goog-listen-tags');
     expect(result.value, 'existence-filter-mismatch-bloom');
-  });
-
-  test('testEncodesExpectedCountWhenResumeTokenIsPresent', () {
-    final Query q = Query(ResourcePath.fromString('docs'));
-    final Uint8List token = Uint8List.fromList(<int>[1, 2, 3]);
-    final QueryData queryData = QueryData(q.toTarget(), 1, 2,
-        QueryPurpose.listen, SnapshotVersion.none, token, 42);
-    final proto_.Target actual = serializer.encodeTarget(queryData);
-
-    expect(actual.expectedCount.value, 42);
-    expect(actual.resumeToken, token);
-    expect(actual.query, serializer.encodeQueryTarget(q.toTarget()));
-  });
-
-  test('testIgnoresExpectedCountWithoutResumeToken', () {
-    final Query q = Query(ResourcePath.fromString('docs'));
-    final QueryData queryData = QueryData(q.toTarget(), 1, 2,
-        QueryPurpose.listen, SnapshotVersion.none, Uint8List(0), 42);
-    final proto_.Target actual = serializer.encodeTarget(queryData);
-
-    expect(actual.hasExpectedCount(), isFalse);
   });
 
   test('testDecodesExistenceFilterWithAndWithoutUnchangedNames', () {
@@ -870,6 +974,73 @@ void main() {
         q.toTarget(),
         serializer
             .decodeQueryTarget(serializer.encodeQueryTarget(q.toTarget())));
+  });
+
+  test('testEncodesCompositeFiltersOnDeeperCollections', () {
+    // (prop < 42) || (author == "ehsann" && tags array-contains "pending")
+    final Query q =
+        Query(ResourcePath.fromString('rooms/1/messages/10/attachments'))
+            .filter(orFilters(<Filter>[
+      filter('prop', '<', 42),
+      andFilters(<Filter>[
+        filter('author', '==', 'ehsann'),
+        filter('tags', 'array-contains', 'pending'),
+      ]),
+    ]));
+    final proto_.Target actual = serializer.encodeTarget(wrapQueryData(q));
+
+    proto.StructuredQuery_Filter fieldFilter(String path,
+            proto.StructuredQuery_FieldFilter_Operator op, proto_.Value value) =>
+        proto.StructuredQuery_Filter.create()
+          ..fieldFilter = (proto.StructuredQuery_FieldFilter.create()
+            ..field_1 =
+                (proto.StructuredQuery_FieldReference.create()..fieldPath = path)
+            ..op = op
+            ..value = value);
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'attachments')
+          ..where = (proto.StructuredQuery_Filter.create()
+            ..compositeFilter = (proto.StructuredQuery_CompositeFilter.create()
+              ..op = proto.StructuredQuery_CompositeFilter_Operator.OR
+              ..filters.add(fieldFilter(
+                  'prop',
+                  proto.StructuredQuery_FieldFilter_Operator.LESS_THAN,
+                  valueBuilder()..integerValue = Int64(42)))
+              ..filters.add(proto.StructuredQuery_Filter.create()
+                ..compositeFilter = (proto.StructuredQuery_CompositeFilter
+                    .create()
+                  ..op = proto.StructuredQuery_CompositeFilter_Operator.AND
+                  ..filters.add(fieldFilter(
+                      'author',
+                      proto.StructuredQuery_FieldFilter_Operator.EQUAL,
+                      valueBuilder()..stringValue = 'ehsann'))
+                  ..filters.add(fieldFilter(
+                      'tags',
+                      proto.StructuredQuery_FieldFilter_Operator.ARRAY_CONTAINS,
+                      valueBuilder()..stringValue = 'pending'))))))
+          ..orderBy.add(proto.StructuredQuery_Order.create()
+            ..field_1 =
+                (proto.StructuredQuery_FieldReference.create()..fieldPath = 'prop')
+            ..direction = proto.StructuredQuery_Direction.ASCENDING)
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents/rooms/1/messages/10'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..freeze();
+
+    expect(actual, expected);
+    final Target roundTripped =
+        serializer.decodeQueryTarget(serializer.encodeQueryTarget(q.toTarget()));
+    expect(roundTripped, q.toTarget());
   });
 
   test('testNotEqualSerialization', () {
@@ -1506,6 +1677,127 @@ void main() {
       ..query = queryBuilder
       ..targetId = 1
       ..resumeToken = resumeToken(1000)!
+      ..freeze();
+
+    expect(actual, expected);
+    expect(
+        q.toTarget(),
+        serializer
+            .decodeQueryTarget(serializer.encodeQueryTarget(q.toTarget())));
+  });
+
+  test('testEncodesReadTime', () {
+    final Query q = Query(ResourcePath.fromString('docs'));
+    final proto_.Target actual = serializer.encodeTarget(QueryData(q.toTarget(), 1, 2,
+        QueryPurpose.listen, version(4000000), Uint8List(0)));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      // encodeTimestamp() sets nanos explicitly; Dart protobuf equality tells
+      // an explicit zero apart from an unset field, the wire bytes are equal.
+      ..readTime = proto.Timestamp(seconds: Int64(4), nanos: 0)
+      ..freeze();
+
+    expect(actual, expected);
+    expect(
+        q.toTarget(),
+        serializer
+            .decodeQueryTarget(serializer.encodeQueryTarget(q.toTarget())));
+  });
+
+  test('encodesExpectedCountWhenResumeTokenIsPresent', () {
+    final Query q = Query(ResourcePath.fromString('docs'));
+    final proto_.Target actual = serializer.encodeTarget(QueryData(q.toTarget(), 1, 2,
+        QueryPurpose.listen, SnapshotVersion.none, resumeToken(1000), 42));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      ..resumeToken = resumeToken(1000)!
+      ..expectedCount = proto.Int32Value(value: 42)
+      ..freeze();
+
+    expect(actual, expected);
+    expect(
+        q.toTarget(),
+        serializer
+            .decodeQueryTarget(serializer.encodeQueryTarget(q.toTarget())));
+  });
+
+  test('encodesExpectedCountWhenReadTimeIsPresent', () {
+    final Query q = Query(ResourcePath.fromString('docs'));
+    final proto_.Target actual = serializer.encodeTarget(QueryData(q.toTarget(), 1, 2,
+        QueryPurpose.listen, version(4000000), Uint8List(0), 42));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
+      // encodeTimestamp() sets nanos explicitly; Dart protobuf equality tells
+      // an explicit zero apart from an unset field, the wire bytes are equal.
+      ..readTime = proto.Timestamp(seconds: Int64(4), nanos: 0)
+      ..expectedCount = proto.Int32Value(value: 42)
+      ..freeze();
+
+    expect(actual, expected);
+    expect(
+        q.toTarget(),
+        serializer
+            .decodeQueryTarget(serializer.encodeQueryTarget(q.toTarget())));
+  });
+
+  test('shouldIgnoreExpectedCountWithoutResumeTokenOrReadTime', () {
+    final Query q = Query(ResourcePath.fromString('docs'));
+    final proto_.Target actual = serializer.encodeTarget(QueryData(q.toTarget(), 1, 2,
+        QueryPurpose.listen, SnapshotVersion.none, Uint8List(0), 42));
+
+    final proto.StructuredQuery structuredQueryBuilder =
+        proto.StructuredQuery.create()
+          ..from.add(proto.StructuredQuery_CollectionSelector.create()
+            ..collectionId = 'docs')
+          ..orderBy.add(defaultKeyOrder());
+
+    final proto_.Target_QueryTarget queryBuilder =
+        proto.Target_QueryTarget.create()
+          ..parent = 'projects/p/databases/d/documents'
+          ..structuredQuery = structuredQueryBuilder;
+
+    final proto_.Target expected = proto_.Target.create()
+      ..query = queryBuilder
+      ..targetId = 1
       ..freeze();
 
     expect(actual, expected);
