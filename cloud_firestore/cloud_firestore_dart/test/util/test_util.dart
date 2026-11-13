@@ -345,6 +345,24 @@ Map<int, QueryData> activeLimboQueries(String docKey, Iterable<int> targets) {
   return listenMap;
 }
 
+/// Simulates an add target request and its ack for each target id in
+/// [targetIdsCollections], so that [aggregator] tracks those targets: it
+/// ignores watch changes for targets it has no state for (firebase-js-sdk
+/// #9985). Port of the JS test helper `addWatchTargets`.
+void addWatchTargets(
+  WatchChangeAggregator aggregator,
+  List<Iterable<int>> targetIdsCollections,
+) {
+  for (final Iterable<int> targetIds in targetIdsCollections) {
+    for (final int targetId in targetIds) {
+      aggregator
+        ..recordPendingTargetRequest(targetId)
+        ..handleTargetChange(WatchChangeWatchTargetChange(
+            WatchTargetChangeType.added, <int>[targetId]));
+    }
+  }
+}
+
 RemoteEvent addedRemoteEvent(MaybeDocument doc, List<int> updatedInTargets,
     List<int> removedFromTargets) {
   final WatchChangeDocumentChange change = WatchChangeDocumentChange(
@@ -355,8 +373,10 @@ RemoteEvent addedRemoteEvent(MaybeDocument doc, List<int> updatedInTargets,
     getDatabaseId: () => DatabaseId.forDatabase('p', 'd'),
     getQueryDataForTarget: (int targetId) =>
         queryData(targetId, QueryPurpose.listen, doc.key.toString()),
-  ))
-        ..handleDocumentChange(change);
+  ));
+  addWatchTargets(
+      aggregator, <List<int>>[updatedInTargets, removedFromTargets]);
+  aggregator.handleDocumentChange(change);
   return aggregator.createRemoteEvent(doc.version);
 }
 
@@ -371,6 +391,8 @@ RemoteEvent addedRemoteEvents(List<MaybeDocument> docs,
     getQueryDataForTarget: (int targetId) => queryData(targetId,
         QueryPurpose.listen, docs.first.key.path.popLast().toString()),
   ));
+  addWatchTargets(
+      aggregator, <List<int>>[updatedInTargets, removedFromTargets]);
 
   SnapshotVersion version = SnapshotVersion.none;
   for (final MaybeDocument doc in docs) {
@@ -399,8 +421,10 @@ RemoteEvent updateRemoteEvent(
           isLimbo ? QueryPurpose.limboResolution : QueryPurpose.listen;
       return queryData(targetId, purpose, doc.key.toString());
     },
-  ))
-        ..handleDocumentChange(change);
+  ));
+  addWatchTargets(aggregator,
+      <List<int>>[updatedInTargets, removedFromTargets, limboTargets]);
+  aggregator.handleDocumentChange(change);
   return aggregator.createRemoteEvent(doc.version);
 }
 

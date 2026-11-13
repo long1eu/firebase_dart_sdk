@@ -64,6 +64,10 @@ void main() {
       targetMetadataProvider.setSyncedKeys(entry.value, existingKeys);
     }
 
+    // Put all targets into the 'added' state, then move the
+    // `outstandingResponses` targets into the 'pending' state.
+    util.addWatchTargets(aggregator, <List<int>>[targetIds]);
+
     for (MapEntry<int, int> entry in outstandingResponses.entries) {
       for (int i = 0; i < entry.value; ++i) {
         aggregator.recordPendingTargetRequest(entry.key);
@@ -114,6 +118,37 @@ void main() {
         targetMap, outstandingResponses, existingKeys, watchChanges);
     return aggregator.createRemoteEvent(util.version(snapshotVersion));
   }
+
+  // firebase-js-sdk #9985: changes for a target that the aggregator does not
+  // track (no request was recorded for it, e.g. an old target) are ignored
+  // instead of creating state for it.
+  test('ignores watch changes for untracked targets', () {
+    final QueryData queryData = util.activeQueries(<int>[1])[1]!;
+    targetMetadataProvider.setSyncedKeys(queryData, noExistingKeys);
+    final WatchChangeAggregator aggregator =
+        WatchChangeAggregator(targetMetadataProvider);
+
+    final Document doc =
+        util.doc('docs/1', 1, util.map(<dynamic>['value', 1]));
+    aggregator
+      ..handleTargetChange(WatchChangeWatchTargetChange(
+          WatchTargetChangeType.current, <int>[1], resumeToken))
+      ..handleDocumentChange(
+          WatchChangeDocumentChange(<int>[1], <int>[], doc.key, doc));
+    final RemoteEvent event = aggregator.createRemoteEvent(util.version(2));
+
+    expect(event.targetChanges, isEmpty);
+    expect(event.documentUpdates, isEmpty);
+
+    // Once the target is requested and acknowledged, its changes count.
+    util.addWatchTargets(aggregator, <List<int>>[<int>[1]]);
+    aggregator.handleDocumentChange(
+        WatchChangeDocumentChange(<int>[1], <int>[], doc.key, doc));
+    final RemoteEvent tracked = aggregator.createRemoteEvent(util.version(3));
+    expect(tracked.documentUpdates.keys, <DocumentKey>[doc.key]);
+    expect(tracked.targetChanges[1]!.addedDocuments.toList(),
+        <DocumentKey>[doc.key]);
+  });
 
   test('testWillAccumulateDocumentAddedAndRemovedEvents', () {
     final Map<int, QueryData> targetMap =

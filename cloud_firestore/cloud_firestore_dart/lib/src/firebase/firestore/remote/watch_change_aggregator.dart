@@ -79,7 +79,17 @@ class WatchChangeAggregator {
   /// Processes and adds the [WatchChangeWatchTargetChange] to the current set of changes.
   void handleTargetChange(WatchChangeWatchTargetChange targetChange) {
     for (int targetId in _getTargetIds(targetChange)) {
-      final TargetState targetState = _ensureTargetState(targetId);
+      final TargetState? targetState = _targetStates[targetId];
+      // An unknown target means the change is for an old target
+      // (firebase-js-sdk #9985).
+      if (targetState == null) {
+        Log.d(
+          _tag,
+          'handleTargetChange received targetChange for untracked target ID '
+          '($targetId) with state (${targetChange.changeType})',
+        );
+        continue;
+      }
 
       switch (targetChange.changeType) {
         case WatchTargetChangeType.noChange:
@@ -352,7 +362,13 @@ class WatchChangeAggregator {
   /// Adds the provided document to the internal list of document updates and its document key to
   /// the given target's mapping.
   void _addDocumentToTarget(int targetId, MaybeDocument document) {
-    if (!_isActiveTarget(targetId)) {
+    final TargetState? targetState = _targetStates[targetId];
+    if (targetState == null || !_isActiveTarget(targetId)) {
+      Log.d(
+        _tag,
+        'addDocumentToTarget received document for unknown inactive target '
+        '($targetId)',
+      );
       return;
     }
 
@@ -361,7 +377,6 @@ class WatchChangeAggregator {
         ? DocumentViewChangeType.modified
         : DocumentViewChangeType.added;
 
-    final TargetState targetState = _ensureTargetState(targetId);
     targetState.addDocumentChange(document.key, changeType);
 
     _pendingDocumentUpdates[document.key] = document;
@@ -379,11 +394,16 @@ class WatchChangeAggregator {
     DocumentKey key,
     MaybeDocument? updatedDocument,
   ) {
-    if (!_isActiveTarget(targetId)) {
+    final TargetState? targetState = _targetStates[targetId];
+    if (targetState == null || !_isActiveTarget(targetId)) {
+      Log.d(
+        _tag,
+        'removeDocumentFromTarget received document for unknown or inactive '
+        'target ($targetId)',
+      );
       return;
     }
 
-    final TargetState targetState = _ensureTargetState(targetId);
     if (_targetContainsDocument(targetId, key)) {
       targetState.addDocumentChange(key, DocumentViewChangeType.removed);
     } else {
@@ -405,7 +425,10 @@ class WatchChangeAggregator {
   /// documents that the [LocalStore] considers to be part of the target as well as any accumulated
   /// changes.
   int _getCurrentDocumentCountForTarget(int targetId) {
-    final TargetState targetState = _ensureTargetState(targetId);
+    final TargetState? targetState = _targetStates[targetId];
+    if (targetState == null) {
+      return 0;
+    }
     final TargetChange targetChange = targetState.toTargetChange();
     return _targetMetadataProvider.getRemoteKeysForTarget(targetId).length +
         targetChange.addedDocuments.length -
@@ -416,12 +439,15 @@ class WatchChangeAggregator {
   /// 'in-sync' with the client's active targets.
   void recordPendingTargetRequest(int targetId) {
     // For each request we get we need to record we need a response for it.
-    final TargetState targetState = _ensureTargetState(targetId);
+    TargetState? targetState = _targetStates[targetId];
+    if (targetState == null) {
+      Log.d(
+        _tag,
+        'recordPendingTargetRequest set up tracking for target ID $targetId',
+      );
+      targetState = _targetStates[targetId] = TargetState();
+    }
     targetState.recordPendingTargetRequest();
-  }
-
-  TargetState _ensureTargetState(int targetId) {
-    return _targetStates[targetId] ??= TargetState();
   }
 
   Set<int> _ensureDocumentTargetMapping(DocumentKey key) {
@@ -438,7 +464,8 @@ class WatchChangeAggregator {
   /// in that has no outstanding target change requests).
   QueryData? _queryDataForActiveTarget(int targetId) {
     final TargetState? targetState = _targetStates[targetId];
-    return targetState != null && targetState.isPending()
+    // An untracked target is not active either (firebase-js-sdk #9985).
+    return targetState == null || targetState.isPending()
         ? null
         : _targetMetadataProvider.getQueryDataForTarget(targetId);
   }

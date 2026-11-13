@@ -1368,6 +1368,9 @@ class LocalStoreTestCase {
     final WatchChangeAggregator aggregator = WatchChangeAggregator(
       testTargetMetadataProvider,
     );
+    addWatchTargets(aggregator, <List<int>>[
+      <int>[targetId],
+    ]);
 
     final WatchChangeWatchTargetChange watchChange =
         WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[
@@ -1410,6 +1413,9 @@ class LocalStoreTestCase {
     final WatchChangeAggregator aggregator1 = WatchChangeAggregator(
       testTargetMetadataProvider,
     );
+    addWatchTargets(aggregator1, <List<int>>[
+      <int>[targetId],
+    ]);
 
     final WatchChangeWatchTargetChange watchChange1 =
         WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[
@@ -1425,6 +1431,9 @@ class LocalStoreTestCase {
     final WatchChangeAggregator aggregator2 = WatchChangeAggregator(
       testTargetMetadataProvider,
     );
+    addWatchTargets(aggregator2, <List<int>>[
+      <int>[targetId],
+    ]);
     final WatchChangeWatchTargetChange watchChange2 =
         WatchChangeWatchTargetChange(WatchTargetChangeType.current, <int>[
           targetId,
@@ -2567,12 +2576,15 @@ class LocalStoreTestCase {
       queryData(targetId, QueryPurpose.listen, 'foo/bar'),
       DocumentKey.emptyKeySet,
     );
-    final WatchChangeAggregator aggregator = WatchChangeAggregator(provider)
-      ..handleTargetChange(
-        WatchChangeWatchTargetChange(WatchTargetChangeType.noChange, <int>[
-          targetId,
-        ], resumeToken(theVersion)),
-      );
+    final WatchChangeAggregator aggregator = WatchChangeAggregator(provider);
+    addWatchTargets(aggregator, <List<int>>[
+      <int>[targetId],
+    ]);
+    aggregator.handleTargetChange(
+      WatchChangeWatchTargetChange(WatchTargetChangeType.noChange, <int>[
+        targetId,
+      ], resumeToken(theVersion)),
+    );
     return aggregator.createRemoteEvent(version(theVersion));
   }
 
@@ -2587,13 +2599,16 @@ class LocalStoreTestCase {
       queryData(targetId, QueryPurpose.listen, 'foo'),
       syncedKeys,
     );
-    final WatchChangeAggregator aggregator = WatchChangeAggregator(provider)
-      ..handleExistenceFilter(
-        WatchChangeExistenceFilterWatchChange(
-          targetId,
-          ExistenceFilter(remoteCount),
-        ),
-      );
+    final WatchChangeAggregator aggregator = WatchChangeAggregator(provider);
+    addWatchTargets(aggregator, <List<int>>[
+      <int>[targetId],
+    ]);
+    aggregator.handleExistenceFilter(
+      WatchChangeExistenceFilterWatchChange(
+        targetId,
+        ExistenceFilter(remoteCount),
+      ),
+    );
     return aggregator.createRemoteEvent(version(theVersion));
   }
 
@@ -3832,6 +3847,7 @@ class LocalStoreTestCase {
             queryData(targetId, QueryPurpose.listen, 'foo'),
       ),
     );
+    addWatchTargets(aggregator, <List<int>>[updatedInTargets]);
     SnapshotVersion snapshotVersion = SnapshotVersion.none;
     for (MaybeDocument doc in docs) {
       aggregator.handleDocumentChange(
