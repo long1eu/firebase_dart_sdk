@@ -6,6 +6,7 @@ import 'package:firebase_app_dart/internal.dart' show Log;
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 
+import 'action_code.dart';
 import 'auth_exception.dart';
 import 'auth_storage.dart';
 import 'auth_user.dart';
@@ -31,8 +32,10 @@ import 'environment_stub.dart' if (dart.library.io) 'environment_io.dart';
 /// (Firestore does). The session (the refresh token) is kept in an [AuthStorage]; the default forgets it when the
 /// process ends.
 ///
-/// This is not a port of the Firebase Auth SDK: there are no federated providers, no phone sign-in, no email
-/// actions, no multi-factor and no account management.
+/// Account management follows the REST-backed operations of the JS SDK: password reset, email verification and
+/// action codes, email, password and profile updates, reauthentication with a password, account deletion, and
+/// the sign-in methods of an email address. This is not a port of the whole Firebase Auth SDK: there are no
+/// federated providers or popup and redirect flows, no phone sign-in, no email link sign-in and no multi-factor.
 class FirebaseUserAuth implements InternalTokenProvider {
   /// Creates an instance for the project of [apiKey] (the Web API key of the Firebase project).
   ///
@@ -253,8 +256,9 @@ class FirebaseUserAuth implements InternalTokenProvider {
   @override
   String? get uid => _session?.user.uid;
 
-  /// Emits the user after every sign-in and sign-out (null when signed out). It does not emit the current user
-  /// when it is listened to: read [currentUser] for that.
+  /// Emits the user after every sign-in and sign-out (null when signed out), and after a change of the data of the
+  /// signed-in user ([updateProfile], [updateEmail], [reload], ...). It does not emit the current user when it is
+  /// listened to: read [currentUser] for that.
   Stream<AuthUser?> get userChanges => _userChanges.stream;
 
   /// Emits the ID token after a sign-in, after every refresh, and an empty token after a sign-out.
@@ -278,6 +282,13 @@ class FirebaseUserAuth implements InternalTokenProvider {
               uid: json['uid']! as String,
               email: json['email'] is String ? json['email']! as String : null,
               isAnonymous: json['isAnonymous'] == true,
+              emailVerified: json['emailVerified'] == true,
+              displayName: json['displayName'] is String
+                  ? json['displayName']! as String
+                  : null,
+              photoUrl: json['photoUrl'] is String
+                  ? json['photoUrl']! as String
+                  : null,
             ),
             json['refreshToken']! as String,
             null,
@@ -333,16 +344,261 @@ class FirebaseUserAuth implements InternalTokenProvider {
     await _clearSession();
   }
 
-  /// Deletes the account of the signed-in user and signs out. Meant for tests and for throwaway (anonymous)
-  /// accounts; the backend refuses it (`requires-recent-login`) when the sign-in is too long ago.
+  /// Deletes the account of the signed-in user and signs out (`user.delete()` of the JS SDK). The backend refuses
+  /// it with `requires-recent-login` when the sign-in is too long ago: reauthenticate first.
   Future<void> deleteCurrentUser() async {
-    final GetTokenResult token = await getAccessToken(forceRefresh: false);
-    await _send(
-      _identityToolkit('accounts:delete'),
-      json: <String, Object?>{'idToken': token.token},
-    );
-    await _clearSession();
+    await _forUser((String idToken, int generation) async {
+      await _send(
+        _identityToolkit('accounts:delete'),
+        json: <String, Object?>{'idToken': idToken},
+      );
+      if (generation == _generation) {
+        await _clearSession();
+      }
+    });
   }
+
+  // ---- account management (the REST-backed operations of the JS SDK) ----
+
+  /// Sends a password reset email to [email] (`sendPasswordResetEmail`). The link carries the code that
+  /// [confirmPasswordReset] takes.
+  ///
+  /// Throws `user-not-found` (projects without email enumeration protection), `invalid-email`,
+  /// `too-many-requests`, `invalid-continue-uri`, ...
+  Future<void> sendPasswordResetEmail(
+    String email, {
+    ActionCodeSettings? actionCodeSettings,
+  }) async {
+    _checkNotDisposed();
+    await _send(
+      _identityToolkit('accounts:sendOobCode'),
+      json: <String, Object?>{
+        'requestType': ActionCodeOperation.passwordReset.serverName,
+        'email': email,
+        ...?actionCodeSettings?.toRequest(),
+      },
+    );
+  }
+
+  /// Sets [newPassword] with the [code] of a password reset email (`confirmPasswordReset`).
+  ///
+  /// Throws `expired-action-code`, `invalid-action-code`, `weak-password`, `user-disabled`, ...
+  Future<void> confirmPasswordReset(String code, String newPassword) async {
+    _checkNotDisposed();
+    await _send(
+      _identityToolkit('accounts:resetPassword'),
+      json: <String, Object?>{'oobCode': code, 'newPassword': newPassword},
+    );
+  }
+
+  /// What the action [code] is for and which email address it is about, without applying it (`checkActionCode`).
+  Future<ActionCodeInfo> checkActionCode(String code) async {
+    _checkNotDisposed();
+    return ActionCodeInfo.fromResponse(
+      await _send(
+        _identityToolkit('accounts:resetPassword'),
+        json: <String, Object?>{'oobCode': code},
+      ),
+    );
+  }
+
+  /// The email address of the password reset [code], which is not used up (`verifyPasswordResetCode`).
+  Future<String> verifyPasswordResetCode(String code) async {
+    final ActionCodeInfo info = await checkActionCode(code);
+    final String? email = info.email;
+    if (email == null) {
+      throw const FirebaseAuthProviderException(
+        'internal-error',
+        'The action code has no email address.',
+      );
+    }
+    return email;
+  }
+
+  /// Applies the action [code] of an email: verifies the email address, or changes it for
+  /// [verifyBeforeUpdateEmail], or undoes a change (`applyActionCode`). The signed-in user is not reloaded, like
+  /// in the JS SDK: call [reload] to see the change.
+  ///
+  /// Throws `expired-action-code`, `invalid-action-code`, `user-disabled`, `user-not-found`, ...
+  Future<void> applyActionCode(String code) async {
+    _checkNotDisposed();
+    await _send(
+      _identityToolkit('accounts:update'),
+      json: <String, Object?>{'oobCode': code},
+    );
+  }
+
+  /// The sign-in methods of the account of [email], for example `['password']` (`fetchSignInMethodsForEmail`).
+  ///
+  /// Projects with email enumeration protection (the default for new projects) always answer with an empty list;
+  /// the JS SDK documents the method as deprecated for that reason.
+  Future<List<String>> fetchSignInMethodsForEmail(String email) async {
+    _checkNotDisposed();
+    // Like the JS SDK: the current page when there is one, else http://localhost.
+    final Uri base = Uri.base;
+    final String continueUri = base.scheme == 'http' || base.scheme == 'https'
+        ? base.toString()
+        : 'http://localhost';
+    final Map<String, Object?> response = await _send(
+      _identityToolkit('accounts:createAuthUri'),
+      json: <String, Object?>{'identifier': email, 'continueUri': continueUri},
+    );
+    final Object? methods = response['signinMethods'];
+    return methods is List ? methods.whereType<String>().toList() : <String>[];
+  }
+
+  /// Sends an email to the signed-in user to verify the email address (`sendEmailVerification`). The user is
+  /// reloaded when the backend knows another address than [currentUser].
+  Future<void> sendEmailVerification({
+    ActionCodeSettings? actionCodeSettings,
+  }) => _forUser((String idToken, int generation) async {
+    final Map<String, Object?> response = await _send(
+      _identityToolkit('accounts:sendOobCode'),
+      json: <String, Object?>{
+        'requestType': ActionCodeOperation.verifyEmail.serverName,
+        'idToken': idToken,
+        ...?actionCodeSettings?.toRequest(),
+      },
+    );
+    if (response['email'] != _session?.user.email) {
+      await _reload(generation);
+    }
+  });
+
+  /// Sends an email to [newEmail]; the address of the account changes when the link in it is used
+  /// (`verifyBeforeUpdateEmail`). This is what projects with email enumeration protection allow instead of
+  /// [updateEmail].
+  Future<void> verifyBeforeUpdateEmail(
+    String newEmail, {
+    ActionCodeSettings? actionCodeSettings,
+  }) => _forUser((String idToken, int generation) async {
+    final Map<String, Object?> response = await _send(
+      _identityToolkit('accounts:sendOobCode'),
+      json: <String, Object?>{
+        'requestType': ActionCodeOperation.verifyAndChangeEmail.serverName,
+        'idToken': idToken,
+        'newEmail': newEmail,
+        ...?actionCodeSettings?.toRequest(),
+      },
+    );
+    if (response['email'] != _session?.user.email) {
+      await _reload(generation);
+    }
+  });
+
+  /// Changes the email address of the signed-in user (`updateEmail`).
+  ///
+  /// Throws `requires-recent-login`, `email-already-in-use`, `invalid-email`, and `operation-not-allowed` on
+  /// projects with email enumeration protection (use [verifyBeforeUpdateEmail] there).
+  Future<void> updateEmail(String newEmail) =>
+      _updateEmailOrPassword(<String, Object?>{'email': newEmail});
+
+  /// Changes the password of the signed-in user (`updatePassword`). The session continues with the new tokens
+  /// the backend returns.
+  ///
+  /// Throws `requires-recent-login`, `weak-password`, ...
+  Future<void> updatePassword(String newPassword) =>
+      _updateEmailOrPassword(<String, Object?>{'password': newPassword});
+
+  /// Changes the display name and the photo URL of the signed-in user (`updateProfile`). A null argument keeps the
+  /// value; an empty string removes it (the JS SDK takes null for that, which the REST API does not honour: the
+  /// attribute is deleted with `deleteAttribute`).
+  Future<void> updateProfile({String? displayName, String? photoUrl}) async {
+    if (displayName == null && photoUrl == null) {
+      return;
+    }
+    await _forUser((String idToken, int generation) async {
+      final List<String> delete = <String>[
+        if (displayName != null && displayName.isEmpty) 'DISPLAY_NAME',
+        if (photoUrl != null && photoUrl.isEmpty) 'PHOTO_URL',
+      ];
+      final Map<String, Object?> response = await _send(
+        _identityToolkit('accounts:update'),
+        json: <String, Object?>{
+          'idToken': idToken,
+          if (displayName != null && displayName.isNotEmpty)
+            'displayName': displayName,
+          if (photoUrl != null && photoUrl.isNotEmpty) 'photoUrl': photoUrl,
+          if (delete.isNotEmpty) 'deleteAttribute': delete,
+          'returnSecureToken': true,
+        },
+      );
+      final AuthUser? user = _session?.user;
+      if (user == null) {
+        return;
+      }
+      final Object? newName = response['displayName'];
+      final Object? newPhoto = response['photoUrl'];
+      await _updateSession(
+        response,
+        generation,
+        user: AuthUser(
+          uid: user.uid,
+          email: user.email,
+          isAnonymous: user.isAnonymous,
+          emailVerified: user.emailVerified,
+          displayName: newName is String && newName.isNotEmpty ? newName : null,
+          photoUrl: newPhoto is String && newPhoto.isNotEmpty ? newPhoto : null,
+        ),
+      );
+    });
+  }
+
+  /// Signs the signed-in user in again with [email] and [password] (`reauthenticateWithCredential` with an
+  /// `EmailAuthProvider` credential), which operations such as [updatePassword] and [deleteCurrentUser] need
+  /// when the last sign-in is too long ago.
+  ///
+  /// Throws `user-mismatch` when the credentials are those of another account (or of none), `wrong-password`,
+  /// `invalid-credential`, ...
+  Future<AuthUser> reauthenticateWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
+    _checkNotDisposed();
+    final _Session session = _requireSession();
+    final int generation = _generation;
+    final Map<String, Object?> response;
+    try {
+      response = await _send(
+        _identityToolkit('accounts:signInWithPassword'),
+        json: <String, Object?>{
+          'email': email,
+          'password': password,
+          'returnSecureToken': true,
+        },
+      );
+    } on FirebaseAuthProviderException catch (e) {
+      if (e.code == 'user-not-found') {
+        throw _userMismatch;
+      }
+      rethrow;
+    }
+    final Object? idToken = response['idToken'];
+    if (idToken is! String) {
+      throw const FirebaseAuthProviderException(
+        'internal-error',
+        'The authentication service did not return tokens.',
+      );
+    }
+    final GetTokenResult token = GetTokenResult(idToken);
+    if ((token.claims['sub'] ?? response['localId']) != session.user.uid) {
+      throw _userMismatch;
+    }
+    if (generation != _generation) {
+      throw const FirebaseAuthProviderException(
+        'cancelled',
+        'The reauthentication was overtaken by another sign-in or a sign-out.',
+      );
+    }
+    await _updateSession(response, generation);
+    await _reload(generation);
+    return _session?.user ?? session.user;
+  }
+
+  /// Reads the data of the signed-in user from the backend again (`reload`): email address, verification, display
+  /// name and photo. Signs out when the account is gone or disabled.
+  Future<void> reload() =>
+      _forUser((String idToken, int generation) => _reload(generation));
 
   /// Returns the ID token of the signed-in user, refreshing it when it expires within five minutes or when
   /// [forceRefresh] is set.
@@ -381,6 +637,148 @@ class FirebaseUserAuth implements InternalTokenProvider {
   }
 
   // ---- implementation ----
+
+  static const FirebaseAuthProviderException _userMismatch =
+      FirebaseAuthProviderException(
+        'user-mismatch',
+        'The supplied credentials do not correspond to the signed-in user.',
+      );
+
+  _Session _requireSession() {
+    final _Session? session = _session;
+    if (session == null) {
+      throw const FirebaseAuthProviderException(
+        'null-user',
+        'No user is signed in.',
+      );
+    }
+    return session;
+  }
+
+  /// Runs [operation] with the ID token of the signed-in user. Like `_logoutIfInvalidated` of the JS SDK, the user
+  /// is signed out when the backend answers that the account is disabled or the credential no longer valid.
+  Future<T> _forUser<T>(
+    Future<T> Function(String idToken, int generation) operation,
+  ) async {
+    _checkNotDisposed();
+    _requireSession();
+    final int generation = _generation;
+    final String idToken = (await getAccessToken(forceRefresh: false)).token;
+    try {
+      return await operation(idToken, generation);
+    } on FirebaseAuthProviderException catch (e) {
+      if ((e.code == 'user-disabled' || e.code == 'user-token-expired') &&
+          generation == _generation &&
+          _session != null) {
+        await _clearSession();
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _updateEmailOrPassword(Map<String, Object?> fields) =>
+      _forUser((String idToken, int generation) async {
+        final Map<String, Object?> response = await _send(
+          _identityToolkit('accounts:update'),
+          json: <String, Object?>{
+            'idToken': idToken,
+            ...fields,
+            'returnSecureToken': true,
+          },
+        );
+        await _updateSession(response, generation);
+        await _reload(generation);
+      });
+
+  /// Takes the tokens of [response] (when it has them) and [user] (when given) into the session of [generation],
+  /// like `_updateTokensIfNecessary` of the JS SDK, and tells the listeners.
+  Future<void> _updateSession(
+    Map<String, Object?> response,
+    int generation, {
+    AuthUser? user,
+  }) async {
+    final _Session? session = _session;
+    if (session == null || generation != _generation) {
+      return;
+    }
+    final Object? idToken = response['idToken'];
+    final Object? refreshToken = response['refreshToken'];
+    final AuthUser newUser = user ?? session.user;
+    final _Session updated = idToken is String
+        ? _Session(
+            newUser,
+            refreshToken is String ? refreshToken : session.refreshToken,
+            idToken,
+            _expiry(GetTokenResult(idToken), response['expiresIn']),
+          )
+        : _Session(
+            newUser,
+            session.refreshToken,
+            session.idToken,
+            session.expiry,
+          );
+    await _setSession(
+      updated,
+      persist:
+          updated.refreshToken != session.refreshToken ||
+          newUser != session.user,
+    );
+    if (idToken is String && !_tokenChanges.isClosed) {
+      _tokenChanges.add(InternalTokenResult(idToken));
+    }
+    if (newUser != session.user && !_userChanges.isClosed) {
+      _userChanges.add(newUser);
+    }
+  }
+
+  /// Reads the account of the signed-in user (`accounts:lookup`) and takes it into the session of [generation].
+  Future<void> _reload(int generation) async {
+    if (_session == null || generation != _generation) {
+      return;
+    }
+    final String idToken = (await getAccessToken(forceRefresh: false)).token;
+    final Map<String, Object?> response = await _send(
+      _identityToolkit('accounts:lookup'),
+      json: <String, Object?>{'idToken': idToken},
+    );
+    final Object? users = response['users'];
+    final Object? account = users is List && users.isNotEmpty
+        ? users.first
+        : null;
+    if (account is! Map<String, Object?>) {
+      // What the JS SDK does when the backend has no such user.
+      throw const FirebaseAuthProviderException(
+        'internal-error',
+        'The authentication service returned no account.',
+      );
+    }
+    final AuthUser? user = _session?.user;
+    if (user == null || generation != _generation) {
+      return;
+    }
+    String? text(Object? value) =>
+        value is String && value.isNotEmpty ? value : null;
+    final String? email = text(account['email']);
+    final Object? providers = account['providerUserInfo'];
+    // Like the JS SDK: a user stays anonymous until the account has an email address and a password, or a
+    // provider; a user that was not anonymous never becomes anonymous.
+    final bool isAnonymous =
+        user.isAnonymous &&
+        !(email != null && account['passwordHash'] != null) &&
+        !(providers is List && providers.isNotEmpty);
+    await _updateSession(
+      const <String, Object?>{},
+      generation,
+      user: AuthUser(
+        uid: user.uid,
+        email: email,
+        isAnonymous: isAnonymous,
+        emailVerified: account['emailVerified'] == true,
+        displayName: text(account['displayName']),
+        photoUrl: text(account['photoUrl']),
+      ),
+    );
+  }
 
   bool _isFresh(_Session session) {
     final DateTime? expiry = session.expiry;
@@ -537,11 +935,19 @@ class FirebaseUserAuth implements InternalTokenProvider {
       );
     }
     final Object? email = response['email'] ?? token.claims['email'];
+    final Object? displayName = response['displayName'] ?? token.claims['name'];
+    final Object? photoUrl =
+        response['profilePicture'] ?? token.claims['picture'];
     final _Session session = _Session(
       AuthUser(
         uid: uid,
-        email: email is String ? email : null,
+        email: email is String && email.isNotEmpty ? email : null,
         isAnonymous: token.signInProvider == 'anonymous',
+        emailVerified: token.claims['email_verified'] == true,
+        displayName: displayName is String && displayName.isNotEmpty
+            ? displayName
+            : null,
+        photoUrl: photoUrl is String && photoUrl.isNotEmpty ? photoUrl : null,
       ),
       refreshToken,
       idToken,
@@ -626,6 +1032,9 @@ class FirebaseUserAuth implements InternalTokenProvider {
           'uid': session.user.uid,
           'email': session.user.email,
           'isAnonymous': session.user.isAnonymous,
+          'emailVerified': session.user.emailVerified,
+          'displayName': session.user.displayName,
+          'photoUrl': session.user.photoUrl,
           'refreshToken': session.refreshToken,
         }),
       );

@@ -21,12 +21,14 @@ class FirebaseAuthProviderException implements Exception {
     final String? detail = separator < 0
         ? null
         : serverMessage.substring(separator + 3).trim();
+    // Like the JS SDK (_performFetchWithErrorHandling): the codes of SERVER_ERROR_MAP, and any other code of the
+    // backend in kebab case (`QUOTA_EXCEEDED` is `quota-exceeded`).
     final String code =
         _codes[serverCode] ??
         (serverCode.contains('API key not valid') ||
                 serverCode.contains('API_KEY_INVALID')
             ? 'invalid-api-key'
-            : 'internal-error');
+            : serverCode.toLowerCase().replaceAll(RegExp(r'[_\s]+'), '-'));
     return FirebaseAuthProviderException(
       code,
       detail ?? _messages[code] ?? serverMessage,
@@ -57,32 +59,49 @@ class FirebaseAuthProviderException implements Exception {
     'user-not-found',
   }.contains(code);
 
+  /// SERVER_ERROR_MAP of the JS SDK (packages/auth/src/api/errors.ts), the entries that the REST calls of this
+  /// package can meet. Codes that are not listed map to their kebab case form.
   static const Map<String, String> _codes = <String, String>{
-    'EMAIL_EXISTS': 'email-already-in-use',
-    'EMAIL_NOT_FOUND': 'user-not-found',
-    'USER_NOT_FOUND': 'user-not-found',
-    'INVALID_PASSWORD': 'wrong-password',
-    'INVALID_LOGIN_CREDENTIALS': 'invalid-credential',
-    'INVALID_EMAIL': 'invalid-email',
-    'MISSING_EMAIL': 'missing-email',
-    'MISSING_PASSWORD': 'missing-password',
-    'WEAK_PASSWORD': 'weak-password',
-    'USER_DISABLED': 'user-disabled',
-    'TOO_MANY_ATTEMPTS_TRY_LATER': 'too-many-requests',
-    'OPERATION_NOT_ALLOWED': 'operation-not-allowed',
-    'ADMIN_ONLY_OPERATION': 'admin-restricted-operation',
-    'INVALID_CUSTOM_TOKEN': 'invalid-custom-token',
-    'MISSING_CUSTOM_TOKEN': 'invalid-custom-token',
+    // Custom token.
     'CREDENTIAL_MISMATCH': 'custom-token-mismatch',
-    'TOKEN_EXPIRED': 'user-token-expired',
-    'INVALID_REFRESH_TOKEN': 'invalid-refresh-token',
-    'MISSING_REFRESH_TOKEN': 'invalid-refresh-token',
-    'INVALID_GRANT_TYPE': 'internal-error',
-    'PROJECT_NOT_FOUND': 'project-not-found',
-    'CONFIGURATION_NOT_FOUND': 'configuration-not-found',
-    'QUOTA_EXCEEDED': 'quota-exceeded',
+    'MISSING_CUSTOM_TOKEN': 'internal-error',
+    // createAuthUri.
+    'INVALID_IDENTIFIER': 'invalid-email',
+    'MISSING_CONTINUE_URI': 'internal-error',
+    // Email and password.
+    'INVALID_PASSWORD': 'wrong-password',
+    'MISSING_PASSWORD': 'missing-password',
+    'INVALID_LOGIN_CREDENTIALS': 'invalid-credential',
+    'EMAIL_EXISTS': 'email-already-in-use',
+    'PASSWORD_LOGIN_DISABLED': 'operation-not-allowed',
+    'INVALID_IDP_RESPONSE': 'invalid-credential',
+    'INVALID_PENDING_TOKEN': 'invalid-credential',
+    'FEDERATED_USER_ID_ALREADY_LINKED': 'credential-already-in-use',
+    'MISSING_REQ_TYPE': 'internal-error',
+    // Password reset and action codes.
+    'EMAIL_NOT_FOUND': 'user-not-found',
+    'RESET_PASSWORD_EXCEED_LIMIT': 'too-many-requests',
+    'EXPIRED_OOB_CODE': 'expired-action-code',
+    'INVALID_OOB_CODE': 'invalid-action-code',
+    'MISSING_OOB_CODE': 'internal-error',
+    // Requests with an ID token.
     'CREDENTIAL_TOO_OLD_LOGIN_AGAIN': 'requires-recent-login',
     'INVALID_ID_TOKEN': 'invalid-user-token',
+    'TOKEN_EXPIRED': 'user-token-expired',
+    'USER_NOT_FOUND': 'user-token-expired',
+    // Others.
+    'TOO_MANY_ATTEMPTS_TRY_LATER': 'too-many-requests',
+    'PASSWORD_DOES_NOT_MEET_REQUIREMENTS':
+        'password-does-not-meet-requirements',
+    'ADMIN_ONLY_OPERATION': 'admin-restricted-operation',
+    'INVALID_REQ_TYPE': 'invalid-req-type',
+    // Not in the map of the JS SDK, which turns them into the same codes (kebab case); listed for clarity.
+    'INVALID_EMAIL': 'invalid-email',
+    'WEAK_PASSWORD': 'weak-password',
+    'USER_DISABLED': 'user-disabled',
+    'OPERATION_NOT_ALLOWED': 'operation-not-allowed',
+    'INVALID_CUSTOM_TOKEN': 'invalid-custom-token',
+    'INVALID_REFRESH_TOKEN': 'invalid-refresh-token',
   };
 
   static const Map<String, String> _messages = <String, String>{
@@ -105,6 +124,14 @@ class FirebaseAuthProviderException implements Exception {
         'The credential of the user is no longer valid. Sign in again.',
     'invalid-refresh-token': 'The refresh token is invalid. Sign in again.',
     'invalid-api-key': 'The API key is not valid.',
+    'expired-action-code': 'The action code has expired.',
+    'invalid-action-code':
+        'The action code is invalid. It may be malformed, expired, or already used.',
+    'requires-recent-login':
+        'This operation is sensitive and requires recent authentication. Sign in again.',
+    'user-mismatch':
+        'The supplied credentials do not correspond to the signed-in user.',
+    'invalid-user-token': 'The credential of the user is no longer valid.',
   };
 
   @override

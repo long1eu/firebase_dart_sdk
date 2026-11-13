@@ -12,6 +12,7 @@ library;
 import 'src/firebase_user_auth.dart';
 import 'src/oauth_token_provider.dart';
 
+export 'src/action_code.dart';
 export 'src/auth_exception.dart';
 export 'src/auth_storage.dart';
 export 'src/auth_user.dart';

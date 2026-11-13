@@ -13,9 +13,11 @@ package:
 | `applicationDefaultCredentials()` | servers, command line tools | OAuth 2.0 access token of the environment | **bypassed** |
 
 This is **not** a port of the Firebase Auth SDK. `FirebaseUserAuth` covers anonymous,
-email/password and custom-token sign-in, the token refresh and sign-out. There are no federated
-providers (Google, Apple, ...), no phone sign-in, no email actions (verification, password
-reset), no multi-factor and no account management.
+email/password and custom-token sign-in, the token refresh, sign-out, and the REST-backed account
+operations of the JS SDK: password reset, email verification and action codes, email, password
+and profile updates, reauthentication with a password, reload and deletion (the package README
+has the table). There are no federated providers (Google, Apple, ...) and no popup or redirect
+flows, no phone sign-in, no email link sign-in and no multi-factor.
 
 ## With Firestore
 

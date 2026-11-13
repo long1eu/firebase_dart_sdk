@@ -10,6 +10,15 @@ First version. Not published yet.
   `X-Client-Version` (`FirebaseUserAuth.clientVersion`), `X-Firebase-gmpid` (the `appId`
   parameter) and `X-Firebase-AppCheck` (the `appCheck` parameter); `forApp` takes both from the
   app.
+- `FirebaseUserAuth` account management, ported from the REST-backed operations of the JS SDK:
+  `sendPasswordResetEmail`, `confirmPasswordReset`, `verifyPasswordResetCode`, `checkActionCode`,
+  `applyActionCode`, `sendEmailVerification`, `verifyBeforeUpdateEmail`, `updateEmail`,
+  `updatePassword`, `updateProfile`, `reauthenticateWithEmailAndPassword`, `reload`,
+  `deleteCurrentUser` and `fetchSignInMethodsForEmail`, with `ActionCodeSettings`,
+  `ActionCodeInfo` and `ActionCodeOperation`. `AuthUser` has `emailVerified`, `displayName` and
+  `photoUrl`, stored with the session; `userChanges` also emits after a change of the user's
+  data. Error codes follow the JS SDK's map of server codes (an unknown code is its kebab case
+  form).
 - The Auth emulator host is checked like the Firestore host: user info, a path, a query, a bad
   port and Google hosts throw an `ArgumentError`; `http://` and `https://` URLs are accepted as
   `connectAuthEmulator` takes them, and an emulator off the loopback interface logs a warning.

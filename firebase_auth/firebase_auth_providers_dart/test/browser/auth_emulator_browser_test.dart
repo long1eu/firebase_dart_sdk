@@ -146,6 +146,33 @@ void main() {
     },
   );
 
+  test('account management from the browser', () async {
+    skipWithoutEmulator();
+    if (!emulatorUp) {
+      return;
+    }
+    final FirebaseUserAuth auth = FirebaseUserAuth(
+      apiKey: 'fake-api-key',
+      emulatorHost: emulatorHost,
+    );
+    addTearDown(auth.dispose);
+    final String email =
+        'browser${DateTime.now().microsecondsSinceEpoch}@example.com';
+    await auth.createUserWithEmailAndPassword(email, 'password');
+    // The continue URI is the page of the test, like in the JS SDK.
+    expect(await auth.fetchSignInMethodsForEmail(email), <String>['password']);
+    await auth.updateProfile(displayName: 'Browser');
+    expect(auth.currentUser!.displayName, 'Browser');
+    await auth.sendEmailVerification();
+    await auth.sendPasswordResetEmail(email);
+    await auth.updatePassword('password-2');
+    await auth.reauthenticateWithEmailAndPassword(email, 'password-2');
+    await auth.reload();
+    expect(auth.currentUser!.displayName, 'Browser');
+    await auth.deleteCurrentUser();
+    expect(auth.uid, isNull);
+  });
+
   test('the emulator host as an http:// URL, in the browser', () async {
     skipWithoutEmulator();
     if (!emulatorUp) {

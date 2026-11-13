@@ -509,7 +509,23 @@ void main() {
         'INVALID_CUSTOM_TOKEN': 'invalid-custom-token',
         'CREDENTIAL_MISMATCH': 'custom-token-mismatch',
         'API key not valid. Please pass a valid API key.': 'invalid-api-key',
-        'SOMETHING_NEW': 'internal-error',
+        // SERVER_ERROR_MAP of the JS SDK.
+        'USER_NOT_FOUND': 'user-token-expired',
+        'TOKEN_EXPIRED': 'user-token-expired',
+        'INVALID_ID_TOKEN': 'invalid-user-token',
+        'CREDENTIAL_TOO_OLD_LOGIN_AGAIN': 'requires-recent-login',
+        'EXPIRED_OOB_CODE': 'expired-action-code',
+        'INVALID_OOB_CODE': 'invalid-action-code',
+        'MISSING_OOB_CODE': 'internal-error',
+        'RESET_PASSWORD_EXCEED_LIMIT': 'too-many-requests',
+        'INVALID_IDENTIFIER': 'invalid-email',
+        'PASSWORD_LOGIN_DISABLED': 'operation-not-allowed',
+        'MISSING_CUSTOM_TOKEN': 'internal-error',
+        'PASSWORD_DOES_NOT_MEET_REQUIREMENTS : Missing password requirements: [Password must contain an upper case character]':
+            'password-does-not-meet-requirements',
+        // Like the JS SDK, any other code of the backend in kebab case.
+        'SOMETHING_NEW': 'something-new',
+        'QUOTA_EXCEEDED : Exceeded quota for email lookup.': 'quota-exceeded',
       };
       for (final MapEntry<String, String> entry in expected.entries) {
         handler = (http.Request request) async => error(entry.key);
@@ -598,6 +614,261 @@ void main() {
     });
   });
 
+  group('account management', () {
+    /// The backend of the group: sign-in as [backend], [answer] for the account operations.
+    void answering(
+      Future<http.Response> Function(String method, Map<String, Object?> body)
+      answer,
+    ) {
+      handler = (http.Request request) async {
+        final String method = request.url.pathSegments.last;
+        if (method.startsWith('accounts:sign') || method == 'token') {
+          return backend(request);
+        }
+        return answer(method, jsonDecode(request.body) as Map<String, Object?>);
+      };
+    }
+
+    test('the requests have the shape of the JS SDK', () async {
+      final List<List<Object?>> calls = <List<Object?>>[];
+      answering((String method, Map<String, Object?> body) async {
+        calls.add(<Object?>[method, body]);
+        return switch (method) {
+          'accounts:sendOobCode' => json(<String, Object?>{
+            'email': 'a@example.com',
+          }),
+          'accounts:createAuthUri' => json(<String, Object?>{
+            'signinMethods': <String>['password'],
+          }),
+          'accounts:lookup' => json(<String, Object?>{
+            'users': <Object?>[
+              <String, Object?>{
+                'localId': 'uid-of-a@example.com',
+                'email': 'a@example.com',
+              },
+            ],
+          }),
+          _ => json(<String, Object?>{}),
+        };
+      });
+      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      final String idToken = (await auth.getAccessToken(
+        forceRefresh: false,
+      )).token;
+
+      await auth.sendPasswordResetEmail(
+        'a@example.com',
+        actionCodeSettings: const ActionCodeSettings(
+          url: 'https://example.com/done',
+          handleCodeInApp: true,
+          iOSBundleId: 'com.example.ios',
+          androidPackageName: 'com.example.android',
+          androidInstallApp: true,
+          androidMinimumVersion: '12',
+          linkDomain: 'example.page.link',
+        ),
+      );
+      await auth.confirmPasswordReset('code-1', 'new-password');
+      await auth.applyActionCode('code-2');
+      await auth.sendEmailVerification();
+      await auth.updateProfile(displayName: 'Ada', photoUrl: '');
+      expect(await auth.fetchSignInMethodsForEmail('a@example.com'), <String>[
+        'password',
+      ]);
+
+      expect(calls, <List<Object?>>[
+        <Object?>[
+          'accounts:sendOobCode',
+          <String, Object?>{
+            'requestType': 'PASSWORD_RESET',
+            'email': 'a@example.com',
+            'continueUrl': 'https://example.com/done',
+            'linkDomain': 'example.page.link',
+            'canHandleCodeInApp': true,
+            'iOSBundleId': 'com.example.ios',
+            'androidPackageName': 'com.example.android',
+            'androidInstallApp': true,
+            'androidMinimumVersionCode': '12',
+          },
+        ],
+        <Object?>[
+          'accounts:resetPassword',
+          <String, Object?>{'oobCode': 'code-1', 'newPassword': 'new-password'},
+        ],
+        <Object?>[
+          'accounts:update',
+          <String, Object?>{'oobCode': 'code-2'},
+        ],
+        <Object?>[
+          'accounts:sendOobCode',
+          <String, Object?>{'requestType': 'VERIFY_EMAIL', 'idToken': idToken},
+        ],
+        <Object?>[
+          'accounts:update',
+          <String, Object?>{
+            'idToken': idToken,
+            'displayName': 'Ada',
+            'deleteAttribute': <Object?>['PHOTO_URL'],
+            'returnSecureToken': true,
+          },
+        ],
+        <Object?>[
+          'accounts:createAuthUri',
+          <String, Object?>{
+            'identifier': 'a@example.com',
+            'continueUri': 'http://localhost',
+          },
+        ],
+      ]);
+    });
+
+    test('action code settings are checked before sending', () async {
+      for (final (ActionCodeSettings settings, String code)
+          in <(ActionCodeSettings, String)>[
+            (const ActionCodeSettings(url: ''), 'invalid-continue-uri'),
+            (
+              const ActionCodeSettings(url: 'https://x', iOSBundleId: ''),
+              'missing-ios-bundle-id',
+            ),
+            (
+              const ActionCodeSettings(
+                url: 'https://x',
+                androidPackageName: '',
+              ),
+              'missing-android-pkg-name',
+            ),
+            (
+              const ActionCodeSettings(url: 'https://x', linkDomain: ''),
+              'invalid-hosting-link-domain',
+            ),
+          ]) {
+        await expectLater(
+          auth.sendPasswordResetEmail(
+            'a@example.com',
+            actionCodeSettings: settings,
+          ),
+          throwsA(
+            isA<FirebaseAuthProviderException>().having(
+              (FirebaseAuthProviderException e) => e.code,
+              'code',
+              code,
+            ),
+          ),
+        );
+      }
+      expect(requests, isEmpty);
+    });
+
+    test('checkActionCode reads the operation and the addresses', () async {
+      answering(
+        (String method, Map<String, Object?> body) async =>
+            json(<String, Object?>{
+              'email': 'old@example.com',
+              'newEmail': 'new@example.com',
+              'requestType': body['oobCode'],
+            }),
+      );
+      final ActionCodeInfo change = await auth.checkActionCode(
+        'VERIFY_AND_CHANGE_EMAIL',
+      );
+      expect(change.operation, ActionCodeOperation.verifyAndChangeEmail);
+      expect(change.email, 'new@example.com');
+      expect(change.previousEmail, 'old@example.com');
+      final ActionCodeInfo recover = await auth.checkActionCode(
+        'RECOVER_EMAIL',
+      );
+      expect(recover.email, 'old@example.com');
+      expect(recover.previousEmail, 'new@example.com');
+      await expectLater(
+        auth.checkActionCode('SOMETHING_ELSE'),
+        throwsA(
+          isA<FirebaseAuthProviderException>().having(
+            (FirebaseAuthProviderException e) => e.code,
+            'code',
+            'internal-error',
+          ),
+        ),
+      );
+    });
+
+    test(
+      'a disabled account signs the user out (_logoutIfInvalidated)',
+      () async {
+        answering(
+          (String method, Map<String, Object?> body) async =>
+              error('USER_DISABLED'),
+        );
+        await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+        await expectLater(
+          auth.updateProfile(displayName: 'x'),
+          throwsA(isA<FirebaseAuthProviderException>()),
+        );
+        expect(auth.uid, isNull);
+      },
+    );
+
+    test('another error keeps the user', () async {
+      answering(
+        (String method, Map<String, Object?> body) async =>
+            error('CREDENTIAL_TOO_OLD_LOGIN_AGAIN'),
+      );
+      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      await expectLater(
+        auth.updatePassword('another'),
+        throwsA(
+          isA<FirebaseAuthProviderException>().having(
+            (FirebaseAuthProviderException e) => e.code,
+            'code',
+            'requires-recent-login',
+          ),
+        ),
+      );
+      expect(auth.uid, 'uid-of-a@example.com');
+    });
+
+    test('reauthentication as somebody else is a user-mismatch', () async {
+      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      await expectLater(
+        auth.reauthenticateWithEmailAndPassword('b@example.com', 'secret'),
+        throwsA(
+          isA<FirebaseAuthProviderException>().having(
+            (FirebaseAuthProviderException e) => e.code,
+            'code',
+            'user-mismatch',
+          ),
+        ),
+      );
+      expect(auth.uid, 'uid-of-a@example.com');
+    });
+
+    test('the profile is stored and restored', () async {
+      answering(
+        (String method, Map<String, Object?> body) async =>
+            json(<String, Object?>{
+              'displayName': 'Ada',
+              'photoUrl': 'https://example.com/a.png',
+            }),
+      );
+      await auth.signInWithEmailAndPassword('a@example.com', 'secret');
+      await auth.updateProfile(
+        displayName: 'Ada',
+        photoUrl: 'https://example.com/a.png',
+      );
+      await auth.dispose();
+      auth = create();
+      await auth.restore();
+      expect(
+        auth.currentUser,
+        const AuthUser(
+          uid: 'uid-of-a@example.com',
+          email: 'a@example.com',
+          displayName: 'Ada',
+          photoUrl: 'https://example.com/a.png',
+        ),
+      );
+    });
+  });
+
   group('storage', () {
     const String key = 'firebase_auth_providers_dart:$apiKey';
 
@@ -609,6 +880,9 @@ void main() {
           'uid': 'uid-of-a@example.com',
           'email': 'a@example.com',
           'isAnonymous': false,
+          'emailVerified': false,
+          'displayName': null,
+          'photoUrl': null,
           'refreshToken': 'refresh:uid-of-a@example.com',
         });
         await auth.signOut();
