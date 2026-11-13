@@ -17,6 +17,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:test/test.dart';
 
 import '../../../util/lite_test_util.dart';
+import '../../../util/test_backend.dart';
 
 class Post {
   Post(this.title, this.author);
@@ -2171,7 +2172,10 @@ void main() {
     });
 
     test('performs aggregations on documents with all aggregated fields using '
-        'getAggregationFromServer', () async {
+        'getAggregationFromServer', skip: TestBackend().skipOnEnterprise(
+          'an aggregation counts every document, not only those that have '
+          'all the aggregated fields',
+        ), () async {
       final CollectionReference<Map<String, Object?>> coll =
           await newLiteTestCollectionWith(<Map<String, Object?>>[
             <String, Object?>{

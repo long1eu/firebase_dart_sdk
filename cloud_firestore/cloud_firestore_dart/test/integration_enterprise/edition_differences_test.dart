@@ -105,6 +105,31 @@ void main() {
         <String, Object?>{'count': 0, 'sum': null, 'average': null});
   });
 
+  test('an aggregation covers documents without the aggregated fields',
+      skip: skipReason, () async {
+    final CollectionReference collection =
+        await collectionWithDocs(<String, Map<String, Object?>>{
+      'a': <String, Object?>{'pages': 100, 'year': 1980},
+      'b': <String, Object?>{'pages': 50, 'year': 2020},
+      'c': <String, Object?>{'pages': 150},
+    });
+
+    final AggregateQuerySnapshot snapshot =
+        await collection.aggregateWithAliases(<String, AggregateField>{
+      'count': AggregateField.count(),
+      'totalPages': AggregateField.sum('pages'),
+      'averageYear': AggregateField.average('year'),
+    }).get(AggregateSource.server);
+
+    // The Standard edition only aggregates over the documents that have
+    // every aggregated field ('a' and 'b'): count 2, totalPages 150.
+    expect(snapshot.data(), <String, Object?>{
+      'count': 3,
+      'totalPages': 300,
+      'averageYear': 2000.0,
+    });
+  });
+
   test('more than 5 aggregations are allowed in one query', skip: skipReason,
       () async {
     final CollectionReference collection =

@@ -677,7 +677,7 @@ edition emulator first and then `test/integration_enterprise`.
 
 The whole standard suite also runs against the Enterprise edition emulator
 (`tool/test_integration.sh enterprise`). With emulator v1.22.0 the client behaves the same on
-both editions except for the points below; the ten tests that expect the Standard behaviour are
+both editions except for the points below; the eleven tests that expect the Standard behaviour are
 skipped there with a reason, and `test/integration_enterprise/edition_differences_test.dart`
 pins the Enterprise behaviour. These were observed with the emulator only, not with a production
 Enterprise database.
@@ -702,6 +702,9 @@ Enterprise database.
   more match.
 - **`sum` over no documents** is `null` on Enterprise and `0` on Standard (`average` is `null`
   on both).
+- **Documents an aggregation covers.** On Standard, `sum`, `average` and `count` in one
+  aggregation only see the documents that have every aggregated field; on Enterprise they see
+  every document of the query.
 - **Number of aggregations.** Standard rejects more than 5 aggregations in one query;
   Enterprise accepts them.
 - **Integer `sum` overflow.** When an integer sum leaves the 64-bit range, also only while
