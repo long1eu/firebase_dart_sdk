@@ -19,6 +19,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/lite.dart' as lite;
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/firebase_auth_credentials_provider.dart';
@@ -1136,7 +1137,7 @@ Future<CheckResult> _halfClose(Kit kit) async {
 Query<Map<String, Object?>> _rebase(
     Firestore db, Query<Map<String, Object?>> query) {
   // ignore: invalid_use_of_internal_member
-  return Query<Map<String, Object?>>(query.query, db);
+  return QueryInternal.create<Map<String, Object?>>(query.query, db);
 }
 
 /// Null and NaN in equality filters. The Standard edition never matches them; the Enterprise edition does (as

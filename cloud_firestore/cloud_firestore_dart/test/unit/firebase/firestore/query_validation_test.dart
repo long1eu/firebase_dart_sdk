@@ -19,26 +19,20 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/filter.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
 import 'package:test/test.dart';
 
 import '../../../util/test_util.dart' as util;
 import 'test_util.dart' as unit;
 
-/// A [Firestore] test double that provides the pieces the query builders need.
-class _TestFirestore extends unit.FirebaseFirestoreMock {
-  @override
-  DatabaseId get databaseId => DatabaseId.forProject('project');
-
-  @override
-  UserDataConverter get dataConverter => UserDataConverter(databaseId);
-}
+// ignore: non_constant_identifier_names
+Firestore _TestFirestore() =>
+    FirestoreInternal.detached(DatabaseId.forProject('project'));
 
 /// Backend-free port of the query related cases of upstream ValidationTest
 /// (which the Dart port only has as an emulator integration test).
 void main() {
   final Firestore db = _TestFirestore();
-  Query collection() => Query(util.query('collection'), db);
+  Query collection() => QueryInternal.create(util.query('collection'), db);
 
   Matcher throwsInvalidQuery([Pattern? message]) => throwsA(
         isA<ArgumentError>().having((ArgumentError e) => e.message.toString(),

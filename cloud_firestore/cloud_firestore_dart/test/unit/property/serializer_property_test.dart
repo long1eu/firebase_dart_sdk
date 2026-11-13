@@ -4,6 +4,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart' as api;
+import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart'
+    show DocumentSnapshotInternal;
+import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart'
+    show QueryInternal;
+import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart'
+    show QuerySnapshotInternal;
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
@@ -268,7 +274,7 @@ void main() {
         api.Filter.equalTo('b', 2),
       ]),
     ]) {
-      final Target target = api.Query<Map<String, Object?>>(
+      final Target target = QueryInternal.create<Map<String, Object?>>(
         Query(ResourcePath.fromString('coll')),
         modelFirestore,
       ).where(filter).query.toTarget();
@@ -378,7 +384,7 @@ void main() {
 
   group('snapshot JSON', () {
     api.DocumentSnapshot<Map<String, Object?>> snapshotOf(Document document) =>
-        api.DocumentSnapshot<Map<String, Object?>>.fromDocument(
+        DocumentSnapshotInternal.fromDocument<Map<String, Object?>>(
           modelFirestore,
           document,
           isFromCache: false,
@@ -468,8 +474,8 @@ void main() {
             documents = documents.add(doc);
           }
           final api.QuerySnapshot<Map<String, Object?>> snapshot =
-              api.QuerySnapshot<Map<String, Object?>>(
-                api.Query<Map<String, Object?>>(query, modelFirestore),
+              QuerySnapshotInternal.create<Map<String, Object?>>(
+                QueryInternal.create<Map<String, Object?>>(query, modelFirestore),
                 ViewSnapshot.fromInitialDocuments(
                   query,
                   documents,

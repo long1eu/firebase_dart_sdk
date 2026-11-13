@@ -17,25 +17,23 @@ import 'dart:collection';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_source.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:collection/collection.dart';
-import 'package:meta/meta.dart';
 
 /// A query that calculates aggregations over the documents of a [Query]
 /// without downloading the documents themselves.
 class AggregateQuery {
   /// Implementation detail of the SDK; not part of the supported API. Use [Query.count] or
   /// [Query.aggregate].
-  @internal
-  AggregateQuery(this.query, List<AggregateField> aggregateFields)
+  AggregateQuery._(this.query, List<AggregateField> aggregateFields)
     : aggregateFields = List<AggregateField>.unmodifiable(aggregateFields),
       aliases = null;
 
   /// Creates an aggregate query whose results are keyed by the user-chosen
   /// aliases of [aliases] (see `Query.aggregateWithAliases`).
-  @internal
-  AggregateQuery.withAliases(this.query, Map<String, AggregateField> aliases)
+  AggregateQuery._withAliases(this.query, Map<String, AggregateField> aliases)
     : aggregateFields = List<AggregateField>.unmodifiable(
         LinkedHashSet<AggregateField>.of(aliases.values),
       ),
@@ -62,7 +60,7 @@ class AggregateQuery {
   ]) async {
     final Map<String, FieldValue> data = await query.firestore.client
         .runAggregateQuery(query.query, aggregateFields);
-    return AggregateQuerySnapshot(this, data);
+    return AggregateQuerySnapshotInternal.create(this, data);
   }
 
   @override
@@ -85,4 +83,20 @@ class AggregateQuery {
     const ListEquality<AggregateField>().hash(aggregateFields),
     const MapEquality<String, AggregateField>().hash(aliases),
   );
+}
+
+/// Members of [AggregateQuery] for the SDK itself. Not exported by the public libraries.
+extension AggregateQueryInternal on AggregateQuery {
+  /// An aggregate query over [query] for [aggregateFields].
+  static AggregateQuery create(
+    Query<Object?> query,
+    List<AggregateField> aggregateFields,
+  ) => AggregateQuery._(query, aggregateFields);
+
+  /// An aggregate query whose results are keyed by the user-chosen aliases
+  /// of [aliases] (see `Query.aggregateWithAliases`).
+  static AggregateQuery withAliases(
+    Query<Object?> query,
+    Map<String, AggregateField> aliases,
+  ) => AggregateQuery._withAliases(query, aliases);
 }

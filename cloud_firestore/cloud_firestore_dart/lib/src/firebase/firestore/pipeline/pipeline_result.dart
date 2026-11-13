@@ -64,7 +64,10 @@ class PipelineResult {
     final DocumentKey? key = _key;
     return key == null
         ? null
-        : DocumentReference<Map<String, Object?>>(key, _firestore);
+        : DocumentReferenceInternal.create<Map<String, Object?>>(
+            key,
+            _firestore,
+          );
   }
 
   /// The id of the document, or null if this result is not a document.
@@ -98,7 +101,10 @@ class PipelineResult {
     } else if (value is ArrayValue) {
       return value.internalValue.map(_convertValue).toList();
     } else if (value is ReferenceValue) {
-      return DocumentReference<Map<String, Object?>>(value.value, _firestore);
+      return DocumentReferenceInternal.create<Map<String, Object?>>(
+        value.value,
+        _firestore,
+      );
     } else {
       return value.value;
     }

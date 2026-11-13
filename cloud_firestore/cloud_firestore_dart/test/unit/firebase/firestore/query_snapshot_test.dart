@@ -85,15 +85,15 @@ void main() {
     );
 
     final QuerySnapshot snapshot =
-        QuerySnapshot(Query(fooQuery, firestore), viewSnapshot, firestore);
+        QuerySnapshotInternal.create(QueryInternal.create(fooQuery, firestore), viewSnapshot, firestore);
 
-    final QueryDocumentSnapshot doc1Snap = QueryDocumentSnapshot.fromDocument(
+    final QueryDocumentSnapshot doc1Snap = QueryDocumentSnapshotInternal.fromDocument(
       firestore,
       doc1New,
       fromCache: false,
       hasPendingWrites: false,
     );
-    final QueryDocumentSnapshot doc2Snap = QueryDocumentSnapshot.fromDocument(
+    final QueryDocumentSnapshot doc2Snap = QueryDocumentSnapshotInternal.fromDocument(
       firestore,
       doc2New,
       fromCache: false,
@@ -102,7 +102,7 @@ void main() {
 
     expect(snapshot.documentChanges.length, 1);
     final List<DocumentChange> changesWithoutMetadata = <DocumentChange>[
-      DocumentChange(
+      DocumentChangeInternal.create(
         doc2Snap,
         DocumentChangeType.modified,
         1 /*oldIndex*/,
@@ -112,13 +112,13 @@ void main() {
     expect(snapshot.documentChanges, changesWithoutMetadata);
 
     final List<DocumentChange> changesWithMetadata = <DocumentChange>[
-      DocumentChange(
+      DocumentChangeInternal.create(
         doc1Snap,
         DocumentChangeType.modified,
         0 /*oldIndex*/,
         0 /*newIndex*/,
       ),
-      DocumentChange(
+      DocumentChangeInternal.create(
         doc2Snap,
         DocumentChangeType.modified,
         1 /*oldIndex*/,

@@ -3,6 +3,7 @@
 // limitToLast, with and without pending writes. See test/util/index_engine_harness.dart.
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/local_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/index_manager.dart';
 import 'package:test/test.dart';

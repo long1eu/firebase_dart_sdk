@@ -126,7 +126,7 @@ DocumentSnapshot<T> documentSnapshotFromJson<T>(
   if (parsed.bundle.isEmpty) {
     // PORTING NOTE: toJson() of a missing document writes an empty bundle, which the JS SDK fails to parse. The port
     // reads it back as the missing document.
-    return DocumentSnapshot<T>.fromNoDocument(
+    return DocumentSnapshotInternal.fromNoDocument<T>(
       firestore,
       key,
       isFromCache: false,
@@ -149,7 +149,7 @@ DocumentSnapshot<T> documentSnapshotFromJson<T>(
       FirestoreErrorCode.invalidArgument,
     );
   }
-  return DocumentSnapshot<T>.fromDocument(
+  return DocumentSnapshotInternal.fromDocument<T>(
     firestore,
     document,
     isFromCache: false,
@@ -192,8 +192,8 @@ QuerySnapshot<T> querySnapshotFromJson<T>(
     hasCachedResults: false,
     readTime: namedQuery.readTime,
   );
-  return QuerySnapshot<T>(
-    Query<T>(query, firestore, converter),
+  return QuerySnapshotInternal.create<T>(
+    QueryInternal.create<T>(query, firestore, converter),
     snapshot,
     firestore,
   );
@@ -208,7 +208,7 @@ Stream<DocumentSnapshot<T>> documentSnapshotsFromJson<T>(
 ) {
   final _SnapshotJson parsed = _SnapshotJson.forResume(json, _documentSource);
   final DocumentKey key = _documentKey(parsed.bundleName);
-  final DocumentReference<T> reference = DocumentReference<T>(
+  final DocumentReference<T> reference = DocumentReferenceInternal.create<T>(
     key,
     firestore,
     converter,
@@ -245,7 +245,7 @@ Stream<QuerySnapshot<T>> querySnapshotsFromJson<T>(
         FirestoreErrorCode.invalidArgument,
       );
     }
-    return Query<T>(
+    return QueryInternal.create<T>(
       namedQuery.query,
       firestore,
       converter,

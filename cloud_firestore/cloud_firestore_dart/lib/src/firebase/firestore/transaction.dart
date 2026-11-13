@@ -25,7 +25,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
-import 'package:meta/meta.dart';
 
 /// The signature for providing code to be executed within a transaction context.
 typedef TransactionCallback<T> = Future<T> Function(Transaction);
@@ -39,8 +38,7 @@ typedef TransactionCallback<T> = Future<T> Function(Transaction);
 class Transaction {
   /// Implementation detail of the SDK; not part of the supported API. Use
   /// [Firestore.runTransaction].
-  @internal
-  Transaction(this._transaction, this._firestore);
+  Transaction._(this._transaction, this._firestore);
 
   final core.Transaction _transaction;
 
@@ -149,7 +147,7 @@ class Transaction {
     for (final Document document in documents) {
       documentSet = documentSet.add(document);
     }
-    return QuerySnapshot<T>(
+    return QuerySnapshotInternal.create<T>(
       query,
       ViewSnapshot.fromInitialDocuments(
         query.query,
@@ -175,7 +173,7 @@ class Transaction {
       aggregateQuery.query.query,
       aggregateQuery.aggregateFields,
     );
-    return AggregateQuerySnapshot(aggregateQuery, data);
+    return AggregateQuerySnapshotInternal.create(aggregateQuery, data);
   }
 
   void _validateQuery(Query<Object?> query) {
@@ -206,7 +204,7 @@ class Transaction {
 
     final MaybeDocument doc = result.first;
     if (doc is Document) {
-      return DocumentSnapshot<T>.fromDocument(
+      return DocumentSnapshotInternal.fromDocument<T>(
         _firestore,
         doc,
         isFromCache: false,
@@ -214,7 +212,7 @@ class Transaction {
         converter: documentRef.converter,
       );
     } else if (doc is NoDocument) {
-      return DocumentSnapshot<T>.fromNoDocument(
+      return DocumentSnapshotInternal.fromNoDocument<T>(
         _firestore,
         doc.key,
         isFromCache: false,
@@ -228,4 +226,13 @@ class Transaction {
       );
     }
   }
+}
+
+/// Members of [Transaction] for the SDK itself. Not exported by the public libraries.
+extension TransactionInternal on Transaction {
+  /// Wraps the core [transaction] of [firestore].
+  static Transaction create(
+    core.Transaction transaction,
+    Firestore firestore,
+  ) => Transaction._(transaction, firestore);
 }

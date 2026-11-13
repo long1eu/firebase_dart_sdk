@@ -48,19 +48,14 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
-import 'package:mockito/mockito.dart';
 import 'package:test/test.dart';
 
 import '../../../util/test_util.dart' as util;
 
-class _TestFirestore extends Mock implements Firestore {
-  _TestFirestore(this.databaseId);
+Firestore _testFirestore(DatabaseId databaseId) =>
+    FirestoreInternal.detached(databaseId);
 
-  @override
-  final DatabaseId databaseId;
-}
-
-final Firestore firestore = _TestFirestore(DatabaseId.forProject('project'));
+final Firestore firestore = _testFirestore(DatabaseId.forProject('project'));
 
 DocumentSnapshot<Map<String, Object?>> documentSnapshot(
   String path,
@@ -68,11 +63,11 @@ DocumentSnapshot<Map<String, Object?>> documentSnapshot(
   bool hasPendingWrites = false,
 }) {
   if (data == null) {
-    return DocumentSnapshot<Map<String, Object?>>.fromNoDocument(
+    return DocumentSnapshotInternal.fromNoDocument<Map<String, Object?>>(
         firestore, util.key(path),
         isFromCache: true, hasPendingWrites: hasPendingWrites);
   }
-  return DocumentSnapshot<Map<String, Object?>>.fromDocument(
+  return DocumentSnapshotInternal.fromDocument<Map<String, Object?>>(
       firestore, util.doc(path, 1000, data),
       isFromCache: true, hasPendingWrites: hasPendingWrites);
 }
@@ -100,8 +95,8 @@ QuerySnapshot<Map<String, Object?>> querySnapshot(
     hasCachedResults: false,
     readTime: readTime,
   );
-  return QuerySnapshot<Map<String, Object?>>(
-      Query<Map<String, Object?>>(query, firestore), snapshot, firestore);
+  return QuerySnapshotInternal.create<Map<String, Object?>>(
+      QueryInternal.create<Map<String, Object?>>(query, firestore), snapshot, firestore);
 }
 
 Matcher throwsFirestoreError(FirestoreErrorCode code, [Object? message]) {
@@ -362,7 +357,7 @@ void main() {
       });
       test('a bundle of another project', () {
         final Firestore other =
-            _TestFirestore(DatabaseId.forProject('other-project'));
+            _testFirestore(DatabaseId.forProject('other-project'));
         final Map<String, Object?> json =
             documentSnapshot('foo/bar', <String, Object?>{'a': 1}).toJson();
         expect(
@@ -374,7 +369,7 @@ void main() {
 
   group('DocumentReference', () {
     test('toJson includes the JSON fields', () {
-      final Map<String, Object> json = DocumentReference<Map<String, Object?>>(
+      final Map<String, Object> json = DocumentReferenceInternal.create<Map<String, Object?>>(
               util.key('foo/bar'), firestore)
           .toJson();
       expect(json, <String, Object>{
@@ -385,7 +380,7 @@ void main() {
 
     test('fromJson equals the original reference', () {
       final DocumentReference<Map<String, Object?>> reference =
-          DocumentReference<Map<String, Object?>>(
+          DocumentReferenceInternal.create<Map<String, Object?>>(
               util.key('foo/bar/baz/qux'), firestore);
       final DocumentReference<Map<String, Object?>> fromJson =
           DocumentReference<Map<String, Object?>>.fromJson(

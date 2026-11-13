@@ -20,20 +20,16 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_so
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as pb;
 import 'package:fixnum/fixnum.dart';
-import 'package:test/fake.dart';
 
 final DatabaseId testDatabaseId =
     DatabaseId.forDatabase('new-project', '(default)');
 
-class FakeFirestore extends Fake implements Firestore {
-  FakeFirestore([DatabaseId? databaseId])
-      : databaseId = databaseId ?? testDatabaseId;
+/// A [Firestore] without a client, for [databaseId] (by default [testDatabaseId]).
+// ignore: non_constant_identifier_names
+Firestore FakeFirestore([DatabaseId? databaseId]) =>
+    FirestoreInternal.detached(databaseId ?? testDatabaseId);
 
-  @override
-  final DatabaseId databaseId;
-}
-
-final FakeFirestore fakeFirestore = FakeFirestore();
+final Firestore fakeFirestore = FakeFirestore();
 
 PipelineSource source() => PipelineSource(fakeFirestore);
 

@@ -26,7 +26,7 @@ void main() {
   test('createWithCountShouldReturnInstanceWithTheGivenQueryAndCount', () {
     final AggregateQuery query = collectionReference('foo/bar/baz').count();
     final AggregateQuerySnapshot snapshot =
-        AggregateQuerySnapshot(query, <String, FieldValue>{
+        AggregateQuerySnapshotInternal.create(query, <String, FieldValue>{
       AggregateField.count().alias: IntegerValue.valueOf(42),
     });
     expect(snapshot.query, same(query));
@@ -46,7 +46,7 @@ void main() {
       AggregateField.average('rating'),
     ]);
     final AggregateQuerySnapshot snapshot =
-        AggregateQuerySnapshot(query, <String, FieldValue>{
+        AggregateQuerySnapshotInternal.create(query, <String, FieldValue>{
       AggregateField.count().alias: IntegerValue.valueOf(3),
       AggregateField.sum('pages').alias: IntegerValue.valueOf(150),
       AggregateField.average('rating').alias: NullValue.nullValue(),
@@ -66,7 +66,7 @@ void main() {
     final AggregateQuery query = collectionReference('coll')
         .aggregate(<AggregateField>[AggregateField.average('rating')]);
     final AggregateQuerySnapshot snapshot =
-        AggregateQuerySnapshot(query, <String, FieldValue>{
+        AggregateQuerySnapshotInternal.create(query, <String, FieldValue>{
       AggregateField.average('rating').alias: DoubleValue.valueOf(4.5),
     });
     expect(snapshot.data(), <String, Object?>{'average_rating': 4.5});
@@ -90,7 +90,7 @@ void main() {
     ]);
 
     final AggregateQuerySnapshot snapshot =
-        AggregateQuerySnapshot(query, <String, FieldValue>{
+        AggregateQuerySnapshotInternal.create(query, <String, FieldValue>{
       AggregateField.count().alias: IntegerValue.valueOf(3),
       AggregateField.sum('pages').alias: IntegerValue.valueOf(150),
       AggregateField.average('rating').alias: NullValue.nullValue(),

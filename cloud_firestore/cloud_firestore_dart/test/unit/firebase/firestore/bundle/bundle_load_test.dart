@@ -136,7 +136,7 @@ void main() {
                           ? bytes.length
                           : i + chunkSize)
               ]);
-        final LoadBundleTask task = LoadBundleTask();
+        final LoadBundleTask task = LoadBundleTaskInternal.create();
         await syncEngine.loadBundle(BundleReader(serializer, stream), task);
         return task;
       }
@@ -176,7 +176,7 @@ void main() {
       });
 
       test('reports the progress while loading', () async {
-        final LoadBundleTask task = LoadBundleTask();
+        final LoadBundleTask task = LoadBundleTaskInternal.create();
         final List<LoadBundleTaskProgress> progress =
             <LoadBundleTaskProgress>[];
         final Future<void> done = task.stream.forEach(progress.add);
@@ -219,7 +219,7 @@ void main() {
         expect(first.isSuccessful, isTrue);
 
         // Same id and the same (or older) create time.
-        final LoadBundleTask task = LoadBundleTask();
+        final LoadBundleTask task = LoadBundleTaskInternal.create();
         final List<LoadBundleTaskProgress> progress =
             <LoadBundleTaskProgress>[];
         final Future<void> done = task.stream.forEach(progress.add);

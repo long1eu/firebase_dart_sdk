@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/event_manager.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart'
@@ -39,7 +40,7 @@ void main() {
 
   setUp(() {
     client = _FakeClient();
-    firestore = Firestore(
+    firestore = FirestoreInternal.create(
         DatabaseId.forProject('p'), null, client, TaskScheduler('test'));
   });
 

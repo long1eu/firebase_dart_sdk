@@ -3,11 +3,10 @@
 // on 20/09/2018
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
-import 'package:meta/meta.dart';
 
 /// Sentinel values that can be used when writing document fields with `set()` or `update()`.
 abstract class FieldValue {
-  const FieldValue._(this.elements);
+  const FieldValue._(this._elements);
 
   /// Returns a sentinel for use with update() to mark a field for deletion.
   factory FieldValue.delete() => _deleteInstance;
@@ -77,42 +76,9 @@ abstract class FieldValue {
   /// Unlike the other factories this is a plain value, not a sentinel.
   static VectorValue vector(List<double> values) => VectorValue(values);
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  final List<Object?> elements;
+  final List<Object?> _elements;
 
-  /// Returns the method name (e.g. 'FieldValue.delete') that was used to create this FieldValue
-  /// instance, for use in error messages, etc.
-  @internal
-  String get methodName;
-
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  bool get isDelete => this is _DeleteFieldValue;
-
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  bool get isServerTimestamp => this is _ServerTimestampFieldValue;
-
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  bool get isArrayUnion => this is _ArrayUnionFieldValue;
-
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  bool get isArrayRemove => this is _ArrayRemoveFieldValue;
-
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  bool get isIncrement => this is _NumericIncrementFieldValue;
-
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  bool get isMinimum => this is _NumericMinimumFieldValue;
-
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  bool get isMaximum => this is _NumericMaximumFieldValue;
+  String get _methodName;
 
   static const _DeleteFieldValue _deleteInstance = _DeleteFieldValue._();
 
@@ -125,7 +91,7 @@ class _DeleteFieldValue extends FieldValue {
   const _DeleteFieldValue._() : super._(const <Object>[]);
 
   @override
-  String get methodName => 'FieldValue.delete';
+  String get _methodName => 'FieldValue.delete';
 }
 
 /// FieldValue class for server timestamps.
@@ -133,7 +99,7 @@ class _ServerTimestampFieldValue extends FieldValue {
   const _ServerTimestampFieldValue._() : super._(const <Object>[]);
 
   @override
-  String get methodName => 'FieldValue.serverTimestamp';
+  String get _methodName => 'FieldValue.serverTimestamp';
 }
 
 /// FieldValue class for arrayUnion() transforms.
@@ -141,7 +107,7 @@ class _ArrayUnionFieldValue extends FieldValue {
   const _ArrayUnionFieldValue._(List<Object?> elements) : super._(elements);
 
   @override
-  String get methodName => 'FieldValue.arrayUnion';
+  String get _methodName => 'FieldValue.arrayUnion';
 }
 
 /// FieldValue class for arrayRemove() transforms.
@@ -149,7 +115,7 @@ class _ArrayRemoveFieldValue extends FieldValue {
   const _ArrayRemoveFieldValue._(List<Object?> elements) : super._(elements);
 
   @override
-  String get methodName => 'FieldValue.arrayRemove';
+  String get _methodName => 'FieldValue.arrayRemove';
 }
 
 /* FieldValue class for increment() transforms. */
@@ -158,7 +124,7 @@ class _NumericIncrementFieldValue extends FieldValue {
   final num operand;
 
   @override
-  String get methodName => 'FieldValue.increment';
+  String get _methodName => 'FieldValue.increment';
 
   num getOperand() => operand;
 
@@ -185,7 +151,7 @@ class _NumericMinimumFieldValue extends FieldValue {
   final num operand;
 
   @override
-  String get methodName => 'FieldValue.minimum';
+  String get _methodName => 'FieldValue.minimum';
 
   num getOperand() => operand;
 
@@ -207,7 +173,7 @@ class _NumericMaximumFieldValue extends FieldValue {
   final num operand;
 
   @override
-  String get methodName => 'FieldValue.maximum';
+  String get _methodName => 'FieldValue.maximum';
 
   num getOperand() => operand;
 
@@ -221,4 +187,28 @@ class _NumericMaximumFieldValue extends FieldValue {
   @override
   int get hashCode =>
       Object.hash(runtimeType, operand.runtimeType, _hashableOperand(operand));
+}
+
+/// Members of [FieldValue] for the SDK itself. Not exported by the public libraries.
+extension FieldValueInternal on FieldValue {
+  /// The elements of an array union or remove.
+  List<Object?> get elements => _elements;
+
+  /// The name of the factory that created this value (for example
+  /// `FieldValue.delete`), for error messages.
+  String get methodName => _methodName;
+
+  bool get isDelete => this is _DeleteFieldValue;
+
+  bool get isServerTimestamp => this is _ServerTimestampFieldValue;
+
+  bool get isArrayUnion => this is _ArrayUnionFieldValue;
+
+  bool get isArrayRemove => this is _ArrayRemoveFieldValue;
+
+  bool get isIncrement => this is _NumericIncrementFieldValue;
+
+  bool get isMinimum => this is _NumericMinimumFieldValue;
+
+  bool get isMaximum => this is _NumericMaximumFieldValue;
 }

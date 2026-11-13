@@ -9,19 +9,13 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_data_conve
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
 import 'package:test/test.dart';
 
 import '../../../util/test_util.dart' as util;
-import 'test_util.dart' as unit;
 
-class _TestFirestore extends unit.FirebaseFirestoreMock {
-  @override
-  DatabaseId get databaseId => DatabaseId.forProject('project');
-
-  @override
-  UserDataConverter get dataConverter => UserDataConverter(databaseId);
-}
+// ignore: non_constant_identifier_names
+Firestore _TestFirestore() =>
+    FirestoreInternal.detached(DatabaseId.forProject('project'));
 
 String _fromFirestore(
         DocumentSnapshot<Map<String, Object?>> snapshot, Object? _) =>
@@ -33,7 +27,7 @@ Map<String, Object?> _toFirestore(String value, SetOptions? _) =>
 void main() {
   final Firestore db = _TestFirestore();
   Query<Map<String, Object?>> collection() =>
-      Query<Map<String, Object?>>(util.query('collection'), db);
+      QueryInternal.create<Map<String, Object?>>(util.query('collection'), db);
 
   test('each named argument builds the same query as the where* method', () {
     final Query<Map<String, Object?>> q = collection();

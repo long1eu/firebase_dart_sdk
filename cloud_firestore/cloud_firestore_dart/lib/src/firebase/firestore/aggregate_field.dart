@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
-import 'package:meta/meta.dart';
 
 /// Represents an aggregation that can be performed by Firestore.
 ///
@@ -21,17 +20,14 @@ import 'package:meta/meta.dart';
 /// [AggregateField.average] and pass them to `Query.aggregate`.
 abstract class AggregateField {
   AggregateField._(this._fieldPath, this.operator)
-    : alias = _fieldPath == null ? operator : '${operator}_$_fieldPath';
+    : _alias = _fieldPath == null ? operator : '${operator}_$_fieldPath';
 
   final FieldPath? _fieldPath;
 
   /// The name of the aggregation operator: `count`, `sum` or `average`.
   final String operator;
 
-  /// The client-side alias under which the result is stored in an
-  /// [AggregateQuerySnapshot]. The alias sent to the server is different.
-  @internal
-  final String alias;
+  final String _alias;
 
   /// The canonical string of the field this aggregation operates on, or the
   /// empty string for aggregations without a field (count).
@@ -97,4 +93,11 @@ class SumAggregateField extends AggregateField {
 /// Averages the values of a field over the result set.
 class AverageAggregateField extends AggregateField {
   AverageAggregateField._(FieldPath fieldPath) : super._(fieldPath, 'average');
+}
+
+/// Members of [AggregateField] for the SDK itself. Not exported by the public libraries.
+extension AggregateFieldInternal on AggregateField {
+  /// The client-side alias under which the result is stored in an
+  /// `AggregateQuerySnapshot`. The alias sent to the server is different.
+  String get alias => _alias;
 }

@@ -243,9 +243,9 @@ firestore.snapshotsInSync.listen((_) {});
 await firestore.terminate();
 ```
 
-Members marked `@internal` in the golden listing are implementation details that are still
-reachable for technical reasons; the analyzer warns when you use them and they may change or
-disappear in any release.
+The main library exposes no implementation members: what the golden listing shows is the
+supported API. (The Firestore Lite and Pipelines listings still mark a few members of their own
+classes `@internal`; the analyzer warns when you use those and they may change in any release.)
 
 The exact signatures are pinned in `test/unit/api/public_api.golden.txt`. The snippets above are
 compiled against the library by `test/unit/api/readme_snippets_test.dart` (they assume an `app`,

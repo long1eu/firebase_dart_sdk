@@ -13,6 +13,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/empty_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/database_info.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_client.dart';
@@ -50,7 +51,7 @@ Future<Firestore> newFirestore() async {
     scheduler,
   );
   // ignore: invalid_use_of_internal_member
-  final Firestore firestore = Firestore(databaseId, null, client, scheduler);
+  final Firestore firestore = FirestoreInternal.create(databaseId, null, client, scheduler);
   _instances.add(firestore);
   return firestore;
 }

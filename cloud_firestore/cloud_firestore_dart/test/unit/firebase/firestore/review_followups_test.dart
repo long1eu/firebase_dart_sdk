@@ -1,6 +1,7 @@
 // Regression tests for the defects recorded in reviews/review_followups.md.
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -49,7 +50,7 @@ void main() {
     late Firestore db;
 
     setUp(() {
-      db = Firestore(
+      db = FirestoreInternal.create(
           DatabaseId.forProject('p'), null, _Client(), TaskScheduler('test'));
     });
 
@@ -58,7 +59,7 @@ void main() {
       final Document doc =
           util.doc('users/a', 1, <String, Object?>{'nickname': null});
       final QueryDocumentSnapshot<String?> snapshot =
-          QueryDocumentSnapshot<String?>.fromDocument(
+          QueryDocumentSnapshotInternal.fromDocument<String?>(
         db,
         doc,
         fromCache: false,
@@ -75,7 +76,7 @@ void main() {
           util.doc('users/a', 1, <String, Object?>{'nickname': 'n'});
       DocumentSnapshot<String?> snapshot(
               FirestoreDataConverter<String?> converter) =>
-          DocumentSnapshot<String?>.fromDocument(
+          DocumentSnapshotInternal.fromDocument<String?>(
             db,
             doc,
             isFromCache: false,

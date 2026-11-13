@@ -16,7 +16,6 @@ import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/load_bundle_task_progress.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
-import 'package:meta/meta.dart';
 
 /// A listener that is called periodically during execution of a [LoadBundleTask].
 typedef OnProgressListener = void Function(LoadBundleTaskProgress snapshot);
@@ -28,8 +27,7 @@ typedef OnProgressListener = void Function(LoadBundleTaskProgress snapshot);
 /// [future] and the progress updates as [stream] / [addOnProgressListener].
 class LoadBundleTask {
   /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.loadBundle].
-  @internal
-  LoadBundleTask() {
+  LoadBundleTask._() {
     // Failures are reported to every consumer of [future]. Do not turn a failure nobody asked about into an
     // unhandled error.
     _completion.future.ignore();
@@ -77,8 +75,7 @@ class LoadBundleTask {
   // Called by the library.
 
   /// Completes the task successfully with the given final [result].
-  @internal
-  void setResult(LoadBundleTaskProgress result) {
+  void _setResult(LoadBundleTaskProgress result) {
     hardAssert(
       result.taskState == LoadBundleTaskState.success,
       'Expected success, but was ${result.taskState}',
@@ -91,8 +88,7 @@ class LoadBundleTask {
   }
 
   /// Completes the task with the given [exception].
-  @internal
-  void setException(Object exception) {
+  void _setException(Object exception) {
     final LoadBundleTaskProgress snapshot = LoadBundleTaskProgress(
       _snapshot.documentsLoaded,
       _snapshot.totalDocuments,
@@ -109,9 +105,24 @@ class LoadBundleTask {
   }
 
   /// Reports a progress update.
-  @internal
-  void updateProgress(LoadBundleTaskProgress progressUpdate) {
+  void _updateProgress(LoadBundleTaskProgress progressUpdate) {
     _snapshot = progressUpdate;
     _progress.add(progressUpdate);
   }
+}
+
+/// Members of [LoadBundleTask] for the SDK itself. Not exported by the public libraries.
+extension LoadBundleTaskInternal on LoadBundleTask {
+  /// Creates a task that has not started.
+  static LoadBundleTask create() => LoadBundleTask._();
+
+  /// Completes the task successfully with the given final [result].
+  void setResult(LoadBundleTaskProgress result) => _setResult(result);
+
+  /// Completes the task with the given [exception].
+  void setException(Object exception) => _setException(exception);
+
+  /// Reports a progress update.
+  void updateProgress(LoadBundleTaskProgress progressUpdate) =>
+      _updateProgress(progressUpdate);
 }

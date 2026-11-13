@@ -17,7 +17,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_metadata.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:meta/meta.dart';
 
 /// A [QuerySnapshot] contains the results of a query. It can contain zero or more [DocumentSnapshot] objects.
 ///
@@ -26,11 +25,10 @@ import 'package:meta/meta.dart';
 class QuerySnapshot<T extends dynamic>
     extends Iterable<QueryDocumentSnapshot<T>> {
   /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  QuerySnapshot(this.query, this.snapshot, this._firestore)
+  QuerySnapshot._(this.query, this._snapshot, this._firestore)
     : metadata = SnapshotMetadata(
-        snapshot.hasPendingWrites,
-        snapshot.isFromCache,
+        _snapshot.hasPendingWrites,
+        _snapshot.isFromCache,
       );
 
   /// Builds a [QuerySnapshot] from the JSON object written by [toJson], for the [firestore] instance.
@@ -54,9 +52,7 @@ class QuerySnapshot<T extends dynamic>
   /// Returns the metadata for this document snapshot.
   final SnapshotMetadata metadata;
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  final ViewSnapshot snapshot;
+  final ViewSnapshot _snapshot;
   final Firestore _firestore;
 
   List<DocumentChange<T>>? _cachedChanges;
@@ -94,7 +90,7 @@ class QuerySnapshot<T extends dynamic>
     List<DocumentChange<T>>? cachedChanges = _cachedChanges;
     if (cachedChanges == null ||
         _cachedChangesMetadataState != metadataChanges) {
-      cachedChanges = DocumentChange.changesFromSnapshot<T>(
+      cachedChanges = DocumentChangeInternal.changesFromSnapshot<T>(
         _firestore,
         metadataChanges,
         snapshot,
@@ -154,7 +150,7 @@ class QuerySnapshot<T extends dynamic>
       snapshot_json.querySnapshotToJson(_firestore, snapshot);
 
   QueryDocumentSnapshot<T> _convertDocument(Document document) {
-    return QueryDocumentSnapshot<T>.fromDocument(
+    return QueryDocumentSnapshotInternal.fromDocument<T>(
       _firestore,
       document,
       fromCache: snapshot.isFromCache,
@@ -191,4 +187,17 @@ class QuerySnapshot<T extends dynamic>
           ..add('cachedChangesMetadataState', _cachedChangesMetadataState))
         .toString();
   }
+}
+
+/// Members of [QuerySnapshot] for the SDK itself. Not exported by the public libraries.
+extension QuerySnapshotInternal<T> on QuerySnapshot<T> {
+  /// The view snapshot this public snapshot wraps.
+  ViewSnapshot get snapshot => _snapshot;
+
+  /// The snapshot of [query] for the view [snapshot].
+  static QuerySnapshot<T> create<T extends dynamic>(
+    Query<T> query,
+    ViewSnapshot snapshot,
+    Firestore firestore,
+  ) => QuerySnapshot<T>._(query, snapshot, firestore);
 }

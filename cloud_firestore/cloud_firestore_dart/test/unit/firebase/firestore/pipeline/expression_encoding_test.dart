@@ -70,7 +70,7 @@ void main() {
       expect(encode(constant(<String, Object?>{'k': 1})),
           mapValue(<String, pb.Value>{'k': integer(1)}));
       expect(
-          encode(constant(DocumentReference<Map<String, Object?>>(
+          encode(constant(DocumentReferenceInternal.create<Map<String, Object?>>(
               DocumentKey.fromPathString('c/d'), fakeFirestore))),
           ref('projects/new-project/databases/(default)/documents/c/d'));
     });

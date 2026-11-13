@@ -183,7 +183,7 @@ void main() {
 
   group('M5: server timestamp behaviours', () {
     DocumentSnapshot snapshotWith(FieldValue value) {
-      return DocumentSnapshot.fromDocument(
+      return DocumentSnapshotInternal.fromDocument(
         unit.firestore,
         Document(
           util.key('rooms/foo'),

@@ -14,7 +14,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/preco
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
-import 'package:meta/meta.dart';
 
 /// The signature for providing code to be executed within a [WriteBatch]
 /// context.
@@ -34,8 +33,7 @@ typedef BatchCallback = Future<void> Function(WriteBatch);
 /// does so.
 class WriteBatch {
   /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.batch].
-  @internal
-  WriteBatch(this._firestore);
+  WriteBatch._(this._firestore);
 
   final Firestore _firestore;
   final List<Mutation> _mutations = <Mutation>[];
@@ -147,4 +145,10 @@ class WriteBatch {
       );
     }
   }
+}
+
+/// Members of [WriteBatch] for the SDK itself. Not exported by the public libraries.
+extension WriteBatchInternal on WriteBatch {
+  /// A new, empty batch of [firestore].
+  static WriteBatch create(Firestore firestore) => WriteBatch._(firestore);
 }

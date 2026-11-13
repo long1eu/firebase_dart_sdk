@@ -927,7 +927,7 @@ class SpecTestCase implements RemoteStoreCallback {
   Future<void> _doLoadBundle(String json) async {
     final BundleReader bundleReader =
         BundleReader.fromBytes(_bundleSerializer, utf8.encode(json));
-    final LoadBundleTask bundleTask = LoadBundleTask();
+    final LoadBundleTask bundleTask = LoadBundleTaskInternal.create();
     await _syncEngine.loadBundle(bundleReader, bundleTask);
     // Let the resulting snapshots be delivered to the listeners.
     await Future<void>.delayed(_delayDuration);

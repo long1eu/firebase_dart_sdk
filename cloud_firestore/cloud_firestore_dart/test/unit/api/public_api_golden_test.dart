@@ -55,7 +55,13 @@ String _name(Symbol symbol) => MirrorSystem.getName(symbol);
 ///
 /// Mirrors report `show A, B` as one combinator per name, so the shown names
 /// are the union of all `show` combinators.
-bool _isExportedBy(LibraryDependencyMirror dep, Symbol symbol) {
+///
+/// Mirrors list the members of an extension as library members named
+/// `Extension.member`; they are exported when the extension is.
+bool _isExportedBy(LibraryDependencyMirror dep, Symbol member) {
+  final String name = MirrorSystem.getName(member);
+  final Symbol symbol =
+      name.contains('.') ? Symbol(name.substring(0, name.indexOf('.'))) : member;
   final Iterable<CombinatorMirror> shows =
       dep.combinators.where((CombinatorMirror c) => c.isShow);
   if (shows.isNotEmpty &&

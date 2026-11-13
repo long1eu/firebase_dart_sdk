@@ -59,8 +59,11 @@ API changes that need code changes:
     `OpenDatabase`, `OnConfigure`, `OnCreate`, `OnOpen`, `OnVersionChange` (now documented).
     `UnaryFilter` / `CompositeFilter` were already not exported; the API golden listed them by
     mistake.
-  - Marked `@internal` (the analyzer reports any use outside this package; they will be made
-    private or removed later): `Firestore(...)` constructor, `Firestore.newInstance`, `client`,
+  - No longer reachable from `package:cloud_firestore_dart/cloud_firestore_dart.dart` (they are
+    library private; the SDK itself uses them through extensions that the public libraries do
+    not export). None of the classes below has a public constructor any more, so they cannot be
+    subclassed outside the SDK (`implements` for a test double still works): `Firestore(...)`
+    constructor, `Firestore.newInstance`, `client`,
     `scheduler`, `dataConverter`, `databaseId` (use the new `Firestore.projectId` and
     `Firestore.databaseName` getters), `validateReference`; `Query.query`;
     `QuerySnapshot.snapshot`; `DocumentSnapshot.document`; `DocumentReference.key`;
@@ -71,7 +74,12 @@ API changes that need code changes:
     `AggregateQuery` and `AggregateQuerySnapshot` constructors; the `LoadBundleTask`
     constructor, `setResult`, `setException`, `updateProgress`;
     `LoadBundleTaskProgress.forInitial` / `forSuccess`; `FirestoreErrorCode.fromValue`;
-    `Timestamp.validateRange`.
+    `Timestamp.validateRange`; and the constructors of `DocumentReference`,
+    `CollectionReference`, `Query`, `DocumentSnapshot`, `QueryDocumentSnapshot`, `QuerySnapshot`,
+    `DocumentChange` (with `changesFromSnapshot`), `Transaction`, `WriteBatch`, `VectorQuery`,
+    `VectorQuerySnapshot` and `PersistentCacheIndexManager`. `package:cloud_firestore_dart/lite.dart`
+    hides the same members of the classes it shares with the main library (`FieldPath`,
+    `FieldValue`, `SetOptions`, `AggregateField`, `Timestamp`).
 
 Behaviour changes without a compile error:
 

@@ -50,7 +50,7 @@ void main() {
     // of the underlying document (its version, whether it has local mutations)
     // does not matter.
     DocumentSnapshot snapshot(int version, DocumentState state) {
-      return DocumentSnapshot.fromDocument(
+      return DocumentSnapshotInternal.fromDocument(
         firestore,
         util.doc(
             'rooms/foo', version, util.map<Object>(<dynamic>['a', 1]), state),
@@ -69,7 +69,7 @@ void main() {
     expect(otherVersion.hashCode, base.hashCode);
     expect(otherState.hashCode, base.hashCode);
 
-    final DocumentSnapshot differentData = DocumentSnapshot.fromDocument(
+    final DocumentSnapshot differentData = DocumentSnapshotInternal.fromDocument(
       firestore,
       util.doc('rooms/foo', 1, util.map<Object>(<dynamic>['a', 2])),
       isFromCache: false,

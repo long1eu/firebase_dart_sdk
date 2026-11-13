@@ -25,6 +25,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as pb;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:test/test.dart';
 
 import 'pipeline_test_util.dart';
@@ -89,7 +90,7 @@ void main() {
       ]);
       expect(
           stagesOf(source().collection(
-              CollectionReference<Map<String, Object?>>(
+              CollectionReferenceInternal.create<Map<String, Object?>>(
                   ResourcePath.fromString('a/b/c'), fakeFirestore))),
           <pb.Pipeline_Stage>[
             stage('collection', <pb.Value>[ref('/a/b/c')])
@@ -114,16 +115,16 @@ void main() {
     });
 
     test('rejects references of another database', () {
-      final FakeFirestore other =
+      final Firestore other =
           FakeFirestore(DatabaseId.forDatabase('other-project', '(default)'));
       expect(
-          () => source().collection(CollectionReference<Map<String, Object?>>(
+          () => source().collection(CollectionReferenceInternal.create<Map<String, Object?>>(
               ResourcePath.fromString('a'), other)),
           throwsA(isA<ArgumentError>().having((ArgumentError e) => e.message,
               'message', contains('does not match the project ID'))));
       expect(
           () => source().documents(<Object>[
-                DocumentReference<Map<String, Object?>>(
+                DocumentReferenceInternal.create<Map<String, Object?>>(
                     DocumentKey.fromPathString('a/b'), other)
               ]),
           throwsArgumentError);
@@ -147,7 +148,7 @@ void main() {
           stagesOf(source().documents(<Object>[
             'a/b',
             '/c/d',
-            DocumentReference<Map<String, Object?>>(
+            DocumentReferenceInternal.create<Map<String, Object?>>(
                 DocumentKey.fromPathString('e/f'), fakeFirestore),
           ])),
           <pb.Pipeline_Stage>[

@@ -13,6 +13,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/server_timestamp_behavior.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:test/test.dart';
 
 import '../../../util/event_accumulator.dart';

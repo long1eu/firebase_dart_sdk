@@ -1,5 +1,4 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_client.dart';
-import 'package:meta/meta.dart';
 
 /// Controls the creation and the lifecycle of the persistent cache indexes of
 /// a `Firestore` instance.
@@ -14,8 +13,7 @@ import 'package:meta/meta.dart';
 class PersistentCacheIndexManager {
   /// Implementation detail of the SDK; not part of the supported API. Use
   /// `Firestore.persistentCacheIndexManager`.
-  @internal
-  PersistentCacheIndexManager(this._client);
+  PersistentCacheIndexManager._(this._client);
 
   final FirestoreClient _client;
 
@@ -45,4 +43,11 @@ class PersistentCacheIndexManager {
   Future<void> deleteAllIndexes() {
     return _client.deleteAllFieldIndexes();
   }
+}
+
+/// Members of [PersistentCacheIndexManager] for the SDK itself. Not exported by the public libraries.
+extension PersistentCacheIndexManagerInternal on PersistentCacheIndexManager {
+  /// The index manager of the instance that owns [client].
+  static PersistentCacheIndexManager create(FirestoreClient client) =>
+      PersistentCacheIndexManager._(client);
 }

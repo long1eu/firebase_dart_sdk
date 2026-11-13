@@ -14,7 +14,6 @@
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
-import 'package:meta/meta.dart';
 
 /// The results of a [VectorQuery], nearest document first.
 ///
@@ -22,8 +21,7 @@ import 'package:meta/meta.dart';
 /// from the cache and never has pending writes.
 class VectorQuerySnapshot extends Iterable<QueryDocumentSnapshot> {
   /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  VectorQuerySnapshot(this.query, List<QueryDocumentSnapshot> docs)
+  VectorQuerySnapshot._(this.query, List<QueryDocumentSnapshot> docs)
     : docs = List<QueryDocumentSnapshot>.unmodifiable(docs);
 
   /// The query that produced this snapshot.
@@ -40,4 +38,13 @@ class VectorQuerySnapshot extends Iterable<QueryDocumentSnapshot> {
 
   /// The number of documents (same as [length]).
   int get size => docs.length;
+}
+
+/// Members of [VectorQuerySnapshot] for the SDK itself. Not exported by the public libraries.
+extension VectorQuerySnapshotInternal on VectorQuerySnapshot {
+  /// The snapshot of [query] with the documents [docs], nearest first.
+  static VectorQuerySnapshot create(
+    VectorQuery query,
+    List<QueryDocumentSnapshot> docs,
+  ) => VectorQuerySnapshot._(query, docs);
 }

@@ -90,7 +90,7 @@ class FirestoreMultiDbComponent {
       return Future<Firestore>.value(existing);
     }
 
-    Future<Firestore> create() => Firestore.newInstance(
+    Future<Firestore> create() => FirestoreInternal.newInstance(
       app,
       databaseName,
       authProvider: authProvider,

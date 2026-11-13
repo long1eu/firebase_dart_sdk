@@ -16,31 +16,31 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
-import 'package:mockito/mockito.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 
 import '../../../util/test_util.dart' as util;
 
 final Firestore firestore = FirebaseFirestoreMock();
 
 CollectionReference collectionReference(String path) {
-  return CollectionReference(ResourcePath.fromString(path), firestore);
+  return CollectionReferenceInternal.create(ResourcePath.fromString(path), firestore);
 }
 
 DocumentReference documentReference(String path) {
-  return DocumentReference(util.key(path), firestore);
+  return DocumentReferenceInternal.create(util.key(path), firestore);
 }
 
 DocumentSnapshot documentSnapshot(
     String path, Map<String, Object>? data, bool isFromCache) {
   if (data == null) {
-    return DocumentSnapshot.fromNoDocument(
+    return DocumentSnapshotInternal.fromNoDocument(
       firestore,
       util.key(path),
       isFromCache: isFromCache,
       hasPendingWrites: false,
     );
   } else {
-    return DocumentSnapshot.fromDocument(
+    return DocumentSnapshotInternal.fromDocument(
       firestore,
       util.doc(path, 1, data),
       isFromCache: isFromCache,
@@ -50,7 +50,7 @@ DocumentSnapshot documentSnapshot(
 }
 
 Query query(String path) {
-  return Query(util.query(path), firestore);
+  return QueryInternal.create(util.query(path), firestore);
 }
 
 /// A convenience method for creating a particular query snapshot for tests.
@@ -114,7 +114,10 @@ QuerySnapshot querySnapshot(
     hasCachedResults: false,
   );
 
-  return QuerySnapshot(query(path), viewSnapshot, firestore);
+  return QuerySnapshotInternal.create(query(path), viewSnapshot, firestore);
 }
 
-class FirebaseFirestoreMock extends Mock implements Firestore {}
+/// A [Firestore] without a client.
+// ignore: non_constant_identifier_names
+Firestore FirebaseFirestoreMock() =>
+    FirestoreInternal.detached(DatabaseId.forProject('project'));

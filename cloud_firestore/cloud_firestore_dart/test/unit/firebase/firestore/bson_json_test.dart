@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart' hide FieldValue;
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_element.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_reader.dart';
@@ -23,19 +24,14 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_set.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
-import 'package:mockito/mockito.dart';
 import 'package:test/test.dart';
 
 import '../../../util/test_util.dart' as util;
 
-class _TestFirestore extends Mock implements Firestore {
-  _TestFirestore(this.databaseId);
+Firestore _testFirestore(DatabaseId databaseId) =>
+    FirestoreInternal.detached(databaseId);
 
-  @override
-  final DatabaseId databaseId;
-}
-
-final Firestore firestore = _TestFirestore(DatabaseId.forProject('project'));
+final Firestore firestore = _testFirestore(DatabaseId.forProject('project'));
 
 Map<String, Object?> allTypes() {
   return <String, Object?>{
@@ -73,8 +69,8 @@ QuerySnapshot<Map<String, Object?>> querySnapshot(
     hasCachedResults: false,
     readTime: SnapshotVersion.none,
   );
-  return QuerySnapshot<Map<String, Object?>>(
-      Query<Map<String, Object?>>(query, firestore), snapshot, firestore);
+  return QuerySnapshotInternal.create<Map<String, Object?>>(
+      QueryInternal.create<Map<String, Object?>>(query, firestore), snapshot, firestore);
 }
 
 Future<List<BundleElement>> readBundle(String bundle) async {
@@ -95,7 +91,7 @@ void main() {
   test('DocumentSnapshot.fromJson round-trips the BSON types', () async {
     final Document document = util.doc('coll/doc', 1000, allTypes());
     final DocumentSnapshot<Map<String, Object?>> snapshot =
-        DocumentSnapshot<Map<String, Object?>>.fromDocument(firestore, document,
+        DocumentSnapshotInternal.fromDocument<Map<String, Object?>>(firestore, document,
             isFromCache: true, hasPendingWrites: false);
     final Map<String, Object?> json =
         jsonDecode(jsonEncode(snapshot.toJson())) as Map<String, Object?>;

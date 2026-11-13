@@ -3,6 +3,7 @@
 // SDK does inside (which upstream cannot observe: "TODO(b/296100693) Add testing hooks").
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/local/persistance/persistence.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_index.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';

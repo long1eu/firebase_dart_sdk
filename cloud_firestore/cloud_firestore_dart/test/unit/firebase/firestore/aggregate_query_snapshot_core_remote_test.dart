@@ -23,7 +23,7 @@ import 'test_util.dart' as unit;
 /// Ported from upstream AggregateQuerySnapshotTest and AggregateQueryTest
 /// (current `main`), extended to the sum / average fields of the port.
 void main() {
-  AggregateQuery countQuery(String path) => AggregateQuery(
+  AggregateQuery countQuery(String path) => AggregateQueryInternal.create(
       unit.query(path), <AggregateField>[AggregateField.count()]);
 
   Map<String, FieldValue> data(Map<String, Object?> raw) => raw.map(
@@ -33,7 +33,7 @@ void main() {
     test('createWithCountShouldReturnInstanceWithTheGivenQueryAndCount', () {
       final AggregateQuery query = countQuery('foo');
       final AggregateQuerySnapshot snapshot =
-          AggregateQuerySnapshot(query, data(<String, Object?>{'count': 42}));
+          AggregateQuerySnapshotInternal.create(query, data(<String, Object?>{'count': 42}));
 
       expect(snapshot.query, same(query));
       expect(snapshot.getCount(), 42);
@@ -42,12 +42,12 @@ void main() {
     test('equality and hashCode consider query and data', () {
       final AggregateQuery query = countQuery('foo');
       final AggregateQuerySnapshot a =
-          AggregateQuerySnapshot(query, data(<String, Object?>{'count': 1}));
-      final AggregateQuerySnapshot b = AggregateQuerySnapshot(
+          AggregateQuerySnapshotInternal.create(query, data(<String, Object?>{'count': 1}));
+      final AggregateQuerySnapshot b = AggregateQuerySnapshotInternal.create(
           countQuery('foo'), data(<String, Object?>{'count': 1}));
       final AggregateQuerySnapshot otherCount =
-          AggregateQuerySnapshot(query, data(<String, Object?>{'count': 2}));
-      final AggregateQuerySnapshot otherQuery = AggregateQuerySnapshot(
+          AggregateQuerySnapshotInternal.create(query, data(<String, Object?>{'count': 2}));
+      final AggregateQuerySnapshot otherQuery = AggregateQuerySnapshotInternal.create(
           countQuery('bar'), data(<String, Object?>{'count': 1}));
 
       expect(a, b);
@@ -59,19 +59,19 @@ void main() {
     test('data is copied defensively', () {
       final Map<String, FieldValue> raw = data(<String, Object?>{'count': 1});
       final AggregateQuerySnapshot snapshot =
-          AggregateQuerySnapshot(countQuery('foo'), raw);
+          AggregateQuerySnapshotInternal.create(countQuery('foo'), raw);
       raw['count'] = util.wrap(5);
       expect(snapshot.getCount(), 1);
     });
 
     test('getCount fails when the count alias is null', () {
-      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshot(
+      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshotInternal.create(
           countQuery('foo'), data(<String, Object?>{'count': null}));
       expect(snapshot.getCount, throwsArgumentError);
     });
 
     test('reading a field that was not requested fails', () {
-      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshot(
+      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshotInternal.create(
           countQuery('foo'), data(<String, Object?>{'count': 1}));
       expect(() => snapshot.get(AggregateField.sum('a')), throwsArgumentError);
       expect(() => snapshot.getInt(AggregateField.average('a')),
@@ -79,7 +79,7 @@ void main() {
     });
 
     test('sum and average values are read as int, double or null', () {
-      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshot(
+      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshotInternal.create(
         countQuery('foo'),
         data(<String, Object?>{
           'sum_a': 5,
@@ -101,7 +101,7 @@ void main() {
     });
 
     test('non numeric values cannot be read as numbers', () {
-      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshot(
+      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshotInternal.create(
           countQuery('foo'), data(<String, Object?>{'sum_a': 'text'}));
       expect(() => snapshot.getInt(AggregateField.sum('a')), throwsStateError);
       expect(
@@ -109,7 +109,7 @@ void main() {
     });
 
     test('NaN and infinity are saturated when read as int', () {
-      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshot(
+      final AggregateQuerySnapshot snapshot = AggregateQuerySnapshotInternal.create(
         countQuery('foo'),
         data(<String, Object?>{
           'average_nan': double.nan,
@@ -128,26 +128,26 @@ void main() {
 
   group('AggregateQuery', () {
     test('equality and hashCode consider query and fields', () {
-      final AggregateQuery a = AggregateQuery(unit.query('foo'),
+      final AggregateQuery a = AggregateQueryInternal.create(unit.query('foo'),
           <AggregateField>[AggregateField.count(), AggregateField.sum('x')]);
-      final AggregateQuery b = AggregateQuery(unit.query('foo'),
+      final AggregateQuery b = AggregateQueryInternal.create(unit.query('foo'),
           <AggregateField>[AggregateField.count(), AggregateField.sum('x')]);
       expect(a, b);
       expect(a.hashCode, b.hashCode);
       expect(
           a,
-          isNot(AggregateQuery(
+          isNot(AggregateQueryInternal.create(
               unit.query('foo'), <AggregateField>[AggregateField.count()])));
       expect(
           a,
-          isNot(AggregateQuery(unit.query('bar'), <AggregateField>[
+          isNot(AggregateQueryInternal.create(unit.query('bar'), <AggregateField>[
             AggregateField.count(),
             AggregateField.sum('x')
           ])));
       // Order of the aggregations is significant.
       expect(
           a,
-          isNot(AggregateQuery(unit.query('foo'), <AggregateField>[
+          isNot(AggregateQueryInternal.create(unit.query('foo'), <AggregateField>[
             AggregateField.sum('x'),
             AggregateField.count()
           ])));

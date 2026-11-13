@@ -255,7 +255,7 @@ class IntegrationTestUtil {
       connectivityDetector: connectivityDetector,
     );
 
-    return Firestore(databaseId, null, client, scheduler);
+    return FirestoreInternal.create(databaseId, null, client, scheduler);
   }
 
   /// Initializes a new Firestore instance that can be used in testing. It is guaranteed to not share state with other

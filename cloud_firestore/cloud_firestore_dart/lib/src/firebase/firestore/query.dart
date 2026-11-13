@@ -33,10 +33,11 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_listen_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:meta/meta.dart';
 
 /// An enum for the direction of a sort.
 enum Direction {
@@ -55,8 +56,7 @@ enum Direction {
 class Query<T extends dynamic> {
   /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.collection] or
   /// [Firestore.collectionGroup].
-  @internal
-  const Query(this.query, this.firestore, [this.converter]);
+  const Query._(this._query, this.firestore, [this.converter]);
 
   /// The converter attached with [withConverter], or null for raw maps.
   final FirestoreDataConverter<T>? converter;
@@ -67,19 +67,17 @@ class Query<T extends dynamic> {
   Query<U> withConverter<U extends Object?>(
     FirestoreDataConverter<U> converter,
   ) {
-    return Query<U>(query, firestore, converter);
+    return Query<U>._(query, firestore, converter);
   }
 
   /// Returns a query over the same documents that yields raw
   /// `Map<String, Object?>` values (the equivalent of `withConverter(null)` in
   /// the JS SDK).
   Query<Map<String, Object?>> withoutConverter() {
-    return Query<Map<String, Object?>>(query, firestore);
+    return Query<Map<String, Object?>>._(query, firestore);
   }
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  final core.Query query;
+  final core.Query _query;
 
   /// The [Firestore] instance this query belongs to.
   final Firestore firestore;
@@ -629,7 +627,7 @@ class Query<T extends dynamic> {
     // A filter that adds nothing returns the query it was given.
     return identical(newQuery, query)
         ? this
-        : Query<T>(newQuery, firestore, converter);
+        : Query<T>._(newQuery, firestore, converter);
   }
 
   /// Executes the query and returns the results as a [QuerySnapshot].
@@ -647,8 +645,8 @@ class Query<T extends dynamic> {
       final ViewSnapshot viewSnap = await firestore.client
           .getDocumentsFromLocalCache(query);
 
-      return QuerySnapshot<T>(
-        Query<T>(query, firestore, converter),
+      return QuerySnapshotInternal.create<T>(
+        Query<T>._(query, firestore, converter),
         viewSnap,
         firestore,
       );
@@ -722,7 +720,7 @@ class Query<T extends dynamic> {
         'Invalid vector query: the query vector must be a VectorValue or a List<double>, but was ${queryVector.runtimeType}.',
       );
     }
-    return VectorQuery(
+    return VectorQueryInternal.create(
       this,
       vectorField.internalPath,
       vector,
@@ -737,8 +735,10 @@ class Query<T extends dynamic> {
   /// this query, without downloading the documents.
   ///
   /// The count is computed on the server: it fails when the client is offline.
-  AggregateQuery count() =>
-      AggregateQuery(this, <AggregateField>[AggregateField.count()]);
+  AggregateQuery count() => AggregateQueryInternal.create(
+    this,
+    <AggregateField>[AggregateField.count()],
+  );
 
   /// Returns an [AggregateQuery] that calculates the given aggregations over the
   /// result set of this query without downloading the documents.
@@ -746,7 +746,7 @@ class Query<T extends dynamic> {
     if (aggregateFields.isEmpty) {
       throw ArgumentError('At least one AggregateField is required.');
     }
-    return AggregateQuery(this, aggregateFields);
+    return AggregateQueryInternal.create(this, aggregateFields);
   }
 
   /// Returns an [AggregateQuery] that calculates the given aggregations over the
@@ -767,7 +767,7 @@ class Query<T extends dynamic> {
     if (aggregates.isEmpty) {
       throw ArgumentError('At least one AggregateField is required.');
     }
-    return AggregateQuery.withAliases(this, aggregates);
+    return AggregateQueryInternal.withAliases(this, aggregates);
   }
 
   /// Return cached results first and then queries the server with resume token
@@ -805,7 +805,8 @@ class Query<T extends dynamic> {
   Stream<QuerySnapshot<T>> _getSnapshotsInternal(ListenOptions options) {
     _validateHasExplicitOrderByForLimitToLast();
     return listenToQuery(firestore.client, query, options).map(
-      (ViewSnapshot snapshot) => QuerySnapshot<T>(this, snapshot, firestore),
+      (ViewSnapshot snapshot) =>
+          QuerySnapshotInternal.create<T>(this, snapshot, firestore),
     );
   }
 
@@ -856,3 +857,129 @@ Future<T> _firstAndCancel<T>(Stream<T> stream) async {
 /// The key of [value] when it is a document reference of this library.
 DocumentKey? _referenceKey(Object? value) =>
     value is DocumentReference ? value.key : null;
+
+/// A [CollectionReference] can be used for adding documents, getting document references, and
+/// querying for documents (using the methods inherited from [Query]).
+///
+/// **Subclassing Note**: Firestore classes are not meant to be subclassed except for use in test
+/// mocks. Subclassing is not supported in production code and new SDK releases may break code that
+/// does so.
+class CollectionReference<T extends dynamic> extends Query<T> {
+  CollectionReference._(
+    ResourcePath path,
+    Firestore firestore, [
+    FirestoreDataConverter<T>? converter,
+  ]) : super._(core.Query(_checkPath(path)), firestore, converter);
+
+  /// Not an assert: the check has to hold in release builds too.
+  static ResourcePath _checkPath(ResourcePath path) {
+    if (path.length.remainder(2) != 1) {
+      throw ArgumentError(
+        'Invalid collection reference. Collection references must have an odd number of '
+        'segments, but ${path.canonicalString} has ${path.length}',
+      );
+    }
+    return path;
+  }
+
+  /// Return The id of the collection.
+  String get id => query.path.last;
+
+  /// Gets a [DocumentReference] to the document that contains this collection. Only subcollections
+  /// are contained in a document. For root collections, returns null.
+  ///
+  /// Returns the [DocumentReference] that contains this collection or null if this is a root
+  /// collection.
+  DocumentReference<Map<String, Object?>>? get parent {
+    final ResourcePath parentPath = query.path.popLast();
+    if (parentPath.isEmpty) {
+      return null;
+    } else {
+      return DocumentReferenceInternal.create<Map<String, Object?>>(
+        DocumentKey.fromPath(parentPath),
+        firestore,
+      );
+    }
+  }
+
+  /// Gets the path of this collection (relative to the root of the database) as a slash-separated
+  /// string.
+  ///
+  /// Returns the path of this collection.
+  String get path => query.path.canonicalString;
+
+  /// Gets a [DocumentReference] instance that refers to the document at the specified path within
+  /// this collection.
+  ///
+  /// [documentPath] a slash-separated relative path to a document.
+  ///
+  /// Returns the [DocumentReference] instance.
+  DocumentReference<T> doc([String? documentPath]) => document(documentPath);
+
+  /// Gets a [DocumentReference] instance that refers to the document at the specified path within
+  /// this collection. Same as [doc].
+  @Deprecated('Use doc instead.')
+  DocumentReference<T> document([String? documentPath]) {
+    final String path = documentPath ?? autoId();
+    return DocumentReferenceInternal.forPath<T>(
+      query.path.appendField(ResourcePath.fromString(path)),
+      firestore,
+      converter,
+    );
+  }
+
+  /// Adds a new document to this collection with the specified data, assigning it a document ID
+  /// automatically.
+  ///
+  /// [data] a [Map] containing the data for the new document.
+  ///
+  /// Returns a Future that will be resolved with the [DocumentReference] of the newly created
+  /// document.
+  Future<DocumentReference<T>> add(T data) async {
+    checkNotNull<Object>(data, 'Provided data must not be null.');
+    final DocumentReference<T> ref = document();
+    await ref.set(data);
+    return ref;
+  }
+
+  /// Returns a collection reference to the same collection that converts data
+  /// with [converter] (type [U]) when reading and writing. Use
+  /// [withoutConverter] to go back to raw maps.
+  @override
+  CollectionReference<U> withConverter<U extends Object?>(
+    FirestoreDataConverter<U> converter,
+  ) {
+    return CollectionReference<U>._(query.path, firestore, converter);
+  }
+
+  /// Returns a collection reference to the same collection that reads and
+  /// writes raw `Map<String, Object?>` values.
+  @override
+  CollectionReference<Map<String, Object?>> withoutConverter() {
+    return CollectionReference<Map<String, Object?>>._(query.path, firestore);
+  }
+}
+
+/// Members of [Query] for the SDK itself. Not exported by the public libraries.
+extension QueryInternal<T> on Query<T> {
+  /// The core query this public query wraps.
+  core.Query get query => _query;
+
+  /// Wraps the core [query] of [firestore].
+  static Query<T> create<T extends dynamic>(
+    core.Query query,
+    Firestore firestore, [
+    FirestoreDataConverter<T>? converter,
+  ]) => Query<T>._(query, firestore, converter);
+}
+
+/// Members of [CollectionReference] for the SDK itself. Not exported by the public libraries.
+extension CollectionReferenceInternal<T> on CollectionReference<T> {
+  /// A reference to the collection at [path] in [firestore]. Throws an [ArgumentError] if [path] is not a
+  /// collection path.
+  static CollectionReference<T> create<T extends dynamic>(
+    ResourcePath path,
+    Firestore firestore, [
+    FirestoreDataConverter<T>? converter,
+  ]) => CollectionReference<T>._(path, firestore, converter);
+}

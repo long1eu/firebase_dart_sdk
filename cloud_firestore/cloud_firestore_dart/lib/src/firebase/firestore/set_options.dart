@@ -6,22 +6,21 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/field_mask.dart';
-import 'package:meta/meta.dart';
 
 /// An options object that configures the behavior of set() calls. By providing one of the
 /// [SetOptions] objects returned by [mergeAllFields], [mergeFields] and [mergeFieldPaths], the set() calls in
 /// [DocumentReference], [WriteBatch] and [Transaction] can be configured to perform granular merges
 /// instead of overwriting the target documents in their entirety.
 class SetOptions {
-  const SetOptions._(this.merge, this.fieldMask)
+  const SetOptions._(this.merge, this._fieldMask)
     : assert(
-        fieldMask != null && merge,
+        _fieldMask != null && merge,
         'Cannot specify a fieldMask for non-merge sets()',
       );
 
-  const SetOptions._overwrite() : merge = false, fieldMask = null;
+  const SetOptions._overwrite() : merge = false, _fieldMask = null;
 
-  const SetOptions._mergeAll() : merge = true, fieldMask = null;
+  const SetOptions._mergeAll() : merge = true, _fieldMask = null;
 
   /// Changes the behavior of set() calls to only replace the fields under [fields]. Any field
   /// that is not specified in [fields] is ignored and remains untouched.
@@ -62,7 +61,12 @@ class SetOptions {
   /// Whether the data is merged into the existing document instead of replacing it.
   final bool merge;
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  final FieldMask? fieldMask;
+  final FieldMask? _fieldMask;
+}
+
+/// Members of [SetOptions] for the SDK itself. Not exported by the public libraries.
+extension SetOptionsInternal on SetOptions {
+  /// The fields to merge, or null to merge every field of the data (or none,
+  /// for an overwrite).
+  FieldMask? get fieldMask => _fieldMask;
 }

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/emulator_credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_client.dart';
@@ -106,7 +107,7 @@ void main() {
         dependencies: null,
         name: 'reviewDeleteAppShutdownFails',
       );
-      final Firestore firestore = Firestore(DatabaseId.forProject('p'), app,
+      final Firestore firestore = FirestoreInternal.create(DatabaseId.forProject('p'), app,
           _FailingShutdownClient(), TaskScheduler('test'));
       FirestoreMultiDbComponent.register(
           app, DatabaseId.defaultDatabaseId, firestore);

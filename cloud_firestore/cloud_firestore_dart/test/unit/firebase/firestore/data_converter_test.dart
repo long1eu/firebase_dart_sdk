@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/document_view_change.dart';
@@ -75,7 +76,7 @@ void main() {
 
   setUp(() {
     client = _RecordingClient();
-    db = Firestore(
+    db = FirestoreInternal.create(
         DatabaseId.forProject('p'), null, client, TaskScheduler('test'));
   });
 
@@ -202,7 +203,7 @@ void main() {
 
   group('snapshots', () {
     test('DocumentSnapshot.data converts, missing documents give null', () {
-      final DocumentSnapshot<City> snap = DocumentSnapshot<City>.fromDocument(
+      final DocumentSnapshot<City> snap = DocumentSnapshotInternal.fromDocument<City>(
         db,
         cityDoc('cities/sf', 'SF', 10),
         isFromCache: false,
@@ -219,7 +220,7 @@ void main() {
       expect(snap.get('population'), 10);
 
       final DocumentSnapshot<City> missing =
-          DocumentSnapshot<City>.fromNoDocument(
+          DocumentSnapshotInternal.fromNoDocument<City>(
         db,
         DocumentKey.fromPathString('cities/none'),
         isFromCache: false,
@@ -243,7 +244,7 @@ void main() {
         toFirestore: (int v, SetOptions? o) =>
             <String, Object?>{'population': v},
       );
-      final DocumentSnapshot<int> snap = DocumentSnapshot<int>.fromDocument(
+      final DocumentSnapshot<int> snap = DocumentSnapshotInternal.fromDocument<int>(
         db,
         cityDoc('cities/sf', 'SF', 10),
         isFromCache: true,
@@ -276,8 +277,8 @@ void main() {
         hasCachedResults: false,
       );
       final Query<City> query =
-          Query<City>(util.query('cities'), db, cityConverter);
-      final QuerySnapshot<City> snapshot = QuerySnapshot<City>(query, view, db);
+          QueryInternal.create<City>(util.query('cities'), db, cityConverter);
+      final QuerySnapshot<City> snapshot = QuerySnapshotInternal.create<City>(query, view, db);
 
       expect(snapshot.length, 2);
       final List<QueryDocumentSnapshot<City>> list = snapshot.docs;
@@ -292,7 +293,7 @@ void main() {
 
     test('untyped usage is unchanged', () {
       final DocumentSnapshot<Map<String, Object?>> snap =
-          DocumentSnapshot<Map<String, Object?>>.fromDocument(
+          DocumentSnapshotInternal.fromDocument<Map<String, Object?>>(
         db,
         cityDoc('cities/sf', 'SF', 10),
         isFromCache: false,

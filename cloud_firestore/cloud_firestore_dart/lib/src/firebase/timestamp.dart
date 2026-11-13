@@ -3,7 +3,6 @@
 // on 17/09/2018
 
 import 'package:firebase_app_dart/internal.dart';
-import 'package:meta/meta.dart';
 
 /// A Timestamp represents a point in time independent of any time zone or calendar, represented as
 /// seconds and fractions of seconds at nanosecond resolution in UTC Epoch time. It is encoded using
@@ -54,7 +53,7 @@ class Timestamp implements Comparable<Timestamp> {
       nanoseconds += 1000000000;
     }
 
-    validateRange(seconds, nanoseconds);
+    _validateRange(seconds, nanoseconds);
     return Timestamp(seconds, nanoseconds);
   }
 
@@ -72,7 +71,7 @@ class Timestamp implements Comparable<Timestamp> {
       nanoseconds += 1000000000;
     }
 
-    validateRange(seconds, nanoseconds);
+    _validateRange(seconds, nanoseconds);
     return Timestamp(seconds, nanoseconds);
   }
 
@@ -90,7 +89,7 @@ class Timestamp implements Comparable<Timestamp> {
         'Not a JSON representation of a Timestamp',
       );
     }
-    validateRange(seconds, nanoseconds);
+    _validateRange(seconds, nanoseconds);
     return Timestamp(seconds, nanoseconds);
   }
 
@@ -144,9 +143,7 @@ class Timestamp implements Comparable<Timestamp> {
     }
   }
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  static void validateRange(int seconds, int nanoseconds) {
+  static void _validateRange(int seconds, int nanoseconds) {
     Preconditions.checkArgument(
       nanoseconds >= 0,
       'Timestamp nanoseconds out of range: $nanoseconds',
@@ -185,4 +182,12 @@ class Timestamp implements Comparable<Timestamp> {
 
   @override
   int get hashCode => seconds.hashCode * 31 ^ nanoseconds.hashCode * 31;
+}
+
+/// Members of [Timestamp] for the SDK itself. Not exported by the public libraries.
+extension TimestampInternal on Timestamp {
+  /// Throws an [ArgumentError] unless [seconds] and [nanoseconds] are in the
+  /// range a [Timestamp] can hold.
+  static void validateRange(int seconds, int nanoseconds) =>
+      Timestamp._validateRange(seconds, nanoseconds);
 }

@@ -20,6 +20,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:test/test.dart';
 

@@ -27,13 +27,14 @@
 /// the local store or the SQLite layer of the main library.
 library cloud_firestore_dart.lite;
 
-export 'src/firebase/firestore/aggregate_field.dart';
+export 'src/firebase/firestore/aggregate_field.dart'
+    hide AggregateFieldInternal;
 export 'src/firebase/firestore/blob.dart';
 export 'src/firebase/firestore/bson_object_id.dart';
 export 'src/firebase/firestore/bson_timestamp.dart';
 export 'src/firebase/firestore/decimal128_value.dart';
-export 'src/firebase/firestore/field_path.dart';
-export 'src/firebase/firestore/field_value.dart';
+export 'src/firebase/firestore/field_path.dart' hide FieldPathInternal;
+export 'src/firebase/firestore/field_value.dart' hide FieldValueInternal;
 export 'src/firebase/firestore/filter.dart' show Filter;
 export 'src/firebase/firestore/firestore_error.dart';
 export 'src/firebase/firestore/geo_point.dart';
@@ -52,7 +53,7 @@ export 'src/firebase/firestore/max_key.dart';
 export 'src/firebase/firestore/min_key.dart';
 export 'src/firebase/firestore/query.dart' show Direction;
 export 'src/firebase/firestore/regex_value.dart';
-export 'src/firebase/firestore/set_options.dart';
+export 'src/firebase/firestore/set_options.dart' hide SetOptionsInternal;
 export 'src/firebase/firestore/transaction_options.dart';
 export 'src/firebase/firestore/vector_value.dart';
-export 'src/firebase/timestamp.dart';
+export 'src/firebase/timestamp.dart' hide TimestampInternal;

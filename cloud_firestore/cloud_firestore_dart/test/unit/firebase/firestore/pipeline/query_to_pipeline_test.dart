@@ -23,6 +23,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/query_to_pi
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as pb;
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:test/test.dart';
 
 import '../../../../util/test_util.dart' as util;
@@ -353,12 +354,12 @@ void main() {
   });
 
   test('createFrom rejects a query of another database', () {
-    final FakeFirestore other = FakeFirestore(util.dbId('other'));
-    expect(() => source().createFrom(Query<Object?>(util.query('coll'), other)),
+    final Firestore other = FakeFirestore(util.dbId('other'));
+    expect(() => source().createFrom(QueryInternal.create<Object?>(util.query('coll'), other)),
         throwsArgumentError);
     expect(
         stagesOf(source()
-                .createFrom(Query<Object?>(util.query('coll'), fakeFirestore)))
+                .createFrom(QueryInternal.create<Object?>(util.query('coll'), fakeFirestore)))
             .first,
         stage('collection', <pb.Value>[ref('/coll')]));
   });

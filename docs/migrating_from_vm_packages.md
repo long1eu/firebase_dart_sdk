@@ -293,8 +293,9 @@ final DocumentSnapshot<Map<String, Object?>> snapshot = await ref.get();
 
 ## 8. Members that are no longer public
 
-These were reachable in 0.0.7 only because nothing hid them. They are now either not exported
-or marked `@internal`, in which case the analyzer reports every use outside the package.
+These were reachable in 0.0.7 only because nothing hid them. They are not part of the public
+library any more. The classes of the API have no public constructor either: instances come from
+`Firestore` and from other API objects, and a test double has to use `implements`.
 
 | Before | After |
 |---|---|

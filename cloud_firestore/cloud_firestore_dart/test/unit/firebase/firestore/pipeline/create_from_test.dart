@@ -15,6 +15,7 @@
 // the converted query (query_to_pipeline_test.dart covers the query itself).
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as pb;
 import 'package:test/test.dart';
@@ -23,7 +24,7 @@ import '../../../../util/test_util.dart' as util;
 import 'pipeline_test_util.dart';
 
 void main() {
-  Query<Object?> query() => Query<Object?>(util.query('coll'), fakeFirestore);
+  Query<Object?> query() => QueryInternal.create<Object?>(util.query('coll'), fakeFirestore);
 
   // collection, where(exists(__name__)), sort(__name__)
   const int queryStages = 3;
@@ -81,10 +82,10 @@ void main() {
     });
 
     test('rejects a query of another database', () {
-      final FakeFirestore other = FakeFirestore(util.dbId('other'));
+      final Firestore other = FakeFirestore(util.dbId('other'));
       expect(
           () => source().createFromAggregateQuery(
-              Query<Object?>(util.query('coll'), other).count()),
+              QueryInternal.create<Object?>(util.query('coll'), other).count()),
           throwsArgumentError);
     });
   });

@@ -5,7 +5,6 @@
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
     as model;
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
-import 'package:meta/meta.dart';
 
 /// A [FieldPath] refers to a field in a document. The path may consist of a single field name
 /// (referring to a top level field in the document), or a list of field names (referring to a
@@ -13,13 +12,12 @@ import 'package:meta/meta.dart';
 class FieldPath {
   /// Implementation detail of the SDK; not part of the supported API. Use [FieldPath.of] or
   /// [FieldPath.fromDotSeparatedPath].
-  @internal
-  const FieldPath(this.internalPath);
+  const FieldPath._(this._internalPath);
 
   /// Creates a field path from [segments], one field name per nesting level. Unlike [FieldPath.of]
   /// it does not validate the names.
   factory FieldPath.fromSegments(List<String> segments) {
-    return FieldPath(model.FieldPath.fromSegments(segments));
+    return FieldPath._(model.FieldPath.fromSegments(segments));
   }
 
   /// Creates a [FieldPath] from the provided field names. If more than one field name is provided,
@@ -48,7 +46,7 @@ class FieldPath {
   factory FieldPath.fromDotSeparatedPath(String path) {
     checkNotNull(path, 'Provided field path must not be null.');
     checkArgument(
-      !reserved.hasMatch(path),
+      !_reserved.hasMatch(path),
       "Use FieldPath.of() for field names containing '~*/[]'.",
     );
     try {
@@ -62,16 +60,11 @@ class FieldPath {
   }
 
   /// Matches any characters in a field path string that are reserved.
-  @internal
-  static final RegExp reserved = RegExp('[~*/\\[\\]]');
+  static final RegExp _reserved = RegExp('[~*/\\[\\]]');
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  final model.FieldPath internalPath;
+  final model.FieldPath _internalPath;
 
-  /// Implementation detail of the SDK; not part of the supported API. Use [documentIdField].
-  @internal
-  static final FieldPath documentIdInstance = FieldPath(
+  static final FieldPath _documentIdInstance = FieldPath._(
     model.FieldPath.keyPath,
   );
 
@@ -85,11 +78,11 @@ class FieldPath {
   ///
   /// A getter named `documentId` (the official spelling) cannot exist next to
   /// the method [documentId] until that method is removed.
-  static FieldPath get documentIdField => documentIdInstance;
+  static FieldPath get documentIdField => _documentIdInstance;
 
   @override
   String toString() {
-    return internalPath.toString();
+    return _internalPath.toString();
   }
 
   @override
@@ -97,8 +90,23 @@ class FieldPath {
       identical(this, other) ||
       other is FieldPath &&
           runtimeType == other.runtimeType &&
-          internalPath == other.internalPath;
+          _internalPath == other.internalPath;
 
   @override
-  int get hashCode => internalPath.hashCode * 31;
+  int get hashCode => _internalPath.hashCode * 31;
+}
+
+/// Members of [FieldPath] for the SDK itself. Not exported by the public libraries.
+extension FieldPathInternal on FieldPath {
+  /// The model path this public path wraps.
+  model.FieldPath get internalPath => _internalPath;
+
+  /// Wraps the model path [path].
+  static FieldPath create(model.FieldPath path) => FieldPath._(path);
+
+  /// Matches any characters in a field path string that are reserved.
+  static RegExp get reserved => FieldPath._reserved;
+
+  /// The path of the document id, as [FieldPath.documentIdField].
+  static FieldPath get documentIdInstance => FieldPath._documentIdInstance;
 }

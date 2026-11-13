@@ -46,7 +46,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart
 import 'package:cloud_firestore_dart/src/firebase/firestore/write_batch.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:meta/meta.dart';
 
 /// Represents a Firestore Database and is the entry point for all Firestore operations
 ///
@@ -54,17 +53,17 @@ import 'package:meta/meta.dart';
 /// not supported in production code and new SDK releases may break code that does so.
 class Firestore {
   /// Implementation detail of the SDK; not part of the supported API. Use [instanceFor].
-  @visibleForTesting
-  @internal
-  Firestore(this.databaseId, this.firebaseApp, this.client, this._scheduler)
-    : dataConverter = UserDataConverter(databaseId);
+  Firestore._(
+    this._databaseId,
+    this.firebaseApp,
+    FirestoreClient? client,
+    this._scheduler,
+  ) : _clientOrNull = client,
+      _dataConverter = UserDataConverter(_databaseId);
 
   static const String _tag = 'FirebaseFirestore';
 
-  /// Implementation detail of the SDK; not part of the supported API. Use [projectId] and
-  /// [databaseName].
-  @internal
-  final DatabaseId databaseId;
+  final DatabaseId _databaseId;
 
   /// The id of the Google Cloud project this instance talks to.
   String get projectId => databaseId.projectId;
@@ -80,13 +79,11 @@ class Firestore {
   /// name the JS SDK, FlutterFire and Firestore Lite use.
   FirebaseApp? get app => firebaseApp;
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  final UserDataConverter dataConverter;
+  final UserDataConverter _dataConverter;
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  final FirestoreClient client;
+  /// Null only for an instance made by `FirestoreInternal.detached` (unit tests of code that needs a [Firestore]
+  /// but never talks to a backend).
+  final FirestoreClient? _clientOrNull;
   final TaskScheduler _scheduler;
 
   /// The instance of the default [FirebaseApp] and the default database.
@@ -113,11 +110,6 @@ class Firestore {
 
     return firestore;
   }
-
-  /// Implementation detail of the SDK; not part of the supported API.
-  @visibleForTesting
-  @internal
-  TaskScheduler get scheduler => _scheduler;
 
   /// Gets the instance for [app] and [database]. Same as [getInstance]; this is
   /// the name used by the current official Firestore API.
@@ -158,8 +150,7 @@ class Firestore {
   }
 
   /// Implementation detail of the SDK; not part of the supported API. Use [instanceFor].
-  @internal
-  static Future<Firestore> newInstance(
+  static Future<Firestore> _newInstance(
     FirebaseApp app,
     String database, {
     InternalTokenProvider? authProvider,
@@ -235,7 +226,7 @@ class Firestore {
       appCheckProvider: appCheck,
       connectivityDetector: createConnectivityChangeDetector(),
     );
-    final Firestore firestore = Firestore(
+    final Firestore firestore = Firestore._(
       databaseId,
       app,
       firestoreClient,
@@ -250,7 +241,10 @@ class Firestore {
   CollectionReference<Map<String, Object?>> collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
     final ResourcePath resourcePath = ResourcePath.fromString(collectionPath);
-    return CollectionReference<Map<String, Object?>>(resourcePath, this);
+    return CollectionReferenceInternal.create<Map<String, Object?>>(
+      resourcePath,
+      this,
+    );
   }
 
   /// Gets a [DocumentReference] instance that refers to the document at the specified path within the database.
@@ -263,7 +257,7 @@ class Firestore {
   @Deprecated('Use doc instead.')
   DocumentReference<Map<String, Object?>> document(String documentPath) {
     checkNotNull(documentPath, 'Provided document path must not be null.');
-    return DocumentReference.forPath(
+    return DocumentReferenceInternal.forPath(
       ResourcePath.fromString(documentPath),
       this,
     );
@@ -288,7 +282,7 @@ class Firestore {
       );
     }
 
-    return Query(
+    return QueryInternal.create(
       core.Query(ResourcePath.empty, collectionGroup: collectionId),
       this,
     );
@@ -317,7 +311,9 @@ class Firestore {
     // 2. Convert exceptions they throw into Futures, and
     // 3. Run the user callback on the user queue.
     Future<T> wrappedUpdateFunction(core.Transaction internalTransaction) {
-      return updateFunction(Transaction(internalTransaction, this));
+      return updateFunction(
+        TransactionInternal.create(internalTransaction, this),
+      );
     }
 
     return client.transaction(
@@ -340,7 +336,7 @@ class Firestore {
   ///
   /// Returns the created [WriteBatch] object.
   WriteBatch batch() {
-    return WriteBatch(this);
+    return WriteBatchInternal.create(this);
   }
 
   /// Executes a [batchFunction] on a newly created [WriteBatch] and then
@@ -395,8 +391,7 @@ class Firestore {
 
   /// Terminates this [Firestore] instance, releasing all the resources it holds.
   ///
-  /// After this the instance cannot be used anymore: to start again, create a new instance with [newInstance] or
-  /// [getInstance].
+  /// After this the instance cannot be used anymore: to start again, create a new instance with [instanceFor].
   ///
   /// Termination does not cancel any pending writes and any tasks that are awaiting a response from the server will
   /// not be resolved. The next time you start an instance, it will resume attempting to send these writes to the
@@ -413,7 +408,7 @@ class Firestore {
   /// Shuts down this [Firestore] instance.
   ///
   /// To restart after shutdown, simply create a new instance of Firestore with
-  /// [newInstance] or [getInstance].
+  /// [instanceFor].
   ///
   /// Shutdown does not cancel any pending writes and any tasks that are
   /// awaiting a response from the server will not be resolved. The next time
@@ -500,7 +495,8 @@ class Firestore {
     if (!client.supportsFieldIndexes) {
       return null;
     }
-    return _persistentCacheIndexManager ??= PersistentCacheIndexManager(client);
+    return _persistentCacheIndexManager ??=
+        PersistentCacheIndexManagerInternal.create(client);
   }
 
   PersistentCacheIndexManager? _persistentCacheIndexManager;
@@ -537,7 +533,7 @@ class Firestore {
   /// response). Returns a [LoadBundleTask], which notifies callers with progress updates, and completion or error
   /// events.
   LoadBundleTask loadBundleStream(Stream<List<int>> bundleData) {
-    final LoadBundleTask resultTask = LoadBundleTask();
+    final LoadBundleTask resultTask = LoadBundleTaskInternal.create();
     client.loadBundle(bundleData, resultTask).catchError((Object error) {
       if (!resultTask.isComplete) {
         resultTask.setException(error);
@@ -553,7 +549,7 @@ class Firestore {
   /// null if there is no query with this name.
   Future<Query<Map<String, Object?>>?> getNamedQuery(String name) async {
     final core.Query? query = await client.getNamedQuery(name);
-    return query == null ? null : Query(query, this);
+    return query == null ? null : QueryInternal.create(query, this);
   }
 
   /// Listens to the document of a [DocumentSnapshot.toJson] result, starting from that snapshot.
@@ -619,8 +615,7 @@ class Firestore {
   }
 
   /// Helper to validate a [DocumentReference]. Used by [WriteBatch] and [Transaction].
-  @internal
-  void validateReference(DocumentReference<Object?> docRef) {
+  void _validateReference(DocumentReference<Object?> docRef) {
     checkNotNull(docRef, 'Provided DocumentReference must not be null.');
     if (docRef.firestore != this) {
       throw ArgumentError(
@@ -628,4 +623,55 @@ class Firestore {
       );
     }
   }
+}
+
+/// Members of [Firestore] for the SDK itself. Not exported by the public libraries.
+extension FirestoreInternal on Firestore {
+  /// The project and database this instance talks to.
+  DatabaseId get databaseId => _databaseId;
+
+  /// Converts user data to model values for this database.
+  UserDataConverter get dataConverter => _dataConverter;
+
+  /// The client that runs the operations of this instance.
+  FirestoreClient get client =>
+      _clientOrNull ??
+      (throw StateError('This Firestore instance has no client.'));
+
+  /// The scheduler of the timers of this instance.
+  TaskScheduler get scheduler => _scheduler;
+
+  /// Throws an [ArgumentError] unless [docRef] belongs to this instance. Used by `WriteBatch` and `Transaction`.
+  void validateReference(DocumentReference<Object?> docRef) =>
+      _validateReference(docRef);
+
+  /// An instance over an existing [client].
+  static Firestore create(
+    DatabaseId databaseId,
+    FirebaseApp? firebaseApp,
+    FirestoreClient client,
+    TaskScheduler scheduler,
+  ) => Firestore._(databaseId, firebaseApp, client, scheduler);
+
+  /// An instance for [databaseId] without a client: references, queries and snapshots can be built for it, every
+  /// operation that needs the backend or the cache throws. For unit tests.
+  static Firestore detached(DatabaseId databaseId) =>
+      Firestore._(databaseId, null, null, TaskScheduler('detached'));
+
+  /// Creates and starts a new instance for [app] and [database], without registering it. Use `Firestore.instanceFor`.
+  static Future<Firestore> newInstance(
+    FirebaseApp app,
+    String database, {
+    InternalTokenProvider? authProvider,
+    InternalAppCheckTokenProvider? appCheckProvider,
+    OpenDatabase? openDatabase,
+    FirestoreSettings? settings,
+  }) => Firestore._newInstance(
+    app,
+    database,
+    authProvider: authProvider,
+    appCheckProvider: appCheckProvider,
+    openDatabase: openDatabase,
+    settings: settings,
+  );
 }

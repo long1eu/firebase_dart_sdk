@@ -4,6 +4,7 @@
 // is an assert.)
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/lite.dart' as lite;
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart'
     as model;
@@ -214,7 +215,7 @@ void main() {
         Map<String, AggregateField> aliases, Map<String, int> values) {
       final AggregateQuery query =
           firestore.collection('coll').aggregateWithAliases(aliases);
-      return AggregateQuerySnapshot(query, <String, model.FieldValue>{
+      return AggregateQuerySnapshotInternal.create(query, <String, model.FieldValue>{
         for (final AggregateField field in aliases.values)
           field.alias: model.IntegerValue.valueOf(values[field.alias]!),
       });
@@ -251,7 +252,7 @@ void main() {
               <String, int>{AggregateField.count().alias: 3})));
       expect(
           a,
-          isNot(AggregateQuerySnapshot(
+          isNot(AggregateQuerySnapshotInternal.create(
               firestore
                   .collection('other')
                   .aggregateWithAliases(
@@ -263,7 +264,7 @@ void main() {
 
     test('without aliases compares the results by aggregation', () {
       AggregateQuerySnapshot of(List<AggregateField> fields) =>
-          AggregateQuerySnapshot(
+          AggregateQuerySnapshotInternal.create(
               firestore.collection('coll').aggregate(fields),
               <String, model.FieldValue>{
                 for (final AggregateField field in fields)

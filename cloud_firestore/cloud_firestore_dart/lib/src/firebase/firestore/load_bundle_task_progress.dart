@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_metadata.dart';
-import 'package:meta/meta.dart';
 
 /// Represents the state of bundle loading tasks.
 ///
@@ -43,33 +42,6 @@ class LoadBundleTaskProgress {
     this.exception,
     this.taskState,
   );
-
-  /// Creates an 'initial' status update from a bundle's metadata. The initial status sets all loading indicators to 0.
-  @internal
-  factory LoadBundleTaskProgress.forInitial(BundleMetadata bundleMetadata) {
-    return LoadBundleTaskProgress(
-      0,
-      bundleMetadata.totalDocuments,
-      0,
-      bundleMetadata.totalBytes,
-      null,
-      LoadBundleTaskState.running,
-    );
-  }
-
-  /// Creates a 'success' status update from a bundle's metadata. The success status sets all loading indicators to
-  /// their maximum values.
-  @internal
-  factory LoadBundleTaskProgress.forSuccess(BundleMetadata bundleMetadata) {
-    return LoadBundleTaskProgress(
-      bundleMetadata.totalDocuments,
-      bundleMetadata.totalDocuments,
-      bundleMetadata.totalBytes,
-      bundleMetadata.totalBytes,
-      null,
-      LoadBundleTaskState.success,
-    );
-  }
 
   /// The progress a [LoadBundleTask] reports before the bundle metadata is known.
   static const LoadBundleTaskProgress initial = LoadBundleTaskProgress(
@@ -124,4 +96,32 @@ class LoadBundleTaskProgress {
   String toString() =>
       'LoadBundleTaskProgress{documentsLoaded: $documentsLoaded, totalDocuments: $totalDocuments, '
       'bytesLoaded: $bytesLoaded, totalBytes: $totalBytes, taskState: $taskState, exception: $exception}';
+}
+
+/// Members of [LoadBundleTaskProgress] for the SDK itself. Not exported by the public libraries.
+extension LoadBundleTaskProgressInternal on LoadBundleTaskProgress {
+  /// Creates an 'initial' status update from a bundle's metadata. The initial status sets all loading indicators to 0.
+  static LoadBundleTaskProgress forInitial(BundleMetadata bundleMetadata) {
+    return LoadBundleTaskProgress(
+      0,
+      bundleMetadata.totalDocuments,
+      0,
+      bundleMetadata.totalBytes,
+      null,
+      LoadBundleTaskState.running,
+    );
+  }
+
+  /// Creates a 'success' status update from a bundle's metadata. The success status sets all loading indicators to
+  /// their maximum values.
+  static LoadBundleTaskProgress forSuccess(BundleMetadata bundleMetadata) {
+    return LoadBundleTaskProgress(
+      bundleMetadata.totalDocuments,
+      bundleMetadata.totalDocuments,
+      bundleMetadata.totalBytes,
+      bundleMetadata.totalBytes,
+      null,
+      LoadBundleTaskState.success,
+    );
+  }
 }

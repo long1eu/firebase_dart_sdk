@@ -19,19 +19,17 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/int32_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/exact_number.dart';
 import 'package:collection/collection.dart';
-import 'package:meta/meta.dart';
 
 /// The results of executing an [AggregateQuery].
 class AggregateQuerySnapshot {
   /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  AggregateQuerySnapshot(this.query, Map<String, FieldValue> data)
+  AggregateQuerySnapshot._(this.query, Map<String, FieldValue> data)
     : _data = Map<String, FieldValue>.unmodifiable(data);
 
   /// The query that produced this snapshot.
   final AggregateQuery query;
 
-  /// Results keyed by [AggregateField.alias].
+  /// Results keyed by the alias of each aggregate field.
   final Map<String, FieldValue> _data;
 
   /// All results of this snapshot: each value is an `int`, a `double` or
@@ -40,7 +38,7 @@ class AggregateQuerySnapshot {
   /// This is the counterpart of the JS SDK's `AggregateQuerySnapshot.data()`.
   /// For a query created with `Query.aggregateWithAliases` the keys are the
   /// user-chosen aliases. Otherwise they are the aliases this SDK derives for
-  /// each field ([AggregateField.alias]: for example `count`, or `sum_price`
+  /// each field (for example `count`, or `sum_price`
   /// for `AggregateField.sum('price')`).
   Map<String, Object?> data() {
     final Map<String, AggregateField>? aliases = query.aliases;
@@ -145,4 +143,13 @@ class AggregateQuerySnapshot {
     query.query,
     const MapEquality<String, Object?>().hash(data()),
   );
+}
+
+/// Members of [AggregateQuerySnapshot] for the SDK itself. Not exported by the public libraries.
+extension AggregateQuerySnapshotInternal on AggregateQuerySnapshot {
+  /// The snapshot of [query] with the results [data], keyed by alias.
+  static AggregateQuerySnapshot create(
+    AggregateQuery query,
+    Map<String, FieldValue> data,
+  ) => AggregateQuerySnapshot._(query, data);
 }

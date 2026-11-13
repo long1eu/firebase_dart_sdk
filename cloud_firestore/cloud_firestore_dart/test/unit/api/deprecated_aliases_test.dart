@@ -4,6 +4,7 @@
 // ignore_for_file: deprecated_member_use_from_same_package, deprecated_member_use
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart';
+import 'package:cloud_firestore_dart/src/internal_access.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/document_view_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/firestore_client.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart'
@@ -22,19 +23,17 @@ import '../../util/test_hygiene.dart';
 
 class _Client extends Mock implements FirestoreClient {}
 
-/// Subclassing and constructing through the `FirebaseFirestore` alias.
-class _TestFirestore extends FirebaseFirestore {
-  _TestFirestore()
-      : super(DatabaseId.forProject('project'), null, _Client(),
-            TaskScheduler('test'));
-}
+/// An instance typed through the `FirebaseFirestore` alias. (The class has
+/// no public constructor, so it cannot be subclassed outside the SDK.)
+FirebaseFirestore _testFirestore() => FirestoreInternal.create(
+    DatabaseId.forProject('project'), null, _Client(), TaskScheduler('test'));
 
 void main() {
   checkTestsLeaveNothingBehind();
 
   group('FirebaseFirestore alias of Firestore', () {
     test('is the same type', () {
-      final FirebaseFirestore viaAlias = _TestFirestore();
+      final FirebaseFirestore viaAlias = _testFirestore();
       final Firestore viaClass = viaAlias;
       expect(identical(viaAlias, viaClass), isTrue);
       expect(viaAlias, isA<Firestore>());
@@ -45,7 +44,7 @@ void main() {
     test('statics are reachable through the alias', () {
       expect(identical(FirebaseFirestore.getInstance, Firestore.getInstance),
           isTrue);
-      expect(identical(FirebaseFirestore.newInstance, Firestore.newInstance),
+      expect(identical(FirebaseFirestore.setLogLevel, Firestore.setLogLevel),
           isTrue);
       expect(identical(FirebaseFirestore.instanceFor, Firestore.instanceFor),
           isTrue);
@@ -56,7 +55,7 @@ void main() {
     });
 
     test('doc and document agree', () {
-      final Firestore firestore = _TestFirestore();
+      final Firestore firestore = _testFirestore();
       expect(firestore.doc('rooms/a/messages/1'),
           firestore.document('rooms/a/messages/1'));
       expect(firestore.doc('rooms/a').path, 'rooms/a');
@@ -77,7 +76,7 @@ void main() {
 
   group('CollectionReference', () {
     test('doc and document agree', () {
-      final Firestore firestore = _TestFirestore();
+      final Firestore firestore = _testFirestore();
       final CollectionReference rooms = firestore.collection('rooms');
       expect(rooms.doc('a'), rooms.document('a'));
       expect(rooms.doc('a').path, 'rooms/a');
@@ -88,8 +87,8 @@ void main() {
 
   group('DocumentSnapshot', () {
     test('ref and reference agree', () {
-      final Firestore firestore = _TestFirestore();
-      final DocumentSnapshot snapshot = DocumentSnapshot.fromNoDocument(
+      final Firestore firestore = _testFirestore();
+      final DocumentSnapshot snapshot = DocumentSnapshotInternal.fromNoDocument(
         firestore,
         util.key('rooms/a'),
         isFromCache: false,
@@ -126,11 +125,11 @@ void main() {
         excludesMetadataChanges: false,
         hasCachedResults: false,
       );
-      return QuerySnapshot(Query(fooQuery, firestore), viewSnapshot, firestore);
+      return QuerySnapshotInternal.create(QueryInternal.create(fooQuery, firestore), viewSnapshot, firestore);
     }
 
     test('docs and documents agree', () {
-      final QuerySnapshot querySnapshot = snapshot(_TestFirestore());
+      final QuerySnapshot querySnapshot = snapshot(_testFirestore());
       expect(querySnapshot.docs, isA<List<QueryDocumentSnapshot>>());
       expect(querySnapshot.docs.length, 2);
       expect(querySnapshot.docs, querySnapshot.documents);
@@ -139,7 +138,7 @@ void main() {
     });
 
     test('docChanges and documentChanges agree', () {
-      final QuerySnapshot querySnapshot = snapshot(_TestFirestore());
+      final QuerySnapshot querySnapshot = snapshot(_testFirestore());
       expect(querySnapshot.docChanges, querySnapshot.documentChanges);
       expect(querySnapshot.docChanges.length, 1);
     });

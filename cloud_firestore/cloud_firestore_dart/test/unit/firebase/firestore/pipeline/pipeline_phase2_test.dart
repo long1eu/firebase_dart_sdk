@@ -23,6 +23,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/pipeline/pipeline_re
 import 'package:cloud_firestore_dart/src/proto/google/firestore/v1/index.dart'
     as pb;
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:test/test.dart';
 
 import 'pipeline_test_util.dart';
@@ -111,7 +112,7 @@ void main() {
     test('insert with a CollectionReference and a document id expression', () {
       expect(
           last(base().insert(
-              collection: CollectionReference<Map<String, Object?>>(
+              collection: CollectionReferenceInternal.create<Map<String, Object?>>(
                   ResourcePath.fromString('a/b/c'), fakeFirestore),
               documentId: field('title').toLower())),
           stage('insert', <pb.Value>[], <String, pb.Value>{
@@ -163,10 +164,10 @@ void main() {
       expect(() => base().insert(collection: 'a/b'), throwsArgumentError);
       expect(() => base().insert(collection: 1), throwsArgumentError);
 
-      final FakeFirestore other =
+      final Firestore other =
           FakeFirestore(DatabaseId.forDatabase('other-project', '(default)'));
       final CollectionReference<Map<String, Object?>> foreign =
-          CollectionReference<Map<String, Object?>>(
+          CollectionReferenceInternal.create<Map<String, Object?>>(
               ResourcePath.fromString('a'), other);
       expect(() => base().insert(collection: foreign), throwsArgumentError);
       expect(() => base().upsert(collection: foreign), throwsArgumentError);

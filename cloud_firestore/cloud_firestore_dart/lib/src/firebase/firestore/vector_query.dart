@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/distance_measure.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart'
     as core;
@@ -20,7 +21,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/vector_value.dart';
-import 'package:meta/meta.dart';
 
 /// The maximum number of nearest neighbours a vector query may request.
 const int maxVectorQueryLimit = 1000;
@@ -36,8 +36,7 @@ const int maxVectorQueryDimensions = 2048;
 /// distance, nearest first.
 class VectorQuery {
   /// Validates the arguments and creates the query.
-  @internal
-  VectorQuery(
+  VectorQuery._(
     this.query,
     this.vectorField,
     this.queryVector,
@@ -103,11 +102,11 @@ class VectorQuery {
       query.query,
       this,
     );
-    return VectorQuerySnapshot(
+    return VectorQuerySnapshotInternal.create(
       this,
       docs
           .map(
-            (Document doc) => QueryDocumentSnapshot.fromDocument(
+            (Document doc) => QueryDocumentSnapshotInternal.fromDocument(
               query.firestore,
               doc,
               fromCache: false,
@@ -139,5 +138,27 @@ class VectorQuery {
     distanceMeasure,
     distanceResultField,
     distanceThreshold,
+  );
+}
+
+/// Members of [VectorQuery] for the SDK itself. Not exported by the public libraries.
+extension VectorQueryInternal on VectorQuery {
+  /// Validates the arguments and creates the query.
+  static VectorQuery create(
+    Query<Object?> query,
+    core.FieldPath vectorField,
+    VectorValue queryVector,
+    int limit,
+    DistanceMeasure distanceMeasure, {
+    String? distanceResultField,
+    double? distanceThreshold,
+  }) => VectorQuery._(
+    query,
+    vectorField,
+    queryVector,
+    limit,
+    distanceMeasure,
+    distanceResultField: distanceResultField,
+    distanceThreshold: distanceThreshold,
   );
 }

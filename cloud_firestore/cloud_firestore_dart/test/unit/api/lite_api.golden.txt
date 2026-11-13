@@ -1,6 +1,5 @@
 abstract class AggregateField
   ==(Object other): bool
-  final alias: String @internal
   final operator: String
   get fieldPath: String
   get hashCode: int
@@ -122,27 +121,14 @@ class DocumentSnapshot
   toString(): String
 class FieldPath
   ==(Object other): bool
-  final internalPath: FieldPath @internal
   get hashCode: int
-  new FieldPath(FieldPath internalPath) @internal
   new FieldPath.fromDotSeparatedPath(String path)
   new FieldPath.fromSegments(List<String> segments)
   new FieldPath.of(List<String> fieldNames)
   static documentId(): FieldPath @deprecated
-  static final documentIdInstance: FieldPath @internal
-  static final reserved: RegExp @internal
   static get documentIdField: FieldPath
   toString(): String
 abstract class FieldValue
-  final elements: List<Object> @internal
-  get isArrayRemove: bool @internal
-  get isArrayUnion: bool @internal
-  get isDelete: bool @internal
-  get isIncrement: bool @internal
-  get isMaximum: bool @internal
-  get isMinimum: bool @internal
-  get isServerTimestamp: bool @internal
-  get methodName: String @internal
   new FieldValue.arrayRemove(List<Object> elements)
   new FieldValue.arrayUnion(List<Object> elements)
   new FieldValue.delete()
@@ -315,7 +301,6 @@ class RegexValue
   new RegexValue(String pattern, String options)
   toString(): String
 class SetOptions
-  final fieldMask: FieldMask @internal
   final merge: bool
   new SetOptions.mergeFieldPaths(List<FieldPath> fields)
   new SetOptions.mergeFields(List<String> fields)
@@ -334,7 +319,6 @@ class Timestamp
   new Timestamp.fromMillis(int milliseconds)
   new Timestamp.now()
   static final jsonType: String
-  static validateRange(int seconds, int nanoseconds): void @internal
   toDate(): DateTime
   toJson(): Map<String, Object>
   toMillis(): int

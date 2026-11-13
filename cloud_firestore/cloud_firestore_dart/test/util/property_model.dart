@@ -2,6 +2,10 @@
 // mutations) on top of the value generators of property.dart.
 
 import 'package:cloud_firestore_dart/cloud_firestore_dart.dart' as api;
+import 'package:cloud_firestore_dart/src/firebase/firestore/document_reference.dart'
+    show DocumentReferenceInternal;
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart'
+    show FirestoreInternal;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/bound.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/filter/filter.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/order_by.dart';
@@ -30,33 +34,26 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_versi
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/unknown_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/user_data_converter.dart';
-import 'package:mockito/mockito.dart';
 
 import 'property.dart';
 
 /// The database of the generated model objects.
 final DatabaseId modelDatabaseId = DatabaseId.forProject('project');
 
-class _ModelFirestore extends Mock implements api.Firestore {
-  @override
-  DatabaseId get databaseId => modelDatabaseId;
-
-  @override
-  UserDataConverter get dataConverter => _converter;
-}
 
 /// A Firestore that only knows its database id: enough to create references
 /// and snapshots in unit tests.
-final api.Firestore modelFirestore = _ModelFirestore();
+final api.Firestore modelFirestore =
+    FirestoreInternal.detached(modelDatabaseId);
 
-final UserDataConverter _converter = UserDataConverter(modelDatabaseId);
+final UserDataConverter _converter = modelFirestore.dataConverter;
 
 /// The model value of a user value.
 FieldValue toModel(Object? value) =>
     _converter.parseQueryValue(value, allowArrays: true);
 
 api.DocumentReference<Map<String, Object?>> modelReference(String path) =>
-    api.DocumentReference<Map<String, Object?>>(
+    DocumentReferenceInternal.create<Map<String, Object?>>(
         DocumentKey.fromPathString(path), modelFirestore);
 
 extension ModelGen on Gen {

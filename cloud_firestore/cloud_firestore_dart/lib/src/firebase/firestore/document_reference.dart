@@ -29,7 +29,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_listen_opti
 import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
-import 'package:meta/meta.dart';
 
 /// A [DocumentReference] refers to a document location in a Firestore database and can be used to write, read, or
 /// listen to the location. There may or may not exist a document at the referenced location. A [DocumentReference] can
@@ -41,13 +40,11 @@ class DocumentReference<T extends dynamic> {
   // TODO(long1eu): We should checkNotNull(firestore), but tests are currently cheating and setting it to null.
   /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.doc] or
   /// [CollectionReference.doc].
-  @internal
-  DocumentReference(this.key, this.firestore, [this.converter]);
+  DocumentReference._(this._key, this.firestore, [this.converter]);
 
   /// Implementation detail of the SDK; not part of the supported API. Use [Firestore.doc] or
   /// [CollectionReference.doc].
-  @internal
-  factory DocumentReference.forPath(
+  factory DocumentReference._forPath(
     ResourcePath path,
     Firestore firestore, [
     FirestoreDataConverter<T>? converter,
@@ -64,7 +61,7 @@ class DocumentReference<T extends dynamic> {
       );
     }
 
-    return DocumentReference<T>(
+    return DocumentReference<T>._(
       DocumentKey.fromPath(path),
       firestore,
       converter,
@@ -96,15 +93,13 @@ class DocumentReference<T extends dynamic> {
         'The referencePath must be a document path',
       );
     }
-    return DocumentReference<T>.forPath(path, firestore, converter);
+    return DocumentReference<T>._forPath(path, firestore, converter);
   }
 
   /// The value of the `type` field written by [toJson].
   static const String jsonType = 'firestore/documentReference/1.0';
 
-  /// Implementation detail of the SDK; not part of the supported API.
-  @internal
-  final DocumentKey key;
+  final DocumentKey _key;
 
   /// Returns a JSON-serializable representation of this reference: its `type` ([jsonType]) and `referencePath`, like
   /// the JS SDK's `DocumentReference.toJSON()`. The Firestore instance and the converter are not part of it; read it
@@ -128,14 +123,14 @@ class DocumentReference<T extends dynamic> {
   DocumentReference<U> withConverter<U extends Object?>(
     FirestoreDataConverter<U> converter,
   ) {
-    return DocumentReference<U>(key, firestore, converter);
+    return DocumentReference<U>._(key, firestore, converter);
   }
 
   /// Returns a reference to the same document that reads and writes raw
   /// `Map<String, Object?>` values (the equivalent of `withConverter(null)`
   /// in the JS SDK).
   DocumentReference<Map<String, Object?>> withoutConverter() {
-    return DocumentReference<Map<String, Object?>>(key, firestore);
+    return DocumentReference<Map<String, Object?>>._(key, firestore);
   }
 
   /// The id of the document: the last segment of its [path].
@@ -145,7 +140,7 @@ class DocumentReference<T extends dynamic> {
   ///
   /// Returns the [CollectionReference] that contains this document.
   CollectionReference<Map<String, Object?>> get parent {
-    return CollectionReference<Map<String, Object?>>(
+    return CollectionReferenceInternal.create<Map<String, Object?>>(
       key.path.popLast(),
       firestore,
     );
@@ -164,7 +159,7 @@ class DocumentReference<T extends dynamic> {
   /// Returns the [CollectionReference] instance.
   CollectionReference<Map<String, Object?>> collection(String collectionPath) {
     checkNotNull(collectionPath, 'Provided collection path must not be null.');
-    return CollectionReference<Map<String, Object?>>(
+    return CollectionReferenceInternal.create<Map<String, Object?>>(
       key.path.appendField(ResourcePath.fromString(collectionPath)),
       firestore,
     );
@@ -257,7 +252,7 @@ class DocumentReference<T extends dynamic> {
       );
       final bool hasPendingWrites = doc != null && doc.hasLocalMutations;
 
-      return DocumentSnapshot<T>(
+      return DocumentSnapshotInternal.create<T>(
         firestore,
         key,
         doc,
@@ -345,7 +340,7 @@ class DocumentReference<T extends dynamic> {
         final bool hasPendingWrites = snapshot.mutatedKeys.contains(
           document.key,
         );
-        return DocumentSnapshot<T>.fromDocument(
+        return DocumentSnapshotInternal.fromDocument<T>(
           firestore,
           document,
           isFromCache: snapshot.isFromCache,
@@ -355,7 +350,7 @@ class DocumentReference<T extends dynamic> {
       } else {
         // We don't raise `hasPendingWrites` for deleted documents.
         const bool hasPendingWrites = false;
-        return DocumentSnapshot<T>.fromNoDocument(
+        return DocumentSnapshotInternal.fromNoDocument<T>(
           firestore,
           key,
           isFromCache: snapshot.isFromCache,
@@ -401,4 +396,25 @@ Future<T> _firstAndCancel<T>(Stream<T> stream) async {
     return value;
   }
   throw StateError('No element');
+}
+
+/// Members of [DocumentReference] for the SDK itself. Not exported by the public libraries.
+extension DocumentReferenceInternal<T> on DocumentReference<T> {
+  /// The key of the document this reference points to.
+  DocumentKey get key => _key;
+
+  /// A reference to the document with [key] in [firestore].
+  static DocumentReference<T> create<T extends dynamic>(
+    DocumentKey key,
+    Firestore firestore, [
+    FirestoreDataConverter<T>? converter,
+  ]) => DocumentReference<T>._(key, firestore, converter);
+
+  /// A reference to the document at [path] in [firestore]. Throws an [ArgumentError] if [path] is not a document
+  /// path.
+  static DocumentReference<T> forPath<T extends dynamic>(
+    ResourcePath path,
+    Firestore firestore, [
+    FirestoreDataConverter<T>? converter,
+  ]) => DocumentReference<T>._forPath(path, firestore, converter);
 }

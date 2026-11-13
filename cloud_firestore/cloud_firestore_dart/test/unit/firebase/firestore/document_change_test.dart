@@ -11,6 +11,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_change.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/metadata_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -18,7 +19,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/target_change.dart';
-import 'package:mockito/mockito.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
 import 'package:test/test.dart';
 
 import '../../../util/test_util.dart';
@@ -69,7 +70,7 @@ void main() {
     final List<Document> actual = initialSnapshot!.documents.toList();
 
     final Firestore firestore = FirebaseFirestoreMock();
-    final List<DocumentChange> changes = DocumentChange.changesFromSnapshot(
+    final List<DocumentChange> changes = DocumentChangeInternal.changesFromSnapshot(
         firestore, MetadataChanges.exclude, updatedSnapshot);
 
     for (DocumentChange change in changes) {
@@ -192,4 +193,7 @@ void main() {
   });
 }
 
-class FirebaseFirestoreMock extends Mock implements Firestore {}
+/// A [Firestore] without a client.
+// ignore: non_constant_identifier_names
+Firestore FirebaseFirestoreMock() =>
+    FirestoreInternal.detached(DatabaseId.forProject('project'));

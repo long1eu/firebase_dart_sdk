@@ -12,7 +12,6 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_set.d
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_document_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 import 'package:firebase_app_dart/internal.dart';
-import 'package:meta/meta.dart';
 
 /// The kind of change a [DocumentChange] describes.
 enum DocumentChangeType {
@@ -35,9 +34,7 @@ enum DocumentChangeType {
 /// does so.
 class DocumentChange<T extends dynamic> {
   /// Implementation detail of the SDK; not part of the supported API.
-  @visibleForTesting
-  @internal
-  DocumentChange(this.document, this.type, this.oldIndex, this.newIndex);
+  DocumentChange._(this.document, this.type, this.oldIndex, this.newIndex);
 
   /// An enumeration of snapshot diff types.
   final DocumentChangeType type;
@@ -64,8 +61,7 @@ class DocumentChange<T extends dynamic> {
   final int newIndex;
 
   /// Creates the list of DocumentChanges from a ViewSnapshot.
-  @internal
-  static List<DocumentChange<T>> changesFromSnapshot<T extends Object?>(
+  static List<DocumentChange<T>> _changesFromSnapshot<T extends Object?>(
     Firestore firestore,
     MetadataChanges metadataChanges,
     ViewSnapshot snapshot, [
@@ -81,7 +77,7 @@ class DocumentChange<T extends dynamic> {
       for (DocumentViewChange change in snapshot.changes) {
         final Document document = change.document;
         final QueryDocumentSnapshot<T> documentSnapshot =
-            QueryDocumentSnapshot<T>.fromDocument(
+            QueryDocumentSnapshotInternal.fromDocument<T>(
               firestore,
               document,
               fromCache: snapshot.isFromCache,
@@ -98,7 +94,7 @@ class DocumentChange<T extends dynamic> {
           'Got added events in wrong order',
         );
         documentChanges.add(
-          DocumentChange<T>(
+          DocumentChange<T>._(
             documentSnapshot,
             DocumentChangeType.added,
             -1,
@@ -118,7 +114,7 @@ class DocumentChange<T extends dynamic> {
         }
         final Document document = change.document;
         final QueryDocumentSnapshot<T> documentSnapshot =
-            QueryDocumentSnapshot<T>.fromDocument(
+            QueryDocumentSnapshotInternal.fromDocument<T>(
               firestore,
               document,
               fromCache: snapshot.isFromCache,
@@ -142,7 +138,7 @@ class DocumentChange<T extends dynamic> {
           newIndex = -1;
         }
         documentChanges.add(
-          DocumentChange<T>(documentSnapshot, type, oldIndex, newIndex),
+          DocumentChange<T>._(documentSnapshot, type, oldIndex, newIndex),
         );
       }
     }
@@ -185,4 +181,28 @@ class DocumentChange<T extends dynamic> {
           ..add('newIndex', newIndex))
         .toString();
   }
+}
+
+/// Members of [DocumentChange] for the SDK itself. Not exported by the public libraries.
+extension DocumentChangeInternal<T> on DocumentChange<T> {
+  /// A change of [document] of the given [type], with its positions in the old and the new snapshot.
+  static DocumentChange<T> create<T extends dynamic>(
+    QueryDocumentSnapshot<T> document,
+    DocumentChangeType type,
+    int oldIndex,
+    int newIndex,
+  ) => DocumentChange<T>._(document, type, oldIndex, newIndex);
+
+  /// Creates the list of DocumentChanges from a ViewSnapshot.
+  static List<DocumentChange<T>> changesFromSnapshot<T extends dynamic>(
+    Firestore firestore,
+    MetadataChanges metadataChanges,
+    ViewSnapshot snapshot, [
+    FirestoreDataConverter<T>? converter,
+  ]) => DocumentChange._changesFromSnapshot<T>(
+    firestore,
+    metadataChanges,
+    snapshot,
+    converter,
+  );
 }
