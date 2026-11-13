@@ -702,18 +702,30 @@ class Pipeline {
         name,
         args: <pb.Value Function(PipelineEncoder)>[
           for (final Object? arg in copy)
-            (PipelineEncoder encoder) => arg is Expression
-                ? arg.toProto(encoder)
-                : arg is Map
-                ? encodeExpressionMap(encoder, <String, Expression>{
-                    for (final MapEntry<Object?, Object?> entry in arg.entries)
-                      entry.key! as String: toExpression(entry.value),
-                  })
-                : toExpression(arg).toProto(encoder),
+            (PipelineEncoder encoder) => _rawArgument(encoder, arg),
         ],
         rawOptions: options,
       ),
     );
+  }
+
+  /// An argument of [rawStage]: an aggregate function or an ordering (also
+  /// as the value of a map, as Android's RawStage takes them), a map of
+  /// arguments, or a value or an expression.
+  static pb.Value _rawArgument(PipelineEncoder encoder, Object? arg) {
+    if (arg is AggregateFunction) {
+      return arg.toProto(encoder);
+    } else if (arg is Ordering) {
+      return arg.toProto(encoder);
+    } else if (arg is Map) {
+      return pb.Value()
+        ..mapValue = (pb.MapValue()
+          ..fields.addAll(<String, pb.Value>{
+            for (final MapEntry<Object?, Object?> entry in arg.entries)
+              entry.key! as String: _rawArgument(encoder, entry.value),
+          }));
+    }
+    return toExpression(arg).toProto(encoder);
   }
 
   /// Executes this pipeline on the server.
