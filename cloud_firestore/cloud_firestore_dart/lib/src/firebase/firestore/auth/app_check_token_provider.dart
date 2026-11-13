@@ -14,6 +14,7 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/redact_tokens.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:rxdart/rxdart.dart';
@@ -45,7 +46,7 @@ class AppCheckTokenProvider {
     if (result.error != null) {
       Log.w(
         _tag,
-        'Error getting App Check token; using placeholder token instead. Error: ${result.error}',
+        'Error getting App Check token; using placeholder token instead. Error: ${redactTokens('${result.error}')}',
       );
     }
     _onChange.add(result.token);
@@ -66,7 +67,7 @@ class AppCheckTokenProvider {
     if (result.error != null) {
       Log.w(
         _tag,
-        'Error getting App Check token; using placeholder token instead. Error: ${result.error}',
+        'Error getting App Check token; using placeholder token instead. Error: ${redactTokens('${result.error}')}',
       );
     }
     return result.token;

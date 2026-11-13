@@ -230,10 +230,15 @@ class FirestoreClient {
   }
 
   ResponseFuture<R> _buildFuture<R>(ResponseStream<R> call) {
-    final Future<R> future =
-        _buildStream(call) //
-            .fold<R?>(null, _ensureOnlyOneResponse)
-            .then<R>(_ensureOneResponse);
+    R? value;
+    // A second response fails the future without resetting the call (which `fold` would do), see [CallReleaser].
+    final Future<R> future = callReleaser
+        .forEach<R>(
+          _buildStream(call),
+          call.cancel,
+          (R response) => value = _ensureOnlyOneResponse<R>(value, response),
+        )
+        .then<R>((_) => _ensureOneResponse<R>(value));
 
     return ResponseFuture<R>(call, future);
   }

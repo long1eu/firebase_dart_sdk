@@ -88,7 +88,14 @@ abstract class BaseStream<
     if (_generation != generation ||
         _state != State.starting ||
         _requestsController != requestsController) {
-      await writeResponse.cancel();
+      // Half-closed (the stop closed the requests) and released rather than cancelled: gRPC may have started the
+      // call already, and the backend ends a call without requests at once; a reset racing its trailers would fail
+      // the other calls on the connection, see [CallReleaser].
+      unawaited(requestsController.close());
+      _callReleaser.release(
+        writeResponse.listen(null, onError: (Object _) {}),
+        writeResponse.cancel,
+      );
       return;
     }
     _writeResponse = writeResponse;

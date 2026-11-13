@@ -191,6 +191,9 @@ class WebChannelStream {
   /// the session is given up.
   static const int _maxEmptyBackChannelRequests = 3;
 
+  /// The longest error body of a back channel request that is read.
+  static const int _maxErrorBodyLength = 1024 * 1024;
+
   final StreamController<Map<String, Object?>> _messages =
       StreamController<Map<String, Object?>>();
   final Completer<Map<String, String>> _handshakeHeaders =
@@ -357,6 +360,11 @@ class WebChannelStream {
           response = received;
           text = body;
           break;
+        } on GrpcError {
+          // The answer is too large (see [WebHttpResponse.readAll]): sending
+          // the request again would not change that.
+          _forwardRequest?.abort();
+          rethrow;
         } catch (_) {
           // The request, or its answer, was lost on the way. It is sent again
           // with the same request id: the server applies a request id once
@@ -395,7 +403,11 @@ class WebChannelStream {
     } catch (e) {
       _forwardRequest = null;
       if (!_closed) {
-        _fail(GrpcError.unavailable('The stream request failed: $e'));
+        _fail(
+          e is GrpcError
+              ? e
+              : GrpcError.unavailable('The stream request failed: $e'),
+        );
       }
       return;
     } finally {
@@ -548,8 +560,15 @@ class WebChannelStream {
           return;
         }
         if (response.statusCode != 200) {
-          // 400 is "Unknown SID": the server no longer has the session.
-          final String text = await response.readAll();
+          // 400 is "Unknown SID": the server no longer has the session. An
+          // error body is short; a longer one is not read to its end.
+          String text;
+          try {
+            text = await response.readAll(maxLength: _maxErrorBodyLength);
+          } on GrpcError {
+            request.abort();
+            text = '';
+          }
           _fail(_httpError(response.statusCode, text));
           return;
         }

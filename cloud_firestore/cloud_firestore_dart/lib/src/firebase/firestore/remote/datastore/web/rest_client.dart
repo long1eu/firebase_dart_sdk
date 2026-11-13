@@ -126,6 +126,7 @@ class RestClient {
       response = await call.response;
       text = await response.readAll();
     } on GrpcError {
+      call.abort();
       rethrow;
     } catch (e) {
       if (timedOut) {

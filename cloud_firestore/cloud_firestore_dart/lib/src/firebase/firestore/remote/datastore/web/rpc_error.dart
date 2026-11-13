@@ -34,8 +34,10 @@ int codeFromHttpStatus(int status) {
     case 200:
       return StatusCode.ok;
     case 400:
-      // Could also be FAILED_PRECONDITION or OUT_OF_RANGE.
-      return StatusCode.invalidArgument;
+      // As the JS SDK: FAILED_PRECONDITION, which a transaction retries. Could
+      // also be INVALID_ARGUMENT or OUT_OF_RANGE. Only used when the body has
+      // no status name.
+      return StatusCode.failedPrecondition;
     case 401:
       return StatusCode.unauthenticated;
     case 403:

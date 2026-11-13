@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/credentials_provider.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/user.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/redact_tokens.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_app_dart/internal.dart';
 import 'package:rxdart/rxdart.dart';
@@ -36,7 +37,7 @@ class FirebaseAuthCredentialsProvider extends CredentialsProvider {
       tokenObserver,
       onError: (Object error) => Log.w(
         'FirebaseAuthCredentialsProvider',
-        'Token stream error: $error',
+        'Token stream error: ${redactTokens('$error')}',
       ),
     );
     if (_wasUnsubscribed) {

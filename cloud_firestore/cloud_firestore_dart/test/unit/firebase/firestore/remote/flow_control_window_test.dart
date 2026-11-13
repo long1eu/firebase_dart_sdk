@@ -393,25 +393,137 @@ void main() {
       final StreamController<List<int>> socket = StreamController<List<int>>();
       final List<List<int>> received = <List<int>>[];
       window.bindIncoming(socket.stream).listen(received.add);
-      // 65535 bytes of data, of which 3 frames carry 255 bytes of padding each.
+      // 65535 bytes of data, of which 3 frames carry 255 bytes of padding each (16384 bytes per frame at most).
       for (int i = 0; i < 3; i++) {
         socket.add(
           _frame(0x0, 0x8, 1, <int>[
             255,
-            ...List<int>.filled(16384, 1),
+            ...List<int>.filled(16128, 1),
             ...List<int>.filled(255, 0),
           ]),
         );
       }
-      socket.add(_data(1, http2DefaultWindowSize - 3 * 16384));
+      socket
+        ..add(_data(1, 16000))
+        ..add(_data(1, http2DefaultWindowSize - 3 * 16128 - 16000));
       await pumpEventQueue();
-      expect(received, hasLength(4));
+      expect(received, hasLength(5));
       expect(window.heldBytes, 0);
       socket.add(_data(1, 1));
       await pumpEventQueue();
-      expect(received, hasLength(4));
+      expect(received, hasLength(5));
       expect(window.heldBytes, 10);
       await socket.close();
+    });
+  });
+
+  group('a server that does not follow the protocol', () {
+    /// A window of 256 KiB with the settings acknowledged; returns the socket, what package:http2 received and the
+    /// errors it got.
+    (
+      StreamController<List<int>>,
+      List<List<int>>,
+      List<Object>,
+      FlowControlWindow,
+    )
+    open() {
+      final FlowControlWindow window = FlowControlWindow(256 * 1024);
+      window.settingsAcknowledged.ignore();
+      final StreamController<List<int>> socket = StreamController<List<int>>();
+      final List<List<int>> received = <List<int>>[];
+      final List<Object> errors = <Object>[];
+      window
+          .bindIncoming(socket.stream)
+          .listen(received.add, onError: errors.add);
+      return (socket, received, errors, window);
+    }
+
+    test('more data than the window allows ends the connection', () async {
+      final (
+        StreamController<List<int>> socket,
+        List<List<int>> received,
+        List<Object> errors,
+        FlowControlWindow window,
+      ) = open();
+      // 65535 bytes reach package:http2; 256 KiB - 64 KiB more may be held while it does not read.
+      final int allowed = 256 * 1024 - http2DefaultWindowSize;
+      for (int sent = 0; sent < http2DefaultWindowSize; sent += 16000) {
+        socket.add(
+          _data(
+            1,
+            sent + 16000 > http2DefaultWindowSize
+                ? http2DefaultWindowSize - sent
+                : 16000,
+          ),
+        );
+      }
+      for (int held = 0; held < allowed; held += 16000) {
+        socket.add(_data(1, held + 16000 > allowed ? allowed - held : 16000));
+      }
+      await pumpEventQueue();
+      expect(errors, isEmpty);
+      expect(window.heldBytes, greaterThan(allowed));
+
+      // One byte more than the server was allowed to send.
+      socket.add(_data(1, 1));
+      await pumpEventQueue();
+      expect(errors, hasLength(1));
+      expect(window.heldBytes, 0);
+      final int count = received.length;
+      socket.add(_data(1, 1000));
+      await pumpEventQueue();
+      expect(received, hasLength(count), reason: 'nothing after the error');
+      expect(
+        socket.hasListener,
+        isFalse,
+        reason: 'the socket is no longer read',
+      );
+    });
+
+    test(
+      'a frame larger than the maximum frame size ends the connection at its header',
+      () async {
+        final (
+          StreamController<List<int>> socket,
+          List<List<int>> received,
+          List<Object> errors,
+          FlowControlWindow window,
+        ) = open();
+        // The header of a frame of 16 MiB - 1, and the first bytes of its payload.
+        socket.add(<int>[0xff, 0xff, 0xff, 0x0, 0, 0, 0, 0, 1, 1, 2, 3]);
+        await pumpEventQueue();
+        expect(errors, hasLength(1));
+        expect(received, isEmpty);
+        await expectLater(window.settingsAcknowledged, throwsStateError);
+      },
+    );
+
+    test('frames without data held behind data are limited too', () async {
+      final (
+        StreamController<List<int>> socket,
+        List<List<int>> received,
+        List<Object> errors,
+        FlowControlWindow window,
+      ) = open();
+      for (int sent = 0; sent < http2DefaultWindowSize; sent += 16000) {
+        socket.add(
+          _data(
+            1,
+            sent + 16000 > http2DefaultWindowSize
+                ? http2DefaultWindowSize - sent
+                : 16000,
+          ),
+        );
+      }
+      socket.add(_data(1, 1)); // held
+      // CONTINUATION frames of stream 1, held behind its data.
+      // 1 MiB is FlowControlWindow.maxHeldControlBytes.
+      for (int i = 0; i * 16000 <= 1024 * 1024; i++) {
+        socket.add(_frame(0x9, 0, 1, List<int>.filled(16000, 0)));
+      }
+      await pumpEventQueue();
+      expect(errors, hasLength(1));
+      expect(window.heldBytes, 0);
     });
   });
 

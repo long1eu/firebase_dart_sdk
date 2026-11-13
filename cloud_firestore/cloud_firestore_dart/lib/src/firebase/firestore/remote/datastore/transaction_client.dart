@@ -71,13 +71,17 @@ class TransactionClient {
       ..transaction = transaction;
 
     final List<Document> result = <Document>[];
-    await for (final proto.RunQueryResponse response in _client.runQuery(
+    final ResponseStream<proto.RunQueryResponse> call = _client.runQuery(
       request,
-    )) {
+    );
+    // Read to the end; a response that fails to decode does not reset the call, see [CallReleaser].
+    await _client.callReleaser.forEach(call, call.cancel, (
+      proto.RunQueryResponse response,
+    ) {
       if (response.hasDocument()) {
         result.add(_serializer.decodeVectorQueryDocument(response.document));
       }
-    }
+    });
     return result;
   }
 

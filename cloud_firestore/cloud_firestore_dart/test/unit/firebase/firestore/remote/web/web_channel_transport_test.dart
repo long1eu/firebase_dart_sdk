@@ -262,6 +262,9 @@ void main() {
       expect(error.code, StatusCode.unavailable);
       error = await failWith(404, 'Not Found');
       expect(error.code, StatusCode.notFound);
+      // As the JS SDK (mapCodeFromHttpStatus): a bare 400 is FAILED_PRECONDITION, which transactions retry.
+      error = await failWith(400, 'Bad Request');
+      expect(error.code, StatusCode.failedPrecondition);
     });
 
     test('a network error is UNAVAILABLE', () async {
@@ -811,6 +814,7 @@ void main() {
     });
 
     test('HTTP statuses map like in the JS SDK', () {
+      expect(codeFromHttpStatus(400), StatusCode.failedPrecondition);
       expect(codeFromHttpStatus(401), StatusCode.unauthenticated);
       expect(codeFromHttpStatus(403), StatusCode.permissionDenied);
       expect(codeFromHttpStatus(409), StatusCode.aborted);

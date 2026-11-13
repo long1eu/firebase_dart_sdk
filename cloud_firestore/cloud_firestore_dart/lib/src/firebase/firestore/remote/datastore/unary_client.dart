@@ -65,12 +65,15 @@ extension DatastoreQuery on Datastore {
       request,
     );
     final List<Document> result = <Document>[];
-    await for (final proto.RunQueryResponse response in call) {
+    // Read to the end; a response that fails to decode does not reset the call, see [CallReleaser].
+    await _client.callReleaser.forEach(call, call.cancel, (
+      proto.RunQueryResponse response,
+    ) {
       // Responses without a document only report progress (the read time).
       if (response.hasDocument()) {
         result.add(_serializer.decodeVectorQueryDocument(response.document));
       }
-    }
+    });
     return result;
   }
 }

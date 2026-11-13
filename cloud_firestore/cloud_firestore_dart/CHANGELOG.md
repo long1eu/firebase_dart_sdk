@@ -8,6 +8,24 @@
   does: the `x-goog-api-key` header over gRPC and WebChannel, and the `key` query parameter of a
   REST call (Firestore Lite on the web sends only the parameter). Requests used to carry no API key,
   so API key restrictions of the project did not apply to them. The Android SDK sends none.
+- gRPC transport: a server that ignores HTTP/2 flow control can no longer make the client buffer without
+  limit. More data than the flow-control window allows, more than 1 MiB of held frames without data, or a
+  frame larger than 16 KiB ends the connection (package:http2 does the same, but only once a frame is
+  complete); the call fails as for any lost connection. A padded frame with more padding than payload is no
+  longer counted as negative.
+- A query, vector query or commit whose response can not be used (a document that does not decode, a second
+  commit response) no longer resets its HTTP/2 stream: the call is left to end and cancelled only if the
+  backend keeps it open. A reset that races the end of the call made package:http2 terminate the connection
+  and fail every other call on it. The same for a Listen or Write call that was started for a stream stopped
+  in the meantime.
+- Errors of auth and App Check providers are logged and passed on with anything that looks like a token
+  (JWTs, bearer and `token=` values, long opaque strings) replaced by `<redacted>`; the stack trace of a
+  failed auth token request is logged at debug level only.
+- Web transport: a REST response or the answer to a WebChannel request is read up to 256 Mi characters
+  (`WebHttpResponse.maxBodyLength`, the bound of one WebChannel chunk); a larger one fails the call with
+  RESOURCE_EXHAUSTED and the request is aborted. An error body of the back channel is read up to 1 MiB.
+- Web transport: an HTTP 400 without a status in its body maps to FAILED_PRECONDITION as in the JS SDK
+  (was INVALID_ARGUMENT).
 
 ## 0.1.0
 

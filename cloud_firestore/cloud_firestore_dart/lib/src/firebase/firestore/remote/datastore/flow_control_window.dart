@@ -53,6 +53,12 @@ class FlowControlWindow {
   /// The receive window, in bytes.
   final int windowSize;
 
+  /// What the connection window was grown by beyond the HTTP/2 default (the WINDOW_UPDATE this class sends); 0 for
+  /// a window not larger than the default, which only makes the windows of the streams smaller.
+  int get _extension => windowSize > http2DefaultWindowSize
+      ? windowSize - http2DefaultWindowSize
+      : 0;
+
   static const int _dataFrame = 0x0;
   static const int _settingsFrame = 0x4;
   static const int _goAwayFrame = 0x7;
@@ -60,6 +66,13 @@ class FlowControlWindow {
   static const int _ackFlag = 0x1;
   static const int _paddedFlag = 0x8;
   static const int _frameHeaderLength = 9;
+
+  /// The largest frame package:http2 accepts: the default SETTINGS_MAX_FRAME_SIZE, which the client never raises.
+  static const int _maxFrameSize = 16384;
+
+  /// How many bytes of frames without flow-controlled data (HEADERS, CONTINUATION, RST_STREAM, empty DATA) may be
+  /// held behind the data of their streams. A server that follows the protocol holds back a few trailers.
+  static const int maxHeldControlBytes = 1024 * 1024;
 
   /// The client connection preface: `PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n`.
   static const int _prefaceLength = 24;
@@ -74,6 +87,10 @@ class FlowControlWindow {
   final List<_HeldFrame> _held = <_HeldFrame>[];
   final Map<int, int> _heldPerStream = <int, int>{};
   int _heldBytes = 0;
+
+  /// The flow-controlled bytes of the held frames.
+  int _heldDataBytes = 0;
+  bool _failed = false;
 
   late final StreamController<List<int>> _incoming;
   StreamSubscription<List<int>>? _socketSubscription;
@@ -119,6 +136,9 @@ class FlowControlWindow {
       _OutgoingSink(socket, this);
 
   void _onIncoming(List<int> data) {
+    if (_failed) {
+      return;
+    }
     Uint8List bytes = data is Uint8List ? data : Uint8List.fromList(data);
     final Uint8List? rest = _incomingRest;
     if (rest != null) {
@@ -134,11 +154,21 @@ class FlowControlWindow {
     while (bytes.length - offset >= _frameHeaderLength) {
       final int length =
           (bytes[offset] << 16) | (bytes[offset + 1] << 8) | bytes[offset + 2];
+      if (length > _maxFrameSize) {
+        // package:http2 rejects it too, but only once all of it arrived (up to 16 MiB, copied for every chunk).
+        _fail(
+          'The server sent a frame of $length bytes (at most $_maxFrameSize allowed)',
+        );
+        return;
+      }
       final int end = offset + _frameHeaderLength + length;
       if (end > bytes.length) {
         break;
       }
       _onIncomingFrame(Uint8List.sublistView(bytes, offset, end));
+      if (_failed) {
+        return;
+      }
       offset = end;
     }
     if (offset < bytes.length) {
@@ -174,9 +204,42 @@ class FlowControlWindow {
         _flowControlledLength(frame) <= _libraryWindow) {
       _forward(frame);
     } else {
+      final int data = _flowControlledLength(frame);
+      // The server may have sent at most the window it was given: the window announced to it (windowSize, grown by
+      // the WINDOW_UPDATEs of package:http2) minus what it sent. What package:http2 got is mirrored in
+      // _libraryWindow, so a server that follows the protocol never makes the held data exceed this. Without the
+      // check, a server that ignores flow control would be buffered here without limit: package:http2, which
+      // terminates the connection for that, never sees the data.
+      if (_heldDataBytes + data > _extension + _libraryWindow ||
+          (_heldBytes - _heldDataBytes) + (frame.length - data) >
+              maxHeldControlBytes) {
+        _fail('The server sent more data than the flow-control window allows');
+        return;
+      }
       _held.add(_HeldFrame(streamId, frame));
       _heldPerStream[streamId] = (_heldPerStream[streamId] ?? 0) + 1;
       _heldBytes += frame.length;
+      _heldDataBytes += data;
+    }
+  }
+
+  /// Ends the connection: the frames of the server do not follow the protocol.
+  void _fail(String message) {
+    _failed = true;
+    _incomingRest = null;
+    _held.clear();
+    _heldPerStream.clear();
+    _heldBytes = 0;
+    _heldDataBytes = 0;
+    final StateError error = StateError(message);
+    if (!_settingsAcknowledged.isCompleted) {
+      _settingsAcknowledged.completeError(error);
+    }
+    unawaited(_socketSubscription?.cancel());
+    if (!_incoming.isClosed) {
+      _incoming
+        ..addError(error)
+        ..close();
     }
   }
 
@@ -187,7 +250,9 @@ class FlowControlWindow {
     }
     final int length = frame.length - _frameHeaderLength;
     if (frame[4] & _paddedFlag != 0 && length > 0) {
-      return length - 1 - frame[_frameHeaderLength];
+      final int padding = 1 + frame[_frameHeaderLength];
+      // More padding than payload is a malformed frame, which package:http2 rejects: count it all.
+      return padding <= length ? length - padding : length;
     }
     return length;
   }
@@ -211,6 +276,7 @@ class FlowControlWindow {
         continue;
       }
       _heldBytes -= held.frame.length;
+      _heldDataBytes -= _flowControlledLength(held.frame);
       final int left = _heldPerStream[held.streamId]! - 1;
       if (left == 0) {
         _heldPerStream.remove(held.streamId);
@@ -225,6 +291,9 @@ class FlowControlWindow {
   }
 
   void _onIncomingDone() {
+    if (_failed) {
+      return;
+    }
     // Whatever is held goes to package:http2, which reports the end of the connection to the streams.
     for (final _HeldFrame held in _held) {
       _incoming.add(held.frame);
@@ -232,6 +301,7 @@ class FlowControlWindow {
     _held.clear();
     _heldPerStream.clear();
     _heldBytes = 0;
+    _heldDataBytes = 0;
     if (!_settingsAcknowledged.isCompleted) {
       _settingsAcknowledged.completeError(
         StateError(

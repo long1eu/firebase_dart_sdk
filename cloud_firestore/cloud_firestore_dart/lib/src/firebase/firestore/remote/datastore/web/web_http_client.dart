@@ -4,6 +4,8 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
+
 /// Sends HTTP requests and streams the response bodies.
 abstract class WebHttpClient {
   /// Starts a request. [body] is sent as UTF-8 text.
@@ -41,6 +43,27 @@ class WebHttpResponse {
   /// single-subscription stream.
   final Stream<String> body;
 
-  /// Reads the whole body.
-  Future<String> readAll() => body.join();
+  /// The longest body [readAll] accepts by default, in UTF-16 code units: 256 Mi, the same bound as one WebChannel
+  /// chunk (`WebChannelChunkParser.maxChunkLength`). A REST response holds every response message of a call (a
+  /// query returns all its documents in one body), so the bound is not per message like the 17 MiB of the gRPC
+  /// clients of the other SDKs: it allows 16 documents of 16 MiB, or hundreds of ordinary ones, and stops a server
+  /// (or something in between) from making the client buffer without end.
+  static const int maxBodyLength = 256 * 1024 * 1024;
+
+  /// Reads the whole body. Fails with a RESOURCE_EXHAUSTED [GrpcError] as soon as it gets longer than [maxLength]
+  /// characters, without reading the rest; the caller should abort the request.
+  Future<String> readAll({int maxLength = maxBodyLength}) async {
+    final StringBuffer buffer = StringBuffer();
+    int length = 0;
+    await for (final String piece in body) {
+      length += piece.length;
+      if (length > maxLength) {
+        throw GrpcError.resourceExhausted(
+          'The response is larger than the limit of $maxLength characters',
+        );
+      }
+      buffer.write(piece);
+    }
+    return buffer.toString();
+  }
 }

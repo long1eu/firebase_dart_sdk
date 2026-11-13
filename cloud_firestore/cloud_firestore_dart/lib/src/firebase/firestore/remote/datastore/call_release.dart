@@ -94,6 +94,45 @@ class CallReleaser {
     return completer.future;
   }
 
+  /// Passes every response of [responses] to [onResponse] and completes when the call ends, with the error of the
+  /// call if it fails. For calls that are read to their end (queries, commits).
+  ///
+  /// When [onResponse] throws (a response that can not be decoded, more responses than expected), the future
+  /// completes with that error and the call is [release]d instead of cancelled: the backend is usually about to end
+  /// it, and a reset racing its trailers would fail every other call on the connection.
+  Future<void> forEach<R>(
+    Stream<R> responses,
+    CancelCall cancel,
+    void Function(R response) onResponse,
+  ) {
+    final Completer<void> completer = Completer<void>();
+    late final StreamSubscription<R> subscription;
+    subscription = responses.listen(
+      (R response) {
+        if (completer.isCompleted) {
+          return;
+        }
+        try {
+          onResponse(response);
+        } catch (e, s) {
+          completer.completeError(e, s);
+          release<R>(subscription, cancel);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
+      },
+      onDone: () {
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      },
+    );
+    return completer.future;
+  }
+
   /// Cancels every released call right away. For when the transport goes away: nothing can race on a connection that
   /// is being closed, and no timer should outlive the client.
   void cancelAll() {

@@ -417,6 +417,24 @@ void main() {
       expect(done, isTrue);
     });
 
+    test(
+      'a long error body of the back channel is not read to its end',
+      () async {
+        open();
+        await handshake();
+        final FakeRequest back = await http.next();
+        back.stream(400);
+        // More than the 1 MiB that an error body may have.
+        back
+          ..add('x' * (1024 * 1024))
+          ..add('x');
+        await pump();
+        expect(back.aborted, isTrue);
+        expect((errors.single as GrpcError).code, StatusCode.unavailable);
+        expect(done, isTrue);
+      },
+    );
+
     test('"stop" from the server closes the stream as UNAVAILABLE', () async {
       open();
       await handshake();
@@ -443,6 +461,36 @@ void main() {
       expect(await stream.handshakeHeaders, isEmpty);
       // There is no session to terminate.
       expect(http.requests, hasLength(1));
+    });
+
+    test('an answer to a forward request above the size limit fails the stream '
+        'with RESOURCE_EXHAUSTED and is not sent again', () async {
+      open();
+      await handshake();
+      final FakeRequest back = await http.next();
+      expect(back.method, 'GET');
+      back.stream(200);
+      stream.send(addTarget);
+      final FakeRequest forward = await http.next();
+      expect(forward.method, 'POST');
+      forward.stream(200);
+      final String mebibyte = 'a' * (1024 * 1024);
+      for (int i = 0; i < 256; i++) {
+        forward.add(mebibyte);
+      }
+      forward.add('a');
+      await pump();
+      expect(forward.aborted, isTrue);
+      expect((errors.single as GrpcError).code, StatusCode.resourceExhausted);
+      expect(done, isTrue);
+      expect(
+        http.requests.where(
+          (FakeRequest r) =>
+              r != forward && r.query['RID'] == forward.query['RID'],
+        ),
+        isEmpty,
+        reason: 'not sent again',
+      );
     });
 
     test('a network error of the handshake is UNAVAILABLE', () async {
