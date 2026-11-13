@@ -7,18 +7,14 @@ import 'dart:async';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/transaction_runner.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/mutation_result.dart';
-import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/verify_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/exponential_backoff.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/timer_task.dart';
 import 'package:mockito/mockito.dart' show Fake;
 import 'package:test/test.dart';
 
-import '../../../../util/test_util.dart';
 
 class _FakeTransactionClient extends Fake implements TransactionClient {
   @override
@@ -165,44 +161,4 @@ void main() {
     expect(secondWait, greaterThan(firstWait * 0.5));
     expect(secondWait, greaterThanOrEqualTo(initialDelay * 0.6));
   });
-
-  test('retries a read-only transaction whose verification fails', () async {
-    final _FailingOnceClient client = _FailingOnceClient();
-    int attempts = 0;
-    final String result = await TransactionRunner<String>(
-      createTransaction: () => Transaction(client, readOnly: true),
-      maxAttempts: 3,
-      backoff: ExponentialBackoff(scheduler, TaskId.retryTransaction,
-          initialDelay: const Duration(milliseconds: 1)),
-      updateFunction: (Transaction transaction) async {
-        attempts++;
-        await transaction.lookup(<DocumentKey>[key('foo/bar')]);
-        return 'done';
-      },
-    ).run();
-
-    expect(result, 'done');
-    expect(attempts, 2);
-    expect(client.commits, 2);
-    expect(client.lastMutations.single, isA<VerifyMutation>());
-  });
-}
-
-class _FailingOnceClient extends Fake implements TransactionClient {
-  int commits = 0;
-  List<Mutation> lastMutations = <Mutation>[];
-
-  @override
-  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async =>
-      <MaybeDocument>[doc('foo/bar', 7, map(<String>['a', 'b']))];
-
-  @override
-  Future<List<MutationResult>> commit(List<Mutation> mutations) async {
-    commits++;
-    lastMutations = mutations;
-    if (commits == 1) {
-      throw FirestoreError('changed', FirestoreErrorCode.aborted);
-    }
-    return <MutationResult>[];
-  }
 }

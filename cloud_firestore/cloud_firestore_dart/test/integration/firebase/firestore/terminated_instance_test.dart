@@ -178,11 +178,14 @@ final List<Entry> entries = <Entry>[
           })),
   Entry(
       'Firestore.runTransaction (read-only)',
-      <String>{},
+      <String>{'Transaction.getQuery', 'Transaction.getAggregate'},
       After.futureFails,
-      (Fixture f) => f.firestore.runTransaction<void>(
-          (Transaction transaction) => transaction.get(f.doc),
-          options: TransactionOptions(readOnly: true))),
+      (Fixture f) =>
+          f.firestore.runTransaction<void>((Transaction transaction) async {
+            await transaction.get(f.doc);
+            await transaction.getQuery(f.doc.parent);
+            await transaction.getAggregate(f.doc.parent.count());
+          }, options: TransactionOptions(readOnly: true))),
 
   // Bundles and snapshot JSON.
   Entry(

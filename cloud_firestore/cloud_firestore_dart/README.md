@@ -397,6 +397,37 @@ When the stream breaks, the writes that were not acknowledged are sent again on 
 upstream does. Overwrites and deletes are harmless to repeat; whether the backend recognises a
 repeated write that carries a relative transform such as `FieldValue.increment` was not verified.
 
+### Read-only transactions
+
+`TransactionOptions(readOnly: true)` runs a read-only transaction **of the backend** (the server
+SDKs have these; the Android and JS client SDKs do not):
+
+```dart
+final total = await firestore.runTransaction((transaction) async {
+  final account = await transaction.get(firestore.doc('accounts/a'));
+  final orders = await transaction.getQuery(
+      firestore.collection('orders').where('account', isEqualTo: 'a'));
+  final count = await transaction.getAggregate(firestore.collection('orders').count());
+  return (account.data, orders.docs.length, count.getCount());
+}, options: TransactionOptions(readOnly: true));
+```
+
+- Every read of the transaction sees the database as it was at one point in time: documents
+  (`get`), queries (`getQuery`) and aggregations (`getAggregate`) are consistent with each other,
+  also while other clients write. `getQuery` and `getAggregate` only exist for read-only
+  transactions; in a read-write transaction they fail with `invalidArgument`, because such a
+  transaction verifies its reads at commit and the result of a query cannot be verified.
+- `TransactionOptions(readOnly: true, readTime: timestamp)` reads the database as it was at
+  `timestamp`. The backend keeps old versions for a limited time and rejects read times before that.
+- Writes in the transaction throw. Nothing is committed and no locks are taken, so there are no
+  conflicts: the callback is not run again when documents change. It is only run again (up to
+  `maxAttempts` times) when the connection fails.
+- The reads go to the backend: they never use the cache, do not include local writes that the
+  backend has not seen, and fail when the client is offline.
+- Until this change a read-only transaction read documents one by one and asked the backend at the
+  end whether they had changed, running again if so. Code that relied on the callback running
+  again now sees the snapshot instead.
+
 ## Lifecycle: `terminate()`
 
 `await firestore.terminate()` stops the instance: listeners stop receiving events, the streams and

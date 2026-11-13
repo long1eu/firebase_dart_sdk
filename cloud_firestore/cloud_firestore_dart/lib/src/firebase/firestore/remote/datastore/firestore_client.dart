@@ -88,6 +88,33 @@ class FirestoreClient {
     );
   }
 
+  /// Starts a transaction on the backend.
+  ResponseFuture<proto.BeginTransactionResponse> beginTransaction(
+    proto.BeginTransactionRequest request, {
+    CallOptions? options,
+  }) {
+    final ResponseStream<proto.BeginTransactionResponse> call = _transport
+        .startCall(
+          FirestoreRpc.beginTransaction,
+          Stream<proto.BeginTransactionRequest>.value(request),
+          options: options,
+        );
+    return _buildFuture<proto.BeginTransactionResponse>(call);
+  }
+
+  /// Rolls a transaction back, which releases it on the backend.
+  ResponseFuture<Empty> rollback(
+    proto.RollbackRequest request, {
+    CallOptions? options,
+  }) {
+    final ResponseStream<Empty> call = _transport.startCall(
+      FirestoreRpc.rollback,
+      Stream<proto.RollbackRequest>.value(request),
+      options: options,
+    );
+    return _buildFuture<Empty>(call);
+  }
+
   /// Commits a transaction, while optionally updating documents.
   ResponseFuture<proto.CommitResponse> commit(
     proto.CommitRequest request, {

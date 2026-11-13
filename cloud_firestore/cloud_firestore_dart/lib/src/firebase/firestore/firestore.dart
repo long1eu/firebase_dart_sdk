@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/snapshot_listen_options.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.dart';
@@ -313,6 +314,9 @@ class Firestore {
       wrappedUpdateFunction,
       options.maxAttempts,
       readOnly: options.readOnly,
+      readTime: options.readTime == null
+          ? null
+          : SnapshotVersion(options.readTime!),
     );
   }
 

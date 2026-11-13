@@ -10,6 +10,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/source.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/transaction_options.dart';
 import 'package:test/test.dart';
@@ -48,23 +49,25 @@ void main() {
             'code', FirestoreErrorCode.invalidArgument)));
   });
 
-  test('testReadOnlyTransactionRetriesWhenADocumentChanges', () async {
+  test('testReadOnlyTransactionIsNotRetriedWhenADocumentChanges', () async {
+    // A read-only transaction reads one snapshot of the backend and commits
+    // nothing: a concurrent write is no conflict (it used to verify its reads
+    // at the end and run again).
     final DocumentReference doc = firestore.collection('spaces').document();
     await doc.set(map(<dynamic>['foo', 1]));
 
     int attempts = 0;
     final Object? result =
         await firestore.runTransaction((Transaction transaction) async {
+      attempts++;
       final DocumentSnapshot snapshot = await transaction.get(doc);
-      if (attempts++ == 0) {
-        // Changes the document after it was read, so the verification fails.
-        await doc.set(map(<dynamic>['foo', 2]));
-      }
+      await doc.set(map(<dynamic>['foo', 2]));
       return snapshot.get('foo');
     }, options: TransactionOptions(readOnly: true));
 
-    expect(attempts, 2);
-    expect(result, 2);
+    expect(attempts, 1);
+    expect(result, 1);
+    expect((await doc.get(Source.server)).get('foo'), 2);
   });
 
   test('testRunsTransactionsAfterGettingExistingDoc', () async {

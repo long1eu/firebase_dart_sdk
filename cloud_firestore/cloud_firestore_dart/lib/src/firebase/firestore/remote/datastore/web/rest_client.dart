@@ -28,6 +28,8 @@ class RestClient {
   static const Map<String, String> _verbs = <String, String>{
     'BatchGetDocuments': 'batchGet',
     'Commit': 'commit',
+    'BeginTransaction': 'beginTransaction',
+    'Rollback': 'rollback',
     'RunQuery': 'runQuery',
     'RunAggregationQuery': 'runAggregationQuery',
     'ExecutePipeline': 'executePipeline',
@@ -38,6 +40,8 @@ class RestClient {
   static const Map<String, String> _pathFields = <String, String>{
     'BatchGetDocuments': 'database',
     'Commit': 'database',
+    'BeginTransaction': 'database',
+    'Rollback': 'database',
     'RunQuery': 'parent',
     'RunAggregationQuery': 'parent',
     'ExecutePipeline': 'database',
@@ -144,6 +148,10 @@ class RestClient {
     }
     if (json is Map) {
       return <Object?>[json];
+    }
+    if (text.trim().isEmpty) {
+      // An empty message (the answer to a rollback) may come without a body.
+      return <Object?>[<String, Object?>{}];
     }
     throw const GrpcError.internal('Unexpected response body');
   }

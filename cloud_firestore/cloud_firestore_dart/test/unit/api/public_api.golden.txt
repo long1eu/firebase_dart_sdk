@@ -579,6 +579,8 @@ class Timestamp
 class Transaction
   delete(DocumentReference<Object> documentRef): Transaction
   get(DocumentReference<dynamic> documentRef): Future<DocumentSnapshot<dynamic>>
+  getAggregate(AggregateQuery aggregateQuery): Future<AggregateQuerySnapshot>
+  getQuery(Query<dynamic> query): Future<QuerySnapshot<dynamic>>
   new Transaction(Transaction _transaction, Firestore _firestore) @internal
   set(DocumentReference<dynamic> documentRef, dynamic data, [SetOptions options]): Transaction
   update(DocumentReference<Object> documentRef, Map<String, Object> data): Transaction
@@ -588,8 +590,9 @@ class TransactionOptions
   ==(Object other): bool
   final maxAttempts: int
   final readOnly: bool
+  final readTime: Timestamp
   get hashCode: int
-  new TransactionOptions({int maxAttempts, bool readOnly})
+  new TransactionOptions({int maxAttempts, bool readOnly, Timestamp readTime})
   static final defaultMaxAttempts: int
   static final defaultOptions: TransactionOptions
   toString(): String

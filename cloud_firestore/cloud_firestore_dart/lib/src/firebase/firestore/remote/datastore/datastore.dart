@@ -41,6 +41,7 @@ import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:firebase_app_dart/internal.dart';
 import 'package:meta/meta.dart';
 import 'package:protobuf/protobuf.dart';
+import 'package:protobuf/well_known_types/google/protobuf/empty.pb.dart';
 import 'package:rxdart/rxdart.dart' hide OnErrorResumeStreamTransformer;
 
 export 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/firestore_transport.dart'

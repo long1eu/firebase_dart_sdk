@@ -4,7 +4,10 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/converter_util.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/transaction.dart'
     as core;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/user_data.dart';
@@ -13,6 +16,10 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/document_snapshot.da
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_set.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/set_options.dart';
@@ -121,6 +128,62 @@ class Transaction {
     _firestore.validateReference(documentRef);
     _transaction.delete(documentRef.key);
     return this;
+  }
+
+  /// Runs [query] on the server inside this transaction and returns its
+  /// results. Only in a read-only transaction
+  /// (`TransactionOptions(readOnly: true)`): the documents are those of the
+  /// snapshot of the database that every read of the transaction sees.
+  ///
+  /// In a read-write transaction the returned Future fails with a
+  /// [FirestoreError] with code `invalidArgument`: such a transaction verifies
+  /// at commit that the documents it read did not change, which is not possible
+  /// for the result of a query.
+  ///
+  /// The snapshot never comes from the cache and has no pending writes; local
+  /// writes that the server has not seen are not part of it.
+  Future<QuerySnapshot<T>> getQuery<T extends Object?>(Query<T> query) async {
+    _validateQuery(query);
+    final List<Document> documents = await _transaction.runQuery(query.query);
+    DocumentSet documentSet = DocumentSet.emptySet(query.query.comparator);
+    for (final Document document in documents) {
+      documentSet = documentSet.add(document);
+    }
+    return QuerySnapshot<T>(
+      query,
+      ViewSnapshot.fromInitialDocuments(
+        query.query,
+        documentSet,
+        DocumentKey.emptyKeySet,
+        isFromCache: false,
+        excludesMetadataChanges: false,
+        hasCachedResults: false,
+      ),
+      _firestore,
+    );
+  }
+
+  /// Runs the aggregation [aggregateQuery] on the server inside this
+  /// transaction. Only in a read-only transaction, like [getQuery]: the
+  /// aggregation is computed over the snapshot of the database that every read
+  /// of the transaction sees.
+  Future<AggregateQuerySnapshot> getAggregate(
+    AggregateQuery aggregateQuery,
+  ) async {
+    _validateQuery(aggregateQuery.query);
+    final Map<String, FieldValue> data = await _transaction.runAggregateQuery(
+      aggregateQuery.query.query,
+      aggregateQuery.aggregateFields,
+    );
+    return AggregateQuerySnapshot(aggregateQuery, data);
+  }
+
+  void _validateQuery(Query<Object?> query) {
+    if (query.firestore != _firestore) {
+      throw ArgumentError(
+        'Provided query is from a different Cloud Firestore instance.',
+      );
+    }
   }
 
   /// Reads the document referenced by the provided [DocumentReference]

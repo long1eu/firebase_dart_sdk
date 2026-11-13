@@ -909,8 +909,14 @@ class RemoteStore implements TargetMetadataProvider {
     );
   }
 
-  Transaction createTransaction({bool readOnly = false}) =>
-      Transaction(_datastore.transactionClient, readOnly: readOnly);
+  Transaction createTransaction({
+    bool readOnly = false,
+    SnapshotVersion? readTime,
+  }) => Transaction(
+    _datastore.transactionClient,
+    readOnly: readOnly,
+    readTime: readTime,
+  );
 
   @override
   QueryData? Function(int targetId) get getQueryDataForTarget {

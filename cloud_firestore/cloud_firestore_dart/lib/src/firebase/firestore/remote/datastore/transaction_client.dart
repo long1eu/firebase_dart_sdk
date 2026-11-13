@@ -31,11 +31,108 @@ class TransactionClient {
         .toList();
   }
 
-  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
+  /// Starts a read-only transaction on the backend and returns its id. Its reads see the database as it was at one
+  /// point in time: at [readTime] when given, otherwise at the time the transaction starts.
+  Future<Uint8List> beginReadOnlyTransaction({
+    SnapshotVersion? readTime,
+  }) async {
+    final proto.TransactionOptions_ReadOnly readOnly =
+        proto.TransactionOptions_ReadOnly();
+    if (readTime != null) {
+      readOnly.readTime = _serializer.encodeVersion(readTime);
+    }
+    final proto.BeginTransactionResponse response = await _client
+        .beginTransaction(
+          proto.BeginTransactionRequest()
+            ..database = _databaseName
+            ..options = (proto.TransactionOptions()..readOnly = readOnly),
+        );
+    return Uint8List.fromList(response.transaction);
+  }
+
+  /// Releases the transaction with the id [transaction] on the backend.
+  Future<void> rollback(Uint8List transaction) async {
+    await _client.rollback(
+      proto.RollbackRequest()
+        ..database = _databaseName
+        ..transaction = transaction,
+    );
+  }
+
+  /// Runs [query] on the backend inside the transaction with the id [transaction] and returns the matching
+  /// documents in the order the backend produced them.
+  Future<List<Document>> runQuery(Query query, Uint8List transaction) async {
+    final proto.Target_QueryTarget target = _serializer.encodeQueryTarget(
+      query.toTarget(),
+    );
+    final proto.RunQueryRequest request = proto.RunQueryRequest()
+      ..parent = target.parent
+      ..structuredQuery = target.structuredQuery
+      ..transaction = transaction;
+
+    final List<Document> result = <Document>[];
+    await for (final proto.RunQueryResponse response in _client.runQuery(
+      request,
+    )) {
+      if (response.hasDocument()) {
+        result.add(_serializer.decodeVectorQueryDocument(response.document));
+      }
+    }
+    return result;
+  }
+
+  /// Runs [aggregateFields] over the documents matching [query] on the backend, inside the transaction with the id
+  /// [transaction]. The result is keyed by the client-side alias of each field.
+  Future<Map<String, FieldValue>> runAggregateQuery(
+    Query query,
+    List<AggregateField> aggregateFields,
+    Uint8List transaction,
+  ) async {
+    final proto.Target_QueryTarget target = _serializer
+        .encodeAggregateQueryTarget(query);
+    final Map<String, String> aliasMap = <String, String>{};
+    final proto.RunAggregationQueryRequest request =
+        proto.RunAggregationQueryRequest()
+          ..parent = target.parent
+          ..structuredAggregationQuery = _serializer
+              .encodeStructuredAggregationQuery(
+                target,
+                aggregateFields,
+                aliasMap,
+              )
+          ..transaction = transaction;
+
+    final ResponseStream<proto.RunAggregationQueryResponse> call = _client
+        .runAggregationQuery(request);
+    final proto.RunAggregationQueryResponse response;
+    try {
+      // The first response carries the whole result; the call is not cancelled, see [CallReleaser].
+      response = await _client.callReleaser.first(call, call.cancel);
+    } on StateError {
+      throw FirestoreError(
+        'No responses received',
+        FirestoreErrorCode.unimplemented,
+      );
+    }
+    return _serializer.decodeAggregationResult(
+      response.result.aggregateFields,
+      aliasMap,
+    );
+  }
+
+  /// Reads the documents with the given [keys] from the backend. With [transaction] (the id of a read-only
+  /// transaction) they are read as of the snapshot of that transaction.
+  Future<List<MaybeDocument>> lookup(
+    List<DocumentKey> keys, {
+    Uint8List? transaction,
+  }) async {
     final proto.BatchGetDocumentsRequest builder =
         proto.BatchGetDocumentsRequest() //
           ..database = _databaseName
           ..documents.addAll(keys.map(_serializer.encodeKey));
+    if (transaction != null) {
+      builder.transaction = transaction;
+    }
 
     // The backend may keep the stream open after it has sent a response for
     // every requested document ("logical termination"), so complete as soon as

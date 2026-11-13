@@ -197,8 +197,19 @@ Future<void> firestoreReadmeLine265() async {
   print(written.results.single.get('documents_modified'));
 }
 
-// README.md:455
-Future<void> firestoreReadmeLine455() async {
+// README.md:405
+Future<void> firestoreReadmeLine405() async {
+  final total = await firestore.runTransaction((transaction) async {
+    final account = await transaction.get(firestore.doc('accounts/a'));
+    final orders = await transaction.getQuery(
+        firestore.collection('orders').where('account', isEqualTo: 'a'));
+    final count = await transaction.getAggregate(firestore.collection('orders').count());
+    return (account.data, orders.docs.length, count.getCount());
+  }, options: TransactionOptions(readOnly: true));
+}
+
+// README.md:486
+Future<void> firestoreReadmeLine486() async {
   final indexes = firestore.persistentCacheIndexManager; // null with a memory cache
   await indexes?.enableIndexAutoCreation();
 }

@@ -90,6 +90,47 @@ void main() {
       expect(response.commitTime.nanos, 553199000);
     });
 
+    test('BeginTransaction and Rollback post to their verbs of the database',
+        () async {
+      final Future<List<proto.BeginTransactionResponse>> begun = transport
+          .startCall(
+              FirestoreRpc.beginTransaction,
+              Stream<proto.BeginTransactionRequest>.value(
+                  proto.BeginTransactionRequest()
+                    ..database = database
+                    ..options = (proto.TransactionOptions()
+                      ..readOnly = proto.TransactionOptions_ReadOnly())))
+          .toList();
+      final FakeRequest begin = await http.next();
+      expect(
+          begin.url.toString(),
+          'http://127.0.0.1:8080/v1/projects/demo-test/databases/(default)'
+          '/documents:beginTransaction');
+      expect(jsonDecode(begin.body!), <String, Object?>{
+        'options': <String, Object?>{'readOnly': <String, Object?>{}}
+      });
+      begin.respond(200, body: '{"transaction":"AQID"}');
+      expect((await begun).single.transaction, <int>[1, 2, 3]);
+
+      final Future<List<Object?>> rolledBack = transport
+          .startCall(
+              FirestoreRpc.rollback,
+              Stream<proto.RollbackRequest>.value(proto.RollbackRequest()
+                ..database = database
+                ..transaction = <int>[1, 2, 3]))
+          .toList();
+      final FakeRequest rollback = await http.next();
+      expect(
+          rollback.url.toString(),
+          'http://127.0.0.1:8080/v1/projects/demo-test/databases/(default)'
+          '/documents:rollback');
+      expect(jsonDecode(rollback.body!),
+          <String, Object?>{'transaction': 'AQID'});
+      // The empty answer, also when it comes without a body.
+      rollback.respond(200);
+      expect(await rolledBack, hasLength(1));
+    });
+
     test('RunQuery takes the parent from the body into the URL, encoded',
         () async {
       final proto.RunQueryRequest request = proto.RunQueryRequest()

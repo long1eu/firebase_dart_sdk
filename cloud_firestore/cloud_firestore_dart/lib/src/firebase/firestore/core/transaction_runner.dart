@@ -39,15 +39,21 @@ class TransactionRunner<TResult> {
       _attemptsRemaining -= 1;
       await _waitForBackoff();
 
+      Transaction? transaction;
       try {
-        final Transaction transaction = _createTransaction();
+        transaction = _createTransaction();
         final TResult result = await _updateFunction(transaction);
         await transaction.commit();
         return result;
       } catch (error) {
+        // A read-only transaction that failed is still open on the backend.
+        await transaction?.release();
         if (_attemptsRemaining > 0 &&
             !(_isTerminated?.call() ?? false) &&
-            _isRetryableTransactionError(error)) {
+            _isRetryableTransactionError(
+              error,
+              readOnly: transaction?.readOnly ?? false,
+            )) {
           continue;
         }
         rethrow;
@@ -61,7 +67,15 @@ class TransactionRunner<TResult> {
     return turn.future;
   }
 
-  static bool _isRetryableTransactionError(Object error) {
+  static bool _isRetryableTransactionError(
+    Object error, {
+    required bool readOnly,
+  }) {
+    if (error is FirestoreError && readOnly) {
+      // A read-only transaction takes no locks and commits nothing: it has no conflicts to retry. Only failures of
+      // the connection are worth another attempt.
+      return !Datastore.isPermanentError(error.code);
+    }
     if (error is FirestoreError) {
       // In transactions, the backend will fail outdated reads with FAILED_PRECONDITION, non-matching document versions
       // with ABORTED, and attempts to create already exists with ALREADY_EXISTS. These errors should be retried.

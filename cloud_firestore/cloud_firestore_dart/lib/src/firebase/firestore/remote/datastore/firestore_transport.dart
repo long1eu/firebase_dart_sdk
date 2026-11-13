@@ -8,6 +8,7 @@ import 'package:async/async.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/grpc_status.dart';
 import 'package:cloud_firestore_dart/src/proto/index.dart' as proto;
 import 'package:protobuf/protobuf.dart';
+import 'package:protobuf/well_known_types/google/protobuf/empty.pb.dart';
 
 /// Describes one RPC of the `google.firestore.v1.Firestore` service.
 class FirestoreRpc<Req extends GeneratedMessage, Res extends GeneratedMessage> {
@@ -64,6 +65,19 @@ class FirestoreRpc<Req extends GeneratedMessage, Res extends GeneratedMessage> {
         proto.ExecutePipelineRequest,
         proto.ExecutePipelineResponse
       >._('ExecutePipeline', proto.ExecutePipelineResponse.create);
+
+  static const FirestoreRpc<
+    proto.BeginTransactionRequest,
+    proto.BeginTransactionResponse
+  >
+  beginTransaction =
+      FirestoreRpc<
+        proto.BeginTransactionRequest,
+        proto.BeginTransactionResponse
+      >._('BeginTransaction', proto.BeginTransactionResponse.create);
+
+  static const FirestoreRpc<proto.RollbackRequest, Empty> rollback =
+      FirestoreRpc<proto.RollbackRequest, Empty>._('Rollback', Empty.create);
 
   static const FirestoreRpc<proto.CommitRequest, proto.CommitResponse> commit =
       FirestoreRpc<proto.CommitRequest, proto.CommitResponse>._(

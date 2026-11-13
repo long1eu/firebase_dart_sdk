@@ -4,6 +4,7 @@
 
 import 'dart:async';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/auth/app_check_token_provider.dart';
@@ -419,12 +420,13 @@ class FirestoreClient implements RemoteStoreCallback {
     Future<TResult> Function(Transaction) updateFunction,
     int maxAttempts, {
     bool readOnly = false,
+    SnapshotVersion? readTime,
   }) async {
     _verifyNotShutdown();
 
     return TransactionRunner<TResult>(
       createTransaction: () =>
-          remoteStore.createTransaction(readOnly: readOnly),
+          remoteStore.createTransaction(readOnly: readOnly, readTime: readTime),
       maxAttempts: maxAttempts,
       // A scheduler of its own: a [TaskScheduler] holds only one pending task per [TaskId], and transactions run
       // concurrently, each one waiting for its own backoff.

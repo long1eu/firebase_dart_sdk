@@ -10,6 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'dart:typed_data';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/database_id.dart';
@@ -40,7 +41,8 @@ class _FakeTransactionClient implements TransactionClient {
   int commits = 0;
 
   @override
-  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async => documents;
+  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys,
+          {Uint8List? transaction}) async => documents;
 
   @override
   Future<List<MutationResult>> commit(List<Mutation> mutations) async {
@@ -307,67 +309,5 @@ void main() {
         <String>['foo/a', 'foo/b', 'foo/c']);
   });
 
-  group('read-only transactions', () {
-    test('commit verifies every document that was read', () async {
-      final _FakeTransactionClient client =
-          _FakeTransactionClient(<MaybeDocument>[
-        doc('foo/bar', 7, map(<String>['a', 'b'])),
-        deletedDoc('foo/gone', 3),
-      ]);
-      final Transaction tx = Transaction(client, readOnly: true);
-      await tx.lookup(<DocumentKey>[docKey, key('foo/gone')]);
-      await tx.commit();
-
-      expect(client.committed, <Mutation>[
-        VerifyMutation(docKey, Precondition(updateTime: version(7))),
-        VerifyMutation(key('foo/gone'), Precondition(exists: false)),
-      ]);
-      expect(tx.committed, isTrue);
-    });
-
-    test('a transaction that read nothing does not commit', () async {
-      final _FakeTransactionClient client =
-          _FakeTransactionClient(<MaybeDocument>[]);
-      final Transaction tx = Transaction(client, readOnly: true);
-      await tx.commit();
-
-      expect(client.commits, 0);
-      expect(tx.committed, isTrue);
-    });
-
-    test('writes are rejected', () async {
-      final _FakeTransactionClient client =
-          _FakeTransactionClient(<MaybeDocument>[]);
-      final Transaction tx = Transaction(client, readOnly: true);
-
-      expect(
-          () => tx.set(
-              docKey, converter.parseSetData(<String, Object?>{'a': 1})),
-          throwsA(
-              firestoreError(FirestoreErrorCode.invalidArgument, 'Read-only')));
-      expect(
-          () => tx.update(
-              docKey, converter.parseUpdateData(<String, Object?>{'a': 1})),
-          throwsA(firestoreError(FirestoreErrorCode.invalidArgument)));
-      expect(() => tx.delete(docKey),
-          throwsA(firestoreError(FirestoreErrorCode.invalidArgument)));
-      await tx.commit();
-      expect(client.commits, 0);
-    });
-
-    test('cannot be used after commit', () async {
-      final _FakeTransactionClient client =
-          _FakeTransactionClient(<MaybeDocument>[]);
-      final Transaction tx = Transaction(client, readOnly: true);
-      await tx.commit();
-
-      expect(tx.commit, throwsA(anything));
-      expect(() => tx.lookup(<DocumentKey>[docKey]), throwsA(anything));
-    });
-
-    test('a read-write transaction is not read-only', () {
-      expect(Transaction(_FakeTransactionClient(<MaybeDocument>[])).readOnly,
-          isFalse);
-    });
-  });
+  // Read-only transactions: see read_only_transaction_test.dart.
 }

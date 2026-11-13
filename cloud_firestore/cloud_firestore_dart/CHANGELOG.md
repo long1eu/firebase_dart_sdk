@@ -178,8 +178,15 @@ Data types:
 
 Transactions and writes:
 
-- Read-only transactions: `TransactionOptions(readOnly: true)`, verified at commit with a
-  `VerifyMutation` (new `verify` field in the vendored `write.proto`).
+- Read-only transactions of the backend: `TransactionOptions(readOnly: true)` starts a read-only
+  transaction on the server with its first read. Every read sees one snapshot of the database:
+  documents with `Transaction.get`, and (new) queries and aggregations with
+  `Transaction.getQuery` and `Transaction.getAggregate`. `TransactionOptions.readTime` reads
+  the database as it was at a past time. Nothing is committed and the callback is not run again
+  for conflicts. (Before, the documents read were verified at commit with `VerifyMutation`s and
+  the transaction retried; the `verify` write is still used for documents that a read-write
+  transaction reads without writing.) Over the web transport they use the REST verbs
+  `beginTransaction` and `rollback`. Emulator-verified only.
 - Transaction retry with exponential backoff and `TransactionOptions(maxAttempts)`.
 - `FieldValue.maximum` / `FieldValue.minimum`.
 

@@ -3,7 +3,10 @@
 // on 20/09/2018
 
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:cloud_firestore_dart/src/firebase/firestore/aggregate_field.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/user_data.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart';
@@ -15,16 +18,26 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/preco
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/mutation/verify_mutation.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/no_document.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/snapshot_version.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/datastore/datastore.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
 
 /// Internal transaction object responsible for accumulating the mutations to
 /// perform and the base versions for any documents read.
 class Transaction {
-  /// Creates a transaction. A [readOnly] transaction rejects every write and, when committed, only verifies that the
-  /// documents it read did not change.
-  Transaction(this._transactionClient, {this.readOnly = false})
-    : readVersions = <DocumentKey, SnapshotVersion>{},
+  /// Creates a transaction.
+  ///
+  /// A [readOnly] transaction is a transaction of the backend: it is started there with its first read, every read
+  /// (documents, queries, aggregations) sees the database at the same point in time ([readTime] when given), nothing
+  /// is committed and it is released when it ends. It rejects every write.
+  ///
+  /// PORTING NOTE: the Android and JS client SDKs have no read-only transactions; this follows the server SDKs.
+  Transaction(this._transactionClient, {this.readOnly = false, this.readTime})
+    : assert(
+        readTime == null || readOnly,
+        'readTime needs a read-only transaction',
+      ),
+      readVersions = <DocumentKey, SnapshotVersion>{},
       mutations = <Mutation>[],
       committed = false;
 
@@ -46,10 +59,80 @@ class Transaction {
   final Set<DocumentKey> writtenDocs = <DocumentKey>{};
   bool committed;
 
+  /// The time whose state a [readOnly] transaction reads, or null for the time it starts.
+  final SnapshotVersion? readTime;
+
+  /// The start of the backend transaction of a [readOnly] transaction, once a read asked for it.
+  Future<Uint8List>? _backendTransaction;
+
+  Future<Uint8List> _ensureBackendTransaction() {
+    return _backendTransaction ??= _transactionClient.beginReadOnlyTransaction(
+      readTime: readTime,
+    );
+  }
+
+  /// Runs [query] on the backend, in the snapshot of this (read-only) transaction.
+  Future<List<Document>> runQuery(Query query) async {
+    _ensureCommitNotCalled();
+    _ensureReadOnly('Queries');
+    return _transactionClient.runQuery(
+      query,
+      await _ensureBackendTransaction(),
+    );
+  }
+
+  /// Runs an aggregation over [query] on the backend, in the snapshot of this (read-only) transaction.
+  Future<Map<String, FieldValue>> runAggregateQuery(
+    Query query,
+    List<AggregateField> aggregateFields,
+  ) async {
+    _ensureCommitNotCalled();
+    _ensureReadOnly('Aggregations');
+    return _transactionClient.runAggregateQuery(
+      query,
+      aggregateFields,
+      await _ensureBackendTransaction(),
+    );
+  }
+
+  void _ensureReadOnly(String what) {
+    if (!readOnly) {
+      // A read-write transaction is optimistic: it verifies the documents it read when it commits, and the result
+      // of a query can't be verified that way.
+      throw FirestoreError(
+        '$what can only be run in a read-only transaction '
+        '(TransactionOptions(readOnly: true)).',
+        FirestoreErrorCode.invalidArgument,
+      );
+    }
+  }
+
+  /// Ends a [readOnly] transaction on the backend, if it was started there. Never fails: the backend also drops
+  /// transactions by itself. Does nothing for a read-write transaction.
+  Future<void> release() async {
+    final Future<Uint8List>? backendTransaction = _backendTransaction;
+    if (backendTransaction == null) {
+      return;
+    }
+    _backendTransaction = null;
+    try {
+      await _transactionClient.rollback(await backendTransaction);
+    } catch (_) {
+      // Best effort.
+    }
+  }
+
   /// Takes a set of keys and asynchronously attempts to fetch all the documents
   /// from the backend, ignoring any local changes.
   Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async {
     _ensureCommitNotCalled();
+
+    if (readOnly) {
+      return _transactionClient.lookup(
+        keys,
+        transaction: await _ensureBackendTransaction(),
+      );
+    }
 
     if (mutations.isNotEmpty) {
       return Future<List<MaybeDocument>>.error(
@@ -100,16 +183,9 @@ class Transaction {
     }
 
     if (readOnly) {
-      // Nothing is written: ask the backend to check that every document read still has the version that was read.
-      // A transaction that read nothing has nothing to verify.
+      // Nothing to commit or to verify: every read came from one snapshot of the backend.
       committed = true;
-      if (readVersions.isEmpty) {
-        return Future<void>.value();
-      }
-      return _transactionClient.commit(<Mutation>[
-        for (DocumentKey key in readVersions.keys)
-          VerifyMutation(key, _precondition(key)),
-      ]);
+      return release();
     }
 
     final Set<DocumentKey> unwritten = Set<DocumentKey>.from(readVersions.keys);

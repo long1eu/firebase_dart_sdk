@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/transaction.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/maybe_document.dart';
@@ -17,7 +18,8 @@ class _FakeTransactionClient implements TransactionClient {
   List<Mutation> committed = <Mutation>[];
 
   @override
-  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys) async => documents;
+  Future<List<MaybeDocument>> lookup(List<DocumentKey> keys,
+          {Uint8List? transaction}) async => documents;
 
   @override
   Future<List<MutationResult>> commit(List<Mutation> mutations) async {
