@@ -6,6 +6,7 @@ const List<String> sqliteSideFileSuffixes = <String>[
   '-shm',
 ];
 
-/// There is no file system on the web, so there is nothing to delete: a
-/// database opened there is not a file this library can reach.
+/// There is no file system on the web, so there is nothing to delete here. A
+/// database that is stored elsewhere (IndexedDB) deletes its own storage: see
+/// `ClearableDatabase`.
 void deleteSqliteDatabaseFiles(String path) {}

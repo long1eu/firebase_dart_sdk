@@ -17,6 +17,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/listent_sequenc
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/firestore_error.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/index/firestore_index_value_writer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_byte_encoder.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/index/index_entry.dart';
@@ -104,6 +105,10 @@ class SQLitePersistence extends Persistence {
   /// The path of the database file, known once [start] opened it. Kept after
   /// [shutdown] so that [clearPersistence] can delete it.
   String? _databasePath;
+
+  /// How the database that was opened deletes its storage, when it does that
+  /// itself (see [ClearableDatabase]).
+  Future<void> Function()? _clearStorage;
 
   @override
   bool started = false;
@@ -198,6 +203,8 @@ class SQLitePersistence extends Persistence {
       hardAssert(!started, 'SQLitePersistence double-started!');
       _db = await _openDb(databaseName, openDatabase);
       _databasePath = _db.path;
+      final Database db = _db;
+      _clearStorage = db is ClearableDatabase ? db.clearStorage : null;
       await queryCache.start();
       started = true;
       referenceDelegate.start(queryCache.highestListenSequenceNumber);
@@ -229,8 +236,9 @@ class SQLitePersistence extends Persistence {
   }
 
   /// Deletes the database file and its journal, WAL and shared memory side
-  /// files. Only valid after [shutdown]; does nothing when the database was
-  /// never opened.
+  /// files, or lets the database delete its own storage when it is a
+  /// [ClearableDatabase]. Only valid after [shutdown]; does nothing when the
+  /// database was never opened.
   ///
   /// PORTING NOTE: Android derives the path from [databaseName] with
   /// `Context.getDatabasePath`. Here the file is chosen by the [OpenDatabase]
@@ -240,7 +248,20 @@ class SQLitePersistence extends Persistence {
     try {
       hardAssert(!started, 'SQLitePersistence cleared while running!');
       final String? path = _databasePath;
-      if (path != null) {
+      final Future<void> Function()? clearStorage = _clearStorage;
+      if (clearStorage != null) {
+        try {
+          await clearStorage();
+        } on FirestoreError {
+          rethrow;
+        } catch (e) {
+          throw FirestoreError(
+            'Failed to clear persistence.$e',
+            FirestoreErrorCode.unknown,
+            e,
+          );
+        }
+      } else if (path != null) {
         deleteSqliteDatabaseFiles(path);
       }
     } finally {

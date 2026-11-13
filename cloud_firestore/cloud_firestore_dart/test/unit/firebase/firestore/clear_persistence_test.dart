@@ -37,6 +37,31 @@ OpenDatabase openFixed(String dbName) {
   };
 }
 
+/// Like [openFixed], for a database that clears its own storage.
+OpenDatabase openSelfClearing(String dbName, List<String> calls,
+    {bool fail = false}) {
+  return (String path,
+      {int? version,
+      OnConfigure? onConfigure,
+      OnCreate? onCreate,
+      OnVersionChange? onUpgrade,
+      OnVersionChange? onDowngrade,
+      OnOpen? onOpen}) async {
+    late final _SelfClearingDatabase db;
+    // The callbacks get the database Firestore will use.
+    final DatabaseMock mock = await DatabaseMock.create(dbName,
+        version: version,
+        onConfigure: onConfigure,
+        onCreate: onCreate,
+        onUpgrade: onUpgrade,
+        onDowngrade: onDowngrade,
+        onOpen: onOpen);
+    mock.renamePath = false;
+    db = _SelfClearingDatabase(mock, calls, fail: fail);
+    return db;
+  };
+}
+
 FirebaseApp newApp(String name) => FirebaseApp.withOptions(
       const FirebaseOptions(
           apiKey: 'key', applicationId: 'appId', projectId: 'projectId'),
@@ -126,6 +151,47 @@ void main() {
       await again.start();
       addTearDown(again.shutdown);
       expect(await again.query('SELECT bundle_id FROM bundles'), isEmpty);
+    });
+
+    test('a ClearableDatabase clears its own storage; no file is deleted',
+        () async {
+      final String dbName = 'clear-${const Uuid().v4()}.db';
+      addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
+      final File file = DatabaseMock.pathForName(dbName);
+      final List<String> calls = <String>[];
+
+      final SQLitePersistence persistence = await SQLitePersistence.create(
+        'key',
+        databaseId,
+        LocalSerializer(RemoteSerializer(databaseId)),
+        openSelfClearing(dbName, calls),
+        const LruGarbageCollectorParams(),
+      );
+      await persistence.start();
+      await persistence.shutdown();
+      expect(calls, <String>['close']);
+
+      await persistence.clearPersistence();
+      // After the close, once, and instead of deleting the file at `path`.
+      expect(calls, <String>['close', 'clearStorage']);
+      expect(file.existsSync(), isTrue);
+    });
+
+    test('an error of clearStorage is reported as unknown', () async {
+      final String dbName = 'clear-${const Uuid().v4()}.db';
+      addTearDown(() => DatabaseMock.deleteDatabaseFiles(dbName));
+      final SQLitePersistence persistence = await SQLitePersistence.create(
+        'key',
+        databaseId,
+        LocalSerializer(RemoteSerializer(databaseId)),
+        openSelfClearing(dbName, <String>[], fail: true),
+        const LruGarbageCollectorParams(),
+      );
+      await persistence.start();
+      await persistence.shutdown();
+
+      await expectLater(persistence.clearPersistence(),
+          throwsA(firestoreErrorWithCode(FirestoreErrorCode.unknown)));
     });
 
     test('is rejected while the persistence is running', () async {
@@ -227,4 +293,44 @@ void main() {
           <String, Object?>{'a': 1});
     });
   });
+}
+
+/// A database that keeps its data somewhere `clearPersistence` cannot delete
+/// by path, as a database in IndexedDB does.
+class _SelfClearingDatabase implements ClearableDatabase {
+  _SelfClearingDatabase(this._delegate, this._calls, {this.fail = false});
+
+  final Database _delegate;
+  final List<String> _calls;
+  final bool fail;
+
+  @override
+  String get path => _delegate.path;
+
+  @override
+  Future<void> execute(String statement, [List<Object?>? arguments]) =>
+      _delegate.execute(statement, arguments);
+
+  @override
+  Future<List<Map<String, dynamic>>> query(String statement,
+          [List<Object?>? arguments]) =>
+      _delegate.query(statement, arguments);
+
+  @override
+  Future<int> delete(String statement, [List<Object?>? arguments]) =>
+      _delegate.delete(statement, arguments);
+
+  @override
+  void close() {
+    _calls.add('close');
+    _delegate.close();
+  }
+
+  @override
+  Future<void> clearStorage() async {
+    _calls.add('clearStorage');
+    if (fail) {
+      throw StateError('storage is busy');
+    }
+  }
 }

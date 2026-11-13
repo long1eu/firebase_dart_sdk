@@ -21,10 +21,16 @@ final Random _random = Random();
 int _apps = 0;
 
 /// A new client with its own app and its own cache (in memory unless
-/// [openDatabase] is given). It is terminated when the test ends.
+/// [openDatabase] is given). It is terminated when the test ends, and its app
+/// is deleted.
+///
+/// The name of a persistent cache comes from [appName]: a later client with
+/// the same name (after this one was terminated with [shutDown]) opens the
+/// same cache.
 Future<Firestore> newClient({
   OpenDatabase? openDatabase,
   bool forceLongPolling = false,
+  String? appName,
 }) async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
@@ -32,19 +38,35 @@ Future<Firestore> newClient({
       applicationId: '1:1234567890:dart:browser',
       projectId: projectId,
     ),
-    name: 'browser-${_apps++}-${_random.nextInt(0x7fffffff)}',
+    name: appName ?? 'browser-${_apps++}-${_random.nextInt(0x7fffffff)}',
   );
-  final Firestore firestore = await Firestore.instanceFor(
-    app: app,
-    openDatabase: openDatabase,
-    settings: FirestoreSettings(
-            experimentalForceLongPolling: forceLongPolling,
-            cacheSettings:
-                openDatabase == null ? const MemoryCacheSettings() : null)
-        .withEmulator(emulatorHost, emulatorPort),
-  );
-  addTearDown(firestore.terminate);
+  final Firestore firestore;
+  try {
+    firestore = await Firestore.instanceFor(
+      app: app,
+      openDatabase: openDatabase,
+      settings: FirestoreSettings(
+              experimentalForceLongPolling: forceLongPolling,
+              cacheSettings:
+                  openDatabase == null ? const MemoryCacheSettings() : null)
+          .withEmulator(emulatorHost, emulatorPort),
+    );
+  } catch (_) {
+    app.delete();
+    rethrow;
+  }
+  _appOf[firestore] = app;
+  addTearDown(() => shutDown(firestore));
   return firestore;
+}
+
+final Map<Firestore, FirebaseApp> _appOf = <Firestore, FirebaseApp>{};
+
+/// Terminates [firestore] and deletes its app, so that the name of the app
+/// can be used again. Does nothing the second time.
+Future<void> shutDown(Firestore firestore) async {
+  await firestore.terminate();
+  _appOf.remove(firestore)?.delete();
 }
 
 /// A collection name no other test uses.

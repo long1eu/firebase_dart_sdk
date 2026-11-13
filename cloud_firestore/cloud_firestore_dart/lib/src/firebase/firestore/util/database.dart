@@ -77,6 +77,20 @@ abstract class Database {
   void close();
 }
 
+/// A [Database] that deletes its own storage for `Firestore.clearPersistence`.
+///
+/// By default `clearPersistence` deletes the file at [Database.path] and
+/// SQLite's side files next to it, which is all a database in a file system
+/// needs. Implement this interface when the database is kept somewhere else,
+/// for example in IndexedDB in a browser: `clearPersistence` then calls
+/// [clearStorage] instead and deletes no file.
+abstract interface class ClearableDatabase implements Database {
+  /// Deletes everything this database stored. Called after [close], at most
+  /// once; the database is not used afterwards. An error fails
+  /// `clearPersistence` with `FirestoreErrorCode.unknown`.
+  Future<void> clearStorage();
+}
+
 /// Not used by the SDK; kept out of the public API.
 @internal
 enum ConflictAlgorithm {

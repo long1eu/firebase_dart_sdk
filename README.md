@@ -64,9 +64,9 @@ follow the JS SDK.
   `_firebase_database_collection_vm`, now folded in). See
   [docs/migrating_from_vm_packages.md](docs/migrating_from_vm_packages.md).
 - Web support is experimental. In a browser the client uses REST and WebChannel over `fetch`
-  instead of gRPC, with a memory cache only. 16 browser tests pass in Chrome against the
-  emulator (dart2wasm; with dart2js 15 pass and 1 is skipped), and the whole standard integration
-  suite passes on the VM over the web transport. No other browser and no production backend was
+  instead of gRPC, with a memory cache or an opt-in SQLite cache in IndexedDB. The browser tests
+  pass in Chrome against the emulator (dart2wasm and dart2js), and the whole standard
+  integration suite passes on the VM over the web transport. No other browser and no production backend was
   tried.
 - Not implemented: the client-side index engine (`setIndexConfiguration`, auto-indexing; only
   its internal building blocks exist), sharing one cache between running clients, and Pipelines

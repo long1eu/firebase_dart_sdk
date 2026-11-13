@@ -34,8 +34,8 @@ yet**, so the `dart pub add` command above only works once it is.
   connectivity changes) is untested.
 - Features of the Enterprise edition (BSON value types, Pipelines) were verified against the
   emulator in Enterprise edition only, never against a production Enterprise database.
-- Web support is experimental: tested in Chrome only, against the emulator only, with a
-  memory cache only. See [Platforms](#platforms).
+- Web support is experimental: tested in Chrome only, against the emulator only. The cache is
+  in memory unless you opt in to SQLite in IndexedDB. See [Platforms](#platforms).
 
 ## Platforms
 
@@ -48,7 +48,17 @@ Web support is experimental. Browsers have no sockets, so there the client talks
 Firestore the way the JS SDK does: REST/JSON for the one-shot calls and WebChannel for the
 listen and write streams, over `fetch`. What to know:
 
-- The cache is in memory only on the web (no SQLite persistence there yet).
+- The cache is in memory by default. To keep it across page loads, pass the `OpenDatabase` of
+  [`example/sqlite_database_web.dart`](example/sqlite_database_web.dart) (copy the file into
+  your app): SQLite compiled to WebAssembly by `package:sqlite3`, with the database in
+  IndexedDB. It needs the `sqlite3.wasm` file of that package next to your page. One tab at a
+  time: a second tab that opens the same cache gets a `FirestoreError` with
+  `failedPrecondition` (a Web Lock guards the database) and should use a memory cache;
+  `openWithMemoryFallback` in that file does this. `clearPersistence()` deletes the IndexedDB
+  database. Cost, measured for a small app compiled with `dart compile js -O2`: 588 KB (180 KB
+  gzipped) with a memory cache, 807 KB (239 KB gzipped) with the persistent cache, plus
+  `sqlite3.wasm`, 731 KB (349 KB gzipped). The whole database is read into memory when it is
+  opened, and a tab that is killed in the middle of a transaction can lose that transaction.
 - It was verified against the emulator only: 19 tests in Chrome
   (`dart test -p chrome -c dart2wasm test/browser`; with `-c dart2js` 18 pass and 1 is skipped),
   and the whole standard integration suite on the VM over the web transport
@@ -575,8 +585,8 @@ Not done:
 - **Production.** Nothing has been run against production Firestore, and the Enterprise edition
   features only against the Enterprise edition emulator. The opt-in real-project test mode
   exists but has not been run.
-- **Web beyond the experiment**: persistence on the web (the cache is in memory only there) and
-  any browser other than Chrome.
+- **Web beyond the experiment**: sharing the persistent cache between tabs (it is one tab at
+  a time), OPFS storage, and any browser other than Chrome.
 - **Pipelines** beyond the [preview](#pipelines-preview) described above: full-text search,
   window functions, pipelines in a `Transaction`, local evaluation and real-time pipelines.
 - `Query.findNearest` evaluation against the local cache.

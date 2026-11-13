@@ -269,6 +269,7 @@ const Map<String, String> exempt = <String, String>{
   'Database.execute': 'implemented by the user of the package',
   'Database.query': 'implemented by the user of the package',
   'Database.delete': 'implemented by the user of the package',
+  'ClearableDatabase.clearStorage': 'implemented by the user of the package',
 };
 
 /// `Class.member` of every public, non-internal member of the exported

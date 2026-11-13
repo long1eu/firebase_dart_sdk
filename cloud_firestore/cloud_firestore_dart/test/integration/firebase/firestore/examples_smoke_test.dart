@@ -12,7 +12,12 @@ import 'package:test/test.dart';
 import '../../../util/test_hygiene.dart';
 
 /// Files of example/ that are libraries, not programs.
-const Set<String> _libraries = <String>{'common.dart', 'sqlite_database.dart'};
+const Set<String> _libraries = <String>{
+  'common.dart',
+  'sqlite_database.dart',
+  // For browsers; exercised by test/browser/web_persistence_test.dart.
+  'sqlite_database_web.dart',
+};
 
 /// The topics that must stay covered; a missing file fails the test.
 const Set<String> _expected = <String>{

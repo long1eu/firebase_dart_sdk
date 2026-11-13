@@ -25,3 +25,7 @@ build/
 
 # Node harness of the JS interop tests (npm install in tool/interop)
 tool/interop/node_modules/
+
+# The WebAssembly build of SQLite for the browser tests (tool/test_browser.sh downloads it).
+cloud_firestore/cloud_firestore_dart/test/browser/sqlite3.wasm
+cloud_firestore/cloud_firestore_dart/test/browser/sqlite3.wasm.version

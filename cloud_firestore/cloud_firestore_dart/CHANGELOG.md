@@ -15,8 +15,8 @@ How this was verified:
 - Features of the Enterprise edition (BSON value types, Pipelines) were run against the
   emulator in Enterprise edition only.
 - Web support is experimental: it was run in Chrome only, against the emulator only, with a
-  memory cache only (19 browser tests, and the standard integration suite on the VM over the web
-  transport).
+  memory cache or the opt-in SQLite cache in IndexedDB (browser tests, and the standard
+  integration suite on the VM over the web transport).
 
 ### Renamed packages
 
@@ -267,7 +267,8 @@ Networking:
   `Listen` and `Write` streams, over `fetch` (`package:web`, a new dependency). This is what the
   JS SDK does; neither the backend nor the emulator accept gRPC-Web. The VM keeps using gRPC.
   Limits:
-  - The cache is in memory only on the web; there is no SQLite persistence there yet.
+  - The cache is in memory on the web unless the application opts in to the SQLite cache in
+    IndexedDB (below).
   - Verified against the emulator only: on the VM, where the whole standard integration suite
     runs over the web transport (`tool/test_integration.sh standard --transport=webchannel`, or
     `FIRESTORE_TEST_TRANSPORT=webchannel`), and in Chrome with 19 browser tests
@@ -275,6 +276,19 @@ Networking:
     skipped). No other browser and no production backend was tried.
   - Compile with dart2wasm to keep 64 bit integers exact. Compiled with dart2js, integers
     above 2^53 lose precision.
+- **Opt-in persistence on the web** (experimental): `example/sqlite_database_web.dart` is a
+  complete `OpenDatabase` for browsers, to copy into an application like
+  `example/sqlite_database.dart`. It runs SQLite as WebAssembly (`package:sqlite3`, which stays
+  out of this package's dependencies) with the database in IndexedDB, guards it with a Web Lock
+  so that a second tab is refused with `failedPrecondition`, and waits for IndexedDB at the end
+  of every transaction. New public interface `ClearableDatabase`: a `Database` that implements
+  it deletes its own storage for `clearPersistence()`, which is how the IndexedDB database is
+  removed (by default `clearPersistence` deletes the file at `Database.path`). Verified in
+  Chrome against the emulator: data and pending writes survive a new page load of a tab that
+  was not closed properly, a cache held by another browsing context is refused, the 14 schema
+  migrations run one by one and at once, automatic cache indexes work, `clearPersistence`
+  removes the database. Not verified: other browsers, large caches (the database is held in
+  memory), a tab killed in the middle of a transaction.
 - Web transport robustness (web only, the gRPC transport is unchanged):
   - `FirestoreSettings.experimentalForceLongPolling` and
     `experimentalAutoDetectLongPolling` (on by default), for networks where a proxy buffers
@@ -366,8 +380,8 @@ Documentation and tests:
 
 - Persistent cache indexes for queries with inequalities on several fields (they are scanned,
   as upstream), and indexes with a memory cache.
-- Persistence on the web (the cache is in memory only there), and any browser other than
-  Chrome.
+- Sharing the persistent cache between browser tabs (one tab at a time), OPFS storage, and
+  any browser other than Chrome.
 - Pipelines beyond the preview: full-text search, window functions, pipelines in a
   `Transaction`, evaluation against the local cache and real-time pipelines.
 - Multi-tab / multi-process sharing of one cache, as in the JS SDK.

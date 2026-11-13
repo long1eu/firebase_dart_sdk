@@ -63,6 +63,9 @@ class BsonTimestamp
   new BsonTimestamp(int seconds, int increment)
   static final maxValue: int
   toString(): String
+abstract class ClearableDatabase
+  clearStorage(): Future<void>
+  new ClearableDatabase()
 class CollectionReference extends Query<X0>
   add(X0 data): Future<DocumentReference<X0>>
   doc([String documentPath]): DocumentReference<X0>
