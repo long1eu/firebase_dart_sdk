@@ -114,8 +114,8 @@ Future<void> appReadmeLine34() async {
   print(identical(FirebaseApp.instance, app)); // the default app
 }
 
-// ../../firebase_auth/firebase_auth_providers_dart/README.md:36
-Future<void> authProvidersReadmeLine36() async {
+// ../../firebase_auth/firebase_auth_providers_dart/README.md:80
+Future<void> authProvidersReadmeLine80() async {
   // Before the Firestore instance is created: it becomes the token provider of the app.
   final auth = await FirebaseUserAuth.forApp(app);
   final firestore = Firestore.instanceFor(app: app);
@@ -215,8 +215,8 @@ Future<void> migrationGuideLine398() async {
     }
 }
 
-// ../../docs/guides/authentication.md:24
-Future<void> authenticationGuideLine24() async {
+// ../../docs/guides/authentication.md:26
+Future<void> authenticationGuideLine26() async {
   // A signed-in Firebase Auth user: the security rules see request.auth.
   final auth = await FirebaseUserAuth.forApp(app);
   final firestore = Firestore.instanceFor(app: app);
@@ -227,8 +227,8 @@ Future<void> authenticationGuideLine24() async {
   //   app.authProvider = applicationDefaultCredentials();   // package:.../adc.dart
 }
 
-// ../../docs/guides/authentication.md:46
-Future<void> authenticationGuideLine46() async {
+// ../../docs/guides/authentication.md:48
+Future<void> authenticationGuideLine48() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: '<the Web API key of the project>',
     applicationId: '1:1234567890:dart:example',
@@ -248,21 +248,21 @@ Future<void> authenticationGuideLine46() async {
   await auth.signOut();
 }
 
-// ../../docs/guides/authentication.md:100
-Future<void> authenticationGuideLine100() async {
+// ../../docs/guides/authentication.md:102
+Future<void> authenticationGuideLine102() async {
   final auth = await FirebaseUserAuth.forApp(app, storage: FileAuthStorage());
   // auth.currentUser is the user of the last run, if there was one.
 }
 
-// ../../docs/guides/authentication.md:130
-Future<void> authenticationGuideLine130() async {
+// ../../docs/guides/authentication.md:132
+Future<void> authenticationGuideLine132() async {
   final auth = await FirebaseUserAuth.forApp(app,
       emulatorHost: FirebaseUserAuth.emulatorHostFromEnvironment); // FIREBASE_AUTH_EMULATOR_HOST
   // or emulatorHost: '127.0.0.1:9099'
 }
 
-// ../../docs/guides/authentication.md:156
-Future<void> authenticationGuideLine156() async {
+// ../../docs/guides/authentication.md:158
+Future<void> authenticationGuideLine158() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: 'unused',            // required by FirebaseOptions, not sent with these credentials
     applicationId: '1:1234567890:dart:server',
