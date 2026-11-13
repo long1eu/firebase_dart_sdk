@@ -18,14 +18,14 @@ import 'package:firebase_app_dart/internal.dart';
 /// tombstone if the mutation queue does not remove them immediately. When a batch is a tombstone it
 /// has no mutations.
 class MutationBatch {
-  const MutationBatch({
+  MutationBatch({
     required this.batchId,
     required this.localWriteTime,
     required this.baseMutations,
     required this.mutations,
-  })
-    // ignore: prefer_is_empty
-    : assert(mutations.length != 0, 'Cannot create an empty mutation batch');
+  }) {
+    hardAssert(mutations.isNotEmpty, 'Cannot create an empty mutation batch');
+  }
 
   /// A batch ID that was searched for and not found or a batch ID value known to be before all
   /// known batches.

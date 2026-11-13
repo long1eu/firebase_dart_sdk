@@ -154,10 +154,12 @@ class FirestoreIndexValueWriter {
     } else if (indexValue is ReferenceValue) {
       _writeIndexEntityRef(indexValue.key.path, encoder);
     } else if (indexValue is GeoPointValue) {
+      // PORTING NOTE: the Android SDK writes the coordinates as they are, so -0.0 sorts before 0.0 in the index while
+      // the values compare as equal. They are written like the zeros of numbers here.
       _writeValueTypeLabel(encoder, indexTypeGeopoint);
       encoder
-        ..writeDouble(indexValue.value.latitude)
-        ..writeDouble(indexValue.value.longitude);
+        ..writeDouble(_withoutNegativeZero(indexValue.value.latitude))
+        ..writeDouble(_withoutNegativeZero(indexValue.value.longitude));
     } else if (indexValue is VectorFieldValue) {
       _writeIndexVector(indexValue.internalValue, encoder);
     } else if (indexValue is ObjectValue) {
@@ -198,6 +200,9 @@ class FirestoreIndexValueWriter {
       encoder.writeBytes(<int>[blob.subtype, ...blob.bytes]);
     }
   }
+
+  static double _withoutNegativeZero(double number) =>
+      number == 0.0 ? 0.0 : number;
 
   void _writeIndexDouble(double number, DirectionalIndexByteEncoder encoder) {
     if (number.isNaN) {

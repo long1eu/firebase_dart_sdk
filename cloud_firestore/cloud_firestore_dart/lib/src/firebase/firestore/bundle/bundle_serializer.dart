@@ -96,7 +96,9 @@ class BundleSerializer {
     if (queriesJson is List<dynamic>) {
       for (final dynamic query in queriesJson) {
         if (query is! String) {
-          throw ArgumentError('Expected a query name but got: $query');
+          throw ArgumentError(
+            'Expected a query name but got: ${_describe(query)}',
+          );
         }
         queries.add(query);
       }
@@ -386,7 +388,7 @@ class BundleSerializer {
         );
         break;
       default:
-        throw ArgumentError('Unexpected unary filter: $operator');
+        throw ArgumentError('Unexpected unary filter: ${_describe(operator)}');
     }
   }
 
@@ -413,7 +415,9 @@ class BundleSerializer {
       case 'NOT_IN':
         return FilterOperator.NOT_IN;
       default:
-        throw ArgumentError('Unexpected field filter operator: $operator');
+        throw ArgumentError(
+          'Unexpected field filter operator: ${_describe(operator)}',
+        );
     }
   }
 
@@ -428,7 +432,9 @@ class BundleSerializer {
     } else if (limitType == 'LAST') {
       return BundledQueryLimitType.last;
     } else {
-      throw ArgumentError('Invalid limit type for bundle query: $limitType');
+      throw ArgumentError(
+        'Invalid limit type for bundle query: ${_describe(limitType)}',
+      );
     }
   }
 
@@ -525,7 +531,7 @@ class BundleSerializer {
       }
       builder.mapValue = map;
     } else {
-      throw ArgumentError('Unexpected value type: $value');
+      throw ArgumentError('Unexpected value type: ${_describe(value)}');
     }
 
     return builder;
@@ -549,7 +555,7 @@ class BundleSerializer {
     if (timestamp is String) {
       return _decodeTimestampString(timestamp);
     } else if (timestamp is Map<String, dynamic>) {
-      return Timestamp(
+      return _checkedTimestamp(
         _optInt(timestamp, 'seconds', 0),
         _optInt(timestamp, 'nanos', 0),
       );
@@ -569,7 +575,7 @@ class BundleSerializer {
   Timestamp _decodeTimestampString(String timestamp) {
     final RegExpMatch? match = _timestampPattern.firstMatch(timestamp);
     if (match == null) {
-      throw ArgumentError('Invalid timestamp: $timestamp');
+      throw ArgumentError('Invalid timestamp: ${_describe(timestamp)}');
     }
 
     final int year = int.parse(match.group(1)!);
@@ -609,14 +615,46 @@ class BundleSerializer {
         seconds += offsetSeconds;
       }
     }
-    return Timestamp(seconds, nanos);
+    return _checkedTimestamp(seconds, nanos);
   }
+
+  /// The timestamp of [seconds] and [nanos], or an [ArgumentError] if they are out of range.
+  Timestamp _checkedTimestamp(int seconds, int nanos) {
+    return remoteSerializer.decodeTimestamp(
+      proto.Timestamp()
+        ..seconds = Int64(seconds)
+        ..nanos = nanos,
+    );
+  }
+
+  /// [value] (a part of an untrusted JSON element) for an error message: the keys of an object, the length of an
+  /// array, the start of a long string. Printing the value itself could take megabytes, or overflow the stack for a
+  /// deeply nested one.
+  static String _describe(Object? value) {
+    if (value is Map) {
+      final Iterable<String> keys = value.keys
+          .take(10)
+          .map((Object? key) => _clip('$key'));
+      return 'a JSON object with the fields [${keys.join(', ')}${value.length > 10 ? ', ...' : ''}]';
+    }
+    if (value is List) {
+      return 'a JSON array of ${value.length} elements';
+    }
+    if (value is String) {
+      return '"${_clip(value)}"';
+    }
+    return _clip('$value');
+  }
+
+  static String _clip(String text) => text.length <= 100
+      ? text
+      : '${text.substring(0, 100)}... (${text.length} characters)';
 
   // JSON helpers (the Android SDK uses org.json, whose getXxx/optXxx coerce between strings and numbers).
 
   dynamic _get(Map<String, dynamic> json, String key) {
     if (!json.containsKey(key)) {
-      throw ArgumentError('Missing field \'$key\' in $json');
+      throw ArgumentError('Missing field \'$key\' in ${_describe(json)}');
     }
     return json[key];
   }
@@ -629,7 +667,7 @@ class BundleSerializer {
     if (value is num || value is bool) {
       return value.toString();
     }
-    throw ArgumentError('Field \'$key\' is not a string: $value');
+    throw ArgumentError('Field \'$key\' is not a string: ${_describe(value)}');
   }
 
   Map<String, dynamic> _getObject(Map<String, dynamic> json, String key) {
@@ -641,7 +679,7 @@ class BundleSerializer {
     if (value is List<dynamic>) {
       return value;
     }
-    throw ArgumentError('Field \'$key\' is not an array: $value');
+    throw ArgumentError('Field \'$key\' is not an array: ${_describe(value)}');
   }
 
   Map<String, dynamic>? _optObject(Map<String, dynamic> json, String key) {
@@ -697,13 +735,13 @@ class BundleSerializer {
     if (value is Map<String, dynamic>) {
       return value;
     }
-    throw ArgumentError('Expected a JSON object but got: $value');
+    throw ArgumentError('Expected a JSON object but got: ${_describe(value)}');
   }
 
   int _asInt(dynamic value) {
     final int? result = _tryInt(value);
     if (result == null) {
-      throw ArgumentError('Expected an integer but got: $value');
+      throw ArgumentError('Expected an integer but got: ${_describe(value)}');
     }
     return result;
   }
@@ -711,7 +749,7 @@ class BundleSerializer {
   double _asDouble(dynamic value) {
     final double? result = _tryDouble(value);
     if (result == null) {
-      throw ArgumentError('Expected a number but got: $value');
+      throw ArgumentError('Expected a number but got: ${_describe(value)}');
     }
     return result;
   }
@@ -721,13 +759,22 @@ class BundleSerializer {
       return value;
     }
     if (value is double) {
-      return value.toInt();
+      return _doubleToInt(value);
     }
     if (value is String) {
-      return int.tryParse(value) ?? double.tryParse(value)?.toInt();
+      final int? integer = int.tryParse(value);
+      if (integer != null) {
+        return integer;
+      }
+      final double? number = double.tryParse(value);
+      return number == null ? null : _doubleToInt(number);
     }
     return null;
   }
+
+  /// [value] truncated to an integer, or null for NaN and the infinities (such as `1e400`), which have none.
+  static int? _doubleToInt(double value) =>
+      value.isFinite ? value.toInt() : null;
 
   double? _tryDouble(dynamic value) {
     if (value is num) {

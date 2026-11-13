@@ -74,12 +74,25 @@ class GeoPoint implements Comparable<GeoPoint> {
 
   @override
   int compareTo(GeoPoint other) {
-    final int comparision = latitude.compareTo(other.latitude);
+    final int comparision = _compareCoordinates(latitude, other.latitude);
     if (comparision == 0) {
-      return longitude.compareTo(other.longitude);
+      return _compareCoordinates(longitude, other.longitude);
     } else {
       return comparision;
     }
+  }
+
+  /// Compares doubles like Firestore (the Android `NumberComparisonHelper.firestoreCompareDoubles`): 0.0 and -0.0 are
+  /// equal, as for [==]; [double.compareTo] puts -0.0 first. NaN sorts first and equals itself.
+  static int _compareCoordinates(double left, double right) {
+    if (left < right) {
+      return -1;
+    } else if (left > right) {
+      return 1;
+    } else if (left == right) {
+      return 0;
+    }
+    return left.isNaN ? (right.isNaN ? 0 : -1) : 1;
   }
 
   @override

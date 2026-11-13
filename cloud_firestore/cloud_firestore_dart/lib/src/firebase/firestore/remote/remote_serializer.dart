@@ -67,9 +67,25 @@ class RemoteSerializer {
       ..nanos = timestamp.nanoseconds;
   }
 
+  /// Throws an [ArgumentError] if [proto] is outside the range of a [Timestamp]. The [Timestamp] constructor only
+  /// checks it with asserts; the upstream constructor (Android `Timestamp`, JS `Timestamp`) always does.
   Timestamp decodeTimestamp(proto.Timestamp proto) {
-    return Timestamp(proto.seconds.toInt(), proto.nanos);
+    final int seconds = proto.seconds.toInt();
+    final int nanos = proto.nanos;
+    if (nanos < 0 || nanos >= 1000000000) {
+      throw ArgumentError('Timestamp nanoseconds out of range: $nanos');
+    }
+    if (seconds < _minTimestampSeconds || seconds > _maxTimestampSeconds) {
+      throw ArgumentError('Timestamp seconds out of range: $seconds');
+    }
+    return Timestamp(seconds, nanos);
   }
+
+  /// 0001-01-01T00:00:00Z.
+  static const int _minTimestampSeconds = -62135596800;
+
+  /// 9999-12-31T23:59:59Z.
+  static const int _maxTimestampSeconds = 253402300799;
 
   proto.Timestamp encodeVersion(SnapshotVersion version) {
     return encodeTimestamp(version.timestamp);
@@ -91,8 +107,22 @@ class RemoteSerializer {
       ..longitude = geoPoint.longitude;
   }
 
+  /// Throws an [ArgumentError] if [latLng] is outside the range of a [GeoPoint]. The [GeoPoint] constructor only checks
+  /// it with asserts; the upstream constructor (Android `GeoPoint`, JS `GeoPoint`) always does.
   GeoPoint _decodeGeoPoint(proto.LatLng latLng) {
-    return GeoPoint(latLng.latitude, latLng.longitude);
+    final double latitude = latLng.latitude;
+    final double longitude = latLng.longitude;
+    if (!(latitude >= -90 && latitude <= 90)) {
+      throw ArgumentError(
+        'Latitude must be in the range of [-90, 90] but was $latitude',
+      );
+    }
+    if (!(longitude >= -180 && longitude <= 180)) {
+      throw ArgumentError(
+        'Longitude must be in the range of [-180, 180] but was $longitude',
+      );
+    }
+    return GeoPoint(latitude, longitude);
   }
 
   // Names and Keys
@@ -780,26 +810,35 @@ class RemoteSerializer {
       return FieldTransform(
         FieldPath.fromServerFormat(fieldTransform.fieldPath),
         NumericIncrementTransformOperation(
-          decodeValue(fieldTransform.increment) as NumberValue,
+          _decodeNumericOperand(fieldTransform.increment),
         ),
       );
     } else if (fieldTransform.hasMinimum()) {
       return FieldTransform(
         FieldPath.fromServerFormat(fieldTransform.fieldPath),
         NumericMinimumTransformOperation(
-          decodeValue(fieldTransform.minimum) as NumberValue,
+          _decodeNumericOperand(fieldTransform.minimum),
         ),
       );
     } else if (fieldTransform.hasMaximum()) {
       return FieldTransform(
         FieldPath.fromServerFormat(fieldTransform.fieldPath),
         NumericMaximumTransformOperation(
-          decodeValue(fieldTransform.maximum) as NumberValue,
+          _decodeNumericOperand(fieldTransform.maximum),
         ),
       );
     } else {
       throw fail('Unknown FieldTransform proto: $fieldTransform');
     }
+  }
+
+  NumberValue _decodeNumericOperand(proto_v1.Value operand) {
+    final FieldValue value = decodeValue(operand);
+    hardAssert(
+      value is NumberValue,
+      'NumericTransformOperation expects a numeric operand',
+    );
+    return value as NumberValue;
   }
 
   List<FieldValue> _decodeArrayTransformElements(

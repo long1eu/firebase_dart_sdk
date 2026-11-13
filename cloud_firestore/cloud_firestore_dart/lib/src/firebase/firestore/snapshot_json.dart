@@ -28,6 +28,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_metada
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundle_serializer.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/bundled_document_metadata.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/bundle/named_query.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/core/order_by.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart'
     as core;
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/view_snapshot.dart';
@@ -40,6 +41,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/model/document.dart'
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_key.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/document_set.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/query_snapshot.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_serializer.dart';
@@ -181,6 +183,10 @@ QuerySnapshot<T> querySnapshotFromJson<T>(
 
   DocumentSet documents = DocumentSet.emptySet(query.comparator);
   for (final Document document in bundle.documents) {
+    // PORTING NOTE: the JS SDK sorts the documents without this check, and fails an internal assertion of the
+    // comparator for a document that lacks a field the query orders by. The JSON is untrusted input: such a bundle is
+    // invalid.
+    _checkOrderByFields(query, document);
     documents = documents.add(document);
   }
   final ViewSnapshot snapshot = ViewSnapshot.fromInitialDocuments(
@@ -197,6 +203,19 @@ QuerySnapshot<T> querySnapshotFromJson<T>(
     snapshot,
     firestore,
   );
+}
+
+/// Throws a [FirestoreError] if [document] lacks a field that [query] orders by: it cannot be among the results.
+void _checkOrderByFields(core.Query query, Document document) {
+  for (final OrderBy orderBy in query.orderByConstraints) {
+    if (!orderBy.field.isKeyField && document.getField(orderBy.field) == null) {
+      throw FirestoreError(
+        'The bundle holds the document ${document.key.path}, which has no field ${orderBy.field} to order the '
+        'query by.',
+        FirestoreErrorCode.invalidArgument,
+      );
+    }
+  }
 }
 
 /// Loads the bundle of a [DocumentSnapshot.toJson] result and listens to the document from there.
@@ -303,7 +322,17 @@ Stream<S> _resume<S>(
 }
 
 DocumentKey _documentKey(String path) {
-  final ResourcePath resourcePath = ResourcePath.fromString(path);
+  final ResourcePath resourcePath;
+  try {
+    resourcePath = ResourcePath.fromString(path);
+  } on ArgumentError catch (e) {
+    // The JS ResourcePath.fromString() throws a FirestoreError (invalid-argument) itself.
+    throw FirestoreError(
+      "The JSON field 'bundleName' must be a document path, but was '$path': ${e.message}",
+      FirestoreErrorCode.invalidArgument,
+      e,
+    );
+  }
   if (resourcePath.length == 0 || !DocumentKey.isDocumentKey(resourcePath)) {
     throw FirestoreError(
       "The JSON field 'bundleName' must be a document path, but was '$path'.",
@@ -450,7 +479,7 @@ class _ParsedBundle {
         position = end;
         if (element is! Map<String, dynamic>) {
           throw FormatException(
-            'Cannot decode unknown Bundle element: ${_excerpt('$element')}',
+            'Cannot decode unknown Bundle element: ${_describe(element)}',
           );
         }
 
@@ -461,28 +490,29 @@ class _ParsedBundle {
             );
           }
           final BundleMetadata _ = serializer.decodeBundleMetadata(
-            element['metadata'] as Map<String, dynamic>,
+            _object(element, 'metadata'),
           );
           first = false;
         } else if (element.containsKey('namedQuery')) {
           queries.add(
-            serializer.decodeNamedQuery(
-              element['namedQuery'] as Map<String, dynamic>,
-            ),
+            serializer.decodeNamedQuery(_object(element, 'namedQuery')),
           );
         } else if (element.containsKey('documentMetadata')) {
           final BundledDocumentMetadata _ = serializer
               .decodeBundledDocumentMetadata(
-                element['documentMetadata'] as Map<String, dynamic>,
+                _object(element, 'documentMetadata'),
               );
         } else if (element.containsKey('document')) {
           final BundleDocument document = serializer.decodeDocument(
-            element['document'] as Map<String, dynamic>,
+            _object(element, 'document'),
           );
+          // The fields are decoded lazily: decode them here, so that a malformed one is reported as an invalid
+          // bundle.
+          final ObjectValue _ = document.document.data;
           documents.add(document.document);
         } else {
           throw FormatException(
-            'Cannot decode unknown Bundle element: ${_excerpt('$element')}',
+            'Cannot decode unknown Bundle element: ${_describe(element)}',
           );
         }
       }
@@ -493,12 +523,13 @@ class _ParsedBundle {
       }
     } on FirestoreError {
       rethrow;
-    } on Object catch (e) {
+    } on Object catch (e, stackTrace) {
       // The error may repeat the input, which can be megabytes long.
       throw FirestoreError(
         'Invalid snapshot bundle: ${_excerpt('$e')}',
         FirestoreErrorCode.invalidArgument,
         e,
+        stackTrace,
       );
     }
     return _ParsedBundle(queries, documents);
@@ -513,4 +544,27 @@ class _ParsedBundle {
 
   final List<NamedQuery> queries;
   final List<Document> documents;
+
+  static Map<String, dynamic> _object(
+    Map<String, dynamic> element,
+    String key,
+  ) {
+    final Object? value = element[key];
+    if (value is! Map<String, dynamic>) {
+      throw FormatException('"$key" must be a JSON object');
+    }
+    return value;
+  }
+
+  /// [element] for error messages: printing all of its JSON could take megabytes, or overflow the stack for a deeply
+  /// nested one.
+  static String _describe(Object? element) {
+    if (element is Map) {
+      return 'a JSON object with the fields [${element.keys.take(10).join(', ')}]';
+    }
+    if (element is List) {
+      return 'a JSON array of ${element.length} elements';
+    }
+    return _excerpt('$element');
+  }
 }
