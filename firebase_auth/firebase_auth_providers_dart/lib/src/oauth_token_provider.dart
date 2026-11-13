@@ -125,6 +125,7 @@ class OAuthTokenProvider implements InternalTokenProvider {
     final Uint8List signature = signRs256(
       ascii.encode(input),
       n: key.n,
+      e: key.e,
       p: key.p,
       q: key.q,
       dmp1: key.dmp1,

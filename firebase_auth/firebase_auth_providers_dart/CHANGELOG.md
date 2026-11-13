@@ -1,3 +1,13 @@
+## Unreleased
+
+- `FirebaseUserAuth`: the emulator host is checked like the Firestore host. User info, a path,
+  a query, a bad port and Google hosts throw an `ArgumentError`. `http://` and `https://` URLs are
+  accepted as `connectAuthEmulator` takes them, and an emulator off the loopback interface logs a
+  warning.
+- The RS256 signer of service accounts blinds the message and verifies the signature before using
+  it.
+- Documented that the stored refresh token is a credential and how to protect the `AuthStorage`.
+
 ## 0.1.0
 
 First version. Not published yet.

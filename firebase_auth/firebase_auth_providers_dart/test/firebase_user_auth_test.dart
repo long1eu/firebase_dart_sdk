@@ -192,6 +192,102 @@ void main() {
         'http://127.0.0.1:9099/securetoken.googleapis.com/v1/token?key=$apiKey',
       ]);
     });
+
+    test(
+      'the emulator host may name its scheme, like connectAuthEmulator',
+      () async {
+        for (final (String given, String origin) in <(String, String)>[
+          ('localhost:9099', 'http://localhost:9099'),
+          ('http://127.0.0.1:9099/', 'http://127.0.0.1:9099'),
+          ('HTTPS://auth.internal:8443', 'https://auth.internal:8443'),
+          ('[::1]:9099', 'http://[::1]:9099'),
+          ('auth-emulator', 'http://auth-emulator'),
+        ]) {
+          requests.clear();
+          await auth.dispose();
+          auth = create(emulatorHost: given);
+          await auth.signInAnonymously();
+          expect(
+            requests.single.url.toString(),
+            '$origin/identitytoolkit.googleapis.com/v1/accounts:signUp?key=$apiKey',
+            reason: given,
+          );
+        }
+      },
+    );
+
+    test('an emulator host that is not host:port is refused', () {
+      for (final String host in <String>[
+        '',
+        'user@127.0.0.1:9099',
+        '127.0.0.1:9099/path',
+        '127.0.0.1:9099?x=1',
+        '127.0.0.1:9099#x',
+        'ftp://127.0.0.1:9099',
+        '127.0.0.1 :9099',
+        r'127.0.0.1\x',
+        '127.0.0.1:0',
+        '127.0.0.1:65536',
+        '127.0.0.1:port',
+        '::1:9099',
+        '[::1',
+        '[::1]9099',
+      ]) {
+        expect(
+          () => create(emulatorHost: host),
+          throwsA(isA<ArgumentError>()),
+          reason: host,
+        );
+      }
+    });
+
+    test('a Google host is never taken for an emulator', () {
+      for (final String host in <String>[
+        'identitytoolkit.googleapis.com',
+        'securetoken.googleapis.com:443',
+        'https://identitytoolkit.googleapis.com',
+        'IdentityToolkit.GoogleApis.com.',
+        'googleapis.com',
+        'www.google.com',
+      ]) {
+        expect(
+          () => create(emulatorHost: host),
+          throwsA(
+            isA<ArgumentError>().having(
+              (ArgumentError e) => '${e.message}',
+              'message',
+              contains('not an emulator'),
+            ),
+          ),
+          reason: host,
+        );
+      }
+    });
+
+    test('an emulator off the loopback interface is logged as a warning', () {
+      final List<String> printed = <String>[];
+      runZoned(
+        () {
+          create(emulatorHost: '127.0.0.1:9099');
+          create(emulatorHost: 'localhost:9099');
+          create(emulatorHost: '[::1]:9099');
+          expect(printed, isEmpty);
+          create(emulatorHost: '10.0.0.5:9099');
+        },
+        zoneSpecification: ZoneSpecification(
+          print: (Zone self, ZoneDelegate parent, Zone zone, String line) =>
+              printed.add(line),
+        ),
+      );
+      expect(printed, hasLength(1));
+      expect(
+        printed.single,
+        allOf(
+          contains('http://10.0.0.5:9099'),
+          contains('Do not use with production credentials'),
+        ),
+      );
+    });
   });
 
   group('tokens', () {

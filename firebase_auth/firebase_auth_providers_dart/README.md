@@ -112,8 +112,20 @@ final auth = await FirebaseUserAuth.forApp(app, storage: FileAuthStorage());
 // auth.currentUser is the user of the last run, if there was one.
 ```
 
-The stored value is a credential (whoever has it is that user): keep it where the platform keeps
-secrets. The ID token is not stored.
+**The stored value is a credential.** It is the refresh token, which does not expire: whoever
+reads it can act as that user until the user signs out, the account is disabled or the token is
+revoked. Keep it where the platform keeps secrets, never in plain preferences or a
+world-readable file:
+
+- Flutter (iOS, Android, macOS, Windows, Linux): a secure storage plugin such as
+  `flutter_secure_storage` (Keychain, Android Keystore, Windows Credential Manager, libsecret).
+- Command line tools and servers: the system keychain or secret service, or a file only its
+  owner can read (mode 0600, in a directory with mode 0700).
+- The web: `localStorage` and IndexedDB are readable by every script of the origin (one
+  cross-site scripting flaw gives the session away). Prefer the default in-memory storage or
+  `sessionStorage`, with a strict Content Security Policy.
+
+The ID token is not stored. `signOut()` removes the stored value.
 
 ### The Auth emulator
 
@@ -123,9 +135,18 @@ final auth = await FirebaseUserAuth.forApp(app,
 // or emulatorHost: '127.0.0.1:9099'
 ```
 
-With an emulator host every request goes to the emulator. The variable is not read implicitly:
-without the argument the real service is used. On the web there is no environment, so
+With an emulator host every request goes to the emulator, over plain HTTP: passwords, custom
+tokens and refresh tokens travel unencrypted. The variable is not read implicitly: without the
+argument the real service is used, so a `FIREBASE_AUTH_EMULATOR_HOST` left set on a production
+machine changes nothing unless the code passes it on. On the web there is no environment, so
 `emulatorHostFromEnvironment` is null there.
+
+The host is checked like the host of the Firestore settings: `host:port`, `[ipv6]:port`, or a URL
+with `http://` or `https://` as `connectAuthEmulator` of the JS SDK takes it (`https://` uses
+TLS); user info, a path, a query or a bad port throw an `ArgumentError`, and so does a Google
+host (`*.googleapis.com`, `*.google.com`), which is never an emulator. An emulator that is not on
+the loopback interface (`localhost`, `127.x.x.x`, `[::1]`) is allowed (a container, another
+machine on a test network) but logs a warning, like the JS SDK does for every emulator.
 
 ## A server: service account or Application Default Credentials
 
@@ -159,6 +180,13 @@ final firestore = Firestore.instanceFor(app: app);
 - The access token is fetched when it is first needed and replaced five minutes before it
   expires. The private key never leaves the process: it signs a short-lived assertion that is
   exchanged for the token (JWT bearer flow).
+- The RS256 signature is computed in pure Dart (it also runs on the web); no vetted RSA library
+  is in the dependency tree (`pointycastle` is not a dependency, and the signer of
+  `googleapis_auth` is the same computation). It blinds the message and verifies every signature
+  with the public key before using it, which defeats the timing and fault attacks on the CRT
+  step that matter here. Dart's `BigInt` is not constant time and the key sits in ordinary
+  memory: where a key needs a managed or hardware boundary, use Application Default Credentials
+  (or IAM `signBlob`) instead of a key file.
 - `OAuthTokenProvider.serviceAccount` is in the main library and has no `dart:io` dependency;
   `applicationDefaultCredentials()` is in `adc.dart` because the lookup reads the environment and
   files.

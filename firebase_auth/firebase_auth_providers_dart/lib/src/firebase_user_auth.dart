@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
+import 'package:firebase_app_dart/internal.dart' show Log;
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 
@@ -40,7 +41,12 @@ class FirebaseUserAuth implements InternalTokenProvider {
   ///
   /// * [storage] keeps the session; [storageKey] is the key it is stored under (by default derived from the API
   ///   key, so that two projects do not share a session).
-  /// * [emulatorHost] (`host:port`) sends every request to the Firebase Auth emulator instead of Google. See
+  /// * [emulatorHost] (`host:port`) sends every request to the Firebase Auth emulator instead of Google, over plain
+  ///   HTTP (or over HTTPS when given as `https://host:port`, like the URL of `connectAuthEmulator` in the JS SDK).
+  ///   It is checked like the host of the Firestore settings: an [ArgumentError] is thrown for anything with user
+  ///   info, a path, a query or a bad port, and for a Google host (`*.googleapis.com`, `*.google.com`), which is
+  ///   never an emulator. An emulator that is not on the loopback interface gets a warning in the log, like the
+  ///   JS SDK warns for every emulator: passwords and tokens travel unencrypted to it. See
   ///   [emulatorHostFromEnvironment].
   /// * [httpClient] is used for all requests and is not closed by [dispose]; without it one is created and closed.
   /// * [clock] and [createTimer] are for tests.
@@ -52,7 +58,10 @@ class FirebaseUserAuth implements InternalTokenProvider {
     http.Client? httpClient,
     DateTime Function()? clock,
     Timer Function(Duration delay, void Function() callback)? createTimer,
-  }) : _storage = storage ?? InMemoryAuthStorage(),
+  }) : _emulatorOrigin = emulatorHost == null
+           ? null
+           : _emulatorOriginOf(emulatorHost),
+       _storage = storage ?? InMemoryAuthStorage(),
        _storageKey = storageKey ?? 'firebase_auth_providers_dart:$apiKey',
        _http = httpClient ?? http.Client(),
        _ownsHttp = httpClient == null,
@@ -100,6 +109,104 @@ class FirebaseUserAuth implements InternalTokenProvider {
 
   /// The `host:port` of the Auth emulator, or null for the real service.
   final String? emulatorHost;
+
+  /// `http://host:port` (or `https://...`) of the Auth emulator, checked; null for the real service.
+  final String? _emulatorOrigin;
+
+  static final RegExp _notAuthorityCharacters = RegExp(r'[/@?#\\\s]');
+  static final RegExp _scheme = RegExp(r'^(https?)://', caseSensitive: false);
+
+  /// Checks [value], the `host:port` (optionally with an `http://` or `https://` scheme and a trailing `/`) of an
+  /// Auth emulator, and returns the origin the requests go to.
+  static String _emulatorOriginOf(String value) {
+    Never invalid(String why) =>
+        throw ArgumentError.value(value, 'emulatorHost', why);
+    String authority = value.trim();
+    String scheme = 'http';
+    final RegExpMatch? match = _scheme.firstMatch(authority);
+    if (match != null) {
+      scheme = match.group(1)!.toLowerCase();
+      authority = authority.substring(match.end);
+    }
+    if (authority.endsWith('/')) {
+      authority = authority.substring(0, authority.length - 1);
+    }
+    if (authority.isEmpty || _notAuthorityCharacters.hasMatch(authority)) {
+      invalid(
+        'Must be host:port (or http://host:port), without user info, path or query',
+      );
+    }
+    final String host;
+    String? port;
+    if (authority.startsWith('[')) {
+      // An IPv6 address: [::1]:9099.
+      final int end = authority.indexOf(']');
+      if (end < 0) {
+        invalid('The IPv6 address is not closed with "]"');
+      }
+      host = authority.substring(0, end + 1);
+      final String rest = authority.substring(end + 1);
+      if (rest.isNotEmpty) {
+        if (!rest.startsWith(':')) {
+          invalid('Must be host:port');
+        }
+        port = rest.substring(1);
+      }
+    } else {
+      final List<String> parts = authority.split(':');
+      if (parts.length > 2) {
+        invalid('Must be host:port (an IPv6 address goes in brackets)');
+      }
+      host = parts[0];
+      port = parts.length == 2 ? parts[1] : null;
+    }
+    if (host.isEmpty || host == '[]') {
+      invalid('The host is empty');
+    }
+    if (port != null) {
+      final int? number = int.tryParse(port);
+      if (number == null || number < 1 || number > 65535) {
+        invalid('The port must be a number from 1 to 65535');
+      }
+    }
+    String normalized = host.toLowerCase();
+    while (normalized.endsWith('.')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    if (normalized == 'googleapis.com' ||
+        normalized.endsWith('.googleapis.com') ||
+        normalized == 'google.com' ||
+        normalized.endsWith('.google.com')) {
+      invalid(
+        'A Google host is not an emulator: requests to the emulator carry passwords and tokens without the '
+        'protection of the real service',
+      );
+    }
+    if (!_isLoopback(normalized)) {
+      Log.w(
+        'FirebaseUserAuth',
+        'WARNING: You are using the Auth Emulator at $scheme://$authority, which is intended for local testing '
+            'only. Do not use with production credentials.',
+      );
+    }
+    return '$scheme://$authority';
+  }
+
+  static bool _isLoopback(String host) {
+    if (host == 'localhost' || host.endsWith('.localhost')) {
+      return true;
+    }
+    if (host == '[::1]') {
+      return true;
+    }
+    final List<String> octets = host.split('.');
+    return octets.length == 4 &&
+        octets[0] == '127' &&
+        octets.every((String o) {
+          final int? n = int.tryParse(o);
+          return n != null && n >= 0 && n <= 255;
+        });
+  }
 
   final AuthStorage _storage;
   final String _storageKey;
@@ -264,7 +371,7 @@ class FirebaseUserAuth implements InternalTokenProvider {
   }
 
   Uri _identityToolkit(String method) {
-    final String? emulator = emulatorHost;
+    final String? emulator = _emulatorOrigin;
     return emulator == null
         ? Uri.https(
             'identitytoolkit.googleapis.com',
@@ -272,18 +379,18 @@ class FirebaseUserAuth implements InternalTokenProvider {
             <String, String>{'key': apiKey},
           )
         : Uri.parse(
-            'http://$emulator/identitytoolkit.googleapis.com/v1/$method?key=${Uri.encodeQueryComponent(apiKey)}',
+            '$emulator/identitytoolkit.googleapis.com/v1/$method?key=${Uri.encodeQueryComponent(apiKey)}',
           );
   }
 
   Uri get _secureToken {
-    final String? emulator = emulatorHost;
+    final String? emulator = _emulatorOrigin;
     return emulator == null
         ? Uri.https('securetoken.googleapis.com', '/v1/token', <String, String>{
             'key': apiKey,
           })
         : Uri.parse(
-            'http://$emulator/securetoken.googleapis.com/v1/token?key=${Uri.encodeQueryComponent(apiKey)}',
+            '$emulator/securetoken.googleapis.com/v1/token?key=${Uri.encodeQueryComponent(apiKey)}',
           );
   }
 
