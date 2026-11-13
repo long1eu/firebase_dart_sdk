@@ -8,77 +8,123 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/serial_queue.da
 import 'package:test/test.dart';
 
 void main() {
-  test('runs operations one at a time, in the order they were requested',
-      () async {
-    final SerialQueue queue = SerialQueue();
-    final List<String> events = <String>[];
+  test(
+    'runs operations one at a time, in the order they were requested',
+    () async {
+      final SerialQueue queue = SerialQueue();
+      final List<String> events = <String>[];
 
-    Future<void> task(String name, int millis) => queue.run<void>(() async {
-          events.add('$name:start');
-          await Future<void>.delayed(Duration(milliseconds: millis));
-          events.add('$name:end');
-        });
+      Future<void> task(String name, int millis) => queue.run<void>(() async {
+        events.add('$name:start');
+        await Future<void>.delayed(Duration(milliseconds: millis));
+        events.add('$name:end');
+      });
 
-    await Future.wait(
-        <Future<void>>[task('a', 30), task('b', 1), task('c', 1)]);
+      await Future.wait(<Future<void>>[
+        task('a', 30),
+        task('b', 1),
+        task('c', 1),
+      ]);
 
-    expect(events,
-        <String>['a:start', 'a:end', 'b:start', 'b:end', 'c:start', 'c:end']);
-  });
+      expect(events, <String>[
+        'a:start',
+        'a:end',
+        'b:start',
+        'b:end',
+        'c:start',
+        'c:end',
+      ]);
+    },
+  );
 
   test('a failing operation does not block the ones behind it', () async {
     final SerialQueue queue = SerialQueue();
 
-    final Future<void> failing =
-        queue.run<void>(() async => throw StateError('boom'));
+    final Future<void> failing = queue.run<void>(
+      () async => throw StateError('boom'),
+    );
     final Future<int> next = queue.run<int>(() async => 42);
 
     await expectLater(failing, throwsStateError);
     expect(await next, 42);
   });
 
-  test('a task running on the queue can call run again without deadlocking',
-      () async {
-    final SerialQueue queue = SerialQueue();
-    final List<String> events = <String>[];
+  test(
+    'a task running on the queue can call run again without deadlocking',
+    () async {
+      final SerialQueue queue = SerialQueue();
+      final List<String> events = <String>[];
 
-    await queue.run<void>(() async {
-      events.add('outer:start');
-      await Future<void>.delayed(const Duration(milliseconds: 5));
-      await queue.run<void>(() async => events.add('inner'));
-      events.add('outer:end');
-    }).timeout(const Duration(seconds: 2));
+      await queue
+          .run<void>(() async {
+            events.add('outer:start');
+            await Future<void>.delayed(const Duration(milliseconds: 5));
+            await queue.run<void>(() async => events.add('inner'));
+            events.add('outer:end');
+          })
+          .timeout(const Duration(seconds: 2));
 
-    expect(events, <String>['outer:start', 'inner', 'outer:end']);
-  });
+      expect(events, <String>['outer:start', 'inner', 'outer:end']);
+    },
+  );
 
-  test('work that outlives its task is queued again instead of running inline',
-      () async {
-    final SerialQueue queue = SerialQueue();
-    final List<String> events = <String>[];
-    final Completer<void> release = Completer<void>();
-    late Future<void> leaked;
+  test(
+    'work that outlives its task is queued again instead of running inline',
+    () async {
+      final SerialQueue queue = SerialQueue();
+      final List<String> events = <String>[];
+      final Completer<void> release = Completer<void>();
+      late Future<void> leaked;
 
-    final Future<void> first = queue.run<void>(() async {
-      // Continues after the task completed, like a timer started by the task.
-      leaked = release.future.then((_) => queue.run<void>(() async {
+      final Future<void> first = queue.run<void>(() async {
+        // Continues after the task completed, like a timer started by the task.
+        leaked = release.future.then(
+          (_) => queue.run<void>(() async {
             events.add('leaked:start');
             await Future<void>.delayed(const Duration(milliseconds: 20));
             events.add('leaked:end');
-          }));
-    });
-    await first;
+          }),
+        );
+      });
+      await first;
 
-    final Future<void> second = queue.run<void>(() async {
-      events.add('second:start');
-      release.complete();
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-      events.add('second:end');
-    });
+      final Future<void> second = queue.run<void>(() async {
+        events.add('second:start');
+        release.complete();
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        events.add('second:end');
+      });
 
-    await Future.wait(<Future<void>>[second, leaked]);
+      await Future.wait(<Future<void>>[second, leaked]);
 
-    expect(events,
-        <String>['second:start', 'second:end', 'leaked:start', 'leaked:end']);
-  });
+      expect(events, <String>[
+        'second:start',
+        'second:end',
+        'leaked:start',
+        'leaked:end',
+      ]);
+    },
+  );
+
+  // JS SDK test/unit/util/async_queue.test.ts cases whose JS AsyncQueue
+  // semantics differ from SerialQueue. The delayed operation cases are ported
+  // against TaskScheduler in util/task_scheduler_test.dart.
+  test(
+    'schedules ops in right order',
+    skip:
+        'SerialQueue runs a run() call made from the running task inline '
+        '(see "a task running on the queue can call run again without '
+        'deadlocking"); the JS AsyncQueue queues it after the current '
+        'operation, so "Bye for good." is pushed before "Welcome back."',
+    () {},
+  );
+
+  test(
+    'handles failures',
+    skip:
+        'SerialQueue keeps running operations after one fails (see "a '
+        'failing operation does not block the ones behind it"); the JS '
+        'AsyncQueue enters a failed state and rejects every later operation',
+    () {},
+  );
 }

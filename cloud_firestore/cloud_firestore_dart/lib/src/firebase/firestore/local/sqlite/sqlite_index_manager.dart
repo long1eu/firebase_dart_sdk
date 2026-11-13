@@ -270,12 +270,13 @@ class SqliteIndexManager extends IndexManager {
     SplayTreeSet<IndexEntry> newEntries,
   ) async {
     Log.d(_tag, 'Updating index entries for document \'$key\'');
-    for (final IndexEntry entry in newEntries.difference(existingEntries)) {
-      await _addIndexEntry(key, entry);
-    }
-    for (final IndexEntry entry in existingEntries.difference(newEntries)) {
-      await _deleteIndexEntry(key, entry);
-    }
+    await diffCollections(
+      existingEntries,
+      newEntries,
+      (IndexEntry left, IndexEntry right) => left.compareTo(right),
+      (IndexEntry entry) => _addIndexEntry(key, entry),
+      (IndexEntry entry) => _deleteIndexEntry(key, entry),
+    );
   }
 
   @override

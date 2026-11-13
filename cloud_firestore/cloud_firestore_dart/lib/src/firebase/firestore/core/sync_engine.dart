@@ -706,7 +706,6 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
     }
   }
 
-  // TODO(long1eu): implement getRemoteKeysForTarget
   @override
   ImmutableSortedSet<DocumentKey> Function(int targetId)
   get getRemoteKeysForTarget {
@@ -722,9 +721,7 @@ class SyncEngine implements RemoteStoreCallback, SharedClientStateSyncer {
           for (Query query in targetQueries) {
             final QueryView? queryView = _queryViewsByQuery[query];
             if (queryView != null) {
-              for (DocumentKey key in queryView.view.syncedDocuments) {
-                remoteKeys = remoteKeys.insert(key);
-              }
+              remoteKeys = remoteKeys.unionWith(queryView.view.syncedDocuments);
             }
           }
         }

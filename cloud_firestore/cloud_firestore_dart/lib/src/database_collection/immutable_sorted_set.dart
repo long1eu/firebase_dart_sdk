@@ -35,6 +35,21 @@ class ImmutableSortedSet<T> extends Iterable<T> {
     return ImmutableSortedSet<T>._(_map.insert(entry, null));
   }
 
+  /// Returns a set with the elements of this set and of [other].
+  ImmutableSortedSet<T> unionWith(ImmutableSortedSet<T> other) {
+    ImmutableSortedSet<T> result = this;
+    ImmutableSortedSet<T> smaller = other;
+    // Make sure `result` always refers to the larger one of the two sets.
+    if (result.length < smaller.length) {
+      result = other;
+      smaller = this;
+    }
+    for (final T element in smaller) {
+      result = result.insert(element);
+    }
+    return result;
+  }
+
   T? get minEntry => _map.minKey;
 
   T? get maxEntry => _map.maxKey;

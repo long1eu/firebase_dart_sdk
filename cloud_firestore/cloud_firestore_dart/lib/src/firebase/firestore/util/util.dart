@@ -100,6 +100,60 @@ int _compare(dynamic a, dynamic b) => (a as Comparable<dynamic>).compareTo(b);
 
 Comparator<T> comparator<T extends Comparable<T>>() => _compare;
 
+/// Compares [before] and [after] using [comparator], which defines equality between elements. Invokes [onAdd] for
+/// every element that is in [after] but not in [before], and [onRemove] for every element that is in [before] but
+/// not in [after]. The callbacks run one at a time, in the order defined by [comparator].
+///
+/// Sorts copies of both collections, so it runs in O(n log n), where n is the size of the two collections.
+Future<void> diffCollections<T>(
+  Iterable<T> before,
+  Iterable<T> after,
+  Comparator<T> comparator,
+  FutureOr<void> Function(T element) onAdd,
+  FutureOr<void> Function(T element) onRemove,
+) async {
+  final Iterator<T> beforeSorted = (before.toList()..sort(comparator)).iterator;
+  final Iterator<T> afterSorted = (after.toList()..sort(comparator)).iterator;
+  bool hasBefore = beforeSorted.moveNext();
+  bool hasAfter = afterSorted.moveNext();
+
+  // Walk through the two collections at the same time, using the ordering defined by [comparator].
+  while (hasBefore || hasAfter) {
+    final int cmp;
+    if (!hasBefore) {
+      cmp = 1;
+    } else if (!hasAfter) {
+      cmp = -1;
+    } else {
+      cmp = comparator(beforeSorted.current, afterSorted.current);
+    }
+    if (cmp > 0) {
+      // The element was added if the next element in the ordered walk is only in [after].
+      await onAdd(afterSorted.current);
+      hasAfter = afterSorted.moveNext();
+    } else if (cmp < 0) {
+      // The element was removed if the next element in the ordered walk is only in [before].
+      await onRemove(beforeSorted.current);
+      hasBefore = beforeSorted.moveNext();
+    } else {
+      hasBefore = beforeSorted.moveNext();
+      hasAfter = afterSorted.moveNext();
+    }
+  }
+}
+
+/// Returns a map with the first [n] entries of [data] when sorted by [comparator] applied to the values.
+Map<K, V> firstNEntries<K, V>(Map<K, V> data, int n, Comparator<V> comparator) {
+  if (data.length <= n) {
+    return data;
+  }
+  final List<MapEntry<K, V>> sortedValues = data.entries.toList()
+    ..sort(
+      (MapEntry<K, V> l, MapEntry<K, V> r) => comparator(l.value, r.value),
+    );
+  return Map<K, V>.fromEntries(sortedValues.take(n));
+}
+
 /// Describes the type of an object, handling null objects gracefully.
 String typeName(Object? value) {
   return value == null ? 'null' : '${value.runtimeType}';

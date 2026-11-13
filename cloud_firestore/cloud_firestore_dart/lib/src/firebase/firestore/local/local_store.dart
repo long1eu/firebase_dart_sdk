@@ -3,7 +3,6 @@
 // on 23/09/2018
 
 import 'dart:async';
-import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore_dart/src/database_collection/database_collection.dart';
@@ -51,6 +50,7 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_event.
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/remote_store.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/remote/target_change.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/util/assert.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/util/util.dart';
 import 'package:cloud_firestore_dart/src/firebase/timestamp.dart';
 import 'package:firebase_app_dart/internal.dart';
 
@@ -246,24 +246,16 @@ class LocalStore implements BundleCallback {
   /// Makes [newFieldIndexes] the configured field indexes: the indexes that are not in the list are deleted with
   /// their entries, the ones that are new are added (and filled by the index backfiller), the others are kept.
   Future<void> configureFieldIndexes(List<FieldIndex> newFieldIndexes) {
-    return _persistence.runTransaction('Configure indexes', () async {
-      final SplayTreeSet<FieldIndex> existing = SplayTreeSet<FieldIndex>(
+    return _persistence.runTransaction(
+      'Configure indexes',
+      () => diffCollections(
+        _indexManager.getFieldIndexes(),
+        newFieldIndexes,
         FieldIndex.semanticCompare,
-      )..addAll(_indexManager.getFieldIndexes());
-      final SplayTreeSet<FieldIndex> wanted = SplayTreeSet<FieldIndex>(
-        FieldIndex.semanticCompare,
-      )..addAll(newFieldIndexes);
-      for (final FieldIndex index in existing) {
-        if (!wanted.contains(index)) {
-          await _indexManager.deleteFieldIndex(index);
-        }
-      }
-      for (final FieldIndex index in wanted) {
-        if (!existing.contains(index)) {
-          await _indexManager.addFieldIndex(index);
-        }
-      }
-    });
+        _indexManager.addFieldIndex,
+        _indexManager.deleteFieldIndex,
+      ),
+    );
   }
 
   /// Removes all field indexes and their entries.

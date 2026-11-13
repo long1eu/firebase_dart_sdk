@@ -211,16 +211,10 @@ class SQLiteRemoteDocumentCache implements RemoteDocumentCache {
           ),
         );
       }
-      // The first [limit] entries, by read time and key.
-      final List<MapEntry<DocumentKey, ReadDocument>> entries =
-          results.entries.toList()..sort((
-            MapEntry<DocumentKey, ReadDocument> l,
-            MapEntry<DocumentKey, ReadDocument> r,
-          ) {
-            final int cmp = l.value.readTime.compareTo(r.value.readTime);
-            return cmp != 0 ? cmp : l.key.compareTo(r.key);
-          });
-      return Map<DocumentKey, ReadDocument>.fromEntries(entries.take(limit));
+      return firstNEntries(results, limit, (ReadDocument l, ReadDocument r) {
+        final int cmp = l.readTime.compareTo(r.readTime);
+        return cmp != 0 ? cmp : l.document.key.compareTo(r.document.key);
+      });
     }
   }
 

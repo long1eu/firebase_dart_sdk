@@ -24,12 +24,18 @@ void main() {
     test('builds the message once and throws an AssertionError', () {
       int calls = 0;
       expect(
-          () => hardAssertLazy(false, () {
-                calls++;
-                return 'failed with ${42}';
-              }),
-          throwsA(isA<AssertionError>().having(
-              (AssertionError e) => e.message, 'message', 'failed with 42')));
+        () => hardAssertLazy(false, () {
+          calls++;
+          return 'failed with ${42}';
+        }),
+        throwsA(
+          isA<AssertionError>().having(
+            (AssertionError e) => e.message,
+            'message',
+            'failed with 42',
+          ),
+        ),
+      );
       expect(calls, 1);
       // Same error type and format as hardAssert.
       Object? eager;
@@ -113,8 +119,11 @@ void main() {
 
       for (final String a in values) {
         for (final String b in values) {
-          expect(sign(compareUtf8Strings(a, b)), sign(bytes(a, b)),
-              reason: 'comparing ${a.codeUnits} and ${b.codeUnits}');
+          expect(
+            sign(compareUtf8Strings(a, b)),
+            sign(bytes(a, b)),
+            reason: 'comparing ${a.codeUnits} and ${b.codeUnits}',
+          );
         }
       }
     });
@@ -125,8 +134,9 @@ void main() {
     expect('00ff', toDebugString(blob(<int>[0, 0xFF]).bytes));
     expect('1f3b', toDebugString(blob(<int>[0x1F, 0x3B]).bytes));
     expect(
-        '000102030405060708090a0b0c0d0e0f',
-        toDebugString(blob(<int>[
+      '000102030405060708090a0b0c0d0e0f',
+      toDebugString(
+        blob(<int>[
           0,
           1,
           2,
@@ -142,7 +152,99 @@ void main() {
           0xC,
           0xD,
           0xE,
-          0xF
-        ]).bytes));
+          0xF,
+        ]).bytes,
+      ),
+    );
+  });
+
+  Future<void> validateDiffCollection(
+    List<String> before,
+    List<String> after,
+  ) async {
+    final List<String> result = List<String>.of(before);
+    await diffCollections(
+      before,
+      after,
+      (String l, String r) => l.compareTo(r),
+      result.add,
+      result.remove,
+    );
+    expect(result, unorderedEquals(after));
+  }
+
+  test('testDiffCollectionsWithMissingElement', () async {
+    await validateDiffCollection(<String>['a', 'b', 'c'], <String>['a', 'b']);
+  });
+
+  test('testDiffCollectionsWithAddedElement', () async {
+    await validateDiffCollection(<String>['a', 'b'], <String>['a', 'b', 'c']);
+  });
+
+  test('testDiffCollectionsWithoutOrdering', () async {
+    await validateDiffCollection(<String>['b', 'a'], <String>['a', 'b']);
+  });
+
+  test('testDiffCollectionsWithEmptyLists', () async {
+    await validateDiffCollection(<String>['a'], <String>[]);
+    await validateDiffCollection(<String>[], <String>['a']);
+    await validateDiffCollection(<String>[], <String>[]);
+  });
+
+  test('testFirstNEntries', () {
+    Map<int, int> data = <int, int>{1: 1, 3: 3, 2: 2};
+    data = firstNEntries(data, 2, (int l, int r) => l.compareTo(r));
+    expect(data, <int, int>{1: 1, 2: 2});
+  });
+
+  // Port of the JS SDK test/unit/util/array.test.ts: diffArrays is
+  // Util.diffCollections in the port.
+  group('diffArrays', () {
+    Future<void> validateDiffArray(
+      List<String> before,
+      List<String> after,
+    ) async {
+      final Set<String> result = Set<String>.of(before);
+      await diffCollections(
+        before,
+        after,
+        (String a, String b) => a.compareTo(b),
+        (String v) {
+          expect(before, isNot(contains(v)));
+          expect(after, contains(v));
+          result.add(v);
+        },
+        (String v) {
+          expect(before, contains(v));
+          expect(after, isNot(contains(v)));
+          result.remove(v);
+        },
+      );
+      expect(result.length, after.length);
+      for (final String v in after) {
+        expect(result, contains(v));
+      }
+    }
+
+    test('Missing Element', () async {
+      await validateDiffArray(<String>['a', 'b', 'c'], <String>['a', 'b']);
+      await validateDiffArray(<String>['a', 'b', 'c', 'd'], <String>['a', 'b']);
+    });
+
+    test('AddedElement', () async {
+      await validateDiffArray(<String>['a', 'b'], <String>['a', 'b', 'c']);
+      await validateDiffArray(<String>['a', 'b'], <String>['a', 'b', 'c', 'd']);
+    });
+
+    test('Without Ordering', () async {
+      await validateDiffArray(<String>['a', 'b'], <String>['b', 'a']);
+      await validateDiffArray(<String>['a', 'b', 'c'], <String>['c', 'b', 'a']);
+    });
+
+    test('Empty Lists', () async {
+      await validateDiffArray(<String>['a'], <String>[]);
+      await validateDiffArray(<String>[], <String>['a']);
+      await validateDiffArray(<String>[], <String>[]);
+    });
   });
 }

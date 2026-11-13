@@ -45,9 +45,11 @@ String signName(int value) {
 }
 
 class StringGenerator {
-  StringGenerator(int seed,
-      {this.surrogatePairProbability = 0.33, this.maxLength = 20})
-      : rnd = Random(seed);
+  StringGenerator(
+    int seed, {
+    this.surrogatePairProbability = 0.33,
+    this.maxLength = 20,
+  }) : rnd = Random(seed);
 
   static const int minHighSurrogate = 0xD800;
   static const int maxHighSurrogate = 0xDBFF;
@@ -91,7 +93,9 @@ class StringGenerator {
         rnd.nextInt(maxHighSurrogate - minHighSurrogate + 1) + minHighSurrogate;
     final int low =
         rnd.nextInt(maxLowSurrogate - minLowSurrogate + 1) + minLowSurrogate;
-    return 0x10000 + ((high - minHighSurrogate) << 10) + (low - minLowSurrogate);
+    return 0x10000 +
+        ((high - minHighSurrogate) << 10) +
+        (low - minLowSurrogate);
   }
 
   int _nextNonSurrogateCodePoint() {
@@ -115,16 +119,17 @@ void main() {
       final String s2 = prefix + stringGenerator.next();
 
       final int actual = compareUtf8Strings(s1, s2);
-      final int expected =
-          compareByteStrings(utf8.encode(s1), utf8.encode(s2));
+      final int expected = compareByteStrings(utf8.encode(s1), utf8.encode(s2));
 
       if (actual.sign == expected.sign) {
         passCount++;
       } else {
-        errors.add('compareUtf8Strings(s1="$s1", s2="$s2") returned '
-            '${signName(actual)} ($actual), but expected '
-            '${signName(expected)} (i=$i, s1.length=${s1.length}, '
-            's2.length=${s2.length})');
+        errors.add(
+          'compareUtf8Strings(s1="$s1", s2="$s2") returned '
+          '${signName(actual)} ($actual), but expected '
+          '${signName(expected)} (i=$i, s1.length=${s1.length}, '
+          's2.length=${s2.length})',
+        );
       }
     }
 
@@ -139,18 +144,4 @@ void main() {
       fail(sb.toString());
     }
   });
-
-  // The remaining main UtilTest cases test Util.diffCollections and
-  // Util.firstNEntries, which the port does not have.
-  for (final String name in <String>[
-    'testDiffCollectionsWithMissingElement',
-    'testDiffCollectionsWithAddedElement',
-    'testDiffCollectionsWithoutOrdering',
-    'testDiffCollectionsWithEmptyLists',
-  ]) {
-    test(name,
-        skip: 'Util.diffCollections is not implemented in the port', () {});
-  }
-  test('testFirstNEntries',
-      skip: 'Util.firstNEntries is not implemented in the port', () {});
 }

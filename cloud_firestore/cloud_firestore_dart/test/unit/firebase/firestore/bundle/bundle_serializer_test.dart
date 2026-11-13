@@ -40,14 +40,17 @@ void main() {
   const String testProject = 'projects/project/databases/(default)/documents';
   const String testDocument = '$testProject/coll/doc';
 
-  final BundleSerializer serializer =
-      BundleSerializer(RemoteSerializer(DatabaseId.forProject('project')));
+  final BundleSerializer serializer = BundleSerializer(
+    RemoteSerializer(DatabaseId.forProject('project')),
+  );
 
-  Map<String, dynamic> field(String path) =>
-      <String, dynamic>{'fieldPath': path};
+  Map<String, dynamic> field(String path) => <String, dynamic>{
+    'fieldPath': path,
+  };
 
-  Map<String, dynamic> stringValue(String value) =>
-      <String, dynamic>{'stringValue': value};
+  Map<String, dynamic> stringValue(String value) => <String, dynamic>{
+    'stringValue': value,
+  };
 
   void assertDecodesValue(Object? json, FieldValue expected) {
     final Map<String, dynamic> documentJson = <String, dynamic>{
@@ -56,21 +59,26 @@ void main() {
       'createTime': '2020-01-01T00:00:01.000000001Z',
       'updateTime': '2020-01-01T00:00:02.000000002Z',
     };
-    final BundleDocument actualDocument =
-        serializer.decodeDocument(documentJson);
-    final BundleDocument expectedDocument = BundleDocument(Document(
-      key('coll/doc'),
-      const SnapshotVersion(Timestamp(1577836802, 2)),
-      DocumentState.synced,
-      ObjectValue.empty.set(FieldPath.fromSingleSegment('foo'), expected),
-    ));
+    final BundleDocument actualDocument = serializer.decodeDocument(
+      documentJson,
+    );
+    final BundleDocument expectedDocument = BundleDocument(
+      Document(
+        key('coll/doc'),
+        const SnapshotVersion(Timestamp(1577836802, 2)),
+        DocumentState.synced,
+        ObjectValue.empty.set(FieldPath.fromSingleSegment('foo'), expected),
+      ),
+    );
 
     expect(actualDocument, expectedDocument);
   }
 
   void assertDecodesNamedQuery(
-      Map<String, dynamic> structuredQuery, Query expected,
-      {BundledQueryLimitType limitType = BundledQueryLimitType.first}) {
+    Map<String, dynamic> structuredQuery,
+    Query expected, {
+    BundledQueryLimitType limitType = BundledQueryLimitType.first,
+  }) {
     final Map<String, dynamic> queryJson = <String, dynamic>{
       'name': 'query-1',
       'bundledQuery': <String, dynamic>{
@@ -97,13 +105,14 @@ void main() {
         if (allDescendants != null) 'allDescendants': allDescendants,
       };
 
-  Map<String, dynamic> collQuery(
-          {Map<String, dynamic>? where, Map<String, dynamic>? extra}) =>
-      <String, dynamic>{
-        'from': <Object?>[from('coll')],
-        if (where != null) 'where': where,
-        ...?extra,
-      };
+  Map<String, dynamic> collQuery({
+    Map<String, dynamic>? where,
+    Map<String, dynamic>? extra,
+  }) => <String, dynamic>{
+    'from': <Object?>[from('coll')],
+    if (where != null) 'where': where,
+    ...?extra,
+  };
 
   Map<String, dynamic> unaryFilter(String op, String fieldPath) =>
       <String, dynamic>{
@@ -111,25 +120,29 @@ void main() {
       };
 
   Map<String, dynamic> fieldFilter(
-          String op, String fieldPath, Map<String, dynamic> value) =>
-      <String, dynamic>{
-        'fieldFilter': <String, dynamic>{
-          'op': op,
-          'field': field(fieldPath),
-          'value': value,
-        },
-      };
+    String op,
+    String fieldPath,
+    Map<String, dynamic> value,
+  ) => <String, dynamic>{
+    'fieldFilter': <String, dynamic>{
+      'op': op,
+      'field': field(fieldPath),
+      'value': value,
+    },
+  };
 
   group('value decoding', () {
     test('testDecodesNullValue', () {
-      assertDecodesValue(
-          <String, dynamic>{'nullValue': null}, NullValue.nullValue());
+      assertDecodesValue(<String, dynamic>{
+        'nullValue': null,
+      }, NullValue.nullValue());
     });
 
     test('testDecodesBooleanValue', () {
       for (final bool test in <bool>[true, false]) {
-        assertDecodesValue(
-            <String, dynamic>{'booleanValue': test}, BoolValue.valueOf(test));
+        assertDecodesValue(<String, dynamic>{
+          'booleanValue': test,
+        }, BoolValue.valueOf(test));
       }
     });
 
@@ -145,15 +158,17 @@ void main() {
 
     test('testDecodesIntegerValues', () {
       for (final int test in integers) {
-        assertDecodesValue(<String, dynamic>{'integerValue': test},
-            IntegerValue.valueOf(test));
+        assertDecodesValue(<String, dynamic>{
+          'integerValue': test,
+        }, IntegerValue.valueOf(test));
       }
     });
 
     test('testDecodesStringEncodedIntegerValues', () {
       for (final int test in integers) {
-        assertDecodesValue(<String, dynamic>{'integerValue': '$test'},
-            IntegerValue.valueOf(test));
+        assertDecodesValue(<String, dynamic>{
+          'integerValue': '$test',
+        }, IntegerValue.valueOf(test));
       }
     });
 
@@ -176,8 +191,9 @@ void main() {
         double.maxFinite,
       ];
       for (final double test in tests) {
-        assertDecodesValue(
-            <String, dynamic>{'doubleValue': test}, DoubleValue.valueOf(test));
+        assertDecodesValue(<String, dynamic>{
+          'doubleValue': test,
+        }, DoubleValue.valueOf(test));
       }
     });
 
@@ -188,8 +204,9 @@ void main() {
         double.infinity,
       ];
       for (final double test in tests) {
-        assertDecodesValue(<String, dynamic>{'doubleValue': '$test'},
-            DoubleValue.valueOf(test));
+        assertDecodesValue(<String, dynamic>{
+          'doubleValue': '$test',
+        }, DoubleValue.valueOf(test));
       }
     });
 
@@ -239,50 +256,52 @@ void main() {
       ];
 
       for (int i = 0; i < json.length; i++) {
-        assertDecodesValue(<String, dynamic>{'timestampValue': json[i]},
-            TimestampValue.valueOf(timestamps[i]));
+        assertDecodesValue(<String, dynamic>{
+          'timestampValue': json[i],
+        }, TimestampValue.valueOf(timestamps[i]));
       }
     });
 
     test('testDecodesTimestampsWithTimezoneOffsets', () {
       // Not part of the Android tests: the offset is subtracted for '+' and added for '-'.
-      assertDecodesValue(
-          <String, dynamic>{'timestampValue': '2020-01-01T01:00:00+01:00'},
-          TimestampValue.valueOf(const Timestamp(1577836800, 0)));
-      assertDecodesValue(
-          <String, dynamic>{'timestampValue': '2019-12-31T19:00:00.5-05:00'},
-          TimestampValue.valueOf(const Timestamp(1577836800, 500000000)));
+      assertDecodesValue(<String, dynamic>{
+        'timestampValue': '2020-01-01T01:00:00+01:00',
+      }, TimestampValue.valueOf(const Timestamp(1577836800, 0)));
+      assertDecodesValue(<String, dynamic>{
+        'timestampValue': '2019-12-31T19:00:00.5-05:00',
+      }, TimestampValue.valueOf(const Timestamp(1577836800, 500000000)));
     });
 
     test('testDecodesTimestampsOutsideOfTheEpochCentury', () {
       // Not part of the Android tests: proleptic Gregorian calendar, first and last year.
-      assertDecodesValue(
-          <String, dynamic>{'timestampValue': '0001-01-01T00:00:00Z'},
-          TimestampValue.valueOf(const Timestamp(-62135596800, 0)));
-      assertDecodesValue(
-          <String, dynamic>{'timestampValue': '9999-12-31T23:59:59.999999999Z'},
-          TimestampValue.valueOf(const Timestamp(253402300799, 999999999)));
-      assertDecodesValue(
-          <String, dynamic>{'timestampValue': '1969-12-31T23:59:59Z'},
-          TimestampValue.valueOf(const Timestamp(-1, 0)));
+      assertDecodesValue(<String, dynamic>{
+        'timestampValue': '0001-01-01T00:00:00Z',
+      }, TimestampValue.valueOf(const Timestamp(-62135596800, 0)));
+      assertDecodesValue(<String, dynamic>{
+        'timestampValue': '9999-12-31T23:59:59.999999999Z',
+      }, TimestampValue.valueOf(const Timestamp(253402300799, 999999999)));
+      assertDecodesValue(<String, dynamic>{
+        'timestampValue': '1969-12-31T23:59:59Z',
+      }, TimestampValue.valueOf(const Timestamp(-1, 0)));
     });
 
     test('testRejectsInvalidTimestamps', () {
       for (final Object? invalid in <Object?>[
         'yesterday',
         '2020-01-01T00:00:00',
-        5
+        5,
       ]) {
         expect(
-            () => serializer.decodeDocument(<String, dynamic>{
-                  'name': testDocument,
-                  'fields': <String, dynamic>{
-                    'foo': <String, dynamic>{'timestampValue': invalid}
-                  },
-                  'updateTime': '2020-01-01T00:00:02.000000002Z',
-                }),
-            throwsA(isA<ArgumentError>()),
-            reason: '$invalid');
+          () => serializer.decodeDocument(<String, dynamic>{
+            'name': testDocument,
+            'fields': <String, dynamic>{
+              'foo': <String, dynamic>{'timestampValue': invalid},
+            },
+            'updateTime': '2020-01-01T00:00:02.000000002Z',
+          }),
+          throwsA(isA<ArgumentError>()),
+          reason: '$invalid',
+        );
       }
     });
 
@@ -293,31 +312,36 @@ void main() {
     });
 
     test('testDecodesBlobValues', () {
-      assertDecodesValue(<String, dynamic>{'bytesValue': 'AAECAw=='},
-          BlobValue.valueOf(blob(<int>[0, 1, 2, 3])));
+      assertDecodesValue(<String, dynamic>{
+        'bytesValue': 'AAECAw==',
+      }, BlobValue.valueOf(blob(<int>[0, 1, 2, 3])));
     });
 
     test('testDecodesReferenceValues', () {
       assertDecodesValue(
-          <String, dynamic>{'referenceValue': testDocument},
-          ReferenceValue.valueOf(
-              DatabaseId.forProject('project'), key('coll/doc')));
+        <String, dynamic>{'referenceValue': testDocument},
+        ReferenceValue.valueOf(
+          DatabaseId.forProject('project'),
+          key('coll/doc'),
+        ),
+      );
     });
 
     test('testDecodesArrayValues', () {
       assertDecodesValue(
-          <String, dynamic>{
-            'arrayValue': <String, dynamic>{
-              'values': <Object?>[
-                <String, dynamic>{'booleanValue': true},
-                stringValue('foo'),
-              ],
-            },
+        <String, dynamic>{
+          'arrayValue': <String, dynamic>{
+            'values': <Object?>[
+              <String, dynamic>{'booleanValue': true},
+              stringValue('foo'),
+            ],
           },
-          ArrayValue.fromList(<FieldValue>[
-            BoolValue.valueOf(true),
-            StringValue.valueOf('foo'),
-          ]));
+        },
+        ArrayValue.fromList(<FieldValue>[
+          BoolValue.valueOf(true),
+          StringValue.valueOf('foo'),
+        ]),
+      );
     });
 
     test('testDecodesNestedObjectValues', () {
@@ -352,7 +376,7 @@ void main() {
                     'mapValue': <String, dynamic>{
                       'fields': <String, dynamic>{
                         'e': <String, dynamic>{
-                          'integerValue': -9223372036854775808
+                          'integerValue': -9223372036854775808,
                         },
                       },
                     },
@@ -384,33 +408,36 @@ void main() {
     });
 
     test('testDecodesDocumentsWithoutFields', () {
-      final BundleDocument document =
-          serializer.decodeDocument(<String, dynamic>{
-        'name': testDocument,
-        'updateTime': '2020-01-01T00:00:02.000000002Z',
-      });
+      final BundleDocument document = serializer.decodeDocument(
+        <String, dynamic>{
+          'name': testDocument,
+          'updateTime': '2020-01-01T00:00:02.000000002Z',
+        },
+      );
       expect(document.document.data, ObjectValue.empty);
     });
 
     test('testRejectsDocumentsOfOtherDatabases', () {
       expect(
-          () => serializer.decodeDocument(<String, dynamic>{
-                'name': 'projects/other/databases/(default)/documents/coll/doc',
-                'updateTime': '2020-01-01T00:00:02.000000002Z',
-              }),
-          throwsA(isA<ArgumentError>()));
+        () => serializer.decodeDocument(<String, dynamic>{
+          'name': 'projects/other/databases/(default)/documents/coll/doc',
+          'updateTime': '2020-01-01T00:00:02.000000002Z',
+        }),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('testRejectsUnknownValueTypes', () {
       expect(
-          () => serializer.decodeDocument(<String, dynamic>{
-                'name': testDocument,
-                'fields': <String, dynamic>{
-                  'foo': <String, dynamic>{'mystery': 1}
-                },
-                'updateTime': '2020-01-01T00:00:02.000000002Z',
-              }),
-          throwsA(isA<ArgumentError>()));
+        () => serializer.decodeDocument(<String, dynamic>{
+          'name': testDocument,
+          'fields': <String, dynamic>{
+            'foo': <String, dynamic>{'mystery': 1},
+          },
+          'updateTime': '2020-01-01T00:00:02.000000002Z',
+        }),
+        throwsA(isA<ArgumentError>()),
+      );
     });
   });
 
@@ -426,24 +453,31 @@ void main() {
     });
 
     test('testDecodesNullFilter', () {
-      assertDecodesNamedQuery(collQuery(where: unaryFilter('IS_NULL', 'f1')),
-          query('coll').filter(filter('f1', '==', null)));
+      assertDecodesNamedQuery(
+        collQuery(where: unaryFilter('IS_NULL', 'f1')),
+        query('coll').filter(filter('f1', '==', null)),
+      );
     });
 
     test('testDecodesNotNullFilter', () {
       assertDecodesNamedQuery(
-          collQuery(where: unaryFilter('IS_NOT_NULL', 'f1')),
-          query('coll').filter(filter('f1', '!=', null)));
+        collQuery(where: unaryFilter('IS_NOT_NULL', 'f1')),
+        query('coll').filter(filter('f1', '!=', null)),
+      );
     });
 
     test('testDecodesNaNFilter', () {
-      assertDecodesNamedQuery(collQuery(where: unaryFilter('IS_NAN', 'f1')),
-          query('coll').filter(filter('f1', '==', double.nan)));
+      assertDecodesNamedQuery(
+        collQuery(where: unaryFilter('IS_NAN', 'f1')),
+        query('coll').filter(filter('f1', '==', double.nan)),
+      );
     });
 
     test('testDecodesNotNaNFilter', () {
-      assertDecodesNamedQuery(collQuery(where: unaryFilter('IS_NOT_NAN', 'f1')),
-          query('coll').filter(filter('f1', '!=', double.nan)));
+      assertDecodesNamedQuery(
+        collQuery(where: unaryFilter('IS_NOT_NAN', 'f1')),
+        query('coll').filter(filter('f1', '!=', double.nan)),
+      );
     });
 
     final Map<String, String> operators = <String, String>{
@@ -458,8 +492,9 @@ void main() {
     operators.forEach((String op, String dartOp) {
       test('testDecodes${op}Filter', () {
         assertDecodesNamedQuery(
-            collQuery(where: fieldFilter(op, 'f1', stringValue('foo'))),
-            query('coll').filter(filter('f1', dartOp, 'foo')));
+          collQuery(where: fieldFilter(op, 'f1', stringValue('foo'))),
+          query('coll').filter(filter('f1', dartOp, 'foo')),
+        );
       });
     });
 
@@ -471,19 +506,22 @@ void main() {
     arrayOperators.forEach((String op, String dartOp) {
       test('testDecodes${op}Filter', () {
         assertDecodesNamedQuery(
-            collQuery(
-                where: fieldFilter(op, 'f1', <String, dynamic>{
+          collQuery(
+            where: fieldFilter(op, 'f1', <String, dynamic>{
               'arrayValue': <String, dynamic>{
                 'values': <Object?>[stringValue('foo')],
               },
-            })),
-            query('coll').filter(filter('f1', dartOp, <Object?>['foo'])));
+            }),
+          ),
+          query('coll').filter(filter('f1', dartOp, <Object?>['foo'])),
+        );
       });
     });
 
     test('testDecodesCompositeFilter', () {
       assertDecodesNamedQuery(
-          collQuery(where: <String, dynamic>{
+        collQuery(
+          where: <String, dynamic>{
             'compositeFilter': <String, dynamic>{
               'op': 'AND',
               'filters': <Object?>[
@@ -491,17 +529,20 @@ void main() {
                 fieldFilter('EQUAL', 'f2', stringValue('bar')),
               ],
             },
-          }),
-          query('coll')
-              .filter(filter('f1', '==', 'foo'))
-              .filter(filter('f2', '==', 'bar')));
+          },
+        ),
+        query(
+          'coll',
+        ).filter(filter('f1', '==', 'foo')).filter(filter('f2', '==', 'bar')),
+      );
     });
 
     // PORTING NOTE: the Android SDK rejects 'OR' composite filters. The port reads them (as the JS SDK does) so that
     // the bundle of `QuerySnapshot.toJson()` for an OR query can be read back; unknown operators are still rejected.
     test('testDecodesOrCompositeFilters', () {
       assertDecodesNamedQuery(
-          collQuery(where: <String, dynamic>{
+        collQuery(
+          where: <String, dynamic>{
             'compositeFilter': <String, dynamic>{
               'op': 'OR',
               'filters': <Object?>[
@@ -517,47 +558,58 @@ void main() {
                 },
               ],
             },
-          }),
-          query('coll').filter(CompositeFilter.or(<Filter>[
+          },
+        ),
+        query('coll').filter(
+          CompositeFilter.or(<Filter>[
             filter('f1', '==', 'foo'),
             CompositeFilter.and(<Filter>[
               filter('f2', '==', 'bar'),
               filter('f3', '==', 'baz'),
             ]),
-          ])));
+          ]),
+        ),
+      );
     });
 
     test('testRejectsUnknownCompositeFilters', () {
       expect(
-          () => assertDecodesNamedQuery(
-              collQuery(where: <String, dynamic>{
-                'compositeFilter': <String, dynamic>{
-                  'op': 'OPERATOR_UNSPECIFIED',
-                  'filters': <Object?>[
-                    fieldFilter('EQUAL', 'f1', stringValue('foo')),
-                  ],
-                },
-              }),
-              query('coll')),
-          throwsA(isA<ArgumentError>()));
+        () => assertDecodesNamedQuery(
+          collQuery(
+            where: <String, dynamic>{
+              'compositeFilter': <String, dynamic>{
+                'op': 'OPERATOR_UNSPECIFIED',
+                'filters': <Object?>[
+                  fieldFilter('EQUAL', 'f1', stringValue('foo')),
+                ],
+              },
+            },
+          ),
+          query('coll'),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('testDecodeOrderByQuery', () {
       assertDecodesNamedQuery(
-          collQuery(extra: <String, dynamic>{
+        collQuery(
+          extra: <String, dynamic>{
             'orderBy': <Object?>[
               <String, dynamic>{'field': field('f1')},
               <String, dynamic>{'field': field('f2'), 'direction': 'ASCENDING'},
               <String, dynamic>{
                 'field': field('f3'),
-                'direction': 'DESCENDING'
+                'direction': 'DESCENDING',
               },
             ],
-          }),
-          query('coll')
-              .orderBy(orderBy('f1'))
-              .orderBy(orderBy('f2', 'asc'))
-              .orderBy(orderBy('f3', 'desc')));
+          },
+        ),
+        query('coll')
+            .orderBy(orderBy('f1'))
+            .orderBy(orderBy('f2', 'asc'))
+            .orderBy(orderBy('f3', 'desc')),
+      );
     });
 
     test('testDecodesLimitQuery', () {
@@ -567,8 +619,9 @@ void main() {
         '5', // Proto3 JSON, string encoded
       ]) {
         assertDecodesNamedQuery(
-            collQuery(extra: <String, dynamic>{'limit': limit}),
-            query('coll').limit(5));
+          collQuery(extra: <String, dynamic>{'limit': limit}),
+          query('coll').limit(5),
+        );
       }
     });
 
@@ -576,16 +629,20 @@ void main() {
       // PORTING NOTE: core Query has no limitToLast yet: the query is the one the backend sees (limit to first) and
       // the limit type is kept next to it.
       assertDecodesNamedQuery(
-          collQuery(extra: <String, dynamic>{
+        collQuery(
+          extra: <String, dynamic>{
             'limit': <String, dynamic>{'value': 5},
-          }),
-          query('coll').limit(5),
-          limitType: BundledQueryLimitType.last);
+          },
+        ),
+        query('coll').limit(5),
+        limitType: BundledQueryLimitType.last,
+      );
     });
 
     test('testDecodesStartAtQuery', () {
       assertDecodesNamedQuery(
-          collQuery(extra: <String, dynamic>{
+        collQuery(
+          extra: <String, dynamic>{
             'orderBy': <Object?>[
               <String, dynamic>{'field': field('foo')},
             ],
@@ -593,15 +650,23 @@ void main() {
               'values': <Object?>[stringValue('bar')],
               'before': false,
             },
-          }),
-          query('coll').orderBy(orderBy('foo')).startAt(Bound(
-              position: <FieldValue>[StringValue.valueOf('bar')],
-              inclusive: false)));
+          },
+        ),
+        query('coll')
+            .orderBy(orderBy('foo'))
+            .startAt(
+              Bound(
+                position: <FieldValue>[StringValue.valueOf('bar')],
+                inclusive: false,
+              ),
+            ),
+      );
     });
 
     test('testDecodesEndBeforeQuery', () {
       assertDecodesNamedQuery(
-          collQuery(extra: <String, dynamic>{
+        collQuery(
+          extra: <String, dynamic>{
             'orderBy': <Object?>[
               <String, dynamic>{'field': field('foo')},
             ],
@@ -609,54 +674,112 @@ void main() {
               'values': <Object?>[stringValue('bar')],
               'before': true,
             },
-          }),
-          query('coll').orderBy(orderBy('foo')).endAt(Bound(
-              position: <FieldValue>[StringValue.valueOf('bar')],
-              inclusive: false)));
+          },
+        ),
+        query('coll')
+            .orderBy(orderBy('foo'))
+            .endAt(
+              Bound(
+                position: <FieldValue>[StringValue.valueOf('bar')],
+                inclusive: false,
+              ),
+            ),
+      );
     });
 
     test('testDoesNotDecodeOffset', () {
       expect(
-          () => assertDecodesNamedQuery(
-              collQuery(extra: <String, dynamic>{'offset': 5}), query('coll')),
-          throwsA(isA<ArgumentError>()));
+        () => assertDecodesNamedQuery(
+          collQuery(extra: <String, dynamic>{'offset': 5}),
+          query('coll'),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('testDoesNotDecodeSelect', () {
       expect(
-          () => assertDecodesNamedQuery(
-              collQuery(extra: <String, dynamic>{'select': <Object?>[]}),
-              query('coll')),
-          throwsA(isA<ArgumentError>()));
+        () => assertDecodesNamedQuery(
+          collQuery(extra: <String, dynamic>{'select': <Object?>[]}),
+          query('coll'),
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('testDoesNotDecodeMissingCollection', () {
       expect(
-          () => assertDecodesNamedQuery(
-              <String, dynamic>{'from': <Object?>[]}, query('coll')),
-          throwsA(isA<ArgumentError>()));
+        () => assertDecodesNamedQuery(<String, dynamic>{
+          'from': <Object?>[],
+        }, query('coll')),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('testDoesNotDecodeMultipleCollections', () {
       expect(
-          () => assertDecodesNamedQuery(<String, dynamic>{
-                'from': <Object?>[from('c1'), from('c2')],
-              }, query('coll')),
-          throwsA(isA<ArgumentError>()));
+        () => assertDecodesNamedQuery(<String, dynamic>{
+          'from': <Object?>[from('c1'), from('c2')],
+        }, query('coll')),
+        throwsA(isA<ArgumentError>()),
+      );
     });
 
     test('testDoesNotDecodeUnknownLimitTypes', () {
       expect(
-          () => serializer.decodeNamedQuery(<String, dynamic>{
-                'name': 'query-1',
-                'bundledQuery': <String, dynamic>{
-                  'parent': testProject,
-                  'structuredQuery': collQuery(),
-                  'limitType': 'MIDDLE',
-                },
-                'readTime': '2020-01-01T00:00:01.000000001Z',
-              }),
-          throwsA(isA<ArgumentError>()));
+        () => serializer.decodeNamedQuery(<String, dynamic>{
+          'name': 'query-1',
+          'bundledQuery': <String, dynamic>{
+            'parent': testProject,
+            'structuredQuery': collQuery(),
+            'limitType': 'MIDDLE',
+          },
+          'readTime': '2020-01-01T00:00:01.000000001Z',
+        }),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+  });
+
+  group('target decoding', () {
+    Map<String, dynamic> namedQueryWithLimit(String limitType) =>
+        <String, dynamic>{
+          'name': 'myNamedQuery',
+          'bundledQuery': <String, dynamic>{
+            'parent': testProject,
+            'structuredQuery': <String, dynamic>{
+              'from': <Object?>[from('foo')],
+              'limit': <String, dynamic>{'value': 10},
+            },
+            'limitType': limitType,
+          },
+          'readTime': <String, dynamic>{
+            'seconds': '1679674432',
+            'nanos': 579934000,
+          },
+        };
+
+    test('testDecodesTargetWithoutImplicitOrderByOnName', () {
+      final NamedQuery namedQuery = serializer.decodeNamedQuery(
+        namedQueryWithLimit('FIRST'),
+      );
+      expect(
+        namedQuery.bundledQuery.query.toTarget(),
+        query('foo').limitToFirst(10).toTarget(),
+      );
+      expect(namedQuery.bundledQuery.limitType, BundledQueryLimitType.first);
+    });
+
+    test('testDecodesLimitToLastTargetWithoutImplicitOrderByOnName', () {
+      final NamedQuery namedQuery = serializer.decodeNamedQuery(
+        namedQueryWithLimit('LAST'),
+      );
+      expect(
+        namedQuery.bundledQuery.query.toTarget(),
+        // Note that `limitToFirst(10)` is expected.
+        query('foo').limitToFirst(10).toTarget(),
+      );
+      expect(namedQuery.bundledQuery.limitType, BundledQueryLimitType.last);
     });
   });
 
@@ -669,8 +792,13 @@ void main() {
         'totalDocuments': 4,
         'totalBytes': 5,
       };
-      const BundleMetadata expectedMetadata =
-          BundleMetadata('bundle-1', 1, SnapshotVersion(Timestamp(2, 3)), 4, 5);
+      const BundleMetadata expectedMetadata = BundleMetadata(
+        'bundle-1',
+        1,
+        SnapshotVersion(Timestamp(2, 3)),
+        4,
+        5,
+      );
       expect(serializer.decodeBundleMetadata(json), expectedMetadata);
     });
 
@@ -683,8 +811,13 @@ void main() {
         'totalDocuments': 4,
         'totalBytes': '5',
       };
-      const BundleMetadata expectedMetadata =
-          BundleMetadata('bundle-1', 1, SnapshotVersion(Timestamp(2, 3)), 4, 5);
+      const BundleMetadata expectedMetadata = BundleMetadata(
+        'bundle-1',
+        1,
+        SnapshotVersion(Timestamp(2, 3)),
+        4,
+        5,
+      );
       expect(serializer.decodeBundleMetadata(json), expectedMetadata);
     });
 
@@ -705,11 +838,11 @@ void main() {
     });
 
     test('testDecodesBundledDocumentMetadataWithoutQueriesOrExists', () {
-      final BundledDocumentMetadata metadata =
-          serializer.decodeBundledDocumentMetadata(<String, dynamic>{
-        'name': testDocument,
-        'readTime': '2020-01-01T00:00:01.000000001Z',
-      });
+      final BundledDocumentMetadata metadata = serializer
+          .decodeBundledDocumentMetadata(<String, dynamic>{
+            'name': testDocument,
+            'readTime': '2020-01-01T00:00:01.000000001Z',
+          });
       expect(metadata.exists, isFalse);
       expect(metadata.queries, isEmpty);
     });
@@ -718,15 +851,18 @@ void main() {
   group('decodeValue', () {
     test('decodesScalarAndNestedValues', () {
       expect(serializer.decodeValue(stringValue('a')), wrap('a'));
-      expect(serializer.decodeValue(<String, dynamic>{'integerValue': '42'}),
-          wrap(42));
       expect(
-          serializer.decodeValue(<String, dynamic>{
-            'arrayValue': <String, dynamic>{
-              'values': <dynamic>[stringValue('x')],
-            },
-          }),
-          wrap(<dynamic>['x']));
+        serializer.decodeValue(<String, dynamic>{'integerValue': '42'}),
+        wrap(42),
+      );
+      expect(
+        serializer.decodeValue(<String, dynamic>{
+          'arrayValue': <String, dynamic>{
+            'values': <dynamic>[stringValue('x')],
+          },
+        }),
+        wrap(<dynamic>['x']),
+      );
     });
   });
 }
