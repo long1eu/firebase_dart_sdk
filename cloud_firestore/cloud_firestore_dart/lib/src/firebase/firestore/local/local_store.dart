@@ -1102,6 +1102,12 @@ class LocalStore implements BundleCallback {
   /// data from previous executions (such as the set of remote keys).
   ///
   /// [usePreviousResults] is whether results from previous executions can be used to optimize this query execution.
+  ///
+  /// PORTING NOTE: the JS SDK's `localStoreExecuteQuery` also advances the read time of each collection group with the
+  /// read times of the returned documents (`setMaxReadTime`), so that the next [getNewDocumentChanges] of a secondary
+  /// client returns only documents read after them. The documents of the port carry no read time and the query
+  /// engine returns plain documents, so this is not done: the first [getNewDocumentChanges] of a collection group
+  /// returns all of its cached documents. The views filter them, so the results are the same; only the work differs.
   Future<QueryResult> executeQuery(Query query, bool usePreviousResults) async {
     final QueryData? queryData = await getQueryData(query.toTarget());
     SnapshotVersion lastLimboFreeSnapshotVersion = SnapshotVersion.none;

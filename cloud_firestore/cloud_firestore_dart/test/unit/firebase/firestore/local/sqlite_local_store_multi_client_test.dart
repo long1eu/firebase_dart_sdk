@@ -110,6 +110,24 @@ void main() {
   });
 
   group('getNewDocumentChanges', () {
+    // PORTING NOTE at LocalStore.executeQuery: JS advances the read time with the query results (setMaxReadTime), so
+    // its getNewDocumentChanges would return nothing here.
+    test('executeQuery does not advance the read time', () async {
+      final int targetId = await d.allocateQuery(query('foo'));
+      await d.applyRemoteEvent(
+        addedRemoteEvent(doc('foo/a', 1, map(<dynamic>['v', 1])), <int>[
+          targetId,
+        ], <int>[]),
+      );
+
+      await d.localStore.executeQuery(query('foo'), false);
+
+      final ImmutableSortedMap<DocumentKey, MaybeDocument> changes = await d
+          .localStore
+          .getNewDocumentChanges('foo');
+      expect(_keys(changes), <DocumentKey>[key('foo/a')]);
+    });
+
     test('returns the documents read since the previous call', () async {
       final int targetId = await d.allocateQuery(query('foo'));
       await d.applyRemoteEvent(
